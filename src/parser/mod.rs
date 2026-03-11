@@ -17,9 +17,14 @@ mod lex;
 mod package;
 mod part;
 mod port;
+mod span;
+
+pub(crate) use span::{node_from_to, Input};
 
 use crate::ast::RootNamespace;
 use crate::error::ParseError;
+use nom::InputLength;
+use nom_locate::LocatedSpan;
 
 /// Parse full input; must consume entire input. Strips UTF-8 BOM if present.
 pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
@@ -27,22 +32,27 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
         .strip_prefix('\u{FEFF}')
         .map(str::as_bytes)
         .unwrap_or_else(|| input.as_bytes());
-    match package::root_namespace(bytes) {
+    let located = LocatedSpan::new(bytes);
+    match package::root_namespace(located) {
         Ok((rest, root)) => {
-            if rest.is_empty() {
+            if rest.fragment().is_empty() {
                 Ok(root)
             } else {
-                let offset = bytes.len() - rest.len();
-                Err(ParseError::new("expected end of input").with_offset(offset))
+                let offset = located.location_offset() + located.input_len() - rest.input_len();
+                Err(ParseError::new("expected end of input").with_location(offset, rest.location_line(), rest.get_column()))
             }
         }
         Err(nom::Err::Error(e)) => {
-            let offset = bytes.len() - e.input.len();
-            Err(ParseError::new(format!("parse error: {:?}", e.code)).with_offset(offset))
+            let offset = e.input.location_offset();
+            let line = e.input.location_line();
+            let column = e.input.get_column();
+            Err(ParseError::new(format!("parse error: {:?}", e.code)).with_location(offset, line, column))
         }
         Err(nom::Err::Failure(e)) => {
-            let offset = bytes.len() - e.input.len();
-            Err(ParseError::new(format!("parse error: {:?}", e.code)).with_offset(offset))
+            let offset = e.input.location_offset();
+            let line = e.input.location_line();
+            let column = e.input.get_column();
+            Err(ParseError::new(format!("parse error: {:?}", e.code)).with_location(offset, line, column))
         }
         Err(nom::Err::Incomplete(_)) => Err(ParseError::new("unexpected end of input")),
     }

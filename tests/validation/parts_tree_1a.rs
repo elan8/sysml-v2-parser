@@ -2,9 +2,9 @@
 
 use std::path::Path;
 use sysml_parser::ast::{
-    AttributeBody, AttributeDef, AttributeUsage, Expression, Identification, Import, Package,
-    PackageBody, PackageBodyElement, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
-    PartUsageBody, PartUsageBodyElement, RootNamespace, Visibility,
+    AttributeBody, AttributeDef, AttributeUsage, Expression, Identification, Import, Node,
+    Package, PackageBody, PackageBodyElement, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
+    PartUsageBody, PartUsageBodyElement, RootNamespace, Span, Visibility,
 };
 use sysml_parser::parse;
 
@@ -15,139 +15,143 @@ fn id(name: &str) -> Identification {
     }
 }
 
+fn n<T>(v: T) -> Node<T> {
+    Node::new(Span::dummy(), v)
+}
+
 /// 1750 [kg]
-fn expr_1750_kg() -> Expression {
-    Expression::LiteralWithUnit {
-        value: Box::new(Expression::LiteralInteger(1750)),
-        unit: Box::new(Expression::Bracket(Box::new(Expression::FeatureRef("kg".to_string())))),
-    }
+fn expr_1750_kg() -> Node<Expression> {
+    n(Expression::LiteralWithUnit {
+        value: Box::new(n(Expression::LiteralInteger(1750))),
+        unit: Box::new(n(Expression::Bracket(Box::new(n(Expression::FeatureRef("kg".to_string())))))),
+    })
 }
 
 /// 2000 [kg]
-fn expr_2000_kg() -> Expression {
-    Expression::LiteralWithUnit {
-        value: Box::new(Expression::LiteralInteger(2000)),
-        unit: Box::new(Expression::Bracket(Box::new(Expression::FeatureRef("kg".to_string())))),
-    }
+fn expr_2000_kg() -> Node<Expression> {
+    n(Expression::LiteralWithUnit {
+        value: Box::new(n(Expression::LiteralInteger(2000))),
+        unit: Box::new(n(Expression::Bracket(Box::new(n(Expression::FeatureRef("kg".to_string())))))),
+    })
 }
 
 /// frontWheel#(1)
-fn expr_front_wheel_1() -> Expression {
-    Expression::Index {
-        base: Box::new(Expression::FeatureRef("frontWheel".to_string())),
-        index: Box::new(Expression::LiteralInteger(1)),
-    }
+fn expr_front_wheel_1() -> Node<Expression> {
+    n(Expression::Index {
+        base: Box::new(n(Expression::FeatureRef("frontWheel".to_string()))),
+        index: Box::new(n(Expression::LiteralInteger(1))),
+    })
 }
 
 /// frontWheel#(2)
-fn expr_front_wheel_2() -> Expression {
-    Expression::Index {
-        base: Box::new(Expression::FeatureRef("frontWheel".to_string())),
-        index: Box::new(Expression::LiteralInteger(2)),
-    }
+fn expr_front_wheel_2() -> Node<Expression> {
+    n(Expression::Index {
+        base: Box::new(n(Expression::FeatureRef("frontWheel".to_string()))),
+        index: Box::new(n(Expression::LiteralInteger(2))),
+    })
 }
 
 /// rearWheel#(1)
-fn expr_rear_wheel_1() -> Expression {
-    Expression::Index {
-        base: Box::new(Expression::FeatureRef("rearWheel".to_string())),
-        index: Box::new(Expression::LiteralInteger(1)),
-    }
+fn expr_rear_wheel_1() -> Node<Expression> {
+    n(Expression::Index {
+        base: Box::new(n(Expression::FeatureRef("rearWheel".to_string()))),
+        index: Box::new(n(Expression::LiteralInteger(1))),
+    })
 }
 
 /// rearWheel#(2)
-fn expr_rear_wheel_2() -> Expression {
-    Expression::Index {
-        base: Box::new(Expression::FeatureRef("rearWheel".to_string())),
-        index: Box::new(Expression::LiteralInteger(2)),
-    }
+fn expr_rear_wheel_2() -> Node<Expression> {
+    n(Expression::Index {
+        base: Box::new(n(Expression::FeatureRef("rearWheel".to_string()))),
+        index: Box::new(n(Expression::LiteralInteger(2))),
+    })
 }
 
 /// Expected AST for `1a-Parts Tree.sysml`: full structure with package, import, part def, part usage.
 fn expected_ast() -> RootNamespace {
     RootNamespace {
-        elements: vec![PackageBodyElement::Package(Package {
+        elements: vec![n(PackageBodyElement::Package(n(Package {
             identification: id("1a-Parts Tree"),
             body: PackageBody::Brace {
                 elements: vec![
-                    PackageBodyElement::Import(Import {
+                    n(PackageBodyElement::Import(n(Import {
                         visibility: Some(Visibility::Private),
                         is_import_all: false,
                         target: "SI::kg".to_string(),
-                    }),
-                    PackageBodyElement::Package(Package {
+                    }))),
+                    n(PackageBodyElement::Package(n(Package {
                         identification: id("Definitions"),
                         body: PackageBody::Brace {
                             elements: vec![
-                                PackageBodyElement::PartDef(PartDef {
+                                n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("Vehicle"),
                                     specializes: None,
                                     body: PartDefBody::Brace {
-                                        elements: vec![PartDefBodyElement::AttributeDef(
+                                        elements: vec![n(PartDefBodyElement::AttributeDef(n(
                                             AttributeDef {
                                                 name: "mass".to_string(),
                                                 typing: Some("ISQ::mass".to_string()),
                                                 body: AttributeBody::Brace,
                                             },
-                                        )],
+                                        )))],
                                     },
-                                }),
-                                PackageBodyElement::PartDef(PartDef {
+                                }))),
+                                n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("AxleAssembly"),
                                     specializes: None,
                                     body: PartDefBody::Semicolon,
-                                }),
-                                PackageBodyElement::PartDef(PartDef {
+                                }))),
+                                n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("Axle"),
                                     specializes: None,
                                     body: PartDefBody::Brace {
-                                        elements: vec![PartDefBodyElement::AttributeDef(
+                                        elements: vec![n(PartDefBodyElement::AttributeDef(n(
                                             AttributeDef {
                                                 name: "mass".to_string(),
                                                 typing: Some("ISQ::mass".to_string()),
                                                 body: AttributeBody::Semicolon,
                                             },
-                                        )],
+                                        )))],
                                     },
-                                }),
-                                PackageBodyElement::PartDef(PartDef {
+                                }))),
+                                n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("FrontAxle"),
                                     specializes: Some("Axle".to_string()),
                                     body: PartDefBody::Brace {
-                                        elements: vec![PartDefBodyElement::AttributeDef(
+                                        elements: vec![n(PartDefBodyElement::AttributeDef(n(
                                             AttributeDef {
                                                 name: "steeringAngle".to_string(),
                                                 typing: Some("ScalarValues::Real".to_string()),
                                                 body: AttributeBody::Semicolon,
                                             },
-                                        )],
+                                        )))],
                                     },
-                                }),
-                                PackageBodyElement::PartDef(PartDef {
+                                }))),
+                                n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("Wheel"),
                                     specializes: None,
                                     body: PartDefBody::Semicolon,
-                                }),
+                                }))),
                             ],
                         },
-                    }),
-                    PackageBodyElement::Package(Package {
+                    }))),
+                    n(PackageBodyElement::Package(n(Package {
                         identification: id("Usages"),
                         body: PackageBody::Brace {
                             elements: vec![
-                                PackageBodyElement::Import(Import {
+                                n(PackageBodyElement::Import(n(Import {
                                     visibility: Some(Visibility::Private),
                                     is_import_all: true,
                                     target: "Definitions::*".to_string(),
-                                }),
-                                PackageBodyElement::PartUsage(part_vehicle1()),
-                                PackageBodyElement::PartUsage(part_vehicle1_c1()),
+                                }))),
+                                n(PackageBodyElement::PartUsage(n(part_vehicle1()))),
+                                n(PackageBodyElement::PartUsage(n(part_vehicle1_c1()))),
                             ],
                         },
-                    }),
+                    }))),
                 ],
             },
-        })],
+        })))],
     }
 }
 
@@ -160,13 +164,13 @@ fn part_vehicle1() -> PartUsage {
         subsets: None,
         body: PartUsageBody::Brace {
             elements: vec![
-                PartUsageBodyElement::AttributeUsage(AttributeUsage {
+                n(PartUsageBodyElement::AttributeUsage(n(AttributeUsage {
                     name: "mass".to_string(),
                     redefines: Some("Vehicle::mass".to_string()),
                     value: Some(expr_1750_kg()),
                     body: AttributeBody::Brace,
-                }),
-                PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                }))),
+                n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     name: "frontAxleAssembly".to_string(),
                     type_name: "AxleAssembly".to_string(),
                     multiplicity: None,
@@ -174,26 +178,26 @@ fn part_vehicle1() -> PartUsage {
                     subsets: None,
                     body: PartUsageBody::Brace {
                         elements: vec![
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "frontAxle".to_string(),
                                 type_name: "Axle".to_string(),
                                 multiplicity: None,
                                 ordered: false,
                                 subsets: None,
                                 body: PartUsageBody::Semicolon,
-                            })),
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            })))),
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "frontWheel".to_string(),
                                 type_name: "Wheel".to_string(),
                                 multiplicity: Some("[2]".to_string()),
                                 ordered: true,
                                 subsets: None,
                                 body: PartUsageBody::Brace { elements: vec![] },
-                            })),
+                            })))),
                         ],
                     },
-                })),
-                PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                })))),
+                n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     name: "rearAxleAssembly".to_string(),
                     type_name: "AxleAssembly".to_string(),
                     multiplicity: None,
@@ -201,25 +205,25 @@ fn part_vehicle1() -> PartUsage {
                     subsets: None,
                     body: PartUsageBody::Brace {
                         elements: vec![
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "rearAxle".to_string(),
                                 type_name: "Axle".to_string(),
                                 multiplicity: None,
                                 ordered: false,
                                 subsets: None,
                                 body: PartUsageBody::Semicolon,
-                            })),
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            })))),
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "rearWheel".to_string(),
                                 type_name: "Wheel".to_string(),
                                 multiplicity: Some("[2]".to_string()),
                                 ordered: true,
                                 subsets: None,
                                 body: PartUsageBody::Semicolon,
-                            })),
+                            })))),
                         ],
                     },
-                })),
+                })))),
             ],
         },
     }
@@ -234,13 +238,13 @@ fn part_vehicle1_c1() -> PartUsage {
         subsets: None,
         body: PartUsageBody::Brace {
             elements: vec![
-                PartUsageBodyElement::AttributeUsage(AttributeUsage {
+                n(PartUsageBodyElement::AttributeUsage(n(AttributeUsage {
                     name: "mass".to_string(),
                     redefines: Some("Vehicle::mass".to_string()),
                     value: Some(expr_2000_kg()),
                     body: AttributeBody::Brace,
-                }),
-                PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                }))),
+                n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     name: "frontAxleAssembly".to_string(),
                     type_name: "AxleAssembly".to_string(),
                     multiplicity: None,
@@ -248,23 +252,23 @@ fn part_vehicle1_c1() -> PartUsage {
                     subsets: None,
                     body: PartUsageBody::Brace {
                         elements: vec![
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "frontAxle".to_string(),
                                 type_name: "FrontAxle".to_string(),
                                 multiplicity: None,
                                 ordered: false,
                                 subsets: None,
                                 body: PartUsageBody::Brace { elements: vec![] },
-                            })),
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            })))),
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "frontWheel".to_string(),
                                 type_name: "Wheel".to_string(),
                                 multiplicity: Some("[2]".to_string()),
                                 ordered: true,
                                 subsets: None,
                                 body: PartUsageBody::Brace { elements: vec![] },
-                            })),
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            })))),
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "frontWheel_1".to_string(),
                                 type_name: "".to_string(),
                                 multiplicity: None,
@@ -274,8 +278,8 @@ fn part_vehicle1_c1() -> PartUsage {
                                     Some(expr_front_wheel_1()),
                                 )),
                                 body: PartUsageBody::Semicolon,
-                            })),
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            })))),
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "frontWheel_2".to_string(),
                                 type_name: "".to_string(),
                                 multiplicity: None,
@@ -285,11 +289,11 @@ fn part_vehicle1_c1() -> PartUsage {
                                     Some(expr_front_wheel_2()),
                                 )),
                                 body: PartUsageBody::Semicolon,
-                            })),
+                            })))),
                         ],
                     },
-                })),
-                PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                })))),
+                n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     name: "rearAxleAssembly".to_string(),
                     type_name: "AxleAssembly".to_string(),
                     multiplicity: None,
@@ -297,23 +301,23 @@ fn part_vehicle1_c1() -> PartUsage {
                     subsets: None,
                     body: PartUsageBody::Brace {
                         elements: vec![
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "rearAxle".to_string(),
                                 type_name: "Axle".to_string(),
                                 multiplicity: None,
                                 ordered: false,
                                 subsets: None,
                                 body: PartUsageBody::Semicolon,
-                            })),
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            })))),
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "rearWheel".to_string(),
                                 type_name: "Wheel".to_string(),
                                 multiplicity: Some("[2]".to_string()),
                                 ordered: true,
                                 subsets: None,
                                 body: PartUsageBody::Semicolon,
-                            })),
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            })))),
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "rearWheel_1".to_string(),
                                 type_name: "".to_string(),
                                 multiplicity: None,
@@ -323,8 +327,8 @@ fn part_vehicle1_c1() -> PartUsage {
                                     Some(expr_rear_wheel_1()),
                                 )),
                                 body: PartUsageBody::Semicolon,
-                            })),
-                            PartUsageBodyElement::PartUsage(Box::new(PartUsage {
+                            })))),
+                            n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                                 name: "rearWheel_2".to_string(),
                                 type_name: "".to_string(),
                                 multiplicity: None,
@@ -334,10 +338,10 @@ fn part_vehicle1_c1() -> PartUsage {
                                     Some(expr_rear_wheel_2()),
                                 )),
                                 body: PartUsageBody::Semicolon,
-                            })),
+                            })))),
                         ],
                     },
-                })),
+                })))),
             ],
         },
     }

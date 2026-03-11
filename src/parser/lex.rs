@@ -1,6 +1,7 @@
 //! Lexer and skip helpers: whitespace, comments, names, qualified names, and body-skip utilities.
 
 use crate::ast::Identification;
+use crate::parser::Input;
 use nom::branch::alt;
 use nom::sequence::delimited;
 use nom::bytes::complete::{tag, take_until, take_while, take_while1};
@@ -10,13 +11,13 @@ use nom::sequence::preceded;
 use nom::IResult;
 
 /// Skip optional whitespace (space, tab, newline).
-pub(crate) fn ws(input: &[u8]) -> IResult<&[u8], ()> {
+pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = take_while(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r')(input)?;
     Ok((input, ()))
 }
 
 /// Skip whitespace and comments (block, single-line, doc+block). Use between tokens and at body boundaries.
-pub(crate) fn ws_and_comments(input: &[u8]) -> IResult<&[u8], ()> {
+pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = take_while(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r')(input)?;
     let (input, _) = many0(alt((
         block_comment,
@@ -27,79 +28,81 @@ pub(crate) fn ws_and_comments(input: &[u8]) -> IResult<&[u8], ()> {
 }
 
 /// Block comment: /* ... */
-fn block_comment(input: &[u8]) -> IResult<&[u8], ()> {
-    let (input, _) = tag("/*")(input)?;
-    let (input, _) = take_until("*/")(input)?;
-    let (input, _) = tag("*/")(input)?;
+fn block_comment(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = tag(b"/*")(input)?;
+    let (input, _) = take_until(&b"*/"[..])(input)?;
+    let (input, _) = tag(b"*/")(input)?;
     let (input, _) = ws(input)?;
     Ok((input, ()))
 }
 
 /// Single-line comment: // to EOL (consumes the newline).
-fn line_comment(input: &[u8]) -> IResult<&[u8], ()> {
-    let (input, _) = tag("//")(input)?;
+fn line_comment(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = tag(b"//")(input)?;
     let (input, _) = take_while(|c: u8| c != b'\n' && c != b'\r')(input)?;
     let (input, _) = take_while(|c: u8| c == b'\n' || c == b'\r')(input)?;
     Ok((input, ()))
 }
 
 /// Doc keyword followed by optional whitespace and a block comment.
-fn doc_then_block_comment(input: &[u8]) -> IResult<&[u8], ()> {
-    let (input, _) = tag("doc")(input)?;
+fn doc_then_block_comment(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = tag(b"doc")(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag("/*")(input)?;
-    let (input, _) = take_until("*/")(input)?;
-    let (input, _) = tag("*/")(input)?;
+    let (input, _) = tag(b"/*")(input)?;
+    let (input, _) = take_until(&b"*/"[..])(input)?;
+    let (input, _) = tag(b"*/")(input)?;
     let (input, _) = ws(input)?;
     Ok((input, ()))
 }
 
 /// Parse one or more whitespace characters (consumes at least one).
-pub(crate) fn ws1(input: &[u8]) -> IResult<&[u8], ()> {
+pub(crate) fn ws1(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = take_while1(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r')(input)?;
     Ok((input, ()))
 }
 
 /// NAME: BASIC_NAME (identifier) or UNRESTRICTED_NAME (single-quoted string).
-pub(crate) fn name(input: &[u8]) -> IResult<&[u8], String> {
+pub(crate) fn name(input: Input<'_>) -> IResult<Input<'_>, String> {
     alt((quoted_name, basic_name))(input)
 }
 
 /// Unquoted identifier: letter or underscore, then alphanumeric or underscore.
-fn basic_name(input: &[u8]) -> IResult<&[u8], String> {
+fn basic_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, raw) = take_while1(|c: u8| c.is_ascii_alphanumeric() || c == b'_')(input)?;
-    let s = String::from_utf8_lossy(raw).into_owned();
+    let s = String::from_utf8_lossy(raw.fragment()).into_owned();
     Ok((input, s))
 }
 
 /// Quoted name: '...' (content between single quotes; \' for escape).
-fn quoted_name(input: &[u8]) -> IResult<&[u8], String> {
-    let (input, _) = tag("'")(input)?;
+fn quoted_name(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, _) = tag(b"'")(input)?;
+    let frag = input.fragment();
     let mut s = String::new();
-    let mut i = input;
-    while !i.is_empty() {
-        if i.starts_with(b"\\'") {
+    let mut count = 0usize;
+    while count < frag.len() {
+        if frag[count] == b'\\' && count + 1 < frag.len() && frag[count + 1] == b'\'' {
             s.push('\'');
-            i = &i[2..];
-        } else if i[0] == b'\'' {
-            i = &i[1..];
+            count += 2;
+        } else if frag[count] == b'\'' {
+            count += 1;
             break;
         } else {
-            s.push(i[0] as char);
-            i = &i[1..];
+            s.push(frag[count] as char);
+            count += 1;
         }
     }
-    Ok((i, s))
+    let (input, _) = nom::bytes::complete::take(count)(input)?;
+    Ok((input, s))
 }
 
 /// QualifiedName: ( '$' '::' )? ( NAME '::' )* NAME. Returns string like "SI::kg" or "ISQ::mass".
-pub(crate) fn qualified_name(input: &[u8]) -> IResult<&[u8], String> {
+pub(crate) fn qualified_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
-    let (input, opt_dollar) = opt(tag("$"))(input)?;
-    let (input, _) = opt(preceded(tag("::"), ws_and_comments))(input)?;
+    let (input, opt_dollar) = opt(tag(b"$"))(input)?;
+    let (input, _) = opt(preceded(tag(b"::"), ws_and_comments))(input)?;
     let (input, first) = name(input)?;
     let (input, rest_segments) = many0(preceded(
-        preceded(ws_and_comments, tag("::")),
+        preceded(ws_and_comments, tag(b"::")),
         preceded(ws_and_comments, name),
     ))(input)?;
     let mut segments = Vec::new();
@@ -113,39 +116,42 @@ pub(crate) fn qualified_name(input: &[u8]) -> IResult<&[u8], String> {
 }
 
 /// Skip any content until we see '}' at the same brace level (tracks nesting, skips comments).
-pub(crate) fn skip_until_brace_end(input: &[u8]) -> IResult<&[u8], ()> {
+pub(crate) fn skip_until_brace_end(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let frag = input.fragment();
     let mut depth = 1u32;
-    let mut i = input;
-    while depth > 0 && !i.is_empty() {
-        if i.starts_with(b"/*") {
-            if let Some(pos) = find_subslice(i, b"*/") {
-                i = &i[pos + 2..];
+    let mut pos = 0usize;
+    while depth > 0 && pos < frag.len() {
+        if pos + 2 <= frag.len() && frag[pos..].starts_with(b"/*") {
+            if let Some(rel) = find_subslice(&frag[pos..], b"*/") {
+                pos += rel + 2;
                 continue;
             }
             break;
         }
-        if i.starts_with(b"//") {
-            let mut j = 2;
-            while j < i.len() && i[j] != b'\n' && i[j] != b'\r' {
+        if pos + 2 <= frag.len() && frag[pos..].starts_with(b"//") {
+            let mut j = pos + 2;
+            while j < frag.len() && frag[j] != b'\n' && frag[j] != b'\r' {
                 j += 1;
             }
-            while j < i.len() && (i[j] == b'\n' || i[j] == b'\r') {
+            while j < frag.len() && (frag[j] == b'\n' || frag[j] == b'\r') {
                 j += 1;
             }
-            i = &i[j..];
+            pos = j;
             continue;
         }
-        if i[0] == b'{' {
+        if frag[pos] == b'{' {
             depth += 1;
-        } else if i[0] == b'}' {
+        } else if frag[pos] == b'}' {
             depth -= 1;
             if depth == 0 {
+                pos += 1;
                 break;
             }
         }
-        i = &i[1..];
+        pos += 1;
     }
-    Ok((i, ()))
+    let (input, _) = nom::bytes::complete::take(pos)(input)?;
+    Ok((input, ()))
 }
 
 pub(crate) fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -153,11 +159,11 @@ pub(crate) fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 /// Identification: ( '<' ShortName '>' )? ( Name )?
-pub(crate) fn identification(input: &[u8]) -> IResult<&[u8], Identification> {
+pub(crate) fn identification(input: Input<'_>) -> IResult<Input<'_>, Identification> {
     let (input, short_name) = opt(delimited(
-        preceded(ws_and_comments, tag("<")),
+        preceded(ws_and_comments, tag(b"<")),
         preceded(ws_and_comments, name),
-        preceded(ws_and_comments, tag(">")),
+        preceded(ws_and_comments, tag(b">")),
     ))(input)?;
     let (input, decl_name) = opt(preceded(ws_and_comments, name))(input)?;
     Ok((
@@ -170,18 +176,21 @@ pub(crate) fn identification(input: &[u8]) -> IResult<&[u8], Identification> {
 }
 
 /// Take input until we hit one of the terminator bytes (e.g. '{' or ';'), return as string (trimmed).
-pub(crate) fn take_until_terminator<'a>(input: &'a [u8], terminators: &[u8]) -> IResult<&'a [u8], String> {
+pub(crate) fn take_until_terminator<'a>(input: Input<'a>, terminators: &'a [u8]) -> IResult<Input<'a>, String> {
+    let frag = input.fragment();
     let mut i = 0;
-    while i < input.len() {
-        if terminators.contains(&input[i]) {
-            let s = String::from_utf8_lossy(&input[..i]).trim().to_string();
-            return Ok((&input[i..], s));
+    while i < frag.len() {
+        if terminators.contains(&frag[i]) {
+            let s = String::from_utf8_lossy(&frag[..i]).trim().to_string();
+            let (input, _) = nom::bytes::complete::take(i)(input)?;
+            return Ok((input, s));
         }
-        if input[i] == b'/' && i + 1 < input.len() && (input[i + 1] == b'*' || input[i + 1] == b'/') {
+        if frag[i] == b'/' && i + 1 < frag.len() && (frag[i + 1] == b'*' || frag[i + 1] == b'/') {
             break;
         }
         i += 1;
     }
-    let s = String::from_utf8_lossy(&input[..i]).trim().to_string();
-    Ok((&input[i..], s))
+    let s = String::from_utf8_lossy(&frag[..i]).trim().to_string();
+    let (input, _) = nom::bytes::complete::take(i)(input)?;
+    Ok((input, s))
 }

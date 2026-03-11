@@ -1,5 +1,57 @@
 //! Abstract syntax tree types for SysML v2 textual notation.
 
+/// Source location: byte offset, line, column, and length in the source file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Span {
+    pub offset: usize,
+    pub line: u32,
+    pub column: usize,
+    pub len: usize,
+}
+
+impl Span {
+    /// Dummy span for tests or synthetic nodes (offset 0, line 1, column 1, len 0).
+    pub fn dummy() -> Self {
+        Self {
+            offset: 0,
+            line: 1,
+            column: 1,
+            len: 0,
+        }
+    }
+}
+
+/// AST node: source span plus the element value. Use for every parsed node so it can be linked to source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Node<T> {
+    pub span: Span,
+    pub value: T,
+}
+
+impl<T> Node<T> {
+    pub fn new(span: Span, value: T) -> Self {
+        Self { span, value }
+    }
+}
+
+impl<T> std::ops::Deref for Node<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.value
+    }
+}
+
+/// Trait for generic access to node source span (e.g. visitors).
+pub trait AstNode {
+    fn span(&self) -> Span;
+}
+
+impl<T> AstNode for Node<T> {
+    fn span(&self) -> Span {
+        self.span.clone()
+    }
+}
+
 /// Expression: literals, feature refs, member access, index, bracket/unit, etc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
@@ -10,40 +62,40 @@ pub enum Expression {
     /// Single name or qualified name.
     FeatureRef(String),
     /// base.member (e.g. engine.fuelCmdPort).
-    MemberAccess(Box<Expression>, String),
+    MemberAccess(Box<Node<Expression>>, String),
     /// base#(index) e.g. frontWheel#(1).
     Index {
-        base: Box<Expression>,
-        index: Box<Expression>,
+        base: Box<Node<Expression>>,
+        index: Box<Node<Expression>>,
     },
     /// [unit] e.g. [kg].
-    Bracket(Box<Expression>),
+    Bracket(Box<Node<Expression>>),
     /// value [unit] e.g. 1750 [kg].
     LiteralWithUnit {
-        value: Box<Expression>,
-        unit: Box<Expression>,
+        value: Box<Node<Expression>>,
+        unit: Box<Node<Expression>>,
     },
 }
 
 /// Root of a SysML document: a sequence of package-level elements.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootNamespace {
-    pub elements: Vec<PackageBodyElement>,
+    pub elements: Vec<Node<PackageBodyElement>>,
 }
 
 /// Top-level element inside a namespace or package body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PackageBodyElement {
-    Package(Package),
-    Import(Import),
-    PartDef(PartDef),
-    PartUsage(PartUsage),
-    PortDef(PortDef),
-    InterfaceDef(InterfaceDef),
-    AliasDef(AliasDef),
-    AttributeDef(AttributeDef),
-    ActionDef(ActionDef),
-    ActionUsage(ActionUsage),
+    Package(Node<Package>),
+    Import(Node<Import>),
+    PartDef(Node<PartDef>),
+    PartUsage(Node<PartUsage>),
+    PortDef(Node<PortDef>),
+    InterfaceDef(Node<InterfaceDef>),
+    AliasDef(Node<AliasDef>),
+    AttributeDef(Node<AttributeDef>),
+    ActionDef(Node<ActionDef>),
+    ActionUsage(Node<ActionUsage>),
 }
 
 /// A package declaration: `package` Identification PackageBody
@@ -70,7 +122,7 @@ pub enum PackageBody {
     Semicolon,
     /// Brace form: list of body elements (may be empty).
     Brace {
-        elements: Vec<PackageBodyElement>,
+        elements: Vec<Node<PackageBodyElement>>,
     },
 }
 
@@ -106,15 +158,15 @@ pub struct PartDef {
 pub enum PartDefBody {
     Semicolon,
     Brace {
-        elements: Vec<PartDefBodyElement>,
+        elements: Vec<Node<PartDefBodyElement>>,
     },
 }
 
 /// Element inside a part definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PartDefBodyElement {
-    AttributeDef(AttributeDef),
-    PortUsage(PortUsage),
+    AttributeDef(Node<AttributeDef>),
+    PortUsage(Node<PortUsage>),
 }
 
 /// Attribute definition: `attribute` name (`:>` type)? body.
@@ -142,8 +194,8 @@ pub struct PartUsage {
     /// Multiplicity, e.g. Some("[2]").
     pub multiplicity: Option<String>,
     pub ordered: bool,
-    /// Optional `subsets` feature and value expression, e.g. ("frontWheel", Some(Index(FeatureRef("frontWheel"), LiteralInteger(1)))).
-    pub subsets: Option<(String, Option<Expression>)>,
+    /// Optional `subsets` feature and value expression.
+    pub subsets: Option<(String, Option<Node<Expression>>)>,
     pub body: PartUsageBody,
 }
 
@@ -152,19 +204,19 @@ pub struct PartUsage {
 pub enum PartUsageBody {
     Semicolon,
     Brace {
-        elements: Vec<PartUsageBodyElement>,
+        elements: Vec<Node<PartUsageBodyElement>>,
     },
 }
 
 /// Element inside a part usage body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PartUsageBodyElement {
-    AttributeUsage(AttributeUsage),
-    PartUsage(Box<PartUsage>),
-    PortUsage(PortUsage),
-    Bind(Bind),
-    InterfaceUsage(InterfaceUsage),
-    Connect(Connect),
+    AttributeUsage(Node<AttributeUsage>),
+    PartUsage(Box<Node<PartUsage>>),
+    PortUsage(Node<PortUsage>),
+    Bind(Node<Bind>),
+    InterfaceUsage(Node<InterfaceUsage>),
+    Connect(Node<Connect>),
 }
 
 /// Attribute usage: `attribute` name `redefines`? value? body.
@@ -173,8 +225,8 @@ pub struct AttributeUsage {
     pub name: String,
     /// Redefines target, e.g. Some("Vehicle::mass").
     pub redefines: Option<String>,
-    /// Value expression, e.g. LiteralWithUnit { value: LiteralInteger(1750), unit: Bracket(FeatureRef("kg")) }.
-    pub value: Option<Expression>,
+    /// Value expression.
+    pub value: Option<Node<Expression>>,
     pub body: AttributeBody,
 }
 
@@ -194,14 +246,14 @@ pub struct PortDef {
 pub enum PortDefBody {
     Semicolon,
     Brace {
-        elements: Vec<PortDefBodyElement>,
+        elements: Vec<Node<PortDefBodyElement>>,
     },
 }
 
 /// Element inside a port definition body (nested port usages).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PortDefBodyElement {
-    PortUsage(PortUsage),
+    PortUsage(Node<PortUsage>),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
@@ -211,7 +263,7 @@ pub struct PortUsage {
     pub type_name: Option<String>,
     pub multiplicity: Option<String>,
     /// Subsets feature and optional value expression.
-    pub subsets: Option<(String, Option<Expression>)>,
+    pub subsets: Option<(String, Option<Node<Expression>>)>,
     pub redefines: Option<String>,
     pub body: PortBody,
 }
@@ -222,7 +274,7 @@ pub enum PortBody {
     Semicolon,
     Brace,
     /// Brace with nested port usages (e.g. port vehicleToRoadPort redefines ... { port left...; port right...; }).
-    BraceWithPorts { elements: Vec<PortUsage> },
+    BraceWithPorts { elements: Vec<Node<PortUsage>> },
 }
 
 // ---------------------------------------------------------------------------
@@ -241,16 +293,16 @@ pub struct InterfaceDef {
 pub enum InterfaceDefBody {
     Semicolon,
     Brace {
-        elements: Vec<InterfaceDefBodyElement>,
+        elements: Vec<Node<InterfaceDefBodyElement>>,
     },
 }
 
 /// Element inside an interface definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InterfaceDefBodyElement {
-    EndDecl(EndDecl),
-    RefDecl(RefDecl),
-    ConnectStmt(ConnectStmt),
+    EndDecl(Node<EndDecl>),
+    RefDecl(Node<RefDecl>),
+    ConnectStmt(Node<ConnectStmt>),
 }
 
 /// End declaration in interface def: `end` name `:` type `;`.
@@ -278,8 +330,8 @@ pub enum RefBody {
 /// Connect statement in interface def or usage: `connect` from `to` to body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnectStmt {
-    pub from: Expression,
-    pub to: Expression,
+    pub from: Node<Expression>,
+    pub to: Node<Expression>,
     pub body: ConnectBody,
 }
 
@@ -297,8 +349,8 @@ pub enum ConnectBody {
 /// Bind: `bind` left `=` right (`;` or `{ }`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bind {
-    pub left: Expression,
-    pub right: Expression,
+    pub left: Node<Expression>,
+    pub right: Node<Expression>,
     /// Optional body after the bind (semicolon or brace); 3a fixture uses `bind x = y { }`.
     pub body: Option<ConnectBody>,
 }
@@ -309,16 +361,16 @@ pub enum InterfaceUsage {
     /// `interface` `:Type`? `connect` from `to` to body; optional body with ref redefs.
     TypedConnect {
         interface_type: Option<String>,
-        from: Expression,
-        to: Expression,
+        from: Node<Expression>,
+        to: Node<Expression>,
         body: ConnectBody,
-        body_elements: Vec<InterfaceUsageBodyElement>,
+        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
     },
     /// `interface` from `to` to body.
     Connection {
-        from: Expression,
-        to: Expression,
-        body_elements: Vec<InterfaceUsageBodyElement>,
+        from: Node<Expression>,
+        to: Node<Expression>,
+        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
     },
 }
 
@@ -326,14 +378,18 @@ pub enum InterfaceUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InterfaceUsageBodyElement {
     /// `ref` `:>>` name `=` value body.
-    RefRedef { name: String, value: Expression, body: RefBody },
+    RefRedef {
+        name: String,
+        value: Node<Expression>,
+        body: RefBody,
+    },
 }
 
 /// Connect at part usage level: `connect` from `to` to body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Connect {
-    pub from: Expression,
-    pub to: Expression,
+    pub from: Node<Expression>,
+    pub to: Node<Expression>,
     pub body: ConnectBody,
 }
 
@@ -372,7 +428,7 @@ pub struct ActionDef {
 pub enum ActionDefBody {
     Semicolon,
     Brace {
-        elements: Vec<InOutDecl>,
+        elements: Vec<Node<InOutDecl>>,
     },
 }
 
@@ -405,41 +461,41 @@ pub struct ActionUsage {
 pub enum ActionUsageBody {
     Semicolon,
     Brace {
-        elements: Vec<ActionUsageBodyElement>,
+        elements: Vec<Node<ActionUsageBodyElement>>,
     },
 }
 
 /// Element inside an action usage body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionUsageBodyElement {
-    InOutDecl(InOutDecl),
-    Bind(Bind),
-    Flow(Flow),
-    FirstStmt(FirstStmt),
-    MergeStmt(MergeStmt),
-    ActionUsage(Box<ActionUsage>),
+    InOutDecl(Node<InOutDecl>),
+    Bind(Node<Bind>),
+    Flow(Node<Flow>),
+    FirstStmt(Node<FirstStmt>),
+    MergeStmt(Node<MergeStmt>),
+    ActionUsage(Box<Node<ActionUsage>>),
 }
 
 /// Flow: `flow` from `to` to body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Flow {
-    pub from: Expression,
-    pub to: Expression,
+    pub from: Node<Expression>,
+    pub to: Node<Expression>,
     pub body: ConnectBody,
 }
 
 /// First/then control flow: `first` expr `then` expr body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FirstStmt {
-    pub first: Expression,
-    pub then: Expression,
+    pub first: Node<Expression>,
+    pub then: Node<Expression>,
     pub body: FirstMergeBody,
 }
 
 /// Merge: `merge` expr body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MergeStmt {
-    pub merge: Expression,
+    pub merge: Node<Expression>,
     pub body: FirstMergeBody,
 }
 

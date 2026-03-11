@@ -1,7 +1,9 @@
 //! Expression and path parsing for values and bind/connect.
 
-use crate::ast::Expression;
+use crate::ast::{Expression, Node};
 use crate::parser::lex::{name, ws_and_comments};
+use crate::parser::node_from_to;
+use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
@@ -10,71 +12,81 @@ use nom::sequence::{delimited, preceded};
 use nom::IResult;
 
 /// Integer literal.
-fn literal_integer(input: &[u8]) -> IResult<&[u8], Expression> {
+fn literal_integer(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, sign) = opt(alt((tag("-"), tag("+"))))(input)?;
+    let (input, sign) = opt(alt((tag(b"-"), tag(b"+"))))(input)?;
     let (input, digits) = digit1(input)?;
-    let s = String::from_utf8_lossy(digits);
+    let s = String::from_utf8_lossy(digits.fragment());
     let n: i64 = s.parse().unwrap_or(0);
-    let n = if sign == Some(&b"-"[..]) { -n } else { n };
-    Ok((input, Expression::LiteralInteger(n)))
+    let n = if sign.map(|s: Input| s.fragment() == b"-").unwrap_or(false) {
+        -n
+    } else {
+        n
+    };
+    Ok((input, node_from_to(start, input, Expression::LiteralInteger(n))))
 }
 
 /// Real literal (simple: digits.digits).
-fn literal_real(input: &[u8]) -> IResult<&[u8], Expression> {
+fn literal_real(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, whole) = digit1(input)?;
-    let (input, _) = tag(".")(input)?;
+    let (input, _) = tag(b".")(input)?;
     let (input, frac) = digit1(input)?;
     let s = format!(
         "{}.{}",
-        String::from_utf8_lossy(whole),
-        String::from_utf8_lossy(frac)
+        String::from_utf8_lossy(whole.fragment()),
+        String::from_utf8_lossy(frac.fragment())
     );
-    Ok((input, Expression::LiteralReal(s)))
+    Ok((input, node_from_to(start, input, Expression::LiteralReal(s))))
 }
 
 /// String literal: double-quoted.
-fn literal_string(input: &[u8]) -> IResult<&[u8], Expression> {
+fn literal_string(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag("\"")(input)?;
+    let (input, _) = tag(b"\"")(input)?;
+    let frag = input.fragment();
     let mut i = 0;
-    let input_slice = input;
-    while i < input_slice.len() {
-        if input_slice[i] == b'\\' && i + 1 < input_slice.len() {
+    while i < frag.len() {
+        if frag[i] == b'\\' && i + 1 < frag.len() {
             i += 2;
             continue;
         }
-        if input_slice[i] == b'"' {
-            let s = String::from_utf8_lossy(&input_slice[..i]).into_owned();
-            let s = s.replace("\\\"", "\"");
-            return Ok((&input_slice[i + 1..], Expression::LiteralString(s)));
+        if frag[i] == b'"' {
+            let s = String::from_utf8_lossy(&frag[..i]).replace("\\\"", "\"");
+            let (input, _) = nom::bytes::complete::take(i + 1)(input)?;
+            return Ok((input, node_from_to(start, input, Expression::LiteralString(s))));
         }
         i += 1;
     }
-    let s = String::from_utf8_lossy(input_slice).into_owned();
-    Ok((&input_slice[input_slice.len()..], Expression::LiteralString(s)))
+    let s = String::from_utf8_lossy(frag).replace("\\\"", "\"");
+    let (input, _) = nom::bytes::complete::take(frag.len())(input)?;
+    Ok((input, node_from_to(start, input, Expression::LiteralString(s))))
 }
 
 /// Boolean literal: true | false.
-fn literal_boolean(input: &[u8]) -> IResult<&[u8], Expression> {
+fn literal_boolean(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, v) = alt((
-        map(tag("true"), |_| true),
-        map(tag("false"), |_| false),
+        map(tag(b"true"), |_| true),
+        map(tag(b"false"), |_| false),
     ))(input)?;
-    Ok((input, Expression::LiteralBoolean(v)))
+    Ok((input, node_from_to(start, input, Expression::LiteralBoolean(v))))
 }
 
-/// Feature reference: single name (for expression context we use name, not qualified_name, so we don't consume ::).
-fn feature_ref_primary(input: &[u8]) -> IResult<&[u8], Expression> {
+/// Feature reference: single name.
+fn feature_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, n) = name(input)?;
-    Ok((input, Expression::FeatureRef(n)))
+    Ok((input, node_from_to(start, input, Expression::FeatureRef(n))))
 }
 
 /// Literal only (no unit): integer, real, string, boolean.
-fn literal_only(input: &[u8]) -> IResult<&[u8], Expression> {
+fn literal_only(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         literal_boolean,
@@ -84,38 +96,45 @@ fn literal_only(input: &[u8]) -> IResult<&[u8], Expression> {
     ))(input)
 }
 
-/// Literal with optional [ unit ]: 1750 [kg] -> LiteralWithUnit(LiteralInteger(1750), Bracket(FeatureRef("kg"))).
-fn literal_with_unit(input: &[u8]) -> IResult<&[u8], Expression> {
-    let (input, value) = literal_only(input)?;
+/// Literal with optional [ unit ]: 1750 [kg] -> LiteralWithUnit(...).
+fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, value_node) = literal_only(input)?;
     let (input, _) = ws_and_comments(input)?;
-    if !input.starts_with(b"[") {
-        return Ok((input, value));
+    if !input.fragment().starts_with(b"[") {
+        return Ok((input, value_node));
     }
-    let (input, _) = tag("[")(input)?;
+    let (input, _) = tag(b"[")(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, unit_name) = name(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag("]")(input)?;
-    let unit = Expression::Bracket(Box::new(Expression::FeatureRef(unit_name)));
+    let (input, _) = tag(b"]")(input)?;
+    let unit = Node::new(
+        crate::ast::Span::dummy(),
+        Expression::Bracket(Box::new(Node::new(
+            crate::ast::Span::dummy(),
+            Expression::FeatureRef(unit_name),
+        ))),
+    );
     let expr = Expression::LiteralWithUnit {
-        value: Box::new(value),
+        value: Box::new(value_node),
         unit: Box::new(unit),
     };
-    Ok((input, expr))
+    Ok((input, node_from_to(start, input, expr)))
 }
 
 /// Parenthesized expression: ( expression ).
-fn parenthesized(input: &[u8]) -> IResult<&[u8], Expression> {
+fn parenthesized(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     delimited(
-        tag("("),
+        tag(b"("),
         preceded(ws_and_comments, expression),
-        preceded(ws_and_comments, tag(")")),
+        preceded(ws_and_comments, tag(b")")),
     )(input)
 }
 
 /// Primary expression: literal with unit, literal only, feature ref, or parenthesized.
-fn primary(input: &[u8]) -> IResult<&[u8], Expression> {
+fn primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         literal_with_unit,
@@ -126,51 +145,60 @@ fn primary(input: &[u8]) -> IResult<&[u8], Expression> {
 }
 
 /// Apply postfix #( expr ) or . name to an expression.
-fn postfix(input: &[u8], mut expr: Expression) -> IResult<&[u8], Expression> {
+fn postfix<'a>(
+    input: Input<'a>,
+    start: Input<'a>,
+    current: Node<Expression>,
+) -> IResult<Input<'a>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
-    if input.starts_with(b"#") {
-        let (input, _) = tag("#")(input)?;
-        let (input, _) = preceded(ws_and_comments, tag("("))(input)?;
-        let (input, index_expr) = preceded(ws_and_comments, expression)(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(")"))(input)?;
-        expr = Expression::Index {
-            base: Box::new(expr),
-            index: Box::new(index_expr),
+    if input.fragment().starts_with(b"#") {
+        let (input, _) = tag(b"#")(input)?;
+        let (input, _) = preceded(ws_and_comments, tag(b"("))(input)?;
+        let (input, index_node) = preceded(ws_and_comments, expression)(input)?;
+        let (input, _) = preceded(ws_and_comments, tag(b")"))(input)?;
+        let expr = Expression::Index {
+            base: Box::new(current),
+            index: Box::new(index_node),
         };
-        return postfix(input, expr);
+        return postfix(input, start, node_from_to(start, input, expr));
     }
-    if input.starts_with(b".") {
-        let (input, _) = tag(".")(input)?;
+    if input.fragment().starts_with(b".") {
+        let (input, _) = tag(b".")(input)?;
         let (input, _) = ws_and_comments(input)?;
         let (input, member) = name(input)?;
-        expr = Expression::MemberAccess(Box::new(expr), member);
-        return postfix(input, expr);
+        let expr = Expression::MemberAccess(Box::new(current), member);
+        return postfix(input, start, node_from_to(start, input, expr));
     }
-    Ok((input, expr))
+    Ok((input, current))
 }
 
 /// Full expression: primary then zero or more postfix (#(expr), .name).
-pub(crate) fn expression(input: &[u8]) -> IResult<&[u8], Expression> {
-    let (input, expr) = primary(input)?;
-    postfix(input, expr)
+pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, primary_node) = primary(input)?;
+    postfix(input, start, primary_node)
 }
 
-/// Path expression: name or name.name.name... (for bind/connect). Returns Expression (FeatureRef or MemberAccess chain).
-pub(crate) fn path_expression(input: &[u8]) -> IResult<&[u8], Expression> {
+/// Path expression: name or name.name.name... (for bind/connect). Returns Node<Expression>.
+pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, first) = name(input)?;
     let mut expr = Expression::FeatureRef(first);
     let mut rest = input;
     loop {
         let (next, _) = ws_and_comments(rest)?;
-        if !next.starts_with(b".") {
+        if !next.fragment().starts_with(b".") {
             break;
         }
-        let (next, _) = tag(".")(next)?;
+        let (next, _) = tag(b".")(next)?;
         let (next, _) = ws_and_comments(next)?;
         let (next, member) = name(next)?;
-        expr = Expression::MemberAccess(Box::new(expr), member);
+        expr = Expression::MemberAccess(
+            Box::new(Node::new(crate::ast::Span::dummy(), expr)),
+            member,
+        );
         rest = next;
     }
-    Ok((rest, expr))
+    Ok((rest, node_from_to(start, rest, expr)))
 }

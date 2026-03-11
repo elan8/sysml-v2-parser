@@ -4,8 +4,8 @@ use std::path::Path;
 use sysml_parser::ast::{
     ActionDef, ActionDefBody, ActionUsage, ActionUsageBody, ActionUsageBodyElement, AliasBody,
     AliasDef, AttributeBody, AttributeDef, Bind, ConnectBody, Expression, FirstMergeBody, FirstStmt,
-    Flow, Identification, InOut, InOutDecl, MergeStmt, Package, PackageBody, PackageBodyElement,
-    RootNamespace, Visibility,
+    Flow, Identification, Import, InOut, InOutDecl, MergeStmt, Node, Package, PackageBody,
+    PackageBodyElement, RootNamespace, Span, Visibility,
 };
 use sysml_parser::parse;
 
@@ -16,36 +16,40 @@ fn id(name: &str) -> Identification {
     }
 }
 
-fn expr_path(path: &str) -> Expression {
+fn n<T>(v: T) -> Node<T> {
+    Node::new(Span::dummy(), v)
+}
+
+fn expr_path(path: &str) -> Node<Expression> {
     let segments: Vec<&str> = path.split('.').collect();
     let mut expr = Expression::FeatureRef(segments[0].to_string());
     for seg in segments.iter().skip(1) {
-        expr = Expression::MemberAccess(Box::new(expr), (*seg).to_string());
+        expr = Expression::MemberAccess(Box::new(n(expr)), (*seg).to_string());
     }
-    expr
+    n(expr)
 }
 
 fn expected_ast() -> RootNamespace {
     RootNamespace {
-        elements: vec![PackageBodyElement::Package(Package {
+        elements: vec![n(PackageBodyElement::Package(n(Package {
             identification: id("3a-Function-based Behavior-1"),
             body: PackageBody::Brace {
                 elements: vec![
-                    PackageBodyElement::Import(sysml_parser::ast::Import {
+                    n(PackageBodyElement::Import(n(Import {
                         visibility: Some(Visibility::Public),
                         is_import_all: true,
                         target: "Definitions::*".to_string(),
-                    }),
-                    PackageBodyElement::Import(sysml_parser::ast::Import {
+                    }))),
+                    n(PackageBodyElement::Import(n(Import {
                         visibility: Some(Visibility::Public),
                         is_import_all: true,
                         target: "Usages::*".to_string(),
-                    }),
-                    PackageBodyElement::Package(definitions_package()),
-                    PackageBodyElement::Package(usages_package()),
+                    }))),
+                    n(PackageBodyElement::Package(n(definitions_package()))),
+                    n(PackageBodyElement::Package(n(usages_package()))),
                 ],
             },
-        })],
+        })))],
     }
 }
 
@@ -54,121 +58,121 @@ fn definitions_package() -> Package {
         identification: id("Definitions"),
         body: PackageBody::Brace {
             elements: vec![
-                PackageBodyElement::AliasDef(AliasDef {
+                n(PackageBodyElement::AliasDef(n(AliasDef {
                     identification: id("Torque"),
                     target: "ISQ::TorqueValue".to_string(),
                     body: AliasBody::Brace,
-                }),
-                PackageBodyElement::AttributeDef(AttributeDef {
+                }))),
+                n(PackageBodyElement::AttributeDef(n(AttributeDef {
                     name: "FuelCmd".to_string(),
                     typing: None,
                     body: AttributeBody::Semicolon,
-                }),
-                PackageBodyElement::AttributeDef(AttributeDef {
+                }))),
+                n(PackageBodyElement::AttributeDef(n(AttributeDef {
                     name: "EngineStart".to_string(),
                     typing: None,
                     body: AttributeBody::Semicolon,
-                }),
-                PackageBodyElement::AttributeDef(AttributeDef {
+                }))),
+                n(PackageBodyElement::AttributeDef(n(AttributeDef {
                     name: "EngineOff".to_string(),
                     typing: None,
                     body: AttributeBody::Semicolon,
-                }),
-                PackageBodyElement::ActionDef(ActionDef {
+                }))),
+                n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Generate Torque"),
                     body: ActionDefBody::Brace {
                         elements: vec![
-                            InOutDecl {
+                            n(InOutDecl {
                                 direction: InOut::In,
                                 name: "fuelCmd".to_string(),
                                 type_name: "FuelCmd".to_string(),
-                            },
-                            InOutDecl {
+                            }),
+                            n(InOutDecl {
                                 direction: InOut::Out,
                                 name: "engineTorque".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
+                            }),
                         ],
                     },
-                }),
-                PackageBodyElement::ActionDef(ActionDef {
+                }))),
+                n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Amplify Torque"),
                     body: ActionDefBody::Brace {
                         elements: vec![
-                            InOutDecl {
+                            n(InOutDecl {
                                 direction: InOut::In,
                                 name: "engineTorque".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
-                            InOutDecl {
+                            }),
+                            n(InOutDecl {
                                 direction: InOut::Out,
                                 name: "transmissionTorque".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
+                            }),
                         ],
                     },
-                }),
-                PackageBodyElement::ActionDef(ActionDef {
+                }))),
+                n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Transfer Torque"),
                     body: ActionDefBody::Brace {
                         elements: vec![
-                            InOutDecl {
+                            n(InOutDecl {
                                 direction: InOut::In,
                                 name: "transmissionTorque".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
-                            InOutDecl {
+                            }),
+                            n(InOutDecl {
                                 direction: InOut::Out,
                                 name: "driveshaftTorque".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
+                            }),
                         ],
                     },
-                }),
-                PackageBodyElement::ActionDef(ActionDef {
+                }))),
+                n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Distribute Torque"),
                     body: ActionDefBody::Brace {
                         elements: vec![
-                            InOutDecl {
+                            n(InOutDecl {
                                 direction: InOut::In,
                                 name: "driveShaftTorque".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
-                            InOutDecl {
+                            }),
+                            n(InOutDecl {
                                 direction: InOut::Out,
                                 name: "wheelTorque1".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
-                            InOutDecl {
+                            }),
+                            n(InOutDecl {
                                 direction: InOut::Out,
                                 name: "wheelTorque2".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
+                            }),
                         ],
                     },
-                }),
-                PackageBodyElement::ActionDef(ActionDef {
+                }))),
+                n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Provide Power"),
                     body: ActionDefBody::Brace {
                         elements: vec![
-                            InOutDecl {
+                            n(InOutDecl {
                                 direction: InOut::In,
                                 name: "fuelCmd".to_string(),
                                 type_name: "FuelCmd".to_string(),
-                            },
-                            InOutDecl {
+                            }),
+                            n(InOutDecl {
                                 direction: InOut::Out,
                                 name: "wheelTorque1".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
-                            InOutDecl {
+                            }),
+                            n(InOutDecl {
                                 direction: InOut::Out,
                                 name: "wheelTorque2".to_string(),
                                 type_name: "Torque".to_string(),
-                            },
+                            }),
                         ],
                     },
-                }),
+                }))),
             ],
         },
     }
@@ -178,7 +182,7 @@ fn usages_package() -> Package {
     Package {
         identification: id("Usages"),
         body: PackageBody::Brace {
-            elements: vec![PackageBodyElement::ActionUsage(provide_power_action())],
+            elements: vec![n(PackageBodyElement::ActionUsage(n(provide_power_action())))],
         },
     }
 }
@@ -190,151 +194,151 @@ fn provide_power_action() -> ActionUsage {
         accept: None,
         body: ActionUsageBody::Brace {
             elements: vec![
-                ActionUsageBodyElement::InOutDecl(InOutDecl {
+                n(ActionUsageBodyElement::InOutDecl(n(InOutDecl {
                     direction: InOut::In,
                     name: "fuelCmd".to_string(),
                     type_name: "FuelCmd".to_string(),
-                }),
-                ActionUsageBodyElement::InOutDecl(InOutDecl {
+                }))),
+                n(ActionUsageBodyElement::InOutDecl(n(InOutDecl {
                     direction: InOut::Out,
                     name: "wheelTorque1".to_string(),
                     type_name: "Torque".to_string(),
-                }),
-                ActionUsageBodyElement::InOutDecl(InOutDecl {
+                }))),
+                n(ActionUsageBodyElement::InOutDecl(n(InOutDecl {
                     direction: InOut::Out,
                     name: "wheelTorque2".to_string(),
                     type_name: "Torque".to_string(),
-                }),
-                ActionUsageBodyElement::Bind(Bind {
+                }))),
+                n(ActionUsageBodyElement::Bind(n(Bind {
                     left: expr_path("generate torque.fuelCmd"),
                     right: expr_path("fuelCmd"),
                     body: Some(ConnectBody::Brace),
-                }),
-                ActionUsageBodyElement::ActionUsage(Box::new(ActionUsage {
+                }))),
+                n(ActionUsageBodyElement::ActionUsage(Box::new(n(ActionUsage {
                     name: "generate torque".to_string(),
                     type_name: "Generate Torque".to_string(),
                     accept: None,
                     body: ActionUsageBody::Brace { elements: vec![] },
-                })),
-                ActionUsageBodyElement::Flow(Flow {
+                })))),
+                n(ActionUsageBodyElement::Flow(n(Flow {
                     from: expr_path("generate torque.engineTorque"),
                     to: expr_path("amplify torque.engineTorque"),
                     body: ConnectBody::Brace,
-                }),
-                ActionUsageBodyElement::ActionUsage(Box::new(ActionUsage {
+                }))),
+                n(ActionUsageBodyElement::ActionUsage(Box::new(n(ActionUsage {
                     name: "amplify torque".to_string(),
                     type_name: "Amplify Torque".to_string(),
                     accept: None,
                     body: ActionUsageBody::Semicolon,
-                })),
-                ActionUsageBodyElement::Flow(Flow {
+                })))),
+                n(ActionUsageBodyElement::Flow(n(Flow {
                     from: expr_path("amplify torque.transmissionTorque"),
                     to: expr_path("transfer torque.transmissionTorque"),
                     body: ConnectBody::Semicolon,
-                }),
-                ActionUsageBodyElement::ActionUsage(Box::new(ActionUsage {
+                }))),
+                n(ActionUsageBodyElement::ActionUsage(Box::new(n(ActionUsage {
                     name: "transfer torque".to_string(),
                     type_name: "Transfer Torque".to_string(),
                     accept: None,
                     body: ActionUsageBody::Semicolon,
-                })),
-                ActionUsageBodyElement::Flow(Flow {
+                })))),
+                n(ActionUsageBodyElement::Flow(n(Flow {
                     from: expr_path("transfer torque.driveshaftTorque"),
                     to: expr_path("distribute torque.driveShaftTorque"),
                     body: ConnectBody::Semicolon,
-                }),
-                ActionUsageBodyElement::ActionUsage(Box::new(ActionUsage {
+                }))),
+                n(ActionUsageBodyElement::ActionUsage(Box::new(n(ActionUsage {
                     name: "distribute torque".to_string(),
                     type_name: "Distribute Torque".to_string(),
                     accept: None,
                     body: ActionUsageBody::Semicolon,
-                })),
-                ActionUsageBodyElement::Bind(Bind {
+                })))),
+                n(ActionUsageBodyElement::Bind(n(Bind {
                     left: expr_path("wheelTorque1"),
                     right: expr_path("distribute torque.wheelTorque1"),
                     body: Some(ConnectBody::Semicolon),
-                }),
-                ActionUsageBodyElement::Bind(Bind {
+                }))),
+                n(ActionUsageBodyElement::Bind(n(Bind {
                     left: expr_path("wheelTorque2"),
                     right: expr_path("distribute torque.wheelTorque2"),
                     body: Some(ConnectBody::Semicolon),
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("start".to_string()),
-                    then: Expression::FeatureRef("continue".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("start".to_string())),
+                    then: n(Expression::FeatureRef("continue".to_string())),
                     body: FirstMergeBody::Brace,
-                }),
-                ActionUsageBodyElement::MergeStmt(MergeStmt {
-                    merge: Expression::FeatureRef("continue".to_string()),
+                }))),
+                n(ActionUsageBodyElement::MergeStmt(n(MergeStmt {
+                    merge: n(Expression::FeatureRef("continue".to_string())),
                     body: FirstMergeBody::Brace,
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("continue".to_string()),
-                    then: Expression::FeatureRef("engineStarted".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("continue".to_string())),
+                    then: n(Expression::FeatureRef("engineStarted".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::ActionUsage(Box::new(ActionUsage {
+                }))),
+                n(ActionUsageBodyElement::ActionUsage(Box::new(n(ActionUsage {
                     name: "engineStarted".to_string(),
                     type_name: "EngineStart".to_string(),
                     accept: Some(("engineStart".to_string(), "EngineStart".to_string())),
                     body: ActionUsageBody::Brace { elements: vec![] },
-                })),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("engineStarted".to_string()),
-                    then: Expression::FeatureRef("engineStopped".to_string()),
+                })))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("engineStarted".to_string())),
+                    then: n(Expression::FeatureRef("engineStopped".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::ActionUsage(Box::new(ActionUsage {
+                }))),
+                n(ActionUsageBodyElement::ActionUsage(Box::new(n(ActionUsage {
                     name: "engineStopped".to_string(),
                     type_name: "EngineOff".to_string(),
                     accept: Some(("engineOff".to_string(), "EngineOff".to_string())),
                     body: ActionUsageBody::Semicolon,
-                })),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("engineStopped".to_string()),
-                    then: Expression::FeatureRef("continue".to_string()),
+                })))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("engineStopped".to_string())),
+                    then: n(Expression::FeatureRef("continue".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("engineStarted".to_string()),
-                    then: Expression::FeatureRef("generate torque".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("engineStarted".to_string())),
+                    then: n(Expression::FeatureRef("generate torque".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("engineStarted".to_string()),
-                    then: Expression::FeatureRef("amplify torque".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("engineStarted".to_string())),
+                    then: n(Expression::FeatureRef("amplify torque".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("engineStarted".to_string()),
-                    then: Expression::FeatureRef("transfer torque".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("engineStarted".to_string())),
+                    then: n(Expression::FeatureRef("transfer torque".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("engineStarted".to_string()),
-                    then: Expression::FeatureRef("distribute torque".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("engineStarted".to_string())),
+                    then: n(Expression::FeatureRef("distribute torque".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("generate torque".to_string()),
-                    then: Expression::FeatureRef("engineStopped".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("generate torque".to_string())),
+                    then: n(Expression::FeatureRef("engineStopped".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("amplify torque".to_string()),
-                    then: Expression::FeatureRef("engineStopped".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("amplify torque".to_string())),
+                    then: n(Expression::FeatureRef("engineStopped".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("transfer torque".to_string()),
-                    then: Expression::FeatureRef("engineStopped".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("transfer torque".to_string())),
+                    then: n(Expression::FeatureRef("engineStopped".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
-                ActionUsageBodyElement::FirstStmt(FirstStmt {
-                    first: Expression::FeatureRef("distribute torque".to_string()),
-                    then: Expression::FeatureRef("engineStopped".to_string()),
+                }))),
+                n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
+                    first: n(Expression::FeatureRef("distribute torque".to_string())),
+                    then: n(Expression::FeatureRef("engineStopped".to_string())),
                     body: FirstMergeBody::Semicolon,
-                }),
+                }))),
             ],
         },
     }
