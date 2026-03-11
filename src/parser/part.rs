@@ -143,16 +143,26 @@ fn part_usage_body(input: &[u8]) -> IResult<&[u8], PartUsageBody> {
     ))(input)
 }
 
-/// Bind: `bind` path `=` path `;`
-fn bind_(input: &[u8]) -> IResult<&[u8], Bind> {
+/// Bind: `bind` path `=` path (`;` or `{ }`)
+pub(crate) fn bind_(input: &[u8]) -> IResult<&[u8], Bind> {
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag("bind")(input)?;
     let (input, _) = ws1(input)?;
     let (input, left) = path_expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag("="))(input)?;
     let (input, right) = preceded(ws_and_comments, path_expression)(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(";"))(input)?;
-    Ok((input, Bind { left, right }))
+    let (input, body) = alt((
+        map(preceded(ws_and_comments, tag(";")), |_| Some(ConnectBody::Semicolon)),
+        map(
+            nom::sequence::delimited(
+                preceded(ws_and_comments, tag("{")),
+                skip_until_brace_end,
+                preceded(ws_and_comments, tag("}")),
+            ),
+            |_| Some(ConnectBody::Brace),
+        ),
+    ))(input)?;
+    Ok((input, Bind { left, right, body }))
 }
 
 /// Connect (part usage level): `connect` path `to` path body

@@ -7,13 +7,15 @@
 //! - [part]: part definition and part usage
 //! - [package]: package and root namespace
 
+mod action;
+mod alias;
 mod attribute;
 mod expr;
 mod import;
+mod interface;
 mod lex;
 mod package;
 mod part;
-mod interface;
 mod port;
 
 use crate::ast::RootNamespace;

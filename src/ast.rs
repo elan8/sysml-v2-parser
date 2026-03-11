@@ -40,6 +40,10 @@ pub enum PackageBodyElement {
     PartUsage(PartUsage),
     PortDef(PortDef),
     InterfaceDef(InterfaceDef),
+    AliasDef(AliasDef),
+    AttributeDef(AttributeDef),
+    ActionDef(ActionDef),
+    ActionUsage(ActionUsage),
 }
 
 /// A package declaration: `package` Identification PackageBody
@@ -290,11 +294,13 @@ pub enum ConnectBody {
 // Part usage body: bind, interface usage, connect
 // ---------------------------------------------------------------------------
 
-/// Bind: `bind` left `=` right `;`.
+/// Bind: `bind` left `=` right (`;` or `{ }`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bind {
     pub left: Expression,
     pub right: Expression,
+    /// Optional body after the bind (semicolon or brace); 3a fixture uses `bind x = y { }`.
+    pub body: Option<ConnectBody>,
 }
 
 /// Interface usage: typed+connect or connection form.
@@ -329,4 +335,117 @@ pub struct Connect {
     pub from: Expression,
     pub to: Expression,
     pub body: ConnectBody,
+}
+
+// ---------------------------------------------------------------------------
+// Alias
+// ---------------------------------------------------------------------------
+
+/// Alias definition: `alias` Identification `for` qualified_name body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AliasDef {
+    pub identification: Identification,
+    pub target: String,
+    pub body: AliasBody,
+}
+
+/// Body of an alias definition: `;` or `{` ... `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AliasBody {
+    Semicolon,
+    Brace,
+}
+
+// ---------------------------------------------------------------------------
+// Action (function-based behavior)
+// ---------------------------------------------------------------------------
+
+/// Action definition: `action def` Identification body (in/out params).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionDef {
+    pub identification: Identification,
+    pub body: ActionDefBody,
+}
+
+/// Body of an action definition: `;` or `{` InOutDecl* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionDefBody {
+    Semicolon,
+    Brace {
+        elements: Vec<InOutDecl>,
+    },
+}
+
+/// In/out parameter in action def: `in` name `:` type `;` or `out` name `:` type `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InOutDecl {
+    pub direction: InOut,
+    pub name: String,
+    pub type_name: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InOut {
+    In,
+    Out,
+}
+
+/// Action usage: `action` name `:` type_name (`accept` param_name `:` param_type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionUsage {
+    pub name: String,
+    pub type_name: String,
+    /// For accept form: (param_name, param_type).
+    pub accept: Option<(String, String)>,
+    pub body: ActionUsageBody,
+}
+
+/// Body of an action usage: `;` or `{` ActionUsageBodyElement* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionUsageBody {
+    Semicolon,
+    Brace {
+        elements: Vec<ActionUsageBodyElement>,
+    },
+}
+
+/// Element inside an action usage body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionUsageBodyElement {
+    InOutDecl(InOutDecl),
+    Bind(Bind),
+    Flow(Flow),
+    FirstStmt(FirstStmt),
+    MergeStmt(MergeStmt),
+    ActionUsage(Box<ActionUsage>),
+}
+
+/// Flow: `flow` from `to` to body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Flow {
+    pub from: Expression,
+    pub to: Expression,
+    pub body: ConnectBody,
+}
+
+/// First/then control flow: `first` expr `then` expr body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FirstStmt {
+    pub first: Expression,
+    pub then: Expression,
+    pub body: FirstMergeBody,
+}
+
+/// Merge: `merge` expr body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergeStmt {
+    pub merge: Expression,
+    pub body: FirstMergeBody,
+}
+
+/// Body of first/merge: `;` or `{` ... `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FirstMergeBody {
+    Semicolon,
+    Brace,
 }

@@ -8,3 +8,6 @@ mod parts_tree_1a;
 
 #[path = "validation/parts_interconnection_2a.rs"]
 mod parts_interconnection_2a;
+
+#[path = "validation/function_based_behavior_3a.rs"]
+mod function_based_behavior_3a;

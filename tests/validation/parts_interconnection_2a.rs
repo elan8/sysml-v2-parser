@@ -366,6 +366,7 @@ fn part_vehicle1_c1() -> PartUsage {
                 PartUsageBodyElement::Bind(Bind {
                     left: expr_path("fuelCmdPort"),
                     right: expr_path("engine.fuelCmdPort"),
+                    body: Some(ConnectBody::Semicolon),
                 }),
                 PartUsageBodyElement::PartUsage(Box::new(PartUsage {
                     name: "engine".to_string(),
@@ -413,10 +414,12 @@ fn part_vehicle1_c1() -> PartUsage {
                 PartUsageBodyElement::Bind(Bind {
                     left: expr_path("rearAxleAssembly.leftWheel.wheelToRoadPort"),
                     right: expr_path("vehicleToRoadPort.leftWheelToRoadPort"),
+                    body: Some(ConnectBody::Semicolon),
                 }),
                 PartUsageBodyElement::Bind(Bind {
                     left: expr_path("rearAxleAssembly.rightWheel.wheelToRoadPort"),
                     right: expr_path("vehicleToRoadPort.rightWheelToRoadPort"),
+                    body: Some(ConnectBody::Semicolon),
                 }),
                 PartUsageBodyElement::PortUsage(PortUsage {
                     name: "vehicleToRoadPort".to_string(),
@@ -468,6 +471,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                 PartUsageBodyElement::Bind(Bind {
                     left: expr_path("shaftPort_d"),
                     right: expr_path("differential.shaftPort_d"),
+                    body: Some(ConnectBody::Semicolon),
                 }),
                 PartUsageBodyElement::PartUsage(Box::new(part_differential())),
                 PartUsageBodyElement::InterfaceUsage(InterfaceUsage::Connection {
