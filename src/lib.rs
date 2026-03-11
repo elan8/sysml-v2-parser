@@ -16,8 +16,8 @@ pub use ast::{
     Perform, PerformBody, PerformBodyElement, PortBody, PortDef, PortDefBody, PortDefBodyElement,
     PortUsage, RefBody, RefDecl, RootNamespace, Span, Visibility,
 };
-pub use error::ParseError;
-pub use parser::parse_root;
+pub use error::{DiagnosticSeverity, ParseError};
+pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
 
 /// Parse a SysML v2 textual input into a root namespace AST.
 ///

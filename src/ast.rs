@@ -1,6 +1,7 @@
 //! Abstract syntax tree types for SysML v2 textual notation.
 
 /// Source location: byte offset, line, column, and length in the source file.
+/// Line and column are **1-based**. Use [`Span::to_lsp_range`] for 0-based LSP ranges.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     pub offset: usize,
@@ -18,6 +19,14 @@ impl Span {
             column: 1,
             len: 0,
         }
+    }
+
+    /// LSP uses 0-based line and 0-based character. Returns (start_line, start_character, end_line, end_character).
+    pub fn to_lsp_range(&self) -> (u32, u32, u32, u32) {
+        let start_line = self.line.saturating_sub(1);
+        let start_char = self.column.saturating_sub(1);
+        let end_char = start_char.saturating_add(self.len);
+        (start_line, start_char as u32, start_line, end_char as u32)
     }
 }
 

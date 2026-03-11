@@ -5,9 +5,9 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::sequence::delimited;
 use nom::bytes::complete::{tag, take_until, take_while, take_while1};
-use nom::combinator::opt;
+use nom::combinator::{map, opt, rest, value};
 use nom::multi::many0;
-use nom::sequence::preceded;
+use nom::sequence::{preceded, tuple};
 use nom::IResult;
 
 /// Skip optional whitespace (space, tab, newline).
@@ -70,6 +70,22 @@ fn doc_then_block_comment(input: Input<'_>) -> IResult<Input<'_>, ()> {
 pub(crate) fn ws1(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = take_while1(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r')(input)?;
     Ok((input, ()))
+}
+
+/// Skip to the next sync point (next line start after newline and ws/comments), or to end of input.
+/// Used for error recovery so parsing can continue after a failed top-level element.
+pub(crate) fn skip_to_next_sync_point(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    alt((
+        map(
+            tuple((
+                take_until(&b"\n"[..]),
+                opt(tag(b"\n")),
+                ws_and_comments,
+            )),
+            |_| (),
+        ),
+        value((), rest),
+    ))(input)
 }
 
 /// NAME: BASIC_NAME (identifier) or UNRESTRICTED_NAME (single-quoted string).

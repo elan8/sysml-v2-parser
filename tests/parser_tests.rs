@@ -3,7 +3,7 @@
 use sysml_parser::ast::{
     Identification, Node, Package, PackageBody, PackageBodyElement, RootNamespace, Span,
 };
-use sysml_parser::parse;
+use sysml_parser::{parse, parse_with_diagnostics};
 
 fn id(name: &str) -> Identification {
     Identification {
@@ -67,4 +67,33 @@ fn test_package_with_brace_body() {
         result, expected,
         "AST should match expected for package Bar {{ }}"
     );
+}
+
+#[test]
+fn test_parse_with_diagnostics_partial_ast_and_multiple_errors() {
+    // One valid element, two invalid lines, then another valid element. Recovery should collect
+    // two errors and still produce a partial AST with both valid packages.
+    let input = "package Foo;\nnot valid\nalso bad\npackage Bar;";
+    let result = parse_with_diagnostics(input);
+    assert!(!result.is_ok(), "should have parse errors");
+    assert_eq!(result.errors.len(), 2, "should report two parse errors");
+    assert_eq!(
+        result.root.elements.len(),
+        2,
+        "partial AST should contain both valid packages"
+    );
+    // First element is Foo, second is Bar
+    let names: Vec<&str> = result
+        .root
+        .elements
+        .iter()
+        .filter_map(|n| {
+            if let PackageBodyElement::Package(p) = &n.value {
+                p.identification.name.as_deref()
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(names, ["Foo", "Bar"]);
 }
