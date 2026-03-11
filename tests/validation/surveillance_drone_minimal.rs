@@ -98,3 +98,63 @@ fn test_parse_fixture_exact_start() {
     let attr = body.iter().find(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.name == "Real"));
     assert!(attr.is_some(), "expected AttributeDef(Real) in body, got {:?}", body);
 }
+
+/// Doc comments inside perform bodies must be parsed as Doc elements, not skipped.
+#[test]
+fn test_perform_body_doc_comment_parsed_as_element() {
+    super::init_log();
+    let input = r#"package P {
+    part def T { }
+    part p : T {
+        perform 'act' {
+            doc /* allocation comment */
+            in x = p.x;
+        }
+    }
+}"#;
+    let result = parse(input);
+    let root = match &result {
+        Ok(ast) => ast,
+        Err(e) => panic!("parse should succeed: {:?}", e),
+    };
+    let pkg = match &root.elements[0].value {
+        PackageBodyElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let pkg_body = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let part_usage = pkg_body
+        .iter()
+        .find_map(|e| match &e.value { PackageBodyElement::PartUsage(p) => Some(&p.value), _ => None })
+        .expect("expected part usage p");
+    let part_body = match &part_usage.body {
+        sysml_parser::ast::PartUsageBody::Brace { elements } => elements,
+        _ => panic!("expected part brace body"),
+    };
+    let perform = part_body
+        .iter()
+        .find_map(|e| match &e.value { sysml_parser::ast::PartUsageBodyElement::Perform(p) => Some(&p.value), _ => None })
+        .expect("expected perform");
+    let perform_body = match &perform.body {
+        sysml_parser::ast::PerformBody::Brace { elements } => elements,
+        _ => panic!("expected perform brace body"),
+    };
+    assert_eq!(perform_body.len(), 2, "perform body must have Doc then InOut (doc comments are not skipped)");
+    match &perform_body[0].value {
+        sysml_parser::ast::PerformBodyElement::Doc(d) => assert!(
+            d.value.text.contains("allocation comment"),
+            "doc text should contain the comment content, got {:?}",
+            d.value.text
+        ),
+        other => panic!("expected first element Doc, got {:?}", other),
+    }
+    match &perform_body[1].value {
+        sysml_parser::ast::PerformBodyElement::InOut(b) => {
+            assert_eq!(b.value.direction, sysml_parser::ast::InOut::In);
+            assert_eq!(b.value.name, "x");
+        }
+        other => panic!("expected second element InOut, got {:?}", other),
+    }
+}

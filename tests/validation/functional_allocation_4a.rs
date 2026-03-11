@@ -2,9 +2,9 @@
 
 use std::path::Path;
 use sysml_parser::ast::{
-    Expression, Identification, Import, InOut, Node, Package, PackageBody, PackageBodyElement,
+    DocComment, Expression, Identification, Import, InOut, Node, Package, PackageBody, PackageBodyElement,
     PartUsage, PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,
-    PortBody, PortUsage, RootNamespace, Span, Visibility,
+    PerformInOutBinding, PortBody, PortUsage, RootNamespace, Span, Visibility,
 };
 use sysml_parser::parse;
 
@@ -70,11 +70,16 @@ fn vehicle1_c1_functional_allocation() -> PartUsage {
                     action_name: "provide power".to_string(),
                     type_name: None,
                     body: PerformBody::Brace {
-                        elements: vec![n(PerformBodyElement {
-                            direction: InOut::In,
-                            name: "fuelCmd".to_string(),
-                            value: expr_path("fuelCmdPort.fuelCmd"),
-                        })],
+                        elements: vec![
+                            n(PerformBodyElement::Doc(n(DocComment {
+                                text: "\n\t\t * This allocates the action '3a-Function-based Behavior-1'::'provide power' as an enacted \n\t\t * performance of 'vehicle_c1_functional_allocation'.\n\t\t ".to_string(),
+                            }))),
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
+                                direction: InOut::In,
+                                name: "fuelCmd".to_string(),
+                                value: expr_path("fuelCmdPort.fuelCmd"),
+                            }))),
+                        ],
                     },
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(part_engine())))),
@@ -119,16 +124,16 @@ fn part_engine() -> PartUsage {
                     type_name: None,
                     body: PerformBody::Brace {
                         elements: vec![
-                            n(PerformBodyElement {
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
                                 direction: InOut::In,
                                 name: "fuelCmd".to_string(),
                                 value: expr_path("fuelCmdPort.fuelCmd"),
-                            }),
-                            n(PerformBodyElement {
+                            }))),
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
                                 direction: InOut::Out,
                                 name: "engineTorque".to_string(),
                                 value: expr_path("drivePwrPort.engineTorque"),
-                            }),
+                            }))),
                         ],
                     },
                 }))),
@@ -167,16 +172,16 @@ fn part_transmission() -> PartUsage {
                     type_name: None,
                     body: PerformBody::Brace {
                         elements: vec![
-                            n(PerformBodyElement {
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
                                 direction: InOut::In,
                                 name: "engineTorque".to_string(),
                                 value: expr_path("clutchPort.engineTorque"),
-                            }),
-                            n(PerformBodyElement {
+                            }))),
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
                                 direction: InOut::Out,
                                 name: "transmissionTorque".to_string(),
                                 value: expr_path("shaftPort_a.transmissionTorque"),
-                            }),
+                            }))),
                         ],
                     },
                 }))),
@@ -215,16 +220,16 @@ fn part_driveshaft() -> PartUsage {
                     type_name: None,
                     body: PerformBody::Brace {
                         elements: vec![
-                            n(PerformBodyElement {
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
                                 direction: InOut::In,
                                 name: "transmissionTorque".to_string(),
                                 value: expr_path("shaftPort_b.transmissionTorque"),
-                            }),
-                            n(PerformBodyElement {
+                            }))),
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
                                 direction: InOut::Out,
                                 name: "driveshaftTorque".to_string(),
                                 value: expr_path("shaftPort_c.driveshaftTorque"),
-                            }),
+                            }))),
                         ],
                     },
                 }))),
@@ -263,21 +268,21 @@ fn part_rear_axle_assembly() -> PartUsage {
                     type_name: None,
                     body: PerformBody::Brace {
                         elements: vec![
-                            n(PerformBodyElement {
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
                                 direction: InOut::In,
                                 name: "driveshaftTorque".to_string(),
                                 value: expr_path("shaftPort_d.driveshaftTorque"),
-                            }),
-                            n(PerformBodyElement {
+                            }))),
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
                                 direction: InOut::Out,
                                 name: "wheelTorque1".to_string(),
                                 value: expr_path("rearAxle.leftHalfAxle.axleToWheelPort.wheelTorque"),
-                            }),
-                            n(PerformBodyElement {
+                            }))),
+                            n(PerformBodyElement::InOut(n(PerformInOutBinding {
                                 direction: InOut::Out,
                                 name: "wheelTorque2".to_string(),
                                 value: expr_path("rearAxle.rightHalfAxle.axleToWheelPort.wheelTorque"),
-                            }),
+                            }))),
                         ],
                     },
                 }))),

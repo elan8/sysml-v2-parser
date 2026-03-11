@@ -69,7 +69,11 @@ fn test_parse_surveillance_drone() {
     let has_satisfy = body
         .iter()
         .any(|e| matches!(&e.value, PackageBodyElement::Satisfy(_)));
+    let has_doc = body
+        .iter()
+        .any(|e| matches!(&e.value, PackageBodyElement::Doc(_)));
 
+    assert!(has_doc, "doc comments must be parsed as Doc elements in the AST, not skipped");
     assert!(has_part_def, "fixture should contain part defs");
     assert!(has_requirement_def, "fixture should contain requirement defs");
     assert!(has_use_case_def, "fixture should contain use case defs");

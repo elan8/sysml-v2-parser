@@ -3,7 +3,7 @@
 use crate::ast::{
     Allocate, Bind, Connect, ConnectBody, InOut, InterfaceUsage, InterfaceUsageBodyElement, Node,
     PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
-    Perform, PerformBody, PerformBodyElement, RefBody,
+    Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::expr::{expression, path_expression};
@@ -196,8 +196,8 @@ fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, String> {
     Ok((input, action_name))
 }
 
-/// Perform body element: `in` name `=` expr `;` or `out` name `=` expr `;`.
-fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBodyElement>> {
+/// In/out binding inside a perform body: `in` name `=` expr `;` or `out` name `=` expr `;`.
+fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = alt((
@@ -215,7 +215,7 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
         node_from_to(
             start,
             input,
-            PerformBodyElement {
+            PerformInOutBinding {
                 direction,
                 name: name_str,
                 value: value_expr,
@@ -224,42 +224,26 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
     ))
 }
 
-/// Skip an optional `doc /* ... */` comment (treated as freeform annotation).
-fn skip_doc_comment(input: Input<'_>) -> IResult<Input<'_>, ()> {
+/// Perform body element: doc comment or in/out binding.
+fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBodyElement>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
-    if !input.fragment().starts_with(b"doc") {
-        return Ok((input, ()));
-    }
-    // Peek: after "doc" there must be whitespace then "/*"
-    let after_doc = &input.fragment()[3..];
-    let is_doc = after_doc.first().map(|b| b.is_ascii_whitespace()).unwrap_or(false);
-    if !is_doc {
-        return Ok((input, ()));
-    }
-    // Try to parse the doc comment, but if it fails just leave input alone.
-    match doc_comment(input) {
-        Ok((rest, _)) => {
-            let (rest, _) = ws_and_comments(rest)?;
-            Ok((rest, ()))
-        }
-        Err(_) => Ok((input, ())),
-    }
+    let (input, elem) = alt((
+        map(doc_comment, PerformBodyElement::Doc),
+        map(perform_in_out_binding, PerformBodyElement::InOut),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, elem)))
 }
 
-/// Perform body element, optionally preceded by a doc comment.
-fn perform_body_element_with_doc(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBodyElement>> {
-    let (input, _) = skip_doc_comment(input)?;
-    perform_body_element(input)
-}
-
-/// Perform body: `{` (doc/comments and perform_body_element* ) `}`.
+/// Perform body: `{` PerformBodyElement* `}`.
 fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     let (input, _) = ws_and_comments(input)?;
     let (input, elements) = nom::sequence::delimited(
         tag(&b"{"[..]),
         preceded(
             ws_and_comments,
-            many0(preceded(ws_and_comments, perform_body_element_with_doc)),
+            many0(preceded(ws_and_comments, perform_body_element)),
         ),
         preceded(ws_and_comments, tag(&b"}"[..])),
     )

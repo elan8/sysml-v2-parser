@@ -294,9 +294,16 @@ pub enum PerformBody {
     },
 }
 
+/// Element inside a perform body: doc comment or in/out binding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PerformBodyElement {
+    Doc(Node<DocComment>),
+    InOut(Node<PerformInOutBinding>),
+}
+
 /// In/out binding inside a perform body: `in` name `=` expr `;` or `out` name `=` expr `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PerformBodyElement {
+pub struct PerformInOutBinding {
     pub direction: InOut,
     pub name: String,
     pub value: Node<Expression>,

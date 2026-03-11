@@ -9,11 +9,11 @@ pub mod parser;
 pub use ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody, ActionUsageBodyElement, AliasBody,
     AliasDef, AstNode, AttributeBody, AttributeDef, AttributeUsage, Bind, Connect, ConnectBody,
-    ConnectStmt, EndDecl, Expression, FirstMergeBody, FirstStmt, Flow, Identification, InOut,
+    ConnectStmt, DocComment, EndDecl, Expression, FirstMergeBody, FirstStmt, Flow, Identification, InOut,
     InOutDecl, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
     InterfaceUsageBodyElement, Import, MergeStmt, Node, Package, PackageBody, PackageBodyElement,
     PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
-    Perform, PerformBody, PerformBodyElement, PortBody, PortDef, PortDefBody, PortDefBodyElement,
+    Perform, PerformBody, PerformBodyElement, PerformInOutBinding, PortBody, PortDef, PortDefBody, PortDefBodyElement,
     PortUsage, RefBody, RefDecl, RootNamespace, Span, Visibility,
 };
 pub use error::{DiagnosticSeverity, ParseError};
