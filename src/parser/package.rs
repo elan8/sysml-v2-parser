@@ -6,6 +6,8 @@ use crate::ast::{
 use crate::parser::import::import_;
 use crate::parser::lex::{identification, ws1, ws_and_comments};
 use crate::parser::part::{part_def, part_usage};
+use crate::parser::interface::interface_def;
+use crate::parser::port::port_def;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
@@ -49,7 +51,7 @@ pub(crate) fn package_body(input: &[u8]) -> IResult<&[u8], PackageBody> {
     ))(input)
 }
 
-/// PackageBodyElement: Package | Import | PartDef | PartUsage
+/// PackageBodyElement: Package | Import | PartDef | PartUsage | PortDef | InterfaceDef
 pub(crate) fn package_body_element(input: &[u8]) -> IResult<&[u8], PackageBodyElement> {
     let (input, _) = ws_and_comments(input)?;
     alt((
@@ -57,6 +59,8 @@ pub(crate) fn package_body_element(input: &[u8]) -> IResult<&[u8], PackageBodyEl
         map(import_, PackageBodyElement::Import),
         map(part_def, PackageBodyElement::PartDef),
         map(part_usage, PackageBodyElement::PartUsage),
+        map(port_def, PackageBodyElement::PortDef),
+        map(interface_def, PackageBodyElement::InterfaceDef),
     ))(input)
 }
 

@@ -8,10 +8,13 @@
 //! - [package]: package and root namespace
 
 mod attribute;
+mod expr;
 mod import;
 mod lex;
 mod package;
 mod part;
+mod interface;
+mod port;
 
 use crate::ast::RootNamespace;
 use crate::error::ParseError;

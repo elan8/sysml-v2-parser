@@ -1,5 +1,30 @@
 //! Abstract syntax tree types for SysML v2 textual notation.
 
+/// Expression: literals, feature refs, member access, index, bracket/unit, etc.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Expression {
+    LiteralInteger(i64),
+    LiteralReal(String),
+    LiteralString(String),
+    LiteralBoolean(bool),
+    /// Single name or qualified name.
+    FeatureRef(String),
+    /// base.member (e.g. engine.fuelCmdPort).
+    MemberAccess(Box<Expression>, String),
+    /// base#(index) e.g. frontWheel#(1).
+    Index {
+        base: Box<Expression>,
+        index: Box<Expression>,
+    },
+    /// [unit] e.g. [kg].
+    Bracket(Box<Expression>),
+    /// value [unit] e.g. 1750 [kg].
+    LiteralWithUnit {
+        value: Box<Expression>,
+        unit: Box<Expression>,
+    },
+}
+
 /// Root of a SysML document: a sequence of package-level elements.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootNamespace {
@@ -13,6 +38,8 @@ pub enum PackageBodyElement {
     Import(Import),
     PartDef(PartDef),
     PartUsage(PartUsage),
+    PortDef(PortDef),
+    InterfaceDef(InterfaceDef),
 }
 
 /// A package declaration: `package` Identification PackageBody
@@ -83,6 +110,7 @@ pub enum PartDefBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PartDefBodyElement {
     AttributeDef(AttributeDef),
+    PortUsage(PortUsage),
 }
 
 /// Attribute definition: `attribute` name (`:>` type)? body.
@@ -110,8 +138,8 @@ pub struct PartUsage {
     /// Multiplicity, e.g. Some("[2]").
     pub multiplicity: Option<String>,
     pub ordered: bool,
-    /// Optional `subsets` feature and value, e.g. ("frontWheel", "frontWheel#(1)").
-    pub subsets: Option<(String, Option<String>)>,
+    /// Optional `subsets` feature and value expression, e.g. ("frontWheel", Some(Index(FeatureRef("frontWheel"), LiteralInteger(1)))).
+    pub subsets: Option<(String, Option<Expression>)>,
     pub body: PartUsageBody,
 }
 
@@ -129,6 +157,10 @@ pub enum PartUsageBody {
 pub enum PartUsageBodyElement {
     AttributeUsage(AttributeUsage),
     PartUsage(Box<PartUsage>),
+    PortUsage(PortUsage),
+    Bind(Bind),
+    InterfaceUsage(InterfaceUsage),
+    Connect(Connect),
 }
 
 /// Attribute usage: `attribute` name `redefines`? value? body.
@@ -137,7 +169,164 @@ pub struct AttributeUsage {
     pub name: String,
     /// Redefines target, e.g. Some("Vehicle::mass").
     pub redefines: Option<String>,
-    /// Value expression, e.g. Some("1750 [kg]").
-    pub value: Option<String>,
+    /// Value expression, e.g. LiteralWithUnit { value: LiteralInteger(1750), unit: Bracket(FeatureRef("kg")) }.
+    pub value: Option<Expression>,
     pub body: AttributeBody,
+}
+
+// ---------------------------------------------------------------------------
+// Port
+// ---------------------------------------------------------------------------
+
+/// Port definition: `port def` Identification body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PortDef {
+    pub identification: Identification,
+    pub body: PortDefBody,
+}
+
+/// Body of a port definition: `;` or `{` PortDefBodyElement* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PortDefBody {
+    Semicolon,
+    Brace {
+        elements: Vec<PortDefBodyElement>,
+    },
+}
+
+/// Element inside a port definition body (nested port usages).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PortDefBodyElement {
+    PortUsage(PortUsage),
+}
+
+/// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PortUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub multiplicity: Option<String>,
+    /// Subsets feature and optional value expression.
+    pub subsets: Option<(String, Option<Expression>)>,
+    pub redefines: Option<String>,
+    pub body: PortBody,
+}
+
+/// Body of a port usage: `;` or `{` PortUsage* `}` (nested ports).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PortBody {
+    Semicolon,
+    Brace,
+    /// Brace with nested port usages (e.g. port vehicleToRoadPort redefines ... { port left...; port right...; }).
+    BraceWithPorts { elements: Vec<PortUsage> },
+}
+
+// ---------------------------------------------------------------------------
+// Interface
+// ---------------------------------------------------------------------------
+
+/// Interface definition: `interface def` Identification body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InterfaceDef {
+    pub identification: Identification,
+    pub body: InterfaceDefBody,
+}
+
+/// Body of an interface definition: `;` or `{` InterfaceDefBodyElement* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InterfaceDefBody {
+    Semicolon,
+    Brace {
+        elements: Vec<InterfaceDefBodyElement>,
+    },
+}
+
+/// Element inside an interface definition body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InterfaceDefBodyElement {
+    EndDecl(EndDecl),
+    RefDecl(RefDecl),
+    ConnectStmt(ConnectStmt),
+}
+
+/// End declaration in interface def: `end` name `:` type `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EndDecl {
+    pub name: String,
+    pub type_name: String,
+}
+
+/// Ref declaration in interface def: `ref` name `:` type body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefDecl {
+    pub name: String,
+    pub type_name: String,
+    pub body: RefBody,
+}
+
+/// Body of a ref declaration: `;` or `{` ... `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RefBody {
+    Semicolon,
+    Brace,
+}
+
+/// Connect statement in interface def or usage: `connect` from `to` to body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectStmt {
+    pub from: Expression,
+    pub to: Expression,
+    pub body: ConnectBody,
+}
+
+/// Body of a connect statement: `;` or `{` ... `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectBody {
+    Semicolon,
+    Brace,
+}
+
+// ---------------------------------------------------------------------------
+// Part usage body: bind, interface usage, connect
+// ---------------------------------------------------------------------------
+
+/// Bind: `bind` left `=` right `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Bind {
+    pub left: Expression,
+    pub right: Expression,
+}
+
+/// Interface usage: typed+connect or connection form.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InterfaceUsage {
+    /// `interface` `:Type`? `connect` from `to` to body; optional body with ref redefs.
+    TypedConnect {
+        interface_type: Option<String>,
+        from: Expression,
+        to: Expression,
+        body: ConnectBody,
+        body_elements: Vec<InterfaceUsageBodyElement>,
+    },
+    /// `interface` from `to` to body.
+    Connection {
+        from: Expression,
+        to: Expression,
+        body_elements: Vec<InterfaceUsageBodyElement>,
+    },
+}
+
+/// Element in interface usage body (e.g. ref redefinition).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InterfaceUsageBodyElement {
+    /// `ref` `:>>` name `=` value body.
+    RefRedef { name: String, value: Expression, body: RefBody },
+}
+
+/// Connect at part usage level: `connect` from `to` to body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Connect {
+    pub from: Expression,
+    pub to: Expression,
+    pub body: ConnectBody,
 }

@@ -7,9 +7,12 @@ pub mod error;
 pub mod parser;
 
 pub use ast::{
-    AttributeBody, AttributeDef, AttributeUsage, Identification, Import, Package, PackageBody,
-    PackageBodyElement, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
-    PartUsageBodyElement, RootNamespace, Visibility,
+    AttributeBody, AttributeDef, AttributeUsage, Bind, Connect, ConnectBody, ConnectStmt,
+    EndDecl, Expression, Identification, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
+    InterfaceUsage, InterfaceUsageBodyElement, Import, Package, PackageBody, PackageBodyElement,
+    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
+    PortBody, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl,
+    RootNamespace, Visibility,
 };
 pub use error::ParseError;
 pub use parser::parse_root;

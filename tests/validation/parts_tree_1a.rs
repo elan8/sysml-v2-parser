@@ -2,9 +2,9 @@
 
 use std::path::Path;
 use sysml_parser::ast::{
-    AttributeBody, AttributeDef, AttributeUsage, Identification, Import, Package, PackageBody,
-    PackageBodyElement, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
-    PartUsageBodyElement, RootNamespace, Visibility,
+    AttributeBody, AttributeDef, AttributeUsage, Expression, Identification, Import, Package,
+    PackageBody, PackageBodyElement, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
+    PartUsageBody, PartUsageBodyElement, RootNamespace, Visibility,
 };
 use sysml_parser::parse;
 
@@ -12,6 +12,54 @@ fn id(name: &str) -> Identification {
     Identification {
         short_name: None,
         name: Some(name.to_string()),
+    }
+}
+
+/// 1750 [kg]
+fn expr_1750_kg() -> Expression {
+    Expression::LiteralWithUnit {
+        value: Box::new(Expression::LiteralInteger(1750)),
+        unit: Box::new(Expression::Bracket(Box::new(Expression::FeatureRef("kg".to_string())))),
+    }
+}
+
+/// 2000 [kg]
+fn expr_2000_kg() -> Expression {
+    Expression::LiteralWithUnit {
+        value: Box::new(Expression::LiteralInteger(2000)),
+        unit: Box::new(Expression::Bracket(Box::new(Expression::FeatureRef("kg".to_string())))),
+    }
+}
+
+/// frontWheel#(1)
+fn expr_front_wheel_1() -> Expression {
+    Expression::Index {
+        base: Box::new(Expression::FeatureRef("frontWheel".to_string())),
+        index: Box::new(Expression::LiteralInteger(1)),
+    }
+}
+
+/// frontWheel#(2)
+fn expr_front_wheel_2() -> Expression {
+    Expression::Index {
+        base: Box::new(Expression::FeatureRef("frontWheel".to_string())),
+        index: Box::new(Expression::LiteralInteger(2)),
+    }
+}
+
+/// rearWheel#(1)
+fn expr_rear_wheel_1() -> Expression {
+    Expression::Index {
+        base: Box::new(Expression::FeatureRef("rearWheel".to_string())),
+        index: Box::new(Expression::LiteralInteger(1)),
+    }
+}
+
+/// rearWheel#(2)
+fn expr_rear_wheel_2() -> Expression {
+    Expression::Index {
+        base: Box::new(Expression::FeatureRef("rearWheel".to_string())),
+        index: Box::new(Expression::LiteralInteger(2)),
     }
 }
 
@@ -115,7 +163,7 @@ fn part_vehicle1() -> PartUsage {
                 PartUsageBodyElement::AttributeUsage(AttributeUsage {
                     name: "mass".to_string(),
                     redefines: Some("Vehicle::mass".to_string()),
-                    value: Some("1750 [kg]".to_string()),
+                    value: Some(expr_1750_kg()),
                     body: AttributeBody::Brace,
                 }),
                 PartUsageBodyElement::PartUsage(Box::new(PartUsage {
@@ -189,7 +237,7 @@ fn part_vehicle1_c1() -> PartUsage {
                 PartUsageBodyElement::AttributeUsage(AttributeUsage {
                     name: "mass".to_string(),
                     redefines: Some("Vehicle::mass".to_string()),
-                    value: Some("2000 [kg]".to_string()),
+                    value: Some(expr_2000_kg()),
                     body: AttributeBody::Brace,
                 }),
                 PartUsageBodyElement::PartUsage(Box::new(PartUsage {
@@ -223,7 +271,7 @@ fn part_vehicle1_c1() -> PartUsage {
                                 ordered: false,
                                 subsets: Some((
                                     "frontWheel".to_string(),
-                                    Some("frontWheel#(1)".to_string()),
+                                    Some(expr_front_wheel_1()),
                                 )),
                                 body: PartUsageBody::Semicolon,
                             })),
@@ -234,7 +282,7 @@ fn part_vehicle1_c1() -> PartUsage {
                                 ordered: false,
                                 subsets: Some((
                                     "frontWheel".to_string(),
-                                    Some("frontWheel#(2)".to_string()),
+                                    Some(expr_front_wheel_2()),
                                 )),
                                 body: PartUsageBody::Semicolon,
                             })),
@@ -272,7 +320,7 @@ fn part_vehicle1_c1() -> PartUsage {
                                 ordered: false,
                                 subsets: Some((
                                     "rearWheel".to_string(),
-                                    Some("rearWheel#(1)".to_string()),
+                                    Some(expr_rear_wheel_1()),
                                 )),
                                 body: PartUsageBody::Semicolon,
                             })),
@@ -283,7 +331,7 @@ fn part_vehicle1_c1() -> PartUsage {
                                 ordered: false,
                                 subsets: Some((
                                     "rearWheel".to_string(),
-                                    Some("rearWheel#(2)".to_string()),
+                                    Some(expr_rear_wheel_2()),
                                 )),
                                 body: PartUsageBody::Semicolon,
                             })),

@@ -1,8 +1,9 @@
 //! Attribute definition and usage parsing.
 
 use crate::ast::{AttributeBody, AttributeDef, AttributeUsage};
+use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_name, skip_until_brace_end, take_until_terminator, ws1, ws_and_comments,
+    name, qualified_name, skip_until_brace_end, ws1, ws_and_comments,
 };
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -56,7 +57,7 @@ pub(crate) fn attribute_usage(input: &[u8]) -> IResult<&[u8], AttributeUsage> {
     ))(input)?;
     let (input, value) = nom::combinator::opt(preceded(
         preceded(ws_and_comments, tag("=")),
-        preceded(ws_and_comments, |i| take_until_terminator(i, b"{;")),
+        preceded(ws_and_comments, expression),
     ))(input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
@@ -64,7 +65,7 @@ pub(crate) fn attribute_usage(input: &[u8]) -> IResult<&[u8], AttributeUsage> {
         AttributeUsage {
             name: name_str,
             redefines,
-            value: value.filter(|s| !s.is_empty()),
+            value,
             body,
         },
     ))
