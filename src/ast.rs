@@ -21,12 +21,19 @@ impl Span {
     }
 }
 
-/// AST node: source span plus the element value. Use for every parsed node so it can be linked to source.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Node<T> {
     pub span: Span,
     pub value: T,
 }
+
+impl<T: PartialEq> PartialEq for Node<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl<T: Eq> Eq for Node<T> {}
 
 impl<T> Node<T> {
     pub fn new(span: Span, value: T) -> Self {

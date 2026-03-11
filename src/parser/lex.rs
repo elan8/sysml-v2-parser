@@ -144,7 +144,6 @@ pub(crate) fn skip_until_brace_end(input: Input<'_>) -> IResult<Input<'_>, ()> {
         } else if frag[pos] == b'}' {
             depth -= 1;
             if depth == 0 {
-                pos += 1;
                 break;
             }
         }

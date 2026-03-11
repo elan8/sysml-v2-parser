@@ -22,7 +22,9 @@ use nom::IResult;
 
 /// Keyword "package" with following whitespace.
 fn keyword_package(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    log::debug!("keyword_package: input len={}", input.fragment().len());
     let (input, _) = tag(b"package")(input)?;
+    log::debug!("keyword_package: after tag, rest len={}", input.fragment().len());
     let (input, _) = ws1(input)?;
     Ok((input, ()))
 }
@@ -61,6 +63,11 @@ pub(crate) fn package_body(input: Input<'_>) -> IResult<Input<'_>, PackageBody> 
 pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PackageBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    let frag = start.fragment();
+    log::debug!(
+        "package_body_element: first 20 bytes: {:?}",
+        frag.get(..20.min(frag.len())).unwrap_or(frag),
+    );
     let (input, elem) = alt((
         map(package_, PackageBodyElement::Package),
         map(import_, PackageBodyElement::Import),

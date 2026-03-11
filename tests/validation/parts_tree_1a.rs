@@ -359,10 +359,22 @@ fn validation_fixture_path(relative: &str) -> std::path::PathBuf {
 
 #[test]
 fn test_parse_1a_parts_tree() {
+    super::init_log();
     let path = validation_fixture_path("01-Parts Tree").join("1a-Parts Tree.sysml");
+    log::debug!("fixture path: {}", path.display());
     let input = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
-    let result = parse(&input).expect("parse should succeed for 1a-Parts Tree.sysml");
+    log::debug!("input len: {} bytes, first 200 chars: {:?}", input.len(), input.chars().take(200).collect::<String>());
+    let result = match parse(&input) {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("parse failed: {}", e);
+            log::error!("input len: {} bytes", input.len());
+            log::error!("first 300 chars: {:?}", input.chars().take(300).collect::<String>());
+            log::error!("first 100 bytes: {:?}", input.bytes().take(100).collect::<Vec<_>>());
+            panic!("parse should succeed for 1a-Parts Tree.sysml: {}", e);
+        }
+    };
     let expected = expected_ast();
     assert_eq!(
         result, expected,

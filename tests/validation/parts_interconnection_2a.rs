@@ -648,9 +648,12 @@ fn validation_fixture_path(relative: &str) -> std::path::PathBuf {
 
 #[test]
 fn test_parse_2a_parts_interconnection() {
+    super::init_log();
     let path = validation_fixture_path("02-Parts Interconnection").join("2a-Parts Interconnection.sysml");
+    log::debug!("fixture path: {}", path.display());
     let input = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
+    log::debug!("input len: {} bytes", input.len());
     let result = parse(&input).expect("parse should succeed for 2a-Parts Interconnection.sysml");
     let expected = expected_ast();
     assert_eq!(

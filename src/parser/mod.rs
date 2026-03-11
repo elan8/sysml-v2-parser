@@ -39,6 +39,14 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
                 Ok(root)
             } else {
                 let offset = located.location_offset() + located.input_len() - rest.input_len();
+                let unconsumed = rest.fragment();
+                log::debug!(
+                    "parse_root: expected end of input; parsed {} elements; unconsumed len={}, offset={}, first 80 bytes: {:?}",
+                    root.elements.len(),
+                    unconsumed.len(),
+                    offset,
+                    &unconsumed.get(..80.min(unconsumed.len())).unwrap_or(unconsumed),
+                );
                 Err(ParseError::new("expected end of input").with_location(offset, rest.location_line(), rest.get_column()))
             }
         }

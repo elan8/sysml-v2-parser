@@ -355,10 +355,13 @@ fn validation_fixture_path(relative: &str) -> std::path::PathBuf {
 
 #[test]
 fn test_parse_3a_function_based_behavior() {
+    super::init_log();
     let path = validation_fixture_path("03-Function-based Behavior")
         .join("3a-Function-based Behavior-1.sysml");
+    log::debug!("fixture path: {}", path.display());
     let input = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
+    log::debug!("input len: {} bytes", input.len());
     let result = parse(&input)
         .expect("parse should succeed for 3a-Function-based Behavior-1.sysml");
     let expected = expected_ast();
