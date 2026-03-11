@@ -18,12 +18,13 @@ use nom::bytes::complete::tag;
 use nom::combinator::map;
 use nom::multi::many0;
 use nom::sequence::preceded;
+use nom::Parser;
 use nom::IResult;
 
 /// Keyword "package" with following whitespace.
 fn keyword_package(input: Input<'_>) -> IResult<Input<'_>, ()> {
     log::debug!("keyword_package: input len={}", input.fragment().len());
-    let (input, _) = tag(b"package")(input)?;
+    let (input, _) = tag(&b"package"[..]).parse(input)?;
     log::debug!("keyword_package: after tag, rest len={}", input.fragment().len());
     let (input, _) = ws1(input)?;
     Ok((input, ()))
@@ -52,20 +53,21 @@ pub(crate) fn package_body(input: Input<'_>) -> IResult<Input<'_>, PackageBody> 
     let result = alt((
         map(
             nom::sequence::delimited(
-                preceded(ws_and_comments, tag(b"{")),
+                preceded(ws_and_comments, tag(&b"{"[..])),
                 preceded(
                     ws_and_comments,
                     many0(preceded(ws_and_comments, package_body_element)),
                 ),
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |elements| {
                 log::debug!("package_body: brace form ok, {} elements", elements.len());
                 PackageBody::Brace { elements }
             },
         ),
-        map(preceded(ws_and_comments, tag(b";")), |_| PackageBody::Semicolon),
-    ))(input);
+        map(preceded(ws_and_comments, tag(&b";"[..])), |_| PackageBody::Semicolon),
+    ))
+    .parse(input);
     if let Err(_) = &result {
         log::debug!("package_body: alt failed (brace or semicolon)");
     }
@@ -92,7 +94,8 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
         map(attribute_def, PackageBodyElement::AttributeDef),
         map(action_def, PackageBodyElement::ActionDef),
         map(action_usage, PackageBodyElement::ActionUsage),
-    ))(input)?;
+    ))
+    .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
@@ -100,7 +103,7 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
 pub(crate) fn root_namespace(input: Input<'_>) -> IResult<Input<'_>, RootNamespace> {
     let (input, _) = ws_and_comments(input)?;
     log::debug!("root_namespace: after leading ws, input len={}", input.fragment().len());
-    let (input, elements) = many0(preceded(ws_and_comments, package_body_element))(input)?;
+    let (input, elements) = many0(preceded(ws_and_comments, package_body_element)).parse(input)?;
     log::debug!(
         "root_namespace: many0 done, elements={}, rest len={}",
         elements.len(),

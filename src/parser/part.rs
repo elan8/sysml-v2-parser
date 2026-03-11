@@ -16,26 +16,28 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::combinator::{map, opt, value};
 use nom::multi::many0;
-use nom::sequence::{preceded, tuple};
+use nom::sequence::preceded;
+use nom::Parser;
 use nom::IResult;
 
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
 pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| PartDefBody::Semicolon),
+        map(tag(&b";"[..]), |_| PartDefBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 preceded(
                     ws_and_comments,
                     many0(preceded(ws_and_comments, part_def_body_element)),
                 ),
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |elements| PartDefBody::Brace { elements },
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
@@ -44,7 +46,8 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
     let (input, elem) = alt((
         map(port_usage, PartDefBodyElement::PortUsage),
         map(attribute_def, PartDefBodyElement::AttributeDef),
-    ))(input)?;
+    ))
+    .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
@@ -52,15 +55,16 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
 pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"part")(input)?;
+    let (input, _) = tag(&b"part"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag(b"def")(input)?;
+    let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
     let (input, specializes) = opt(preceded(
-        preceded(ws_and_comments, tag(b":>")),
+        preceded(ws_and_comments, tag(&b":>"[..])),
         preceded(ws_and_comments, qualified_name),
-    ))(input)?;
+    ))
+    .parse(input)?;
     let (input, body) = part_def_body(input)?;
     Ok((
         input,
@@ -75,9 +79,9 @@ pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
 /// Multiplicity: '[' ... ']' as string
 fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"[")(input)?;
-    let (input, content) = take_until(&b"]"[..])(input)?;
-    let (input, _) = tag(b"]")(input)?;
+    let (input, _) = tag(&b"["[..]).parse(input)?;
+    let (input, content) = take_until(&b"]"[..]).parse(input)?;
+    let (input, _) = tag(&b"]"[..]).parse(input)?;
     let s = format!("[{}]", String::from_utf8_lossy(content.fragment()).trim());
     Ok((input, s))
 }
@@ -86,43 +90,40 @@ fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
 pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"part")(input)?;
+    let (input, _) = tag(&b"part"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = alt((
+    let mut name_parser = alt((
         preceded(
-            preceded(ws_and_comments, tag(b":>>")),
+            preceded(ws_and_comments, tag(&b":>>"[..])),
             preceded(ws_and_comments, name),
         ),
         preceded(ws_and_comments, name),
-    ))(input)?;
+    ));
+    let (input, name_str) = name_parser.parse(input)?;
     let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(b":")),
+        preceded(ws_and_comments, tag(&b":"[..])),
         preceded(ws_and_comments, qualified_name),
-    ))(input)?;
-    let (input, multiplicity_opt) = opt(multiplicity)(input)?;
-    let (input, ordered) = opt(preceded(ws_and_comments, tag(b"ordered")))(input)?;
-    let (input, subsets) = opt(alt((
+    ))
+    .parse(input)?;
+    let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
+    let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
+    let mut subsets_parser = opt(preceded(
+        alt((
+            preceded(ws_and_comments, tag(&b":>"[..])),
+            preceded(ws_and_comments, tag(&b"subsets"[..])),
+        )),
         preceded(
-            preceded(ws_and_comments, tag(b"subsets")),
-            preceded(ws1, tuple((
+            ws_and_comments,
+            (
                 name,
                 opt(preceded(
-                    preceded(ws_and_comments, tag(b"=")),
+                    preceded(ws_and_comments, tag(&b"="[..])),
                     preceded(ws_and_comments, expression),
                 )),
-            ))),
+            ),
         ),
-        preceded(
-            preceded(ws_and_comments, tag(b":>")),
-            preceded(ws_and_comments, tuple((
-                name,
-                opt(preceded(
-                    preceded(ws_and_comments, tag(b"=")),
-                    preceded(ws_and_comments, expression),
-                )),
-            ))),
-        ),
-    )))(input)?;
+    ));
+    let (input, subsets) = subsets_parser.parse(input)?;
     let (input, body) = part_usage_body(input)?;
     Ok((
         input,
@@ -146,22 +147,23 @@ fn part_usage_body(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
         frag.get(..40.min(frag.len())).unwrap_or(frag),
     );
     let result = alt((
-        map(tag(b";"), |_| PartUsageBody::Semicolon),
+        map(tag(&b";"[..]), |_| PartUsageBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 preceded(
                     ws_and_comments,
                     many0(preceded(ws_and_comments, part_usage_body_element)),
                 ),
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |elements| {
                 log::debug!("part_usage_body: brace ok, {} elements", elements.len());
                 PartUsageBody::Brace { elements }
             },
         ),
-    ))(input);
+    ))
+    .parse(input);
     if let Err(_) = &result {
         log::debug!(
             "part_usage_body: failed at: {:?}",
@@ -174,10 +176,11 @@ fn part_usage_body(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
 /// Action path for perform: name ( '.' name )* -> joined with ".".
 fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, first) = name(input)?;
-    let (input, rest) = many0(preceded(
-        preceded(ws_and_comments, tag(b".")),
+    let mut rest_parser = many0(preceded(
+        preceded(ws_and_comments, tag(&b"."[..])),
         preceded(ws_and_comments, name),
-    ))(input)?;
+    ));
+    let (input, rest) = rest_parser.parse(input)?;
     let action_name = std::iter::once(first)
         .chain(rest)
         .collect::<Vec<_>>()
@@ -190,14 +193,15 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = alt((
-        value(InOut::In, tag(b"in")),
-        value(InOut::Out, tag(b"out")),
-    ))(input)?;
+        value(InOut::In, tag(&b"in"[..])),
+        value(InOut::Out, tag(&b"out"[..])),
+    ))
+    .parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b"="))(input)?;
-    let (input, value_expr) = preceded(ws_and_comments, path_expression)(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b";"))(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+    let (input, value_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -216,13 +220,14 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
 fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     let (input, _) = ws_and_comments(input)?;
     let (input, elements) = nom::sequence::delimited(
-        tag(b"{"),
+        tag(&b"{"[..]),
         preceded(
             ws_and_comments,
             many0(preceded(ws_and_comments, perform_body_element)),
         ),
-        preceded(ws_and_comments, tag(b"}")),
-    )(input)?;
+        preceded(ws_and_comments, tag(&b"}"[..])),
+    )
+    .parse(input)?;
     Ok((input, PerformBody::Brace { elements }))
 }
 
@@ -230,7 +235,7 @@ fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
 fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"perform")(input)?;
+    let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, action_name) = perform_action_path(input)?;
     let (input, body) = perform_body(input)?;
@@ -244,22 +249,23 @@ fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
 pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"bind")(input)?;
+    let (input, _) = tag(&b"bind"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, left) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b"="))(input)?;
-    let (input, right) = preceded(ws_and_comments, path_expression)(input)?;
-    let (input, body) = alt((
-        map(preceded(ws_and_comments, tag(b";")), |_| Some(ConnectBody::Semicolon)),
+    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+    let (input, right) = preceded(ws_and_comments, path_expression).parse(input)?;
+    let mut body_parser = alt((
+        map(preceded(ws_and_comments, tag(&b";"[..])), |_| Some(ConnectBody::Semicolon)),
         map(
             nom::sequence::delimited(
-                preceded(ws_and_comments, tag(b"{")),
+                preceded(ws_and_comments, tag(&b"{"[..])),
                 skip_until_brace_end,
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| Some(ConnectBody::Brace),
         ),
-    ))(input)?;
+    ));
+    let (input, body) = body_parser.parse(input)?;
     Ok((input, node_from_to(start, input, Bind { left, right, body })))
 }
 
@@ -267,11 +273,11 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
 fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"connect")(input)?;
+    let (input, _) = tag(&b"connect"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, from_expr) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b"to"))(input)?;
-    let (input, to_expr) = preceded(ws_and_comments, path_expression)(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+    let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -287,11 +293,11 @@ fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
 fn interface_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"ref")(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b":>>"))(input)?;
-    let (input, ref_name) = preceded(ws_and_comments, name)(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b"="))(input)?;
-    let (input, value) = preceded(ws_and_comments, expression)(input)?;
+    let (input, _) = tag(&b"ref"[..]).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b":>>"[..])).parse(input)?;
+    let (input, ref_name) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+    let (input, value) = preceded(ws_and_comments, expression).parse(input)?;
     let (input, body) = ref_body_parse(input)?;
     Ok((
         input,
@@ -306,54 +312,57 @@ fn interface_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Int
 fn ref_body_parse(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| RefBody::Semicolon),
+        map(tag(&b";"[..]), |_| RefBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 skip_until_brace_end,
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| RefBody::Brace,
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Connect body for interface usage (TypedConnect): `;` or `{` body_elements* `}`
 fn connect_body_with_elements(input: Input<'_>) -> IResult<Input<'_>, (ConnectBody, Vec<Node<InterfaceUsageBodyElement>>)> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(b";"), |_| (ConnectBody::Semicolon, vec![])),
+    let mut parser = alt((
+        map(tag(&b";"[..]), |_| (ConnectBody::Semicolon, vec![])),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 preceded(
                     ws_and_comments,
                     many0(preceded(ws_and_comments, interface_usage_body_element)),
                 ),
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |elements| (ConnectBody::Brace, elements),
         ),
-    ))(input)
+    ));
+    parser.parse(input)
 }
 
 /// Interface usage: `interface` ( `:Type` )? `connect` path `to` path body  OR  `interface` path `to` path body?
 fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"interface")(input)?;
+    let (input, _) = tag(&b"interface"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, interface_type) = opt(preceded(
-        tag(b":"),
+        tag(&b":"[..]),
         preceded(ws_and_comments, qualified_name),
-    ))(input)?;
+    ))
+    .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"connect") {
-        let (input, _) = tag(b"connect")(input)?;
+        let (input, _) = tag(&b"connect"[..]).parse(input)?;
         let (input, _) = ws1(input)?;
         let (input, from_expr) = path_expression(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(b"to"))(input)?;
-        let (input, to_expr) = preceded(ws_and_comments, path_expression)(input)?;
+        let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+        let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
         let (input, (body, body_elements)) = connect_body_with_elements(input)?;
         Ok((
             input,
@@ -367,9 +376,9 @@ fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>>
         ))
     } else {
         let (input, from_expr) = path_expression(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(b"to"))(input)?;
-        let (input, to_expr) = preceded(ws_and_comments, path_expression)(input)?;
-        let (input, _) = opt(connect_body)(input)?;
+        let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+        let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+        let (input, _) = opt(connect_body).parse(input)?;
         Ok((
             input,
             node_from_to(start, input, InterfaceUsage::Connection {
@@ -399,6 +408,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         map(bind_, PartUsageBodyElement::Bind),
         map(interface_usage, PartUsageBodyElement::InterfaceUsage),
         map(connect_, PartUsageBodyElement::Connect),
-    ))(input)?;
+    ))
+    .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }

@@ -11,32 +11,45 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
 use nom::sequence::{delimited, preceded};
+use nom::Parser;
 use nom::IResult;
 
 /// Attribute body: ';' or '{' ... '}' (skip content inside braces)
 pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| AttributeBody::Semicolon),
+        map(tag(&b";"[..]), |_| AttributeBody::Semicolon),
         map(
-            delimited(tag(b"{"), skip_until_brace_end, preceded(ws_and_comments, tag(b"}"))),
+            delimited(
+                tag(&b"{"[..]),
+                skip_until_brace_end,
+                preceded(ws_and_comments, tag(&b"}"[..])),
+            ),
             |_| AttributeBody::Brace,
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Attribute definition: 'attribute' name ( ':>' | ':' )? qualified_name? body
 pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"attribute")(input)?;
+    let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(b"def"), ws1))(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, name_str) = name(input)?;
     let (input, typing) = nom::combinator::opt(alt((
-        preceded(preceded(ws_and_comments, tag(b":>")), preceded(ws_and_comments, qualified_name)),
-        preceded(preceded(ws_and_comments, tag(b":")), preceded(ws_and_comments, qualified_name)),
-    )))(input)?;
+        preceded(
+            preceded(ws_and_comments, tag(&b":>"[..])),
+            preceded(ws_and_comments, qualified_name),
+        ),
+        preceded(
+            preceded(ws_and_comments, tag(&b":"[..])),
+            preceded(ws_and_comments, qualified_name),
+        ),
+    )))
+    .parse(input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -52,17 +65,19 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
 pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"attribute")(input)?;
+    let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, redefines) = nom::combinator::opt(preceded(
-        preceded(ws_and_comments, tag(b"redefines")),
+        preceded(ws_and_comments, tag(&b"redefines"[..])),
         preceded(ws1, qualified_name),
-    ))(input)?;
+    ))
+    .parse(input)?;
     let (input, value) = nom::combinator::opt(preceded(
-        preceded(ws_and_comments, tag(b"=")),
+        preceded(ws_and_comments, tag(&b"="[..])),
         preceded(ws_and_comments, expression),
-    ))(input)?;
+    ))
+    .parse(input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,

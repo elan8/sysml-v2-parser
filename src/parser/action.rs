@@ -15,22 +15,24 @@ use nom::bytes::complete::tag;
 use nom::combinator::map;
 use nom::multi::many0;
 use nom::sequence::preceded;
+use nom::Parser;
 use nom::IResult;
 
 /// First/merge body: `;` or `{` ... `}`
 fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| FirstMergeBody::Semicolon),
+        map(tag(&b";"[..]), |_| FirstMergeBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 skip_until_brace_end,
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| FirstMergeBody::Brace,
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// In/out decl: `in` name `:` type `;` or `out` name `:` type `;`
@@ -38,13 +40,14 @@ fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = alt((
-        map(preceded(tag(b"in"), ws1), |_| InOut::In),
-        map(preceded(tag(b"out"), ws1), |_| InOut::Out),
-    ))(input)?;
+        map(preceded(tag(&b"in"[..]), ws1), |_| InOut::In),
+        map(preceded(tag(&b"out"[..]), ws1), |_| InOut::Out),
+    ))
+    .parse(input)?;
     let (input, param_name) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b":"))(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name)(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b";"))(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(start, input, InOutDecl {
@@ -59,28 +62,29 @@ fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
 fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| ActionDefBody::Semicolon),
+        map(tag(&b";"[..]), |_| ActionDefBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 preceded(
                     ws_and_comments,
                     many0(preceded(ws_and_comments, in_out_decl)),
                 ),
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |elements| ActionDefBody::Brace { elements },
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Action definition: `action` `def` Identification body
 pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"action")(input)?;
+    let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag(b"def")(input)?;
+    let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
     let (input, body) = action_def_body(input)?;
@@ -97,11 +101,11 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
 fn flow_(input: Input<'_>) -> IResult<Input<'_>, Node<Flow>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"flow")(input)?;
+    let (input, _) = tag(&b"flow"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, from_expr) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b"to"))(input)?;
-    let (input, to_expr) = preceded(ws_and_comments, path_expression)(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+    let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -117,11 +121,11 @@ fn flow_(input: Input<'_>) -> IResult<Input<'_>, Node<Flow>> {
 fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"first")(input)?;
+    let (input, _) = tag(&b"first"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, first_expr) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b"then"))(input)?;
-    let (input, then_expr) = preceded(ws_and_comments, path_expression)(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, then_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
@@ -137,7 +141,7 @@ fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
 fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"merge")(input)?;
+    let (input, _) = tag(&b"merge"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, merge_expr) = path_expression(input)?;
     let (input, body) = first_merge_body(input)?;
@@ -154,19 +158,20 @@ fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
 fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| ActionUsageBody::Semicolon),
+        map(tag(&b";"[..]), |_| ActionUsageBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 preceded(
                     ws_and_comments,
                     many0(preceded(ws_and_comments, action_usage_body_element)),
                 ),
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |elements| ActionUsageBody::Brace { elements },
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Action usage body element: InOutDecl | Bind | Flow | FirstStmt | MergeStmt | ActionUsage
@@ -180,7 +185,8 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         map(first_stmt, ActionUsageBodyElement::FirstStmt),
         map(merge_stmt, ActionUsageBodyElement::MergeStmt),
         map(action_usage, |a| ActionUsageBodyElement::ActionUsage(Box::new(a))),
-    ))(input)?;
+    ))
+    .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
@@ -188,40 +194,44 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
 pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"action")(input)?;
+    let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, (type_name, accept)) = nom::branch::alt((
         nom::combinator::map(
-            nom::sequence::tuple((
-                preceded(ws_and_comments, tag(b":")),
+            (
+                preceded(ws_and_comments, tag(&b":"[..])),
                 preceded(ws_and_comments, name),
                 nom::combinator::opt(preceded(
-                    preceded(ws_and_comments, tag(b"accept")),
-                    preceded(ws1, nom::sequence::tuple((
-                        name,
-                        preceded(ws_and_comments, tag(b":")),
-                        preceded(ws_and_comments, qualified_name),
-                    ))),
+                    preceded(ws_and_comments, tag(&b"accept"[..])),
+                    preceded(
+                        ws1,
+                        (
+                            name,
+                            preceded(ws_and_comments, tag(&b":"[..])),
+                            preceded(ws_and_comments, qualified_name),
+                        ),
+                    ),
                 )),
-            )),
+            ),
             |(_, type_name, accept)| (type_name, accept.map(|(pn, _, tn)| (pn, tn))),
         ),
         nom::combinator::map(
             preceded(
-                preceded(ws_and_comments, tag(b"accept")),
+                preceded(ws_and_comments, tag(&b"accept"[..])),
                 preceded(
                     ws1,
-                    nom::sequence::tuple((
+                    (
                         name,
-                        preceded(ws_and_comments, tag(b":")),
+                        preceded(ws_and_comments, tag(&b":"[..])),
                         preceded(ws_and_comments, name),
-                    )),
+                    ),
                 ),
             ),
             |(param_name, _, param_type)| (param_type.clone(), Some((param_name, param_type))),
         ),
-    ))(input)?;
+    ))
+    .parse(input)?;
     let (input, body) = action_usage_body(input)?;
     Ok((
         input,

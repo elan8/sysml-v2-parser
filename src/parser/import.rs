@@ -7,23 +7,25 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::sequence::{delimited, preceded, tuple};
+use nom::sequence::{delimited, preceded};
+use nom::Parser;
 use nom::IResult;
 
 /// RelationshipBody: ';' or '{' ... '}'. For '{' we skip content until matching '}'.
 pub(crate) fn relationship_body(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| ()),
+        map(tag(&b";"[..]), |_| ()),
         map(
             delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 skip_until_brace_end,
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| (),
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Import: visibility? 'import' isImportAll? (QualifiedName | QualifiedName '::' '*') RelationshipBody
@@ -31,20 +33,21 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, visibility) = opt(alt((
-        map(preceded(tag(b"public"), ws1), |_| Visibility::Public),
-        map(preceded(tag(b"private"), ws1), |_| Visibility::Private),
-        map(preceded(tag(b"protected"), ws1), |_| Visibility::Protected),
-    )))(input)?;
-    let (input, _) = tag(b"import")(input)?;
+        map(preceded(tag(&b"public"[..]), ws1), |_| Visibility::Public),
+        map(preceded(tag(&b"private"[..]), ws1), |_| Visibility::Private),
+        map(preceded(tag(&b"protected"[..]), ws1), |_| Visibility::Protected),
+    )))
+    .parse(input)?;
+    let (input, _) = tag(&b"import"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = opt(preceded(tag(b"all"), ws1))(input)?;
+    let (input, _) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
     let (input, (target, is_import_all)) = alt((
         map(
-            tuple((
+            (
                 qualified_name,
-                preceded(ws_and_comments, tag(b"::")),
-                preceded(ws_and_comments, tag(b"*")),
-            )),
+                preceded(ws_and_comments, tag(&b"::"[..])),
+                preceded(ws_and_comments, tag(&b"*"[..])),
+            ),
             |(q, _, _)| {
                 log::debug!("import_: parsed target (with ::*) = {}::*", q);
                 (format!("{}::*", q), true)
@@ -54,7 +57,8 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
             log::debug!("import_: parsed target (no ::*) = {}", q);
             (q, false)
         }),
-    ))(input)?;
+    ))
+    .parse(input)?;
     let (input, _) = relationship_body(input)?;
     Ok((
         input,

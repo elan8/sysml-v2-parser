@@ -1,7 +1,6 @@
 //! Parser input type and span extraction for source locations.
 
 use crate::ast::{Node, Span};
-use nom::InputLength;
 use nom_locate::LocatedSpan;
 
 /// Parser input: bytes with location tracking (offset, line, column).
@@ -9,7 +8,7 @@ pub type Input<'a> = LocatedSpan<&'a [u8]>;
 
 /// Build a Span from the start and rest inputs (the consumed region).
 pub fn span_from_to(start: Input<'_>, rest: Input<'_>) -> Span {
-    let len = start.input_len().saturating_sub(rest.input_len());
+    let len = start.fragment().len().saturating_sub(rest.fragment().len());
     Span {
         offset: start.location_offset(),
         line: start.location_line(),
@@ -29,13 +28,14 @@ mod tests {
     use crate::ast::Span;
     use nom::bytes::complete::tag;
     use nom::error::Error;
+    use nom::Parser;
     use nom_locate::LocatedSpan;
 
     #[test]
     fn span_from_to_consumed_region() {
         let bytes = b"package Foo;" as &[u8];
         let start = LocatedSpan::new(bytes);
-        let (rest, _) = tag::<_, _, Error<Input>>(b"package")(start).unwrap();
+        let (rest, _) = tag::<_, Input<'_>, Error<Input<'_>>>(&b"package"[..]).parse(start).unwrap();
         let span = span_from_to(start, rest);
         assert_eq!(
             span,

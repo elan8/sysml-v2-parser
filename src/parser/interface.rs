@@ -13,18 +13,19 @@ use nom::bytes::complete::tag;
 use nom::combinator::map;
 use nom::multi::many0;
 use nom::sequence::preceded;
+use nom::Parser;
 use nom::IResult;
 
 /// End declaration: `end` name `:` type `;`
 fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"end")(input)?;
+    let (input, _) = tag(&b"end"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b":"))(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name)(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b";"))(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(start, input, EndDecl {
@@ -38,27 +39,28 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
 fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| RefBody::Semicolon),
+        map(tag(&b";"[..]), |_| RefBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 skip_until_brace_end,
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| RefBody::Brace,
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Ref declaration: `ref` name `:` type body
 fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"ref")(input)?;
+    let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b":"))(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name)(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
     let (input, body) = ref_body(input)?;
     Ok((
         input,
@@ -74,27 +76,28 @@ fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
 pub(crate) fn connect_body(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| ConnectBody::Semicolon),
+        map(tag(&b";"[..]), |_| ConnectBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 skip_until_brace_end,
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| ConnectBody::Brace,
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Connect statement: `connect` from `to` to body
 fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"connect")(input)?;
+    let (input, _) = tag(&b"connect"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, from_expr) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b"to"))(input)?;
-    let (input, to_expr) = preceded(ws_and_comments, path_expression)(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+    let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -113,7 +116,8 @@ fn interface_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         map(end_decl, InterfaceDefBodyElement::EndDecl),
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),
-    ))(input)?;
+    ))
+    .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
@@ -121,28 +125,29 @@ fn interface_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
 fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| InterfaceDefBody::Semicolon),
+        map(tag(&b";"[..]), |_| InterfaceDefBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 preceded(
                     ws_and_comments,
                     many0(preceded(ws_and_comments, interface_def_body_element)),
                 ),
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |elements| InterfaceDefBody::Brace { elements },
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Interface definition: `interface` `def` Identification body
 pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"interface")(input)?;
+    let (input, _) = tag(&b"interface"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag(b"def")(input)?;
+    let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
     let (input, body) = interface_def_body(input)?;

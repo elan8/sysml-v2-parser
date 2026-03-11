@@ -24,7 +24,6 @@ pub(crate) use span::{node_from_to, Input};
 use crate::ast::RootNamespace;
 use crate::error::ParseError;
 use nom::error::Error;
-use nom::InputLength;
 use nom_locate::LocatedSpan;
 
 /// Result of parsing with error recovery: a (possibly partial) AST and zero or more diagnostics.
@@ -87,7 +86,7 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
                 log::debug!("parse_root: success, {} top-level elements", root.elements.len());
                 Ok(root)
             } else {
-                let offset = located.location_offset() + located.input_len() - rest.input_len();
+                let offset = located.location_offset() + located.fragment().len() - rest.fragment().len();
                 let unconsumed = rest.fragment();
                 let first_80 = unconsumed.get(..80.min(unconsumed.len())).unwrap_or(unconsumed);
                 log::debug!(

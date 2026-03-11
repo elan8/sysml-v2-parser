@@ -8,33 +8,35 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
 use nom::sequence::preceded;
+use nom::Parser;
 use nom::IResult;
 
 /// Alias body: `;` or `{` ... `}`
 fn alias_body(input: Input<'_>) -> IResult<Input<'_>, AliasBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(b";"), |_| AliasBody::Semicolon),
+        map(tag(&b";"[..]), |_| AliasBody::Semicolon),
         map(
             nom::sequence::delimited(
-                tag(b"{"),
+                tag(&b"{"[..]),
                 skip_until_brace_end,
-                preceded(ws_and_comments, tag(b"}")),
+                preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| AliasBody::Brace,
         ),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Alias definition: `alias` Identification `for` qualified_name body
 pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"alias")(input)?;
+    let (input, _) = tag(&b"alias"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(b"for"))(input)?;
-    let (input, target) = preceded(ws1, qualified_name)(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"for"[..])).parse(input)?;
+    let (input, target) = preceded(ws1, qualified_name).parse(input)?;
     let (input, body) = alias_body(input)?;
     Ok((
         input,

@@ -9,14 +9,15 @@ use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
 use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded};
+use nom::Parser;
 use nom::IResult;
 
 /// Integer literal.
 fn literal_integer(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, sign) = opt(alt((tag(b"-"), tag(b"+"))))(input)?;
-    let (input, digits) = digit1(input)?;
+    let (input, sign) = opt(alt((tag(&b"-"[..]), tag(&b"+"[..])))).parse(input)?;
+    let (input, digits) = digit1.parse(input)?;
     let s = String::from_utf8_lossy(digits.fragment());
     let n: i64 = s.parse().unwrap_or(0);
     let n = if sign.map(|s: Input| s.fragment() == b"-").unwrap_or(false) {
@@ -31,9 +32,9 @@ fn literal_integer(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 fn literal_real(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, whole) = digit1(input)?;
-    let (input, _) = tag(b".")(input)?;
-    let (input, frac) = digit1(input)?;
+    let (input, whole) = digit1.parse(input)?;
+    let (input, _) = tag(&b"."[..]).parse(input)?;
+    let (input, frac) = digit1.parse(input)?;
     let s = format!(
         "{}.{}",
         String::from_utf8_lossy(whole.fragment()),
@@ -46,7 +47,7 @@ fn literal_real(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 fn literal_string(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"\"")(input)?;
+    let (input, _) = tag(&b"\""[..]).parse(input)?;
     let frag = input.fragment();
     let mut i = 0;
     while i < frag.len() {
@@ -56,13 +57,13 @@ fn literal_string(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         }
         if frag[i] == b'"' {
             let s = String::from_utf8_lossy(&frag[..i]).replace("\\\"", "\"");
-            let (input, _) = nom::bytes::complete::take(i + 1)(input)?;
+            let (input, _) = nom::bytes::complete::take(i + 1).parse(input)?;
             return Ok((input, node_from_to(start, input, Expression::LiteralString(s))));
         }
         i += 1;
     }
     let s = String::from_utf8_lossy(frag).replace("\\\"", "\"");
-    let (input, _) = nom::bytes::complete::take(frag.len())(input)?;
+    let (input, _) = nom::bytes::complete::take(frag.len()).parse(input)?;
     Ok((input, node_from_to(start, input, Expression::LiteralString(s))))
 }
 
@@ -71,9 +72,10 @@ fn literal_boolean(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, v) = alt((
-        map(tag(b"true"), |_| true),
-        map(tag(b"false"), |_| false),
-    ))(input)?;
+        map(tag(&b"true"[..]), |_| true),
+        map(tag(&b"false"[..]), |_| false),
+    ))
+    .parse(input)?;
     Ok((input, node_from_to(start, input, Expression::LiteralBoolean(v))))
 }
 
@@ -93,7 +95,8 @@ fn literal_only(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         literal_integer,
         literal_real,
         literal_string,
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Literal with optional [ unit ]: 1750 [kg] -> LiteralWithUnit(...).
@@ -104,11 +107,11 @@ fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     if !input.fragment().starts_with(b"[") {
         return Ok((input, value_node));
     }
-    let (input, _) = tag(b"[")(input)?;
+    let (input, _) = tag(&b"["[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, unit_name) = name(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(b"]")(input)?;
+    let (input, _) = tag(&b"]"[..]).parse(input)?;
     let unit = Node::new(
         crate::ast::Span::dummy(),
         Expression::Bracket(Box::new(Node::new(
@@ -127,10 +130,11 @@ fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 fn parenthesized(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     delimited(
-        tag(b"("),
+        tag(&b"("[..]),
         preceded(ws_and_comments, expression),
-        preceded(ws_and_comments, tag(b")")),
-    )(input)
+        preceded(ws_and_comments, tag(&b")"[..])),
+    )
+    .parse(input)
 }
 
 /// Primary expression: literal with unit, literal only, feature ref, or parenthesized.
@@ -141,7 +145,8 @@ fn primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         literal_only,
         feature_ref_primary,
         parenthesized,
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Apply postfix #( expr ) or . name to an expression.
@@ -152,10 +157,10 @@ fn postfix<'a>(
 ) -> IResult<Input<'a>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"#") {
-        let (input, _) = tag(b"#")(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(b"("))(input)?;
-        let (input, index_node) = preceded(ws_and_comments, expression)(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(b")"))(input)?;
+        let (input, _) = tag(&b"#"[..]).parse(input)?;
+        let (input, _) = preceded(ws_and_comments, tag(&b"("[..])).parse(input)?;
+        let (input, index_node) = preceded(ws_and_comments, expression).parse(input)?;
+        let (input, _) = preceded(ws_and_comments, tag(&b")"[..])).parse(input)?;
         let expr = Expression::Index {
             base: Box::new(current),
             index: Box::new(index_node),
@@ -163,7 +168,7 @@ fn postfix<'a>(
         return postfix(input, start, node_from_to(start, input, expr));
     }
     if input.fragment().starts_with(b".") {
-        let (input, _) = tag(b".")(input)?;
+        let (input, _) = tag(&b"."[..]).parse(input)?;
         let (input, _) = ws_and_comments(input)?;
         let (input, member) = name(input)?;
         let expr = Expression::MemberAccess(Box::new(current), member);
@@ -191,7 +196,7 @@ pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expre
         if !next.fragment().starts_with(b".") {
             break;
         }
-        let (next, _) = tag(b".")(next)?;
+        let (next, _) = tag(&b"."[..]).parse(next)?;
         let (next, _) = ws_and_comments(next)?;
         let (next, member) = name(next)?;
         expr = Expression::MemberAccess(
