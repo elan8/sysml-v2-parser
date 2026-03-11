@@ -22,3 +22,30 @@ pub fn span_from_to(start: Input<'_>, rest: Input<'_>) -> Span {
 pub fn node_from_to<T>(start: Input<'_>, rest: Input<'_>, value: T) -> Node<T> {
     Node::new(span_from_to(start, rest), value)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{span_from_to, Input};
+    use crate::ast::Span;
+    use nom::bytes::complete::tag;
+    use nom::error::Error;
+    use nom_locate::LocatedSpan;
+
+    #[test]
+    fn span_from_to_consumed_region() {
+        let bytes = b"package Foo;" as &[u8];
+        let start = LocatedSpan::new(bytes);
+        let (rest, _) = tag::<_, _, Error<Input>>(b"package")(start).unwrap();
+        let span = span_from_to(start, rest);
+        assert_eq!(
+            span,
+            Span {
+                offset: 0,
+                line: 1,
+                column: 1,
+                len: 7,
+            },
+            "span should cover consumed 'package' (7 bytes)"
+        );
+    }
+}

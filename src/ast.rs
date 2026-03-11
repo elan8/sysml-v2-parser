@@ -21,6 +21,20 @@ impl Span {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::Span;
+
+    #[test]
+    fn span_dummy() {
+        let s = Span::dummy();
+        assert_eq!(s.offset, 0);
+        assert_eq!(s.line, 1);
+        assert_eq!(s.column, 1);
+        assert_eq!(s.len, 0);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Node<T> {
     pub span: Span,
