@@ -141,7 +141,13 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
         }
     };
 
-    while !input.fragment().is_empty() && errors.len() < MAX_RECOVERY_ERRORS {
+    while errors.len() < MAX_RECOVERY_ERRORS {
+        // Skip leading ws/comments; if nothing left, we're done (avoids parsing "" as root_element).
+        let (rest, _) = lex::ws_and_comments(input).unwrap_or((input, ()));
+        input = rest;
+        if input.fragment().is_empty() {
+            break;
+        }
         match package::root_element(input) {
             Ok((rest, elem)) => {
                 elements.push(elem);
