@@ -3,20 +3,51 @@
 //! Each validation .sysml file has a corresponding test module under `validation/`
 //! for easier maintenance.
 //!
-//! Logging is initialized with default level DEBUG. Use `--nocapture` to see log output when running tests.
-//! Set `RUST_LOG` to override (e.g. `RUST_LOG=trace`).
+//! Logging defaults to WARN so test output stays small. Use `RUST_LOG=debug` (or
+//! `RUST_LOG=sysml_parser=debug`) and `--nocapture` when debugging parser behavior.
 
 #[path = "validation/parts_tree_1a.rs"]
 mod parts_tree_1a;
 
-/// Initialize the logger so that `log` statements in library and tests are visible.
-/// Default level is DEBUG when `RUST_LOG` is not set.
+/// Initialize the logger. Default level is WARN so failures don't flood with DEBUG.
+/// Set `RUST_LOG=debug` (or `RUST_LOG=sysml_parser=debug`) when debugging.
 pub(crate) fn init_log() {
     let mut builder = env_logger::Builder::from_default_env();
     if std::env::var("RUST_LOG").is_err() {
-        builder.filter_level(log::LevelFilter::Debug);
+        builder.filter_level(log::LevelFilter::Warn);
     }
     let _ = builder.try_init();
+}
+
+/// Asserts that parsed and expected ASTs are equal. Normalizes parsed (strips optional
+/// spans) so comparison matches hand-built expected AST. On failure, panics with a short
+/// message (first difference position and snippet) instead of dumping full ASTs.
+pub(crate) fn assert_ast_eq(
+    parsed: &sysml_parser::ast::RootNamespace,
+    expected: &sysml_parser::ast::RootNamespace,
+    msg: &str,
+) {
+    let normalized = parsed.normalize_for_test_comparison();
+    if normalized == *expected {
+        return;
+    }
+    let pa = format!("{:?}", normalized);
+    let pe = format!("{:?}", expected);
+    let pos = pa
+        .chars()
+        .zip(pe.chars())
+        .position(|(a, b)| a != b)
+        .unwrap_or(pa.len().min(pe.len()));
+    let snippet: String = pa
+        .chars()
+        .skip(pos.saturating_sub(80))
+        .take(160)
+        .collect();
+    panic!(
+        "{}: AST mismatch at char {} (parsed {} chars, expected {} chars). Snippet: ...{}... \
+         Set RUST_LOG=debug and run with --nocapture for full parser trace.",
+        msg, pos, pa.len(), pe.len(), snippet
+    );
 }
 
 #[path = "validation/parts_interconnection_2a.rs"]

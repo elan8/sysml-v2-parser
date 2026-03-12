@@ -7,6 +7,7 @@ use crate::ast::{
 use crate::parser::expr::path_expression;
 use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
 use crate::parser::node_from_to;
+use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -22,15 +23,17 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"end"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, (type_ref_span, type_name)) = preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(start, input, EndDecl {
             name: name_str,
             type_name,
+            name_span: Some(name_span),
+            type_ref_span: Some(type_ref_span),
         }),
     ))
 }
@@ -58,9 +61,9 @@ fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, (type_ref_span, type_name)) = preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
     let (input, body) = ref_body(input)?;
     Ok((
         input,
@@ -68,6 +71,8 @@ fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             name: name_str,
             type_name,
             body,
+            name_span: Some(name_span),
+            type_ref_span: Some(type_ref_span),
         }),
     ))
 }

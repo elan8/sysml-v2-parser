@@ -9,6 +9,7 @@ use crate::parser::interface::connect_body;
 use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
+use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -213,12 +214,12 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
-    let (input, (type_name, accept)) = nom::branch::alt((
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, (type_ref_span, type_name, accept)) = nom::branch::alt((
         nom::combinator::map(
             (
                 preceded(ws_and_comments, tag(&b":"[..])),
-                preceded(ws_and_comments, name),
+                preceded(ws_and_comments, with_span(name)),
                 nom::combinator::opt(preceded(
                     preceded(ws_and_comments, tag(&b"accept"[..])),
                     preceded(
@@ -231,7 +232,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                     ),
                 )),
             ),
-            |(_, type_name, accept)| (type_name, accept.map(|(pn, _, tn)| (pn, tn))),
+            |(_, (span, type_name), accept)| (Some(span), type_name, accept.map(|(pn, _, tn)| (pn, tn))),
         ),
         nom::combinator::map(
             preceded(
@@ -245,7 +246,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                     ),
                 ),
             ),
-            |(param_name, _, param_type)| (param_type.clone(), Some((param_name, param_type))),
+            |(param_name, _, param_type)| (None, param_type.clone(), Some((param_name, param_type))),
         ),
     ))
     .parse(input)?;
@@ -257,6 +258,8 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
             type_name,
             accept,
             body,
+            name_span: Some(name_span),
+            type_ref_span,
         }),
     ))
 }

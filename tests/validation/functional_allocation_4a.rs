@@ -69,6 +69,8 @@ fn vehicle1_c1_functional_allocation() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: Some(("vehicle1_c1".to_string(), None)),
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PortUsage(n(port_fuel_cmd_port()))),
@@ -107,6 +109,8 @@ fn port_fuel_cmd_port() -> PortUsage {
         subsets: None,
         redefines: None,
         body: PortBody::Brace,
+        name_span: None,
+        type_ref_span: None,
     }
 }
 
@@ -117,6 +121,8 @@ fn part_engine() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
@@ -126,6 +132,8 @@ fn part_engine() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Brace,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartUsageBodyElement::Perform(n(Perform {
                     action_name: "provide power.generate torque".to_string(),
@@ -152,6 +160,8 @@ fn part_engine() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Brace,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -165,6 +175,8 @@ fn part_transmission() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
@@ -174,6 +186,8 @@ fn part_transmission() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Brace,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartUsageBodyElement::Perform(n(Perform {
                     action_name: "provide power.amplify torque".to_string(),
@@ -200,6 +214,8 @@ fn part_transmission() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Brace,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -213,6 +229,8 @@ fn part_driveshaft() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
@@ -222,6 +240,8 @@ fn part_driveshaft() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Brace,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartUsageBodyElement::Perform(n(Perform {
                     action_name: "provide power.transfer torque".to_string(),
@@ -248,6 +268,8 @@ fn part_driveshaft() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Brace,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -261,6 +283,8 @@ fn part_rear_axle_assembly() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
@@ -270,6 +294,8 @@ fn part_rear_axle_assembly() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Brace,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartUsageBodyElement::Perform(n(Perform {
                     action_name: "provide power.distribute torque".to_string(),
@@ -307,6 +333,8 @@ fn part_rear_axle() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PartUsage(Box::new(n(part_left_half_axle())))),
@@ -323,6 +351,8 @@ fn part_left_half_axle() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![n(PartUsageBodyElement::PortUsage(n(PortUsage {
                 name: "axleToWheelPort".to_string(),
@@ -331,6 +361,8 @@ fn part_left_half_axle() -> PartUsage {
                 subsets: None,
                 redefines: None,
                 body: PortBody::Brace,
+                name_span: None,
+                type_ref_span: None,
             })))],
         },
     }
@@ -343,6 +375,8 @@ fn part_right_half_axle() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![n(PartUsageBodyElement::PortUsage(n(PortUsage {
                 name: "axleToWheelPort".to_string(),
@@ -351,6 +385,8 @@ fn part_right_half_axle() -> PartUsage {
                 subsets: None,
                 redefines: None,
                 body: PortBody::Brace,
+                name_span: None,
+                type_ref_span: None,
             })))],
         },
     }
@@ -382,8 +418,9 @@ fn test_parse_4a_functional_allocation() {
         Err(e) => panic!("parse should succeed for 4a-Functional Allocation.sysml: {:?}", e),
     };
     let expected = expected_ast();
-    assert_eq!(
-        parsed, &expected,
-        "parsed AST should match expected for 4a-Functional Allocation.sysml"
+    super::assert_ast_eq(
+        parsed,
+        &expected,
+        "parsed AST should match expected for 4a-Functional Allocation.sysml",
     );
 }

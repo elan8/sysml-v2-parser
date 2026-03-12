@@ -268,6 +268,10 @@ pub struct AttributeDef {
     /// Type after `:>`, e.g. Some("ISQ::mass").
     pub typing: Option<String>,
     pub body: AttributeBody,
+    /// Span of the defined name (for semantic tokens).
+    pub name_span: Option<Span>,
+    /// Span of the type after `:>`, if present (for semantic tokens).
+    pub typing_span: Option<Span>,
 }
 
 /// Body of an attribute (def or usage): `;` or `{` ... `}`.
@@ -289,6 +293,10 @@ pub struct PartUsage {
     /// Optional `subsets` feature and value expression.
     pub subsets: Option<(String, Option<Node<Expression>>)>,
     pub body: PartUsageBody,
+    /// Span of the usage name (for semantic tokens).
+    pub name_span: Option<Span>,
+    /// Span of the type reference after `:` (for semantic tokens).
+    pub type_ref_span: Option<Span>,
 }
 
 /// Body of a part usage: `;` or `{` PartUsageBodyElement* `}`.
@@ -359,6 +367,10 @@ pub struct AttributeUsage {
     /// Value expression.
     pub value: Option<Node<Expression>>,
     pub body: AttributeBody,
+    /// Span of the usage name (for semantic tokens).
+    pub name_span: Option<Span>,
+    /// Span of the redefines target after `redefines`, if present (for semantic tokens).
+    pub redefines_span: Option<Span>,
 }
 
 // ---------------------------------------------------------------------------
@@ -399,6 +411,10 @@ pub struct PortUsage {
     pub subsets: Option<(String, Option<Node<Expression>>)>,
     pub redefines: Option<String>,
     pub body: PortBody,
+    /// Span of the usage name (for semantic tokens).
+    pub name_span: Option<Span>,
+    /// Span of the type reference after `:`, if present (for semantic tokens).
+    pub type_ref_span: Option<Span>,
 }
 
 /// Body of a port usage: `;` or `{` PortUsage* `}` (nested ports).
@@ -443,6 +459,10 @@ pub enum InterfaceDefBodyElement {
 pub struct EndDecl {
     pub name: String,
     pub type_name: String,
+    /// Span of the name (for semantic tokens).
+    pub name_span: Option<Span>,
+    /// Span of the type after `:` (for semantic tokens).
+    pub type_ref_span: Option<Span>,
 }
 
 /// Ref declaration in interface def: `ref` name `:` type body.
@@ -451,6 +471,10 @@ pub struct RefDecl {
     pub name: String,
     pub type_name: String,
     pub body: RefBody,
+    /// Span of the name (for semantic tokens).
+    pub name_span: Option<Span>,
+    /// Span of the type after `:` (for semantic tokens).
+    pub type_ref_span: Option<Span>,
 }
 
 /// Body of a ref declaration: `;` or `{` ... `}`.
@@ -595,6 +619,10 @@ pub struct ActionUsage {
     /// For accept form: (param_name, param_type).
     pub accept: Option<(String, String)>,
     pub body: ActionUsageBody,
+    /// Span of the usage name (for semantic tokens).
+    pub name_span: Option<Span>,
+    /// Span of the type reference after `:` (for semantic tokens).
+    pub type_ref_span: Option<Span>,
 }
 
 /// Body of an action usage: `;` or `{` ActionUsageBodyElement* `}`.
@@ -892,4 +920,422 @@ pub enum CalcDefBodyElement {
 pub struct ReturnDecl {
     pub name: String,
     pub type_name: String,
+}
+
+// ---------------------------------------------------------------------------
+// Normalization for test comparison (strips optional spans so parsed == expected)
+// ---------------------------------------------------------------------------
+
+impl RootNamespace {
+    /// Returns a copy with all optional source spans set to `None` and all `Node` spans set to
+    /// `Span::dummy()`. Use when comparing parser output to hand-built expected AST in tests.
+    pub fn normalize_for_test_comparison(&self) -> Self {
+        RootNamespace {
+            elements: self
+                .elements
+                .iter()
+                .map(normalize_root_element_node)
+                .collect(),
+        }
+    }
+}
+
+fn dummy_node<T: Clone>(_n: &Node<T>, value: T) -> Node<T> {
+    Node::new(Span::dummy(), value)
+}
+
+fn normalize_root_element_node(el: &Node<RootElement>) -> Node<RootElement> {
+    let value = match &el.value {
+        RootElement::Package(p) => RootElement::Package(dummy_node(p, normalize_package(&p.value))),
+        RootElement::Namespace(n) => {
+            RootElement::Namespace(dummy_node(n, normalize_namespace_decl(&n.value)))
+        }
+    };
+    dummy_node(el, value)
+}
+
+fn normalize_namespace_decl(n: &NamespaceDecl) -> NamespaceDecl {
+    NamespaceDecl {
+        identification: n.identification.clone(),
+        body: normalize_package_body(&n.body),
+    }
+}
+
+fn normalize_package(p: &Package) -> Package {
+    Package {
+        identification: p.identification.clone(),
+        body: normalize_package_body(&p.body),
+    }
+}
+
+fn normalize_package_body(b: &PackageBody) -> PackageBody {
+    match b {
+        PackageBody::Semicolon => PackageBody::Semicolon,
+        PackageBody::Brace { elements } => PackageBody::Brace {
+            elements: elements
+                .iter()
+                .map(normalize_package_body_element_node)
+                .collect(),
+        },
+    }
+}
+
+fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<PackageBodyElement> {
+    let value = match &el.value {
+        PackageBodyElement::Doc(n) => PackageBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PackageBodyElement::Comment(n) => {
+            PackageBodyElement::Comment(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::TextualRep(n) => {
+            PackageBodyElement::TextualRep(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::Filter(n) => {
+            PackageBodyElement::Filter(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::Package(n) => {
+            PackageBodyElement::Package(dummy_node(n, normalize_package(&n.value)))
+        }
+        PackageBodyElement::Import(n) => PackageBodyElement::Import(dummy_node(n, n.value.clone())),
+        PackageBodyElement::PartDef(n) => {
+            PackageBodyElement::PartDef(dummy_node(n, normalize_part_def(&n.value)))
+        }
+        PackageBodyElement::PartUsage(n) => {
+            PackageBodyElement::PartUsage(dummy_node(n, normalize_part_usage(&n.value)))
+        }
+        PackageBodyElement::PortDef(n) => {
+            PackageBodyElement::PortDef(dummy_node(n, normalize_port_def(&n.value)))
+        }
+        PackageBodyElement::InterfaceDef(n) => {
+            PackageBodyElement::InterfaceDef(dummy_node(n, normalize_interface_def(&n.value)))
+        }
+        PackageBodyElement::AliasDef(n) => PackageBodyElement::AliasDef(dummy_node(n, n.value.clone())),
+        PackageBodyElement::AttributeDef(n) => {
+            PackageBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
+        }
+        PackageBodyElement::ActionDef(n) => {
+            PackageBodyElement::ActionDef(dummy_node(n, normalize_action_def(&n.value)))
+        }
+        PackageBodyElement::ActionUsage(n) => {
+            PackageBodyElement::ActionUsage(dummy_node(n, normalize_action_usage(&n.value)))
+        }
+        PackageBodyElement::RequirementDef(n) => {
+            PackageBodyElement::RequirementDef(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::RequirementUsage(n) => {
+            PackageBodyElement::RequirementUsage(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::Satisfy(n) => PackageBodyElement::Satisfy(dummy_node(n, n.value.clone())),
+        PackageBodyElement::UseCaseDef(n) => {
+            PackageBodyElement::UseCaseDef(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::Actor(n) => PackageBodyElement::Actor(dummy_node(n, n.value.clone())),
+        PackageBodyElement::StateDef(n) => {
+            PackageBodyElement::StateDef(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::ConstraintDef(n) => {
+            PackageBodyElement::ConstraintDef(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::CalcDef(n) => PackageBodyElement::CalcDef(dummy_node(n, n.value.clone())),
+    };
+    dummy_node(el, value)
+}
+
+fn normalize_attribute_def(a: &AttributeDef) -> AttributeDef {
+    AttributeDef {
+        name: a.name.clone(),
+        typing: a.typing.clone(),
+        body: a.body.clone(),
+        name_span: None,
+        typing_span: None,
+    }
+}
+
+fn normalize_part_def(p: &PartDef) -> PartDef {
+    PartDef {
+        identification: p.identification.clone(),
+        specializes: p.specializes.clone(),
+        body: normalize_part_def_body(&p.body),
+    }
+}
+
+fn normalize_part_def_body(b: &PartDefBody) -> PartDefBody {
+    match b {
+        PartDefBody::Semicolon => PartDefBody::Semicolon,
+        PartDefBody::Brace { elements } => PartDefBody::Brace {
+            elements: elements
+                .iter()
+                .map(normalize_part_def_body_element_node)
+                .collect(),
+        },
+    }
+}
+
+fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<PartDefBodyElement> {
+    let value = match &el.value {
+        PartDefBodyElement::Doc(n) => PartDefBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PartDefBodyElement::AttributeDef(n) => {
+            PartDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
+        }
+        PartDefBodyElement::AttributeUsage(n) => {
+            PartDefBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
+        }
+        PartDefBodyElement::PortUsage(n) => {
+            PartDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
+        }
+        PartDefBodyElement::PartUsage(n) => {
+            PartDefBodyElement::PartUsage(Box::new(dummy_node(n, normalize_part_usage(&n.value))))
+        }
+        PartDefBodyElement::Connect(n) => PartDefBodyElement::Connect(dummy_node(n, n.value.clone())),
+        PartDefBodyElement::Perform(n) => PartDefBodyElement::Perform(dummy_node(n, n.value.clone())),
+        PartDefBodyElement::Allocate(n) => PartDefBodyElement::Allocate(dummy_node(n, n.value.clone())),
+    };
+    dummy_node(el, value)
+}
+
+fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
+    AttributeUsage {
+        name: a.name.clone(),
+        redefines: a.redefines.clone(),
+        value: a.value.clone(),
+        body: a.body.clone(),
+        name_span: None,
+        redefines_span: None,
+    }
+}
+
+fn normalize_part_usage(p: &PartUsage) -> PartUsage {
+    PartUsage {
+        name: p.name.clone(),
+        type_name: p.type_name.clone(),
+        multiplicity: p.multiplicity.clone(),
+        ordered: p.ordered,
+        subsets: p.subsets.clone(),
+        body: normalize_part_usage_body(&p.body),
+        name_span: None,
+        type_ref_span: None,
+    }
+}
+
+fn normalize_part_usage_body(b: &PartUsageBody) -> PartUsageBody {
+    match b {
+        PartUsageBody::Semicolon => PartUsageBody::Semicolon,
+        PartUsageBody::Brace { elements } => PartUsageBody::Brace {
+            elements: elements
+                .iter()
+                .map(normalize_part_usage_body_element_node)
+                .collect(),
+        },
+    }
+}
+
+fn normalize_part_usage_body_element_node(
+    el: &Node<PartUsageBodyElement>,
+) -> Node<PartUsageBodyElement> {
+    let value = match &el.value {
+        PartUsageBodyElement::Doc(n) => PartUsageBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PartUsageBodyElement::AttributeUsage(n) => {
+            PartUsageBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
+        }
+        PartUsageBodyElement::PartUsage(n) => {
+            PartUsageBodyElement::PartUsage(Box::new(dummy_node(n, normalize_part_usage(&n.value))))
+        }
+        PartUsageBodyElement::PortUsage(n) => {
+            PartUsageBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
+        }
+        PartUsageBodyElement::Bind(n) => PartUsageBodyElement::Bind(dummy_node(n, n.value.clone())),
+        PartUsageBodyElement::InterfaceUsage(n) => {
+            PartUsageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::Connect(n) => PartUsageBodyElement::Connect(dummy_node(n, n.value.clone())),
+        PartUsageBodyElement::Perform(n) => {
+            PartUsageBodyElement::Perform(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::Allocate(n) => {
+            PartUsageBodyElement::Allocate(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::Satisfy(n) => PartUsageBodyElement::Satisfy(dummy_node(n, n.value.clone())),
+        PartUsageBodyElement::StateUsage(n) => {
+            PartUsageBodyElement::StateUsage(dummy_node(n, n.value.clone()))
+        }
+    };
+    dummy_node(el, value)
+}
+
+fn normalize_port_usage(p: &PortUsage) -> PortUsage {
+    PortUsage {
+        name: p.name.clone(),
+        type_name: p.type_name.clone(),
+        multiplicity: p.multiplicity.clone(),
+        subsets: p.subsets.clone(),
+        redefines: p.redefines.clone(),
+        body: normalize_port_body(&p.body),
+        name_span: None,
+        type_ref_span: None,
+    }
+}
+
+fn normalize_port_body(b: &PortBody) -> PortBody {
+    match b {
+        PortBody::Semicolon => PortBody::Semicolon,
+        PortBody::Brace => PortBody::Brace,
+        PortBody::BraceWithPorts { elements } => PortBody::BraceWithPorts {
+            elements: elements
+                .iter()
+                .map(|n| dummy_node(n, normalize_port_usage(&n.value)))
+                .collect(),
+        },
+    }
+}
+
+fn normalize_port_def(p: &PortDef) -> PortDef {
+    PortDef {
+        identification: p.identification.clone(),
+        body: normalize_port_def_body(&p.body),
+    }
+}
+
+fn normalize_port_def_body(b: &PortDefBody) -> PortDefBody {
+    match b {
+        PortDefBody::Semicolon => PortDefBody::Semicolon,
+        PortDefBody::Brace { elements } => PortDefBody::Brace {
+            elements: elements
+                .iter()
+                .map(normalize_port_def_body_element_node)
+                .collect(),
+        },
+    }
+}
+
+fn normalize_port_def_body_element_node(
+    el: &Node<PortDefBodyElement>,
+) -> Node<PortDefBodyElement> {
+    let value = match &el.value {
+        PortDefBodyElement::InOutDecl(n) => {
+            PortDefBodyElement::InOutDecl(dummy_node(n, n.value.clone()))
+        }
+        PortDefBodyElement::Doc(n) => PortDefBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PortDefBodyElement::PortUsage(n) => {
+            PortDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
+        }
+    };
+    dummy_node(el, value)
+}
+
+fn normalize_interface_def(i: &InterfaceDef) -> InterfaceDef {
+    InterfaceDef {
+        identification: i.identification.clone(),
+        body: normalize_interface_def_body(&i.body),
+    }
+}
+
+fn normalize_interface_def_body(b: &InterfaceDefBody) -> InterfaceDefBody {
+    match b {
+        InterfaceDefBody::Semicolon => InterfaceDefBody::Semicolon,
+        InterfaceDefBody::Brace { elements } => InterfaceDefBody::Brace {
+            elements: elements
+                .iter()
+                .map(normalize_interface_def_body_element_node)
+                .collect(),
+        },
+    }
+}
+
+fn normalize_interface_def_body_element_node(
+    el: &Node<InterfaceDefBodyElement>,
+) -> Node<InterfaceDefBodyElement> {
+    let value = match &el.value {
+        InterfaceDefBodyElement::EndDecl(n) => {
+            InterfaceDefBodyElement::EndDecl(dummy_node(n, normalize_end_decl(&n.value)))
+        }
+        InterfaceDefBodyElement::RefDecl(n) => {
+            InterfaceDefBodyElement::RefDecl(dummy_node(n, normalize_ref_decl(&n.value)))
+        }
+        InterfaceDefBodyElement::ConnectStmt(n) => {
+            InterfaceDefBodyElement::ConnectStmt(dummy_node(n, n.value.clone()))
+        }
+    };
+    dummy_node(el, value)
+}
+
+fn normalize_end_decl(e: &EndDecl) -> EndDecl {
+    EndDecl {
+        name: e.name.clone(),
+        type_name: e.type_name.clone(),
+        name_span: None,
+        type_ref_span: None,
+    }
+}
+
+fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
+    RefDecl {
+        name: r.name.clone(),
+        type_name: r.type_name.clone(),
+        body: r.body.clone(),
+        name_span: None,
+        type_ref_span: None,
+    }
+}
+
+fn normalize_action_def(a: &ActionDef) -> ActionDef {
+    ActionDef {
+        identification: a.identification.clone(),
+        body: normalize_action_def_body(&a.body),
+    }
+}
+
+fn normalize_action_def_body(b: &ActionDefBody) -> ActionDefBody {
+    match b {
+        ActionDefBody::Semicolon => ActionDefBody::Semicolon,
+        ActionDefBody::Brace { elements } => ActionDefBody::Brace {
+            elements: elements
+                .iter()
+                .map(|n| dummy_node(n, n.value.clone()))
+                .collect(),
+        },
+    }
+}
+
+fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
+    ActionUsage {
+        name: a.name.clone(),
+        type_name: a.type_name.clone(),
+        accept: a.accept.clone(),
+        body: normalize_action_usage_body(&a.body),
+        name_span: None,
+        type_ref_span: None,
+    }
+}
+
+fn normalize_action_usage_body(b: &ActionUsageBody) -> ActionUsageBody {
+    match b {
+        ActionUsageBody::Semicolon => ActionUsageBody::Semicolon,
+        ActionUsageBody::Brace { elements } => ActionUsageBody::Brace {
+            elements: elements
+                .iter()
+                .map(normalize_action_usage_body_element_node)
+                .collect(),
+        },
+    }
+}
+
+fn normalize_action_usage_body_element_node(
+    el: &Node<ActionUsageBodyElement>,
+) -> Node<ActionUsageBodyElement> {
+    let value = match &el.value {
+        ActionUsageBodyElement::InOutDecl(n) => {
+            ActionUsageBodyElement::InOutDecl(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::Bind(n) => ActionUsageBodyElement::Bind(dummy_node(n, n.value.clone())),
+        ActionUsageBodyElement::Flow(n) => ActionUsageBodyElement::Flow(dummy_node(n, n.value.clone())),
+        ActionUsageBodyElement::FirstStmt(n) => {
+            ActionUsageBodyElement::FirstStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::MergeStmt(n) => {
+            ActionUsageBodyElement::MergeStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::ActionUsage(n) => {
+            ActionUsageBodyElement::ActionUsage(Box::new(dummy_node(n, normalize_action_usage(&n.value))))
+        }
+    };
+    dummy_node(el, value)
 }

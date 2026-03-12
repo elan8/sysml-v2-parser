@@ -71,16 +71,22 @@ fn definitions_package() -> Package {
                     name: "FuelCmd".to_string(),
                     typing: None,
                     body: AttributeBody::Semicolon,
+                    name_span: None,
+                    typing_span: None,
                 }))),
                 n(PackageBodyElement::AttributeDef(n(AttributeDef {
                     name: "EngineStart".to_string(),
                     typing: None,
                     body: AttributeBody::Semicolon,
+                    name_span: None,
+                    typing_span: None,
                 }))),
                 n(PackageBodyElement::AttributeDef(n(AttributeDef {
                     name: "EngineOff".to_string(),
                     typing: None,
                     body: AttributeBody::Semicolon,
+                    name_span: None,
+                    typing_span: None,
                 }))),
                 n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Generate Torque"),
@@ -196,6 +202,8 @@ fn provide_power_action() -> ActionUsage {
         name: "provide power".to_string(),
         type_name: "Provide Power".to_string(),
         accept: None,
+        name_span: None,
+        type_ref_span: None,
         body: ActionUsageBody::Brace {
             elements: vec![
                 n(ActionUsageBodyElement::InOutDecl(n(InOutDecl {
@@ -222,6 +230,8 @@ fn provide_power_action() -> ActionUsage {
                     name: "generate torque".to_string(),
                     type_name: "Generate Torque".to_string(),
                     accept: None,
+                    name_span: None,
+                    type_ref_span: None,
                     body: ActionUsageBody::Brace { elements: vec![] },
                 })))),
                 n(ActionUsageBodyElement::Flow(n(Flow {
@@ -233,6 +243,8 @@ fn provide_power_action() -> ActionUsage {
                     name: "amplify torque".to_string(),
                     type_name: "Amplify Torque".to_string(),
                     accept: None,
+                    name_span: None,
+                    type_ref_span: None,
                     body: ActionUsageBody::Semicolon,
                 })))),
                 n(ActionUsageBodyElement::Flow(n(Flow {
@@ -244,6 +256,8 @@ fn provide_power_action() -> ActionUsage {
                     name: "transfer torque".to_string(),
                     type_name: "Transfer Torque".to_string(),
                     accept: None,
+                    name_span: None,
+                    type_ref_span: None,
                     body: ActionUsageBody::Semicolon,
                 })))),
                 n(ActionUsageBodyElement::Flow(n(Flow {
@@ -255,6 +269,8 @@ fn provide_power_action() -> ActionUsage {
                     name: "distribute torque".to_string(),
                     type_name: "Distribute Torque".to_string(),
                     accept: None,
+                    name_span: None,
+                    type_ref_span: None,
                     body: ActionUsageBody::Semicolon,
                 })))),
                 n(ActionUsageBodyElement::Bind(n(Bind {
@@ -285,6 +301,8 @@ fn provide_power_action() -> ActionUsage {
                     name: "engineStarted".to_string(),
                     type_name: "EngineStart".to_string(),
                     accept: Some(("engineStart".to_string(), "EngineStart".to_string())),
+                    name_span: None,
+                    type_ref_span: None,
                     body: ActionUsageBody::Brace { elements: vec![] },
                 })))),
                 n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
@@ -296,6 +314,8 @@ fn provide_power_action() -> ActionUsage {
                     name: "engineStopped".to_string(),
                     type_name: "EngineOff".to_string(),
                     accept: Some(("engineOff".to_string(), "EngineOff".to_string())),
+                    name_span: None,
+                    type_ref_span: None,
                     body: ActionUsageBody::Semicolon,
                 })))),
                 n(ActionUsageBodyElement::FirstStmt(n(FirstStmt {
@@ -369,8 +389,9 @@ fn test_parse_3a_function_based_behavior() {
     let result = parse(&input)
         .expect("parse should succeed for 3a-Function-based Behavior-1.sysml");
     let expected = expected_ast();
-    assert_eq!(
-        result, expected,
-        "parsed AST should match expected for 3a-Function-based Behavior-1.sysml"
+    super::assert_ast_eq(
+        &result,
+        &expected,
+        "parsed AST should match expected for 3a-Function-based Behavior-1.sysml",
     );
 }

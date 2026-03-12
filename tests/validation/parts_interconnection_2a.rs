@@ -142,6 +142,8 @@ fn port_def_vehicle_to_road() -> PackageBodyElement {
                 subsets: None,
                 redefines: None,
                 body: PortBody::Semicolon,
+                name_span: None,
+                type_ref_span: None,
             })))],
         },
     }))
@@ -160,6 +162,8 @@ fn part_def_vehicle_a() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     name: "vehicleToRoadPort".to_string(),
@@ -168,6 +172,8 @@ fn part_def_vehicle_a() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -186,6 +192,8 @@ fn part_def_rear_axle_assembly() -> PackageBodyElement {
                 subsets: None,
                 redefines: None,
                 body: PortBody::Semicolon,
+                name_span: None,
+                type_ref_span: None,
             })))],
         },
     }))
@@ -204,6 +212,8 @@ fn part_def_half_axle() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     name: "axleToWheelPort".to_string(),
@@ -212,6 +222,8 @@ fn part_def_half_axle() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -231,6 +243,8 @@ fn part_def_engine() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     name: "drivePwrPort".to_string(),
@@ -239,6 +253,8 @@ fn part_def_engine() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -258,6 +274,8 @@ fn part_def_transmission() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     name: "shaftPort_a".to_string(),
@@ -266,6 +284,8 @@ fn part_def_transmission() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -285,6 +305,8 @@ fn part_def_driveshaft() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     name: "shaftPort_c".to_string(),
@@ -293,6 +315,8 @@ fn part_def_driveshaft() -> PackageBodyElement {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -307,10 +331,14 @@ fn interface_def_engine_to_transmission() -> PackageBodyElement {
                 n(InterfaceDefBodyElement::EndDecl(n(EndDecl {
                     name: "drivePwrPort".to_string(),
                     type_name: "DrivePwrPort".to_string(),
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(InterfaceDefBodyElement::EndDecl(n(EndDecl {
                     name: "clutchPort".to_string(),
                     type_name: "ClutchPort".to_string(),
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -325,15 +353,21 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                 n(InterfaceDefBodyElement::EndDecl(n(EndDecl {
                     name: "shaftPort_a".to_string(),
                     type_name: "ShaftPort_a".to_string(),
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(InterfaceDefBodyElement::EndDecl(n(EndDecl {
                     name: "shaftPort_d".to_string(),
                     type_name: "ShaftPort_d".to_string(),
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(InterfaceDefBodyElement::RefDecl(n(RefDecl {
                     name: "driveshaft".to_string(),
                     type_name: "Driveshaft".to_string(),
                     body: RefBody::Brace,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(InterfaceDefBodyElement::ConnectStmt(n(ConnectStmt {
                     from: n(Expression::FeatureRef("shaftPort_a".to_string())),
@@ -366,6 +400,8 @@ fn part_vehicle1_c1() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::Bind(n(Bind {
@@ -380,6 +416,8 @@ fn part_vehicle1_c1() -> PartUsage {
                     ordered: false,
                     subsets: None,
                     body: PartUsageBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::InterfaceUsage(n(InterfaceUsage::TypedConnect {
                     interface_type: Some("EngineToTransmissionInterface".to_string()),
@@ -395,6 +433,8 @@ fn part_vehicle1_c1() -> PartUsage {
                     ordered: false,
                     subsets: None,
                     body: PartUsageBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     name: "driveshaft".to_string(),
@@ -403,6 +443,8 @@ fn part_vehicle1_c1() -> PartUsage {
                     ordered: false,
                     subsets: None,
                     body: PartUsageBody::Brace { elements: vec![] },
+                    name_span: None,
+                    type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::InterfaceUsage(n(InterfaceUsage::TypedConnect {
                     interface_type: Some("DriveshaftInterface".to_string()),
@@ -444,6 +486,8 @@ fn part_vehicle1_c1() -> PartUsage {
                                 )),
                                 redefines: None,
                                 body: PortBody::Semicolon,
+                                name_span: None,
+                                type_ref_span: None,
                             }),
                             n(PortUsage {
                                 name: "rightWheelToRoadPort".to_string(),
@@ -455,9 +499,13 @@ fn part_vehicle1_c1() -> PartUsage {
                                 )),
                                 redefines: None,
                                 body: PortBody::Semicolon,
+                                name_span: None,
+                                type_ref_span: None,
                             }),
                         ],
                     },
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -471,6 +519,8 @@ fn part_rear_axle_assembly() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::Bind(n(Bind {
@@ -507,6 +557,8 @@ fn part_rear_axle_assembly() -> PartUsage {
                     ordered: true,
                     subsets: None,
                     body: PartUsageBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     name: "leftWheel".to_string(),
@@ -526,6 +578,8 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 subsets: None,
                                 redefines: None,
                                 body: PortBody::Semicolon,
+                                name_span: None,
+                                type_ref_span: None,
                             }))),
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
                                 name: "wheelToRoadPort".to_string(),
@@ -534,9 +588,13 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 subsets: None,
                                 redefines: None,
                                 body: PortBody::Semicolon,
+                                name_span: None,
+                                type_ref_span: None,
                             }))),
                         ],
                     },
+                    name_span: None,
+                    type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     name: "rightWheel".to_string(),
@@ -556,6 +614,8 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 subsets: None,
                                 redefines: None,
                                 body: PortBody::Semicolon,
+                                name_span: None,
+                                type_ref_span: None,
                             }))),
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
                                 name: "wheelToRoadPort".to_string(),
@@ -564,9 +624,13 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 subsets: None,
                                 redefines: None,
                                 body: PortBody::Semicolon,
+                                name_span: None,
+                                type_ref_span: None,
                             }))),
                         ],
                     },
+                    name_span: None,
+                    type_ref_span: None,
                 })))),
             ],
         },
@@ -580,6 +644,8 @@ fn part_differential() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
@@ -589,6 +655,8 @@ fn part_differential() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Brace,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
                     name: "leftDiffPort".to_string(),
@@ -597,6 +665,8 @@ fn part_differential() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
                     name: "rightDiffPort".to_string(),
@@ -605,6 +675,8 @@ fn part_differential() -> PartUsage {
                     subsets: None,
                     redefines: None,
                     body: PortBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 }))),
             ],
         },
@@ -618,6 +690,8 @@ fn part_rear_axle() -> PartUsage {
         multiplicity: None,
         ordered: false,
         subsets: None,
+        name_span: None,
+        type_ref_span: None,
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
@@ -627,6 +701,8 @@ fn part_rear_axle() -> PartUsage {
                     ordered: false,
                     subsets: None,
                     body: PartUsageBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     name: "rightHalfAxle".to_string(),
@@ -635,6 +711,8 @@ fn part_rear_axle() -> PartUsage {
                     ordered: false,
                     subsets: None,
                     body: PartUsageBody::Semicolon,
+                    name_span: None,
+                    type_ref_span: None,
                 })))),
             ],
         },
@@ -660,8 +738,9 @@ fn test_parse_2a_parts_interconnection() {
     log::debug!("input len: {} bytes", input.len());
     let result = parse(&input).expect("parse should succeed for 2a-Parts Interconnection.sysml");
     let expected = expected_ast();
-    assert_eq!(
-        result, expected,
-        "parsed AST should match expected for 2a-Parts Interconnection.sysml"
+    super::assert_ast_eq(
+        &result,
+        &expected,
+        "parsed AST should match expected for 2a-Parts Interconnection.sysml",
     );
 }

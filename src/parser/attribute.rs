@@ -6,6 +6,7 @@ use crate::parser::lex::{
     name, qualified_name, skip_until_brace_end, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
+use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -38,18 +39,21 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let (input, name_str) = name(input)?;
-    let (input, typing) = nom::combinator::opt(alt((
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, typing_result) = nom::combinator::opt(alt((
         preceded(
             preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, qualified_name),
+            preceded(ws_and_comments, with_span(qualified_name)),
         ),
         preceded(
             preceded(ws_and_comments, tag(&b":"[..])),
-            preceded(ws_and_comments, qualified_name),
+            preceded(ws_and_comments, with_span(qualified_name)),
         ),
     )))
     .parse(input)?;
+    let (typing_span, typing) = typing_result
+        .map(|(span, s)| (Some(span), Some(s)))
+        .unwrap_or((None, None));
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -57,6 +61,8 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
             name: name_str,
             typing,
             body,
+            name_span: Some(name_span),
+            typing_span,
         }),
     ))
 }
@@ -67,12 +73,15 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
-    let (input, redefines) = nom::combinator::opt(preceded(
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, redefines_result) = nom::combinator::opt(preceded(
         preceded(ws_and_comments, tag(&b"redefines"[..])),
-        preceded(ws1, qualified_name),
+        preceded(ws1, with_span(qualified_name)),
     ))
     .parse(input)?;
+    let (redefines_span, redefines) = redefines_result
+        .map(|(span, s)| (Some(span), Some(s)))
+        .unwrap_or((None, None));
     let (input, value) = nom::combinator::opt(preceded(
         preceded(ws_and_comments, tag(&b"="[..])),
         preceded(ws_and_comments, expression),
@@ -86,6 +95,8 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             redefines,
             value,
             body,
+            name_span: Some(name_span),
+            redefines_span,
         }),
     ))
 }

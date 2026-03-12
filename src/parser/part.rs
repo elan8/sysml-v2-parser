@@ -11,6 +11,7 @@ use crate::parser::interface::connect_body;
 use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::port::port_usage;
+use crate::parser::with_span;
 use crate::parser::requirement::doc_comment;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -100,19 +101,17 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"part"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let mut name_parser = alt((
-        preceded(
-            preceded(ws_and_comments, tag(&b":>>"[..])),
-            preceded(ws_and_comments, name),
-        ),
-        preceded(ws_and_comments, name),
-    ));
-    let (input, name_str) = name_parser.parse(input)?;
-    let (input, type_name) = opt(preceded(
+    let (input, _) = opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, type_result) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, with_span(qualified_name)),
     ))
     .parse(input)?;
+    let (type_ref_span, type_name) = type_result
+        .map(|(s, t)| (Some(s), t))
+        .unwrap_or((None, String::new()));
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
     let mut subsets_parser = opt(preceded(
@@ -137,11 +136,13 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         input,
         node_from_to(start, input, PartUsage {
             name: name_str,
-            type_name: type_name.unwrap_or_else(String::new),
+            type_name,
             multiplicity: multiplicity_opt,
             ordered: ordered.is_some(),
             subsets: subsets.map(|(n, v)| (n, v)),
             body,
+            name_span: Some(name_span),
+            type_ref_span,
         }),
     ))
 }

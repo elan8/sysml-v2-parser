@@ -22,6 +22,20 @@ pub fn node_from_to<T>(start: Input<'_>, rest: Input<'_>, value: T) -> Node<T> {
     Node::new(span_from_to(start, rest), value)
 }
 
+/// Run a parser and return the value together with the span of the consumed input.
+/// Use this to capture sub-spans for semantic tokens (e.g. name, type reference).
+pub fn with_span<'a, F, O, E>(mut f: F) -> impl FnMut(Input<'a>) -> nom::IResult<Input<'a>, (Span, O), E>
+where
+    E: nom::error::ParseError<Input<'a>>,
+    F: FnMut(Input<'a>) -> nom::IResult<Input<'a>, O, E>,
+{
+    move |input: Input<'a>| {
+        let start = input;
+        let (rest, value) = f(input)?;
+        Ok((rest, (span_from_to(start, rest), value)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{span_from_to, Input};

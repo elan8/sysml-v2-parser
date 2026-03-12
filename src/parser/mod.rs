@@ -23,7 +23,7 @@ mod span;
 mod state;
 mod usecase;
 
-pub(crate) use span::{node_from_to, Input};
+pub(crate) use span::{node_from_to, with_span, Input};
 
 use crate::ast::RootNamespace;
 use crate::error::ParseError;

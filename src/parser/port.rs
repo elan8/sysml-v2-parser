@@ -6,6 +6,7 @@ use crate::parser::requirement::doc_comment;
 use crate::parser::expr::expression;
 use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
 use crate::parser::node_from_to;
+use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
@@ -52,31 +53,32 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"port"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = alt((
-        preceded(
-            preceded(ws_and_comments, tag(&b":>>"[..])),
-            preceded(ws_and_comments, name),
-        ),
-        preceded(ws_and_comments, name),
-    ))
-    .parse(input)?;
-    let (input, type_name) = opt(preceded(
+    let (input, _) = opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, type_result) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
         preceded(
             ws_and_comments,
-            nom::combinator::map(
-                (nom::combinator::opt(tag(&b"~"[..])), qualified_name),
-                |(tilde, name)| {
-                    if tilde.is_some() {
-                        format!("~{}", name)
-                    } else {
-                        name
-                    }
-                },
+            (
+                nom::combinator::opt(tag(&b"~"[..])),
+                with_span(qualified_name),
             ),
         ),
     ))
     .parse(input)?;
+    let (type_ref_span, type_name) = type_result
+        .map(|(tilde, (span, name))| {
+            (
+                Some(span),
+                Some(if tilde.is_some() {
+                    format!("~{}", name)
+                } else {
+                    name
+                }),
+            )
+        })
+        .unwrap_or((None, None));
     let (input, multiplicity) = opt(multiplicity).parse(input)?;
     let (input, subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
@@ -104,6 +106,8 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
             subsets,
             redefines,
             body,
+            name_span: Some(name_span),
+            type_ref_span,
         }),
     ))
 }
