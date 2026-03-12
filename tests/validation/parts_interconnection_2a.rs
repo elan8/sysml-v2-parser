@@ -90,17 +90,20 @@ fn definitions_package() -> Package {
                 n(PackageBodyElement::PartDef(n(PartDef {
                     identification: id("AxleAssembly"),
                     specializes: None,
+                    specializes_span: None,
                     body: PartDefBody::Semicolon,
                 }))),
                 n(part_def_rear_axle_assembly()),
                 n(PackageBodyElement::PartDef(n(PartDef {
                     identification: id("Axle"),
                     specializes: None,
+                    specializes_span: None,
                     body: PartDefBody::Semicolon,
                 }))),
                 n(PackageBodyElement::PartDef(n(PartDef {
                     identification: id("RearAxle"),
                     specializes: Some("Axle".to_string()),
+                    specializes_span: None,
                     body: PartDefBody::Semicolon,
                 }))),
                 n(part_def_half_axle()),
@@ -110,11 +113,13 @@ fn definitions_package() -> Package {
                 n(PackageBodyElement::PartDef(n(PartDef {
                     identification: id("Differential"),
                     specializes: None,
+                    specializes_span: None,
                     body: PartDefBody::Brace { elements: vec![] },
                 }))),
                 n(PackageBodyElement::PartDef(n(PartDef {
                     identification: id("Wheel"),
                     specializes: None,
+                    specializes_span: None,
                     body: PartDefBody::Semicolon,
                 }))),
                 n(interface_def_engine_to_transmission()),
@@ -153,6 +158,7 @@ fn part_def_vehicle_a() -> PackageBodyElement {
     PackageBodyElement::PartDef(n(PartDef {
         identification: id("VehicleA"),
         specializes: None,
+        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
@@ -184,6 +190,7 @@ fn part_def_rear_axle_assembly() -> PackageBodyElement {
     PackageBodyElement::PartDef(n(PartDef {
         identification: id("RearAxleAssembly"),
         specializes: Some("AxleAssembly".to_string()),
+        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![n(PartDefBodyElement::PortUsage(n(PortUsage {
                 name: "shaftPort_d".to_string(),
@@ -203,6 +210,7 @@ fn part_def_half_axle() -> PackageBodyElement {
     PackageBodyElement::PartDef(n(PartDef {
         identification: id("HalfAxle"),
         specializes: None,
+        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
@@ -234,6 +242,7 @@ fn part_def_engine() -> PackageBodyElement {
     PackageBodyElement::PartDef(n(PartDef {
         identification: id("Engine"),
         specializes: None,
+        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
@@ -265,6 +274,7 @@ fn part_def_transmission() -> PackageBodyElement {
     PackageBodyElement::PartDef(n(PartDef {
         identification: id("Transmission"),
         specializes: None,
+        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
@@ -296,6 +306,7 @@ fn part_def_driveshaft() -> PackageBodyElement {
     PackageBodyElement::PartDef(n(PartDef {
         identification: id("Driveshaft"),
         specializes: None,
+        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {

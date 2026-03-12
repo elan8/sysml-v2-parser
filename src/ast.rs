@@ -236,6 +236,8 @@ pub struct PartDef {
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("Axle") for `part def FrontAxle :> Axle`.
     pub specializes: Option<String>,
+    /// Span of the `:> <type>` fragment (for semantic tokens), when present.
+    pub specializes_span: Option<Span>,
     pub body: PartDefBody,
 }
 
@@ -1054,6 +1056,7 @@ fn normalize_part_def(p: &PartDef) -> PartDef {
     PartDef {
         identification: p.identification.clone(),
         specializes: p.specializes.clone(),
+        specializes_span: None,
         body: normalize_part_def_body(&p.body),
     }
 }

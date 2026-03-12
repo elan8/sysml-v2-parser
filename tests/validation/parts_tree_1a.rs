@@ -88,6 +88,7 @@ target: "SI::kg".to_string(),
                                 n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("Vehicle"),
                                     specializes: None,
+                                    specializes_span: None,
                                     body: PartDefBody::Brace {
                                         elements: vec![n(PartDefBodyElement::AttributeDef(n(
                                             AttributeDef {
@@ -103,11 +104,13 @@ target: "SI::kg".to_string(),
                                 n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("AxleAssembly"),
                                     specializes: None,
+                                    specializes_span: None,
                                     body: PartDefBody::Semicolon,
                                 }))),
                                 n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("Axle"),
                                     specializes: None,
+                                    specializes_span: None,
                                     body: PartDefBody::Brace {
                                         elements: vec![n(PartDefBodyElement::AttributeDef(n(
                                             AttributeDef {
@@ -123,6 +126,7 @@ target: "SI::kg".to_string(),
                                 n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("FrontAxle"),
                                     specializes: Some("Axle".to_string()),
+                                    specializes_span: None,
                                     body: PartDefBody::Brace {
                                         elements: vec![n(PartDefBodyElement::AttributeDef(n(
                                             AttributeDef {
@@ -138,6 +142,7 @@ target: "SI::kg".to_string(),
                                 n(PackageBodyElement::PartDef(n(PartDef {
                                     identification: id("Wheel"),
                                     specializes: None,
+                                    specializes_span: None,
                                     body: PartDefBody::Semicolon,
                                 }))),
                             ],

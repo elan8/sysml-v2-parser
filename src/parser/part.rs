@@ -9,7 +9,7 @@ use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
-use crate::parser::node_from_to;
+use crate::parser::{node_from_to, span_from_to};
 use crate::parser::port::port_usage;
 use crate::parser::with_span;
 use crate::parser::requirement::doc_comment;
@@ -69,17 +69,23 @@ pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
-    let (input, specializes) = opt(preceded(
+    let before_specializes = input;
+    let (input, opt_specializes) = opt((
         preceded(ws_and_comments, tag(&b":>"[..])),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    let (specializes, specializes_span) = match opt_specializes {
+        Some((_, type_name)) => (Some(type_name), Some(span_from_to(before_specializes, input))),
+        None => (None, None),
+    };
     let (input, body) = part_def_body(input)?;
     Ok((
         input,
         node_from_to(start, input, PartDef {
             identification,
             specializes,
+            specializes_span,
             body,
         }),
     ))
