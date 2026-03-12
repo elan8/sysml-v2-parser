@@ -27,6 +27,12 @@ pub struct ParseError {
     pub severity: Option<DiagnosticSeverity>,
     /// Optional code for quick fixes or documentation (e.g. "expected_keyword").
     pub code: Option<String>,
+    /// What was expected at this position (e.g. "';' or '}'", "'package' or 'namespace'").
+    pub expected: Option<String>,
+    /// Snippet of what was found at the error position (for display).
+    pub found: Option<String>,
+    /// Short hint on how to fix the error.
+    pub suggestion: Option<String>,
 }
 
 impl ParseError {
@@ -39,6 +45,9 @@ impl ParseError {
             length: None,
             severity: None,
             code: None,
+            expected: None,
+            found: None,
+            suggestion: None,
         }
     }
 
@@ -70,6 +79,21 @@ impl ParseError {
         self
     }
 
+    pub fn with_expected(mut self, expected: impl Into<String>) -> Self {
+        self.expected = Some(expected.into());
+        self
+    }
+
+    pub fn with_found(mut self, found: impl Into<String>) -> Self {
+        self.found = Some(found.into());
+        self
+    }
+
+    pub fn with_suggestion(mut self, suggestion: impl Into<String>) -> Self {
+        self.suggestion = Some(suggestion.into());
+        self
+    }
+
     /// LSP uses 0-based line and 0-based character. Returns (start_line, start_character, end_line, end_character).
     /// Returns `None` if position is unknown.
     pub fn to_lsp_range(&self) -> Option<(u32, u32, u32, u32)> {
@@ -85,12 +109,24 @@ impl ParseError {
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match (self.offset, self.line, self.column) {
-            (Some(off), Some(line), Some(col)) => {
-                write!(f, "{} at line {}, column {} (offset {})", self.message, line, col, off)
+        let base = self
+            .expected
+            .as_deref()
+            .map(|e| format!("expected {e}"))
+            .unwrap_or_else(|| self.message.clone());
+        let mut msg = base;
+        if let Some(ref found) = self.found {
+            if !msg.contains("(found ") {
+                msg.push_str(&format!(" (found '{found}')"));
             }
-            (Some(off), _, _) => write!(f, "{} at offset {}", self.message, off),
-            _ => write!(f, "{}", self.message),
+        }
+        if let Some(ref suggestion) = self.suggestion {
+            msg.push_str(&format!(" {suggestion}"));
+        }
+        match (self.offset, self.line, self.column) {
+            (Some(_), Some(line), Some(col)) => write!(f, "{msg} at line {line}, column {col}"),
+            (Some(off), _, _) => write!(f, "{msg} at offset {off}"),
+            _ => write!(f, "{msg}"),
         }
     }
 }

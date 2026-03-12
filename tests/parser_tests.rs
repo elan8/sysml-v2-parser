@@ -96,4 +96,56 @@ fn test_parse_with_diagnostics_partial_ast_and_multiple_errors() {
         })
         .collect();
     assert_eq!(names, ["Foo", "Bar"]);
+
+    // Error quality: each error should have "found" snippet and expected context
+    for err in &result.errors {
+        assert!(err.found.is_some(), "error should have 'found' snippet: {}", err.message);
+        assert!(
+            err.expected.is_some(),
+            "error should have 'expected' context: {}",
+            err.message
+        );
+        assert!(
+            err.expected.as_deref().map_or(false, |e| e.contains("package") || e.contains("namespace")),
+            "expected should mention package or namespace: {:?}",
+            err.expected
+        );
+        assert!(err.code.is_some(), "error should have a code");
+    }
+    // First error is at "not valid"
+    assert!(
+        result.errors[0].found.as_deref().map_or(false, |f| f.contains("not")),
+        "first error found should mention invalid token: {:?}",
+        result.errors[0].found
+    );
+}
+
+#[test]
+fn test_parse_error_expected_end_of_input_has_found() {
+    // Trailing text after valid packages: parse succeeds for "package Foo; package Bar;" then rest "garbage" triggers "expected end of input"
+    let input = "package Foo; package Bar; garbage";
+    let result = parse(input);
+    let err = result.unwrap_err();
+    assert!(
+        err.message.contains("expected end of input"),
+        "error should be 'expected end of input': {}",
+        err
+    );
+    assert!(err.found.is_some(), "expected end of input error should have 'found': {}", err);
+    assert!(err.found.as_deref().map_or(false, |f| f.contains("garbage")), "found should show trailing text: {:?}", err.found);
+    assert_eq!(err.code.as_deref(), Some("expected_end_of_input"));
+}
+
+#[test]
+fn test_parse_error_display_includes_found_and_location() {
+    let input = "package Foo;\nxyz";
+    let result = parse_with_diagnostics(input);
+    let err = &result.errors[0];
+    let display = err.to_string();
+    assert!(display.contains("line"), "Display should include line number");
+    assert!(
+        err.found.as_ref().map_or(false, |f| display.contains(f)),
+        "Display should include found snippet: {}",
+        display
+    );
 }

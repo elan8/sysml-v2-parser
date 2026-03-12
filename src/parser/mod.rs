@@ -46,6 +46,24 @@ impl ParseResult {
     }
 }
 
+const FOUND_SNIPPET_MAX_LEN: usize = 40;
+
+/// Take a short snippet from the input at the error position for "found" display.
+/// Uses first line or first FOUND_SNIPPET_MAX_LEN bytes, UTF-8 with replacement char.
+fn fragment_to_found_snippet(fragment: &[u8]) -> (String, usize) {
+    let take = fragment
+        .iter()
+        .position(|&b| b == b'\n' || b == b'\r')
+        .map(|p| p.min(FOUND_SNIPPET_MAX_LEN))
+        .unwrap_or_else(|| fragment.len().min(FOUND_SNIPPET_MAX_LEN));
+    let slice = fragment.get(..take).unwrap_or(fragment);
+    let s = String::from_utf8_lossy(slice)
+        .replace('\n', "\\n")
+        .replace('\r', "\\r");
+    let len = slice.len();
+    (s.trim_end().to_string(), len)
+}
+
 /// Map nom error kind to a human-readable message for language server diagnostics.
 fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
     use nom::error::ErrorKind;
@@ -65,14 +83,44 @@ fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
     }
 }
 
-fn nom_err_to_parse_error(e: &Error<Input<'_>>, length: Option<usize>) -> ParseError {
+/// Map nom error kind to a specific code for LSP/quick fixes.
+fn nom_error_kind_to_code(code: &nom::error::ErrorKind) -> &'static str {
+    use nom::error::ErrorKind;
+    match code {
+        ErrorKind::Tag => "expected_keyword",
+        ErrorKind::Digit => "expected_number",
+        ErrorKind::Alpha | ErrorKind::AlphaNumeric => "expected_identifier",
+        ErrorKind::Space | ErrorKind::MultiSpace => "expected_whitespace",
+        ErrorKind::Eof => "unexpected_eof",
+        ErrorKind::TakeUntil => "expected_terminator",
+        ErrorKind::TakeWhile1 => "expected_token",
+        ErrorKind::Alt => "expected_alt",
+        ErrorKind::Many0 | ErrorKind::Many1 => "expected_list",
+        _ => "parse_error",
+    }
+}
+
+fn nom_err_to_parse_error(
+    e: &Error<Input<'_>>,
+    length_override: Option<usize>,
+    expected_context: Option<&'static str>,
+) -> ParseError {
     let offset = e.input.location_offset();
     let line = e.input.location_line();
     let column = e.input.get_column();
+    let fragment = e.input.fragment();
+    let (found_snippet, found_len) = fragment_to_found_snippet(fragment);
     let message = nom_error_kind_to_message(&e.code).to_string();
-    let mut pe = ParseError::new(message).with_location(offset, line, column);
-    if let Some(len) = length {
-        pe = pe.with_length(len);
+    let span_len = length_override.unwrap_or(found_len).max(1);
+    let mut pe = ParseError::new(message)
+        .with_location(offset, line, column)
+        .with_length(span_len)
+        .with_code(nom_error_kind_to_code(&e.code));
+    if !found_snippet.is_empty() {
+        pe = pe.with_found(found_snippet);
+    }
+    if let Some(ctx) = expected_context {
+        pe = pe.with_expected(ctx);
     }
     pe
 }
@@ -104,15 +152,27 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
                     "parse_root: unconsumed as str: {:?}",
                     String::from_utf8_lossy(first_80),
                 );
-                Err(ParseError::new("expected end of input")
+                let (found_snippet, found_len) = fragment_to_found_snippet(rest.fragment());
+                let mut pe = ParseError::new("expected end of input")
                     .with_location(offset, rest.location_line(), rest.get_column())
-                    .with_code("expected_end_of_input"))
+                    .with_length(found_len.max(1))
+                    .with_code("expected_end_of_input");
+                if !found_snippet.is_empty() {
+                    pe = pe.with_found(found_snippet);
+                }
+                Err(pe)
             }
         }
-        Err(nom::Err::Error(e)) => {
-            Err(nom_err_to_parse_error(&e, Some(1)).with_code("parse_error"))
-        }
-        Err(nom::Err::Failure(e)) => Err(nom_err_to_parse_error(&e, Some(1)).with_code("parse_error")),
+        Err(nom::Err::Error(e)) => Err(nom_err_to_parse_error(
+            &e,
+            None,
+            Some("'package' or 'namespace' at top level"),
+        )),
+        Err(nom::Err::Failure(e)) => Err(nom_err_to_parse_error(
+            &e,
+            None,
+            Some("'package' or 'namespace' at top level"),
+        )),
         Err(nom::Err::Incomplete(_)) => Err(ParseError::new("unexpected end of input").with_code("unexpected_eof")),
     }
 }
@@ -154,7 +214,7 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
                 input = rest;
             }
             Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
-                let pe = nom_err_to_parse_error(&e, Some(1)).with_code("parse_error");
+                let pe = nom_err_to_parse_error(&e, None, Some("'package' or 'namespace'"));
                 errors.push(pe);
                 match lex::skip_to_next_sync_point(e.input) {
                     Ok((rest, _)) => input = rest,
@@ -176,12 +236,15 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
     let (input, _) = lex::ws_and_comments(input).unwrap_or((input, ()));
 
     if !input.fragment().is_empty() {
-        errors.push(
-            ParseError::new("expected end of input")
-                .with_location(input.location_offset(), input.location_line(), input.get_column())
-                .with_length(input.fragment().len().min(1))
-                .with_code("expected_end_of_input"),
-        );
+        let (found_snippet, found_len) = fragment_to_found_snippet(input.fragment());
+        let mut pe = ParseError::new("expected end of input")
+            .with_location(input.location_offset(), input.location_line(), input.get_column())
+            .with_length(found_len.max(1))
+            .with_code("expected_end_of_input");
+        if !found_snippet.is_empty() {
+            pe = pe.with_found(found_snippet);
+        }
+        errors.push(pe);
     }
 
     ParseResult {
