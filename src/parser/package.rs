@@ -7,6 +7,7 @@ use crate::ast::{
 use crate::parser::action::{action_def, action_usage};
 use crate::parser::alias::alias_def;
 use crate::parser::attribute::attribute_def;
+use crate::parser::item::item_def;
 use crate::parser::constraint::{calc_def, constraint_def};
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
@@ -172,6 +173,7 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
         map(use_case_def, PackageBodyElement::UseCaseDef),
         map(actor_decl, PackageBodyElement::Actor),
         map(state_def, PackageBodyElement::StateDef),
+        map(item_def, PackageBodyElement::ItemDef),
         map(constraint_def, PackageBodyElement::ConstraintDef),
         map(calc_def, PackageBodyElement::CalcDef),
     ))

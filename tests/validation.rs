@@ -64,3 +64,6 @@ mod surveillance_drone;
 
 #[path = "validation/surveillance_drone_minimal.rs"]
 mod surveillance_drone_minimal;
+
+#[path = "validation/traffic_light_intersection.rs"]
+mod traffic_light_intersection;

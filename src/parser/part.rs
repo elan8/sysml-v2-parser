@@ -1,8 +1,8 @@
 //! Part definition and part usage parsing.
 
 use crate::ast::{
-    Allocate, Bind, Connect, ConnectBody, InOut, InterfaceUsage, InterfaceUsageBodyElement, Node,
-    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
+    Allocate, Bind, Connect, ConnectBody, ExhibitState, InOut, InterfaceUsage, InterfaceUsageBodyElement,
+    Node, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
     Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
@@ -42,11 +42,37 @@ pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody>
     .parse(input)
 }
 
+/// Exhibit state usage: `exhibit state` name `:` type `;`
+fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"exhibit"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, _) = tag(&b"state"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, name_str) = name(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ExhibitState {
+                name: name_str,
+                type_name,
+            },
+        ),
+    ))
+}
+
 fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     let (input, elem) = alt((
         map(doc_comment, PartDefBodyElement::Doc),
+        map(exhibit_state, PartDefBodyElement::ExhibitState),
         map(perform_action_decl, PartDefBodyElement::Perform),
         map(perform_usage, PartDefBodyElement::Perform),
         map(allocate_, PartDefBodyElement::Allocate),

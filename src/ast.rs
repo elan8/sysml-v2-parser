@@ -170,6 +170,7 @@ pub enum PackageBodyElement {
     UseCaseDef(Node<UseCaseDef>),
     Actor(Node<ActorDecl>),
     StateDef(Node<StateDef>),
+    ItemDef(Node<ItemDef>),
     ConstraintDef(Node<ConstraintDef>),
     CalcDef(Node<CalcDef>),
 }
@@ -261,6 +262,15 @@ pub enum PartDefBodyElement {
     Connect(Node<Connect>),
     Perform(Node<Perform>),
     Allocate(Node<Allocate>),
+    /// `exhibit state` name `:` type (`;` or body).
+    ExhibitState(Node<ExhibitState>),
+}
+
+/// Exhibit state usage: `exhibit state` name `:` type (`;` or body).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExhibitState {
+    pub name: String,
+    pub type_name: String,
 }
 
 /// Attribute definition: `attribute` name (`:>` type)? body.
@@ -281,6 +291,13 @@ pub struct AttributeDef {
 pub enum AttributeBody {
     Semicolon,
     Brace,
+}
+
+/// Item definition: `item def` Identification body (for events, etc.).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemDef {
+    pub identification: Identification,
+    pub body: AttributeBody,
 }
 
 /// Part usage: `part` name `:` type multiplicity? `ordered`? body.
@@ -813,8 +830,25 @@ pub enum StateDefBody {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StateDefBodyElement {
+    Doc(Node<DocComment>),
+    /// `entry` (`;` or body) - entry action.
+    Entry(Node<EntryAction>),
+    /// `then` name `;` - initial state.
+    Then(Node<ThenStmt>),
     StateUsage(Node<StateUsage>),
     Transition(Node<Transition>),
+}
+
+/// Entry action: `entry` (`;` or body).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntryAction {
+    pub body: StateDefBody,
+}
+
+/// Then (initial state): `then` name `;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenStmt {
+    pub state_name: String,
 }
 
 /// State usage: `state` name (`:` type)? body.
@@ -1034,6 +1068,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::StateDef(n) => {
             PackageBodyElement::StateDef(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::ItemDef(n) => {
+            PackageBodyElement::ItemDef(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::ConstraintDef(n) => {
             PackageBodyElement::ConstraintDef(dummy_node(n, n.value.clone()))
         }
@@ -1091,6 +1128,7 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::Connect(n) => PartDefBodyElement::Connect(dummy_node(n, n.value.clone())),
         PartDefBodyElement::Perform(n) => PartDefBodyElement::Perform(dummy_node(n, n.value.clone())),
         PartDefBodyElement::Allocate(n) => PartDefBodyElement::Allocate(dummy_node(n, n.value.clone())),
+        PartDefBodyElement::ExhibitState(n) => PartDefBodyElement::ExhibitState(dummy_node(n, n.value.clone())),
     };
     dummy_node(el, value)
 }

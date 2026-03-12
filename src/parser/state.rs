@@ -1,6 +1,7 @@
 use crate::ast::{
-    Node, StateDef, StateDefBody, StateDefBodyElement, StateUsage, Transition
+    EntryAction, Node, StateDef, StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition,
 };
+use crate::parser::requirement::doc_comment;
 use crate::parser::expr::expression;
 use crate::parser::lex::{identification, name, ws1, ws_and_comments, qualified_name};
 use crate::parser::node_from_to;
@@ -43,9 +44,30 @@ fn state_def_body(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
     .parse(input)
 }
 
+/// Entry action: `entry` (`;` or body)
+fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
+    let start = input;
+    let (input, _) = tag(&b"entry"[..]).parse(input)?;
+    let (input, body) = state_def_body(input)?;
+    Ok((input, node_from_to(start, input, EntryAction { body })))
+}
+
+/// Then (initial state): `then` name `;`
+fn then_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ThenStmt>> {
+    let start = input;
+    let (input, _) = tag(&b"then"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, state_name) = name(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((input, node_from_to(start, input, ThenStmt { state_name })))
+}
+
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
     let start = input;
     let mut parser = alt((
+        map(doc_comment, |n| node_from_to(start, input, StateDefBodyElement::Doc(n))),
+        map(entry_action, |n| node_from_to(start, input, StateDefBodyElement::Entry(n))),
+        map(then_stmt, |n| node_from_to(start, input, StateDefBodyElement::Then(n))),
         map(state_usage, |n| node_from_to(start, input, StateDefBodyElement::StateUsage(n))),
         map(transition, |n| node_from_to(start, input, StateDefBodyElement::Transition(n))),
     ));
@@ -70,6 +92,12 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, source) = expression(input)?;
+    // Optional: `accept` trigger expression (e.g. `accept PhaseTimerElapsed`)
+    let (input, _) = opt((
+        preceded(ws_and_comments, tag(&b"accept"[..])),
+        preceded(ws1, expression),
+    ))
+    .parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = expression(input)?;

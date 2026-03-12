@@ -11,6 +11,7 @@ mod action;
 mod alias;
 mod attribute;
 mod constraint;
+mod item;
 mod expr;
 mod import;
 mod interface;
@@ -196,6 +197,7 @@ fn should_report_error_inside_package(found: &str) -> bool {
         || trimmed.starts_with("attribute ")
         || trimmed.starts_with("action ")
         || trimmed.starts_with("requirement ")
+        || trimmed.starts_with("item ")
         || trimmed.starts_with("use ")
         || trimmed.starts_with("state ")
         || trimmed.starts_with("constraint ")
