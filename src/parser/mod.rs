@@ -12,6 +12,7 @@ mod alias;
 mod attribute;
 mod connection;
 mod constraint;
+mod dependency;
 mod item;
 mod enumeration;
 mod expr;
@@ -232,6 +233,9 @@ fn should_report_error_inside_package(found: &str) -> bool {
         || trimmed.starts_with("enum ")
         || trimmed.starts_with("occurrence ")
         || trimmed.starts_with("library ")
+        || trimmed.starts_with("dependency ")
+        || trimmed.starts_with("concern ")
+        || trimmed.starts_with("frame ")
     {
         return false;
     }

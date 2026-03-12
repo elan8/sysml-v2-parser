@@ -186,6 +186,9 @@ pub enum PackageBodyElement {
     MetadataDef(Node<MetadataDef>),
     EnumDef(Node<EnumDef>),
     OccurrenceDef(Node<OccurrenceDef>),
+    Dependency(Node<Dependency>),
+    ConcernUsage(Node<ConcernUsage>),
+    UseCaseUsage(Node<UseCaseUsage>),
 }
 
 /// A package declaration: `package` Identification PackageBody
@@ -836,7 +839,8 @@ pub enum RequirementDefBody {
 pub enum RequirementDefBodyElement {
     SubjectDecl(Node<SubjectDecl>),
     RequireConstraint(Node<RequireConstraint>),
-    Doc(Node<DocComment>), // Just keeping it simple for now, or maybe DocComment is not in AST, wait.
+    Frame(Node<FrameMember>),
+    Doc(Node<DocComment>),
 }
 
 /// Subject declaration: `subject` name `:` type `;`.
@@ -864,8 +868,40 @@ pub struct Satisfy {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequirementUsage {
     pub name: String,
-    pub type_name: String,
+    pub type_name: Option<String>,
     pub body: RequirementDefBody,
+}
+
+/// Dependency: `dependency` (Identification `from`)? client(s) `to` supplier(s) RelationshipBody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dependency {
+    pub identification: Option<Identification>,
+    pub clients: Vec<String>,
+    pub suppliers: Vec<String>,
+    pub body: ConnectBody,
+}
+
+/// Framed concern member in requirement body: `frame` name (`;` or body).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrameMember {
+    pub name: String,
+    pub body: RequirementDefBody,
+}
+
+/// Concern usage at package level: `concern` name (`:` type)? RequirementBody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConcernUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: RequirementDefBody,
+}
+
+/// Use case usage at package level: `use case` name (`:` type)? CaseBody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UseCaseUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: UseCaseDefBody,
 }
 
 
@@ -1314,6 +1350,15 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         }
         PackageBodyElement::RenderingUsage(n) => {
             PackageBodyElement::RenderingUsage(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::Dependency(n) => {
+            PackageBodyElement::Dependency(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::ConcernUsage(n) => {
+            PackageBodyElement::ConcernUsage(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::UseCaseUsage(n) => {
+            PackageBodyElement::UseCaseUsage(dummy_node(n, n.value.clone()))
         }
     };
     dummy_node(el, value)

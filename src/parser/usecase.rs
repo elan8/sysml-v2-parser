@@ -1,13 +1,14 @@
 use crate::ast::{
-    Node, ActorDecl, ActorUsage, Objective, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement
+    Node, ActorDecl, ActorUsage, Objective, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement,
+    UseCaseUsage,
 };
-use crate::parser::lex::{identification, name, ws1, ws_and_comments, qualified_name};
+use crate::parser::lex::{identification, name, qualified_name, ws1, ws_and_comments};
 use crate::parser::requirement::{doc_comment, subject_decl};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::map;
+use nom::combinator::{map, opt};
 use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
@@ -29,6 +30,30 @@ fn keyword_use_case_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     Ok((input, ()))
+}
+
+/// use case name ( : type )? CaseBody
+pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUsage>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"use"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, _) = tag(&b"case"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, ident) = name(input)?;
+    let (input, type_name) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
+    let (input, body) = use_case_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, UseCaseUsage {
+            name: ident,
+            type_name,
+            body,
+        }),
+    ))
 }
 
 pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseDef>> {

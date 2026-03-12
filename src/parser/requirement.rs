@@ -1,6 +1,7 @@
 use crate::ast::{
-    CommentAnnotation, DocComment, Node, RequireConstraint, RequirementDef, RequirementDefBody,
-    RequirementDefBodyElement, SubjectDecl, Satisfy, RequirementUsage, ConstraintBody, TextualRepresentation,
+    CommentAnnotation, ConcernUsage, DocComment, FrameMember, Node, RequireConstraint,
+    RequirementDef, RequirementDefBody, RequirementDefBodyElement, SubjectDecl, Satisfy,
+    RequirementUsage, ConstraintBody, TextualRepresentation,
 };
 use crate::parser::expr::expression;
 use crate::parser::lex::{identification, name, ws, ws1, ws_and_comments, skip_until_brace_end, qualified_name};
@@ -46,12 +47,23 @@ pub(crate) fn requirement_def_body(input: Input<'_>) -> IResult<Input<'_>, Requi
 
 fn requirement_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementDefBodyElement>> {
     let start = input;
-    let mut parser = alt((
-        map(subject_decl, |n| node_from_to(start, input, RequirementDefBodyElement::SubjectDecl(n))),
-        map(require_constraint, |n| node_from_to(start, input, RequirementDefBodyElement::RequireConstraint(n))),
-        map(doc_comment, |n| node_from_to(start, input, RequirementDefBodyElement::Doc(n))),
-    ));
-    parser.parse(input)
+    let (rest, elem) = alt((
+        map(subject_decl, RequirementDefBodyElement::SubjectDecl),
+        map(require_constraint, RequirementDefBodyElement::RequireConstraint),
+        map(frame_member, RequirementDefBodyElement::Frame),
+        map(doc_comment, RequirementDefBodyElement::Doc),
+    ))
+    .parse(input)?;
+    Ok((rest, node_from_to(start, rest, elem)))
+}
+
+fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"frame"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, n) = name(input)?;
+    let (input, body) = requirement_def_body(input)?;
+    Ok((input, node_from_to(start, input, FrameMember { name: n, body })))
 }
 
 pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>> {
@@ -243,13 +255,32 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
     Ok((input, node_from_to(start, input, Satisfy { source, target, body: crate::ast::ConnectBody::Semicolon })))
 }
 
+pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ConcernUsage>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"concern"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, ident) = name(input)?;
+    let (input, type_name) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
+    let (input, body) = requirement_def_body(input)?;
+    let val = ConcernUsage { name: ident, type_name, body };
+    Ok((input, node_from_to(start, input, val)))
+}
+
 pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementUsage>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"requirement"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, type_name) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
     let (input, body) = requirement_def_body(input)?;
-    Ok((input, node_from_to(start, input, RequirementUsage { name: ident, type_name, body })))
+    let val = RequirementUsage { name: ident, type_name, body };
+    Ok((input, node_from_to(start, input, val)))
 }

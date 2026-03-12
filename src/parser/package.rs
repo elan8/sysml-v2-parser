@@ -8,6 +8,7 @@ use crate::parser::action::{action_def, action_usage};
 use crate::parser::alias::alias_def;
 use crate::parser::attribute::attribute_def;
 use crate::parser::connection::connection_def;
+use crate::parser::dependency::dependency;
 use crate::parser::constraint::{calc_def, constraint_def};
 use crate::parser::enumeration::enum_def;
 use crate::parser::item::item_def;
@@ -21,10 +22,11 @@ use crate::parser::node_from_to;
 use crate::parser::part::{part_def, part_usage};
 use crate::parser::port::port_def;
 use crate::parser::requirement::{
-    comment_annotation, doc_comment, requirement_def, requirement_usage, satisfy, textual_representation,
+    comment_annotation, concern_usage, doc_comment, requirement_def, requirement_usage, satisfy,
+    textual_representation,
 };
 use crate::parser::state::state_def;
-use crate::parser::usecase::{actor_decl, use_case_def};
+use crate::parser::usecase::{actor_decl, use_case_def, use_case_usage};
 use crate::parser::view::{
     rendering_def, rendering_usage, view_def, view_usage, viewpoint_def, viewpoint_usage,
 };
@@ -200,6 +202,7 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
         map(port_def, PackageBodyElement::PortDef),
         map(interface_def, PackageBodyElement::InterfaceDef),
         map(connection_def, PackageBodyElement::ConnectionDef),
+        map(dependency, PackageBodyElement::Dependency),
         map(metadata_def, PackageBodyElement::MetadataDef),
         map(enum_def, PackageBodyElement::EnumDef),
         map(occurrence_def, PackageBodyElement::OccurrenceDef),
@@ -212,6 +215,8 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
         map(requirement_usage, PackageBodyElement::RequirementUsage),
         map(satisfy, PackageBodyElement::Satisfy),
         map(use_case_def, PackageBodyElement::UseCaseDef),
+        map(use_case_usage, PackageBodyElement::UseCaseUsage),
+        map(concern_usage, PackageBodyElement::ConcernUsage),
         map(actor_decl, PackageBodyElement::Actor),
         map(state_def, PackageBodyElement::StateDef),
     ));
