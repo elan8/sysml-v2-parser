@@ -1,9 +1,9 @@
 //! View, viewpoint, and rendering parsing (SysML v2 Clause 8.2.2.26).
 
 use crate::ast::{
-    FilterMember, Node, ViewBody, ViewBodyElement, ViewDef, ViewDefBody, ViewDefBodyElement,
-    ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage, RenderingDef, RenderingDefBody,
-    RenderingUsage,
+    ExposeMember, FilterMember, Node, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef,
+    ViewDefBody, ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
+    RenderingDef, RenderingDefBody, RenderingUsage,
 };
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{identification, name, qualified_name, ws1, ws_and_comments};
@@ -12,7 +12,7 @@ use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::map;
+use nom::combinator::{map, success};
 use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
@@ -144,9 +144,81 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
         map(doc_comment, ViewBodyElement::Doc),
         map(view_filter_member, ViewBodyElement::Filter),
         map(view_rendering_usage, ViewBodyElement::ViewRendering),
+        map(expose_member, ViewBodyElement::Expose),
+        map(satisfy_view_member, ViewBodyElement::Satisfy),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// expose (MembershipImport | NamespaceImport) RelationshipBody
+/// MembershipImport = QualifiedName (::**)?
+/// NamespaceImport = QualifiedName :: * (::**)?
+fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"expose"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, first) = qualified_name.parse(input)?;
+    let (input, target) = alt((
+        // ::*::** (try before ::* since * would consume first char of **)
+        map(
+            (
+                preceded(ws_and_comments, tag(&b"::"[..])),
+                preceded(ws_and_comments, tag(&b"*"[..])),
+                preceded(ws_and_comments, tag(&b"::"[..])),
+                preceded(ws_and_comments, tag(&b"**"[..])),
+            ),
+            |_| format!("{}::*::**", first),
+        ),
+        // ::** (try before ::*)
+        map(
+            (
+                preceded(ws_and_comments, tag(&b"::"[..])),
+                preceded(ws_and_comments, tag(&b"**"[..])),
+            ),
+            |_| format!("{}::**", first),
+        ),
+        // ::*
+        map(
+            (
+                preceded(ws_and_comments, tag(&b"::"[..])),
+                preceded(ws_and_comments, tag(&b"*"[..])),
+            ),
+            |_| format!("{}::*", first),
+        ),
+        // plain
+        map(success(()), |_| first.clone()),
+    ))
+    .parse(input)?;
+    // Optional filter [ expr ] - skip content to reach body
+    let (input, _) = nom::combinator::opt(nom::sequence::delimited(
+        preceded(ws_and_comments, tag(&b"["[..])),
+        nom::bytes::complete::take_until(&b"]"[..]),
+        preceded(ws_and_comments, tag(&b"]"[..])),
+    ))
+    .parse(input)?;
+    let (input, body) = connect_body(input)?;
+    Ok((input, node_from_to(start, input, ExposeMember { target, body })))
+}
+
+/// satisfy QualifiedName RelationshipBody (simplified form in view body)
+fn satisfy_view_member(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewMember>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"satisfy"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, viewpoint_ref) = qualified_name.parse(input)?;
+    let (input, body) = connect_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            SatisfyViewMember {
+                viewpoint_ref,
+                body,
+            },
+        ),
+    ))
 }
 
 fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {

@@ -1175,6 +1175,23 @@ pub enum ViewBodyElement {
     Doc(Node<DocComment>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
+    Expose(Node<ExposeMember>),
+    Satisfy(Node<SatisfyViewMember>),
+}
+
+/// Expose in view body: `expose` (MembershipImport | NamespaceImport) RelationshipBody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExposeMember {
+    /// Full target path (e.g. vehicle, vehicle::*, vehicle::*::**, SystemModel::vehicle::**).
+    pub target: String,
+    pub body: ConnectBody,
+}
+
+/// Satisfy in view body: `satisfy` QualifiedName RelationshipBody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SatisfyViewMember {
+    pub viewpoint_ref: String,
+    pub body: ConnectBody,
 }
 
 /// Viewpoint usage: `viewpoint` ConstraintUsageDeclaration RequirementBody.

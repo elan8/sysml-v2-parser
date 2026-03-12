@@ -236,6 +236,8 @@ fn should_report_error_inside_package(found: &str) -> bool {
         || trimmed.starts_with("dependency ")
         || trimmed.starts_with("concern ")
         || trimmed.starts_with("frame ")
+        || trimmed.starts_with("expose ")
+        || trimmed.starts_with("satisfy ")
     {
         return false;
     }
