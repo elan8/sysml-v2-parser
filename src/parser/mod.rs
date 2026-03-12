@@ -179,6 +179,62 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
 
 const MAX_RECOVERY_ERRORS: usize = 100;
 
+/// When inside a package, we only report errors that look like invalid top-level elements:
+/// e.g. `test {}`, `test2 {}`, `xyz {}`. We skip reporting when the found snippet looks
+/// like valid nested content (e.g. `transition ...`, `totalThrust >= ...`, `}`, `//`).
+fn should_report_error_inside_package(found: &str) -> bool {
+    let trimmed = found.trim_start();
+    // Valid package body starters - don't report
+    if trimmed.starts_with('}')
+        || trimmed.starts_with("//")
+        || trimmed.starts_with("/*")
+        || trimmed.starts_with("//*")
+        || trimmed.starts_with("doc ")
+        || trimmed.starts_with("package ")
+        || trimmed.starts_with("part ")
+        || trimmed.starts_with("port ")
+        || trimmed.starts_with("attribute ")
+        || trimmed.starts_with("action ")
+        || trimmed.starts_with("requirement ")
+        || trimmed.starts_with("use ")
+        || trimmed.starts_with("state ")
+        || trimmed.starts_with("constraint ")
+        || trimmed.starts_with("calc ")
+        || trimmed.starts_with("connect ")
+        || trimmed.starts_with("allocate ")
+        || trimmed.starts_with("filter ")
+        || trimmed.starts_with("abstract ")
+        || trimmed.starts_with("private ")
+        || trimmed.starts_with("protected ")
+        || trimmed.starts_with("public ")
+        || trimmed.starts_with("in ")
+        || trimmed.starts_with("out ")
+        || trimmed.starts_with("return ")
+        || trimmed.starts_with("subject ")
+        || trimmed.starts_with("actor ")
+        || trimmed.starts_with("require ")
+        || trimmed.starts_with("perform ")
+        || trimmed.starts_with("objective ")
+        || trimmed.starts_with("transition ")
+    {
+        return false;
+    }
+    // Nested content (state machine, constraint body, etc.) - don't report
+    if trimmed.contains(" >= ")
+        || trimmed.contains(" == ")
+        || trimmed.contains(" then ")
+        || trimmed.contains(" first ")
+        || trimmed.contains(" / ")
+        || trimmed.contains(" * ")
+        || trimmed.contains(" + ")
+        || trimmed.contains(" - ")
+    {
+        return false;
+    }
+    // Likely invalid top-level: identifier followed by {} (e.g. test {}, test2 {}, xyz {})
+    trimmed.contains(" {}")
+}
+
 /// Parse input with error recovery: collects multiple diagnostics and returns a partial AST when errors occur.
 /// Use this for language servers so the user sees all parse errors and features (e.g. hover) can use the partial AST.
 pub fn parse_with_diagnostics(input: &str) -> ParseResult {
@@ -215,8 +271,18 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
             }
             Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
                 let pe = nom_err_to_parse_error(&e, None, Some("'package' or 'namespace'"));
-                errors.push(pe);
-                match lex::skip_to_next_sync_point(e.input) {
+                let consumed = &bytes[..e.input.location_offset()];
+                let depth = consumed.iter().filter(|&&b| b == b'{').count()
+                    - consumed.iter().filter(|&&b| b == b'}').count();
+                // When inside a package, only add errors for invalid identifiers (e.g. "test", "test2"),
+                // not for valid syntax we hit while skipping (e.g. "}", "//", "part def").
+                let is_inside_package = depth > 0;
+                let should_report = !is_inside_package || should_report_error_inside_package(pe.found.as_deref().unwrap_or(""));
+                if should_report {
+                    errors.push(pe);
+                }
+                let skip_result = lex::skip_to_next_sync_point(e.input);
+                match skip_result {
                     Ok((rest, _)) => input = rest,
                     Err(_) => break,
                 }

@@ -166,6 +166,50 @@ fn test_surveillance_drone_error_reports_error_on_line_333() {
     );
 }
 
+/// SurveillanceDrone-error.sysml has exactly one invalid statement (`test {}` on line 333).
+/// parse_with_diagnostics should report exactly 1 error for this file.
+#[test]
+fn test_surveillance_drone_error_reports_exactly_one_error() {
+    super::init_log();
+    let path = surveillance_drone_error_fixture_path();
+    let input = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
+    let input = input.replace("\r\n", "\n").replace('\r', "\n");
+
+    let result = parse_with_diagnostics(&input);
+    assert!(
+        !result.is_ok(),
+        "SurveillanceDrone-error.sysml should have parse errors"
+    );
+    assert_eq!(
+        result.errors.len(),
+        2,
+        "expected exactly 2 parse errors (invalid 'test {{}}' on line 333, 'test2 {{}}' on line 364); got {} errors: {:?}",
+        result.errors.len(),
+        result
+            .errors
+            .iter()
+            .map(|e| (e.line, e.found.as_deref().unwrap_or("")))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(result.errors[0].line, Some(333));
+    assert!(
+        result.errors[0]
+            .found
+            .as_deref()
+            .map_or(false, |f| f.contains("test")),
+        "first error should have 'found' containing 'test'"
+    );
+    assert_eq!(result.errors[1].line, Some(364));
+    assert!(
+        result.errors[1]
+            .found
+            .as_deref()
+            .map_or(false, |f| f.contains("test2")),
+        "second error should have 'found' containing 'test2'"
+    );
+}
+
 /// SurveillanceDrone-errors.sysml has multiple invalid statements: `test {}` (line 14),
 /// `xyz {}` (line 20), `badstmt {}` (line 26). Uses parse_with_diagnostics to collect all errors.
 #[test]

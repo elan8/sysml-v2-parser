@@ -361,6 +361,8 @@ package SurveillanceDrone {
 		doc /* Capture and output video stream. */
 	}
 
+	test2 {}
+
 	// Parts perform actions; allocations use named action usages (source/target must be usages per spec 7.15).
 	part def SurveillanceQuadrotorDroneWithBehavior :> SurveillanceQuadrotorDrone {
 		perform action executePatrol : ExecutePatrol;

@@ -79,6 +79,29 @@ pub(crate) fn skip_to_next_sync_point(input: Input<'_>) -> IResult<Input<'_>, ()
     .parse(input)
 }
 
+/// Skip to the next root-level package or namespace (next line starting with "package " or "namespace "
+/// after ws/comments), or to end of input. Used when recovery from a failure inside a package body.
+/// Skip to the next root-level package or namespace, or to end of input.
+/// Used when recovering from a failure inside a package body (avoids reporting errors on every line).
+pub(crate) fn skip_to_next_root_element(mut input: Input<'_>) -> IResult<Input<'_>, ()> {
+    loop {
+        if input.fragment().is_empty() {
+            return Ok((input, ()));
+        }
+        let (after_ws, _) = ws_and_comments(input).unwrap_or((input, ()));
+        let frag = after_ws.fragment();
+        if frag.len() >= 8
+            && (frag.starts_with(b"package ") || frag.starts_with(b"namespace "))
+        {
+            return Ok((after_ws, ()));
+        }
+        match skip_to_next_sync_point(input) {
+            Ok((rest, _)) => input = rest,
+            Err(_) => return Ok((input, ())),
+        }
+    }
+}
+
 /// NAME: BASIC_NAME (identifier) or UNRESTRICTED_NAME (single-quoted string).
 pub(crate) fn name(input: Input<'_>) -> IResult<Input<'_>, String> {
     alt((quoted_name, basic_name)).parse(input)
