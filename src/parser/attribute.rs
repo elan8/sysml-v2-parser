@@ -3,17 +3,53 @@
 use crate::ast::{AttributeBody, AttributeDef, AttributeUsage, Node};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_name, skip_until_brace_end, ws1, ws_and_comments,
+    name, qualified_name, skip_until_brace_end, take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
-use nom::bytes::complete::tag;
+use nom::bytes::complete::{tag, take_until};
 use nom::combinator::map;
 use nom::sequence::{delimited, preceded};
 use nom::Parser;
 use nom::IResult;
+
+fn is_reserved_shorthand_starter(name: &str) -> bool {
+    matches!(
+        name,
+        "interface"
+            | "part"
+            | "connect"
+            | "bind"
+            | "perform"
+            | "allocate"
+            | "port"
+            | "state"
+            | "satisfy"
+            | "action"
+            | "attribute"
+            | "ref"
+            | "doc"
+            | "metadata"
+            | "filter"
+            | "use"
+            | "view"
+            | "viewpoint"
+            | "render"
+            | "rendering"
+            | "requirement"
+            | "require"
+            | "concern"
+            | "actor"
+            | "item"
+            | "individual"
+            | "constraint"
+            | "calc"
+            | "enum"
+            | "occurrence"
+    )
+}
 
 /// Value part: `= expr` | `:= expr` | `default = expr` | `default := expr` (BNF FeatureValue).
 fn value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expression>> {
@@ -28,6 +64,21 @@ fn value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expressio
     ))
     .parse(input)?;
     expression(input)
+}
+
+fn skip_value_part(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = alt((
+        preceded(tag(&b"="[..]), ws_and_comments),
+        preceded(tag(&b":="[..]), ws_and_comments),
+        preceded(
+            preceded(tag(&b"default"[..]), ws1),
+            preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
+        ),
+    ))
+    .parse(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
+    Ok((input, ()))
 }
 
 /// Attribute body: ';' or '{' ... '}' (skip content inside braces)
@@ -69,6 +120,7 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
     let (typing_span, typing) = typing_result
         .map(|(span, s)| (Some(span), Some(s)))
         .unwrap_or((None, None));
+    let (input, _) = nom::combinator::opt(skip_value_part).parse(input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -114,6 +166,55 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             body,
             name_span: Some(name_span),
             redefines_span,
+        }),
+    ))
+}
+
+/// Shorthand attribute usage (no `attribute` keyword) commonly used inside part bodies.
+///
+/// Supports:
+/// - `name : Type ;`
+/// - `name : Type = expr ;`
+/// - `:>> name : Type = expr ;` (leading `:>>` ignored; treated as a usage)
+pub(crate) fn attribute_usage_shorthand(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    if is_reserved_shorthand_starter(&name_str) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+    // Parse (and ignore) the declared type.
+    let (input, _) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    // Optional value assignment. For now, we accept the syntax but do not fully parse the expression
+    // (some validation fixtures use complex function calls like `sum(( ... ))`).
+    let (input, _) = nom::combinator::opt(preceded(
+        ws_and_comments,
+        alt((
+            preceded(tag(&b"="[..]), ws_and_comments),
+            preceded(tag(&b":="[..]), ws_and_comments),
+            preceded(
+                preceded(tag(&b"default"[..]), ws1),
+                preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
+            ),
+        )),
+    ))
+    .parse(input)?;
+    let (input, _) = nom::combinator::opt(preceded(ws_and_comments, take_until(&b";"[..]))).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, AttributeUsage {
+            name: name_str,
+            redefines: None,
+            value: None,
+            body: AttributeBody::Semicolon,
+            name_span: Some(name_span),
+            redefines_span: None,
         }),
     ))
 }

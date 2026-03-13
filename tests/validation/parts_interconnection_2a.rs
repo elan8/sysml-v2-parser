@@ -137,6 +137,7 @@ fn definitions_package() -> Package {
 fn port_def_semicolon(name: &str) -> PackageBodyElement {
     PackageBodyElement::PortDef(n(PortDef {
         identification: id(name),
+        specializes: None,
         body: PortDefBody::Semicolon,
     }))
 }
@@ -144,6 +145,7 @@ fn port_def_semicolon(name: &str) -> PackageBodyElement {
 fn port_def_vehicle_to_road() -> PackageBodyElement {
     PackageBodyElement::PortDef(n(PortDef {
         identification: id("VehicleToRoadPort"),
+        specializes: None,
         body: PortDefBody::Brace {
             elements: vec![n(PortDefBodyElement::PortUsage(n(PortUsage {
                 name: "wheelToRoadPort".to_string(),
@@ -387,6 +389,7 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                 n(InterfaceDefBodyElement::RefDecl(n(RefDecl {
                     name: "driveshaft".to_string(),
                     type_name: "Driveshaft".to_string(),
+                    value: None,
                     body: RefBody::Brace,
                     name_span: None,
                     type_ref_span: None,

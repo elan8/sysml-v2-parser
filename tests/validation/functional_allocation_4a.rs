@@ -118,12 +118,12 @@ fn port_fuel_cmd_port() -> PortUsage {
 
 fn part_engine() -> PartUsage {
     PartUsage {
-        name: "engine".to_string(),
+        name: String::new(),
         type_name: String::new(),
         multiplicity: None,
         ordered: false,
         subsets: None,
-        redefines: None,
+        redefines: Some("engine".to_string()),
         value: None,
         name_span: None,
         type_ref_span: None,
@@ -174,12 +174,12 @@ fn part_engine() -> PartUsage {
 
 fn part_transmission() -> PartUsage {
     PartUsage {
-        name: "transmission".to_string(),
+        name: String::new(),
         type_name: String::new(),
         multiplicity: None,
         ordered: false,
         subsets: None,
-        redefines: None,
+        redefines: Some("transmission".to_string()),
         value: None,
         name_span: None,
         type_ref_span: None,
@@ -230,12 +230,12 @@ fn part_transmission() -> PartUsage {
 
 fn part_driveshaft() -> PartUsage {
     PartUsage {
-        name: "driveshaft".to_string(),
+        name: String::new(),
         type_name: String::new(),
         multiplicity: None,
         ordered: false,
         subsets: None,
-        redefines: None,
+        redefines: Some("driveshaft".to_string()),
         value: None,
         name_span: None,
         type_ref_span: None,
@@ -286,12 +286,12 @@ fn part_driveshaft() -> PartUsage {
 
 fn part_rear_axle_assembly() -> PartUsage {
     PartUsage {
-        name: "rearAxleAssembly".to_string(),
+        name: String::new(),
         type_name: String::new(),
         multiplicity: None,
         ordered: false,
         subsets: None,
-        redefines: None,
+        redefines: Some("rearAxleAssembly".to_string()),
         value: None,
         name_span: None,
         type_ref_span: None,
@@ -338,12 +338,12 @@ fn part_rear_axle_assembly() -> PartUsage {
 
 fn part_rear_axle() -> PartUsage {
     PartUsage {
-        name: "rearAxle".to_string(),
+        name: String::new(),
         type_name: String::new(),
         multiplicity: None,
         ordered: false,
         subsets: None,
-        redefines: None,
+        redefines: Some("rearAxle".to_string()),
         value: None,
         name_span: None,
         type_ref_span: None,
@@ -358,12 +358,12 @@ fn part_rear_axle() -> PartUsage {
 
 fn part_left_half_axle() -> PartUsage {
     PartUsage {
-        name: "leftHalfAxle".to_string(),
+        name: String::new(),
         type_name: String::new(),
         multiplicity: None,
         ordered: false,
         subsets: None,
-        redefines: None,
+        redefines: Some("leftHalfAxle".to_string()),
         value: None,
         name_span: None,
         type_ref_span: None,
@@ -384,12 +384,12 @@ fn part_left_half_axle() -> PartUsage {
 
 fn part_right_half_axle() -> PartUsage {
     PartUsage {
-        name: "rightHalfAxle".to_string(),
+        name: String::new(),
         type_name: String::new(),
         multiplicity: None,
         ordered: false,
         subsets: None,
-        redefines: None,
+        redefines: Some("rightHalfAxle".to_string()),
         value: None,
         name_span: None,
         type_ref_span: None,

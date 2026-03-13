@@ -173,7 +173,9 @@ pub enum PackageBodyElement {
     UseCaseDef(Node<UseCaseDef>),
     Actor(Node<ActorDecl>),
     StateDef(Node<StateDef>),
+    StateUsage(Node<StateUsage>),
     ItemDef(Node<ItemDef>),
+    IndividualDef(Node<IndividualDef>),
     ConstraintDef(Node<ConstraintDef>),
     CalcDef(Node<CalcDef>),
     ViewDef(Node<ViewDef>),
@@ -325,6 +327,14 @@ pub struct ItemDef {
     pub body: AttributeBody,
 }
 
+/// Individual definition: `individual def` Identification `:>` type body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndividualDef {
+    pub identification: Identification,
+    pub specializes: Option<String>,
+    pub body: AttributeBody,
+}
+
 /// Part usage: `part` name `:` type multiplicity? `ordered`? (`redefines`|`:>>`)? value? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartUsage {
@@ -372,6 +382,8 @@ pub enum PartUsageBodyElement {
     PartUsage(Box<Node<PartUsage>>),
     PortUsage(Node<PortUsage>),
     Bind(Node<Bind>),
+    /// `ref` name `:` type body (reference binding in part usage).
+    Ref(Node<RefDecl>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
     Perform(Node<Perform>),
@@ -438,6 +450,8 @@ pub struct AttributeUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PortDef {
     pub identification: Identification,
+    /// Supertype after `:>`, e.g. Some("ClutchPort") for `port def ManualClutchPort :> ClutchPort`.
+    pub specializes: Option<String>,
     pub body: PortDefBody,
 }
 
@@ -527,6 +541,8 @@ pub struct EndDecl {
 pub struct RefDecl {
     pub name: String,
     pub type_name: String,
+    /// Optional binding value: `= expr` (SysML shorthand binding for references).
+    pub value: Option<Node<Expression>>,
     pub body: RefBody,
     /// Span of the name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -855,6 +871,7 @@ pub enum RequirementDefBody {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RequirementDefBodyElement {
+    Import(Node<Import>),
     SubjectDecl(Node<SubjectDecl>),
     RequireConstraint(Node<RequireConstraint>),
     Frame(Node<FrameMember>),
@@ -995,6 +1012,8 @@ pub enum StateDefBodyElement {
     Entry(Node<EntryAction>),
     /// `then` name `;` - initial state.
     Then(Node<ThenStmt>),
+    /// `ref` name `:` type body – reference binding in state.
+    Ref(Node<RefDecl>),
     StateUsage(Node<StateUsage>),
     Transition(Node<Transition>),
 }
@@ -1002,6 +1021,8 @@ pub enum StateDefBodyElement {
 /// Entry action: `entry` (`;` or body).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntryAction {
+    /// For `entry action name body` form; None for plain `entry` body.
+    pub action_name: Option<String>,
     pub body: StateDefBody,
 }
 
@@ -1019,11 +1040,14 @@ pub struct StateUsage {
     pub body: StateDefBody,
 }
 
-/// Transition: `transition` name `first` source `then` target body.
+/// Transition: `transition` name [`first` source] [`if` guard] [`do` effect] `then` target body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transition {
     pub name: String,
-    pub source: Node<Expression>,
+    /// If omitted, form is `transition name then target;`.
+    pub source: Option<Node<Expression>>,
+    pub guard: Option<Node<Expression>>,
+    pub effect: Option<Node<Expression>>,
     pub target: Node<Expression>,
     pub body: ConnectBody,
 }
@@ -1365,8 +1389,14 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::StateDef(n) => {
             PackageBodyElement::StateDef(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::StateUsage(n) => {
+            PackageBodyElement::StateUsage(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::ItemDef(n) => {
             PackageBodyElement::ItemDef(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::IndividualDef(n) => {
+            PackageBodyElement::IndividualDef(dummy_node(n, n.value.clone()))
         }
         PackageBodyElement::ConstraintDef(n) => {
             PackageBodyElement::ConstraintDef(dummy_node(n, n.value.clone()))
@@ -1492,6 +1522,79 @@ fn normalize_part_usage_body(b: &PartUsageBody) -> PartUsageBody {
     }
 }
 
+fn normalize_perform(p: &Perform) -> Perform {
+    Perform {
+        action_name: p.action_name.clone(),
+        type_name: p.type_name.clone(),
+        body: normalize_perform_body(&p.body),
+    }
+}
+
+fn normalize_perform_body(b: &PerformBody) -> PerformBody {
+    match b {
+        PerformBody::Semicolon => PerformBody::Semicolon,
+        PerformBody::Brace { elements } => PerformBody::Brace {
+            elements: elements
+                .iter()
+                .map(normalize_perform_body_element_node)
+                .collect(),
+        },
+    }
+}
+
+fn normalize_perform_body_element_node(
+    el: &Node<PerformBodyElement>,
+) -> Node<PerformBodyElement> {
+    let value = match &el.value {
+        PerformBodyElement::Doc(n) => PerformBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PerformBodyElement::InOut(n) => PerformBodyElement::InOut(dummy_node(
+            n,
+            PerformInOutBinding {
+                direction: n.value.direction,
+                name: n.value.name.clone(),
+                value: normalize_expression_node(&n.value.value),
+            },
+        )),
+    };
+    dummy_node(el, value)
+}
+
+fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
+    let value = match &node.value {
+        Expression::LiteralInteger(x) => Expression::LiteralInteger(*x),
+        Expression::LiteralReal(s) => Expression::LiteralReal(s.clone()),
+        Expression::LiteralString(s) => Expression::LiteralString(s.clone()),
+        Expression::LiteralBoolean(b) => Expression::LiteralBoolean(*b),
+        Expression::FeatureRef(s) => Expression::FeatureRef(s.clone()),
+        Expression::MemberAccess(base, member) => Expression::MemberAccess(
+            Box::new(normalize_expression_node(base)),
+            member.clone(),
+        ),
+        Expression::Index { base, index } => Expression::Index {
+            base: Box::new(normalize_expression_node(base)),
+            index: Box::new(normalize_expression_node(index)),
+        },
+        Expression::Bracket(inner) => {
+            Expression::Bracket(Box::new(normalize_expression_node(inner)))
+        }
+        Expression::LiteralWithUnit { value: v, unit } => Expression::LiteralWithUnit {
+            value: Box::new(normalize_expression_node(v)),
+            unit: Box::new(normalize_expression_node(unit)),
+        },
+        Expression::BinaryOp { op, left, right } => Expression::BinaryOp {
+            op: op.clone(),
+            left: Box::new(normalize_expression_node(left)),
+            right: Box::new(normalize_expression_node(right)),
+        },
+        Expression::UnaryOp { op, operand } => Expression::UnaryOp {
+            op: op.clone(),
+            operand: Box::new(normalize_expression_node(operand)),
+        },
+        Expression::Null => Expression::Null,
+    };
+    Node::new(Span::dummy(), value)
+}
+
 fn normalize_part_usage_body_element_node(
     el: &Node<PartUsageBodyElement>,
 ) -> Node<PartUsageBodyElement> {
@@ -1506,13 +1609,16 @@ fn normalize_part_usage_body_element_node(
         PartUsageBodyElement::PortUsage(n) => {
             PartUsageBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
+        PartUsageBodyElement::Ref(n) => {
+            PartUsageBodyElement::Ref(dummy_node(n, normalize_ref_decl(&n.value)))
+        }
         PartUsageBodyElement::Bind(n) => PartUsageBodyElement::Bind(dummy_node(n, n.value.clone())),
         PartUsageBodyElement::InterfaceUsage(n) => {
             PartUsageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
         }
         PartUsageBodyElement::Connect(n) => PartUsageBodyElement::Connect(dummy_node(n, n.value.clone())),
         PartUsageBodyElement::Perform(n) => {
-            PartUsageBodyElement::Perform(dummy_node(n, n.value.clone()))
+            PartUsageBodyElement::Perform(dummy_node(n, normalize_perform(&n.value)))
         }
         PartUsageBodyElement::Allocate(n) => {
             PartUsageBodyElement::Allocate(dummy_node(n, n.value.clone()))
@@ -1557,6 +1663,7 @@ fn normalize_port_body(b: &PortBody) -> PortBody {
 fn normalize_port_def(p: &PortDef) -> PortDef {
     PortDef {
         identification: p.identification.clone(),
+        specializes: p.specializes.clone(),
         body: normalize_port_def_body(&p.body),
     }
 }
@@ -1696,6 +1803,7 @@ fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
     RefDecl {
         name: r.name.clone(),
         type_name: r.type_name.clone(),
+        value: r.value.clone(),
         body: r.body.clone(),
         name_span: None,
         type_ref_span: None,

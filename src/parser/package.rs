@@ -11,21 +11,23 @@ use crate::parser::connection::connection_def;
 use crate::parser::dependency::dependency;
 use crate::parser::constraint::{calc_def, constraint_def};
 use crate::parser::enumeration::enum_def;
+use crate::parser::individual::individual_def;
 use crate::parser::item::item_def;
 use crate::parser::metadata::metadata_def;
 use crate::parser::occurrence::occurrence_def;
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::interface::interface_def;
-use crate::parser::lex::{identification, ws1, ws_and_comments};
+use crate::parser::lex::{identification, skip_statement_or_block, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::part::{part_def, part_usage};
+use crate::parser::part::{part_def_or_usage, PartDefOrUsage};
 use crate::parser::port::port_def;
 use crate::parser::requirement::{
     comment_annotation, concern_usage, doc_comment, requirement_def, requirement_usage, satisfy,
     textual_representation,
 };
 use crate::parser::state::state_def;
+use crate::parser::state::state_usage;
 use crate::parser::usecase::{actor_decl, use_case_def, use_case_usage};
 use crate::parser::view::{
     rendering_def, rendering_usage, view_def, view_usage, viewpoint_def, viewpoint_usage,
@@ -33,7 +35,7 @@ use crate::parser::view::{
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{cut, map, opt};
+use nom::combinator::{map, opt};
 use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::Parser;
@@ -41,9 +43,7 @@ use nom::IResult;
 
 /// Keyword "package" with following whitespace.
 fn keyword_package(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    log::debug!("keyword_package: input len={}", input.fragment().len());
     let (input, _) = tag(&b"package"[..]).parse(input)?;
-    log::debug!("keyword_package: after tag, rest len={}", input.fragment().len());
     let (input, _) = ws1(input)?;
     Ok((input, ()))
 }
@@ -121,30 +121,118 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
 /// PackageBody: ';' | '{' PackageBodyElement* '}'
 /// Brace form is tried first so that ws before '{' is not consumed by the semicolon branch.
 pub(crate) fn package_body(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
-    let len_before = input.fragment().len();
-    log::debug!("package_body: entry, input len={}", len_before);
-    let result = alt((
-        map(
-            nom::sequence::delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                preceded(
-                    ws_and_comments,
-                    many0(preceded(ws_and_comments, package_body_element)),
-                ),
-                cut(preceded(ws_and_comments, tag(&b"}"[..]))),
-            ),
-            |elements| {
-                log::debug!("package_body: brace form ok, {} elements", elements.len());
-                PackageBody::Brace { elements }
-            },
-        ),
+    alt((
+        package_body_brace,
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| PackageBody::Semicolon),
     ))
-    .parse(input);
-    if let Err(_) = &result {
-        log::debug!("package_body: alt failed (brace or semicolon)");
+    .parse(input)
+}
+
+fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
+    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().is_empty() {
+            return Ok((input, PackageBody::Brace { elements }));
+        }
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+            return Ok((input, PackageBody::Brace { elements }));
+        }
+        match package_body_element(input) {
+            Ok((next, element)) => {
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Failure(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                elements.push(element);
+                input = next;
+            }
+            Err(_) if is_recoverable_package_starter(input.fragment()) => {
+                let (next, _) = skip_statement_or_block(input)?;
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Failure(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                input = next;
+            }
+            Err(_) => {
+                return Err(nom::Err::Failure(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
+        }
     }
-    result
+}
+
+fn is_recoverable_package_starter(fragment: &[u8]) -> bool {
+    const KEYWORDS: &[&str] = &[
+        "action",
+        "actor",
+        "analysis",
+        "alias",
+        "allocate",
+        "allocation",
+        "assert",
+        "assume",
+        "attribute",
+        "case",
+        "calc",
+        "concern",
+        "connection",
+        "constraint",
+        "decision",
+        "dependency",
+        "enum",
+        "exhibit",
+        "expose",
+        "fork",
+        "individual",
+        "interface",
+        "join",
+        "library",
+        "merge",
+        "metadata",
+        "objective",
+        "occurrence",
+        "package",
+        "part",
+        "port",
+        "ref",
+        "render",
+        "rendering",
+        "require",
+        "requirement",
+        "return",
+        "snapshot",
+        "stakeholder",
+        "state",
+        "subject",
+        "then",
+        "timeslice",
+        "use",
+        "verification",
+        "view",
+        "viewpoint",
+    ];
+
+    KEYWORDS
+        .iter()
+        .any(|keyword| starts_with_keyword(fragment, keyword.as_bytes()))
+}
+
+fn starts_with_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
+    fragment.starts_with(keyword)
+        && fragment
+            .get(keyword.len())
+            .is_none_or(|b| b.is_ascii_whitespace() || matches!(*b, b'{' | b':' | b';' | b'['))
 }
 
 /// KerML ElementFilterMember: MemberPrefix? 'filter' condition = OwnedExpression ';'
@@ -178,11 +266,6 @@ pub(crate) fn filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterM
 pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PackageBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
-    let frag = start.fragment();
-    log::debug!(
-        "package_body_element: first 20 bytes: {:?}",
-        frag.get(..20.min(frag.len())).unwrap_or(frag),
-    );
     // Doc first so "doc /* ... */" at start of package body parses before other elements.
     // Annotation parsers grouped to help type inference.
     // Split into groups to avoid nom Choice type explosion with too many alts.
@@ -197,8 +280,10 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
         map(library_package_, PackageBodyElement::LibraryPackage),
         map(package_, PackageBodyElement::Package),
         map(import_, PackageBodyElement::Import),
-        map(part_def, PackageBodyElement::PartDef),
-        map(part_usage, PackageBodyElement::PartUsage),
+        map(part_def_or_usage, |p| match p {
+            PartDefOrUsage::Def(n) => PackageBodyElement::PartDef(n),
+            PartDefOrUsage::Usage(n) => PackageBodyElement::PartUsage(n),
+        }),
         map(port_def, PackageBodyElement::PortDef),
         map(interface_def, PackageBodyElement::InterfaceDef),
         map(connection_def, PackageBodyElement::ConnectionDef),
@@ -219,9 +304,11 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
         map(concern_usage, PackageBodyElement::ConcernUsage),
         map(actor_decl, PackageBodyElement::Actor),
         map(state_def, PackageBodyElement::StateDef),
+        map(state_usage, PackageBodyElement::StateUsage),
     ));
     let other_parser = alt((
         map(item_def, PackageBodyElement::ItemDef),
+        map(individual_def, PackageBodyElement::IndividualDef),
         map(constraint_def, PackageBodyElement::ConstraintDef),
         map(calc_def, PackageBodyElement::CalcDef),
         map(view_def, PackageBodyElement::ViewDef),
@@ -244,13 +331,7 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
 /// Root: (package | namespace)*
 pub(crate) fn root_namespace(input: Input<'_>) -> IResult<Input<'_>, RootNamespace> {
     let (input, _) = ws_and_comments(input)?;
-    log::debug!("root_namespace: after leading ws, input len={}", input.fragment().len());
     let (input, elements) = many0(preceded(ws_and_comments, root_element)).parse(input)?;
-    log::debug!(
-        "root_namespace: many0 done, elements={}, rest len={}",
-        elements.len(),
-        input.fragment().len(),
-    );
     let (input, _) = ws_and_comments(input)?;
     Ok((input, RootNamespace { elements }))
 }

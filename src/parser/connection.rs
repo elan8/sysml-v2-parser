@@ -76,6 +76,7 @@ fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             RefDecl {
                 name: name_str,
                 type_name,
+                value: None,
                 body,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),

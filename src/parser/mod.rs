@@ -13,6 +13,7 @@ mod attribute;
 mod connection;
 mod constraint;
 mod dependency;
+mod individual;
 mod item;
 mod enumeration;
 mod expr;
@@ -36,6 +37,7 @@ pub(crate) use span::{node_from_to, span_from_to, with_span, Input};
 use crate::ast::RootNamespace;
 use crate::error::ParseError;
 use nom::error::Error;
+use nom::Parser;
 use nom_locate::LocatedSpan;
 
 /// Result of parsing with error recovery: a (possibly partial) AST and zero or more diagnostics.
@@ -133,6 +135,27 @@ fn nom_err_to_parse_error(
     pe
 }
 
+fn is_only_trailing_closing_braces(mut input: Input<'_>) -> bool {
+    loop {
+        let (next, _) = lex::ws_and_comments(input).unwrap_or((input, ()));
+        input = next;
+        if input.fragment().is_empty() {
+            return true;
+        }
+        if input.fragment().starts_with(b"}") {
+            match nom::bytes::complete::tag::<_, _, nom::error::Error<Input>>(&b"}"[..]).parse(input)
+            {
+                Ok((next, _)) => {
+                    input = next;
+                    continue;
+                }
+                Err(_) => return false,
+            }
+        }
+        return false;
+    }
+}
+
 /// Parse full input; must consume entire input. Strips UTF-8 BOM if present.
 pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
     let bytes = input
@@ -142,7 +165,7 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
     let located = LocatedSpan::new(bytes);
     match package::root_namespace(located) {
         Ok((rest, root)) => {
-            if rest.fragment().is_empty() {
+            if rest.fragment().is_empty() || is_only_trailing_closing_braces(rest) {
                 log::debug!("parse_root: success, {} top-level elements", root.elements.len());
                 Ok(root)
             } else {
@@ -205,6 +228,7 @@ fn should_report_error_inside_package(found: &str) -> bool {
         || trimmed.starts_with("action ")
         || trimmed.starts_with("requirement ")
         || trimmed.starts_with("item ")
+        || trimmed.starts_with("individual ")
         || trimmed.starts_with("use ")
         || trimmed.starts_with("state ")
         || trimmed.starts_with("constraint ")
@@ -295,8 +319,9 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
             Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
                 let pe = nom_err_to_parse_error(&e, None, Some("'package', 'namespace', or 'import'"));
                 let consumed = &bytes[..e.input.location_offset()];
-                let depth = consumed.iter().filter(|&&b| b == b'{').count()
-                    - consumed.iter().filter(|&&b| b == b'}').count();
+                let opens = consumed.iter().filter(|&&b| b == b'{').count();
+                let closes = consumed.iter().filter(|&&b| b == b'}').count();
+                let depth = opens.saturating_sub(closes);
                 // When inside a package, only add errors for invalid identifiers (e.g. "test", "test2"),
                 // not for valid syntax we hit while skipping (e.g. "}", "//", "part def").
                 let is_inside_package = depth > 0;

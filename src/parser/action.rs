@@ -6,7 +6,10 @@ use crate::ast::{
 };
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
-use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::lex::{
+    identification, name, qualified_name, skip_statement_or_block, skip_until_brace_end, ws1,
+    ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::with_span;
@@ -14,7 +17,6 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
-use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::Parser;
 use nom::IResult;
@@ -64,19 +66,44 @@ fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| ActionDefBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                preceded(
-                    ws_and_comments,
-                    many0(preceded(ws_and_comments, action_def_body_element)),
-                ),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| ActionDefBody::Brace { elements },
-        ),
+        action_def_body_brace,
     ))
     .parse(input)
+}
+
+fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
+    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+            return Ok((input, ActionDefBody::Brace { elements }));
+        }
+        match action_def_body_element(input) {
+            Ok((next, element)) => {
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                elements.push(element);
+                input = next;
+            }
+            Err(_) => {
+                let (next, _) = skip_statement_or_block(input)?;
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                input = next;
+            }
+        }
+    }
 }
 
 /// Element inside an action definition body: InOutDecl | Doc | Perform
@@ -177,19 +204,44 @@ fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| ActionUsageBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                preceded(
-                    ws_and_comments,
-                    many0(preceded(ws_and_comments, action_usage_body_element)),
-                ),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| ActionUsageBody::Brace { elements },
-        ),
+        action_usage_body_brace,
     ))
     .parse(input)
+}
+
+fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
+    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+            return Ok((input, ActionUsageBody::Brace { elements }));
+        }
+        match action_usage_body_element(input) {
+            Ok((next, element)) => {
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                elements.push(element);
+                input = next;
+            }
+            Err(_) => {
+                let (next, _) = skip_statement_or_block(input)?;
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                input = next;
+            }
+        }
+    }
 }
 
 /// Action usage body element: InOutDecl | Bind | Flow | FirstStmt | MergeStmt | ActionUsage
@@ -208,18 +260,18 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
     Ok((input, node_from_to(start, input, elem)))
 }
 
-/// Action usage: `action` name ( `:` type_name ( `accept` param `:` param_type )? | `accept` param_name `:` param_type ) body
+/// Action usage: `action` name ( `:` type_name ( `accept` param `:` param_type )? | `accept` param_name `:` param_type )? body
 pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, (type_ref_span, type_name, accept)) = nom::branch::alt((
+    let (input, type_accept) = nom::combinator::opt(nom::branch::alt((
         nom::combinator::map(
             (
                 preceded(ws_and_comments, tag(&b":"[..])),
-                preceded(ws_and_comments, with_span(name)),
+                preceded(ws_and_comments, with_span(qualified_name)),
                 nom::combinator::opt(preceded(
                     preceded(ws_and_comments, tag(&b"accept"[..])),
                     preceded(
@@ -248,8 +300,9 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
             ),
             |(param_name, _, param_type)| (None, param_type.clone(), Some((param_name, param_type))),
         ),
-    ))
+    )))
     .parse(input)?;
+    let (type_ref_span, type_name, accept) = type_accept.unwrap_or((None, String::new(), None));
     let (input, body) = action_usage_body(input)?;
     Ok((
         input,

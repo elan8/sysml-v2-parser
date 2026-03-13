@@ -4,13 +4,16 @@ use crate::ast::{
     RequirementUsage, ConstraintBody, TextualRepresentation,
 };
 use crate::parser::expr::expression;
-use crate::parser::lex::{identification, name, ws, ws1, ws_and_comments, skip_until_brace_end, qualified_name};
+use crate::parser::import::import_;
+use crate::parser::lex::{
+    identification, name, qualified_name, skip_statement_or_block, skip_until_brace_end, ws, ws1,
+    ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
 
@@ -33,21 +36,50 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
 pub(crate) fn requirement_def_body(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
     alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| RequirementDefBody::Semicolon),
-        map(
-            delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                many0(preceded(ws_and_comments, requirement_def_body_element)),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| RequirementDefBody::Brace { elements },
-        ),
+        requirement_def_body_brace,
     ))
     .parse(input)
+}
+
+fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
+    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+            return Ok((input, RequirementDefBody::Brace { elements }));
+        }
+        match requirement_def_body_element(input) {
+            Ok((next, element)) => {
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                elements.push(element);
+                input = next;
+            }
+            Err(_) => {
+                let (next, _) = skip_statement_or_block(input)?;
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                input = next;
+            }
+        }
+    }
 }
 
 fn requirement_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementDefBodyElement>> {
     let start = input;
     let (rest, elem) = alt((
+        map(import_, RequirementDefBodyElement::Import),
         map(subject_decl, RequirementDefBodyElement::SubjectDecl),
         map(require_constraint, RequirementDefBodyElement::RequireConstraint),
         map(frame_member, RequirementDefBodyElement::Frame),
@@ -73,13 +105,28 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
     let (input, n) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, _) = alt((
+        map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
+        map(
+            delimited(
+                preceded(ws_and_comments, tag(&b"{"[..])),
+                skip_until_brace_end,
+                preceded(ws_and_comments, tag(&b"}"[..])),
+            ),
+            |_| (),
+        ),
+    ))
+    .parse(input)?;
     Ok((input, node_from_to(start, input, SubjectDecl { name: n, type_name })))
 }
 
 pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<RequireConstraint>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"require"[..])).parse(input)?;
+    let (input, _) = preceded(
+        ws_and_comments,
+        alt((tag(&b"require"[..]), tag(&b"assume"[..]))),
+    )
+    .parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
     let (input, body) = constraint_body(input)?;
@@ -251,8 +298,19 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
     let (input, _) = preceded(ws_and_comments, tag(&b"by"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((input, node_from_to(start, input, Satisfy { source, target, body: crate::ast::ConnectBody::Semicolon })))
+    let (input, body) = alt((
+        map(preceded(ws_and_comments, tag(&b";"[..])), |_| crate::ast::ConnectBody::Semicolon),
+        map(
+            delimited(
+                preceded(ws_and_comments, tag(&b"{"[..])),
+                skip_until_brace_end,
+                preceded(ws_and_comments, tag(&b"}"[..])),
+            ),
+            |_| crate::ast::ConnectBody::Brace,
+        ),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, Satisfy { source, target, body })))
 }
 
 pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ConcernUsage>> {

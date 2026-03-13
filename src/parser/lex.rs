@@ -236,3 +236,68 @@ pub(crate) fn take_until_terminator<'a>(input: Input<'a>, terminators: &'a [u8])
     let (input, _) = nom::bytes::complete::take(i).parse(input)?;
     Ok((input, s))
 }
+
+/// Skip one unknown statement or balanced block.
+///
+/// This is used as a recovery mechanism inside body parsers so we can continue
+/// parsing later known elements instead of aborting the entire enclosing body.
+pub(crate) fn skip_statement_or_block(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = ws_and_comments(input)?;
+    let frag = input.fragment();
+    if frag.is_empty() {
+        return Ok((input, ()));
+    }
+    if frag[0] == b'{' {
+        let (input, _) = tag(&b"{"[..]).parse(input)?;
+        let (input, _) = skip_until_brace_end(input)?;
+        let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+        return Ok((input, ()));
+    }
+
+    let mut depth = 0usize;
+    let mut pos = 0usize;
+    while pos < frag.len() {
+        if pos + 2 <= frag.len() && frag[pos..].starts_with(b"/*") {
+            if let Some(rel) = find_subslice(&frag[pos..], b"*/") {
+                pos += rel + 2;
+                continue;
+            }
+            pos = frag.len();
+            break;
+        }
+        if pos + 2 <= frag.len() && frag[pos..].starts_with(b"//") {
+            while pos < frag.len() && frag[pos] != b'\n' && frag[pos] != b'\r' {
+                pos += 1;
+            }
+            while pos < frag.len() && (frag[pos] == b'\n' || frag[pos] == b'\r') {
+                pos += 1;
+            }
+            if depth == 0 {
+                break;
+            }
+            continue;
+        }
+        match frag[pos] {
+            b'{' => depth += 1,
+            b'}' => {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+                if depth == 0 {
+                    pos += 1;
+                    break;
+                }
+            }
+            b';' if depth == 0 => {
+                pos += 1;
+                break;
+            }
+            _ => {}
+        }
+        pos += 1;
+    }
+    let advance = pos.max(1).min(frag.len());
+    let (input, _) = nom::bytes::complete::take(advance).parse(input)?;
+    Ok((input, ()))
+}

@@ -1,15 +1,18 @@
 use crate::ast::{
-    EntryAction, Node, StateDef, StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition,
+    EntryAction, Node, RefBody, RefDecl, StateDef, StateDefBody, StateDefBodyElement, StateUsage,
+    ThenStmt, Transition,
 };
 use crate::parser::requirement::doc_comment;
 use crate::parser::expr::expression;
-use crate::parser::lex::{identification, name, ws1, ws_and_comments, qualified_name};
+use crate::parser::lex::{
+    identification, name, qualified_name, skip_statement_or_block, skip_until_brace_end, ws1,
+    ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
 
@@ -32,24 +35,106 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
 fn state_def_body(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
     alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| StateDefBody::Semicolon),
-        map(
-            delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                many0(preceded(ws_and_comments, state_def_body_element)),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| StateDefBody::Brace { elements },
-        ),
+        state_def_body_brace,
     ))
     .parse(input)
 }
 
-/// Entry action: `entry` (`;` or body)
+fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
+    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+            return Ok((input, StateDefBody::Brace { elements }));
+        }
+        match state_def_body_element(input) {
+            Ok((next, element)) => {
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                elements.push(element);
+                input = next;
+            }
+            Err(_) => {
+                let (next, _) = skip_statement_or_block(input)?;
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                input = next;
+            }
+        }
+    }
+}
+
+/// Entry action: `entry` (`;` or body)  or  `entry action` name body
 fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     let start = input;
     let (input, _) = tag(&b"entry"[..]).parse(input)?;
+    let (input, action_name) = opt((
+        preceded(ws_and_comments, tag(&b"action"[..])),
+        preceded(ws1, name),
+    ))
+    .parse(input)?;
+    let action_name = action_name.map(|(_, n)| n);
     let (input, body) = state_def_body(input)?;
-    Ok((input, node_from_to(start, input, EntryAction { body })))
+    Ok((
+        input,
+        node_from_to(start, input, EntryAction { action_name, body }),
+    ))
+}
+
+/// Ref in state body: `ref` name `:` type body
+fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
+    let start = input;
+    let (input, _) = tag(&b"ref"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, name_str) = name(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, value) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"="[..])),
+        preceded(ws_and_comments, expression),
+    ))
+    .parse(input)?;
+    let (input, body) = preceded(
+        ws_and_comments,
+        alt((
+            map(tag(&b";"[..]), |_| RefBody::Semicolon),
+            map(
+                delimited(
+                    tag(&b"{"[..]),
+                    skip_until_brace_end,
+                    preceded(ws_and_comments, tag(&b"}"[..])),
+                ),
+                |_| RefBody::Brace,
+            ),
+        )),
+    )
+    .parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            RefDecl {
+                name: name_str,
+                type_name,
+                value,
+                body,
+                name_span: None,
+                type_ref_span: None,
+            },
+        ),
+    ))
 }
 
 /// Then (initial state): `then` name `;`
@@ -68,6 +153,7 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
         map(doc_comment, |n| node_from_to(start, input, StateDefBodyElement::Doc(n))),
         map(entry_action, |n| node_from_to(start, input, StateDefBodyElement::Entry(n))),
         map(then_stmt, |n| node_from_to(start, input, StateDefBodyElement::Then(n))),
+        map(state_ref, |n| node_from_to(start, input, StateDefBodyElement::Ref(n))),
         map(state_usage, |n| node_from_to(start, input, StateDefBodyElement::StateUsage(n))),
         map(transition, |n| node_from_to(start, input, StateDefBodyElement::Transition(n))),
     ));
@@ -80,6 +166,12 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let (input, _) = ws1(input)?;
     let (input, n) = name(input)?;
     let (input, typ) = opt(preceded(preceded(ws_and_comments, tag(&b":"[..])), preceded(ws_and_comments, qualified_name))).parse(input)?;
+    // Optional modifier before body: `parallel` or `initial` (SysML state usage)
+    let (input, _) = opt(alt((
+        preceded(preceded(ws_and_comments, tag(&b"parallel"[..])), ws1),
+        preceded(preceded(ws_and_comments, tag(&b"initial"[..])), ws1),
+    )))
+    .parse(input)?;
     let (input, body) = state_def_body(input)?;
     Ok((input, node_from_to(start, input, StateUsage { name: n, type_name: typ, body })))
 }
@@ -89,18 +181,63 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     let (input, _) = tag(&b"transition"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, n) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, source) = expression(input)?;
-    // Optional: `accept` trigger expression (e.g. `accept PhaseTimerElapsed`)
-    let (input, _) = opt((
-        preceded(ws_and_comments, tag(&b"accept"[..])),
+    // Optional: `first` source (simplified form is `transition name then target;`)
+    let (input, source) = opt((
+        preceded(ws_and_comments, tag(&b"first"[..])),
+        ws1,
+        expression,
+        // Optional: `accept` trigger expression (e.g. `accept PhaseTimerElapsed`)
+        opt((
+            preceded(ws_and_comments, tag(&b"accept"[..])),
+            preceded(ws1, expression),
+        )),
+    ))
+    .parse(input)?;
+    let source = source.map(|(_, _, expr, _)| expr);
+    // Optional: `if` guard and `do` effect before `then`
+    let (input, guard) = opt((
+        preceded(ws_and_comments, tag(&b"if"[..])),
         preceded(ws1, expression),
     ))
     .parse(input)?;
+    let guard = guard.map(|(_, expr)| expr);
+    let (input, effect) = opt((
+        preceded(ws_and_comments, tag(&b"do"[..])),
+        preceded(ws1, expression),
+    ))
+    .parse(input)?;
+    let effect = effect.map(|(_, expr)| expr);
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((input, node_from_to(start, input, Transition { name: n, source, target, body: crate::ast::ConnectBody::Semicolon })))
+    let (input, body) = preceded(
+        ws_and_comments,
+        alt((
+            map(tag(&b";"[..]), |_| crate::ast::ConnectBody::Semicolon),
+            map(
+                delimited(
+                    tag(&b"{"[..]),
+                    skip_until_brace_end,
+                    preceded(ws_and_comments, tag(&b"}"[..])),
+                ),
+                |_| crate::ast::ConnectBody::Brace,
+            ),
+        )),
+    )
+    .parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            Transition {
+                name: n,
+                source,
+                guard,
+                effect,
+                target,
+                body,
+            },
+        ),
+    ))
 }

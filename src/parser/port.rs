@@ -156,7 +156,7 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
     Ok((input, node_from_to(start, input, elem)))
 }
 
-/// Port definition: 'port' 'def' Identification body
+/// Port definition: 'port' 'def' Identification ( ':>' qualified_name )? body
 pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -165,11 +165,17 @@ pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
+    let (input, specializes) = nom::combinator::opt(nom::sequence::preceded(
+        nom::sequence::preceded(ws_and_comments, tag(&b":>"[..])),
+        nom::sequence::preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
     let (input, body) = port_def_body(input)?;
     Ok((
         input,
         node_from_to(start, input, PortDef {
             identification,
+            specializes,
             body,
         }),
     ))
