@@ -259,3 +259,75 @@ fn test_view_usage_parse() {
         _ => panic!("expected ViewUsage"),
     }
 }
+
+#[test]
+fn test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling() {
+    let input = "package P {\n#fmeaspec requirement req1 { }\npart def Good;\n}";
+    let result = parse(input).expect("parse should succeed with recovery");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    assert!(
+        elements.iter().any(|e| matches!(e.value, PackageBodyElement::PartDef(_))),
+        "later valid sibling should still be present after recovering from annotated unsupported member"
+    );
+}
+
+#[test]
+fn test_package_body_recovery_skips_malformed_abstract_part_and_keeps_next_member() {
+    let input = "package P {\nabstract part def Broken { invalid }\npart def Good;\n}";
+    let result = parse(input).expect("parse should succeed with recovery");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    assert_eq!(
+        elements
+            .iter()
+            .filter(|e| matches!(e.value, PackageBodyElement::PartDef(_)))
+            .count(),
+        1,
+        "recovery should skip malformed abstract part and continue with the next valid definition"
+    );
+}
+
+#[test]
+fn test_requirement_body_recovery_keeps_later_require_constraint() {
+    let input = "package P {\nrequirement def R {\nsubject vehicle : Vehicle;\nattribute massActual: MassValue;\nrequire constraint { }\n}\n}";
+    let result = parse(input).expect("parse should succeed with requirement-body recovery");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let req = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::RequirementDef(r) => Some(&r.value),
+            _ => None,
+        })
+        .expect("requirement def should be present");
+    let body_elements = match &req.body {
+        sysml_parser::ast::RequirementDefBody::Brace { elements } => elements,
+        _ => panic!("expected requirement brace body"),
+    };
+    assert!(
+        body_elements.iter().any(|e| matches!(
+            e.value,
+            sysml_parser::ast::RequirementDefBodyElement::RequireConstraint(_)
+        )),
+        "later known requirement member should survive recovery over unsupported members"
+    );
+}

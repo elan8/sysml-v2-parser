@@ -10,6 +10,84 @@ use nom::sequence::{delimited, preceded};
 use nom::Parser;
 use nom::IResult;
 
+pub(crate) const PACKAGE_BODY_STARTERS: &[&[u8]] = &[
+    b"#",
+    b"action",
+    b"actor",
+    b"analysis",
+    b"alias",
+    b"allocate",
+    b"allocation",
+    b"abstract",
+    b"assert",
+    b"assume",
+    b"attribute",
+    b"calc",
+    b"comment",
+    b"concern",
+    b"connection",
+    b"constraint",
+    b"dependency",
+    b"doc",
+    b"enum",
+    b"expose",
+    b"filter",
+    b"frame",
+    b"import",
+    b"individual",
+    b"interface",
+    b"item",
+    b"library",
+    b"metadata",
+    b"namespace",
+    b"occurrence",
+    b"package",
+    b"part",
+    b"port",
+    b"private",
+    b"protected",
+    b"public",
+    b"render",
+    b"rendering",
+    b"rep",
+    b"require",
+    b"requirement",
+    b"satisfy",
+    b"state",
+    b"use",
+    b"variation",
+    b"verification",
+    b"view",
+    b"viewpoint",
+];
+
+pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
+    b"@",
+    b"allocate",
+    b"attribute",
+    b"bind",
+    b"connect",
+    b"doc",
+    b"exhibit",
+    b"interface",
+    b"part",
+    b"perform",
+    b"port",
+    b"ref",
+    b"satisfy",
+];
+
+pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
+    b"attribute",
+    b"doc",
+    b"frame",
+    b"import",
+    b"require",
+    b"requirement",
+    b"satisfy",
+    b"subject",
+];
+
 /// Skip optional whitespace (space, tab, newline).
 pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = take_while(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r').parse(input)?;
@@ -100,6 +178,56 @@ pub(crate) fn skip_to_next_root_element(mut input: Input<'_>) -> IResult<Input<'
             Err(_) => return Ok((input, ())),
         }
     }
+}
+
+pub(crate) fn starts_with_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
+    if keyword
+        .iter()
+        .any(|b| !b.is_ascii_alphanumeric() && *b != b'_')
+    {
+        return fragment.starts_with(keyword);
+    }
+    fragment.starts_with(keyword)
+        && fragment
+            .get(keyword.len())
+            .is_none_or(|b| b.is_ascii_whitespace() || matches!(*b, b'{' | b':' | b';' | b'['))
+}
+
+pub(crate) fn starts_with_any_keyword(fragment: &[u8], keywords: &[&[u8]]) -> bool {
+    keywords
+        .iter()
+        .any(|keyword| starts_with_keyword(fragment, keyword))
+}
+
+/// Skip to the next likely body element starter for the current grammar scope, or to the closing `}` / EOF.
+pub(crate) fn skip_to_next_body_element_or_end<'a>(
+    mut input: Input<'a>,
+    starters: &[&[u8]],
+) -> IResult<Input<'a>, ()> {
+    loop {
+        let (after_ws, _) = ws_and_comments(input).unwrap_or((input, ()));
+        input = after_ws;
+        if input.fragment().is_empty()
+            || input.fragment().starts_with(b"}")
+            || starts_with_any_keyword(input.fragment(), starters)
+        {
+            return Ok((input, ()));
+        }
+        match skip_to_next_sync_point(input) {
+            Ok((rest, _)) if rest.location_offset() != input.location_offset() => input = rest,
+            _ => return Ok((input, ())),
+        }
+    }
+}
+
+/// Recover from a failed body element parse by first skipping the current statement or block,
+/// then syncing to the next likely body element starter or `}`.
+pub(crate) fn recover_body_element<'a>(
+    input: Input<'a>,
+    starters: &[&[u8]],
+) -> IResult<Input<'a>, ()> {
+    let (input, _) = skip_statement_or_block(input)?;
+    skip_to_next_body_element_or_end(input, starters)
 }
 
 /// NAME: BASIC_NAME (identifier) or UNRESTRICTED_NAME (single-quoted string).

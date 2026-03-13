@@ -6,8 +6,8 @@ use crate::ast::{
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_statement_or_block, skip_until_brace_end, ws, ws1,
-    ws_and_comments,
+    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
+    starts_with_any_keyword, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::Input;
@@ -62,8 +62,8 @@ fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Requiremen
                 elements.push(element);
                 input = next;
             }
-            Err(_) => {
-                let (next, _) = skip_statement_or_block(input)?;
+            Err(_) if starts_with_any_keyword(input.fragment(), REQUIREMENT_BODY_STARTERS) => {
+                let (next, _) = recover_body_element(input, REQUIREMENT_BODY_STARTERS)?;
                 if next.location_offset() == input.location_offset() {
                     return Err(nom::Err::Error(nom::error::Error::new(
                         input,
@@ -71,6 +71,12 @@ fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Requiremen
                     )));
                 }
                 input = next;
+            }
+            Err(_) => {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
             }
         }
     }

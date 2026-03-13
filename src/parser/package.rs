@@ -18,7 +18,10 @@ use crate::parser::occurrence::occurrence_def;
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::interface::interface_def;
-use crate::parser::lex::{identification, skip_statement_or_block, ws1, ws_and_comments};
+use crate::parser::lex::{
+    identification, recover_body_element, starts_with_any_keyword, ws1, ws_and_comments,
+    PACKAGE_BODY_STARTERS,
+};
 use crate::parser::node_from_to;
 use crate::parser::part::{part_def_or_usage, PartDefOrUsage};
 use crate::parser::port::port_def;
@@ -152,8 +155,8 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
                 elements.push(element);
                 input = next;
             }
-            Err(_) if is_recoverable_package_starter(input.fragment()) => {
-                let (next, _) = skip_statement_or_block(input)?;
+            Err(_) if starts_with_any_keyword(input.fragment(), PACKAGE_BODY_STARTERS) => {
+                let (next, _) = recover_body_element(input, PACKAGE_BODY_STARTERS)?;
                 if next.location_offset() == input.location_offset() {
                     return Err(nom::Err::Failure(nom::error::Error::new(
                         input,
@@ -170,69 +173,6 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
             }
         }
     }
-}
-
-fn is_recoverable_package_starter(fragment: &[u8]) -> bool {
-    const KEYWORDS: &[&str] = &[
-        "action",
-        "actor",
-        "analysis",
-        "alias",
-        "allocate",
-        "allocation",
-        "assert",
-        "assume",
-        "attribute",
-        "case",
-        "calc",
-        "concern",
-        "connection",
-        "constraint",
-        "decision",
-        "dependency",
-        "enum",
-        "exhibit",
-        "expose",
-        "fork",
-        "individual",
-        "interface",
-        "join",
-        "library",
-        "merge",
-        "metadata",
-        "objective",
-        "occurrence",
-        "package",
-        "part",
-        "port",
-        "ref",
-        "render",
-        "rendering",
-        "require",
-        "requirement",
-        "return",
-        "snapshot",
-        "stakeholder",
-        "state",
-        "subject",
-        "then",
-        "timeslice",
-        "use",
-        "verification",
-        "view",
-        "viewpoint",
-    ];
-
-    KEYWORDS
-        .iter()
-        .any(|keyword| starts_with_keyword(fragment, keyword.as_bytes()))
-}
-
-fn starts_with_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
-    fragment.starts_with(keyword)
-        && fragment
-            .get(keyword.len())
-            .is_none_or(|b| b.is_ascii_whitespace() || matches!(*b, b'{' | b':' | b';' | b'['))
 }
 
 /// KerML ElementFilterMember: MemberPrefix? 'filter' condition = OwnedExpression ';'
