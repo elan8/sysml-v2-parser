@@ -70,3 +70,6 @@ mod surveillance_drone_minimal;
 
 #[path = "validation/traffic_light_intersection.rs"]
 mod traffic_light_intersection;
+
+#[path = "validation/kitchen_timer.rs"]
+mod kitchen_timer;

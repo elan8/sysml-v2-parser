@@ -1,7 +1,7 @@
 //! Part definition and part usage parsing.
 
 use crate::ast::{
-    Allocate, Bind, Connect, ConnectBody, DefinitionPrefix, ExhibitState, InOut, InterfaceUsage,
+    Allocate, Bind, Connect, ConnectBody, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
     InterfaceUsageBodyElement, Node, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
     PartUsageBody, PartUsageBodyElement, ParseErrorNode, Perform, PerformBody, PerformBodyElement,
     PerformInOutBinding, RefBody, RefDecl,
@@ -147,6 +147,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         map(allocate_, PartDefBodyElement::Allocate),
         map(connect_, PartDefBodyElement::Connect),
         map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
+        map(interface_usage, PartDefBodyElement::InterfaceUsage),
         map(port_usage, PartDefBodyElement::PortUsage),
         map(attribute_usage, PartDefBodyElement::AttributeUsage),
         map(attribute_usage_shorthand, PartDefBodyElement::AttributeUsage),
@@ -701,6 +702,18 @@ fn connect_body_with_elements(input: Input<'_>) -> IResult<Input<'_>, (ConnectBo
     }
 }
 
+/// Connector end reference used in interface/connect syntax.
+/// Accepts either `path` or `endName ::> path`; the end name is currently ignored.
+fn connector_end_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = opt((
+        name,
+        preceded(ws_and_comments, tag(&b"::>"[..])),
+    ))
+    .parse(input)?;
+    preceded(ws_and_comments, path_expression).parse(input)
+}
+
 /// Interface usage: `interface` ( `:Type` )? `connect` path `to` path body  OR  `interface` path `to` path body?
 fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>> {
     let start = input;
@@ -716,9 +729,9 @@ fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>>
     if input.fragment().starts_with(b"connect") {
         let (input, _) = tag(&b"connect"[..]).parse(input)?;
         let (input, _) = ws1(input)?;
-        let (input, from_expr) = path_expression(input)?;
+        let (input, from_expr) = connector_end_expression(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+        let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
         let (input, (body, body_elements)) = connect_body_with_elements(input)?;
         Ok((
             input,
@@ -731,9 +744,9 @@ fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>>
             }),
         ))
     } else {
-        let (input, from_expr) = path_expression(input)?;
+        let (input, from_expr) = connector_end_expression(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+        let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
         let (input, _) = opt(connect_body).parse(input)?;
         Ok((
             input,

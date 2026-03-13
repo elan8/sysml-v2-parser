@@ -5,6 +5,7 @@ use crate::ast::{
     Node, RefBody, RefDecl,
 };
 use crate::parser::expr::path_expression;
+use crate::parser::requirement::doc_comment;
 use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::with_span;
@@ -23,15 +24,28 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"end"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, _) = nom::combinator::opt(preceded(ws_and_comments, tag(&b"port"[..]))).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, (type_ref_span, type_name)) = preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
+    let (input, (tilde, (type_ref_span, type_name))) = preceded(
+        ws_and_comments,
+        (
+            nom::combinator::opt(tag(&b"~"[..])),
+            with_span(qualified_name),
+        ),
+    )
+    .parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(start, input, EndDecl {
             name: name_str,
-            type_name,
+            type_name: if tilde.is_some() {
+                format!("~{}", type_name)
+            } else {
+                type_name
+            },
             name_span: Some(name_span),
             type_ref_span: Some(type_ref_span),
         }),
@@ -119,6 +133,7 @@ fn interface_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     let (input, elem) = alt((
+        map(doc_comment, InterfaceDefBodyElement::Doc),
         map(end_decl, InterfaceDefBodyElement::EndDecl),
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),

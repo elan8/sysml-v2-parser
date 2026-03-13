@@ -1,6 +1,7 @@
 //! Port definition and port usage parsing.
 
 use crate::ast::{Node, PortBody, PortDef, PortDefBody, PortDefBodyElement, PortUsage};
+use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::action::in_out_decl;
 use crate::parser::requirement::doc_comment;
 use crate::parser::expr::expression;
@@ -150,6 +151,8 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
     let (input, elem) = nom::branch::alt((
         map(in_out_decl, PortDefBodyElement::InOutDecl),
         map(doc_comment, PortDefBodyElement::Doc),
+        map(attribute_usage, PortDefBodyElement::AttributeUsage),
+        map(attribute_def, PortDefBodyElement::AttributeDef),
         map(port_usage, PortDefBodyElement::PortUsage),
     ))
     .parse(input)?;

@@ -19,7 +19,7 @@ use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::interface::interface_def;
 use crate::parser::lex::{
-    identification, recover_body_element, starts_with_any_keyword, ws1, ws_and_comments,
+    identification, recover_body_element, starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
     PACKAGE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -146,6 +146,29 @@ pub(crate) fn package_body(input: Input<'_>) -> IResult<Input<'_>, PackageBody> 
     .parse(input)
 }
 
+fn package_body_element_fallback(input: Input<'_>) -> IResult<Input<'_>, Node<PackageBodyElement>> {
+    let (input, _) = ws_and_comments(input)?;
+    let frag = input.fragment();
+
+    if starts_with_keyword(frag, b"part")
+        || starts_with_keyword(frag, b"abstract")
+        || starts_with_keyword(frag, b"variation")
+    {
+        let start = input;
+        let (input, parsed) = part_def_or_usage(input)?;
+        let value = match parsed {
+            PartDefOrUsage::Def(n) => PackageBodyElement::PartDef(n),
+            PartDefOrUsage::Usage(n) => PackageBodyElement::PartUsage(n),
+        };
+        return Ok((input, node_from_to(start, input, value)));
+    }
+
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Tag,
+    )))
+}
+
 fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
     let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
     let mut elements = Vec::new();
@@ -171,6 +194,17 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
                 input = next;
             }
             Err(_) if starts_with_any_keyword(input.fragment(), PACKAGE_BODY_STARTERS) => {
+                if let Ok((next, element)) = package_body_element_fallback(input) {
+                    if next.location_offset() == input.location_offset() {
+                        return Err(nom::Err::Failure(nom::error::Error::new(
+                            input,
+                            nom::error::ErrorKind::Many0,
+                        )));
+                    }
+                    elements.push(element);
+                    input = next;
+                    continue;
+                }
                 let (next, _) = recover_body_element(input, PACKAGE_BODY_STARTERS)?;
                 if next.location_offset() == input.location_offset() {
                     return Err(nom::Err::Failure(nom::error::Error::new(
@@ -303,4 +337,49 @@ pub(crate) fn root_namespace(input: Input<'_>) -> IResult<Input<'_>, RootNamespa
     let (input, elements) = many0(preceded(ws_and_comments, root_element)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     Ok((input, RootNamespace { elements }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    #[test]
+    fn kitchen_timer_display_tail_parses_as_package_body_element() {
+        let input = include_str!("../../tests/fixtures/KitchenTimer.sysml")
+            .replace("\r\n", "\n")
+            .replace('\r', "\n");
+        let start = input
+            .find("\tpart def Display {")
+            .expect("fixture should contain Display part");
+        let tail = &input.as_bytes()[start..];
+        let located = LocatedSpan::new(tail);
+
+        let result = package_body_element(located);
+        assert!(
+            result.is_ok(),
+            "package_body_element should parse Display tail, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn kitchen_timer_display_tail_parses_as_part_directly() {
+        let input = include_str!("../../tests/fixtures/KitchenTimer.sysml")
+            .replace("\r\n", "\n")
+            .replace('\r', "\n");
+        let start = input
+            .find("\tpart def Display {")
+            .expect("fixture should contain Display part");
+        let tail = &input.as_bytes()[start..];
+        let located = LocatedSpan::new(tail);
+        let (located, _) = ws_and_comments(located).expect("leading ws");
+
+        let result = part_def_or_usage(located);
+        assert!(
+            result.is_ok(),
+            "part_def_or_usage should parse Display tail directly, got {:?}",
+            result
+        );
+    }
 }

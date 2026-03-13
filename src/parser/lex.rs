@@ -127,13 +127,22 @@ pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// be parsed explicitly so it appears in the AST. //* ... */ is tried before line_comment so that
 /// "//*" starts a block comment, not a line comment.
 pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = take_while(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r').parse(input)?;
-    let (input, _) = many0(alt((
-        block_comment,
-        block_comment_slash_star,
-        line_comment,
-    ))).parse(input)?;
-    Ok((input, ()))
+    let mut input = input;
+    loop {
+        let start = input.location_offset();
+        let (next, _) = take_while(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r').parse(input)?;
+        input = next;
+        let (next, _) = many0(alt((
+            block_comment,
+            block_comment_slash_star,
+            line_comment,
+        )))
+        .parse(input)?;
+        input = next;
+        if input.location_offset() == start {
+            return Ok((input, ()));
+        }
+    }
 }
 
 /// Block comment: /* ... */

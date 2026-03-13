@@ -298,6 +298,7 @@ pub enum PartDefBodyElement {
     AttributeUsage(Node<AttributeUsage>),
     PortUsage(Node<PortUsage>),
     PartUsage(Box<Node<PartUsage>>),
+    InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
     Perform(Node<Perform>),
     Allocate(Node<Allocate>),
@@ -482,6 +483,8 @@ pub enum PortDefBody {
 pub enum PortDefBodyElement {
     InOutDecl(Node<InOutDecl>),
     Doc(Node<DocComment>),
+    AttributeDef(Node<AttributeDef>),
+    AttributeUsage(Node<AttributeUsage>),
     PortUsage(Node<PortUsage>),
 }
 
@@ -533,6 +536,7 @@ pub enum InterfaceDefBody {
 /// Element inside an interface definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InterfaceDefBodyElement {
+    Doc(Node<DocComment>),
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
@@ -1496,6 +1500,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::PartUsage(n) => {
             PartDefBodyElement::PartUsage(Box::new(dummy_node(n, normalize_part_usage(&n.value))))
         }
+        PartDefBodyElement::InterfaceUsage(n) => {
+            PartDefBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
+        }
         PartDefBodyElement::Connect(n) => PartDefBodyElement::Connect(dummy_node(n, n.value.clone())),
         PartDefBodyElement::Perform(n) => PartDefBodyElement::Perform(dummy_node(n, n.value.clone())),
         PartDefBodyElement::Allocate(n) => PartDefBodyElement::Allocate(dummy_node(n, n.value.clone())),
@@ -1709,6 +1716,12 @@ fn normalize_port_def_body_element_node(
             PortDefBodyElement::InOutDecl(dummy_node(n, n.value.clone()))
         }
         PortDefBodyElement::Doc(n) => PortDefBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PortDefBodyElement::AttributeDef(n) => {
+            PortDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
+        }
+        PortDefBodyElement::AttributeUsage(n) => {
+            PortDefBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
+        }
         PortDefBodyElement::PortUsage(n) => {
             PortDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
@@ -1798,6 +1811,9 @@ fn normalize_interface_def_body_element_node(
     el: &Node<InterfaceDefBodyElement>,
 ) -> Node<InterfaceDefBodyElement> {
     let value = match &el.value {
+        InterfaceDefBodyElement::Doc(n) => {
+            InterfaceDefBodyElement::Doc(dummy_node(n, n.value.clone()))
+        }
         InterfaceDefBodyElement::EndDecl(n) => {
             InterfaceDefBodyElement::EndDecl(dummy_node(n, normalize_end_decl(&n.value)))
         }
