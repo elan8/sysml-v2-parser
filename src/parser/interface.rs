@@ -154,9 +154,16 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
         return Ok((input, InterfaceDefBody::Semicolon));
     }
     let (input, _) = tag(&b"{"[..]).parse(input)?;
-    let (input, _) = skip_until_brace_end(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, elements) = many0(preceded(ws_and_comments, interface_def_body_element)).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = if input.fragment().starts_with(b"}") {
+        (input, ())
+    } else {
+        skip_until_brace_end(input)?
+    };
     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-    Ok((input, InterfaceDefBody::Brace { elements: vec![] }))
+    Ok((input, InterfaceDefBody::Brace { elements }))
 }
 
 /// Interface definition: `interface` `def` Identification body

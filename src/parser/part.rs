@@ -58,10 +58,59 @@ pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody>
 }
 
 fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
-    let (input, _) = tag(&b"{"[..]).parse(input)?;
-    let (input, _) = skip_until_brace_end(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-    Ok((input, PartDefBody::Brace { elements: vec![] }))
+    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+            return Ok((input, PartDefBody::Brace { elements }));
+        }
+        match part_def_body_element(input) {
+            Ok((next, element)) => {
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                elements.push(element);
+                input = next;
+            }
+            Err(_) if starts_with_any_keyword(input.fragment(), PART_BODY_STARTERS) => {
+                let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                elements.push(node_from_to(
+                    input,
+                    next,
+                    PartDefBodyElement::Error(Node::new(
+                        crate::ast::Span::dummy(),
+                        ParseErrorNode {
+                            message: "recovered part definition body element".to_string(),
+                            code: "recovered_part_def_body_element".to_string(),
+                            expected: Some("valid part definition body element".to_string()),
+                            found: recovery_found_snippet(input),
+                            suggestion: None,
+                        },
+                    )),
+                ));
+                input = next;
+            }
+            Err(_) => {
+                // Keep top-level PartDef mapping stable: if body content is not modeled,
+                // consume the remaining brace content permissively and finish the body.
+                let (input, _) = skip_until_brace_end(input)?;
+                let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                return Ok((input, PartDefBody::Brace { elements }));
+            }
+        }
+    }
 }
 
 /// Exhibit state usage: `exhibit state` name `:` type `;`

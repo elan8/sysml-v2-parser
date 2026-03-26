@@ -67,6 +67,7 @@ pub(crate) const PACKAGE_BODY_STARTERS: &[&[u8]] = &[
 
 pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"@",
+    b"abstract",
     b"allocate",
     b"attribute",
     b"bind",
@@ -77,6 +78,9 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"part",
     b"perform",
     b"port",
+    b"private",
+    b"protected",
+    b"public",
     b"ref",
     b"satisfy",
 ];
