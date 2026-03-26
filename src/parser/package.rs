@@ -1,8 +1,9 @@
 //! Package and root namespace parsing.
 
 use crate::ast::{
-    FilterMember, GenericDecl, LibraryPackage, NamespaceDecl, Node, Package, PackageBody, PackageBodyElement,
-    ParseErrorNode, RootElement, RootNamespace, Visibility,
+    ExtendedLibraryDecl, FilterMember, KermlFeatureDecl, KermlSemanticDecl, LibraryPackage,
+    NamespaceDecl, Node, Package, PackageBody, PackageBodyElement, ParseErrorNode, RootElement,
+    RootNamespace, Visibility,
 };
 use crate::parser::action::{action_def, action_usage};
 use crate::parser::allocation::{allocate_usage, allocation_def, allocation_usage};
@@ -189,7 +190,7 @@ fn package_body_element_fallback(input: Input<'_>) -> IResult<Input<'_>, Node<Pa
     )))
 }
 
-fn generic_decl_text(start: Input<'_>, end: Input<'_>) -> String {
+fn modeled_decl_text(start: Input<'_>, end: Input<'_>) -> String {
     let delta = end.location_offset().saturating_sub(start.location_offset());
     let bytes = start.fragment();
     let take = delta.min(bytes.len());
@@ -205,22 +206,8 @@ fn starts_with_visibility_prefix(fragment: &[u8]) -> Option<usize> {
     None
 }
 
-fn is_generic_library_decl_start(fragment: &[u8]) -> bool {
-    if fragment.starts_with(b"#") {
-        return false;
-    }
-    if starts_with_keyword(fragment, b"package")
-        || starts_with_keyword(fragment, b"library")
-        || starts_with_keyword(fragment, b"namespace")
-        || starts_with_keyword(fragment, b"import")
-        || starts_with_keyword(fragment, b"doc")
-        || starts_with_keyword(fragment, b"comment")
-        || starts_with_keyword(fragment, b"filter")
-    {
-        return false;
-    }
+fn strip_common_decl_prefixes(fragment: &[u8]) -> &[u8] {
     let mut frag = fragment;
-    let original_frag = fragment;
     if let Some(len) = starts_with_visibility_prefix(frag) {
         frag = &frag[len..];
         let mut i = 0usize;
@@ -238,31 +225,117 @@ fn is_generic_library_decl_start(fragment: &[u8]) -> bool {
         }
         frag = &frag[i..];
     }
+    frag
+}
+
+fn is_modeled_decl_start(fragment: &[u8], starters: &[&[u8]]) -> bool {
+    if fragment.starts_with(b"#") {
+        return false;
+    }
+    if starts_with_keyword(fragment, b"package")
+        || starts_with_keyword(fragment, b"library")
+        || starts_with_keyword(fragment, b"namespace")
+        || starts_with_keyword(fragment, b"import")
+        || starts_with_keyword(fragment, b"doc")
+        || starts_with_keyword(fragment, b"comment")
+        || starts_with_keyword(fragment, b"filter")
+    {
+        return false;
+    }
+    let frag = strip_common_decl_prefixes(fragment);
+    starts_with_any_keyword(frag, starters)
+}
+
+fn parse_modeled_decl<'a>(
+    input: Input<'a>,
+    starters: &'a [&'a [u8]],
+) -> IResult<Input<'a>, (String, String)> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().is_empty() || input.fragment().starts_with(b"}") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    if !is_modeled_decl_start(input.fragment(), starters) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let raw_start = input;
+    let stripped = strip_common_decl_prefixes(input.fragment());
+    let bnf_production = starters
+        .iter()
+        .find(|kw| starts_with_keyword(stripped, kw))
+        .map(|kw| String::from_utf8_lossy(kw).to_string())
+        .unwrap_or_else(|| "declaration".to_string());
+    let (input, _) = skip_statement_or_block(input)?;
+    Ok((input, (bnf_production, modeled_decl_text(raw_start, input))))
+}
+
+fn kerml_semantic_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlSemanticDecl>> {
+    let start = input;
+    let starters: &[&[u8]] = &[
+        b"behavior",
+        b"function",
+        b"datatype",
+        b"assoc",
+        b"struct",
+        b"metaclass",
+        b"class",
+        b"classifier",
+        b"feature",
+        b"step",
+    ];
+    let (input, (bnf_production, text)) = parse_modeled_decl(input, starters)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            KermlSemanticDecl {
+                bnf_production,
+                text,
+            },
+        ),
+    ))
+}
+
+fn kerml_feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlFeatureDecl>> {
+    let start = input;
+    let starters: &[&[u8]] = &[b"occurrence", b"expr", b"predicate", b"succession"];
+    let (input, (bnf_production, text)) = parse_modeled_decl(input, starters)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            KermlFeatureDecl {
+                bnf_production,
+                text,
+            },
+        ),
+    ))
+}
+
+fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLibraryDecl>> {
+    let start = input;
     let starters: &[&[u8]] = &[
         b"action",
         b"allocation",
         b"analysis",
-        b"assoc",
         b"attribute",
-        b"behavior",
         b"case",
         b"calc",
         b"connection",
         b"constraint",
-        b"datatype",
-        b"expr",
-        b"function",
         b"flow",
         b"interface",
         b"item",
-        b"metaclass",
         b"metadata",
         b"requirement",
-        b"occurrence",
-        b"predicate",
         b"state",
-        b"struct",
-        b"succession",
         b"use",
         b"verification",
         b"view",
@@ -271,62 +344,18 @@ fn is_generic_library_decl_start(fragment: &[u8]) -> bool {
         b"enum",
         b"message",
         b"concern",
+        b"part",
+        b"port",
     ];
-    if starts_with_any_keyword(frag, starters) {
-        return true;
-    }
-    // Keep legacy recovery tests stable: only fall back for richer abstract
-    // part/port declarations that include specialization-like fragments.
-    if (starts_with_keyword(frag, b"part") || starts_with_keyword(frag, b"port"))
-        && (original_frag.windows(2).any(|w| w == b":>") || original_frag.windows(9).any(|w| w == b"nonunique"))
-    {
-        return true;
-    }
-    if starts_with_keyword(frag, b"part") || starts_with_keyword(frag, b"port") {
-        return false;
-    }
-    // Last-resort declaration fallback for SysML/KerML library files:
-    // if a statement looks declaration-like (`def`, `:>`, or typed `name: Type`),
-    // consume it as a generic declaration instead of emitting recovery noise.
-    let line_end = original_frag
-        .iter()
-        .position(|&b| b == b'\n' || b == b'\r')
-        .unwrap_or(original_frag.len())
-        .min(160);
-    let line = &original_frag[..line_end];
-    if line.windows(5).any(|w| w == b" def ")
-        || line.windows(2).any(|w| w == b":>")
-        || line.windows(1).any(|w| w == b":")
-    {
-        return true;
-    }
-    false
-}
-
-fn generic_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<GenericDecl>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().is_empty() || input.fragment().starts_with(b"}") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    if !is_generic_library_decl_start(input.fragment()) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let raw_start = input;
-    let (input, _) = skip_statement_or_block(input)?;
+    let (input, (bnf_production, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
-            GenericDecl {
-                text: generic_decl_text(raw_start, input),
+            ExtendedLibraryDecl {
+                bnf_production,
+                text,
             },
         ),
     ))
@@ -596,7 +625,13 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
     if let Ok((input, elem)) = map(rendering_usage, PackageBodyElement::RenderingUsage).parse(input) {
         return Ok((input, node_from_to(start, input, elem)));
     }
-    let (input, elem) = map(generic_library_decl, PackageBodyElement::GenericDecl).parse(input)?;
+    if let Ok((input, elem)) = map(kerml_semantic_decl, PackageBodyElement::KermlSemanticDecl).parse(input) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    if let Ok((input, elem)) = map(kerml_feature_decl, PackageBodyElement::KermlFeatureDecl).parse(input) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    let (input, elem) = map(extended_library_decl, PackageBodyElement::ExtendedLibraryDecl).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 

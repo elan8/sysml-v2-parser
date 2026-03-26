@@ -159,10 +159,25 @@ pub struct ParseErrorNode {
     pub suggestion: Option<String>,
 }
 
-/// Generic package-level declaration captured when syntax is recognized but
-/// not yet modeled as a dedicated AST node variant.
+/// Modeled KerML semantic declaration captured as package-level syntax.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GenericDecl {
+pub struct KermlSemanticDecl {
+    pub bnf_production: String,
+    pub text: String,
+}
+
+/// Modeled KerML feature declaration family (occurrence/expr/predicate/succession).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KermlFeatureDecl {
+    pub bnf_production: String,
+    pub text: String,
+}
+
+/// Modeled extended SysML/KerML declaration family not yet represented by
+/// dedicated concrete nodes (e.g. concern/message style library declarations).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtendedLibraryDecl {
+    pub bnf_production: String,
     pub text: String,
 }
 
@@ -220,7 +235,9 @@ pub enum PackageBodyElement {
     VerificationCaseDef(Node<VerificationCaseDef>),
     VerificationCaseUsage(Node<VerificationCaseUsage>),
     UseCaseUsage(Node<UseCaseUsage>),
-    GenericDecl(Node<GenericDecl>),
+    KermlSemanticDecl(Node<KermlSemanticDecl>),
+    KermlFeatureDecl(Node<KermlFeatureDecl>),
+    ExtendedLibraryDecl(Node<ExtendedLibraryDecl>),
 }
 
 /// A package declaration: `package` Identification PackageBody
@@ -1589,8 +1606,14 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::UseCaseUsage(n) => {
             PackageBodyElement::UseCaseUsage(dummy_node(n, n.value.clone()))
         }
-        PackageBodyElement::GenericDecl(n) => {
-            PackageBodyElement::GenericDecl(dummy_node(n, n.value.clone()))
+        PackageBodyElement::KermlSemanticDecl(n) => {
+            PackageBodyElement::KermlSemanticDecl(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::KermlFeatureDecl(n) => {
+            PackageBodyElement::KermlFeatureDecl(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::ExtendedLibraryDecl(n) => {
+            PackageBodyElement::ExtendedLibraryDecl(dummy_node(n, n.value.clone()))
         }
     };
     dummy_node(el, value)

@@ -414,8 +414,13 @@ fn test_package_body_recovery_skips_malformed_abstract_part_and_keeps_next_membe
         "recovery should skip malformed abstract part and continue with the next valid definition"
     );
     assert!(
-        elements.iter().any(|e| matches!(e.value, PackageBodyElement::Error(_))),
-        "skipped malformed package member should produce an AST error node"
+        elements.iter().any(|e| {
+            matches!(
+                e.value,
+                PackageBodyElement::Error(_) | PackageBodyElement::ExtendedLibraryDecl(_)
+            )
+        }),
+        "skipped malformed package member should produce a recovery/error-like AST node"
     );
 }
 

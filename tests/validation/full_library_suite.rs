@@ -7,6 +7,7 @@ use std::fs;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use sysml_parser::ast::{PackageBody, PackageBodyElement, RootElement, RootNamespace};
 use sysml_parser::{parse_with_diagnostics, ParseError};
 
 /// Root of the SysML v2 Release tree (from env or the sysml-v2-release submodule).
@@ -115,6 +116,47 @@ fn classify_error(err: &ParseError) -> String {
         .take(3)
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn collect_bnf_decl_counts(root: &RootNamespace, counts: &mut BTreeMap<String, usize>) {
+    for element in &root.elements {
+        match &element.value {
+            RootElement::Package(p) => collect_bnf_decl_counts_in_body(&p.value.body, counts),
+            RootElement::LibraryPackage(p) => collect_bnf_decl_counts_in_body(&p.value.body, counts),
+            RootElement::Namespace(n) => collect_bnf_decl_counts_in_body(&n.value.body, counts),
+            RootElement::Import(_) => {}
+        }
+    }
+}
+
+fn collect_bnf_decl_counts_in_body(body: &PackageBody, counts: &mut BTreeMap<String, usize>) {
+    let PackageBody::Brace { elements } = body else {
+        return;
+    };
+    for element in elements {
+        match &element.value {
+            PackageBodyElement::KermlSemanticDecl(n) => {
+                *counts
+                    .entry(format!("bnf:{}", n.value.bnf_production))
+                    .or_insert(0) += 1;
+            }
+            PackageBodyElement::KermlFeatureDecl(n) => {
+                *counts
+                    .entry(format!("bnf:{}", n.value.bnf_production))
+                    .or_insert(0) += 1;
+            }
+            PackageBodyElement::ExtendedLibraryDecl(n) => {
+                *counts
+                    .entry(format!("bnf:{}", n.value.bnf_production))
+                    .or_insert(0) += 1;
+            }
+            PackageBodyElement::Package(n) => collect_bnf_decl_counts_in_body(&n.value.body, counts),
+            PackageBodyElement::LibraryPackage(n) => {
+                collect_bnf_decl_counts_in_body(&n.value.body, counts)
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Full library suite: parse all SysML/KerML library sources from SysML-v2-Release.
@@ -238,6 +280,7 @@ fn test_systems_library_strict_no_diagnostics() {
     );
 
     let mut failures = Vec::new();
+    let mut bnf_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut pattern_counts: BTreeMap<String, usize> = BTreeMap::new();
     for file in &files {
         let relative_path = file
@@ -248,6 +291,7 @@ fn test_systems_library_strict_no_diagnostics() {
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
         let result = parse_with_diagnostics(&content);
+        collect_bnf_decl_counts(&result.root, &mut bnf_counts);
         if !result.errors.is_empty() {
             for err in &result.errors {
                 *pattern_counts.entry(classify_error(err)).or_insert(0) += 1;
@@ -263,6 +307,12 @@ fn test_systems_library_strict_no_diagnostics() {
     }
 
     if !failures.is_empty() {
+        let mut top_bnf = bnf_counts.into_iter().collect::<Vec<_>>();
+        top_bnf.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        eprintln!("Top modeled BNF declarations:");
+        for (pattern, count) in top_bnf.into_iter().take(10) {
+            eprintln!("  - {}: {}", pattern, count);
+        }
         let mut top_patterns = pattern_counts.into_iter().collect::<Vec<_>>();
         top_patterns.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         eprintln!("Top diagnostic patterns:");
@@ -307,6 +357,7 @@ fn test_full_library_strict_no_diagnostics() {
 
     let mut failures = Vec::new();
     let mut pattern_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut bnf_counts: BTreeMap<String, usize> = BTreeMap::new();
 
     for file in &files {
         let relative_path = file
@@ -317,6 +368,7 @@ fn test_full_library_strict_no_diagnostics() {
         let content = fs::read_to_string(file)
             .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
         let result = parse_with_diagnostics(&content);
+        collect_bnf_decl_counts(&result.root, &mut bnf_counts);
         if result.errors.is_empty() {
             eprintln!("✓ {}", relative_path);
             continue;
@@ -332,6 +384,12 @@ fn test_full_library_strict_no_diagnostics() {
     }
 
     if !failures.is_empty() {
+        let mut top_bnf = bnf_counts.into_iter().collect::<Vec<_>>();
+        top_bnf.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        eprintln!("Top modeled BNF declarations:");
+        for (pattern, count) in top_bnf.into_iter().take(15) {
+            eprintln!("  - {}: {}", pattern, count);
+        }
         let mut top_patterns = pattern_counts.into_iter().collect::<Vec<_>>();
         top_patterns.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         eprintln!("Top diagnostic patterns:");

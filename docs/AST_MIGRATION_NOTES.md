@@ -2,23 +2,26 @@
 
 ## 2026-03 library-coverage update
 
-To support strict parsing of the full SysML/KerML library set without top-level recovery noise, the package-body AST gained one additive variant:
+To support strict parsing of the full SysML/KerML library set without top-level recovery noise, package-body fallback declarations are now split into BNF-aligned modeled families:
 
-- `PackageBodyElement::GenericDecl(Node<GenericDecl>)`
+- `PackageBodyElement::KermlSemanticDecl(Node<KermlSemanticDecl>)`
+- `PackageBodyElement::KermlFeatureDecl(Node<KermlFeatureDecl>)`
+- `PackageBodyElement::ExtendedLibraryDecl(Node<ExtendedLibraryDecl>)`
 
-Where:
+Where each node carries:
 
-- `GenericDecl.text` stores the original declaration text fragment that was recognized and consumed by the generic declaration fallback.
+- `bnf_production`: primary BNF starter this declaration matched (e.g. `function`, `behavior`, `datatype`, `occurrence`, `expr`, `feature`, ...).
+- `text`: original declaration text fragment that was consumed.
 
 ### Compatibility impact
 
-- This is an additive enum variant, so existing exhaustive matches over `PackageBodyElement` must add a `GenericDecl` branch.
+- These are additive enum variants, so existing exhaustive matches over `PackageBodyElement` must add corresponding branches.
 - Existing node shapes for all previously supported dedicated constructs remain unchanged.
-- Diagnostics behavior changed for unsupported package-level declarations: many declarations that previously produced `recovered_package_body_element` diagnostics are now represented as `GenericDecl` and no longer emit that recovery diagnostic.
+- Diagnostics behavior changed for unsupported package-level declarations: many declarations that previously produced `recovered_package_body_element` diagnostics are now represented as modeled declaration nodes and no longer emit that recovery diagnostic.
 
 ### Suggested downstream handling (Spec42)
 
-- Treat `GenericDecl` as a non-fatal declaration node.
+- Treat modeled declaration nodes as non-fatal declaration nodes.
 - For indexing/symbol extraction pipelines, either:
-  - skip `GenericDecl` nodes, or
-  - parse `GenericDecl.text` with downstream heuristics if partial symbol extraction is desired.
+  - skip these nodes, or
+  - parse each node `.text` with downstream heuristics if partial symbol extraction is desired.
