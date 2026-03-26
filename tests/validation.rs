@@ -62,6 +62,9 @@ mod functional_allocation_4a;
 #[path = "validation/full_validation_suite.rs"]
 mod full_validation_suite;
 
+#[path = "validation/full_library_suite.rs"]
+mod full_library_suite;
+
 #[path = "validation/surveillance_drone.rs"]
 mod surveillance_drone;
 

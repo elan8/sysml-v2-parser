@@ -159,6 +159,13 @@ pub struct ParseErrorNode {
     pub suggestion: Option<String>,
 }
 
+/// Generic package-level declaration captured when syntax is recognized but
+/// not yet modeled as a dedicated AST node variant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GenericDecl {
+    pub text: String,
+}
+
 /// Top-level element inside a namespace or package body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PackageBodyElement {
@@ -213,6 +220,7 @@ pub enum PackageBodyElement {
     VerificationCaseDef(Node<VerificationCaseDef>),
     VerificationCaseUsage(Node<VerificationCaseUsage>),
     UseCaseUsage(Node<UseCaseUsage>),
+    GenericDecl(Node<GenericDecl>),
 }
 
 /// A package declaration: `package` Identification PackageBody
@@ -1580,6 +1588,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         }
         PackageBodyElement::UseCaseUsage(n) => {
             PackageBodyElement::UseCaseUsage(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::GenericDecl(n) => {
+            PackageBodyElement::GenericDecl(dummy_node(n, n.value.clone()))
         }
     };
     dummy_node(el, value)

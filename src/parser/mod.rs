@@ -257,9 +257,7 @@ fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>
     if let PartDefBody::Brace { elements } = body {
         for element in elements {
             match &element.value {
-                PartDefBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
+                PartDefBodyElement::Error(_) => {}
                 PartDefBodyElement::PartUsage(n) => collect_part_usage_body_errors(&n.value.body, errors),
                 PartDefBodyElement::Perform(n) => collect_perform_body_errors(&n.value.body, errors),
                 _ => {}

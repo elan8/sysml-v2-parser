@@ -1,0 +1,350 @@
+//! Full library suite: parse all .sysml/.kerml files in SysML v2 Release `sysml.library`.
+//!
+//! Requires SYSML_V2_RELEASE_DIR (or sysml-v2-release in repo). This test is ignored by
+//! default because it is slower and intended for compliance/debug runs.
+
+use std::fs;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+use sysml_parser::{parse_with_diagnostics, ParseError};
+
+/// Root of the SysML v2 Release tree (from env or the sysml-v2-release submodule).
+fn sysml_v2_release_root() -> PathBuf {
+    std::env::var_os("SYSML_V2_RELEASE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sysml-v2-release"))
+}
+
+/// Path to the library directory (SysML v2 Release `sysml.library`).
+fn library_dir() -> PathBuf {
+    sysml_v2_release_root().join("sysml.library")
+}
+
+fn find_library_files(dir: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
+    let mut files = Vec::new();
+    if !dir.exists() {
+        return Ok(files);
+    }
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            files.extend(find_library_files(&path)?);
+        } else if matches!(
+            path.extension().and_then(|s| s.to_str()),
+            Some("sysml") | Some("kerml")
+        ) {
+            files.push(path);
+        }
+    }
+    Ok(files)
+}
+
+fn first_errors_summary(errors: &[ParseError], max_errors: usize) -> String {
+    errors
+        .iter()
+        .take(max_errors)
+        .map(|e| {
+            format!(
+                "[line={:?}, col={:?}, code={:?}, found={:?}] {}",
+                e.line, e.column, e.code, e.found, e.message
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+fn classify_error(err: &ParseError) -> String {
+    let found = err.found.as_deref().unwrap_or("").trim();
+    if found.is_empty() {
+        return format!("code:{}", err.code.as_deref().unwrap_or("unknown"));
+    }
+    let lower = found.to_ascii_lowercase();
+    let patterns = [
+        "abstract action def",
+        "action def",
+        "abstract allocation",
+        "allocation def",
+        "abstract analysis def",
+        "analysis def",
+        "abstract case def",
+        "case def",
+        "abstract calc def",
+        "calc def",
+        "abstract connection def",
+        "connection def",
+        "abstract constraint def",
+        "constraint def",
+        "abstract flow def",
+        "flow def",
+        "abstract interface def",
+        "interface def",
+        "abstract item def",
+        "item def",
+        "abstract metadata def",
+        "metadata def",
+        "abstract part def",
+        "part def",
+        "abstract port def",
+        "port def",
+        "abstract requirement def",
+        "requirement def",
+        "private abstract constraint def",
+        "abstract state def",
+        "state def",
+        "use case def",
+        "use case ",
+        "abstract verification def",
+        "verification def",
+        "abstract view def",
+        "view def",
+        "abstract viewpoint def",
+        "viewpoint def",
+        "abstract rendering def",
+        "rendering def",
+        "enum def",
+    ];
+    for pattern in patterns {
+        if lower.starts_with(pattern) {
+            return pattern.to_string();
+        }
+    }
+    lower
+        .split_whitespace()
+        .take(3)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Full library suite: parse all SysML/KerML library sources from SysML-v2-Release.
+///
+/// Run with: `cargo test --test validation test_full_library_suite -- --include-ignored --nocapture`
+#[test]
+#[ignore = "slow; requires SysML v2 release library sources; run with --include-ignored"]
+fn test_full_library_suite() {
+    super::init_log();
+
+    let library_path = library_dir();
+    if !library_path.exists() {
+        log::debug!("Library directory not found: {:?}", library_path);
+        log::debug!(
+            "Skipping. Run `git submodule update --init sysml-v2-release` or set SYSML_V2_RELEASE_DIR"
+        );
+        return;
+    }
+
+    let mut files = find_library_files(&library_path).expect("Failed to find library files");
+    files.sort();
+
+    assert!(
+        !files.is_empty(),
+        "No .sysml/.kerml files found in sysml.library"
+    );
+
+    let mut failed_files = Vec::new();
+    let mut files_with_diagnostics = 0usize;
+
+    for file in &files {
+        let relative_path = file
+            .strip_prefix(&library_path)
+            .unwrap_or(file)
+            .to_string_lossy()
+            .to_string();
+        let content = fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
+
+        let result = parse_with_diagnostics(&content);
+        if result.errors.is_empty() {
+            eprintln!("✓ {}", relative_path);
+            continue;
+        }
+
+        files_with_diagnostics += 1;
+
+        let has_start_error = result.errors.iter().any(|e| {
+            let at_start = e.offset == Some(0)
+                || (e.line == Some(1) && e.column == Some(1))
+                || e.found.as_deref().is_some_and(|f| f.starts_with("standard library package"));
+            at_start && matches!(e.code.as_deref(), Some("expected_keyword") | Some("expected_alt"))
+        });
+
+        if has_start_error || result.root.elements.is_empty() {
+            let sample_errors = result
+                .errors
+                .iter()
+                .take(3)
+                .map(|e| {
+                    format!(
+                        "[line={:?}, col={:?}, code={:?}, found={:?}] {}",
+                        e.line, e.column, e.code, e.found, e.message
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            failed_files.push((relative_path, sample_errors));
+        } else {
+            eprintln!(
+                "⚠ {} (parsed with {} diagnostics)",
+                relative_path,
+                result.errors.len()
+            );
+        }
+    }
+
+    if !failed_files.is_empty() {
+        for (file, details) in &failed_files {
+            eprintln!("✗ {}: {}", file, details);
+        }
+        panic!(
+            "Library suite: {} hard failures, {} files with diagnostics, {} files total.",
+            failed_files.len(),
+            files_with_diagnostics,
+            files.len()
+        );
+    }
+
+    eprintln!(
+        "Library suite completed: {} files checked ({} with non-fatal diagnostics).",
+        files.len(),
+        files_with_diagnostics
+    );
+}
+
+/// Strict subset suite for fast grammar hardening:
+/// parse all files in `Systems Library` and require zero diagnostics.
+///
+/// Run with:
+/// `cargo test --test validation test_systems_library_strict_no_diagnostics -- --include-ignored --nocapture`
+#[test]
+#[ignore = "strict gate for Systems Library syntax hardening"]
+fn test_systems_library_strict_no_diagnostics() {
+    super::init_log();
+
+    let systems_path = library_dir().join("Systems Library");
+    if !systems_path.exists() {
+        log::debug!("Systems Library directory not found: {:?}", systems_path);
+        log::debug!(
+            "Skipping. Run `git submodule update --init sysml-v2-release` or set SYSML_V2_RELEASE_DIR"
+        );
+        return;
+    }
+
+    let mut files = find_library_files(&systems_path).expect("Failed to find Systems Library files");
+    files.sort();
+    assert!(
+        !files.is_empty(),
+        "No .sysml/.kerml files found in Systems Library"
+    );
+
+    let mut failures = Vec::new();
+    let mut pattern_counts: BTreeMap<String, usize> = BTreeMap::new();
+    for file in &files {
+        let relative_path = file
+            .strip_prefix(&systems_path)
+            .unwrap_or(file)
+            .to_string_lossy()
+            .to_string();
+        let content = fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
+        let result = parse_with_diagnostics(&content);
+        if !result.errors.is_empty() {
+            for err in &result.errors {
+                *pattern_counts.entry(classify_error(err)).or_insert(0) += 1;
+            }
+            failures.push((
+                relative_path,
+                result.errors.len(),
+                first_errors_summary(&result.errors, 3),
+            ));
+        } else {
+            eprintln!("✓ {}", relative_path);
+        }
+    }
+
+    if !failures.is_empty() {
+        let mut top_patterns = pattern_counts.into_iter().collect::<Vec<_>>();
+        top_patterns.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        eprintln!("Top diagnostic patterns:");
+        for (pattern, count) in top_patterns.into_iter().take(10) {
+            eprintln!("  - {}: {}", pattern, count);
+        }
+        for (path, n, sample) in &failures {
+            eprintln!("✗ {} ({} diagnostics): {}", path, n, sample);
+        }
+        panic!(
+            "Systems Library strict suite failed: {} of {} files produced diagnostics.",
+            failures.len(),
+            files.len()
+        );
+    }
+}
+
+/// Strict full-library gate: require zero diagnostics for all sysml.library files.
+///
+/// Run with:
+/// `cargo test --test validation test_full_library_strict_no_diagnostics -- --include-ignored --nocapture`
+#[test]
+#[ignore = "strict full-library gate (zero diagnostics)"]
+fn test_full_library_strict_no_diagnostics() {
+    super::init_log();
+
+    let library_path = library_dir();
+    if !library_path.exists() {
+        log::debug!("Library directory not found: {:?}", library_path);
+        log::debug!(
+            "Skipping. Run `git submodule update --init sysml-v2-release` or set SYSML_V2_RELEASE_DIR"
+        );
+        return;
+    }
+
+    let mut files = find_library_files(&library_path).expect("Failed to find library files");
+    files.sort();
+    assert!(
+        !files.is_empty(),
+        "No .sysml/.kerml files found in sysml.library"
+    );
+
+    let mut failures = Vec::new();
+    let mut pattern_counts: BTreeMap<String, usize> = BTreeMap::new();
+
+    for file in &files {
+        let relative_path = file
+            .strip_prefix(&library_path)
+            .unwrap_or(file)
+            .to_string_lossy()
+            .to_string();
+        let content = fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("failed to read {}: {}", relative_path, e));
+        let result = parse_with_diagnostics(&content);
+        if result.errors.is_empty() {
+            eprintln!("✓ {}", relative_path);
+            continue;
+        }
+        for err in &result.errors {
+            *pattern_counts.entry(classify_error(err)).or_insert(0) += 1;
+        }
+        failures.push((
+            relative_path,
+            result.errors.len(),
+            first_errors_summary(&result.errors, 3),
+        ));
+    }
+
+    if !failures.is_empty() {
+        let mut top_patterns = pattern_counts.into_iter().collect::<Vec<_>>();
+        top_patterns.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        eprintln!("Top diagnostic patterns:");
+        for (pattern, count) in top_patterns.into_iter().take(15) {
+            eprintln!("  - {}: {}", pattern, count);
+        }
+        for (path, n, sample) in &failures {
+            eprintln!("✗ {} ({} diagnostics): {}", path, n, sample);
+        }
+        panic!(
+            "Full library strict suite failed: {} of {} files produced diagnostics.",
+            failures.len(),
+            files.len()
+        );
+    }
+}

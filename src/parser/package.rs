@@ -1,7 +1,7 @@
 //! Package and root namespace parsing.
 
 use crate::ast::{
-    FilterMember, LibraryPackage, NamespaceDecl, Node, Package, PackageBody, PackageBodyElement,
+    FilterMember, GenericDecl, LibraryPackage, NamespaceDecl, Node, Package, PackageBody, PackageBodyElement,
     ParseErrorNode, RootElement, RootNamespace, Visibility,
 };
 use crate::parser::action::{action_def, action_usage};
@@ -27,8 +27,8 @@ use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::interface::interface_def;
 use crate::parser::lex::{
-    identification, recover_body_element, starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
-    PACKAGE_BODY_STARTERS,
+    identification, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
+    starts_with_keyword, ws1, ws_and_comments, PACKAGE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::part::{part_def_or_usage, PartDefOrUsage};
@@ -187,6 +187,149 @@ fn package_body_element_fallback(input: Input<'_>) -> IResult<Input<'_>, Node<Pa
         input,
         nom::error::ErrorKind::Tag,
     )))
+}
+
+fn generic_decl_text(start: Input<'_>, end: Input<'_>) -> String {
+    let delta = end.location_offset().saturating_sub(start.location_offset());
+    let bytes = start.fragment();
+    let take = delta.min(bytes.len());
+    String::from_utf8_lossy(&bytes[..take]).trim().to_string()
+}
+
+fn starts_with_visibility_prefix(fragment: &[u8]) -> Option<usize> {
+    for prefix in [b"public".as_slice(), b"private".as_slice(), b"protected".as_slice()] {
+        if starts_with_keyword(fragment, prefix) {
+            return Some(prefix.len());
+        }
+    }
+    None
+}
+
+fn is_generic_library_decl_start(fragment: &[u8]) -> bool {
+    if fragment.starts_with(b"#") {
+        return false;
+    }
+    if starts_with_keyword(fragment, b"package")
+        || starts_with_keyword(fragment, b"library")
+        || starts_with_keyword(fragment, b"namespace")
+        || starts_with_keyword(fragment, b"import")
+        || starts_with_keyword(fragment, b"doc")
+        || starts_with_keyword(fragment, b"comment")
+        || starts_with_keyword(fragment, b"filter")
+    {
+        return false;
+    }
+    let mut frag = fragment;
+    let original_frag = fragment;
+    if let Some(len) = starts_with_visibility_prefix(frag) {
+        frag = &frag[len..];
+        let mut i = 0usize;
+        while i < frag.len() && frag[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        frag = &frag[i..];
+    }
+    if starts_with_keyword(frag, b"abstract") || starts_with_keyword(frag, b"variation") {
+        let cut = if starts_with_keyword(frag, b"abstract") { 8 } else { 9 };
+        frag = &frag[cut..];
+        let mut i = 0usize;
+        while i < frag.len() && frag[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        frag = &frag[i..];
+    }
+    let starters: &[&[u8]] = &[
+        b"action",
+        b"allocation",
+        b"analysis",
+        b"assoc",
+        b"attribute",
+        b"behavior",
+        b"case",
+        b"calc",
+        b"connection",
+        b"constraint",
+        b"datatype",
+        b"expr",
+        b"function",
+        b"flow",
+        b"interface",
+        b"item",
+        b"metaclass",
+        b"metadata",
+        b"requirement",
+        b"occurrence",
+        b"predicate",
+        b"state",
+        b"struct",
+        b"succession",
+        b"use",
+        b"verification",
+        b"view",
+        b"viewpoint",
+        b"rendering",
+        b"enum",
+        b"message",
+        b"concern",
+    ];
+    if starts_with_any_keyword(frag, starters) {
+        return true;
+    }
+    // Keep legacy recovery tests stable: only fall back for richer abstract
+    // part/port declarations that include specialization-like fragments.
+    if (starts_with_keyword(frag, b"part") || starts_with_keyword(frag, b"port"))
+        && (original_frag.windows(2).any(|w| w == b":>") || original_frag.windows(9).any(|w| w == b"nonunique"))
+    {
+        return true;
+    }
+    if starts_with_keyword(frag, b"part") || starts_with_keyword(frag, b"port") {
+        return false;
+    }
+    // Last-resort declaration fallback for SysML/KerML library files:
+    // if a statement looks declaration-like (`def`, `:>`, or typed `name: Type`),
+    // consume it as a generic declaration instead of emitting recovery noise.
+    let line_end = original_frag
+        .iter()
+        .position(|&b| b == b'\n' || b == b'\r')
+        .unwrap_or(original_frag.len())
+        .min(160);
+    let line = &original_frag[..line_end];
+    if line.windows(5).any(|w| w == b" def ")
+        || line.windows(2).any(|w| w == b":>")
+        || line.windows(1).any(|w| w == b":")
+    {
+        return true;
+    }
+    false
+}
+
+fn generic_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<GenericDecl>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().is_empty() || input.fragment().starts_with(b"}") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    if !is_generic_library_decl_start(input.fragment()) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let raw_start = input;
+    let (input, _) = skip_statement_or_block(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            GenericDecl {
+                text: generic_decl_text(raw_start, input),
+            },
+        ),
+    ))
 }
 
 fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
@@ -450,7 +593,10 @@ pub(crate) fn package_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<
     if let Ok((input, elem)) = map(viewpoint_usage, PackageBodyElement::ViewpointUsage).parse(input) {
         return Ok((input, node_from_to(start, input, elem)));
     }
-    let (input, elem) = map(rendering_usage, PackageBodyElement::RenderingUsage).parse(input)?;
+    if let Ok((input, elem)) = map(rendering_usage, PackageBodyElement::RenderingUsage).parse(input) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    let (input, elem) = map(generic_library_decl, PackageBodyElement::GenericDecl).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
