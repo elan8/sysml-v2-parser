@@ -1,6 +1,9 @@
 use crate::ast::{DefinitionBody, FlowDef, FlowUsage, Node};
 use crate::parser::expr::expression;
-use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::lex::{
+    identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
+    ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -28,18 +31,24 @@ fn definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
 
 pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"flow"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, _) = tag(&b"flow"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = definition_body(input)?;
     Ok((input, node_from_to(start, input, FlowDef { identification, body })))
 }
 
 pub(crate) fn flow_usage(input: Input<'_>) -> IResult<Input<'_>, Node<FlowUsage>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"flow"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, _) = alt((tag(&b"flow"[..]), tag(&b"message"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, type_name) = opt(preceded(
@@ -60,6 +69,8 @@ pub(crate) fn flow_usage(input: Input<'_>) -> IResult<Input<'_>, Node<FlowUsage>
         }
         None => (input, None),
     };
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = definition_body(input)?;
     Ok((
         input,

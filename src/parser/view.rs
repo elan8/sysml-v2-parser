@@ -6,7 +6,9 @@ use crate::ast::{
     RenderingDef, RenderingDefBody, RenderingUsage,
 };
 use crate::parser::interface::connect_body;
-use crate::parser::lex::{identification, name, qualified_name, ws1, ws_and_comments};
+use crate::parser::lex::{
+    identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::Input;
@@ -18,6 +20,7 @@ use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
 
 fn keyword_view_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"def"[..]).parse(input)?;
@@ -67,29 +70,29 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
 }
 
 fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
-    alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| ViewDefBody::Semicolon),
-        map(
-            delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                many0(preceded(ws_and_comments, view_def_body_element)),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| ViewDefBody::Brace { elements },
-        ),
-    ))
-    .parse(input)
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, ViewDefBody::Semicolon));
+    }
+    let (input, _) = tag(&b"{"[..]).parse(input)?;
+    let (input, _) = crate::parser::lex::skip_until_brace_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+    Ok((input, ViewDefBody::Brace { elements: vec![] }))
 }
 
 pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
     let start = input;
     let (input, _) = keyword_view_def(input)?;
     let (input, ident) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = view_def_body(input)?;
     Ok((input, node_from_to(start, input, ViewDef { identification: ident, body })))
 }
 
 fn keyword_viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"def"[..]).parse(input)?;
@@ -101,11 +104,14 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
     let start = input;
     let (input, _) = keyword_viewpoint_def(input)?;
     let (input, ident) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
     Ok((input, node_from_to(start, input, ViewpointDef { identification: ident, body })))
 }
 
 fn keyword_rendering_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"rendering"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"def"[..]).parse(input)?;
@@ -133,6 +139,8 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
     let start = input;
     let (input, _) = keyword_rendering_def(input)?;
     let (input, ident) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = rendering_def_body(input)?;
     Ok((input, node_from_to(start, input, RenderingDef { identification: ident, body })))
 }
@@ -222,23 +230,22 @@ fn satisfy_view_member(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewM
 }
 
 fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
-    alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| ViewBody::Semicolon),
-        map(
-            delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                many0(preceded(ws_and_comments, view_body_element)),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| ViewBody::Brace { elements },
-        ),
-    ))
-    .parse(input)
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, ViewBody::Semicolon));
+    }
+    let (input, _) = tag(&b"{"[..]).parse(input)?;
+    let (input, _) = crate::parser::lex::skip_until_brace_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+    Ok((input, ViewBody::Brace { elements: vec![] }))
 }
 
 pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"view"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, type_name) = preceded(
@@ -249,6 +256,8 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
         )),
     )
     .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = view_body(input)?;
     Ok((
         input,
@@ -266,11 +275,15 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
 
 pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewpointUsage>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"viewpoint"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
@@ -288,7 +301,9 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
 
 pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RenderingUsage>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"rendering"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, _) = tag(&b"rendering"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, type_name) = preceded(
@@ -299,6 +314,8 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
         )),
     )
     .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,

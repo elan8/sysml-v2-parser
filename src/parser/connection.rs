@@ -5,7 +5,10 @@ use crate::ast::{
     RefBody, RefDecl,
 };
 use crate::parser::expr::path_expression;
-use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::lex::{
+    identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
+    ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -140,32 +143,27 @@ fn connection_def_body_element(
 
 fn connection_def_body(input: Input<'_>) -> IResult<Input<'_>, ConnectionDefBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| ConnectionDefBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                preceded(
-                    ws_and_comments,
-                    many0(preceded(ws_and_comments, connection_def_body_element)),
-                ),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| ConnectionDefBody::Brace { elements },
-        ),
-    ))
-    .parse(input)
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, ConnectionDefBody::Semicolon));
+    }
+    let (input, _) = tag(&b"{"[..]).parse(input)?;
+    let (input, _) = skip_until_brace_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+    Ok((input, ConnectionDefBody::Brace { elements: vec![] }))
 }
 
 /// Connection definition: `connection def` Identification body.
 pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"connection"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, identification) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = connection_def_body(input)?;
     Ok((
         input,

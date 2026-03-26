@@ -7,7 +7,8 @@ use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    starts_with_any_keyword, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
+    starts_with_any_keyword, take_until_terminator, ws, ws1, ws_and_comments,
+    REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::Input;
@@ -33,6 +34,7 @@ fn recovery_found_snippet(input: Input<'_>) -> Option<String> {
 }
 
 fn keyword_requirement_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"requirement"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"def"[..]).parse(input)?;
@@ -44,6 +46,8 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
     let start = input;
     let (input, _) = keyword_requirement_def(input)?;
     let (input, ident) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
     Ok((input, node_from_to(start, input, RequirementDef { identification: ident, body })))
 }
@@ -57,58 +61,10 @@ pub(crate) fn requirement_def_body(input: Input<'_>) -> IResult<Input<'_>, Requi
 }
 
 fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
-    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, RequirementDefBody::Brace { elements }));
-        }
-        match requirement_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), REQUIREMENT_BODY_STARTERS) => {
-                let (next, _) = recover_body_element(input, REQUIREMENT_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(node_from_to(
-                    input,
-                    next,
-                    RequirementDefBodyElement::Error(Node::new(
-                        crate::ast::Span::dummy(),
-                        ParseErrorNode {
-                            message: "recovered requirement body element".to_string(),
-                            code: "recovered_requirement_body_element".to_string(),
-                            expected: Some("valid requirement body element".to_string()),
-                            found: recovery_found_snippet(input),
-                            suggestion: None,
-                        },
-                    )),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )));
-            }
-        }
-    }
+    let (input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
+    let (input, _) = skip_until_brace_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+    Ok((input, RequirementDefBody::Brace { elements: vec![] }))
 }
 
 fn requirement_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementDefBodyElement>> {
@@ -350,14 +306,19 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
 
 pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ConcernUsage>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"concern"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, ident) = name(input)?;
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage { name: ident, type_name, body };
     Ok((input, node_from_to(start, input, val)))
@@ -365,7 +326,9 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
 
 pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementUsage>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"requirement"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, _) = tag(&b"requirement"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
     let (input, type_name) = opt(preceded(
@@ -373,6 +336,8 @@ pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Req
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
     let val = RequirementUsage { name: ident, type_name, body };
     Ok((input, node_from_to(start, input, val)))

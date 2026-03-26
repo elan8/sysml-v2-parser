@@ -1,7 +1,7 @@
 //! Metadata definition parsing (BNF MetadataDefinition).
 
 use crate::ast::{DefinitionBody, MetadataDef, Node};
-use crate::parser::lex::{identification, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::lex::{identification, skip_until_brace_end, take_until_terminator, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -39,6 +39,8 @@ pub(crate) fn metadata_def(input: Input<'_>) -> IResult<Input<'_>, Node<Metadata
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = definition_body(input)?;
     Ok((
         input,

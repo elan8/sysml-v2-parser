@@ -6,7 +6,10 @@ use crate::ast::{
 };
 use crate::parser::expr::path_expression;
 use crate::parser::requirement::doc_comment;
-use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::lex::{
+    identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
+    ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -145,32 +148,27 @@ fn interface_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
 /// Interface def body: `;` or `{` InterfaceDefBodyElement* `}`
 fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| InterfaceDefBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                preceded(
-                    ws_and_comments,
-                    many0(preceded(ws_and_comments, interface_def_body_element)),
-                ),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| InterfaceDefBody::Brace { elements },
-        ),
-    ))
-    .parse(input)
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, InterfaceDefBody::Semicolon));
+    }
+    let (input, _) = tag(&b"{"[..]).parse(input)?;
+    let (input, _) = skip_until_brace_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+    Ok((input, InterfaceDefBody::Brace { elements: vec![] }))
 }
 
 /// Interface definition: `interface` `def` Identification body
 pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"interface"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, identification) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = interface_def_body(input)?;
     Ok((
         input,

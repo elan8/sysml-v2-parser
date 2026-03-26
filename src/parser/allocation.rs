@@ -1,6 +1,9 @@
 use crate::ast::{AllocationDef, AllocationUsage, DefinitionBody, Node};
 use crate::parser::expr::expression;
-use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::lex::{
+    identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
+    ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -39,7 +42,9 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
 
 pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AllocationUsage>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"allocation"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, _) = tag(&b"allocation"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, type_name) = opt(preceded(
@@ -60,6 +65,8 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
         }
         None => (input, None),
     };
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = definition_body(input)?;
     Ok((
         input,

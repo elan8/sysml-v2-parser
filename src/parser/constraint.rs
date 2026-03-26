@@ -4,7 +4,10 @@ use crate::ast::{
 };
 use crate::parser::action::in_out_decl;
 use crate::parser::expr::expression;
-use crate::parser::lex::{identification, ws1, ws_and_comments, qualified_name, name};
+use crate::parser::lex::{
+    identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
+    ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -16,28 +19,30 @@ use nom::{IResult, Parser};
 
 pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConstraintDef>> {
     let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"private"[..]), ws1)).parse(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"private"[..]), ws1)).parse(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, ident) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = constraint_def_body(input)?;
     Ok((input, node_from_to(start, input, ConstraintDef { identification: ident, body })))
 }
 
 fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody> {
-    alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| ConstraintDefBody::Semicolon),
-        map(
-            delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                many0(preceded(ws_and_comments, constraint_def_body_element)),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| ConstraintDefBody::Brace { elements },
-        ),
-    ))
-    .parse(input)
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, ConstraintDefBody::Semicolon));
+    }
+    let (input, _) = tag(&b"{"[..]).parse(input)?;
+    let (input, _) = skip_until_brace_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+    Ok((input, ConstraintDefBody::Brace { elements: vec![] }))
 }
 
 fn constraint_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
@@ -62,28 +67,29 @@ fn safe_constraint_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node
 
 pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"private"[..]), ws1)).parse(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, ident) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = calc_def_body(input)?;
     Ok((input, node_from_to(start, input, CalcDef { identification: ident, body })))
 }
 
 fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
-    alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| CalcDefBody::Semicolon),
-        map(
-            delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                many0(preceded(ws_and_comments, calc_def_body_element)),
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |elements| CalcDefBody::Brace { elements },
-        ),
-    ))
-    .parse(input)
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, CalcDefBody::Semicolon));
+    }
+    let (input, _) = tag(&b"{"[..]).parse(input)?;
+    let (input, _) = skip_until_brace_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+    Ok((input, CalcDefBody::Brace { elements: vec![] }))
 }
 
 fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {

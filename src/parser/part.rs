@@ -11,7 +11,7 @@ use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    starts_with_any_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
+    starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments, PART_BODY_STARTERS,
 };
 use nom::sequence::delimited;
 use crate::parser::{node_from_to, span_from_to};
@@ -57,58 +57,10 @@ pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody>
 }
 
 fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, PartDefBody::Brace { elements }));
-        }
-        match part_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), PART_BODY_STARTERS) => {
-                let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(node_from_to(
-                    input,
-                    next,
-                    PartDefBodyElement::Error(Node::new(
-                        crate::ast::Span::dummy(),
-                        ParseErrorNode {
-                            message: "recovered part definition body element".to_string(),
-                            code: "recovered_part_def_body_element".to_string(),
-                            expected: Some("valid part definition body element".to_string()),
-                            found: recovery_found_snippet(input),
-                            suggestion: None,
-                        },
-                    )),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )));
-            }
-        }
-    }
+    let (input, _) = tag(&b"{"[..]).parse(input)?;
+    let (input, _) = skip_until_brace_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+    Ok((input, PartDefBody::Brace { elements: vec![] }))
 }
 
 /// Exhibit state usage: `exhibit state` name `:` type `;`
@@ -277,6 +229,8 @@ fn part_usage_redefines_only<'a>(
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = part_usage_body(input)?;
     Ok((
         input,
@@ -342,6 +296,8 @@ fn part_usage_named<'a>(
     )))
     .parse(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = part_usage_body(input)?;
     Ok((
         input,

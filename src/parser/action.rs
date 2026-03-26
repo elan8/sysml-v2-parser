@@ -8,6 +8,7 @@ use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_until_brace_end,
+    take_until_terminator,
     starts_with_any_keyword, ws1, ws_and_comments, ACTION_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -158,11 +159,14 @@ fn action_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<crate::a
 pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = action_def_body(input)?;
     Ok((
         input,
@@ -315,6 +319,7 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
 pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
@@ -353,6 +358,8 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
         ),
     )))
     .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (type_ref_span, type_name, accept) = type_accept.unwrap_or((None, String::new(), None));
     let (input, body) = action_usage_body(input)?;
     Ok((

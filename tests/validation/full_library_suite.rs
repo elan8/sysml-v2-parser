@@ -159,6 +159,57 @@ fn collect_bnf_decl_counts_in_body(body: &PackageBody, counts: &mut BTreeMap<Str
     }
 }
 
+fn collect_package_body_type_counts(root: &RootNamespace, counts: &mut BTreeMap<String, usize>) {
+    for element in &root.elements {
+        match &element.value {
+            RootElement::Package(p) => collect_body_type_counts(&p.value.body, counts),
+            RootElement::LibraryPackage(p) => collect_body_type_counts(&p.value.body, counts),
+            RootElement::Namespace(n) => collect_body_type_counts(&n.value.body, counts),
+            RootElement::Import(_) => {}
+        }
+    }
+}
+
+fn collect_body_type_counts(body: &PackageBody, counts: &mut BTreeMap<String, usize>) {
+    let PackageBody::Brace { elements } = body else {
+        return;
+    };
+    for element in elements {
+        let key = match &element.value {
+            PackageBodyElement::ExtendedLibraryDecl(_) => "ExtendedLibraryDecl",
+            PackageBodyElement::KermlSemanticDecl(_) => "KermlSemanticDecl",
+            PackageBodyElement::KermlFeatureDecl(_) => "KermlFeatureDecl",
+            PackageBodyElement::ActionDef(_) => "ActionDef",
+            PackageBodyElement::AttributeDef(_) => "AttributeDef",
+            PackageBodyElement::CalcDef(_) => "CalcDef",
+            PackageBodyElement::CaseDef(_) => "CaseDef",
+            PackageBodyElement::ConnectionDef(_) => "ConnectionDef",
+            PackageBodyElement::ConstraintDef(_) => "ConstraintDef",
+            PackageBodyElement::FlowDef(_) => "FlowDef",
+            PackageBodyElement::InterfaceDef(_) => "InterfaceDef",
+            PackageBodyElement::ItemDef(_) => "ItemDef",
+            PackageBodyElement::MetadataDef(_) => "MetadataDef",
+            PackageBodyElement::PartDef(_) => "PartDef",
+            PackageBodyElement::PortDef(_) => "PortDef",
+            PackageBodyElement::RequirementDef(_) => "RequirementDef",
+            PackageBodyElement::StateDef(_) => "StateDef",
+            PackageBodyElement::ViewDef(_) => "ViewDef",
+            PackageBodyElement::ViewpointDef(_) => "ViewpointDef",
+            PackageBodyElement::RenderingDef(_) => "RenderingDef",
+            PackageBodyElement::Package(n) => {
+                collect_body_type_counts(&n.value.body, counts);
+                "Package"
+            }
+            PackageBodyElement::LibraryPackage(n) => {
+                collect_body_type_counts(&n.value.body, counts);
+                "LibraryPackage"
+            }
+            _ => "Other",
+        };
+        *counts.entry(key.to_string()).or_insert(0) += 1;
+    }
+}
+
 /// Full library suite: parse all SysML/KerML library sources from SysML-v2-Release.
 ///
 /// Run with: `cargo test --test validation test_full_library_suite -- --include-ignored --nocapture`
@@ -405,4 +456,69 @@ fn test_full_library_strict_no_diagnostics() {
             files.len()
         );
     }
+}
+
+/// Node-shape quality gate for SysML standard library.
+/// This test intentionally fails when `ExtendedLibraryDecl` is still used there.
+///
+/// Run with:
+/// `cargo test --test validation test_systems_library_node_types_no_extended -- --include-ignored --nocapture`
+#[test]
+#[ignore = "quality gate: ensure systems library maps to dedicated node types"]
+fn test_systems_library_node_types_no_extended() {
+    super::init_log();
+
+    let systems_path = library_dir().join("Systems Library");
+    if !systems_path.exists() {
+        log::debug!("Systems Library directory not found: {:?}", systems_path);
+        return;
+    }
+
+    let mut files = find_library_files(&systems_path).expect("Failed to find Systems Library files");
+    files.sort();
+    assert!(!files.is_empty(), "No systems library files found");
+
+    let mut type_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut extended_by_file = Vec::new();
+
+    for file in &files {
+        let relative = file
+            .strip_prefix(&systems_path)
+            .unwrap_or(file)
+            .to_string_lossy()
+            .to_string();
+        let content = fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("failed to read {}: {}", relative, e));
+        let result = parse_with_diagnostics(&content);
+        collect_package_body_type_counts(&result.root, &mut type_counts);
+
+        let mut file_counts = BTreeMap::new();
+        collect_package_body_type_counts(&result.root, &mut file_counts);
+        let n_extended = *file_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
+        if n_extended > 0 {
+            extended_by_file.push((relative, n_extended));
+        }
+    }
+
+    let n_extended_total = *type_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
+    eprintln!("Systems Library node-type counts:");
+    let mut sorted_counts = type_counts.into_iter().collect::<Vec<_>>();
+    sorted_counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    for (k, v) in sorted_counts {
+        eprintln!("  - {}: {}", k, v);
+    }
+
+    if n_extended_total > 0 {
+        extended_by_file.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        eprintln!("Files still mapped as ExtendedLibraryDecl:");
+        for (path, n) in extended_by_file.iter().take(10) {
+            eprintln!("  - {}: {}", path, n);
+        }
+    }
+
+    assert_eq!(
+        n_extended_total, 0,
+        "Systems Library still contains ExtendedLibraryDecl nodes ({} total)",
+        n_extended_total
+    );
 }

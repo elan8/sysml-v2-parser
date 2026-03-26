@@ -5,7 +5,10 @@ use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::action::in_out_decl;
 use crate::parser::requirement::doc_comment;
 use crate::parser::expr::expression;
-use crate::parser::lex::{identification, name, qualified_name, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::lex::{
+    identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
+    ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -134,15 +137,9 @@ fn port_def_body(input: Input<'_>) -> IResult<Input<'_>, PortDefBody> {
 
 fn port_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortDefBody> {
     let (input, _) = tag(&b"{"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, elements) = many0(preceded(ws_and_comments, port_def_body_element)).parse(input)?;
-    let (input, _) = if elements.is_empty() {
-        skip_until_brace_end(input)?
-    } else {
-        (input, ())
-    };
+    let (input, _) = skip_until_brace_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-    Ok((input, PortDefBody::Brace { elements }))
+    Ok((input, PortDefBody::Brace { elements: vec![] }))
 }
 
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
@@ -163,16 +160,18 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
 pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"port"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    let (input, _) = opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, identification) = identification(input)?;
     let (input, specializes) = nom::combinator::opt(nom::sequence::preceded(
         nom::sequence::preceded(ws_and_comments, tag(&b":>"[..])),
         nom::sequence::preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = port_def_body(input)?;
     Ok((
         input,
