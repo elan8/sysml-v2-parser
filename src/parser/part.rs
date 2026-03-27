@@ -2,7 +2,7 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    Allocate, Bind, Connect, ConnectBody, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
+    Allocate, AttributeBody, AttributeUsage, Bind, Connect, ConnectBody, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
     InterfaceUsageBodyElement, Node, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
     PartUsageBody, PartUsageBodyElement, ParseErrorNode, Perform, PerformBody, PerformBodyElement,
     PerformInOutBinding, RefBody, RefDecl,
@@ -170,9 +170,64 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         map(attribute_usage, PartDefBodyElement::AttributeUsage),
         map(attribute_usage_shorthand, PartDefBodyElement::AttributeUsage),
         map(attribute_def, PartDefBodyElement::AttributeDef),
+        map(opaque_part_member_decl, PartDefBodyElement::AttributeUsage),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// Permissive parser for library-style part members not yet modeled with dedicated AST nodes.
+/// Examples: `ref self: Part :>> Item::self;`, `abstract ref action ... { ... }`.
+fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    if !starts_with_any_keyword(input.fragment(), &[b"ref", b"action", b"state", b"port"]) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, header_text) = take_until_terminator(input, b";{")?;
+    let name_str = header_text
+        .split(|c: char| c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == '(' || c == ')')
+        .filter(|s| !s.is_empty())
+        .find(|token| {
+            !matches!(
+                *token,
+                "ref" | "action" | "state" | "port" | "part" | "private" | "protected" | "public"
+            )
+        })
+        .unwrap_or("member")
+        .to_string();
+    let (input, _) = ws_and_comments(input)?;
+    let (input, body) = alt((
+        map(tag(&b";"[..]), |_| AttributeBody::Semicolon),
+        map(
+            delimited(
+                tag(&b"{"[..]),
+                skip_until_brace_end,
+                preceded(ws_and_comments, tag(&b"}"[..])),
+            ),
+            |_| AttributeBody::Brace,
+        ),
+    ))
+    .parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            AttributeUsage {
+                name: name_str,
+                redefines: None,
+                value: None,
+                body,
+                name_span: None,
+                redefines_span: None,
+            },
+        ),
+    ))
 }
 
 /// Part definition: ( 'abstract' | 'variation' )? 'part' 'def' Identification ( ':>' qualified_name )? body
