@@ -154,8 +154,7 @@ fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
 pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, n) = name(input)?;
+    let (input, n) = opt(preceded(ws1, name)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
     let (input, _) = alt((
@@ -170,7 +169,17 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
         ),
     ))
     .parse(input)?;
-    Ok((input, node_from_to(start, input, SubjectDecl { name: n, type_name })))
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            SubjectDecl {
+                name: n.unwrap_or_default(),
+                type_name,
+            },
+        ),
+    ))
 }
 
 pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<RequireConstraint>> {

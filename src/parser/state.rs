@@ -133,6 +133,8 @@ fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     ))
     .parse(input)?;
     let action_name = action_name.map(|(_, n)| n);
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
@@ -144,15 +146,13 @@ fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
 fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
+    let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
-    let (input, value) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"="[..])),
-        preceded(ws_and_comments, expression),
-    ))
-    .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = preceded(
         ws_and_comments,
         alt((
@@ -176,7 +176,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             RefDecl {
                 name: name_str,
                 type_name,
-                value,
+                value: None,
                 body,
                 name_span: None,
                 type_ref_span: None,
