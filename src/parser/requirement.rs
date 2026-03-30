@@ -8,8 +8,8 @@ use crate::ast::{
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    starts_with_any_keyword, take_until_terminator, ws, ws1, ws_and_comments,
+    identification, looks_like_missing_semicolon, name, qualified_name, recover_body_element,
+    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws, ws1, ws_and_comments,
     REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -63,10 +63,70 @@ pub(crate) fn requirement_def_body(input: Input<'_>) -> IResult<Input<'_>, Requi
 }
 
 fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
-    let (input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
-    let (input, _) = skip_until_brace_end(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-    Ok((input, RequirementDefBody::Brace { elements: vec![] }))
+    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+            return Ok((input, RequirementDefBody::Brace { elements }));
+        }
+        match requirement_def_body_element(input) {
+            Ok((next, element)) => {
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                elements.push(element);
+                input = next;
+            }
+            Err(_) if starts_with_any_keyword(input.fragment(), REQUIREMENT_BODY_STARTERS) => {
+                let (next, _) = recover_body_element(input, REQUIREMENT_BODY_STARTERS)?;
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                elements.push(node_from_to(
+                    input,
+                    next,
+                    RequirementDefBodyElement::Error(Node::new(
+                        crate::ast::Span::dummy(),
+                        if looks_like_missing_semicolon(input, REQUIREMENT_BODY_STARTERS) {
+                            ParseErrorNode {
+                                message: "missing semicolon before next declaration".to_string(),
+                                code: "missing_semicolon".to_string(),
+                                expected: Some("';'".to_string()),
+                                found: recovery_found_snippet(input),
+                                suggestion: Some("Insert ';' before this declaration.".to_string()),
+                            }
+                        } else {
+                            ParseErrorNode {
+                                message: "recovered requirement body element".to_string(),
+                                code: "recovered_requirement_body_element".to_string(),
+                                expected: Some("valid requirement body element".to_string()),
+                                found: recovery_found_snippet(input),
+                                suggestion: Some(
+                                    "Fix this requirement member and re-run parsing.".to_string(),
+                                ),
+                            }
+                        },
+                    )),
+                ));
+                input = next;
+            }
+            Err(_) => {
+                // Keep RequirementDef mapping stable for unmodeled body content.
+                let (input, _) = skip_until_brace_end(input)?;
+                let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                return Ok((input, RequirementDefBody::Brace { elements }));
+            }
+        }
+    }
 }
 
 fn requirement_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementDefBodyElement>> {

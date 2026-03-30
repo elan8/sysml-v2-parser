@@ -532,8 +532,22 @@ fn test_requirement_body_recovery_keeps_later_require_constraint() {
         _ => panic!("expected requirement brace body"),
     };
     assert!(
-        body_elements.is_empty(),
-        "requirement body is permissively consumed and should still map as RequirementDef"
+        body_elements
+            .iter()
+            .any(|e| matches!(e.value, sysml_parser::ast::RequirementDefBodyElement::SubjectDecl(_))),
+        "subject should be parsed in requirement body"
+    );
+    assert!(
+        body_elements
+            .iter()
+            .any(|e| matches!(e.value, sysml_parser::ast::RequirementDefBodyElement::RequireConstraint(_))),
+        "require constraint should be preserved after local body recovery"
+    );
+    assert!(
+        body_elements
+            .iter()
+            .any(|e| matches!(e.value, sysml_parser::ast::RequirementDefBodyElement::Error(_))),
+        "unsupported members should be captured as recoverable errors in requirement body"
     );
 }
 
@@ -542,8 +556,17 @@ fn test_parse_with_diagnostics_reports_local_requirement_recovery() {
     let input = "package P {\nrequirement def R {\nsubject vehicle : Vehicle;\nattribute massActual: MassValue;\nrequire constraint { }\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
-        result.errors.is_empty(),
-        "permissive requirement body parsing should avoid local recovery diagnostics"
+        !result.errors.is_empty(),
+        "unmodeled requirement members should surface as recoverable diagnostics"
+    );
+    assert!(
+        result.errors.iter().any(|e| {
+            matches!(
+                e.code.as_deref(),
+                Some("recovered_requirement_body_element") | Some("missing_semicolon")
+            )
+        }),
+        "expected requirement-body recovery diagnostic"
     );
 }
 
