@@ -2,12 +2,13 @@
 
 use crate::ast::{
     ActionDef, ActionDefBody, ActionUsage, ActionUsageBody, ActionUsageBodyElement,
-    FirstMergeBody, FirstStmt, Flow, InOut, InOutDecl, MergeStmt, Node, ParseErrorNode,
+    FirstMergeBody, FirstStmt, Flow, InOut, InOutDecl, MergeStmt, Node,
 };
+use crate::parser::build_recovery_error_node;
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    identification, looks_like_missing_semicolon, name, qualified_name, recover_body_element, skip_until_brace_end,
+    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
     take_until_terminator,
     starts_with_any_keyword, ws1, ws_and_comments, ACTION_BODY_STARTERS,
 };
@@ -21,17 +22,6 @@ use nom::combinator::map;
 use nom::sequence::preceded;
 use nom::Parser;
 use nom::IResult;
-
-fn recovery_found_snippet(input: Input<'_>) -> Option<String> {
-    let frag = input.fragment();
-    let take = frag
-        .iter()
-        .position(|&b| b == b'\n' || b == b'\r')
-        .unwrap_or(frag.len())
-        .min(60);
-    let snippet = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    if snippet.is_empty() { None } else { Some(snippet) }
-}
 
 /// First/merge body: `;` or `{` ... `}`
 fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
@@ -107,6 +97,12 @@ fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> 
     loop {
         let (next, _) = ws_and_comments(input)?;
         input = next;
+        if input.fragment().is_empty() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Eof,
+            )));
+        }
         if input.fragment().starts_with(b"}") {
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
             return Ok((input, ActionDefBody::Brace { elements }));
@@ -130,25 +126,12 @@ fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> 
                         nom::error::ErrorKind::Many0,
                     )));
                 }
-                let error_node = if looks_like_missing_semicolon(input, ACTION_BODY_STARTERS) {
-                    ParseErrorNode {
-                        message: "missing semicolon before next declaration".to_string(),
-                        code: "missing_semicolon".to_string(),
-                        expected: Some("';'".to_string()),
-                        found: recovery_found_snippet(input),
-                        suggestion: Some("Insert ';' before this declaration.".to_string()),
-                    }
-                } else {
-                    ParseErrorNode {
-                        message: "recovered action definition body element".to_string(),
-                        code: "recovered_action_def_body_element".to_string(),
-                        expected: Some("valid action definition body element".to_string()),
-                        found: recovery_found_snippet(input),
-                        suggestion: Some(
-                            "Fix this action definition member and re-run parsing.".to_string(),
-                        ),
-                    }
-                };
+                let error_node = build_recovery_error_node(
+                    input,
+                    ACTION_BODY_STARTERS,
+                    "action definition body",
+                    "recovered_action_def_body_element",
+                );
                 elements.push(node_from_to(
                     input,
                     next,
@@ -281,6 +264,12 @@ fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBo
     loop {
         let (next, _) = ws_and_comments(input)?;
         input = next;
+        if input.fragment().is_empty() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Eof,
+            )));
+        }
         if input.fragment().starts_with(b"}") {
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
             return Ok((input, ActionUsageBody::Brace { elements }));
@@ -319,27 +308,12 @@ fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBo
                     next,
                     ActionUsageBodyElement::Error(Node::new(
                         crate::ast::Span::dummy(),
-                        if looks_like_missing_semicolon(input, ACTION_BODY_STARTERS) {
-                            ParseErrorNode {
-                                message: "missing semicolon before next declaration".to_string(),
-                                code: "missing_semicolon".to_string(),
-                                expected: Some("';'".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Insert ';' before this declaration.".to_string(),
-                                ),
-                            }
-                        } else {
-                            ParseErrorNode {
-                                message: "recovered action usage body element".to_string(),
-                                code: "recovered_action_usage_body_element".to_string(),
-                                expected: Some("valid action usage body element".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Fix this action usage member and re-run parsing.".to_string(),
-                                ),
-                            }
-                        },
+                        build_recovery_error_node(
+                            input,
+                            ACTION_BODY_STARTERS,
+                            "action usage body",
+                            "recovered_action_usage_body_element",
+                        ),
                     )),
                 ));
                 input = next;

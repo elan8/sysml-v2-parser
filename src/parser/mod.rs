@@ -115,6 +115,21 @@ fn fragment_to_found_snippet(fragment: &[u8]) -> (String, usize) {
     (s.trim_end().to_string(), len)
 }
 
+pub(crate) fn recovery_found_snippet(input: Input<'_>) -> Option<String> {
+    let frag = input.fragment();
+    let take = frag
+        .iter()
+        .position(|&b| b == b'\n' || b == b'\r')
+        .unwrap_or(frag.len())
+        .min(60);
+    let snippet = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+    if snippet.is_empty() {
+        None
+    } else {
+        Some(snippet)
+    }
+}
+
 /// Map nom error kind to a human-readable message for language server diagnostics.
 fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
     use nom::error::ErrorKind;
@@ -205,6 +220,165 @@ fn trim_ascii_start(mut fragment: &[u8]) -> &[u8] {
         break;
     }
     fragment
+}
+
+fn starts_with_missing_name_after_keyword(
+    fragment: &[u8],
+    keyword: &[u8],
+    trailing_keywords: &[&[u8]],
+) -> bool {
+    let mut fragment = trim_ascii_start(fragment);
+    if !lex::starts_with_keyword(fragment, keyword) {
+        return false;
+    }
+    fragment = &fragment[keyword.len()..];
+    while let Some(first) = fragment.first() {
+        if first.is_ascii_whitespace() {
+            fragment = &fragment[1..];
+            continue;
+        }
+        break;
+    }
+    for trailing in trailing_keywords {
+        if lex::starts_with_keyword(fragment, trailing) {
+            fragment = &fragment[trailing.len()..];
+            while let Some(first) = fragment.first() {
+                if first.is_ascii_whitespace() {
+                    fragment = &fragment[1..];
+                    continue;
+                }
+                break;
+            }
+        }
+    }
+    fragment.starts_with(b":")
+}
+
+fn missing_name_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, String, String)> {
+    let cases: &[(&[u8], &[&[u8]], &str, &str)] = &[
+        (b"subject", &[], "subject name", "Use `subject laptop: Laptop;`."),
+        (b"actor", &[], "actor name", "Use `actor user: User;`."),
+        (b"state", &[], "state name", "Use `state ready: Mode;`."),
+        (b"part", &[], "part name", "Use `part wheel: Wheel;`."),
+        (b"ref", &[], "reference name", "Use `ref sensor: Sensor;`."),
+        (b"port", &[], "port name", "Use `port power: PowerPort;`."),
+        (b"attribute", &[], "attribute name", "Use `attribute mass: MassValue;`."),
+        (b"in", &[], "input name", "Use `in speed: Real;`."),
+        (b"out", &[], "output name", "Use `out result: Real;`."),
+        (
+            b"perform",
+            &[b"action"],
+            "action name",
+            "Use `perform action run: Runner;`.",
+        ),
+    ];
+
+    for (keyword, trailing, missing_what, suggestion) in cases {
+        if starts_with_missing_name_after_keyword(fragment, keyword, trailing) {
+            return Some((
+                "missing_member_name",
+                format!("expected {missing_what} before ':'"),
+                format!("{missing_what} before ':'"),
+                format!("{suggestion}"),
+            ));
+        }
+    }
+    None
+}
+
+fn missing_closing_brace_error(bytes: &[u8], input: Input<'_>) -> Option<ParseError> {
+    if !input.fragment().is_empty() {
+        return None;
+    }
+    let consumed = &bytes[..input.location_offset().min(bytes.len())];
+    let opens = consumed.iter().filter(|&&b| b == b'{').count();
+    let closes = consumed.iter().filter(|&&b| b == b'}').count();
+    if opens <= closes {
+        return None;
+    }
+    Some(missing_closing_brace_error_at_eof(consumed))
+}
+
+fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
+    let (line, column) = eof_line_column(bytes);
+    ParseError::new("missing closing '}'")
+        .with_location(bytes.len(), line, column)
+        .with_length(1)
+        .with_code("missing_closing_brace")
+        .with_expected("'}'")
+        .with_suggestion("Add '}' to close the open body.")
+}
+
+fn has_unclosed_brace(bytes: &[u8]) -> bool {
+    let opens = bytes.iter().filter(|&&b| b == b'{').count();
+    let closes = bytes.iter().filter(|&&b| b == b'}').count();
+    opens > closes
+}
+
+fn eof_line_column(bytes: &[u8]) -> (u32, usize) {
+    let mut line = 1u32;
+    let mut column = 1usize;
+    for &b in bytes {
+        if b == b'\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    (line, column)
+}
+
+pub(crate) fn build_recovery_error_node(
+    input: Input<'_>,
+    starters: &[&[u8]],
+    scope_label: &str,
+    generic_code: &str,
+) -> ParseErrorNode {
+    let trimmed = trim_ascii_start(input.fragment());
+
+    if let Some((code, message, expected, suggestion)) = missing_name_diagnostic(trimmed) {
+        return ParseErrorNode {
+            message,
+            code: code.to_string(),
+            expected: Some(expected),
+            found: recovery_found_snippet(input),
+            suggestion: Some(suggestion),
+        };
+    }
+
+    if lex::looks_like_missing_semicolon(input, starters) {
+        return ParseErrorNode {
+            message: "missing semicolon before next declaration".to_string(),
+            code: "missing_semicolon".to_string(),
+            expected: Some("';'".to_string()),
+            found: recovery_found_snippet(input),
+            suggestion: Some("Insert ';' before this declaration.".to_string()),
+        };
+    }
+
+    if lex::starts_with_keyword(trimmed, b"#") || lex::starts_with_keyword(trimmed, b"@") {
+        return ParseErrorNode {
+            message: format!("unsupported annotation syntax in {scope_label}"),
+            code: generic_code.to_string(),
+            expected: Some(format!("valid {scope_label} element")),
+            found: recovery_found_snippet(input),
+            suggestion: Some(
+                "Remove this annotation or extend the parser to support annotated declarations."
+                    .to_string(),
+            ),
+        };
+    }
+
+    ParseErrorNode {
+        message: format!("recovered {scope_label} element"),
+        code: generic_code.to_string(),
+        expected: Some(format!("valid {scope_label} element")),
+        found: recovery_found_snippet(input),
+        suggestion: Some(format!(
+            "Fix this {scope_label} member and re-run parsing."
+        )),
+    }
 }
 
 fn is_only_trailing_closing_braces(mut input: Input<'_>) -> bool {
@@ -404,6 +578,9 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
     let located = LocatedSpan::new(bytes);
     match package::root_namespace(located) {
         Ok((rest, root)) => {
+            if !rest.fragment().is_empty() && has_unclosed_brace(bytes) {
+                return Err(missing_closing_brace_error_at_eof(bytes));
+            }
             if rest.fragment().is_empty() || is_only_trailing_closing_braces(rest) {
                 log::debug!("parse_root: success, {} top-level elements", root.elements.len());
                 Ok(root)
@@ -442,16 +619,20 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
                 Err(pe)
             }
         }
-        Err(nom::Err::Error(e)) => Err(nom_err_to_parse_error(
-            &e,
-            None,
-            Some("'package', 'namespace', or 'import' at top level; or valid element in package body"),
-        )),
-        Err(nom::Err::Failure(e)) => Err(nom_err_to_parse_error(
-            &e,
-            None,
-            Some("'package', 'namespace', or 'import' at top level; or valid element in package body"),
-        )),
+        Err(nom::Err::Error(e)) => Err(missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
+            nom_err_to_parse_error(
+                &e,
+                None,
+                Some("'package', 'namespace', or 'import' at top level; or valid element in package body"),
+            )
+        })),
+        Err(nom::Err::Failure(e)) => Err(missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
+            nom_err_to_parse_error(
+                &e,
+                None,
+                Some("'package', 'namespace', or 'import' at top level; or valid element in package body"),
+            )
+        })),
         Err(nom::Err::Incomplete(_)) => Err(ParseError::new("unexpected end of input").with_code("unexpected_eof")),
     }
 }
@@ -528,7 +709,13 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
                 input = rest;
             }
             Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
-                let pe = nom_err_to_parse_error(&e, None, Some("'package', 'namespace', or 'import'"));
+                let pe = missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
+                    nom_err_to_parse_error(
+                        &e,
+                        None,
+                        Some("'package', 'namespace', or 'import'"),
+                    )
+                });
                 let consumed = &bytes[..e.input.location_offset()];
                 let opens = consumed.iter().filter(|&&b| b == b'{').count();
                 let closes = consumed.iter().filter(|&&b| b == b'}').count();
@@ -536,7 +723,9 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
                 // When inside a package, only add errors for invalid identifiers (e.g. "test", "test2"),
                 // not for valid syntax we hit while skipping (e.g. "}", "//", "part def").
                 let is_inside_package = depth > 0;
-                let should_report = !is_inside_package || should_report_error_inside_package(pe.found.as_deref().unwrap_or(""));
+                let should_report = pe.code.as_deref() == Some("missing_closing_brace")
+                    || !is_inside_package
+                    || should_report_error_inside_package(pe.found.as_deref().unwrap_or(""));
                 if should_report {
                     errors.push(pe);
                 }
@@ -559,6 +748,15 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
     }
 
     let (input, _) = lex::ws_and_comments(input).unwrap_or((input, ()));
+
+    if input.fragment().is_empty()
+        && has_unclosed_brace(bytes)
+        && !errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("missing_closing_brace"))
+    {
+        errors.push(missing_closing_brace_error_at_eof(bytes));
+    }
 
     if !input.fragment().is_empty() {
         let (found_snippet, found_len) = fragment_to_found_snippet(input.fragment());

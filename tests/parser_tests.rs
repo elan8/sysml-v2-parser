@@ -761,6 +761,144 @@ fn test_parse_with_diagnostics_reports_local_requirement_recovery() {
 }
 
 #[test]
+fn test_parse_with_diagnostics_reports_missing_subject_name_in_requirement_body() {
+    let input = "package P {\nrequirement def R {\nsubject: Laptop;\nrequire constraint { }\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(!result.is_ok(), "missing subject name should produce diagnostics");
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.code.as_deref() == Some("missing_member_name"))
+        .expect("expected missing_member_name diagnostic");
+    assert_eq!(err.expected.as_deref(), Some("subject name before ':'"));
+    assert!(
+        err.suggestion
+            .as_deref()
+            .is_some_and(|s| s.contains("subject laptop: Laptop;")),
+        "diagnostic should show an example fix"
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let req = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::RequirementDef(r) => Some(&r.value),
+            _ => None,
+        })
+        .expect("requirement def should be present");
+    let body_elements = match &req.body {
+        sysml_parser::ast::RequirementDefBody::Brace { elements } => elements,
+        _ => panic!("expected requirement brace body"),
+    };
+    assert!(
+        body_elements
+            .iter()
+            .any(|e| matches!(e.value, sysml_parser::ast::RequirementDefBodyElement::RequireConstraint(_))),
+        "later requirement members should still parse after recovering from invalid subject syntax"
+    );
+}
+
+#[test]
+fn test_parse_with_diagnostics_reports_missing_subject_name_in_use_case_body() {
+    let input = "package P {\nuse case def U {\nsubject: Laptop;\nobjective { }\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(!result.is_ok(), "missing subject name should produce diagnostics");
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("missing_member_name")),
+        "expected missing_member_name diagnostic in use case body"
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let use_case = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::UseCaseDef(u) => Some(&u.value),
+            _ => None,
+        })
+        .expect("use case def should be present");
+    let body_elements = match &use_case.body {
+        sysml_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        _ => panic!("expected use case brace body"),
+    };
+    assert!(
+        body_elements
+            .iter()
+            .any(|e| matches!(e.value, sysml_parser::ast::UseCaseDefBodyElement::Objective(_))),
+        "later use case members should still parse after recovering from invalid subject syntax"
+    );
+}
+
+#[test]
+fn test_parse_with_diagnostics_reports_missing_actor_name_in_use_case_body() {
+    let input = "package P {\nuse case def U {\nactor: User;\nobjective { }\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(!result.is_ok(), "missing actor name should produce diagnostics");
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.code.as_deref() == Some("missing_member_name"))
+        .expect("expected missing_member_name diagnostic");
+    assert_eq!(err.expected.as_deref(), Some("actor name before ':'"));
+    assert!(
+        err.suggestion
+            .as_deref()
+            .is_some_and(|s| s.contains("actor user: User;")),
+        "diagnostic should show an actor example fix"
+    );
+}
+
+#[test]
+fn test_parse_with_diagnostics_reports_missing_state_name_in_state_body() {
+    let input = "package P {\nstate def Machine {\nstate: Mode;\ntransition t then Ready;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(!result.is_ok(), "missing state name should produce diagnostics");
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.expected.as_deref() == Some("state name before ':'"))
+        .expect("expected state-name diagnostic");
+    assert!(
+        err.suggestion
+            .as_deref()
+            .is_some_and(|s| s.contains("state ready: Mode;")),
+        "diagnostic should show a state example fix"
+    );
+}
+
+#[test]
+fn test_parse_with_diagnostics_reports_missing_part_name_in_part_body() {
+    let input = "package P {\npart def Vehicle {\npart: Wheel;\nattribute mass: MassValue;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(!result.is_ok(), "missing part name should produce diagnostics");
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.expected.as_deref() == Some("part name before ':'"))
+        .expect("expected part-name diagnostic");
+    assert!(
+        err.suggestion
+            .as_deref()
+            .is_some_and(|s| s.contains("part wheel: Wheel;")),
+        "diagnostic should show a part example fix"
+    );
+}
+
+#[test]
 fn test_parse_with_diagnostics_reports_local_package_recovery() {
     let input = "package P {\n#fmeaspec requirement req1 { }\npart def Good;\n}";
     let result = parse_with_diagnostics(input);
@@ -776,6 +914,11 @@ fn test_parse_with_diagnostics_reports_local_package_recovery() {
             .as_deref()
             .is_some_and(|f| f.contains("#fmeaspec")),
         "diagnostic should preserve recovered snippet"
+    );
+    assert!(
+        err.message.contains("annotation"),
+        "annotation recovery should say why the declaration could not be parsed: {}",
+        err.message
     );
 }
 
@@ -815,6 +958,33 @@ fn test_parse_with_diagnostics_reports_illegal_top_level_part_definition() {
             .is_some_and(|s| s.contains("package") && s.contains("namespace")),
         "diagnostic should suggest wrapping in package or namespace"
     );
+}
+
+#[test]
+fn test_parse_reports_missing_closing_brace_for_unterminated_package() {
+    let input = "package P {\npart def A;\n";
+    let err = parse(input).expect_err("unterminated package should fail");
+    assert_eq!(err.code.as_deref(), Some("missing_closing_brace"));
+    assert_eq!(err.expected.as_deref(), Some("'}'"));
+    assert!(
+        err.suggestion
+            .as_deref()
+            .is_some_and(|s| s.contains("Add '}'")),
+        "missing brace diagnostic should suggest how to close the body"
+    );
+}
+
+#[test]
+fn test_parse_with_diagnostics_reports_missing_closing_brace_for_unterminated_package() {
+    let input = "package P {\npart def A;\n";
+    let result = parse_with_diagnostics(input);
+    assert!(!result.is_ok(), "unterminated package should produce diagnostics");
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.code.as_deref() == Some("missing_closing_brace"))
+        .expect("expected missing closing brace diagnostic");
+    assert_eq!(err.expected.as_deref(), Some("'}'"));
 }
 
 #[test]

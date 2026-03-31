@@ -1,13 +1,14 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    EntryAction, Node, ParseErrorNode, RefBody, RefDecl, StateDef, StateDefBody,
+    EntryAction, Node, RefBody, RefDecl, StateDef, StateDefBody,
     StateDefBodyElement, StateUsage, ThenStmt, Transition,
 };
+use crate::parser::build_recovery_error_node;
 use crate::parser::requirement::doc_comment;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, looks_like_missing_semicolon, name, qualified_name, recover_body_element,
+    identification, name, qualified_name, recover_body_element,
     skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
     STATE_BODY_STARTERS,
 };
@@ -18,17 +19,6 @@ use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
-
-fn recovery_found_snippet(input: Input<'_>) -> Option<String> {
-    let frag = input.fragment();
-    let take = frag
-        .iter()
-        .position(|&b| b == b'\n' || b == b'\r')
-        .unwrap_or(frag.len())
-        .min(60);
-    let snippet = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    if snippet.is_empty() { None } else { Some(snippet) }
-}
 
 fn keyword_state_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -63,6 +53,12 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
     loop {
         let (next, _) = ws_and_comments(input)?;
         input = next;
+        if input.fragment().is_empty() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Eof,
+            )));
+        }
         if input.fragment().starts_with(b"}") {
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
             return Ok((input, StateDefBody::Brace { elements }));
@@ -91,25 +87,12 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
                     next,
                     StateDefBodyElement::Error(Node::new(
                         crate::ast::Span::dummy(),
-                        if looks_like_missing_semicolon(input, STATE_BODY_STARTERS) {
-                            ParseErrorNode {
-                                message: "missing semicolon before next declaration".to_string(),
-                                code: "missing_semicolon".to_string(),
-                                expected: Some("';'".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some("Insert ';' before this declaration.".to_string()),
-                            }
-                        } else {
-                            ParseErrorNode {
-                                message: "recovered state body element".to_string(),
-                                code: "recovered_state_body_element".to_string(),
-                                expected: Some("valid state body element".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Fix this state member and re-run parsing.".to_string(),
-                                ),
-                            }
-                        },
+                        build_recovery_error_node(
+                            input,
+                            STATE_BODY_STARTERS,
+                            "state body",
+                            "recovered_state_body_element",
+                        ),
                     )),
                 ));
                 input = next;

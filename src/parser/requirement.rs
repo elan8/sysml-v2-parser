@@ -3,12 +3,13 @@
 use crate::ast::{
     CommentAnnotation, ConcernUsage, DocComment, FrameMember, Node, RequireConstraint,
     RequirementDef, RequirementDefBody, RequirementDefBodyElement, RequirementUsage,
-    ConstraintBody, ParseErrorNode, SubjectDecl, Satisfy, TextualRepresentation,
+    ConstraintBody, SubjectDecl, Satisfy, TextualRepresentation,
 };
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
+use crate::parser::build_recovery_error_node;
 use crate::parser::lex::{
-    identification, looks_like_missing_semicolon, name, qualified_name, recover_body_element,
+    identification, name, qualified_name, recover_body_element,
     skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws, ws1, ws_and_comments,
     REQUIREMENT_BODY_STARTERS,
 };
@@ -19,21 +20,6 @@ use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
-
-fn recovery_found_snippet(input: Input<'_>) -> Option<String> {
-    let frag = input.fragment();
-    let take = frag
-        .iter()
-        .position(|&b| b == b'\n' || b == b'\r')
-        .unwrap_or(frag.len())
-        .min(60);
-    let snippet = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    if snippet.is_empty() {
-        None
-    } else {
-        Some(snippet)
-    }
-}
 
 fn keyword_requirement_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -68,6 +54,12 @@ fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Requiremen
     loop {
         let (next, _) = ws_and_comments(input)?;
         input = next;
+        if input.fragment().is_empty() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Eof,
+            )));
+        }
         if input.fragment().starts_with(b"}") {
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
             return Ok((input, RequirementDefBody::Brace { elements }));
@@ -96,25 +88,12 @@ fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Requiremen
                     next,
                     RequirementDefBodyElement::Error(Node::new(
                         crate::ast::Span::dummy(),
-                        if looks_like_missing_semicolon(input, REQUIREMENT_BODY_STARTERS) {
-                            ParseErrorNode {
-                                message: "missing semicolon before next declaration".to_string(),
-                                code: "missing_semicolon".to_string(),
-                                expected: Some("';'".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some("Insert ';' before this declaration.".to_string()),
-                            }
-                        } else {
-                            ParseErrorNode {
-                                message: "recovered requirement body element".to_string(),
-                                code: "recovered_requirement_body_element".to_string(),
-                                expected: Some("valid requirement body element".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Fix this requirement member and re-run parsing.".to_string(),
-                                ),
-                            }
-                        },
+                        build_recovery_error_node(
+                            input,
+                            REQUIREMENT_BODY_STARTERS,
+                            "requirement body",
+                            "recovered_requirement_body_element",
+                        ),
                     )),
                 ));
                 input = next;
@@ -154,9 +133,10 @@ fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
 pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
-    let (input, n) = opt(preceded(ws1, name)).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, n) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;    
     let (input, _) = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
         map(
@@ -175,7 +155,7 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
             start,
             input,
             SubjectDecl {
-                name: n.unwrap_or_default(),
+                name: n,
                 type_name,
             },
         ),

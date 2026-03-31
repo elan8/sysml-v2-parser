@@ -4,14 +4,15 @@
 use crate::ast::{
     Allocate, AttributeBody, AttributeUsage, Bind, Connect, ConnectBody, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
     InterfaceUsageBodyElement, Node, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
-    PartUsageBody, PartUsageBodyElement, ParseErrorNode, Perform, PerformBody, PerformBodyElement,
+    PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,
     PerformInOutBinding, RefBody, RefDecl,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage, attribute_usage_shorthand};
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::connect_body;
+use crate::parser::build_recovery_error_node;
 use crate::parser::lex::{
-    identification, looks_like_missing_semicolon, name, qualified_name, recover_body_element, skip_until_brace_end,
+    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
     starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments, PART_BODY_STARTERS,
 };
 use nom::sequence::delimited;
@@ -28,21 +29,6 @@ use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::Parser;
 use nom::IResult;
-
-fn recovery_found_snippet(input: Input<'_>) -> Option<String> {
-    let frag = input.fragment();
-    let take = frag
-        .iter()
-        .position(|&b| b == b'\n' || b == b'\r')
-        .unwrap_or(frag.len())
-        .min(60);
-    let snippet = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    if snippet.is_empty() {
-        None
-    } else {
-        Some(snippet)
-    }
-}
 
 /// Result of parsing either a part definition or part usage (used for package body to avoid part_def consuming "part" before part_usage can run).
 #[derive(Debug)]
@@ -64,6 +50,12 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
     loop {
         let (next, _) = ws_and_comments(input)?;
         input = next;
+        if input.fragment().is_empty() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Eof,
+            )));
+        }
         if input.fragment().starts_with(b"}") {
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
             return Ok((input, PartDefBody::Brace { elements }));
@@ -92,28 +84,12 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
                     next,
                     PartDefBodyElement::Error(Node::new(
                         crate::ast::Span::dummy(),
-                        if looks_like_missing_semicolon(input, PART_BODY_STARTERS) {
-                            ParseErrorNode {
-                                message: "missing semicolon before next declaration".to_string(),
-                                code: "missing_semicolon".to_string(),
-                                expected: Some("';'".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Insert ';' before this declaration.".to_string(),
-                                ),
-                            }
-                        } else {
-                            ParseErrorNode {
-                                message: "recovered part definition body element".to_string(),
-                                code: "recovered_part_def_body_element".to_string(),
-                                expected: Some("valid part definition body element".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Fix this part definition member and re-run parsing."
-                                        .to_string(),
-                                ),
-                            }
-                        },
+                        build_recovery_error_node(
+                            input,
+                            PART_BODY_STARTERS,
+                            "part definition body",
+                            "recovered_part_def_body_element",
+                        ),
                     )),
                 ));
                 input = next;
@@ -478,6 +454,12 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
     loop {
         let (next, _) = ws_and_comments(input)?;
         input = next;
+        if input.fragment().is_empty() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Eof,
+            )));
+        }
         if input.fragment().starts_with(b"}") {
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
             log::debug!("part_usage_body: brace ok, {} elements", elements.len());
@@ -507,27 +489,12 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
                     next,
                     PartUsageBodyElement::Error(Node::new(
                         crate::ast::Span::dummy(),
-                        if looks_like_missing_semicolon(input, PART_BODY_STARTERS) {
-                            ParseErrorNode {
-                                message: "missing semicolon before next declaration".to_string(),
-                                code: "missing_semicolon".to_string(),
-                                expected: Some("';'".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Insert ';' before this declaration.".to_string(),
-                                ),
-                            }
-                        } else {
-                            ParseErrorNode {
-                                message: "recovered part usage body element".to_string(),
-                                code: "recovered_part_usage_body_element".to_string(),
-                                expected: Some("valid part usage body element".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Fix this part usage member and re-run parsing.".to_string(),
-                                ),
-                            }
-                        },
+                        build_recovery_error_node(
+                            input,
+                            PART_BODY_STARTERS,
+                            "part usage body",
+                            "recovered_part_usage_body_element",
+                        ),
                     )),
                 ));
                 input = next;

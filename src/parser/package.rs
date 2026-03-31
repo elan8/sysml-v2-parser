@@ -2,7 +2,7 @@
 
 use crate::ast::{
     ExtendedLibraryDecl, FilterMember, KermlFeatureDecl, KermlSemanticDecl, LibraryPackage,
-    NamespaceDecl, Node, Package, PackageBody, PackageBodyElement, ParseErrorNode, RootElement,
+    NamespaceDecl, Node, Package, PackageBody, PackageBodyElement, RootElement,
     RootNamespace, Visibility,
 };
 use crate::parser::action::{action_def, action_usage};
@@ -28,7 +28,7 @@ use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::interface::interface_def;
 use crate::parser::lex::{
-    identification, looks_like_missing_semicolon, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
+    identification, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
     starts_with_keyword, ws1, ws_and_comments, PACKAGE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -44,6 +44,7 @@ use crate::parser::usecase::{actor_decl, use_case_def, use_case_usage};
 use crate::parser::view::{
     rendering_def, rendering_usage, view_def, view_usage, viewpoint_def, viewpoint_usage,
 };
+use crate::parser::build_recovery_error_node;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -52,21 +53,6 @@ use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::Parser;
 use nom::IResult;
-
-fn recovery_found_snippet(input: Input<'_>) -> Option<String> {
-    let frag = input.fragment();
-    let take = frag
-        .iter()
-        .position(|&b| b == b'\n' || b == b'\r')
-        .unwrap_or(frag.len())
-        .min(60);
-    let snippet = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    if snippet.is_empty() {
-        None
-    } else {
-        Some(snippet)
-    }
-}
 
 /// Keyword "package" with following whitespace.
 fn keyword_package(input: Input<'_>) -> IResult<Input<'_>, ()> {
@@ -368,7 +354,10 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
         let (next, _) = ws_and_comments(input)?;
         input = next;
         if input.fragment().is_empty() {
-            return Ok((input, PackageBody::Brace { elements }));
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Eof,
+            )));
         }
         if input.fragment().starts_with(b"}") {
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
@@ -409,28 +398,12 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
                     next,
                     PackageBodyElement::Error(Node::new(
                         crate::ast::Span::dummy(),
-                        if looks_like_missing_semicolon(input, PACKAGE_BODY_STARTERS) {
-                            ParseErrorNode {
-                                message: "missing semicolon before next declaration".to_string(),
-                                code: "missing_semicolon".to_string(),
-                                expected: Some("';'".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Insert ';' before this declaration.".to_string(),
-                                ),
-                            }
-                        } else {
-                            ParseErrorNode {
-                                message: "recovered package body element".to_string(),
-                                code: "recovered_package_body_element".to_string(),
-                                expected: Some("valid package body element".to_string()),
-                                found: recovery_found_snippet(input),
-                                suggestion: Some(
-                                    "Fix this declaration so parsing can continue cleanly."
-                                        .to_string(),
-                                ),
-                            }
-                        },
+                        build_recovery_error_node(
+                            input,
+                            PACKAGE_BODY_STARTERS,
+                            "package body",
+                            "recovered_package_body_element",
+                        ),
                     )),
                 ));
                 input = next;
