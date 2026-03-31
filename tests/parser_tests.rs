@@ -1,5 +1,7 @@
 //! TDD tests: SysML snippets with expected AST.
 
+use std::path::PathBuf;
+
 use sysml_parser::ast::{
     Identification, LibraryPackage, Node, Package, PackageBody, PackageBodyElement,
     RenderingDefBody, RootElement, RootNamespace, Span, ViewBody, ViewDefBody,
@@ -11,6 +13,17 @@ fn id(name: &str) -> Identification {
         short_name: None,
         name: Some(name.to_string()),
     }
+}
+
+fn primitive_data_types_fixture() -> Option<String> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("sysml-v2-release")
+        .join("sysml")
+        .join("src")
+        .join("validation")
+        .join("15-Properties-Values-Expressions")
+        .join("15_10-Primitive Data Types.sysml");
+    std::fs::read_to_string(path).ok()
 }
 
 /// Node with span matching parser output for full-input parses (offset 0, line 1, column 1).
@@ -909,14 +922,14 @@ fn test_parse_package_with_quoted_name() {
 
 #[test]
 fn test_parse_primitive_data_types_validation_fixture() {
-    let input = include_str!(
-        "../sysml-v2-release/sysml/src/validation/15-Properties-Values-Expressions/15_10-Primitive Data Types.sysml"
-    );
-    let result = parse(input);
+    let Some(input) = primitive_data_types_fixture() else {
+        return;
+    };
+    let result = parse(&input);
     assert!(
         result.is_ok(),
         "fixture should parse cleanly; diagnostics: {:?}",
-        parse_with_diagnostics(input).errors
+        parse_with_diagnostics(&input).errors
     );
 }
 
