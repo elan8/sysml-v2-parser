@@ -76,3 +76,6 @@ mod traffic_light_intersection;
 
 #[path = "validation/kitchen_timer.rs"]
 mod kitchen_timer;
+
+#[path = "validation/use_case_ast_shapes.rs"]
+mod use_case_ast_shapes;

@@ -1,8 +1,10 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    ActorDecl, ActorUsage, Node, Objective, ParseErrorNode, UseCaseDef, UseCaseDefBody,
-    UseCaseDefBodyElement, UseCaseUsage,
+    ActorDecl, ActorRedefinitionAssignment, ActorUsage, FirstSuccession, IncludeUseCase, Node,
+    Objective, ParseErrorNode, RefRedefinition, ReturnRef, SubjectRef, ThenDone,
+    ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement,
+    UseCaseUsage,
 };
 use crate::parser::build_recovery_error_node;
 use crate::parser::lex::{
@@ -18,6 +20,199 @@ use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::{IResult, Parser};
+
+fn slice_text(start: Input<'_>, end: Input<'_>) -> String {
+    let delta = end
+        .location_offset()
+        .saturating_sub(start.location_offset());
+    let bytes = start.fragment();
+    let take = delta.min(bytes.len());
+    String::from_utf8_lossy(&bytes[..take]).trim().to_string()
+}
+
+fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, _) = ws_and_comments(input)?;
+    let frag = input.fragment();
+    if !frag.starts_with(b"[") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // Reuse the generic block skipper by treating the [...] as a statement up to a `]`.
+    let mut i = 0usize;
+    while i < frag.len() && frag[i] != b']' {
+        i += 1;
+    }
+    if i >= frag.len() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Eof,
+        )));
+    }
+    let s = String::from_utf8_lossy(&frag[..=i]).trim().to_string();
+    let (input, _) = nom::bytes::complete::take(i + 1usize).parse(input)?;
+    Ok((input, s))
+}
+
+fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((input, node_from_to(start, input, SubjectRef {})))
+}
+
+fn first_succession(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, target) = name(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((input, node_from_to(start, input, FirstSuccession { target })))
+}
+
+fn then_done(input: Input<'_>) -> IResult<Input<'_>, Node<ThenDone>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, _) = tag(&b"done"[..]).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((input, node_from_to(start, input, ThenDone {})))
+}
+
+fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"include"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, n) = name(input)?;
+    let (input, mult) = opt(multiplicity).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, body) = use_case_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            IncludeUseCase {
+                name: n,
+                multiplicity: mult,
+                body,
+            },
+        ),
+    ))
+}
+
+fn then_include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<ThenIncludeUseCase>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, include) = include_use_case(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, ThenIncludeUseCase { include }),
+    ))
+}
+
+fn use_case_usage_in_body(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUsage>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"use"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, _) = tag(&b"case"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, ident) = name(input)?;
+    let (input, type_name) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
+            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            (input, Some(type_name))
+        } else {
+            (input, None)
+        }
+    };
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, body) = use_case_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            UseCaseUsage {
+                name: ident,
+                type_name,
+                body,
+            },
+        ),
+    ))
+}
+
+fn then_use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ThenUseCaseUsage>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, use_case) = use_case_usage_in_body(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, ThenUseCaseUsage { use_case }),
+    ))
+}
+
+fn actor_redefinition_assignment(input: Input<'_>) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"actor"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b":>>"[..]).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, n) = name(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+    let (input, rhs) = take_until_terminator(input, b";")?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, ActorRedefinitionAssignment { name: n, rhs }),
+    ))
+}
+
+fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"ref"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b":>>"[..]).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, n) = name(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let body_start = input;
+    let (input, _) = skip_statement_or_block(input)?;
+    let body = slice_text(body_start, input);
+    Ok((input, node_from_to(start, input, RefRedefinition { name: n, body })))
+}
+
+fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, _) = tag(&b"ref"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, n) = name(input)?;
+    let (input, mult) = opt(multiplicity).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let body_start = input;
+    let (input, _) = skip_statement_or_block(input)?;
+    let body = slice_text(body_start, input);
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ReturnRef {
+                name: n,
+                multiplicity: mult,
+                body,
+            },
+        ),
+    ))
+}
 
 fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBodyElement> {
     let (input, _) = ws_and_comments(input)?;
@@ -240,8 +435,20 @@ pub(crate) fn use_case_def_body_element(
     let (input, elem) = alt((
         map(doc_comment, UseCaseDefBodyElement::Doc),
         map(subject_decl, UseCaseDefBodyElement::SubjectDecl),
+        map(subject_ref, UseCaseDefBodyElement::SubjectRef),
         map(actor_usage, UseCaseDefBodyElement::ActorUsage),
+        map(
+            actor_redefinition_assignment,
+            UseCaseDefBodyElement::ActorRedefinitionAssignment,
+        ),
         map(objective, UseCaseDefBodyElement::Objective),
+        map(first_succession, UseCaseDefBodyElement::FirstSuccession),
+        map(then_done, UseCaseDefBodyElement::ThenDone),
+        map(then_include_use_case, UseCaseDefBodyElement::ThenIncludeUseCase),
+        map(then_use_case_usage, UseCaseDefBodyElement::ThenUseCaseUsage),
+        map(include_use_case, UseCaseDefBodyElement::IncludeUseCase),
+        map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
+        map(return_ref, UseCaseDefBodyElement::ReturnRef),
         other_use_case_body_element,
     ))
     .parse(input)?;

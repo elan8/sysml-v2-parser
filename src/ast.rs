@@ -1125,6 +1125,66 @@ pub enum UseCaseDefBody {
     },
 }
 
+/// `first <name>;` inside a case/use-case body (used in SysML v2 release fixtures).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FirstSuccession {
+    pub target: String,
+}
+
+/// `then done;` inside a case/use-case body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenDone {}
+
+/// `include <usecase> ...` inside a case/use-case body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncludeUseCase {
+    pub name: String,
+    /// Optional multiplicity suffix like `[0..*]` captured as raw text including brackets.
+    pub multiplicity: Option<String>,
+    pub body: UseCaseDefBody,
+}
+
+/// `then include <usecase> ...` inside a case/use-case body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenIncludeUseCase {
+    pub include: Node<IncludeUseCase>,
+}
+
+/// `then use case <name> ...` inside a case/use-case body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenUseCaseUsage {
+    pub use_case: Node<UseCaseUsage>,
+}
+
+/// `subject;` shorthand used in SysML v2 release fixtures (subject of an enclosing case/use case).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubjectRef {}
+
+/// `actor :>> <name> = <expr>;` redefinition/assignment used in SysML v2 release fixtures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorRedefinitionAssignment {
+    pub name: String,
+    /// Raw RHS expression text up to `;` (we don't model the expression grammar here yet).
+    pub rhs: String,
+}
+
+/// `ref :>> <name> { ... }` redefinition used in SysML v2 release fixtures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefRedefinition {
+    pub name: String,
+    /// Raw body text for now (balanced `{ ... }` including nested braces).
+    pub body: String,
+}
+
+/// `return ref <name><multiplicity?> { ... }` used in SysML v2 release libraries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReturnRef {
+    pub name: String,
+    pub multiplicity: Option<String>,
+    /// Raw body text for now (balanced `{ ... }` including nested braces).
+    pub body: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UseCaseDefBodyElement {
     Error(Node<ParseErrorNode>),
@@ -1132,8 +1192,18 @@ pub enum UseCaseDefBodyElement {
     Other(String),
     Doc(Node<DocComment>),
     SubjectDecl(Node<SubjectDecl>),
+    /// `subject;` shorthand.
+    SubjectRef(Node<SubjectRef>),
     ActorUsage(Node<ActorUsage>),
+    ActorRedefinitionAssignment(Node<ActorRedefinitionAssignment>),
     Objective(Node<Objective>),
+    FirstSuccession(Node<FirstSuccession>),
+    ThenIncludeUseCase(Node<ThenIncludeUseCase>),
+    ThenUseCaseUsage(Node<ThenUseCaseUsage>),
+    ThenDone(Node<ThenDone>),
+    IncludeUseCase(Node<IncludeUseCase>),
+    RefRedefinition(Node<RefRedefinition>),
+    ReturnRef(Node<ReturnRef>),
 }
 
 /// actor usage `actor pilot : Operator;`
