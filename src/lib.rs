@@ -34,3 +34,11 @@ pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
 pub fn parse(input: &str) -> Result<RootNamespace, ParseError> {
     parse_root(input)
 }
+
+/// Parse for editor/LSP use: returns a partial AST plus diagnostics.
+///
+/// Prefer this over [`parse_root`] when you want IDE features (outline/hover/semantic tokens) to
+/// keep working even when the file contains syntax errors.
+pub fn parse_for_editor(input: &str) -> ParseResult {
+    parse_with_diagnostics(input)
+}

@@ -261,6 +261,41 @@ action def ExecutePatrol {
 }
 
 #[test]
+fn test_parse_with_diagnostics_recovers_and_reports_later_errors() {
+    // Intentionally malformed body statements (unknown keywords) followed by a valid member.
+    // The goal is to ensure we report multiple diagnostics and still parse later valid elements.
+    let input = r#"package P {
+action def A {
+  badstmt {};
+  badstmt2 {};
+}
+action def B { }
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.len() >= 2,
+        "expected 2+ diagnostics, got: {:?}",
+        result.errors
+    );
+
+    // Ensure we still parsed the later action def `B`.
+    let pkg = match &result.root.elements[0].value {
+        sysml_parser::ast::RootElement::Package(p) => &p.value,
+        _ => panic!("expected package root element"),
+    };
+    let sysml_parser::ast::PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let has_b = elements.iter().any(|e| match &e.value {
+        sysml_parser::ast::PackageBodyElement::ActionDef(a) => {
+            a.value.identification.name.as_deref() == Some("B")
+        }
+        _ => false,
+    });
+    assert!(has_b, "expected later ActionDef `B` to still be parsed");
+}
+
+#[test]
 fn test_library_abstract_action_feature_decl_parses_without_diagnostics() {
     // Representative Systems Library syntax (Actions.sysml): abstract action feature with typing,
     // multiplicity, modifier, and specialization, with a doc-only body.
