@@ -100,7 +100,19 @@ pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
 pub(crate) const STATE_BODY_STARTERS: &[&[u8]] =
     &[b"doc", b"entry", b"ref", b"state", b"then", b"transition"];
 
-pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[b"actor", b"doc", b"objective", b"subject"];
+pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
+    b"abstract",
+    b"actor",
+    b"case",
+    b"doc",
+    b"first",
+    b"include",
+    b"objective",
+    b"ref",
+    b"return",
+    b"subject",
+    b"then",
+];
 
 pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[b"doc", b"in", b"out"];
 

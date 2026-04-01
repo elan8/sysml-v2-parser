@@ -1,9 +1,10 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    ActorDecl, ActorUsage, Node, Objective, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement,
-    UseCaseUsage,
+    ActorDecl, ActorUsage, Node, Objective, ParseErrorNode, UseCaseDef, UseCaseDefBody,
+    UseCaseDefBodyElement, UseCaseUsage,
 };
+use crate::parser::build_recovery_error_node;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_until_brace_end,
     skip_statement_or_block, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
@@ -17,6 +18,44 @@ use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::{IResult, Parser};
+
+fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBodyElement> {
+    let (input, _) = ws_and_comments(input)?;
+    let start_after_ws = input;
+
+    // If this looks like a genuine syntax error we have a targeted diagnostic for (e.g. `actor: User;`),
+    // let the body recovery path create an `Error` element so `parse_with_diagnostics` surfaces it.
+    let trimmed = start_after_ws.fragment();
+    let is_redefinition = trimmed.windows(3).any(|w| w == b":>>");
+    let diag = build_recovery_error_node(
+        start_after_ws,
+        USE_CASE_BODY_STARTERS,
+        "use case body",
+        "recovered_use_case_body_element",
+    );
+    if matches!(
+        diag.code.as_str(),
+        "missing_member_name" | "missing_type_reference"
+    ) && !is_redefinition
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start_after_ws,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
+    let (input, _) = skip_statement_or_block(input)?;
+    if input.location_offset() == start_after_ws.location_offset() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start_after_ws,
+            nom::error::ErrorKind::Many0,
+        )));
+    }
+    let frag = start_after_ws.fragment();
+    let take = frag.len().min(80);
+    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+    Ok((input, UseCaseDefBodyElement::Other(preview)))
+}
 
 pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActorDecl>> {
     let start = input;
@@ -144,23 +183,49 @@ fn use_case_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBod
             Err(_) => {
                 // Library analysis-case bodies contain many constructs we don't model yet (e.g. `objective name : Type { ... }`,
                 // feature redefinitions with `:>>`, nested calcs/returns). Skip one statement/block to keep parsing stable
-                // without emitting a diagnostic for every unsupported line.
+                // but still emit a recoverable diagnostic for malformed or unsupported members.
                 let start_unknown = input;
-                let (next, _) = skip_statement_or_block(input)?;
+                let (next, _) = recover_body_element(input, USE_CASE_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
                     // Fall back to aborting this body to avoid infinite loops.
                     let (input, _) = skip_until_brace_end(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, UseCaseDefBody::Brace { elements }));
                 }
-                let frag = start_unknown.fragment();
-                let take = frag.len().min(60);
-                let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-                elements.push(node_from_to(
+                // Emit diagnostics only for likely-user mistakes. The SysML v2 release libraries and
+                // validation fixtures use many valid constructs we don't fully model yet (notably `:>>`
+                // redefinitions); those should be captured as `Other` without diagnostics so strict
+                // suites can remain diagnostic-free.
+                let trimmed = start_unknown.fragment();
+                let is_redefinition = trimmed.windows(3).any(|w| w == b":>>");
+                let recovery = build_recovery_error_node(
                     start_unknown,
-                    next,
-                    UseCaseDefBodyElement::Other(preview),
-                ));
+                    USE_CASE_BODY_STARTERS,
+                    "use case body",
+                    "recovered_use_case_body_element",
+                );
+                let should_error = matches!(
+                    recovery.code.as_str(),
+                    "missing_member_name" | "missing_type_reference"
+                ) && !is_redefinition;
+
+                if should_error {
+                    let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
+                    elements.push(node_from_to(
+                        start_unknown,
+                        next,
+                        UseCaseDefBodyElement::Error(node),
+                    ));
+                } else {
+                    let frag = start_unknown.fragment();
+                    let take = frag.len().min(80);
+                    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+                    elements.push(node_from_to(
+                        start_unknown,
+                        next,
+                        UseCaseDefBodyElement::Other(preview),
+                    ));
+                }
                 input = next;
             }
         }
@@ -177,6 +242,7 @@ pub(crate) fn use_case_def_body_element(
         map(subject_decl, UseCaseDefBodyElement::SubjectDecl),
         map(actor_usage, UseCaseDefBodyElement::ActorUsage),
         map(objective, UseCaseDefBodyElement::Objective),
+        other_use_case_body_element,
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
