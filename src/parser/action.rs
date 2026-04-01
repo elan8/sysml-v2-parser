@@ -42,6 +42,12 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"event",
 ];
 
+fn doc_comment_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::DocComment>> {
+    let (input, doc) = crate::parser::requirement::doc_comment(input)?;
+    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
+    Ok((input, doc))
+}
+
 fn optional_multiplicity_brackets(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = opt(preceded(
         ws_and_comments,
@@ -433,7 +439,6 @@ fn action_def_body_element(
 ) -> IResult<Input<'_>, Node<crate::ast::ActionDefBodyElement>> {
     use crate::ast::ActionDefBodyElement;
     use crate::parser::part::perform_action_decl;
-    use crate::parser::requirement::doc_comment;
     use crate::parser::state::state_usage;
 
     let (input, _) = ws_and_comments(input)?;
@@ -444,7 +449,7 @@ fn action_def_body_element(
         map(then_action, ActionDefBodyElement::ThenAction),
         map(action_body_decl, ActionDefBodyElement::Decl),
         map(in_out_decl, ActionDefBodyElement::InOutDecl),
-        map(doc_comment, ActionDefBodyElement::Doc),
+        map(doc_comment_stmt, ActionDefBodyElement::Doc),
         map(action_ref_decl, ActionDefBodyElement::RefDecl),
         map(perform_action_decl, ActionDefBodyElement::Perform),
         map(bind_, ActionDefBodyElement::Bind),
@@ -621,7 +626,6 @@ fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBo
 
 /// Action usage body element: InOutDecl | Bind | Flow | FirstStmt | MergeStmt | ActionUsage
 fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsageBodyElement>> {
-    use crate::parser::requirement::doc_comment;
     use crate::parser::state::state_usage;
 
     let (input, _) = ws_and_comments(input)?;
@@ -632,7 +636,7 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         map(then_action, ActionUsageBodyElement::ThenAction),
         map(action_body_decl, ActionUsageBodyElement::Decl),
         map(in_out_decl, ActionUsageBodyElement::InOutDecl),
-        map(doc_comment, ActionUsageBodyElement::Doc),
+        map(doc_comment_stmt, ActionUsageBodyElement::Doc),
         map(action_ref_decl, ActionUsageBodyElement::RefDecl),
         map(bind_, ActionUsageBodyElement::Bind),
         map(flow_, ActionUsageBodyElement::Flow),
