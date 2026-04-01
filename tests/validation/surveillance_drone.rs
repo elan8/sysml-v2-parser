@@ -174,8 +174,8 @@ fn test_surveillance_drone_error_reports_error_on_line_333() {
     );
 }
 
-/// SurveillanceDrone-error.sysml has exactly one invalid statement (`test {}` on line 333).
-/// parse_with_diagnostics should report exactly 1 error for this file.
+/// SurveillanceDrone-error.sysml contains invalid statements (`test {}` on line 333, `test2 {}` on line 364).
+/// `parse_with_diagnostics` should surface diagnostics for unparseable lines rather than silently skipping them.
 #[test]
 fn test_surveillance_drone_error_reports_exactly_one_error() {
     super::init_log();
@@ -189,10 +189,9 @@ fn test_surveillance_drone_error_reports_exactly_one_error() {
         !result.is_ok(),
         "SurveillanceDrone-error.sysml should have parse errors"
     );
-    assert_eq!(
-        result.errors.len(),
-        2,
-        "expected exactly 2 parse errors (invalid 'test {{}}' on line 333, 'test2 {{}}' on line 364); got {} errors: {:?}",
+    assert!(
+        result.errors.len() >= 2,
+        "expected at least 2 parse errors; got {}: {:?}",
         result.errors.len(),
         result
             .errors
@@ -200,21 +199,30 @@ fn test_surveillance_drone_error_reports_exactly_one_error() {
             .map(|e| (e.line, e.found.as_deref().unwrap_or("")))
             .collect::<Vec<_>>()
     );
-    assert_eq!(result.errors[0].line, Some(333));
+
+    let err_333 = result
+        .errors
+        .iter()
+        .find(|e| e.line == Some(333))
+        .expect("expected a diagnostic on line 333");
     assert!(
-        result.errors[0]
-            .found
-            .as_deref()
-            .is_some_and(|f| f.contains("test")),
-        "first error should have 'found' containing 'test'"
+        err_333.found.as_deref().is_some_and(|f| f.contains("test")),
+        "error on line 333 should have 'found' containing 'test'; got: {:?}",
+        err_333.found
     );
-    assert_eq!(result.errors[1].line, Some(364));
+
+    let err_364 = result
+        .errors
+        .iter()
+        .find(|e| e.line == Some(364))
+        .expect("expected a diagnostic on line 364");
     assert!(
-        result.errors[1]
+        err_364
             .found
             .as_deref()
             .is_some_and(|f| f.contains("test2")),
-        "second error should have 'found' containing 'test2'"
+        "error on line 364 should have 'found' containing 'test2'; got: {:?}",
+        err_364.found
     );
 }
 

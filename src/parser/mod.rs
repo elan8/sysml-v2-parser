@@ -844,41 +844,6 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
 
 const MAX_RECOVERY_ERRORS: usize = 100;
 
-/// When inside a package, we only report errors that look like invalid top-level elements:
-/// e.g. `test {}`, `test2 {}`, `xyz {}`. We skip reporting when the found snippet looks
-/// like valid nested content (e.g. `transition ...`, `totalThrust >= ...`, `}`, `//`).
-fn should_report_error_inside_package(found: &str) -> bool {
-    let trimmed = found.trim_start();
-    // Valid package body starters - don't report
-    if trimmed.starts_with('}')
-        || trimmed.starts_with("//")
-        || trimmed.starts_with("/*")
-        || trimmed.starts_with("//*")
-        || lex::starts_with_any_keyword(trimmed.as_bytes(), lex::PACKAGE_BODY_STARTERS)
-        || trimmed.starts_with("abstract ")
-        || trimmed.starts_with("in ")
-        || trimmed.starts_with("out ")
-        || trimmed.starts_with("perform ")
-        || trimmed.starts_with("transition ")
-    {
-        return false;
-    }
-    // Nested content (state machine, constraint body, etc.) - don't report
-    if trimmed.contains(" >= ")
-        || trimmed.contains(" == ")
-        || trimmed.contains(" then ")
-        || trimmed.contains(" first ")
-        || trimmed.contains(" / ")
-        || trimmed.contains(" * ")
-        || trimmed.contains(" + ")
-        || trimmed.contains(" - ")
-    {
-        return false;
-    }
-    // Likely invalid top-level: identifier followed by {} (e.g. test {}, test2 {}, xyz {})
-    trimmed.contains(" {}")
-}
-
 /// Parse input with error recovery: collects multiple diagnostics and returns a partial AST when errors occur.
 /// Use this for language servers so the user sees all parse errors and features (e.g. hover) can use the partial AST.
 pub fn parse_with_diagnostics(input: &str) -> ParseResult {
@@ -917,19 +882,7 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
                 let pe = missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
                     nom_err_to_parse_error(&e, None, Some("'package', 'namespace', or 'import'"))
                 });
-                let consumed = &bytes[..e.input.location_offset()];
-                let opens = consumed.iter().filter(|&&b| b == b'{').count();
-                let closes = consumed.iter().filter(|&&b| b == b'}').count();
-                let depth = opens.saturating_sub(closes);
-                // When inside a package, only add errors for invalid identifiers (e.g. "test", "test2"),
-                // not for valid syntax we hit while skipping (e.g. "}", "//", "part def").
-                let is_inside_package = depth > 0;
-                let should_report = pe.code.as_deref() == Some("missing_closing_brace")
-                    || !is_inside_package
-                    || should_report_error_inside_package(pe.found.as_deref().unwrap_or(""));
-                if should_report {
-                    errors.push(pe);
-                }
+                errors.push(pe);
                 let skip_result = lex::skip_to_next_sync_point(e.input);
                 match skip_result {
                     Ok((rest, _)) => input = rest,
