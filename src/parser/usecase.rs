@@ -449,6 +449,9 @@ pub(crate) fn use_case_def_body_element(
         map(include_use_case, UseCaseDefBodyElement::IncludeUseCase),
         map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
         map(return_ref, UseCaseDefBodyElement::ReturnRef),
+        map(crate::parser::action::assign_stmt, UseCaseDefBodyElement::Assign),
+        map(crate::parser::action::for_loop, UseCaseDefBodyElement::ForLoop),
+        map(crate::parser::action::then_action, UseCaseDefBodyElement::ThenAction),
         other_use_case_body_element,
     ))
     .parse(input)?;

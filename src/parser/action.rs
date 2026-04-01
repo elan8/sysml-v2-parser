@@ -1,8 +1,9 @@
 //! Action definition and action usage parsing (function-based behavior).
 
 use crate::ast::{
-    ActionDef, ActionDefBody, ActionUsage, ActionUsageBody, ActionUsageBodyElement, FirstMergeBody,
-    FirstStmt, Flow, InOut, InOutDecl, MergeStmt, Node,
+    ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
+    ActionUsageBodyElement, AssignStmt, FirstMergeBody, FirstStmt, Flow, ForLoop, InOut, InOutDecl,
+    MergeStmt, Node, ParseErrorNode, ThenAction,
 };
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
@@ -10,6 +11,7 @@ use crate::parser::lex::{
     identification, name, qualified_name, skip_until_brace_end, skip_statement_or_block,
     take_until_terminator, ws1, ws_and_comments,
 };
+use crate::parser::build_recovery_error_node;
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::with_span;
@@ -20,6 +22,25 @@ use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded};
 use nom::IResult;
 use nom::Parser;
+
+const ACTION_BODY_STARTERS: &[&[u8]] = &[
+    b"in",
+    b"out",
+    b"ref",
+    b"perform",
+    b"bind",
+    b"flow",
+    b"first",
+    b"merge",
+    b"state",
+    b"assign",
+    b"then",
+    b"for",
+    b"action",
+    b"attribute",
+    b"calc",
+    b"event",
+];
 
 fn optional_multiplicity_brackets(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = opt(preceded(
@@ -53,9 +74,10 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    // Optional multiplicity right after the name: `var[0..1]`
+    // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
+    let (input, parsed_name) = opt(with_span(name)).parse(input)?;
     let (input, _) = optional_multiplicity_brackets(input)?;
+    let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
     // Standard library uses either `:` typing, `:>` specialization-like typing, or `:>>` feature redefinition.
     let (input, uses_shift) = preceded(
@@ -147,6 +169,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
     let (input, direction) = alt((
         map(preceded(tag(&b"in"[..]), ws1), |_| InOut::In),
         map(preceded(tag(&b"out"[..]), ws1), |_| InOut::Out),
+        map(preceded(tag(&b"inout"[..]), ws1), |_| InOut::InOut),
     ))
     .parse(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"attribute"[..]), ws1)).parse(input)?;
@@ -258,7 +281,7 @@ fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
     .parse(input)
 }
 
-fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
+pub(crate) fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
     let (mut input, _) = tag(&b"{"[..]).parse(input)?;
     let mut elements = Vec::new();
     loop {
@@ -286,10 +309,6 @@ fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> 
                 input = next;
             }
             Err(_) => {
-                // Action bodies in the standard library include many behavioral statements we don't
-                // model yet (e.g. `assign`, `while`, `then private action ...`). Instead of aborting
-                // the enclosing action definition (which cascades into top-level errors), skip one
-                // statement/block and keep it as a non-diagnostic `Other(...)` element.
                 let start_unknown = input;
                 let (next, _) = skip_statement_or_block(input)?;
                 if next.location_offset() == start_unknown.location_offset() {
@@ -298,18 +317,111 @@ fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> 
                         nom::error::ErrorKind::Many0,
                     )));
                 }
-                let frag = start_unknown.fragment();
-                let take = frag.len().min(60);
-                let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+                let recovery = build_recovery_error_node(
+                    start_unknown,
+                    ACTION_BODY_STARTERS,
+                    "action body",
+                    "recovered_action_body_element",
+                );
+                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
                 elements.push(node_from_to(
                     start_unknown,
                     next,
-                    crate::ast::ActionDefBodyElement::Other(preview),
+                    ActionDefBodyElement::Error(node),
                 ));
                 input = next;
             }
         }
     }
+}
+
+fn slice_text(start: Input<'_>, end: Input<'_>) -> String {
+    let delta = end
+        .location_offset()
+        .saturating_sub(start.location_offset());
+    let bytes = start.fragment();
+    let take = delta.min(bytes.len());
+    String::from_utf8_lossy(&bytes[..take]).trim().to_string()
+}
+
+pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStmt>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, is_then) = opt(map(preceded(tag(&b"then"[..]), ws1), |_| true)).parse(input)?;
+    let is_then = is_then.unwrap_or(false);
+    let (input, _) = tag(&b"assign"[..]).parse(input)?;
+    let (mut input, _) = ws1(input)?;
+
+    // LHS: consume up to `:=`
+    let frag = input.fragment();
+    let mut pos = 0usize;
+    while pos + 1 < frag.len() {
+        if frag[pos] == b':' && frag[pos + 1] == b'=' {
+            break;
+        }
+        pos += 1;
+    }
+    if pos + 1 >= frag.len() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (after_lhs, _) = nom::bytes::complete::take(pos).parse(input)?;
+    let lhs = slice_text(input, after_lhs);
+    let (after_colon_eq, _) = tag(&b":="[..]).parse(after_lhs)?;
+    input = after_colon_eq;
+
+    // RHS: consume up to `;`
+    let (after_rhs, rhs) = take_until_terminator(input, b";")?;
+    let (after_semi, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(after_rhs)?;
+
+    Ok((
+        after_semi,
+        node_from_to(
+            start,
+            after_semi,
+            AssignStmt {
+                is_then,
+                lhs,
+                rhs,
+            },
+        ),
+    ))
+}
+
+pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"for"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, var) = name(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"in"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, range) = take_until_terminator(input, b"{")?;
+    let (input, body) = action_def_body_brace(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, ForLoop { var, range, body }),
+    ))
+}
+
+pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenAction>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"then"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, _) = opt(alt((
+        preceded(tag(&b"public"[..]), ws1),
+        preceded(tag(&b"private"[..]), ws1),
+        preceded(tag(&b"protected"[..]), ws1),
+    )))
+    .parse(input)?;
+    let (input, action) = action_usage(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, ThenAction { action }),
+    ))
 }
 
 /// Element inside an action definition body.
@@ -327,6 +439,10 @@ fn action_def_body_element(
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     let (input, elem) = nom::branch::alt((
+        map(assign_stmt, ActionDefBodyElement::Assign),
+        map(for_loop, ActionDefBodyElement::ForLoop),
+        map(then_action, ActionDefBodyElement::ThenAction),
+        map(action_body_decl, ActionDefBodyElement::Decl),
         map(in_out_decl, ActionDefBodyElement::InOutDecl),
         map(doc_comment, ActionDefBodyElement::Doc),
         map(action_ref_decl, ActionDefBodyElement::RefDecl),
@@ -336,7 +452,7 @@ fn action_def_body_element(
         map(first_stmt, ActionDefBodyElement::FirstStmt),
         map(merge_stmt, ActionDefBodyElement::MergeStmt),
         map(state_usage, ActionDefBodyElement::StateUsage),
-        map(action_usage, |a| {
+        map(visibility_action_usage, |a| {
             ActionDefBodyElement::ActionUsage(Box::new(a))
         }),
     ))
@@ -485,13 +601,17 @@ fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBo
                         nom::error::ErrorKind::Many0,
                     )));
                 }
-                let frag = start_unknown.fragment();
-                let take = frag.len().min(60);
-                let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+                let recovery = build_recovery_error_node(
+                    start_unknown,
+                    ACTION_BODY_STARTERS,
+                    "action body",
+                    "recovered_action_body_element",
+                );
+                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
                 elements.push(node_from_to(
                     start_unknown,
                     next,
-                    ActionUsageBodyElement::Other(preview),
+                    ActionUsageBodyElement::Error(node),
                 ));
                 input = next;
             }
@@ -501,24 +621,86 @@ fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBo
 
 /// Action usage body element: InOutDecl | Bind | Flow | FirstStmt | MergeStmt | ActionUsage
 fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsageBodyElement>> {
+    use crate::parser::requirement::doc_comment;
     use crate::parser::state::state_usage;
 
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     let (input, elem) = alt((
+        map(assign_stmt, ActionUsageBodyElement::Assign),
+        map(for_loop, ActionUsageBodyElement::ForLoop),
+        map(then_action, ActionUsageBodyElement::ThenAction),
+        map(action_body_decl, ActionUsageBodyElement::Decl),
         map(in_out_decl, ActionUsageBodyElement::InOutDecl),
+        map(doc_comment, ActionUsageBodyElement::Doc),
         map(action_ref_decl, ActionUsageBodyElement::RefDecl),
         map(bind_, ActionUsageBodyElement::Bind),
         map(flow_, ActionUsageBodyElement::Flow),
         map(first_stmt, ActionUsageBodyElement::FirstStmt),
         map(merge_stmt, ActionUsageBodyElement::MergeStmt),
         map(state_usage, ActionUsageBodyElement::StateUsage),
-        map(action_usage, |a| {
+        map(visibility_action_usage, |a| {
             ActionUsageBodyElement::ActionUsage(Box::new(a))
         }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+fn visibility_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = opt(alt((
+        preceded(tag(&b"public"[..]), ws1),
+        preceded(tag(&b"private"[..]), ws1),
+        preceded(tag(&b"protected"[..]), ws1),
+    )))
+    .parse(input)?;
+    action_usage(input)
+}
+
+fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = opt(alt((
+        preceded(tag(&b"public"[..]), ws1),
+        preceded(tag(&b"private"[..]), ws1),
+        preceded(tag(&b"protected"[..]), ws1),
+    )))
+    .parse(input)?;
+    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, keyword) = alt((
+        map(tag(&b"attribute"[..]), |_| "attribute".to_string()),
+        map(tag(&b"calc"[..]), |_| "calc".to_string()),
+        map(tag(&b"event"[..]), |_| "event".to_string()),
+    ))
+    .parse(input)?;
+
+    let (input, text) = take_until_terminator(input, b";{")?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = alt((
+        map(tag(&b";"[..]), |_| ()),
+        map(
+            delimited(
+                tag(&b"{"[..]),
+                skip_until_brace_end,
+                preceded(ws_and_comments, tag(&b"}"[..])),
+            ),
+            |_| (),
+        ),
+    ))
+    .parse(input)?;
+
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ActionBodyDecl {
+                keyword,
+                text,
+            },
+        ),
+    ))
 }
 
 /// Action usage: `action` name ( `:` type_name ( `accept` param `:` param_type )? | `accept` param_name `:` param_type )? body

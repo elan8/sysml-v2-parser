@@ -818,9 +818,6 @@ pub enum ActionDefBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionDefBodyElement {
     Error(Node<ParseErrorNode>),
-    /// Unmodeled action-body element captured as raw text (used to keep parsing the standard library
-    /// without emitting recovery diagnostics for every unsupported behavioral statement).
-    Other(String),
     InOutDecl(Node<InOutDecl>),
     Doc(Node<DocComment>),
     RefDecl(Node<RefDecl>),
@@ -831,6 +828,36 @@ pub enum ActionDefBodyElement {
     MergeStmt(Node<MergeStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
+    Assign(Node<AssignStmt>),
+    ForLoop(Node<ForLoop>),
+    ThenAction(Node<ThenAction>),
+    Decl(Node<ActionBodyDecl>),
+}
+
+/// Assignment statement (SysML v2 AssignmentNode/AssignmentActionUsage).
+///
+/// Examples:
+/// - `assign x := y;`
+/// - `then assign position := dynamics.x_out;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssignStmt {
+    pub is_then: bool,
+    pub lhs: String,
+    pub rhs: String,
+}
+
+/// For-loop node (SysML v2 ForLoopNode) - modeled minimally.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ForLoop {
+    pub var: String,
+    pub range: String,
+    pub body: ActionDefBody,
+}
+
+/// Succession to an action usage: `then action ...`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenAction {
+    pub action: Node<ActionUsage>,
 }
 
 /// In/out parameter in action def: `in` name `:` type `;` or `out` name `:` type `;`.
@@ -845,6 +872,7 @@ pub struct InOutDecl {
 pub enum InOut {
     In,
     Out,
+    InOut,
 }
 
 /// Action usage: `action` name `:` type_name (`accept` param_name `:` param_type)? body.
@@ -874,8 +902,7 @@ pub enum ActionUsageBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionUsageBodyElement {
     Error(Node<ParseErrorNode>),
-    /// Unmodeled action-usage-body element captured as raw text.
-    Other(String),
+    Doc(Node<DocComment>),
     InOutDecl(Node<InOutDecl>),
     RefDecl(Node<RefDecl>),
     Bind(Node<Bind>),
@@ -884,6 +911,17 @@ pub enum ActionUsageBodyElement {
     MergeStmt(Node<MergeStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
+    Assign(Node<AssignStmt>),
+    ForLoop(Node<ForLoop>),
+    ThenAction(Node<ThenAction>),
+    Decl(Node<ActionBodyDecl>),
+}
+
+/// A minimally-modeled declaration inside an action/behavior body (e.g. `attribute ...;`, `calc ...;`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionBodyDecl {
+    pub keyword: String,
+    pub text: String,
 }
 
 /// Flow: `flow` from `to` to body.
@@ -1204,6 +1242,9 @@ pub enum UseCaseDefBodyElement {
     IncludeUseCase(Node<IncludeUseCase>),
     RefRedefinition(Node<RefRedefinition>),
     ReturnRef(Node<ReturnRef>),
+    Assign(Node<AssignStmt>),
+    ForLoop(Node<ForLoop>),
+    ThenAction(Node<ThenAction>),
 }
 
 /// actor usage `actor pilot : Operator;`
@@ -2146,7 +2187,6 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::Error(n) => {
             ActionDefBodyElement::Error(dummy_node(n, n.value.clone()))
         }
-        ActionDefBodyElement::Other(s) => ActionDefBodyElement::Other(s.clone()),
         ActionDefBodyElement::InOutDecl(n) => {
             ActionDefBodyElement::InOutDecl(dummy_node(n, n.value.clone()))
         }
@@ -2171,6 +2211,10 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::ActionUsage(n) => ActionDefBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),
         )),
+        ActionDefBodyElement::Assign(n) => ActionDefBodyElement::Assign(dummy_node(n, n.value.clone())),
+        ActionDefBodyElement::ForLoop(n) => ActionDefBodyElement::ForLoop(dummy_node(n, n.value.clone())),
+        ActionDefBodyElement::ThenAction(n) => ActionDefBodyElement::ThenAction(dummy_node(n, n.value.clone())),
+        ActionDefBodyElement::Decl(n) => ActionDefBodyElement::Decl(dummy_node(n, n.value.clone())),
     };
     dummy_node(el, value)
 }
@@ -2205,7 +2249,9 @@ fn normalize_action_usage_body_element_node(
         ActionUsageBodyElement::Error(n) => {
             ActionUsageBodyElement::Error(dummy_node(n, n.value.clone()))
         }
-        ActionUsageBodyElement::Other(s) => ActionUsageBodyElement::Other(s.clone()),
+        ActionUsageBodyElement::Doc(n) => {
+            ActionUsageBodyElement::Doc(dummy_node(n, n.value.clone()))
+        }
         ActionUsageBodyElement::InOutDecl(n) => {
             ActionUsageBodyElement::InOutDecl(dummy_node(n, n.value.clone()))
         }
@@ -2230,6 +2276,10 @@ fn normalize_action_usage_body_element_node(
         ActionUsageBodyElement::ActionUsage(n) => ActionUsageBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),
         )),
+        ActionUsageBodyElement::Assign(n) => ActionUsageBodyElement::Assign(dummy_node(n, n.value.clone())),
+        ActionUsageBodyElement::ForLoop(n) => ActionUsageBodyElement::ForLoop(dummy_node(n, n.value.clone())),
+        ActionUsageBodyElement::ThenAction(n) => ActionUsageBodyElement::ThenAction(dummy_node(n, n.value.clone())),
+        ActionUsageBodyElement::Decl(n) => ActionUsageBodyElement::Decl(dummy_node(n, n.value.clone())),
     };
     dummy_node(el, value)
 }

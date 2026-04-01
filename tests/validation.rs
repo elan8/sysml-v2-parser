@@ -79,3 +79,6 @@ mod kitchen_timer;
 
 #[path = "validation/use_case_ast_shapes.rs"]
 mod use_case_ast_shapes;
+
+#[path = "validation/action_ast_shapes.rs"]
+mod action_ast_shapes;

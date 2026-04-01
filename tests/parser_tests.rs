@@ -234,6 +234,33 @@ fn test_parse_error_display_includes_found_and_location() {
 }
 
 #[test]
+fn test_action_def_is_not_parsed_as_action_usage() {
+    let input = r#"package P {
+action def ExecutePatrol {
+}
+}"#;
+    let root = sysml_parser::parse_root(input).expect("should parse");
+    let pkg = match &root.elements[0].value {
+        sysml_parser::ast::RootElement::Package(p) => &p.value,
+        _ => panic!("expected package root element"),
+    };
+    let sysml_parser::ast::PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let first = elements.first().expect("expected a body element");
+    match &first.value {
+        sysml_parser::ast::PackageBodyElement::ActionDef(a) => {
+            assert_eq!(
+                a.value.identification.name.as_deref(),
+                Some("ExecutePatrol"),
+                "expected ActionDef name ExecutePatrol"
+            );
+        }
+        other => panic!("expected ActionDef, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_library_abstract_action_feature_decl_parses_without_diagnostics() {
     // Representative Systems Library syntax (Actions.sysml): abstract action feature with typing,
     // multiplicity, modifier, and specialization, with a doc-only body.
