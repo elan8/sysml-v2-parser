@@ -801,7 +801,11 @@ mod tests {
         };
         let located = LocatedSpan::new(input.as_bytes());
         let result = package_(located);
-        assert!(result.is_ok(), "package_ should parse fixture, got {:?}", result);
+        assert!(
+            result.is_ok(),
+            "package_ should parse fixture, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -809,7 +813,9 @@ mod tests {
         let Some(input) = primitive_data_types_fixture() else {
             return;
         };
-        let start = input.find('{').expect("fixture should contain package body");
+        let start = input
+            .find('{')
+            .expect("fixture should contain package body");
         let located = LocatedSpan::new(&input.as_bytes()[start..]);
         let result = package_body_brace(located);
         assert!(

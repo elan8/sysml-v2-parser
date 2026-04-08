@@ -29,7 +29,9 @@ fn bench_parse_with_diagnostics(c: &mut Criterion) {
     // Optional SysML v2 release fixtures (skip if release directory not present).
     let release_root = std::env::var_os("SYSML_V2_RELEASE_DIR")
         .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sysml-v2-release"));
+        .unwrap_or_else(|| {
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sysml-v2-release")
+        });
 
     let candidates = [
         release_root
@@ -52,13 +54,17 @@ fn bench_parse_with_diagnostics(c: &mut Criterion) {
                 .strip_prefix(&release_root)
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|_| path.display().to_string());
-            group.bench_with_input(BenchmarkId::new("SysML_v2_release", id), &input, |b, input| {
-                b.iter(|| {
-                    let result = sysml_parser::parse_with_diagnostics(black_box(input));
-                    black_box(result.root.elements.len());
-                    black_box(result.errors.len());
-                })
-            });
+            group.bench_with_input(
+                BenchmarkId::new("SysML_v2_release", id),
+                &input,
+                |b, input| {
+                    b.iter(|| {
+                        let result = sysml_parser::parse_with_diagnostics(black_box(input));
+                        black_box(result.root.elements.len());
+                        black_box(result.errors.len());
+                    })
+                },
+            );
         }
     }
 
@@ -67,4 +73,3 @@ fn bench_parse_with_diagnostics(c: &mut Criterion) {
 
 criterion_group!(benches, bench_parse_with_diagnostics);
 criterion_main!(benches);
-

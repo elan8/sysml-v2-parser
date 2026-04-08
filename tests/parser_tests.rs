@@ -883,8 +883,8 @@ fn test_package_body_recovery_skips_malformed_abstract_part_and_keeps_next_membe
 }
 
 #[test]
-fn test_requirement_body_recovery_keeps_later_require_constraint() {
-    let input = "package P {\nrequirement def R {\nsubject vehicle : Vehicle;\nattribute massActual: MassValue;\nrequire constraint { }\n}\n}";
+fn test_requirement_body_keeps_structured_attributes_and_later_require_constraint() {
+    let input = "package P {\nrequirement def R {\nsubject vehicle : Vehicle;\nattribute massActual: MassValue;\nattribute measuredMass = 42;\nrequire constraint { }\n}\n}";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -915,35 +915,129 @@ fn test_requirement_body_recovery_keeps_later_require_constraint() {
     assert!(
         body_elements.iter().any(|e| matches!(
             e.value,
-            sysml_parser::ast::RequirementDefBodyElement::RequireConstraint(_)
+            sysml_parser::ast::RequirementDefBodyElement::AttributeDef(_)
         )),
-        "require constraint should be preserved after local body recovery"
+        "typed attribute members should be preserved as structured attribute defs"
     );
     assert!(
         body_elements.iter().any(|e| matches!(
             e.value,
-            sysml_parser::ast::RequirementDefBodyElement::Error(_)
+            sysml_parser::ast::RequirementDefBodyElement::AttributeUsage(_)
         )),
-        "unsupported members should be captured as recoverable errors in requirement body"
+        "value-based attribute members should be preserved as structured attribute usages"
+    );
+    assert!(
+        body_elements.iter().any(|e| matches!(
+            e.value,
+            sysml_parser::ast::RequirementDefBodyElement::RequireConstraint(_)
+        )),
+        "require constraint should be preserved after structured attribute members"
     );
 }
 
 #[test]
-fn test_parse_with_diagnostics_reports_local_requirement_recovery() {
+fn test_parse_with_diagnostics_accepts_structured_requirement_attributes() {
     let input = "package P {\nrequirement def R {\nsubject vehicle : Vehicle;\nattribute massActual: MassValue;\nrequire constraint { }\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
-        !result.errors.is_empty(),
-        "unmodeled requirement members should surface as recoverable diagnostics"
+        result.errors.is_empty(),
+        "structured requirement attributes should not produce recovery diagnostics: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn test_parse_requirement_body_supports_attribute_def_and_usage_forms() {
+    let input = "package P {\nrequirement def R {\nattribute def targetMass: MassValue;\nattribute actualMass = measuredMass;\n}\n}";
+    let result = parse(input).expect("requirement body attributes should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let req = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::RequirementDef(r) => Some(&r.value),
+            _ => None,
+        })
+        .expect("requirement def should be present");
+    let body_elements = match &req.body {
+        sysml_parser::ast::RequirementDefBody::Brace { elements } => elements,
+        _ => panic!("expected requirement brace body"),
+    };
+    assert!(
+        body_elements.iter().any(|e| matches!(
+            e.value,
+            sysml_parser::ast::RequirementDefBodyElement::AttributeDef(_)
+        )),
+        "attribute def form should be preserved"
     );
     assert!(
-        result.errors.iter().any(|e| {
-            matches!(
-                e.code.as_deref(),
-                Some("recovered_requirement_body_element") | Some("missing_semicolon")
-            )
-        }),
-        "expected requirement-body recovery diagnostic"
+        body_elements.iter().any(|e| matches!(
+            e.value,
+            sysml_parser::ast::RequirementDefBodyElement::AttributeUsage(_)
+        )),
+        "attribute usage form should be preserved"
+    );
+}
+
+#[test]
+fn test_parse_require_constraint_keeps_inner_members() {
+    let input = "package P {\nrequirement def R {\nrequire constraint {\ndoc /* requirement logic */\nin x : Real;\nout y : Real;\nx >= y;\n}\n}\n}";
+    let result = parse(input).expect("require constraint body should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let req = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::RequirementDef(r) => Some(&r.value),
+            _ => None,
+        })
+        .expect("requirement def should be present");
+    let body_elements = match &req.body {
+        sysml_parser::ast::RequirementDefBody::Brace { elements } => elements,
+        _ => panic!("expected requirement brace body"),
+    };
+    let require_constraint = body_elements
+        .iter()
+        .find_map(|e| match &e.value {
+            sysml_parser::ast::RequirementDefBodyElement::RequireConstraint(c) => Some(&c.value),
+            _ => None,
+        })
+        .expect("require constraint should be present");
+    let constraint_elements = match &require_constraint.body {
+        sysml_parser::ast::RequireConstraintBody::Brace { elements } => elements,
+        _ => panic!("expected structured require constraint body"),
+    };
+    assert!(
+        constraint_elements
+            .iter()
+            .any(|e| matches!(e.value, sysml_parser::ast::ConstraintDefBodyElement::Doc(_))),
+        "doc should be preserved inside require constraint"
+    );
+    assert!(
+        constraint_elements.iter().any(|e| matches!(
+            e.value,
+            sysml_parser::ast::ConstraintDefBodyElement::InOutDecl(_)
+        )),
+        "in/out declarations should be preserved inside require constraint"
+    );
+    assert!(
+        constraint_elements.iter().any(|e| matches!(
+            e.value,
+            sysml_parser::ast::ConstraintDefBodyElement::Expression(_)
+        )),
+        "expressions should be preserved inside require constraint"
     );
 }
 

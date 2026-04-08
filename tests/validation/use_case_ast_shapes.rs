@@ -75,4 +75,3 @@ fn test_use_case_validation_fixture_has_typed_succession_nodes() {
         "expected `then done;` to parse as ThenDone"
     );
 }
-

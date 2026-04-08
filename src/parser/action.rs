@@ -5,13 +5,13 @@ use crate::ast::{
     ActionUsageBodyElement, AssignStmt, FirstMergeBody, FirstStmt, Flow, ForLoop, InOut, InOutDecl,
     MergeStmt, Node, ParseErrorNode, ThenAction,
 };
+use crate::parser::build_recovery_error_node;
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_until_brace_end, skip_statement_or_block,
+    identification, name, qualified_name, skip_statement_or_block, skip_until_brace_end,
     take_until_terminator, ws1, ws_and_comments,
 };
-use crate::parser::build_recovery_error_node;
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::with_span;
@@ -384,15 +384,7 @@ pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStm
 
     Ok((
         after_semi,
-        node_from_to(
-            start,
-            after_semi,
-            AssignStmt {
-                is_then,
-                lhs,
-                rhs,
-            },
-        ),
+        node_from_to(start, after_semi, AssignStmt { is_then, lhs, rhs }),
     ))
 }
 
@@ -424,10 +416,7 @@ pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenActio
     )))
     .parse(input)?;
     let (input, action) = action_usage(input)?;
-    Ok((
-        input,
-        node_from_to(start, input, ThenAction { action }),
-    ))
+    Ok((input, node_from_to(start, input, ThenAction { action })))
 }
 
 /// Element inside an action definition body.
@@ -696,14 +685,7 @@ fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>
 
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            ActionBodyDecl {
-                keyword,
-                text,
-            },
-        ),
+        node_from_to(start, input, ActionBodyDecl { keyword, text }),
     ))
 }
 

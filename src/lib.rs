@@ -21,8 +21,10 @@ pub use ast::{
     Node, OccurrenceUsage, Package, PackageBody, PackageBodyElement, ParseErrorNode, PartDef,
     PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, Perform,
     PerformBody, PerformBodyElement, PerformInOutBinding, PortBody, PortDef, PortDefBody,
-    PortDefBodyElement, PortUsage, RefBody, RefDecl, RootElement, RootNamespace, Span,
-    TextualRepresentation, VerificationCaseDef, VerificationCaseUsage, Visibility,
+    PortDefBodyElement, PortUsage, RefBody, RefDecl, RequireConstraint, RequireConstraintBody,
+    RequirementDef, RequirementDefBody, RequirementDefBodyElement, RequirementUsage, RootElement,
+    RootNamespace, Span, TextualRepresentation, VerificationCaseDef, VerificationCaseUsage,
+    Visibility,
 };
 pub use error::{DiagnosticSeverity, ParseError};
 pub use parser::{parse_root, parse_with_diagnostics, ParseResult};

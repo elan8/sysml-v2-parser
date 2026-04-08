@@ -1027,6 +1027,8 @@ pub enum RequirementDefBodyElement {
     Other(String),
     Import(Node<Import>),
     SubjectDecl(Node<SubjectDecl>),
+    AttributeDef(Node<AttributeDef>),
+    AttributeUsage(Node<AttributeUsage>),
     RequireConstraint(Node<RequireConstraint>),
     Frame(Node<FrameMember>),
     Doc(Node<DocComment>),
@@ -1042,7 +1044,16 @@ pub struct SubjectDecl {
 /// Require constraint: `require constraint { ... }`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequireConstraint {
-    pub body: ConstraintBody,
+    pub body: RequireConstraintBody,
+}
+
+/// Require constraint body: `;` or `{` ConstraintDefBodyElement* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequireConstraintBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<ConstraintDefBodyElement>>,
+    },
 }
 
 /// Requirement usage / Satisfy. Example: `satisfy EnduranceReq by droneInstance;`
@@ -2211,9 +2222,15 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::ActionUsage(n) => ActionDefBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),
         )),
-        ActionDefBodyElement::Assign(n) => ActionDefBodyElement::Assign(dummy_node(n, n.value.clone())),
-        ActionDefBodyElement::ForLoop(n) => ActionDefBodyElement::ForLoop(dummy_node(n, n.value.clone())),
-        ActionDefBodyElement::ThenAction(n) => ActionDefBodyElement::ThenAction(dummy_node(n, n.value.clone())),
+        ActionDefBodyElement::Assign(n) => {
+            ActionDefBodyElement::Assign(dummy_node(n, n.value.clone()))
+        }
+        ActionDefBodyElement::ForLoop(n) => {
+            ActionDefBodyElement::ForLoop(dummy_node(n, n.value.clone()))
+        }
+        ActionDefBodyElement::ThenAction(n) => {
+            ActionDefBodyElement::ThenAction(dummy_node(n, n.value.clone()))
+        }
         ActionDefBodyElement::Decl(n) => ActionDefBodyElement::Decl(dummy_node(n, n.value.clone())),
     };
     dummy_node(el, value)
@@ -2276,10 +2293,18 @@ fn normalize_action_usage_body_element_node(
         ActionUsageBodyElement::ActionUsage(n) => ActionUsageBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),
         )),
-        ActionUsageBodyElement::Assign(n) => ActionUsageBodyElement::Assign(dummy_node(n, n.value.clone())),
-        ActionUsageBodyElement::ForLoop(n) => ActionUsageBodyElement::ForLoop(dummy_node(n, n.value.clone())),
-        ActionUsageBodyElement::ThenAction(n) => ActionUsageBodyElement::ThenAction(dummy_node(n, n.value.clone())),
-        ActionUsageBodyElement::Decl(n) => ActionUsageBodyElement::Decl(dummy_node(n, n.value.clone())),
+        ActionUsageBodyElement::Assign(n) => {
+            ActionUsageBodyElement::Assign(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::ForLoop(n) => {
+            ActionUsageBodyElement::ForLoop(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::ThenAction(n) => {
+            ActionUsageBodyElement::ThenAction(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::Decl(n) => {
+            ActionUsageBodyElement::Decl(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }

@@ -7,8 +7,8 @@ use crate::ast::{
 use crate::parser::action::in_out_decl;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    skip_statement_or_block, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
+    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
+    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
     CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -47,10 +47,28 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
 }
 
 fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody> {
+    let (input, body) = structured_constraint_body(input)?;
+    let body = match body {
+        StructuredConstraintBody::Semicolon => ConstraintDefBody::Semicolon,
+        StructuredConstraintBody::Brace { elements } => ConstraintDefBody::Brace { elements },
+    };
+    Ok((input, body))
+}
+
+pub(crate) enum StructuredConstraintBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<ConstraintDefBodyElement>>,
+    },
+}
+
+pub(crate) fn structured_constraint_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, StructuredConstraintBody> {
     let (mut input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, ConstraintDefBody::Semicolon));
+        return Ok((input, StructuredConstraintBody::Semicolon));
     }
     let (next, _) = tag(&b"{"[..]).parse(input)?;
     input = next;
@@ -60,7 +78,7 @@ fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody
         input = next;
         if input.fragment().starts_with(b"}") {
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, ConstraintDefBody::Brace { elements }));
+            return Ok((input, StructuredConstraintBody::Brace { elements }));
         }
         match constraint_def_body_element(input) {
             Ok((next, element)) => {
@@ -86,13 +104,13 @@ fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody
             Err(_) => {
                 let (input, _) = skip_until_brace_end(input)?;
                 let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                return Ok((input, ConstraintDefBody::Brace { elements }));
+                return Ok((input, StructuredConstraintBody::Brace { elements }));
             }
         }
     }
 }
 
-fn constraint_def_body_element(
+pub(crate) fn constraint_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
     let start = input;

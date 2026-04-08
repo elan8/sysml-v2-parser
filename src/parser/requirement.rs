@@ -1,16 +1,18 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    CommentAnnotation, ConcernUsage, ConstraintBody, DocComment, FrameMember, Node,
-    ParseErrorNode, RequireConstraint, RequirementDef, RequirementDefBody, RequirementDefBodyElement,
-    RequirementUsage, Satisfy, SubjectDecl, TextualRepresentation,
+    CommentAnnotation, ConcernUsage, ConstraintBody, DocComment, FrameMember, Node, ParseErrorNode,
+    RequireConstraint, RequireConstraintBody, RequirementDef, RequirementDefBody,
+    RequirementDefBodyElement, RequirementUsage, Satisfy, SubjectDecl, TextualRepresentation,
 };
+use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::build_recovery_error_node;
+use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    skip_statement_or_block, starts_with_any_keyword, take_until_terminator, ws, ws1, ws_and_comments,
+    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
+    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws, ws1, ws_and_comments,
     REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -31,16 +33,6 @@ fn other_requirement_body_element(
     // enclosing body recovery path generate an `Error` element so diagnostics are surfaced.
     let trimmed = start_after_ws.fragment();
     let is_redefinition = trimmed.windows(3).any(|w| w == b":>>");
-    // `attribute foo: Bar;` is common SysML, but we still don't model it in requirement bodies.
-    // For regular user input, this should show up as a recoverable error (tests rely on this).
-    // In the release libraries it often appears as a redefinition (`attribute :>> ...`) which we
-    // treat as valid-but-unmodeled and capture as `Other`.
-    if trimmed.starts_with(b"attribute") && !is_redefinition {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            start_after_ws,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
     let diag = build_recovery_error_node(
         start_after_ws,
         REQUIREMENT_BODY_STARTERS,
@@ -205,6 +197,8 @@ fn requirement_def_body_element(
         alt((
             map(import_, RequirementDefBodyElement::Import),
             map(subject_decl, RequirementDefBodyElement::SubjectDecl),
+            map(attribute_usage, RequirementDefBodyElement::AttributeUsage),
+            map(attribute_def, RequirementDefBodyElement::AttributeDef),
             map(
                 require_constraint,
                 RequirementDefBodyElement::RequireConstraint,
@@ -272,11 +266,22 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
     .parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
-    let (input, body) = constraint_body(input)?;
+    let (input, body) = require_constraint_body(input)?;
     Ok((
         input,
         node_from_to(start, input, RequireConstraint { body }),
     ))
+}
+
+pub(crate) fn require_constraint_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, RequireConstraintBody> {
+    let (input, body) = structured_constraint_body(input)?;
+    let body = match body {
+        StructuredConstraintBody::Semicolon => RequireConstraintBody::Semicolon,
+        StructuredConstraintBody::Brace { elements } => RequireConstraintBody::Brace { elements },
+    };
+    Ok((input, body))
 }
 
 pub(crate) fn constraint_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintBody> {
@@ -287,7 +292,7 @@ pub(crate) fn constraint_body(input: Input<'_>) -> IResult<Input<'_>, Constraint
         map(
             delimited(
                 preceded(ws_and_comments, tag(&b"{"[..])),
-                skip_until_brace_end, // Simplification for now, we just skip whatever is inside constraint body
+                skip_until_brace_end,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| ConstraintBody::Brace,

@@ -29,7 +29,9 @@ fn scan_package(pkg: &Package, for_loops: &mut usize, then_assigns: &mut usize) 
     for el in elements {
         match &el.value {
             PackageBodyElement::Package(p) => scan_package(&p.value, for_loops, then_assigns),
-            PackageBodyElement::ActionDef(a) => scan_action_def_body(&a.value.body, for_loops, then_assigns),
+            PackageBodyElement::ActionDef(a) => {
+                scan_action_def_body(&a.value.body, for_loops, then_assigns)
+            }
             PackageBodyElement::ActionUsage(a) => {
                 scan_action_usage_body(&a.value.body, for_loops, then_assigns)
             }
@@ -111,7 +113,9 @@ fn test_action_validation_fixture_has_typed_for_and_then_assign_nodes() {
     let mut for_loops = 0usize;
     let mut then_assigns = 0usize;
     for el in &root.elements {
-        let RootElement::Package(p) = &el.value else { continue };
+        let RootElement::Package(p) = &el.value else {
+            continue;
+        };
         scan_package(&p.value, &mut for_loops, &mut then_assigns);
     }
 
@@ -124,4 +128,3 @@ fn test_action_validation_fixture_has_typed_for_and_then_assign_nodes() {
         "expected at least one `then assign ... := ...;` to parse as a typed AssignStmt with is_then=true"
     );
 }
-

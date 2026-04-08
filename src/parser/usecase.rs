@@ -8,8 +8,8 @@ use crate::ast::{
 };
 use crate::parser::build_recovery_error_node;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    skip_statement_or_block, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
+    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
+    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
     USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -68,7 +68,10 @@ fn first_succession(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession
     let (input, _) = ws1(input)?;
     let (input, target) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((input, node_from_to(start, input, FirstSuccession { target })))
+    Ok((
+        input,
+        node_from_to(start, input, FirstSuccession { target }),
+    ))
 }
 
 fn then_done(input: Input<'_>) -> IResult<Input<'_>, Node<ThenDone>> {
@@ -158,7 +161,9 @@ fn then_use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ThenUseCaseU
     ))
 }
 
-fn actor_redefinition_assignment(input: Input<'_>) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
+fn actor_redefinition_assignment(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"actor"[..])).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -185,7 +190,10 @@ fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition
     let body_start = input;
     let (input, _) = skip_statement_or_block(input)?;
     let body = slice_text(body_start, input);
-    Ok((input, node_from_to(start, input, RefRedefinition { name: n, body })))
+    Ok((
+        input,
+        node_from_to(start, input, RefRedefinition { name: n, body }),
+    ))
 }
 
 fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
@@ -444,14 +452,26 @@ pub(crate) fn use_case_def_body_element(
         map(objective, UseCaseDefBodyElement::Objective),
         map(first_succession, UseCaseDefBodyElement::FirstSuccession),
         map(then_done, UseCaseDefBodyElement::ThenDone),
-        map(then_include_use_case, UseCaseDefBodyElement::ThenIncludeUseCase),
+        map(
+            then_include_use_case,
+            UseCaseDefBodyElement::ThenIncludeUseCase,
+        ),
         map(then_use_case_usage, UseCaseDefBodyElement::ThenUseCaseUsage),
         map(include_use_case, UseCaseDefBodyElement::IncludeUseCase),
         map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
         map(return_ref, UseCaseDefBodyElement::ReturnRef),
-        map(crate::parser::action::assign_stmt, UseCaseDefBodyElement::Assign),
-        map(crate::parser::action::for_loop, UseCaseDefBodyElement::ForLoop),
-        map(crate::parser::action::then_action, UseCaseDefBodyElement::ThenAction),
+        map(
+            crate::parser::action::assign_stmt,
+            UseCaseDefBodyElement::Assign,
+        ),
+        map(
+            crate::parser::action::for_loop,
+            UseCaseDefBodyElement::ForLoop,
+        ),
+        map(
+            crate::parser::action::then_action,
+            UseCaseDefBodyElement::ThenAction,
+        ),
         other_use_case_body_element,
     ))
     .parse(input)?;
