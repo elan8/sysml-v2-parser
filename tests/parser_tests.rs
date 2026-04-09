@@ -776,6 +776,34 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
 }
 
 #[test]
+fn test_feature_and_classifier_decls_map_to_dedicated_package_nodes() {
+    let input = "package P {
+        feature myFeature : BaseFeature;
+        class VehicleClass;
+        struct LayoutStruct;
+    }";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    assert!(matches!(elements[0].value, PackageBodyElement::FeatureDecl(_)));
+    assert!(matches!(elements[1].value, PackageBodyElement::ClassifierDecl(_)));
+    assert!(matches!(elements[2].value, PackageBodyElement::ClassifierDecl(_)));
+    assert!(
+        !elements.iter().any(|e| matches!(
+            e.value,
+            PackageBodyElement::KermlSemanticDecl(_) | PackageBodyElement::KermlFeatureDecl(_)
+        )),
+        "dedicated feature/classifier samples should not fall back to generic KerML buckets"
+    );
+}
+
+#[test]
 fn test_quantities_abstract_attribute_def_maps_dedicated() {
     let input = "package P { abstract attribute def TensorQuantityValue :> Array { attribute num: Number[1..*]; } }";
     let result = parse(input).expect("parse should succeed");
@@ -932,6 +960,80 @@ fn test_requirement_body_keeps_structured_attributes_and_later_require_constrain
             sysml_parser::ast::RequirementDefBodyElement::RequireConstraint(_)
         )),
         "require constraint should be preserved after structured attribute members"
+    );
+}
+
+#[test]
+fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
+    let input = "package P {\npart def Vehicle {\nstate monitor: Mode;\nattribute mass: MassValue;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let part_def = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("part def should be present");
+    let sysml_parser::ast::PartDefBody::Brace { elements } = &part_def.body else {
+        panic!("expected part def body");
+    };
+    assert!(
+        elements.iter().any(|e| matches!(
+            e.value,
+            sysml_parser::ast::PartDefBodyElement::Other(_)
+                | sysml_parser::ast::PartDefBodyElement::OpaqueMember(_)
+        )),
+        "library-tolerant unmodeled part members should be preserved explicitly"
+    );
+    assert!(
+        elements.iter().any(|e| matches!(
+            e.value,
+            sysml_parser::ast::PartDefBodyElement::AttributeDef(_)
+        )),
+        "later modeled members should still parse"
+    );
+}
+
+#[test]
+fn test_state_def_recovery_no_longer_truncates_body() {
+    let input = "package P {\nstate def Machine {\nunknown stuff;\ntransition t then Ready;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let state_def = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::StateDef(s) => Some(&s.value),
+            _ => None,
+        })
+        .expect("state def should be present");
+    let sysml_parser::ast::StateDefBody::Brace { elements } = &state_def.body else {
+        panic!("expected state body");
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(e.value, sysml_parser::ast::StateDefBodyElement::Other(_))),
+        "unknown state members should be preserved explicitly instead of truncating the body"
+    );
+    assert!(
+        elements.iter().any(|e| matches!(
+            e.value,
+            sysml_parser::ast::StateDefBodyElement::Transition(_)
+        )),
+        "later valid state members should still parse"
     );
 }
 

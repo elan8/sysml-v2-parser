@@ -7,8 +7,9 @@ use crate::ast::{
 use crate::parser::build_recovery_error_node;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments, STATE_BODY_STARTERS,
+    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
+    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
+    STATE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -109,9 +110,53 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
                 input = next;
             }
             Err(_) => {
-                let (input, _) = skip_until_brace_end(input)?;
-                let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                return Ok((input, StateDefBody::Brace { elements }));
+                let start_unknown = input;
+                if let Ok((next, _)) = skip_statement_or_block(input) {
+                    if next.location_offset() != start_unknown.location_offset() {
+                        let frag = start_unknown.fragment();
+                        let take = frag.len().min(80);
+                        let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+                        elements.push(node_from_to(
+                            start_unknown,
+                            next,
+                            StateDefBodyElement::Other(preview),
+                        ));
+                        input = next;
+                        continue;
+                    }
+                }
+                let recovery = build_recovery_error_node(
+                    start_unknown,
+                    STATE_BODY_STARTERS,
+                    "state body",
+                    "recovered_state_body_element",
+                );
+                let (next, _) = recover_body_element(input, STATE_BODY_STARTERS)?;
+                if next.location_offset() == start_unknown.location_offset() {
+                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                    return Ok((input, StateDefBody::Brace { elements }));
+                }
+                if matches!(
+                    recovery.code.as_str(),
+                    "missing_member_name" | "missing_type_reference"
+                ) {
+                    elements.push(node_from_to(
+                        start_unknown,
+                        next,
+                        StateDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                    ));
+                } else {
+                    let frag = start_unknown.fragment();
+                    let take = frag.len().min(80);
+                    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+                    elements.push(node_from_to(
+                        start_unknown,
+                        next,
+                        StateDefBodyElement::Other(preview),
+                    ));
+                }
+                input = next;
             }
         }
     }

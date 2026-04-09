@@ -1,7 +1,8 @@
 //! Package and root namespace parsing.
 
 use crate::ast::{
-    ExtendedLibraryDecl, FilterMember, KermlFeatureDecl, KermlSemanticDecl, LibraryPackage,
+    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, FilterMember, KermlFeatureDecl,
+    KermlSemanticDecl, LibraryPackage,
     NamespaceDecl, Node, Package, PackageBody, PackageBodyElement, RootElement, RootNamespace,
     Visibility,
 };
@@ -303,12 +304,7 @@ fn kerml_semantic_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlSemanti
         b"inv",
         b"multiplicity",
         b"assoc",
-        b"subclassifier",
-        b"struct",
         b"metaclass",
-        b"class",
-        b"classifier",
-        b"feature",
         b"step",
     ];
     let (input, (bnf_production, text)) = parse_modeled_decl(input, starters)?;
@@ -336,6 +332,40 @@ fn kerml_feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlFeatureD
             input,
             KermlFeatureDecl {
                 bnf_production,
+                text,
+            },
+        ),
+    ))
+}
+
+fn feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureDecl>> {
+    let start = input;
+    let starters: &[&[u8]] = &[b"feature"];
+    let (input, (keyword, text)) = parse_modeled_decl(input, starters)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            FeatureDecl {
+                keyword,
+                text,
+            },
+        ),
+    ))
+}
+
+fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>> {
+    let start = input;
+    let starters: &[&[u8]] = &[b"class", b"classifier", b"struct", b"subclassifier"];
+    let (input, (keyword, text)) = parse_modeled_decl(input, starters)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ClassifierDecl {
+                keyword,
                 text,
             },
         ),
@@ -709,6 +739,14 @@ pub(crate) fn package_body_element(
         return Ok((input, node_from_to(start, input, elem)));
     }
     if let Ok((input, elem)) = map(rendering_usage, PackageBodyElement::RenderingUsage).parse(input)
+    {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    if let Ok((input, elem)) = map(feature_decl, PackageBodyElement::FeatureDecl).parse(input) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    if let Ok((input, elem)) =
+        map(classifier_decl, PackageBodyElement::ClassifierDecl).parse(input)
     {
         return Ok((input, node_from_to(start, input, elem)));
     }

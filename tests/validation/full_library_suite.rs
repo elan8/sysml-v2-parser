@@ -137,6 +137,16 @@ fn collect_bnf_decl_counts_in_body(body: &PackageBody, counts: &mut BTreeMap<Str
     };
     for element in elements {
         match &element.value {
+            PackageBodyElement::FeatureDecl(n) => {
+                *counts
+                    .entry(format!("dedicated:{}", n.value.keyword))
+                    .or_insert(0) += 1;
+            }
+            PackageBodyElement::ClassifierDecl(n) => {
+                *counts
+                    .entry(format!("dedicated:{}", n.value.keyword))
+                    .or_insert(0) += 1;
+            }
             PackageBodyElement::KermlSemanticDecl(n) => {
                 *counts
                     .entry(format!("bnf:{}", n.value.bnf_production))
@@ -183,6 +193,8 @@ fn collect_body_type_counts(body: &PackageBody, counts: &mut BTreeMap<String, us
             PackageBodyElement::ExtendedLibraryDecl(_) => "ExtendedLibraryDecl",
             PackageBodyElement::KermlSemanticDecl(_) => "KermlSemanticDecl",
             PackageBodyElement::KermlFeatureDecl(_) => "KermlFeatureDecl",
+            PackageBodyElement::FeatureDecl(_) => "FeatureDecl",
+            PackageBodyElement::ClassifierDecl(_) => "ClassifierDecl",
             PackageBodyElement::ActionDef(_) => "ActionDef",
             PackageBodyElement::AttributeDef(_) => "AttributeDef",
             PackageBodyElement::CalcDef(_) => "CalcDef",
@@ -212,6 +224,12 @@ fn collect_body_type_counts(body: &PackageBody, counts: &mut BTreeMap<String, us
         };
         *counts.entry(key.to_string()).or_insert(0) += 1;
     }
+}
+
+fn env_threshold(name: &str) -> Option<usize> {
+    std::env::var(name)
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
 }
 
 fn collect_extended_texts(body: &PackageBody, out: &mut Vec<String>) {
@@ -544,6 +562,8 @@ fn test_systems_library_node_types_no_extended() {
     }
 
     let n_extended_total = *type_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
+    let n_semantic_total = *type_counts.get("KermlSemanticDecl").unwrap_or(&0);
+    let n_feature_total = *type_counts.get("KermlFeatureDecl").unwrap_or(&0);
     eprintln!("Systems Library node-type counts:");
     let mut sorted_counts = type_counts.into_iter().collect::<Vec<_>>();
     sorted_counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
@@ -564,6 +584,22 @@ fn test_systems_library_node_types_no_extended() {
         "Systems Library still contains ExtendedLibraryDecl nodes ({} total)",
         n_extended_total
     );
+    if let Some(threshold) = env_threshold("SYSTEMS_LIBRARY_KERML_SEMANTIC_MAX") {
+        assert!(
+            n_semantic_total <= threshold,
+            "Systems Library still contains KermlSemanticDecl nodes ({} total, threshold {})",
+            n_semantic_total,
+            threshold
+        );
+    }
+    if let Some(threshold) = env_threshold("SYSTEMS_LIBRARY_KERML_FEATURE_MAX") {
+        assert!(
+            n_feature_total <= threshold,
+            "Systems Library still contains KermlFeatureDecl nodes ({} total, threshold {})",
+            n_feature_total,
+            threshold
+        );
+    }
 }
 
 /// Node-shape quality gate for the full SysML standard library.
@@ -625,6 +661,8 @@ fn test_full_library_node_types_no_extended() {
     }
 
     let n_extended_total = *type_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
+    let n_semantic_total = *type_counts.get("KermlSemanticDecl").unwrap_or(&0);
+    let n_feature_total = *type_counts.get("KermlFeatureDecl").unwrap_or(&0);
     // Staged burn-down support:
     // - historical checkpoints: 1206 -> <=900 -> <=600 -> <=300 -> 0
     // - default is strict hard-0 once migration is complete.
@@ -657,4 +695,20 @@ fn test_full_library_node_types_no_extended() {
         n_extended_total,
         threshold
     );
+    if let Some(threshold) = env_threshold("FULL_LIBRARY_KERML_SEMANTIC_MAX") {
+        assert!(
+            n_semantic_total <= threshold,
+            "Full std library still contains KermlSemanticDecl nodes ({} total, threshold {})",
+            n_semantic_total,
+            threshold
+        );
+    }
+    if let Some(threshold) = env_threshold("FULL_LIBRARY_KERML_FEATURE_MAX") {
+        assert!(
+            n_feature_total <= threshold,
+            "Full std library still contains KermlFeatureDecl nodes ({} total, threshold {})",
+            n_feature_total,
+            threshold
+        );
+    }
 }

@@ -3,9 +3,10 @@
 
 use crate::ast::{
     Allocate, AttributeBody, AttributeUsage, Bind, Connect, ConnectBody, DefinitionPrefix,
-    ExhibitState, Expression, InOut, InterfaceUsage, InterfaceUsageBodyElement, Node, PartDef,
-    PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, Perform,
-    PerformBody, PerformBodyElement, PerformInOutBinding, RefBody, RefDecl,
+    ExhibitState, Expression, InOut, InterfaceUsage, InterfaceUsageBodyElement, Node,
+    OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
+    PartUsageBodyElement, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
+    RefDecl,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage, attribute_usage_shorthand};
 use crate::parser::build_recovery_error_node;
@@ -99,11 +100,39 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
                 input = next;
             }
             Err(_) => {
-                // Keep top-level PartDef mapping stable: if body content is not modeled,
-                // consume the remaining brace content permissively and finish the body.
-                let (input, _) = skip_until_brace_end(input)?;
-                let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                return Ok((input, PartDefBody::Brace { elements }));
+                let start_unknown = input;
+                let recovery = build_recovery_error_node(
+                    start_unknown,
+                    PART_BODY_STARTERS,
+                    "part definition body",
+                    "recovered_part_def_body_element",
+                );
+                let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
+                if next.location_offset() == start_unknown.location_offset() {
+                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                    return Ok((input, PartDefBody::Brace { elements }));
+                }
+                if matches!(
+                    recovery.code.as_str(),
+                    "missing_member_name" | "missing_type_reference"
+                ) {
+                    elements.push(node_from_to(
+                        start_unknown,
+                        next,
+                        PartDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                    ));
+                } else {
+                    let frag = start_unknown.fragment();
+                    let take = frag.len().min(80);
+                    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+                    elements.push(node_from_to(
+                        start_unknown,
+                        next,
+                        PartDefBodyElement::Other(preview),
+                    ));
+                }
+                input = next;
             }
         }
     }
@@ -147,21 +176,22 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
         map(interface_usage, PartDefBodyElement::InterfaceUsage),
         map(port_usage, PartDefBodyElement::PortUsage),
+        map(part_ref_usage, PartDefBodyElement::Ref),
         map(attribute_usage, PartDefBodyElement::AttributeUsage),
         map(
             attribute_usage_shorthand,
             PartDefBodyElement::AttributeUsage,
         ),
         map(attribute_def, PartDefBodyElement::AttributeDef),
-        map(opaque_part_member_decl, PartDefBodyElement::AttributeUsage),
+        map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
 /// Permissive parser for library-style part members not yet modeled with dedicated AST nodes.
-/// Examples: `ref self: Part :>> Item::self;`, `abstract ref action ... { ... }`.
-fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
+/// Examples: `abstract ref action ... { ... }`, `state monitor: StateKind { ... }`.
+fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMemberDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -172,6 +202,16 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<Attribut
         )));
     }
     let (input, header_text) = take_until_terminator(input, b";{")?;
+    let keyword = if starts_with_any_keyword(input.fragment(), &[b"ref"]) {
+        "ref"
+    } else if starts_with_any_keyword(input.fragment(), &[b"action"]) {
+        "action"
+    } else if starts_with_any_keyword(input.fragment(), &[b"state"]) {
+        "state"
+    } else {
+        "port"
+    }
+    .to_string();
     let name_str = header_text
         .split(|c: char| {
             c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == '(' || c == ')'
@@ -203,13 +243,11 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<Attribut
         node_from_to(
             start,
             input,
-            AttributeUsage {
+            OpaqueMemberDecl {
+                keyword,
                 name: name_str,
-                redefines: None,
-                value: None,
+                text: header_text.trim().to_string(),
                 body,
-                name_span: None,
-                redefines_span: None,
             },
         ),
     ))

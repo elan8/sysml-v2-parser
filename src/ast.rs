@@ -173,6 +173,20 @@ pub struct KermlFeatureDecl {
     pub text: String,
 }
 
+/// Package-level KerML feature declaration captured as an explicit dedicated node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FeatureDecl {
+    pub keyword: String,
+    pub text: String,
+}
+
+/// Package-level KerML classifier declaration captured as an explicit dedicated node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassifierDecl {
+    pub keyword: String,
+    pub text: String,
+}
+
 /// Modeled extended SysML/KerML declaration family not yet represented by
 /// dedicated concrete nodes (e.g. concern/message style library declarations).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -235,6 +249,8 @@ pub enum PackageBodyElement {
     VerificationCaseDef(Node<VerificationCaseDef>),
     VerificationCaseUsage(Node<VerificationCaseUsage>),
     UseCaseUsage(Node<UseCaseUsage>),
+    FeatureDecl(Node<FeatureDecl>),
+    ClassifierDecl(Node<ClassifierDecl>),
     KermlSemanticDecl(Node<KermlSemanticDecl>),
     KermlFeatureDecl(Node<KermlFeatureDecl>),
     ExtendedLibraryDecl(Node<ExtendedLibraryDecl>),
@@ -330,16 +346,28 @@ pub enum PartDefBody {
 pub enum PartDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
+    Other(String),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
+    Ref(Node<RefDecl>),
     PortUsage(Node<PortUsage>),
     PartUsage(Box<Node<PartUsage>>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
     Perform(Node<Perform>),
     Allocate(Node<Allocate>),
+    OpaqueMember(Node<OpaqueMemberDecl>),
     /// `exhibit state` name `:` type (`;` or body).
     ExhibitState(Node<ExhibitState>),
+}
+
+/// Library-tolerant part member preserved without forcing it into an unrelated node shape.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpaqueMemberDecl {
+    pub keyword: String,
+    pub name: String,
+    pub text: String,
+    pub body: AttributeBody,
 }
 
 /// Exhibit state usage: `exhibit state` name `:` type (`;` or body).
@@ -1294,6 +1322,7 @@ pub enum StateDefBody {
 pub enum StateDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
+    Other(String),
     /// `entry` (`;` or body) - entry action.
     Entry(Node<EntryAction>),
     /// `then` name `;` - initial state.
@@ -1765,6 +1794,12 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::UseCaseUsage(n) => {
             PackageBodyElement::UseCaseUsage(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::FeatureDecl(n) => {
+            PackageBodyElement::FeatureDecl(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::ClassifierDecl(n) => {
+            PackageBodyElement::ClassifierDecl(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::KermlSemanticDecl(n) => {
             PackageBodyElement::KermlSemanticDecl(dummy_node(n, n.value.clone()))
         }
@@ -1814,11 +1849,15 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
     let value = match &el.value {
         PartDefBodyElement::Error(n) => PartDefBodyElement::Error(dummy_node(n, n.value.clone())),
         PartDefBodyElement::Doc(n) => PartDefBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PartDefBodyElement::Other(text) => PartDefBodyElement::Other(text.clone()),
         PartDefBodyElement::AttributeDef(n) => {
             PartDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
         }
         PartDefBodyElement::AttributeUsage(n) => {
             PartDefBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
+        }
+        PartDefBodyElement::Ref(n) => {
+            PartDefBodyElement::Ref(dummy_node(n, normalize_ref_decl(&n.value)))
         }
         PartDefBodyElement::PortUsage(n) => {
             PartDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
@@ -1837,6 +1876,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         }
         PartDefBodyElement::Allocate(n) => {
             PartDefBodyElement::Allocate(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::OpaqueMember(n) => {
+            PartDefBodyElement::OpaqueMember(dummy_node(n, n.value.clone()))
         }
         PartDefBodyElement::ExhibitState(n) => {
             PartDefBodyElement::ExhibitState(dummy_node(n, n.value.clone()))
