@@ -1,34 +1,56 @@
 # sysml-parser
 
-SysML v2 textual notation parser.
+SysML v2 textual notation parser for Rust.
 
-## Benchmarks
+This crate parses SysML v2 and related KerML textual syntax into an AST and also exposes a resilient editor-oriented parsing mode that returns partial AST + diagnostics.
 
-This repo includes Criterion benchmarks for parsing performance (editor scenario).
+## Current status
 
-- Run all benches:
+- library parser for a broad SysML v2 subset
+- strict and resilient parsing entry points
+- green unit/integration test suite
+- green full validation and std-library gates when run with the SysML v2 release fixtures
 
-```bash
-cargo bench
+## API
+
+The main public entry points are:
+
+- `parse(input)` for strict parsing
+- `parse_for_editor(input)` for partial AST + diagnostics
+
+Example:
+
+```rust
+use sysml_parser::parse;
+
+fn main() {
+    let model = parse("package Demo;").expect("valid SysML");
+    assert_eq!(model.elements.len(), 1);
+}
 ```
 
-- Run the parser bench only:
+## Development
+
+Run the default test suite:
 
 ```bash
-cargo bench --bench parser_bench
+cargo test
 ```
 
-### Fixture inputs
+Run formatting/lint checks used in CI:
 
-The primary benchmark fixture is read from:
+```bash
+cargo clippy -- -W clippy::all
+```
 
-- `C:\Git\sysml-examples\drone\sysml\SurveillanceDrone.sysml`
+Run the full validation suite against the SysML v2 release tree:
 
-If the file is not present, that benchmark case is skipped.
+```bash
+cargo test --test validation -- --include-ignored
+```
 
-Optional SysML v2 release fixtures are loaded from:
+If the release fixtures are not in `./sysml-v2-release`, set:
 
-- `SYSML_V2_RELEASE_DIR` if set, otherwise `./sysml-v2-release`
-
-Missing release fixtures are also skipped so `cargo bench` remains usable in minimal checkouts.
-
+```bash
+SYSML_V2_RELEASE_DIR=/path/to/SysML-v2-Release
+```

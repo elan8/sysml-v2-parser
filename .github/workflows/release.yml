@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Validate and release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo test
+        run: cargo test
+
+      - name: cargo clippy
+        run: cargo clippy -- -W clippy::all
+
+      - name: Clone SysML v2 Release
+        run: |
+          git clone --depth 1 https://github.com/Systems-Modeling/SysML-v2-Release.git "$RELEASE_ROOT" -b 2026-01
+        env:
+          RELEASE_ROOT: ${{ runner.temp }}/SysML-v2-Release-2026-01
+
+      - name: cargo test (full validation suite)
+        run: cargo test --test validation -- --include-ignored
+        env:
+          SYSML_V2_RELEASE_DIR: ${{ runner.temp }}/SysML-v2-Release-2026-01
+
+      - name: Package crate
+        run: cargo package --allow-dirty --no-verify
+
+      - name: Upload packaged crate
+        uses: actions/upload-artifact@v4
+        with:
+          name: crate-package
+          path: target/package/*.crate
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          generate_release_notes: true
+          files: target/package/*.crate
