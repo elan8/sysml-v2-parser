@@ -1359,9 +1359,12 @@ pub enum ConstraintDefBody {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConstraintDefBodyElement {
+    Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     InOutDecl(Node<InOutDecl>),
     Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
+    /// Unmodeled constraint-body element captured as raw text (used for library parsing).
+    Other(String),
 }
 
 /// constraint body {}
@@ -1415,6 +1418,7 @@ pub enum CalcDefBody {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CalcDefBodyElement {
+    Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     InOutDecl(Node<InOutDecl>),
     ReturnDecl(Node<ReturnDecl>),
@@ -1451,6 +1455,9 @@ pub enum ViewDefBody {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ViewDefBodyElement {
+    Error(Node<ParseErrorNode>),
+    /// Unmodeled view-definition body element captured as raw text (used for library parsing).
+    Other(String),
     Doc(Node<DocComment>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
@@ -1502,6 +1509,9 @@ pub enum ViewBody {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ViewBodyElement {
+    Error(Node<ParseErrorNode>),
+    /// Unmodeled view body element captured as raw text (used for library parsing).
+    Other(String),
     Doc(Node<DocComment>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),

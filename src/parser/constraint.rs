@@ -2,16 +2,16 @@
 
 use crate::ast::{
     CalcDef, CalcDefBody, CalcDefBodyElement, ConstraintDef, ConstraintDefBody,
-    ConstraintDefBodyElement, Node, ReturnDecl,
+    ConstraintDefBodyElement, Node, ParseErrorNode, ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
-    CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
+    skip_until_brace_end, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
+    ws1, ws_and_comments, CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
 };
-use crate::parser::node_from_to;
+use crate::parser::{build_recovery_error_node, node_from_to};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -92,6 +92,7 @@ pub(crate) fn structured_constraint_body(
                 input = next;
             }
             Err(_) if starts_with_any_keyword(input.fragment(), CONSTRAINT_DEF_BODY_STARTERS) => {
+                let start_unknown = input;
                 let (next, _) = recover_body_element(input, CONSTRAINT_DEF_BODY_STARTERS)?;
                 if next.location_offset() == input.location_offset() {
                     return Err(nom::Err::Error(nom::error::Error::new(
@@ -99,12 +100,40 @@ pub(crate) fn structured_constraint_body(
                         nom::error::ErrorKind::Many0,
                     )));
                 }
+                let recovery = build_recovery_error_node(
+                    start_unknown,
+                    CONSTRAINT_DEF_BODY_STARTERS,
+                    "constraint body",
+                    "recovered_constraint_body_element",
+                );
+                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
+                elements.push(node_from_to(
+                    start_unknown,
+                    next,
+                    ConstraintDefBodyElement::Error(node),
+                ));
                 input = next;
             }
             Err(_) => {
-                let (input, _) = skip_until_brace_end(input)?;
-                let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                return Ok((input, StructuredConstraintBody::Brace { elements }));
+                let start_unknown = input;
+                let (next, _) = skip_statement_or_block(input)?;
+                if next.location_offset() == start_unknown.location_offset() {
+                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                    return Ok((input, StructuredConstraintBody::Brace { elements }));
+                }
+                elements.push(node_from_to(
+                    start_unknown,
+                    next,
+                    ConstraintDefBodyElement::Other(
+                        String::from_utf8_lossy(
+                            &start_unknown.fragment()[..start_unknown.fragment().len().min(60)],
+                        )
+                        .trim()
+                        .to_string(),
+                    ),
+                ));
+                input = next;
             }
         }
     }
@@ -114,15 +143,27 @@ pub(crate) fn constraint_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
     let start = input;
-    let (input, elem) = alt((
+    let (input, _) = ws_and_comments(input)?;
+    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc") {
         map(
             crate::parser::requirement::doc_comment,
             ConstraintDefBodyElement::Doc,
-        ),
-        map(in_out_decl, ConstraintDefBodyElement::InOutDecl),
-        map(expression, ConstraintDefBodyElement::Expression),
-    ))
-    .parse(input)?;
+        )
+        .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"in")
+        || starts_with_keyword(input.fragment(), b"out")
+        || starts_with_keyword(input.fragment(), b"inout")
+    {
+        if named_in_out_missing_type(input) {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        map(in_out_decl, ConstraintDefBodyElement::InOutDecl).parse(input)?
+    } else {
+        map(expression, ConstraintDefBodyElement::Expression).parse(input)?
+    };
     Ok((input, node_from_to(start, input, elem)))
 }
 
@@ -194,6 +235,7 @@ fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
                 input = next;
             }
             Err(_) if starts_with_any_keyword(input.fragment(), CALC_DEF_BODY_STARTERS) => {
+                let start_unknown = input;
                 let (next, _) = recover_body_element(input, CALC_DEF_BODY_STARTERS)?;
                 if next.location_offset() == input.location_offset() {
                     return Err(nom::Err::Error(nom::error::Error::new(
@@ -201,6 +243,18 @@ fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
                         nom::error::ErrorKind::Many0,
                     )));
                 }
+                let recovery = build_recovery_error_node(
+                    start_unknown,
+                    CALC_DEF_BODY_STARTERS,
+                    "calc body",
+                    "recovered_calc_body_element",
+                );
+                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
+                elements.push(node_from_to(
+                    start_unknown,
+                    next,
+                    CalcDefBodyElement::Error(node),
+                ));
                 input = next;
             }
             Err(_) => {
@@ -230,17 +284,161 @@ fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
 
 fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
-    let (input, elem) = alt((
+    let (input, _) = ws_and_comments(input)?;
+    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc") {
         map(
             crate::parser::requirement::doc_comment,
             CalcDefBodyElement::Doc,
-        ),
-        map(in_out_decl, CalcDefBodyElement::InOutDecl),
-        map(return_decl, CalcDefBodyElement::ReturnDecl),
-        map(expression, CalcDefBodyElement::Expression),
-    ))
-    .parse(input)?;
+        )
+        .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"in")
+        || starts_with_keyword(input.fragment(), b"out")
+        || starts_with_keyword(input.fragment(), b"inout")
+    {
+        if named_in_out_missing_type(input) {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        map(in_out_decl, CalcDefBodyElement::InOutDecl).parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"return") {
+        if named_return_missing_type(input) {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        if let Ok((input, decl)) = return_decl(input) {
+            (input, CalcDefBodyElement::ReturnDecl(decl))
+        } else {
+            other_calc_return(input)?
+        }
+    } else {
+        map(expression, CalcDefBodyElement::Expression).parse(input)?
+    };
     Ok((input, node_from_to(start, input, elem)))
+}
+
+fn named_in_out_missing_type(input: Input<'_>) -> bool {
+    let Ok((after_ws, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    let direction_len = if starts_with_keyword(after_ws.fragment(), b"inout") {
+        5
+    } else if starts_with_keyword(after_ws.fragment(), b"out") {
+        3
+    } else {
+        2
+    };
+    let mut rest = &after_ws.fragment()[direction_len..];
+    while let Some(first) = rest.first() {
+        if first.is_ascii_whitespace() {
+            rest = &rest[1..];
+        } else {
+            break;
+        }
+    }
+    if rest.starts_with(b":") {
+        return false;
+    }
+    let mut name_len = 0usize;
+    while name_len < rest.len() && (rest[name_len].is_ascii_alphanumeric() || rest[name_len] == b'_')
+    {
+        name_len += 1;
+    }
+    if name_len == 0 {
+        return false;
+    }
+    rest = &rest[name_len..];
+    while let Some(first) = rest.first() {
+        if first.is_ascii_whitespace() {
+            rest = &rest[1..];
+        } else {
+            break;
+        }
+    }
+    if !rest.starts_with(b":") {
+        return false;
+    }
+    rest = &rest[1..];
+    while let Some(first) = rest.first() {
+        if first.is_ascii_whitespace() {
+            rest = &rest[1..];
+        } else {
+            break;
+        }
+    }
+    rest.is_empty() || rest.starts_with(b";") || rest.starts_with(b"{") || rest.starts_with(b"}")
+}
+
+fn named_return_missing_type(input: Input<'_>) -> bool {
+    let Ok((after_ws, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    let mut rest = *after_ws.fragment();
+    if !starts_with_keyword(rest, b"return") {
+        return false;
+    }
+    rest = &rest[6..];
+    while let Some(first) = rest.first() {
+        if first.is_ascii_whitespace() {
+            rest = &rest[1..];
+        } else {
+            break;
+        }
+    }
+    if rest.starts_with(b":") {
+        return false;
+    }
+    let mut name_len = 0usize;
+    while name_len < rest.len() && (rest[name_len].is_ascii_alphanumeric() || rest[name_len] == b'_')
+    {
+        name_len += 1;
+    }
+    if name_len == 0 {
+        return false;
+    }
+    rest = &rest[name_len..];
+    while let Some(first) = rest.first() {
+        if first.is_ascii_whitespace() {
+            rest = &rest[1..];
+        } else {
+            break;
+        }
+    }
+    if rest.starts_with(b":") {
+        rest = &rest[1..];
+        while let Some(first) = rest.first() {
+            if first.is_ascii_whitespace() {
+                rest = &rest[1..];
+            } else {
+                break;
+            }
+        }
+        return rest.is_empty()
+            || rest.starts_with(b";")
+            || rest.starts_with(b"{")
+            || rest.starts_with(b"}");
+    }
+    false
+}
+
+fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement> {
+    let start_unknown = input;
+    let (next, _) = skip_statement_or_block(input)?;
+    if next.location_offset() == start_unknown.location_offset() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Many0,
+        )));
+    }
+    let preview = String::from_utf8_lossy(
+        &start_unknown.fragment()[..start_unknown.fragment().len().min(60)],
+    )
+    .trim()
+    .to_string();
+    Ok((next, CalcDefBodyElement::Other(preview)))
 }
 
 pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {

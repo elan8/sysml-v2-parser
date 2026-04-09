@@ -38,10 +38,12 @@ mod view;
 pub(crate) use span::{node_from_to, span_from_to, with_span, Input};
 
 use crate::ast::{
-    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, PackageBody,
+    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, CalcDefBody,
+    CalcDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, PackageBody,
     PackageBodyElement, ParseErrorNode, PartDefBody, PartDefBodyElement, PartUsageBody,
     PartUsageBodyElement, RequirementDefBody, RequirementDefBodyElement, RootNamespace,
-    StateDefBody, StateDefBodyElement, UseCaseDefBody, UseCaseDefBodyElement,
+    StateDefBody, StateDefBodyElement, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
+    ViewBodyElement, ViewDefBody, ViewDefBodyElement,
 };
 use crate::error::ParseError;
 use nom::error::Error;
@@ -352,6 +354,12 @@ fn missing_name_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, Str
             "action name",
             "Use `perform action run: Runner;`.",
         ),
+        (
+            b"return",
+            &[],
+            "return name",
+            "Use `return result: Real;`.",
+        ),
     ];
 
     for (keyword, trailing, missing_what, suggestion) in cases {
@@ -380,6 +388,7 @@ fn missing_type_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, Str
         (b"in", &[], "input type"),
         (b"out", &[], "output type"),
         (b"perform", &[b"action"], "action type"),
+        (b"return", &[], "return type"),
     ];
 
     for &(keyword, trailing, missing_what) in cases {
@@ -405,6 +414,8 @@ fn missing_type_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, Str
                 "result"
             } else if keyword == &b"perform"[..] {
                 "run"
+            } else if keyword == &b"return"[..] {
+                "result"
             } else {
                 "member"
             };
@@ -426,11 +437,15 @@ fn missing_type_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, Str
                 "Real"
             } else if keyword == &b"perform"[..] {
                 "Runner"
+            } else if keyword == &b"return"[..] {
+                "Real"
             } else {
                 "Type"
             };
             let suggestion = if keyword == &b"perform"[..] {
                 format!("Use `perform action {sample_name}: {sample_type};`.")
+            } else if keyword == &b"return"[..] {
+                format!("Use `return {sample_name}: {sample_type};`.")
             } else {
                 format!("Use `{keyword_label} {sample_name}: {sample_type};`.")
             };
@@ -540,7 +555,7 @@ pub(crate) fn build_recovery_error_node(
     }
 
     ParseErrorNode {
-        message: format!("recovered {scope_label} element"),
+        message: format!("unexpected token in {scope_label}"),
         code: generic_code.to_string(),
         expected: Some(format!("valid {scope_label} element")),
         found: recovery_found_snippet(input),
@@ -656,6 +671,46 @@ fn collect_use_case_body_errors(body: &UseCaseDefBody, errors: &mut Vec<ParseErr
     }
 }
 
+fn collect_constraint_body_errors(body: &ConstraintDefBody, errors: &mut Vec<ParseError>) {
+    if let ConstraintDefBody::Brace { elements } = body {
+        for element in elements {
+            if let ConstraintDefBodyElement::Error(n) = &element.value {
+                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+            }
+        }
+    }
+}
+
+fn collect_calc_body_errors(body: &CalcDefBody, errors: &mut Vec<ParseError>) {
+    if let CalcDefBody::Brace { elements } = body {
+        for element in elements {
+            if let CalcDefBodyElement::Error(n) = &element.value {
+                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+            }
+        }
+    }
+}
+
+fn collect_view_def_body_errors(body: &ViewDefBody, errors: &mut Vec<ParseError>) {
+    if let ViewDefBody::Brace { elements } = body {
+        for element in elements {
+            if let ViewDefBodyElement::Error(n) = &element.value {
+                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+            }
+        }
+    }
+}
+
+fn collect_view_body_errors(body: &ViewBody, errors: &mut Vec<ParseError>) {
+    if let ViewBody::Brace { elements } = body {
+        for element in elements {
+            if let ViewBodyElement::Error(n) = &element.value {
+                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+            }
+        }
+    }
+}
+
 fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>) {
     if let PartDefBody::Brace { elements } = body {
         for element in elements {
@@ -748,6 +803,14 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
                 PackageBodyElement::StateUsage(n) => {
                     collect_state_body_errors(&n.value.body, errors)
                 }
+                PackageBodyElement::ConstraintDef(n) => {
+                    collect_constraint_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::CalcDef(n) => collect_calc_body_errors(&n.value.body, errors),
+                PackageBodyElement::ViewDef(n) => {
+                    collect_view_def_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::ViewUsage(n) => collect_view_body_errors(&n.value.body, errors),
                 _ => {}
             }
         }

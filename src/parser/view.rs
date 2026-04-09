@@ -2,17 +2,17 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    ExposeMember, FilterMember, Node, RenderingDef, RenderingDefBody, RenderingUsage,
-    SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody, ViewDefBodyElement,
-    ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
+    ExposeMember, FilterMember, Node, ParseErrorNode, RenderingDef, RenderingDefBody,
+    RenderingUsage, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody,
+    ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments, VIEW_BODY_STARTERS,
-    VIEW_DEF_BODY_STARTERS,
+    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
+    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
+    VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
-use crate::parser::node_from_to;
+use crate::parser::{build_recovery_error_node, node_from_to};
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::Input;
 use nom::branch::alt;
@@ -100,6 +100,7 @@ fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
                 input = next;
             }
             Err(_) if starts_with_any_keyword(input.fragment(), VIEW_DEF_BODY_STARTERS) => {
+                let start_unknown = input;
                 let (next, _) = recover_body_element(input, VIEW_DEF_BODY_STARTERS)?;
                 if next.location_offset() == input.location_offset() {
                     return Err(nom::Err::Error(nom::error::Error::new(
@@ -107,12 +108,40 @@ fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
                         nom::error::ErrorKind::Many0,
                     )));
                 }
+                let recovery = build_recovery_error_node(
+                    start_unknown,
+                    VIEW_DEF_BODY_STARTERS,
+                    "view definition body",
+                    "recovered_view_def_body_element",
+                );
+                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
+                elements.push(node_from_to(
+                    start_unknown,
+                    next,
+                    ViewDefBodyElement::Error(node),
+                ));
                 input = next;
             }
             Err(_) => {
-                let (input, _) = skip_until_brace_end(input)?;
-                let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                return Ok((input, ViewDefBody::Brace { elements }));
+                let start_unknown = input;
+                let (next, _) = skip_statement_or_block(input)?;
+                if next.location_offset() == start_unknown.location_offset() {
+                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                    return Ok((input, ViewDefBody::Brace { elements }));
+                }
+                elements.push(node_from_to(
+                    start_unknown,
+                    next,
+                    ViewDefBodyElement::Other(
+                        String::from_utf8_lossy(
+                            &start_unknown.fragment()[..start_unknown.fragment().len().min(60)],
+                        )
+                        .trim()
+                        .to_string(),
+                    ),
+                ));
+                input = next;
             }
         }
     }
@@ -327,6 +356,7 @@ fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
                 input = next;
             }
             Err(_) if starts_with_any_keyword(input.fragment(), VIEW_BODY_STARTERS) => {
+                let start_unknown = input;
                 let (next, _) = recover_body_element(input, VIEW_BODY_STARTERS)?;
                 if next.location_offset() == input.location_offset() {
                     return Err(nom::Err::Error(nom::error::Error::new(
@@ -334,12 +364,40 @@ fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
                         nom::error::ErrorKind::Many0,
                     )));
                 }
+                let recovery = build_recovery_error_node(
+                    start_unknown,
+                    VIEW_BODY_STARTERS,
+                    "view body",
+                    "recovered_view_body_element",
+                );
+                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
+                elements.push(node_from_to(
+                    start_unknown,
+                    next,
+                    ViewBodyElement::Error(node),
+                ));
                 input = next;
             }
             Err(_) => {
-                let (input, _) = skip_until_brace_end(input)?;
-                let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                return Ok((input, ViewBody::Brace { elements }));
+                let start_unknown = input;
+                let (next, _) = skip_statement_or_block(input)?;
+                if next.location_offset() == start_unknown.location_offset() {
+                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                    return Ok((input, ViewBody::Brace { elements }));
+                }
+                elements.push(node_from_to(
+                    start_unknown,
+                    next,
+                    ViewBodyElement::Other(
+                        String::from_utf8_lossy(
+                            &start_unknown.fragment()[..start_unknown.fragment().len().min(60)],
+                        )
+                        .trim()
+                        .to_string(),
+                    ),
+                ));
+                input = next;
             }
         }
     }
