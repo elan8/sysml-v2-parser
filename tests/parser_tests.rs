@@ -1285,6 +1285,17 @@ fn test_parse_interface_usage_named_with_multiplicity() {
 }
 
 #[test]
+fn test_parse_part_def_connection_usage_multiline_connect_clause() {
+    let input = "package P {\nconnection def Door { end [1] part room1 : Room; end [1] part room2 : Room; }\npart def Home {\nconnection livingRoom2bedRoom[1] : Door\n  connect livingRoom to bedRoom;\nconnection livingRoom2kitchen[1] : Door\n  connect livingRoom to kitchen;\nconnection livingRoom2bathRoom[1] : Door\n  connect livingRoom to bathRoom;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "multiline connection usage should parse without recovery diagnostics: {:?}",
+        result.errors
+    );
+}
+
+#[test]
 fn test_parse_require_constraint_keeps_inner_members() {
     let input = "package P {\nrequirement def R {\nrequire constraint {\ndoc /* requirement logic */\nin x : Real;\nout y : Real;\nx >= y;\n}\n}\n}";
     let result = parse(input).expect("require constraint body should parse");
