@@ -39,8 +39,7 @@ jobs:
 
       - name: Fetch SysML v2 Release
         run: |
-          chmod +x ./scripts/fetch-sysml-v2-release.sh
-          ./scripts/fetch-sysml-v2-release.sh
+          bash ./scripts/fetch-sysml-v2-release.sh
 
       - name: cargo test (full validation suite)
         run: cargo test -- --include-ignored
