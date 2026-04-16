@@ -1,6 +1,6 @@
 # Validation fixture tests
 
-Each SysML file under `sysml-v2-release/sysml/src/validation/` can have a corresponding Rust test module in this directory for easier maintenance.
+Each SysML file under `sysml-v2-release/sysml/src/validation/` can have a corresponding Rust test module in this directory for easier maintenance. Populate `sysml-v2-release/` with `scripts/fetch-sysml-v2-release.ps1` or `scripts/fetch-sysml-v2-release.sh`, or point `SYSML_V2_RELEASE_DIR` at an unpacked release tree.
 
 ## Layout
 

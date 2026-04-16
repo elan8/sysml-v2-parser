@@ -782,9 +782,14 @@ mod tests {
     use nom_locate::LocatedSpan;
     use std::path::PathBuf;
 
+    fn sysml_v2_release_root() -> PathBuf {
+        std::env::var_os("SYSML_V2_RELEASE_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sysml-v2-release"))
+    }
+
     fn primitive_data_types_fixture() -> Option<String> {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("sysml-v2-release")
+        let path = sysml_v2_release_root()
             .join("sysml")
             .join("src")
             .join("validation")

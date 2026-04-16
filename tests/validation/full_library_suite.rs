@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement, RootNamespace};
 use sysml_v2_parser::{parse_with_diagnostics, ParseError};
 
-/// Root of the SysML v2 Release tree (from env or the sysml-v2-release submodule).
+/// Root of the SysML v2 Release tree (from env or the local sysml-v2-release directory).
 fn sysml_v2_release_root() -> PathBuf {
     std::env::var_os("SYSML_V2_RELEASE_DIR")
         .map(PathBuf::from)
@@ -258,7 +258,7 @@ fn test_full_library_suite() {
     if !library_path.exists() {
         log::debug!("Library directory not found: {:?}", library_path);
         log::debug!(
-            "Skipping. Run `git submodule update --init sysml-v2-release` or set SYSML_V2_RELEASE_DIR"
+            "Skipping. Run `scripts/fetch-sysml-v2-release.*` or set SYSML_V2_RELEASE_DIR"
         );
         return;
     }
@@ -360,7 +360,7 @@ fn test_systems_library_strict_no_diagnostics() {
     if !systems_path.exists() {
         log::debug!("Systems Library directory not found: {:?}", systems_path);
         log::debug!(
-            "Skipping. Run `git submodule update --init sysml-v2-release` or set SYSML_V2_RELEASE_DIR"
+            "Skipping. Run `scripts/fetch-sysml-v2-release.*` or set SYSML_V2_RELEASE_DIR"
         );
         return;
     }
@@ -437,7 +437,7 @@ fn test_full_library_strict_no_diagnostics() {
     if !library_path.exists() {
         log::debug!("Library directory not found: {:?}", library_path);
         log::debug!(
-            "Skipping. Run `git submodule update --init sysml-v2-release` or set SYSML_V2_RELEASE_DIR"
+            "Skipping. Run `scripts/fetch-sysml-v2-release.*` or set SYSML_V2_RELEASE_DIR"
         );
         return;
     }

@@ -37,14 +37,12 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # Pin to release tag 2026-01; update -b if using a different release (https://github.com/Systems-Modeling/SysML-v2-Release/releases)
-      - name: Clone SysML v2 Release
+      - name: Fetch SysML v2 Release
         run: |
-          git clone --depth 1 https://github.com/Systems-Modeling/SysML-v2-Release.git "$RELEASE_ROOT" -b 2026-01
-        env:
-          RELEASE_ROOT: ${{ runner.temp }}/SysML-v2-Release-2026-01
+          chmod +x ./scripts/fetch-sysml-v2-release.sh
+          ./scripts/fetch-sysml-v2-release.sh
 
       - name: cargo test (full validation suite)
         run: cargo test -- --include-ignored
         env:
-          SYSML_V2_RELEASE_DIR: ${{ runner.temp }}/SysML-v2-Release-2026-01
+          SYSML_V2_RELEASE_DIR: ${{ github.workspace }}/sysml-v2-release

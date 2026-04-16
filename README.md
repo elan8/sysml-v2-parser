@@ -49,7 +49,17 @@ Run the full validation suite against the SysML v2 release tree:
 cargo test --test validation -- --include-ignored
 ```
 
-If the release fixtures are not in `./sysml-v2-release`, set:
+Fetch the pinned SysML v2 release fixtures into `./sysml-v2-release`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\fetch-sysml-v2-release.ps1
+```
+
+```bash
+./scripts/fetch-sysml-v2-release.sh
+```
+
+If the release fixtures live somewhere else, set:
 
 ```bash
 SYSML_V2_RELEASE_DIR=/path/to/SysML-v2-Release
