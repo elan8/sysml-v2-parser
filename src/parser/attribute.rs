@@ -205,6 +205,15 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             Some(redefines),
         ),
         AttributeUsageHead::Named { name_span, name } => {
+            let (peek, _) = ws_and_comments(input)?;
+            if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>>") {
+                // Typed declarations (`attribute x : T` / `attribute x :> T`) belong to
+                // attribute definitions, not usages.
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    peek,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
             let (input, redefines_result) = nom::combinator::opt(alt((
                 preceded(
                     preceded(ws_and_comments, tag(&b"redefines"[..])),
