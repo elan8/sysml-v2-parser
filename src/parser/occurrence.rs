@@ -1,12 +1,12 @@
 //! Occurrence definition and usage parsing.
 
 use crate::ast::{
-    DefinitionBody, Node, OccurrenceBodyElement, OccurrenceDef, OccurrenceUsage,
-    OccurrenceUsageBody, ParseErrorNode,
+    AssertConstraintMember, ConstraintDefBody, DefinitionBody, Node, OccurrenceBodyElement,
+    OccurrenceDef, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode,
 };
 use crate::parser::attribute::attribute_usage;
 use crate::parser::build_recovery_error_node;
-use crate::parser::constraint::structured_constraint_body;
+use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_until_brace_end, ws1,
     ws_and_comments,
@@ -25,6 +25,7 @@ use nom::Parser;
 
 const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"doc",
+    b"assert",
     b"attribute",
     b"part",
     b"individual",
@@ -258,7 +259,7 @@ fn occurrence_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Occurren
     let (input, elem) = alt((
         map(doc_comment, OccurrenceBodyElement::Doc),
         map(annotation, OccurrenceBodyElement::Annotation),
-        map(assert_constraint_member, OccurrenceBodyElement::Other),
+        map(assert_constraint_member, OccurrenceBodyElement::AssertConstraint),
         map(attribute_usage, OccurrenceBodyElement::AttributeUsage),
         map(part_usage, |p| OccurrenceBodyElement::PartUsage(Box::new(p))),
         map(individual_usage, |n| {
@@ -281,10 +282,18 @@ fn occurrence_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Occurren
     Ok((input, node_from_to(start, input, elem)))
 }
 
-fn assert_constraint_member(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn assert_constraint_member(input: Input<'_>) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
+    let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"assert"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
-    let (input, _) = structured_constraint_body(input)?;
-    Ok((input, "assert constraint".to_string()))
+    let (input, body) = structured_constraint_body(input)?;
+    let body = match body {
+        StructuredConstraintBody::Semicolon => ConstraintDefBody::Semicolon,
+        StructuredConstraintBody::Brace { elements } => ConstraintDefBody::Brace { elements },
+    };
+    Ok((
+        input,
+        node_from_to(start, input, AssertConstraintMember { body }),
+    ))
 }

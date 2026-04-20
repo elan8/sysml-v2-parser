@@ -72,6 +72,8 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"allocate",
     b"attribute",
     b"bind",
+    b"comment",
+    b"connection",
     b"connect",
     b"doc",
     b"exhibit",

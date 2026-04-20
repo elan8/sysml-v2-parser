@@ -2,14 +2,15 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    Allocate, AttributeBody, AttributeUsage, Bind, Connect, ConnectBody, DefinitionPrefix,
-    ExhibitState, Expression, InOut, InterfaceUsage, InterfaceUsageBodyElement, Node,
-    OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
+    Allocate, AttributeBody, AttributeUsage, Bind, Connect, ConnectBody, ConnectionUsageMember,
+    DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage, InterfaceUsageBodyElement,
+    Node, OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
     PartUsageBodyElement, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
     RefDecl,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage, attribute_usage_shorthand};
 use crate::parser::build_recovery_error_node;
+use crate::parser::connection::connection_member_body;
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
@@ -21,7 +22,7 @@ use crate::parser::occurrence::{
     individual_usage, occurrence_usage, snapshot_usage, then_timeslice_usage, timeslice_usage,
 };
 use crate::parser::port::port_usage;
-use crate::parser::requirement::{doc_comment, requirement_usage, satisfy};
+use crate::parser::requirement::{comment_annotation, doc_comment, requirement_usage, satisfy};
 use crate::parser::with_span;
 use crate::parser::Input;
 use crate::parser::{node_from_to, span_from_to};
@@ -185,57 +186,80 @@ fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
 fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
-    if let Ok((input, elem)) = map(connection_usage_member, PartDefBodyElement::OpaqueMember).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
     let (input, elem) = alt((
-        map(doc_comment, PartDefBodyElement::Doc),
-        map(annotation, PartDefBodyElement::Annotation),
-        map(exhibit_state, PartDefBodyElement::ExhibitState),
-        map(perform_action_decl, PartDefBodyElement::Perform),
-        map(perform_usage, PartDefBodyElement::Perform),
-        map(allocate_, PartDefBodyElement::Allocate),
-        map(connect_, PartDefBodyElement::Connect),
-        map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
-        map(individual_usage, |n| PartDefBodyElement::OccurrenceUsage(Box::new(n))),
-        map(snapshot_usage, |n| PartDefBodyElement::OccurrenceUsage(Box::new(n))),
-        map(timeslice_usage, |n| PartDefBodyElement::OccurrenceUsage(Box::new(n))),
-        map(then_timeslice_usage, |n| PartDefBodyElement::OccurrenceUsage(Box::new(n))),
-        map(occurrence_usage, |n| PartDefBodyElement::OccurrenceUsage(Box::new(n))),
-        map(interface_usage, PartDefBodyElement::InterfaceUsage),
-        map(port_usage, PartDefBodyElement::PortUsage),
-        map(part_ref_usage, PartDefBodyElement::Ref),
-        map(attribute_usage, PartDefBodyElement::AttributeUsage),
-        map(attribute_def, PartDefBodyElement::AttributeDef),
-        map(
-            attribute_usage_shorthand,
-            PartDefBodyElement::AttributeUsage,
-        ),
-        map(requirement_usage, PartDefBodyElement::RequirementUsage),
-        map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
+        alt((
+            map(doc_comment, PartDefBodyElement::Doc),
+            map(comment_annotation, PartDefBodyElement::Comment),
+            map(annotation, PartDefBodyElement::Annotation),
+            map(exhibit_state, PartDefBodyElement::ExhibitState),
+            map(perform_action_decl, PartDefBodyElement::Perform),
+            map(perform_usage, PartDefBodyElement::Perform),
+            map(allocate_, PartDefBodyElement::Allocate),
+            map(connection_usage_member, PartDefBodyElement::Connection),
+            map(connect_, PartDefBodyElement::Connect),
+            map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
+            map(individual_usage, |n| {
+                PartDefBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+            map(snapshot_usage, |n| {
+                PartDefBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+        )),
+        alt((
+            map(timeslice_usage, |n| {
+                PartDefBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+            map(then_timeslice_usage, |n| {
+                PartDefBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+            map(occurrence_usage, |n| {
+                PartDefBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+            map(interface_usage, PartDefBodyElement::InterfaceUsage),
+            map(port_usage, PartDefBodyElement::PortUsage),
+            map(part_ref_usage, PartDefBodyElement::Ref),
+            map(attribute_usage, PartDefBodyElement::AttributeUsage),
+            map(attribute_def, PartDefBodyElement::AttributeDef),
+            map(
+                attribute_usage_shorthand,
+                PartDefBodyElement::AttributeUsage,
+            ),
+            map(requirement_usage, PartDefBodyElement::RequirementUsage),
+            map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
+        )),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
-fn connection_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMemberDecl>> {
+fn connection_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"connection"[..]).parse(input)?;
-    let (input, header_tail) = take_until_terminator(input, b";{")?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, body) = alt((
-        map(tag(&b";"[..]), |_| AttributeBody::Semicolon),
-        map(
-            delimited(
-                tag(&b"{"[..]),
-                skip_until_brace_end,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| AttributeBody::Brace,
-        ),
-    ))
-    .parse(input)?;
+    let (input, name) = if input.fragment().starts_with(b":")
+        || input.fragment().starts_with(b"{")
+        || input.fragment().starts_with(b";")
+    {
+        (input, None)
+    } else {
+        let (input, parsed_name) = name(input)?;
+        (input, Some(parsed_name))
+    };
+    let (input, type_name) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":")
+            && !peek.fragment().starts_with(b":>")
+            && !peek.fragment().starts_with(b":>>")
+        {
+            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+            let (input, parsed_type) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            (input, Some(parsed_type))
+        } else {
+            (input, None)
+        }
+    };
+    let (input, body) = connection_member_body(input)?;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
         preceded(ws_and_comments, qualified_name),
@@ -253,26 +277,17 @@ fn connection_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
         input
     };
 
-    let text = format!("connection{}", header_tail);
-    let name = header_tail
-        .split(|c: char| {
-            c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == '(' || c == ')'
-        })
-        .filter(|s| !s.is_empty())
-        .find(|token| *token != "connection")
-        .unwrap_or("connection")
-        .to_string();
-
     Ok((
         input,
         node_from_to(
             start,
             input,
-            OpaqueMemberDecl {
-                keyword: "connection".to_string(),
+            ConnectionUsageMember {
                 name,
-                text,
+                type_name,
                 body,
+                subsets: trailing_subsets,
+                redefines: trailing_redefines,
             },
         ),
     ))

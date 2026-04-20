@@ -177,7 +177,7 @@ fn connection_def_body_element(
     Ok((input, node_from_to(start, input, elem)))
 }
 
-fn connection_def_body(input: Input<'_>) -> IResult<Input<'_>, ConnectionDefBody> {
+pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, ConnectionDefBody> {
     let (mut input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
@@ -241,7 +241,7 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
     let (input, identification) = identification(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
-    let (input, body) = connection_def_body(input)?;
+    let (input, body) = connection_member_body(input)?;
     Ok((
         input,
         node_from_to(

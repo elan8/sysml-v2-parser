@@ -1,5 +1,6 @@
 use sysml_v2_parser::ast::{
-    ActionDefBody, Expression, OccurrenceBodyElement, OccurrenceUsageBody, PackageBody,
+    ActionDefBody, ConnectionDefBody, ConnectionDefBodyElement, ConstraintDefBody,
+    ConstraintDefBodyElement, Expression, OccurrenceBodyElement, OccurrenceUsageBody, PackageBody,
     PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement,
     RequirementDefBody, RequirementDefBodyElement, RootElement, StateDefBody, StateDefBodyElement,
 };
@@ -213,6 +214,42 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
     assert_eq!(occurrences[0].portion_kind.as_deref(), Some("timeslice"));
     assert_eq!(occurrences[0].subsets.as_deref(), None);
     assert_eq!(occurrences[1].portion_kind.as_deref(), Some("timeslice"));
+
+    let OccurrenceUsageBody::Brace {
+        elements: ingress_elements,
+    } = &occurrences[0].body
+    else {
+        panic!("expected ingress timeslice body");
+    };
+    assert!(
+        ingress_elements.iter().all(
+            |e| !matches!(e.value, OccurrenceBodyElement::Other(ref text) if text == "assert constraint")
+        ),
+        "assert constraint should not degrade to OccurrenceBodyElement::Other"
+    );
+    let assert_constraint = ingress_elements
+        .iter()
+        .find_map(|e| match &e.value {
+            OccurrenceBodyElement::AssertConstraint(member) => Some(&member.value),
+            _ => None,
+        })
+        .expect("assert constraint should parse as a structured occurrence member");
+    let ConstraintDefBody::Brace {
+        elements: assert_elements,
+    } = &assert_constraint.body
+    else {
+        panic!("expected assert constraint body");
+    };
+    assert!(
+        assert_elements.iter().any(|e| {
+            matches!(
+                &e.value,
+                ConstraintDefBodyElement::Expression(expr)
+                    if matches!(&expr.value, Expression::FeatureRef(name) if name == "ready")
+            )
+        }),
+        "assert constraint body should preserve the `ready` expression"
+    );
 
     let OccurrenceUsageBody::Brace { elements } = &occurrences[1].body else {
         panic!("expected timeslice body");
@@ -482,7 +519,64 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
     let PartDefBody::Brace { elements } = &mission.body else {
         panic!("expected part body");
     };
-    assert!(elements.iter().any(|e| matches!(e.value, PartDefBodyElement::OpaqueMember(_))));
+    let connection = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartDefBodyElement::Connection(connection) => Some(&connection.value),
+            _ => None,
+        })
+        .expect("expected structured connection member in part body");
+    assert_eq!(
+        connection.type_name.as_deref(),
+        Some("CapabilityToGoalDerivation")
+    );
+    assert_eq!(connection.subsets.as_deref(), Some("capabilityToGoals"));
+    let ConnectionDefBody::Brace { elements } = &connection.body else {
+        panic!("expected connection body");
+    };
+    assert_eq!(
+        elements
+            .iter()
+            .filter(|el| matches!(el.value, ConnectionDefBodyElement::EndDecl(_)))
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn part_definition_comment_members_parse_structurally() {
+    let input =
+        "package P {\npart def Mission {\ncomment source /* https://example.test/source */\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let mission = match &elements[0].value {
+        PackageBodyElement::PartDef(def) => &def.value,
+        _ => panic!("expected part def"),
+    };
+    let PartDefBody::Brace { elements } = &mission.body else {
+        panic!("expected part body");
+    };
+    let comment = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartDefBodyElement::Comment(comment) => Some(&comment.value),
+            _ => None,
+        })
+        .expect("expected structured comment member in part body");
+    assert_eq!(comment.identification.as_ref().and_then(|id| id.name.as_deref()), Some("source"));
+    assert!(comment.text.contains("https://example.test/source"));
 }
 
 #[test]

@@ -350,6 +350,7 @@ pub enum PartDefBody {
 pub enum PartDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
+    Comment(Node<CommentAnnotation>),
     Annotation(Node<Annotation>),
     Other(String),
     AttributeDef(Node<AttributeDef>),
@@ -361,6 +362,8 @@ pub enum PartDefBodyElement {
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
+    /// `connection` usage member inside a part definition body.
+    Connection(Node<ConnectionUsageMember>),
     Perform(Node<Perform>),
     Allocate(Node<Allocate>),
     OpaqueMember(Node<OpaqueMemberDecl>),
@@ -375,6 +378,16 @@ pub struct OpaqueMemberDecl {
     pub name: String,
     pub text: String,
     pub body: AttributeBody,
+}
+
+/// Connection usage member inside part definitions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectionUsageMember {
+    pub name: Option<String>,
+    pub type_name: Option<String>,
+    pub body: ConnectionDefBody,
+    pub subsets: Option<String>,
+    pub redefines: Option<String>,
 }
 
 /// Exhibit state usage: `exhibit state` name `:` type (`;` or body).
@@ -752,11 +765,18 @@ pub enum OccurrenceUsageBody {
     },
 }
 
+/// Occurrence-level assert member: `assert constraint` body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssertConstraintMember {
+    pub body: ConstraintDefBody,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OccurrenceBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     Annotation(Node<Annotation>),
+    AssertConstraint(Node<AssertConstraintMember>),
     Other(String),
     AttributeUsage(Node<AttributeUsage>),
     PartUsage(Box<Node<PartUsage>>),
@@ -1901,6 +1921,7 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
     let value = match &el.value {
         PartDefBodyElement::Error(n) => PartDefBodyElement::Error(dummy_node(n, n.value.clone())),
         PartDefBodyElement::Doc(n) => PartDefBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PartDefBodyElement::Comment(n) => PartDefBodyElement::Comment(dummy_node(n, n.value.clone())),
         PartDefBodyElement::Annotation(n) => {
             PartDefBodyElement::Annotation(dummy_node(n, n.value.clone()))
         }
@@ -1931,6 +1952,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         }
         PartDefBodyElement::Connect(n) => {
             PartDefBodyElement::Connect(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::Connection(n) => {
+            PartDefBodyElement::Connection(dummy_node(n, n.value.clone()))
         }
         PartDefBodyElement::Perform(n) => {
             PartDefBodyElement::Perform(dummy_node(n, n.value.clone()))
