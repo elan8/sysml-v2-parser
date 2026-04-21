@@ -8,8 +8,8 @@ use crate::parser::attribute::attribute_usage;
 use crate::parser::build_recovery_error_node;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_until_brace_end, ws1,
-    ws_and_comments,
+    identification, name, qualified_name, recover_body_element, redefine_operator,
+    skip_until_brace_end, subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -128,12 +128,12 @@ fn occurrence_usage_tail(
     let start = input;
     let (input, name_str) = name(input)?;
     let (input, subsets) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>"[..])),
+        preceded(ws_and_comments, subset_operator),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
     let (input, redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
+        preceded(ws_and_comments, redefine_operator),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
@@ -143,23 +143,23 @@ fn occurrence_usage_tail(
     ))
     .parse(input)?;
     let (input, trailing_subsets) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>"[..])),
+        preceded(ws_and_comments, subset_operator),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
     let (input, trailing_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
+        preceded(ws_and_comments, redefine_operator),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
     let (input, body) = occurrence_usage_body(input)?;
     let (input, post_body_subsets) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>"[..])),
+        preceded(ws_and_comments, subset_operator),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
     let (input, post_body_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
+        preceded(ws_and_comments, redefine_operator),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;

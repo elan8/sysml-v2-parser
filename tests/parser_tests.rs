@@ -1845,3 +1845,81 @@ individual def Rover specializes MobileRobot;
     };
     assert_eq!(individual_def.value.specializes.as_deref(), Some("MobileRobot"));
 }
+
+#[test]
+fn test_occurrence_usage_accepts_keyword_subset_and_redefine_aliases() {
+    let input = r#"package P {
+occurrence rover subsets BaseOccurrence redefines LegacyOccurrence;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let occ = match &elements[0].value {
+        PackageBodyElement::OccurrenceUsage(o) => o,
+        other => panic!("expected occurrence usage, got {:?}", other),
+    };
+    assert_eq!(occ.value.subsets.as_deref(), Some("BaseOccurrence"));
+    assert_eq!(occ.value.redefines.as_deref(), Some("LegacyOccurrence"));
+}
+
+#[test]
+fn test_requirement_usage_accepts_subsets_keyword_alias() {
+    let input = r#"package P {
+requirement VehicleReq; subsets BaseReq;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let req = match &elements[0].value {
+        PackageBodyElement::RequirementUsage(r) => r,
+        other => panic!("expected requirement usage, got {:?}", other),
+    };
+    assert_eq!(req.value.subsets.as_deref(), Some("BaseReq"));
+}
+
+#[test]
+fn test_port_usage_normalizes_subset_redefine_aliases() {
+    let input = r#"package P {
+part def Carrier {
+  port :>> wheelPort : WheelPortType subsets basePort;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[0].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let part_body = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let port_usage = match &part_body[0].value {
+        sysml_v2_parser::ast::PartDefBodyElement::PortUsage(p) => p,
+        other => panic!("expected port usage, got {:?}", other),
+    };
+    assert_eq!(
+        port_usage.value.subsets.as_ref().map(|(name, _)| name.as_str()),
+        Some("basePort")
+    );
+    assert_eq!(port_usage.value.redefines.as_deref(), Some("wheelPort"));
+}

@@ -511,3 +511,23 @@ pub(crate) fn specialization_operator(input: Input<'_>) -> IResult<Input<'_>, ()
     ))
     .parse(input)
 }
+
+/// Parse subsetting marker in SysML concrete syntax:
+/// either symbolic `:>` or keyword `subsets`.
+pub(crate) fn subset_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    alt((
+        value((), tag(&b":>"[..])),
+        value((), terminated(tag(&b"subsets"[..]), ws1)),
+    ))
+    .parse(input)
+}
+
+/// Parse redefinition marker in SysML concrete syntax:
+/// either symbolic `:>>` or keyword `redefines`.
+pub(crate) fn redefine_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    alt((
+        value((), tag(&b":>>"[..])),
+        value((), terminated(tag(&b"redefines"[..]), ws1)),
+    ))
+    .parse(input)
+}
