@@ -1644,6 +1644,44 @@ fn test_parse_with_diagnostics_reports_missing_semicolon_between_package_members
 }
 
 #[test]
+fn test_parse_with_diagnostics_reports_invalid_expose_separator() {
+    let input = "package Views { view structure: GeneralView { expose SurveillanceDrone.SurveillanceQuadrotorDrone; } }";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.is_ok(),
+        "invalid expose separator should produce diagnostics"
+    );
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.code.as_deref() == Some("invalid_qualified_name_separator"))
+        .expect("expected invalid_qualified_name_separator diagnostic");
+    assert!(
+        err.message.contains("use '::' instead of '.'"),
+        "diagnostic should explain separator issue: {}",
+        err.message
+    );
+    assert_eq!(
+        err.expected.as_deref(),
+        Some("qualified name segments separated by '::'")
+    );
+    assert!(
+        err.suggestion
+            .as_deref()
+            .is_some_and(|s| s.contains("expose A::B;")),
+        "diagnostic should include concrete correction"
+    );
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("missing_semicolon")),
+        "should not surface misleading missing_semicolon for invalid expose separator: {:?}",
+        result.errors
+    );
+}
+
+#[test]
 fn test_action_def_body_allows_doc_and_nested_action_usages_without_semicolon_after_doc() {
     let input = r#"package P {
 action def ExecutePatrol {

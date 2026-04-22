@@ -460,6 +460,55 @@ fn missing_type_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, Str
     None
 }
 
+fn invalid_expose_separator_diagnostic(
+    fragment: &[u8],
+) -> Option<(&'static str, String, String, String)> {
+    let mut fragment = trim_ascii_start(fragment);
+    if !lex::starts_with_keyword(fragment, b"expose") {
+        return None;
+    }
+    fragment = &fragment[b"expose".len()..];
+    while let Some(first) = fragment.first() {
+        if first.is_ascii_whitespace() {
+            fragment = &fragment[1..];
+            continue;
+        }
+        break;
+    }
+    if fragment.is_empty() {
+        return None;
+    }
+
+    let mut saw_dot = false;
+    let mut in_quoted_name = false;
+    for &b in fragment {
+        if b == b'\'' {
+            in_quoted_name = !in_quoted_name;
+            continue;
+        }
+        if in_quoted_name {
+            continue;
+        }
+        if matches!(b, b';' | b'[' | b'{' | b'}' | b'\n' | b'\r') {
+            break;
+        }
+        if b == b'.' {
+            saw_dot = true;
+            break;
+        }
+    }
+    if !saw_dot {
+        return None;
+    }
+
+    Some((
+        "invalid_qualified_name_separator",
+        "invalid qualified name in expose target: use '::' instead of '.'".to_string(),
+        "qualified name segments separated by '::'".to_string(),
+        "Replace '.' with '::' in the expose target (example: `expose A::B;`).".to_string(),
+    ))
+}
+
 fn missing_closing_brace_error(bytes: &[u8], input: Input<'_>) -> Option<ParseError> {
     if !input.fragment().is_empty() {
         return None;
@@ -522,6 +571,17 @@ pub(crate) fn build_recovery_error_node(
     }
 
     if let Some((code, message, expected, suggestion)) = missing_type_diagnostic(trimmed) {
+        return ParseErrorNode {
+            message,
+            code: code.to_string(),
+            expected: Some(expected),
+            found: recovery_found_snippet(input),
+            suggestion: Some(suggestion),
+        };
+    }
+
+    if let Some((code, message, expected, suggestion)) = invalid_expose_separator_diagnostic(trimmed)
+    {
         return ParseErrorNode {
             message,
             code: code.to_string(),
