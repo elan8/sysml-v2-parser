@@ -1282,6 +1282,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             metadata_annotation,
             PartUsageBodyElement::MetadataAnnotation,
         ),
+        map(exhibit_state_as_state_usage, PartUsageBodyElement::StateUsage),
         map(perform_action_decl, PartUsageBodyElement::Perform),
         map(perform_usage, PartUsageBodyElement::Perform),
         map(allocate_, PartUsageBodyElement::Allocate),
@@ -1305,4 +1306,14 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+fn exhibit_state_as_state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::StateUsage>> {
+    let (input, exhibit) = exhibit_state(input)?;
+    let state = crate::ast::StateUsage {
+        name: exhibit.value.name,
+        type_name: exhibit.value.type_name,
+        body: exhibit.value.body,
+    };
+    Ok((input, Node::new(exhibit.span, state)))
 }
