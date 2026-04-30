@@ -2211,3 +2211,125 @@ part def Carrier {
     );
     assert_eq!(port_usage.value.redefines.as_deref(), Some("wheelPort"));
 }
+
+#[test]
+fn test_requirement_body_attribute_typed_with_value_and_redefine_forms() {
+    let input = r#"package P {
+requirement def R {
+  attribute targetMass : Real = (a - (b - c));
+  attribute measuredMass :>> Vehicle::mass = ((a - b) - c);
+}
+}"#;
+    let result = parse(input).expect("requirement attributes should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let req = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::RequirementDef(r) => Some(&r.value),
+            _ => None,
+        })
+        .expect("expected requirement definition");
+    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements } = &req.body else {
+        panic!("expected requirement body");
+    };
+    assert!(elements.iter().any(|e| matches!(
+        e.value,
+        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(_)
+    )));
+    assert!(elements.iter().any(|e| matches!(
+        e.value,
+        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(_)
+    )));
+}
+
+#[test]
+fn test_constraint_expressions_keep_parenthesized_associativity_shapes() {
+    let input = r#"package P {
+constraint def C {
+  ((a-b)-c) >= 0;
+  a-(b-c) >= 0;
+}
+}"#;
+    let result = parse(input).expect("constraint expressions should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let constraint = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::ConstraintDef(c) => Some(&c.value),
+            _ => None,
+        })
+        .expect("expected constraint definition");
+    let sysml_v2_parser::ast::ConstraintDefBody::Brace { elements } = &constraint.body else {
+        panic!("expected constraint body");
+    };
+    let exprs: Vec<&sysml_v2_parser::ast::Node<sysml_v2_parser::ast::Expression>> = elements
+        .iter()
+        .filter_map(|e| match &e.value {
+            sysml_v2_parser::ast::ConstraintDefBodyElement::Expression(expr) => Some(expr),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(exprs.len(), 2, "expected two parsed comparison expressions");
+    for expr in exprs {
+        match &expr.value {
+            sysml_v2_parser::ast::Expression::BinaryOp { op, right, .. } => {
+                assert_eq!(op, ">=");
+                assert!(matches!(
+                    right.value,
+                    sysml_v2_parser::ast::Expression::LiteralInteger(0)
+                ));
+            }
+            other => panic!("expected comparison expression, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn test_shorthand_attribute_value_uses_expression_parser_path() {
+    let input = r#"package P {
+part def Vehicle {
+  mass : Real = ((a-b)-c) >= 0;
+}
+}"#;
+    let result = parse(input).expect("shorthand attribute value should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("expected part def");
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    let usage = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("expected shorthand attribute usage");
+    assert!(
+        usage.value.is_some(),
+        "value expression should be preserved"
+    );
+}

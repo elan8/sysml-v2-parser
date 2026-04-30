@@ -159,6 +159,7 @@ pub struct ParseErrorNode {
     pub expected: Option<String>,
     pub found: Option<String>,
     pub suggestion: Option<String>,
+    pub category: Option<crate::error::DiagnosticCategory>,
 }
 
 /// Modeled KerML semantic declaration captured as package-level syntax.

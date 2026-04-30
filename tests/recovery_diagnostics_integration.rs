@@ -5,7 +5,7 @@ use sysml_v2_parser::ast::{
     PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RequirementDefBody,
     RequirementDefBodyElement, RootElement, UseCaseDefBody, UseCaseDefBodyElement,
 };
-use sysml_v2_parser::parse_with_diagnostics;
+use sysml_v2_parser::{parse_with_diagnostics, DiagnosticCategory};
 
 fn fixture(name: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -421,4 +421,29 @@ fn fixture_unexpected_keyword_in_requirement_body_reports_scope_specific_error()
     assert!(elements
         .iter()
         .any(|e| matches!(e.value, RequirementDefBodyElement::RequireConstraint(_))));
+}
+
+#[test]
+fn diagnostics_include_taxonomy_categories() {
+    let parse_err = parse_with_diagnostics("package P { part def A { part: Wheel; } }");
+    let parse_err_entry = parse_err
+        .errors
+        .iter()
+        .find(|e| e.code.as_deref() == Some("missing_member_name"))
+        .expect("missing member name diagnostic expected");
+    assert_eq!(
+        parse_err_entry.category,
+        Some(DiagnosticCategory::ParseError)
+    );
+
+    let unsupported = parse_with_diagnostics("package P { #fmeaspec requirement req1 { } }");
+    let unsupported_entry = unsupported
+        .errors
+        .iter()
+        .find(|e| e.code.as_deref() == Some("unsupported_annotation_syntax"))
+        .expect("unsupported annotation diagnostic expected");
+    assert_eq!(
+        unsupported_entry.category,
+        Some(DiagnosticCategory::UnsupportedGrammarForm)
+    );
 }

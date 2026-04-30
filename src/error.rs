@@ -10,6 +10,14 @@ pub enum DiagnosticSeverity {
     Warning,
 }
 
+/// High-level diagnostic taxonomy for parser/evaluator reporting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticCategory {
+    ParseError,
+    UnsupportedGrammarForm,
+    UnresolvedSymbol,
+}
+
 /// Error returned when parsing fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {
@@ -33,6 +41,8 @@ pub struct ParseError {
     pub found: Option<String>,
     /// Short hint on how to fix the error.
     pub suggestion: Option<String>,
+    /// High-level diagnostic category used by clients to classify failures.
+    pub category: Option<DiagnosticCategory>,
 }
 
 impl ParseError {
@@ -48,6 +58,7 @@ impl ParseError {
             expected: None,
             found: None,
             suggestion: None,
+            category: None,
         }
     }
 
@@ -91,6 +102,11 @@ impl ParseError {
 
     pub fn with_suggestion(mut self, suggestion: impl Into<String>) -> Self {
         self.suggestion = Some(suggestion.into());
+        self
+    }
+
+    pub fn with_category(mut self, category: DiagnosticCategory) -> Self {
+        self.category = Some(category);
         self
     }
 

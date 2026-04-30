@@ -10,7 +10,7 @@ use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until};
+use nom::bytes::complete::tag;
 use nom::combinator::map;
 use nom::sequence::{delimited, preceded};
 use nom::IResult;
@@ -285,22 +285,9 @@ pub(crate) fn attribute_usage_shorthand(
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     // Parse (and ignore) the declared type.
     let (input, _) = preceded(ws_and_comments, qualified_name).parse(input)?;
-    // Optional value assignment. For now, we accept the syntax but do not fully parse the expression
-    // (some validation fixtures use complex function calls like `sum(( ... ))`).
-    let (input, _) = nom::combinator::opt(preceded(
-        ws_and_comments,
-        alt((
-            preceded(tag(&b"="[..]), ws_and_comments),
-            preceded(tag(&b":="[..]), ws_and_comments),
-            preceded(
-                preceded(tag(&b"default"[..]), ws1),
-                preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
-            ),
-        )),
-    ))
-    .parse(input)?;
-    let (input, _) =
-        nom::combinator::opt(preceded(ws_and_comments, take_until(&b";"[..]))).parse(input)?;
+    // Keep shorthand values on the shared expression path so precedence/parentheses are preserved.
+    let (input, value) =
+        nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -310,7 +297,7 @@ pub(crate) fn attribute_usage_shorthand(
             AttributeUsage {
                 name: name_str,
                 redefines: None,
-                value: None,
+                value,
                 body: AttributeBody::Semicolon,
                 name_span: Some(name_span),
                 redefines_span: None,

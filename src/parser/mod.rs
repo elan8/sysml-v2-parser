@@ -45,7 +45,7 @@ use crate::ast::{
     StateDefBody, StateDefBodyElement, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
     ViewBodyElement, ViewDefBody, ViewDefBodyElement,
 };
-use crate::error::{DiagnosticSeverity, ParseError};
+use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 use nom::error::Error;
 use nom::Parser;
 use nom_locate::LocatedSpan;
@@ -211,7 +211,8 @@ fn nom_err_to_parse_error(
         .with_location(offset, line, column)
         .with_length(span_len)
         .with_code(nom_error_kind_to_code(&e.code))
-        .with_severity(DiagnosticSeverity::Error);
+        .with_severity(DiagnosticSeverity::Error)
+        .with_category(DiagnosticCategory::ParseError);
     if !found_snippet.is_empty() {
         pe = pe.with_found(found_snippet);
     }
@@ -746,6 +747,7 @@ fn unexpected_closing_brace_parse_error(input: Input<'_>) -> ParseError {
         .with_found("}")
         .with_suggestion("Remove this '}' or add the missing opening '{' before it.")
         .with_severity(DiagnosticSeverity::Error)
+        .with_category(DiagnosticCategory::ParseError)
 }
 
 fn missing_closing_brace_error(bytes: &[u8], input: Input<'_>) -> Option<ParseError> {
@@ -769,6 +771,17 @@ fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
         .with_code("missing_closing_brace")
         .with_expected("'}'")
         .with_suggestion("Add '}' to close the open body.")
+        .with_category(DiagnosticCategory::ParseError)
+}
+
+fn category_from_code(code: &str) -> DiagnosticCategory {
+    if code == "unsupported_annotation_syntax" {
+        DiagnosticCategory::UnsupportedGrammarForm
+    } else if code == "unresolved_symbol" {
+        DiagnosticCategory::UnresolvedSymbol
+    } else {
+        DiagnosticCategory::ParseError
+    }
 }
 
 fn has_unclosed_brace(bytes: &[u8]) -> bool {
@@ -1041,6 +1054,7 @@ pub(crate) fn build_recovery_error_node_from_span(
             expected: Some(expected),
             found: recovery_found_snippet_from_span(input, recovery_end),
             suggestion: Some(suggestion),
+            category: Some(DiagnosticCategory::ParseError),
         },
         RecoveryClassification::MissingSemicolon => ParseErrorNode {
             message: "missing semicolon before next declaration".to_string(),
@@ -1048,6 +1062,7 @@ pub(crate) fn build_recovery_error_node_from_span(
             expected: Some("';'".to_string()),
             found: recovery_found_snippet_from_span(input, recovery_end),
             suggestion: Some("Insert ';' before this declaration.".to_string()),
+            category: Some(DiagnosticCategory::ParseError),
         },
         RecoveryClassification::UnsupportedAnnotation => ParseErrorNode {
             message: format!("unsupported annotation syntax in {scope_label}"),
@@ -1058,6 +1073,7 @@ pub(crate) fn build_recovery_error_node_from_span(
                 "Remove this annotation or extend the parser to support annotated declarations."
                     .to_string(),
             ),
+            category: Some(DiagnosticCategory::UnsupportedGrammarForm),
         },
         RecoveryClassification::Unexpected => ParseErrorNode {
             message: format!("unexpected token in {scope_label}"),
@@ -1065,6 +1081,7 @@ pub(crate) fn build_recovery_error_node_from_span(
             expected: Some(format!("valid {scope_label} element")),
             found: recovery_found_snippet_from_span(input, recovery_end),
             suggestion: Some(format!("Fix this {scope_label} member and re-run parsing.")),
+            category: Some(DiagnosticCategory::ParseError),
         },
     }
 }
@@ -1095,7 +1112,11 @@ fn parse_error_from_recovery_node(span: &crate::ast::Span, node: &ParseErrorNode
     let mut err = ParseError::new(node.message.clone())
         .with_location(span.offset, span.line, span.column)
         .with_length(span.len.max(1))
-        .with_code(node.code.clone());
+        .with_code(node.code.clone())
+        .with_category(
+            node.category
+                .unwrap_or_else(|| category_from_code(node.code.as_str())),
+        );
     let severity = if node.code == "unsupported_annotation_syntax" {
         DiagnosticSeverity::Warning
     } else {
@@ -1438,7 +1459,8 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
                 let mut pe = ParseError::new("expected end of input")
                     .with_location(offset, rest.location_line(), rest.get_column())
                     .with_length(found_len.max(1))
-                    .with_code("expected_end_of_input");
+                    .with_code("expected_end_of_input")
+                    .with_category(DiagnosticCategory::ParseError);
                 if !found_snippet.is_empty() {
                     pe = pe.with_found(found_snippet);
                 }
@@ -1468,7 +1490,11 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
                 Some("'package', 'namespace', or 'import' at top level; or valid element in package body"),
             )
         })),
-        Err(nom::Err::Incomplete(_)) => Err(ParseError::new("unexpected end of input").with_code("unexpected_eof")),
+        Err(nom::Err::Incomplete(_)) => Err(
+            ParseError::new("unexpected end of input")
+                .with_code("unexpected_eof")
+                .with_category(DiagnosticCategory::ParseError),
+        ),
     }
 }
 
@@ -1491,7 +1517,9 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
         Err(_) => {
             return ParseResult {
                 root: RootNamespace { elements: vec![] },
-                errors: vec![ParseError::new("invalid input").with_code("invalid_input")],
+                errors: vec![ParseError::new("invalid input")
+                    .with_code("invalid_input")
+                    .with_category(DiagnosticCategory::ParseError)],
             };
         }
     };
@@ -1548,7 +1576,8 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
                             input.get_column(),
                         )
                         .with_length(1)
-                        .with_code("unexpected_eof"),
+                        .with_code("unexpected_eof")
+                        .with_category(DiagnosticCategory::ParseError),
                 );
                 break;
             }
@@ -1583,7 +1612,8 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
                 )
                 .with_length(found_len.max(1))
                 .with_code("expected_end_of_input")
-                .with_severity(DiagnosticSeverity::Error);
+                .with_severity(DiagnosticSeverity::Error)
+                .with_category(DiagnosticCategory::ParseError);
             if !found_snippet.is_empty() {
                 pe = pe.with_found(found_snippet);
             }

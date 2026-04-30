@@ -27,7 +27,7 @@ pub use ast::{
     RequirementDefBodyElement, RequirementUsage, RootElement, RootNamespace, Span,
     TextualRepresentation, VerificationCaseDef, VerificationCaseUsage, Visibility,
 };
-pub use error::{DiagnosticSeverity, ParseError};
+pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
 
 /// Parse a SysML v2 textual input into a root namespace AST.

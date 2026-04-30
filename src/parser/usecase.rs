@@ -502,7 +502,9 @@ pub(crate) fn objective(input: Input<'_>) -> IResult<Input<'_>, Node<Objective>>
     let (input, _) = ws_and_comments(input)?;
     let (input, visibility) = opt(alt((
         map(preceded(tag(&b"private"[..]), ws1), |_| Visibility::Private),
-        map(preceded(tag(&b"protected"[..]), ws1), |_| Visibility::Protected),
+        map(preceded(tag(&b"protected"[..]), ws1), |_| {
+            Visibility::Protected
+        }),
         map(preceded(tag(&b"public"[..]), ws1), |_| Visibility::Public),
     )))
     .parse(input)?;

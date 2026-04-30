@@ -208,7 +208,10 @@ fn requirement_def_body_element(
             map(subject_decl, RequirementDefBodyElement::SubjectDecl),
             map(attribute_usage, RequirementDefBodyElement::AttributeUsage),
             map(attribute_def, RequirementDefBodyElement::AttributeDef),
-            map(verify_requirement, RequirementDefBodyElement::VerifyRequirement),
+            map(
+                verify_requirement,
+                RequirementDefBodyElement::VerifyRequirement,
+            ),
             map(
                 require_constraint,
                 RequirementDefBodyElement::RequireConstraint,
