@@ -4,6 +4,10 @@ SysML v2 textual notation parser for Rust.
 
 This crate parses SysML v2 and related KerML textual syntax into an AST and also exposes a resilient editor-oriented parsing mode that returns partial AST + diagnostics.
 
+## Changelog
+
+Release notes and migration hints: [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Current status
 
 - library parser for a broad SysML v2 subset
