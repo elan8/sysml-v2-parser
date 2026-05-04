@@ -100,6 +100,7 @@ fn expected_ast() -> RootNamespace {
                                             AttributeDef {
                                                 name: "mass".to_string(),
                                                 typing: Some("ISQ::mass".to_string()),
+                                                value: None,
                                                 body: AttributeBody::Brace,
                                                 name_span: None,
                                                 typing_span: None,
@@ -126,6 +127,7 @@ fn expected_ast() -> RootNamespace {
                                             AttributeDef {
                                                 name: "mass".to_string(),
                                                 typing: Some("ISQ::mass".to_string()),
+                                                value: None,
                                                 body: AttributeBody::Semicolon,
                                                 name_span: None,
                                                 typing_span: None,
@@ -144,6 +146,7 @@ fn expected_ast() -> RootNamespace {
                                             AttributeDef {
                                                 name: "steeringAngle".to_string(),
                                                 typing: Some("ScalarValues::Real".to_string()),
+                                                value: None,
                                                 body: AttributeBody::Semicolon,
                                                 name_span: None,
                                                 typing_span: None,

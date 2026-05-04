@@ -405,12 +405,14 @@ pub struct ExhibitState {
     pub body: StateDefBody,
 }
 
-/// Attribute definition: `attribute` name (`:>` type)? body.
+/// Attribute definition: `attribute` [`def`] name (`:>` | `:` type)? (`=` value)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttributeDef {
     pub name: String,
     /// Type after `:>`, e.g. Some("ISQ::mass").
     pub typing: Option<String>,
+    /// Default or binding after `=` / `:=` / `default =` before the body terminator.
+    pub value: Option<Node<Expression>>,
     pub body: AttributeBody,
     /// Span of the defined name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -1908,6 +1910,7 @@ fn normalize_attribute_def(a: &AttributeDef) -> AttributeDef {
     AttributeDef {
         name: a.name.clone(),
         typing: a.typing.clone(),
+        value: a.value.clone(),
         body: a.body.clone(),
         name_span: None,
         typing_span: None,

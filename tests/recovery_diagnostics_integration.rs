@@ -481,10 +481,12 @@ fn invalid_unit_reference_reports_specific_diagnostic() {
     let sysml_v2_parser::ast::ActionDefBody::Brace { elements } = &action.body else {
         panic!("expected action definition brace body");
     };
-    assert!(elements
-        .iter()
-        .any(|e| matches!(e.value, sysml_v2_parser::ast::ActionDefBodyElement::Error(_))));
-    assert!(elements
-        .iter()
-        .any(|e| matches!(e.value, sysml_v2_parser::ast::ActionDefBodyElement::InOutDecl(_))));
+    assert!(elements.iter().any(|e| matches!(
+        e.value,
+        sysml_v2_parser::ast::ActionDefBodyElement::Error(_)
+    )));
+    assert!(elements.iter().any(|e| matches!(
+        e.value,
+        sysml_v2_parser::ast::ActionDefBodyElement::InOutDecl(_)
+    )));
 }

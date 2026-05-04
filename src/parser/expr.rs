@@ -120,11 +120,45 @@ fn literal_only(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         literal_boolean,
-        literal_integer,
         literal_real,
+        literal_integer,
         literal_string,
     ))
     .parse(input)
+}
+
+/// Unit text inside `[` … `]` (e.g. `kg`, `m/s`, `N*m`); broader than `qualified_name` for quantity literals.
+fn unit_name_in_brackets(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, _) = ws_and_comments(input)?;
+    let frag = input.fragment();
+    let mut i = 0usize;
+    while i < frag.len() {
+        let c = frag[i];
+        if c == b']' {
+            break;
+        }
+        if c.is_ascii_whitespace() {
+            break;
+        }
+        if c.is_ascii_alphanumeric() || matches!(c, b'_' | b'/' | b'-' | b'^' | b'.' | b'*' | b':')
+        {
+            i += 1;
+            continue;
+        }
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::AlphaNumeric,
+        )));
+    }
+    if i == 0 {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::AlphaNumeric,
+        )));
+    }
+    let s = String::from_utf8_lossy(&frag[..i]).trim().to_string();
+    let (input, _) = nom::bytes::complete::take(i).parse(input)?;
+    Ok((input, s))
 }
 
 /// Literal with optional [ unit ]: 1750 [kg] -> LiteralWithUnit(...).
@@ -137,7 +171,7 @@ fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     }
     let (input, _) = tag(&b"["[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, unit_name) = qualified_name(input)?;
+    let (input, unit_name) = unit_name_in_brackets.parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"]"[..]).parse(input)?;
     let unit = Node::new(
@@ -164,7 +198,9 @@ fn parenthesized(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b")") {
         let (input, _) = tag(&b")"[..]).parse(input)?;
-        return Ok((input, first));
+        // Include `(` … `)` in the span so consumers (e.g. Spec42 `text_from_span`) round-trip
+        // the full parenthesized source, not only the inner expression.
+        return Ok((input, node_from_to(start, input, first.value)));
     }
     let (input, _) = tag(&b","[..]).parse(input)?;
     let mut elements = vec![first];

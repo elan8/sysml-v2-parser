@@ -70,6 +70,7 @@ fn definitions_package() -> Package {
                 n(PackageBodyElement::AttributeDef(n(AttributeDef {
                     name: "FuelCmd".to_string(),
                     typing: None,
+                    value: None,
                     body: AttributeBody::Semicolon,
                     name_span: None,
                     typing_span: None,
@@ -77,6 +78,7 @@ fn definitions_package() -> Package {
                 n(PackageBodyElement::AttributeDef(n(AttributeDef {
                     name: "EngineStart".to_string(),
                     typing: None,
+                    value: None,
                     body: AttributeBody::Semicolon,
                     name_span: None,
                     typing_span: None,
@@ -84,6 +86,7 @@ fn definitions_package() -> Package {
                 n(PackageBodyElement::AttributeDef(n(AttributeDef {
                     name: "EngineOff".to_string(),
                     typing: None,
+                    value: None,
                     body: AttributeBody::Semicolon,
                     name_span: None,
                     typing_span: None,

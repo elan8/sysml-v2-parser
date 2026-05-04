@@ -733,8 +733,7 @@ fn invalid_unit_reference_diagnostic(
             "invalid_unit_reference",
             "invalid unit expression inside '[ ]'".to_string(),
             "unit name inside '[ ]'".to_string(),
-            "Use a unit symbol or qualified unit name (example: `[kg]` or `[SI::kg]`)."
-                .to_string(),
+            "Use a unit symbol or qualified unit name (example: `[kg]` or `[SI::kg]`).".to_string(),
         ));
     }
 
@@ -972,7 +971,8 @@ fn classify_recovery(
         };
     }
 
-    if let Some((code, message, expected, suggestion)) = invalid_unit_reference_diagnostic(trimmed) {
+    if let Some((code, message, expected, suggestion)) = invalid_unit_reference_diagnostic(trimmed)
+    {
         return RecoveryClassification::InvalidUnitReference {
             code: code.to_string(),
             message,

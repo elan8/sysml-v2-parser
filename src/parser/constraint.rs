@@ -15,7 +15,7 @@ use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::map;
+use nom::combinator::{map, opt};
 use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
@@ -128,7 +128,7 @@ pub(crate) fn structured_constraint_body(
                     next,
                     ConstraintDefBodyElement::Other(
                         String::from_utf8_lossy(
-                            &start_unknown.fragment()[..start_unknown.fragment().len().min(60)],
+                            &start_unknown.fragment()[..start_unknown.fragment().len().min(120)],
                         )
                         .trim()
                         .to_string(),
@@ -165,6 +165,7 @@ pub(crate) fn constraint_def_body_element(
     } else {
         map(expression, ConstraintDefBodyElement::Expression).parse(input)?
     };
+    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
@@ -271,7 +272,7 @@ fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
                     return Ok((input, CalcDefBody::Brace { elements }));
                 }
                 let frag = start_unknown.fragment();
-                let take = frag.len().min(60);
+                let take = frag.len().min(120);
                 let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
                 elements.push(node_from_to(
                     start_unknown,
@@ -319,6 +320,7 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     } else {
         map(expression, CalcDefBodyElement::Expression).parse(input)?
     };
+    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
 }
 
@@ -438,7 +440,7 @@ fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement>
         )));
     }
     let preview = String::from_utf8_lossy(
-        &start_unknown.fragment()[..start_unknown.fragment().len().min(60)],
+        &start_unknown.fragment()[..start_unknown.fragment().len().min(120)],
     )
     .trim()
     .to_string();

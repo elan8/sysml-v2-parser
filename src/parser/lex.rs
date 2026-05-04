@@ -147,9 +147,9 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
     b"then",
 ];
 
-pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[b"doc", b"in", b"out"];
+pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[b"doc", b"in", b"out", b"inout"];
 
-pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[b"doc", b"in", b"out", b"return"];
+pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[b"doc", b"in", b"out", b"inout", b"return"];
 
 pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[b"doc", b"filter", b"render"];
 

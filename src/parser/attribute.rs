@@ -71,21 +71,6 @@ fn value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expressio
     expression(input)
 }
 
-fn skip_value_part(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = alt((
-        preceded(tag(&b"="[..]), ws_and_comments),
-        preceded(tag(&b":="[..]), ws_and_comments),
-        preceded(
-            preceded(tag(&b"default"[..]), ws1),
-            preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
-        ),
-    ))
-    .parse(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
-    Ok((input, ()))
-}
-
 /// Attribute body: ';' or '{' ... '}' (skip content inside braces)
 pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
     let (input, _) = ws_and_comments(input)?;
@@ -136,9 +121,8 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
     let (typing_span, typing) = typing_result
         .map(|(span, s)| (Some(span), Some(s)))
         .unwrap_or((None, None));
-    // Quantities/Units declarations often contain rich suffixes before body (`:>>`, lists, defaults,
-    // multiple typed references). Consume the remainder up to `;`/`{` to keep dedicated mapping.
-    let (input, _) = nom::combinator::opt(skip_value_part).parse(input)?;
+    let (input, value) =
+        nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = attribute_body(input)?;
@@ -150,6 +134,7 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
             AttributeDef {
                 name: name_str,
                 typing,
+                value,
                 body,
                 name_span: None,
                 typing_span,
