@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-06-26
+
+### Added
+
+- **`serde` feature**: all AST types (`Span`, `Node<T>`, `Expression`, operators, and every `pub struct` / `pub enum` in `core`, `common`, `root`, `package`, `structure`, `behavior`, `requirement`, `view`, `kerml_fallback`) now conditionally derive `serde::Serialize` / `serde::Deserialize` when the `serde` feature is enabled. Enable with `sysml-v2-parser = { version = "0.26.0", features = ["serde"] }`. `DiagnosticCategory` and `DiagnosticSeverity` from `error` also gain the derives so that `ParseErrorNode` (embedded in the AST) round-trips cleanly.
+- **`PARSE_AST_VERSION: u32` constant** (in `lib.rs`): must be incremented on any breaking AST schema change. Consumers that cache serialized parse results (e.g. an LSP parse cache keyed by content hash) embed this value in cache entries and reject stale entries on mismatch.
+
+### Fixed
+
+- **Diagnostic collection gaps** in `collect_errors.rs`: `ParseErrorNode`s nested inside the bodies of `CaseDef`, `CaseUsage`, `AnalysisCaseDef`, `AnalysisCaseUsage`, `VerificationCaseDef`, `VerificationCaseUsage`, `ViewpointDef`, `ViewpointUsage`, `RenderingDef`, `PortDef`, `AttributeDef`, `ItemDef`, `IndividualDef`, `MetadataDef`, `MetadataUsage`, `OccurrenceDef`, `OccurrenceUsage`, `AllocationDef`, `AllocationUsage`, `FlowDef`, and `FlowUsage` were silently dropped and never surfaced as LSP diagnostics; they now propagate correctly.
+- **`collect_part_def_body_errors`**: errors inside `ExhibitState`, `RequirementUsage`, `OccurrenceUsage`, `AttributeDef`, and `AttributeUsage` members of part definition bodies now surface.
+- **`collect_part_usage_body_errors`**: errors inside `OccurrenceUsage` and `AttributeUsage` members of part usage bodies now surface.
+- Five new helper collectors introduced: `collect_attribute_body_errors`, `collect_definition_body_errors`, `collect_occurrence_usage_body_errors`, `collect_port_def_body_errors`, `collect_rendering_def_body_errors`.
+
 ## [0.25.4] - 2026-06-12
 
 ### Added

@@ -3,14 +3,17 @@
 use super::diagnostics::{bare_feature_declaration_in_part_def_diagnostic, trim_ascii_start};
 use super::recovery::parse_error_from_recovery_node;
 use crate::ast::{
-    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, CalcDefBody,
-    CalcDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, PackageBody,
-    PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement,
-    RequirementDefBody, RequirementDefBodyElement, RootNamespace, StateDefBody,
-    StateDefBodyElement, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
-    ViewDefBody, ViewDefBodyElement,
+    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement,
+    AttributeBody, AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConstraintDefBody,
+    ConstraintDefBodyElement, DefinitionBody, DefinitionBodyElement, OccurrenceBodyElement,
+    OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
+    PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RenderingDefBody,
+    RenderingDefBodyElement, RequirementDefBody, RequirementDefBodyElement, RootNamespace,
+    StateDefBody, StateDefBodyElement, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
+    ViewBodyElement, ViewDefBody, ViewDefBodyElement,
 };
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
+
 fn collect_requirement_body_errors(body: &RequirementDefBody, errors: &mut Vec<ParseError>) {
     if let RequirementDefBody::Brace { elements } = body {
         for element in elements {
@@ -123,6 +126,92 @@ fn collect_view_body_errors(body: &ViewBody, errors: &mut Vec<ParseError>) {
     }
 }
 
+fn collect_attribute_body_errors(body: &AttributeBody, errors: &mut Vec<ParseError>) {
+    if let AttributeBody::Brace { elements } = body {
+        for element in elements {
+            if let AttributeBodyElement::Error(n) = &element.value {
+                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+            }
+        }
+    }
+}
+
+fn collect_port_def_body_errors(body: &PortDefBody, errors: &mut Vec<ParseError>) {
+    if let PortDefBody::Brace { elements } = body {
+        for element in elements {
+            match &element.value {
+                PortDefBodyElement::Error(n) => {
+                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+                }
+                PortDefBodyElement::AttributeDef(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                PortDefBodyElement::AttributeUsage(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+fn collect_rendering_def_body_errors(body: &RenderingDefBody, errors: &mut Vec<ParseError>) {
+    if let RenderingDefBody::Brace { elements } = body {
+        for element in elements {
+            if let RenderingDefBodyElement::Error(n) = &element.value {
+                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+            }
+        }
+    }
+}
+
+fn collect_occurrence_usage_body_errors(
+    body: &OccurrenceUsageBody,
+    errors: &mut Vec<ParseError>,
+) {
+    if let OccurrenceUsageBody::Brace { elements } = body {
+        for element in elements {
+            match &element.value {
+                OccurrenceBodyElement::Error(n) => {
+                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+                }
+                OccurrenceBodyElement::PartUsage(n) => {
+                    collect_part_usage_body_errors(&n.value.body, errors)
+                }
+                OccurrenceBodyElement::OccurrenceUsage(n) => {
+                    collect_occurrence_usage_body_errors(&n.value.body, errors)
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+fn collect_definition_body_errors(body: &DefinitionBody, errors: &mut Vec<ParseError>) {
+    if let DefinitionBody::Brace { elements } = body {
+        for element in elements {
+            match &element.value {
+                DefinitionBodyElement::Error(n) => {
+                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+                }
+                DefinitionBodyElement::OccurrenceMember(n) => match &n.value {
+                    OccurrenceBodyElement::Error(err) => {
+                        errors.push(parse_error_from_recovery_node(&n.span, &err.value));
+                    }
+                    OccurrenceBodyElement::PartUsage(p) => {
+                        collect_part_usage_body_errors(&p.value.body, errors)
+                    }
+                    OccurrenceBodyElement::OccurrenceUsage(o) => {
+                        collect_occurrence_usage_body_errors(&o.value.body, errors)
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
+    }
+}
+
 fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>) {
     if let PartDefBody::Brace { elements } = body {
         for element in elements {
@@ -138,6 +227,21 @@ fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>
                 }
                 PartDefBodyElement::Perform(n) => {
                     collect_perform_body_errors(&n.value.body, errors)
+                }
+                PartDefBodyElement::AttributeDef(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                PartDefBodyElement::AttributeUsage(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                PartDefBodyElement::RequirementUsage(n) => {
+                    collect_requirement_body_errors(&n.value.body, errors)
+                }
+                PartDefBodyElement::ExhibitState(n) => {
+                    collect_state_body_errors(&n.value.body, errors)
+                }
+                PartDefBodyElement::OccurrenceUsage(n) => {
+                    collect_occurrence_usage_body_errors(&n.value.body, errors)
                 }
                 _ => {}
             }
@@ -168,6 +272,12 @@ fn collect_part_usage_body_errors(body: &PartUsageBody, errors: &mut Vec<ParseEr
                 PartUsageBodyElement::StateUsage(n) => {
                     collect_state_body_errors(&n.value.body, errors)
                 }
+                PartUsageBodyElement::AttributeUsage(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                PartUsageBodyElement::OccurrenceUsage(n) => {
+                    collect_occurrence_usage_body_errors(&n.value.body, errors)
+                }
                 _ => {}
             }
         }
@@ -193,6 +303,12 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
                 PackageBodyElement::PartUsage(n) => {
                     collect_part_usage_body_errors(&n.value.body, errors)
                 }
+                PackageBodyElement::PortDef(n) => {
+                    collect_port_def_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::AttributeDef(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
                 PackageBodyElement::ActionDef(n) => {
                     collect_action_def_body_errors(&n.value.body, errors)
                 }
@@ -211,21 +327,84 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
                 PackageBodyElement::UseCaseUsage(n) => {
                     collect_use_case_body_errors(&n.value.body, errors)
                 }
+                PackageBodyElement::CaseDef(n) => {
+                    collect_use_case_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::CaseUsage(n) => {
+                    collect_use_case_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::AnalysisCaseDef(n) => {
+                    collect_use_case_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::AnalysisCaseUsage(n) => {
+                    collect_use_case_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::VerificationCaseDef(n) => {
+                    collect_use_case_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::VerificationCaseUsage(n) => {
+                    collect_use_case_body_errors(&n.value.body, errors)
+                }
                 PackageBodyElement::ConcernUsage(n) => {
                     collect_requirement_body_errors(&n.value.body, errors)
                 }
-                PackageBodyElement::StateDef(n) => collect_state_body_errors(&n.value.body, errors),
+                PackageBodyElement::ViewpointDef(n) => {
+                    collect_requirement_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::ViewpointUsage(n) => {
+                    collect_requirement_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::StateDef(n) => {
+                    collect_state_body_errors(&n.value.body, errors)
+                }
                 PackageBodyElement::StateUsage(n) => {
                     collect_state_body_errors(&n.value.body, errors)
                 }
                 PackageBodyElement::ConstraintDef(n) => {
                     collect_constraint_body_errors(&n.value.body, errors)
                 }
-                PackageBodyElement::CalcDef(n) => collect_calc_body_errors(&n.value.body, errors),
+                PackageBodyElement::CalcDef(n) => {
+                    collect_calc_body_errors(&n.value.body, errors)
+                }
                 PackageBodyElement::ViewDef(n) => {
                     collect_view_def_body_errors(&n.value.body, errors)
                 }
-                PackageBodyElement::ViewUsage(n) => collect_view_body_errors(&n.value.body, errors),
+                PackageBodyElement::ViewUsage(n) => {
+                    collect_view_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::RenderingDef(n) => {
+                    collect_rendering_def_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::MetadataDef(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::MetadataUsage(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::ItemDef(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::IndividualDef(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::OccurrenceDef(n) => {
+                    collect_definition_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::OccurrenceUsage(n) => {
+                    collect_occurrence_usage_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::AllocationDef(n) => {
+                    collect_definition_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::AllocationUsage(n) => {
+                    collect_definition_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::FlowDef(n) => {
+                    collect_definition_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::FlowUsage(n) => {
+                    collect_definition_body_errors(&n.value.body, errors)
+                }
                 _ => {}
             }
         }
