@@ -376,6 +376,7 @@ pub enum PortDefBodyElement {
     AttributeUsage(Node<AttributeUsage>),
     ItemUsage(Node<ItemUsage>),
     PortUsage(Node<PortUsage>),
+    Other(String),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.

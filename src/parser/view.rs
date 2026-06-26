@@ -10,8 +10,8 @@ use crate::parser::definition_header::{parse_feature_usage_header, parse_usage_h
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    identification, name, qualified_name, starts_with_any_keyword, ws1, ws_and_comments,
-    VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    capture_opaque_member, identification, name, qualified_name, starts_with_any_keyword, ws1,
+    ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::Input;
@@ -23,6 +23,8 @@ use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
 
+const VIEW_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
+
 fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -30,6 +32,10 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
         map(doc_comment, ViewDefBodyElement::Doc),
         map(view_filter_member, ViewDefBodyElement::Filter),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
+        map(
+            |i| capture_opaque_member(i, VIEW_DEF_OPAQUE_STARTERS),
+            ViewDefBodyElement::Other,
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -137,6 +143,8 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
     ))
 }
 
+const RENDERING_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
+
 fn rendering_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingDefBodyElement>> {
@@ -146,6 +154,10 @@ fn rendering_def_body_element(
         map(doc_comment, RenderingDefBodyElement::Doc),
         map(view_filter_member, RenderingDefBodyElement::Filter),
         map(view_rendering_usage, RenderingDefBodyElement::ViewRendering),
+        map(
+            |i| capture_opaque_member(i, RENDERING_DEF_OPAQUE_STARTERS),
+            RenderingDefBodyElement::Other,
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

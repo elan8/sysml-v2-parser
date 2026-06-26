@@ -8,7 +8,7 @@ use crate::parser::attribute::attribute_usage;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
-use crate::parser::lex::{name, recover_body_element, ws1, ws_and_comments};
+use crate::parser::lex::{capture_opaque_member, name, recover_body_element, ws1, ws_and_comments};
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::flow::flow_usage_member;
@@ -37,7 +37,16 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"timeslice",
     b"@",
     b"#",
+    b"end",
+    b"ref",
+    b"abstract",
+    b"private",
+    b"in",
+    b"connection",
 ];
+
+const DEFINITION_BODY_OPAQUE_STARTERS: &[&[u8]] =
+    &[b"end", b"ref", b"abstract", b"private", b"in", b"connection", b"succession"];
 
 /// `;` or brace body with occurrence-style members (`attribute`, `part`, `occurrence`, …).
 pub(crate) fn occurrence_definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
@@ -73,10 +82,17 @@ fn occurrence_definition_body_with_labels<'a>(
         recovery_code,
         |input| {
             let start = input;
-            let (input, node) = occurrence_body_element(input)?;
+            let (input, element) = nom::branch::alt((
+                nom::combinator::map(
+                    |i| capture_opaque_member(i, DEFINITION_BODY_OPAQUE_STARTERS),
+                    DefinitionBodyElement::Other,
+                ),
+                nom::combinator::map(occurrence_body_element, DefinitionBodyElement::OccurrenceMember),
+            ))
+            .parse(input)?;
             Ok((
                 input,
-                node_from_to(start, input, DefinitionBodyElement::OccurrenceMember(node)),
+                node_from_to(start, input, element),
             ))
         },
         |start, end| {

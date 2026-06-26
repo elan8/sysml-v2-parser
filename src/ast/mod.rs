@@ -679,6 +679,7 @@ fn normalize_port_def_body_element_node(el: &Node<PortDefBodyElement>) -> Node<P
         PortDefBodyElement::PortUsage(n) => {
             PortDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
+        PortDefBodyElement::Other(s) => PortDefBodyElement::Other(s.clone()),
     };
     dummy_node(el, value)
 }

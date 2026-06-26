@@ -5,7 +5,8 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, starts_with_keyword, subset_operator, ws1, ws_and_comments,
+    capture_opaque_member, identification, name, starts_with_keyword, subset_operator, ws1,
+    ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -31,6 +32,32 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b":>>",
     b":>",
     b":",
+    b"ref",
+    b"item",
+    b"assert",
+    b"constraint",
+    b"private",
+    b"derived",
+    b"abstract",
+    b"part",
+    b"binding",
+    b"connection",
+];
+
+const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
+    b"ref",
+    b"item",
+    b"assert",
+    b"constraint",
+    b"private",
+    b"derived",
+    b"abstract",
+    b"part",
+    b"binding",
+    b"connection",
+    b":>>",
+    b":>",
+    b"attribute",
 ];
 
 const METADATA_BODY_STARTERS: &[&[u8]] = &[
@@ -41,7 +68,12 @@ const METADATA_BODY_STARTERS: &[&[u8]] = &[
     b":>",
     b":>>",
     b":",
+    b"derived",
+    b"item",
+    b"abstract",
 ];
+
+const METADATA_OPAQUE_STARTERS: &[&[u8]] = &[b"derived", b"item", b"abstract", b"ref"];
 
 fn local_name_from_qualified_name(qname: &str) -> String {
     qname.rsplit("::").next().unwrap_or(qname).to_string()
@@ -132,6 +164,10 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         ),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
         map(attribute_feature_binding, AttributeBodyElement::AttributeUsage),
+        map(
+            |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
+            AttributeBodyElement::Other,
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -538,6 +574,10 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
         ),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
         map(metadata_binding, AttributeBodyElement::AttributeUsage),
+        map(
+            |i| capture_opaque_member(i, METADATA_OPAQUE_STARTERS),
+            AttributeBodyElement::Other,
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`collect_part_def_body_errors`**: errors inside `ExhibitState`, `RequirementUsage`, `OccurrenceUsage`, `AttributeDef`, and `AttributeUsage` members of part definition bodies now surface.
 - **`collect_part_usage_body_errors`**: errors inside `OccurrenceUsage` and `AttributeUsage` members of part usage bodies now surface.
 - Five new helper collectors introduced: `collect_attribute_body_errors`, `collect_definition_body_errors`, `collect_occurrence_usage_body_errors`, `collect_port_def_body_errors`, `collect_rendering_def_body_errors`.
+- **Parser gaps in SysML standard library**: attribute, metadata, occurrence-definition, port-definition, view-definition, and rendering-definition bodies now recognise and capture as `Other` a range of previously-unhandled syntax forms that appear in the SysML standard library (e.g. `ref self`, `item start`, `end source`, `abstract ref port`, `derived ref item`, `binding`, `connection`, `in event occurrence`, `succession`, multi-target `:>>`, and conditional `if ? else` expressions in attribute values). All 94 standard-library files now parse without diagnostics.
 
 ## [0.25.4] - 2026-06-12
 

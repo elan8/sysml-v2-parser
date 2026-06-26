@@ -11,7 +11,9 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
-use crate::parser::lex::{name, ws1, ws_and_comments, PORT_BODY_STARTERS, PORT_DEF_BODY_STARTERS};
+use crate::parser::lex::{
+    capture_opaque_member, name, ws1, ws_and_comments, PORT_BODY_STARTERS, PORT_DEF_BODY_STARTERS,
+};
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
@@ -147,6 +149,8 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     ))
 }
 
+const PORT_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
+
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -158,6 +162,10 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         map(|i| attribute_def(i, true), PortDefBodyElement::AttributeDef),
         map(attribute_usage, PortDefBodyElement::AttributeUsage),
         map(port_usage, PortDefBodyElement::PortUsage),
+        map(
+            |i| capture_opaque_member(i, PORT_DEF_OPAQUE_STARTERS),
+            PortDefBodyElement::Other,
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
