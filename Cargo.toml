@@ -11,10 +11,15 @@ keywords = ["sysml", "parser", "modeling", "kerml"]
 categories = ["parser-implementations"]
 exclude = ["sysml-v2-release/*", "target/*", "test-logs/*"]
 
+[features]
+default = []
+serde = ["dep:serde"]
+
 [dependencies]
 log = "0.4"
 nom = "8"
 nom_locate = "5"
+serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 criterion = "0.5"

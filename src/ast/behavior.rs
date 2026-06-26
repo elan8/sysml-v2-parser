@@ -7,6 +7,7 @@ use crate::ast::core::{Expression, Node, Span};
 
 /// Action definition: `action def` Identification body (in/out params).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -16,6 +17,7 @@ pub struct ActionDef {
 
 /// Body of an action definition: `;` or `{` ActionDefBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionDefBody {
     Semicolon,
     Brace {
@@ -25,6 +27,7 @@ pub enum ActionDefBody {
 
 /// Element inside an action definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionDefBodyElement {
     Error(Node<ParseErrorNode>),
     InOutDecl(Node<InOutDecl>),
@@ -52,6 +55,7 @@ pub enum ActionDefBodyElement {
 /// - `assign x := y;`
 /// - `then assign position := dynamics.x_out;`
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssignStmt {
     pub is_then: bool,
     pub lhs: String,
@@ -60,6 +64,7 @@ pub struct AssignStmt {
 
 /// For-loop node (SysML v2 ForLoopNode) - modeled minimally.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ForLoop {
     pub var: String,
     pub range: String,
@@ -68,12 +73,14 @@ pub struct ForLoop {
 
 /// Succession to an action usage: `then action ...`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThenAction {
     pub action: Node<ActionUsage>,
 }
 
 /// In/out parameter in action def: `in` name `:` type `;` or `out` name `:` type `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InOutDecl {
     pub direction: InOut,
     pub name: String,
@@ -81,6 +88,7 @@ pub struct InOutDecl {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InOut {
     In,
     Out,
@@ -89,6 +97,7 @@ pub enum InOut {
 
 /// Typed payload on accept/send control nodes: `accept name : Type` or `send name : Type`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PayloadClause {
     pub name: String,
     pub type_name: Option<String>,
@@ -98,6 +107,7 @@ pub struct PayloadClause {
 
 /// Transition accept trigger: typed payload or shorthand expression (`accept StartPressed`).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TransitionAccept {
     Payload(PayloadClause),
     Shorthand(Node<Expression>),
@@ -105,6 +115,7 @@ pub enum TransitionAccept {
 
 /// Action usage: `action` name `:` type_name (`accept` param_name `:` param_type)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionUsage {
     pub name: String,
     pub type_name: String,
@@ -121,6 +132,7 @@ pub struct ActionUsage {
 
 /// Body of an action usage: `;` or `{` ActionUsageBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionUsageBody {
     Semicolon,
     Brace {
@@ -130,6 +142,7 @@ pub enum ActionUsageBody {
 
 /// Element inside an action usage body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionUsageBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
@@ -152,6 +165,7 @@ pub enum ActionUsageBodyElement {
 
 /// A minimally-modeled declaration inside an action/behavior body (e.g. `attribute ...;`, `calc ...;`).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionBodyDecl {
     pub keyword: String,
     pub text: String,
@@ -159,6 +173,7 @@ pub struct ActionBodyDecl {
 
 /// Flow definition: `flow def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FlowDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -168,6 +183,7 @@ pub struct FlowDef {
 
 /// Kind of flow usage statement per SysML v2 §8.2.2.16.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FlowUsageKind {
     Flow,
     Message,
@@ -176,6 +192,7 @@ pub enum FlowUsageKind {
 
 /// Flow usage: `flow` | `message` | `succession flow` with optional name, payload, and endpoints.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FlowUsage {
     pub kind: FlowUsageKind,
     pub name: Option<String>,
@@ -188,6 +205,7 @@ pub struct FlowUsage {
 
 /// First/then control flow: `first` expr `then` expr body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FirstStmt {
     pub first: Node<Expression>,
     pub then: Node<Expression>,
@@ -196,6 +214,7 @@ pub struct FirstStmt {
 
 /// Merge: `merge` expr body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MergeStmt {
     pub merge: Node<Expression>,
     pub body: FirstMergeBody,
@@ -203,6 +222,7 @@ pub struct MergeStmt {
 
 /// Body of first/merge: `;` or `{` ... `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FirstMergeBody {
     Semicolon,
     Brace,
@@ -214,6 +234,7 @@ pub enum FirstMergeBody {
 
 /// Allocate statement at part usage level: `allocate` from `to` to body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Allocate {
     pub source: Node<Expression>,
     pub target: Node<Expression>,
@@ -222,6 +243,7 @@ pub struct Allocate {
 
 /// Allocation definition: `allocation def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AllocationDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -231,6 +253,7 @@ pub struct AllocationDef {
 
 /// Allocation usage: `allocation` name (`:` type)? [`allocate` source `to` target]? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AllocationUsage {
     pub name: String,
     pub type_name: Option<String>,
@@ -245,6 +268,7 @@ pub struct AllocationUsage {
 
 /// State definition: `state def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StateDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -253,6 +277,7 @@ pub struct StateDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StateDefBody {
     Semicolon,
     Brace {
@@ -261,6 +286,7 @@ pub enum StateDefBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StateDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
@@ -283,6 +309,7 @@ pub enum StateDefBodyElement {
 
 /// Entry action: `entry` (`;` or body).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EntryAction {
     /// For `entry action name body` form; None for plain `entry` body.
     pub action_name: Option<String>,
@@ -291,6 +318,7 @@ pub struct EntryAction {
 
 /// Then (initial state): `then` name `;`
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThenStmt {
     pub state_name: String,
     pub name_span: Option<Span>,
@@ -298,6 +326,7 @@ pub struct ThenStmt {
 
 /// Final state: `final` name `;` or `final state` name `;`
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FinalState {
     pub state_name: String,
     pub name_span: Span,
@@ -305,6 +334,7 @@ pub struct FinalState {
 
 /// State usage: `state` name (`:` type)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StateUsage {
     pub name: String,
     pub type_name: Option<String>,
@@ -313,6 +343,7 @@ pub struct StateUsage {
 
 /// Transition: `transition` name [`first` source [`accept` trigger]] [`if` guard] [`do` effect] `then` target body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Transition {
     pub name: Option<String>,
     /// If omitted, form is `transition name then target;`.

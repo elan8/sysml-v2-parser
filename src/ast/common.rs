@@ -2,6 +2,7 @@ use crate::ast::core::{Expression, Node, Span};
 
 /// KerML ElementFilterMember: MemberPrefix? 'filter' condition ';'
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FilterMember {
     pub visibility: Option<Visibility>,
     pub condition: Node<Expression>,
@@ -9,6 +10,7 @@ pub struct FilterMember {
 
 /// Placeholder node inserted when resilient parsing skips malformed input.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ParseErrorNode {
     pub message: String,
     pub code: String,
@@ -20,6 +22,7 @@ pub struct ParseErrorNode {
 /// Identification: optional short name in `< >`, optional name.
 /// BNF: ( '<' declaredShortName = NAME '>' )? ( declaredName = NAME )?
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Identification {
     /// Short name inside `< ... >`, if present.
     pub short_name: Option<String>,
@@ -29,6 +32,7 @@ pub struct Identification {
 
 /// Visibility for imports and members.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Visibility {
     Public,
     Private,
@@ -37,12 +41,14 @@ pub enum Visibility {
 
 /// KerML FilterPackageMember: `[` OwnedExpression `]`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FilterPackageMember {
     pub expression: Node<Expression>,
 }
 
 /// Import: `private`? `import` `all`? QualifiedName (`::` `*`)? or FilterPackage form.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Import {
     pub visibility: Option<Visibility>,
     /// Whether this is a namespace import (QualifiedName::* or FilterPackage) or membership import (single QualifiedName).
@@ -56,6 +62,7 @@ pub struct Import {
 }
 /// KerML Documentation: 'doc' Identification? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DocComment {
     /// Optional identification after 'doc'.
     pub identification: Option<Identification>,
@@ -67,6 +74,7 @@ pub struct DocComment {
 
 /// KerML Comment: ( 'comment' Identification? )? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CommentAnnotation {
     pub identification: Option<Identification>,
     pub locale: Option<String>,
@@ -75,6 +83,7 @@ pub struct CommentAnnotation {
 
 /// KerML TextualRepresentation: ( 'rep' Identification )? 'language' STRING_VALUE body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TextualRepresentation {
     pub rep_identification: Option<Identification>,
     pub language: String,
@@ -83,6 +92,7 @@ pub struct TextualRepresentation {
 }
 /// Body of a connect statement: `;` or `{` ... `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConnectBody {
     Semicolon,
     Brace,

@@ -6,6 +6,7 @@ use crate::ast::core::{Expression, Node, Span};
 
 /// Part definition: `part def` Identification (`:>` specializes)? Body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartDef {
     /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix).
     pub definition_prefix: Option<DefinitionPrefix>,
@@ -21,6 +22,7 @@ pub struct PartDef {
 
 /// BNF BasicDefinitionPrefix: `abstract` | `variation`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DefinitionPrefix {
     Abstract,
     Variation,
@@ -28,6 +30,7 @@ pub enum DefinitionPrefix {
 
 /// Body of a part definition: `;` or `{` PartDefBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartDefBody {
     Semicolon,
     Brace {
@@ -37,6 +40,7 @@ pub enum PartDefBody {
 
 /// Element inside a part definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
@@ -74,6 +78,7 @@ pub enum PartDefBodyElement {
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OpaqueMemberDecl {
     pub keyword: String,
     pub name: String,
@@ -83,6 +88,7 @@ pub struct OpaqueMemberDecl {
 
 /// Connection usage member inside part definitions.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionUsageMember {
     pub name: Option<String>,
     pub type_name: Option<String>,
@@ -93,6 +99,7 @@ pub struct ConnectionUsageMember {
 
 /// Exhibit state usage: `exhibit state` name `:` type (`;` or body).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExhibitState {
     pub name: String,
     pub type_name: Option<String>,
@@ -102,6 +109,7 @@ pub struct ExhibitState {
 
 /// Attribute definition: `attribute` [`def`] name (`:>` | `:` type)? (`=` value)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeDef {
     pub name: String,
     /// Short name from `< ... >` when present (e.g. unit symbol `m`, `EUR`).
@@ -121,6 +129,7 @@ pub struct AttributeDef {
 
 /// Body of an attribute (def or usage): `;` or `{` AttributeBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AttributeBody {
     Semicolon,
     Brace {
@@ -129,6 +138,7 @@ pub enum AttributeBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AttributeBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
@@ -139,6 +149,7 @@ pub enum AttributeBodyElement {
 
 /// Item definition: `item def` Identification body (for events, etc.).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -148,6 +159,7 @@ pub struct ItemDef {
 
 /// Individual definition: `individual def` Identification `:>` type body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IndividualDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -157,6 +169,7 @@ pub struct IndividualDef {
 
 /// Part usage: `part` name `:` type multiplicity? `ordered`? (`redefines`|`:>>`)? value? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartUsage {
     /// Optional `abstract` or `variation` prefix on a part usage.
     pub usage_prefix: Option<DefinitionPrefix>,
@@ -182,6 +195,7 @@ pub struct PartUsage {
 
 /// Body of a part usage: `;` or `{` PartUsageBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartUsageBody {
     Semicolon,
     Brace {
@@ -191,6 +205,7 @@ pub enum PartUsageBody {
 
 /// Metadata annotation on usage: `@` Name (`:` Type)? (`about` targets)? MetadataBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataAnnotation {
     pub name: String,
     pub type_name: Option<String>,
@@ -202,6 +217,7 @@ pub struct MetadataAnnotation {
 
 /// User-defined metadata keyword usage: `#keyword` (`:` Type)? (`about` targets)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataKeywordUsage {
     pub keyword: String,
     pub type_name: Option<String>,
@@ -213,6 +229,7 @@ pub struct MetadataKeywordUsage {
 
 /// Generic annotation or metadata usage captured in body scopes.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Annotation {
     pub sigil: String,
     pub head: String,
@@ -224,6 +241,7 @@ pub struct Annotation {
 
 /// Element inside a part usage body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartUsageBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
@@ -251,12 +269,14 @@ pub enum PartUsageBodyElement {
 
 /// Variant reference inside a variation part usage: `variant` name `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VariantUsage {
     pub name: String,
 }
 
 /// Enacted performance: `perform` action_path `{` body `}` inside a part usage.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Perform {
     /// Qualified action name (e.g. "provide power" or "provide power.generate torque").
     pub action_name: String,
@@ -267,6 +287,7 @@ pub struct Perform {
 
 /// Body of a perform: `;` or `{` PerformBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PerformBody {
     Semicolon,
     Brace {
@@ -276,6 +297,7 @@ pub enum PerformBody {
 
 /// Element inside a perform body: doc comment or in/out binding.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PerformBodyElement {
     Doc(Node<DocComment>),
     InOut(Node<PerformInOutBinding>),
@@ -283,6 +305,7 @@ pub enum PerformBodyElement {
 
 /// In/out binding inside a perform body: `in` name `=` expr `;` or `out` name `=` expr `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PerformInOutBinding {
     pub direction: InOut,
     pub name: String,
@@ -291,6 +314,7 @@ pub struct PerformInOutBinding {
 
 /// Attribute usage: `attribute` name (`:>` | `:` type)? `redefines`? value? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeUsage {
     pub name: String,
     /// Type after `:` or `:>`, e.g. Some("MassValue").
@@ -322,6 +346,7 @@ pub struct AttributeUsage {
 
 /// Port definition: `port def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortDef {
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("ClutchPort") for `port def ManualClutchPort :> ClutchPort`.
@@ -332,6 +357,7 @@ pub struct PortDef {
 
 /// Body of a port definition: `;` or `{` PortDefBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PortDefBody {
     Semicolon,
     Brace {
@@ -341,6 +367,7 @@ pub enum PortDefBody {
 
 /// Element inside a port definition body (in/out declarations or nested port usages).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PortDefBodyElement {
     InOutDecl(Node<InOutDecl>),
     Doc(Node<DocComment>),
@@ -353,6 +380,7 @@ pub enum PortDefBodyElement {
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortUsage {
     pub name: String,
     pub type_name: Option<String>,
@@ -373,6 +401,7 @@ pub struct PortUsage {
 
 /// Body of a port usage: `;` or `{` PortBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PortBody {
     Semicolon,
     Brace {
@@ -382,6 +411,7 @@ pub enum PortBody {
 
 /// Element inside a port usage body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum PortBodyElement {
     Error(Node<ParseErrorNode>),
@@ -392,6 +422,7 @@ pub enum PortBodyElement {
 
 /// Connect statement in interface def or usage: `connect` from `to` to body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectStmt {
     pub from: Node<Expression>,
     pub to: Node<Expression>,
@@ -404,6 +435,7 @@ pub struct ConnectStmt {
 
 /// Interface definition: `interface def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InterfaceDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -413,6 +445,7 @@ pub struct InterfaceDef {
 
 /// Body of an interface definition: `;` or `{` InterfaceDefBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceDefBody {
     Semicolon,
     Brace {
@@ -422,6 +455,7 @@ pub enum InterfaceDefBody {
 
 /// Element inside an interface definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceDefBodyElement {
     Doc(Node<DocComment>),
     EndDecl(Node<EndDecl>),
@@ -431,6 +465,7 @@ pub enum InterfaceDefBodyElement {
 
 /// End declaration in interface def: `end` name `:` type `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
     pub name: String,
     pub type_name: String,
@@ -443,6 +478,7 @@ pub struct EndDecl {
 
 /// Ref declaration in interface def: `ref` name `:` type body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RefDecl {
     pub name: String,
     pub type_name: String,
@@ -457,6 +493,7 @@ pub struct RefDecl {
 
 /// Body of a ref declaration: `;` or `{` ... `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RefBody {
     Semicolon,
     Brace,
@@ -468,6 +505,7 @@ pub enum RefBody {
 
 /// Connection definition: `connection def` Identification body (BNF ConnectionDefinition).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionDef {
     pub annotation: Option<String>,
     pub identification: Identification,
@@ -478,6 +516,7 @@ pub struct ConnectionDef {
 
 /// Body of a connection definition: `;` or `{` end/ref/connect* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConnectionDefBody {
     Semicolon,
     Brace {
@@ -486,6 +525,7 @@ pub enum ConnectionDefBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConnectionDefBodyElement {
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
@@ -498,6 +538,7 @@ pub enum ConnectionDefBodyElement {
 
 /// Metadata definition: `metadata def` Identification body (BNF MetadataDefinition).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataDef {
     pub is_abstract: bool,
     pub identification: Identification,
@@ -508,6 +549,7 @@ pub struct MetadataDef {
 
 /// Metadata usage: `metadata` name (`:` type)? (`about` targets)? body (BNF MetadataUsage).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataUsage {
     pub name: String,
     pub type_name: Option<String>,
@@ -521,6 +563,7 @@ pub struct MetadataUsage {
 
 /// Enumeration definition: `enum def` Identification EnumerationBody (BNF EnumerationDefinition).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -529,6 +572,7 @@ pub struct EnumDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum EnumerationBody {
     Semicolon,
     Brace { values: Vec<String> },
@@ -540,6 +584,7 @@ pub enum EnumerationBody {
 
 /// Occurrence definition: `occurrence def` Identification body (BNF OccurrenceDefinition).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceDef {
     pub is_abstract: bool,
     pub identification: Identification,
@@ -550,6 +595,7 @@ pub struct OccurrenceDef {
 
 /// Occurrence usage: `occurrence` name (`:` type)? body, with optional individual/portion modifiers.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceUsage {
     pub is_individual: bool,
     pub is_then: bool,
@@ -564,6 +610,7 @@ pub struct OccurrenceUsage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum OccurrenceUsageBody {
     Semicolon,
     Brace {
@@ -573,11 +620,13 @@ pub enum OccurrenceUsageBody {
 
 /// Occurrence-level assert member: `assert constraint` body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssertConstraintMember {
     pub body: ConstraintDefBody,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum OccurrenceBodyElement {
     Error(Node<ParseErrorNode>),
@@ -597,6 +646,7 @@ pub enum OccurrenceBodyElement {
 
 /// Generic definition body: `;` or `{` DefinitionBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DefinitionBody {
     Semicolon,
     Brace {
@@ -605,6 +655,7 @@ pub enum DefinitionBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum DefinitionBodyElement {
     Error(Node<ParseErrorNode>),
@@ -618,6 +669,7 @@ pub enum DefinitionBodyElement {
 
 /// Bind: `bind` left `=` right (`;` or `{ }`).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Bind {
     pub left: Node<Expression>,
     pub right: Node<Expression>,
@@ -627,6 +679,7 @@ pub struct Bind {
 
 /// Interface usage: typed+connect or connection form.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceUsage {
     /// `interface` `:Type`? `connect` from `to` to body; optional body with ref redefs.
     TypedConnect {
@@ -646,6 +699,7 @@ pub enum InterfaceUsage {
 
 /// Element in interface usage body (e.g. ref redefinition).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceUsageBodyElement {
     /// `ref` `:>>` name `=` value body.
     RefRedef {
@@ -657,6 +711,7 @@ pub enum InterfaceUsageBodyElement {
 
 /// Connect at part usage level: `connect` from `to` to body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Connect {
     pub from: Node<Expression>,
     pub to: Node<Expression>,
@@ -669,6 +724,7 @@ pub struct Connect {
 
 /// Alias definition: `alias` Identification `for` qualified_name body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AliasDef {
     pub identification: Identification,
     pub target: String,
@@ -677,6 +733,7 @@ pub struct AliasDef {
 
 /// Body of an alias definition: `;` or `{` ... `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AliasBody {
     Semicolon,
     Brace,

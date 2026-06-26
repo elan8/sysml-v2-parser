@@ -850,6 +850,7 @@ dependencies = [
  "nom",
  "nom_locate",
  "proptest",
+ "serde",
 ]
 
 [[package]]

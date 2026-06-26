@@ -7,6 +7,7 @@ use crate::ast::core::{Expression, Node, Span};
 
 /// Constraint definition: `constraint def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConstraintDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -15,6 +16,7 @@ pub struct ConstraintDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConstraintDefBody {
     Semicolon,
     Brace {
@@ -23,6 +25,7 @@ pub enum ConstraintDefBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConstraintDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
@@ -35,6 +38,7 @@ pub enum ConstraintDefBodyElement {
 
 /// constraint body {}
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConstraintBody {
     Semicolon,
     Brace, // Often contains docs or block of expressions
@@ -42,6 +46,7 @@ pub enum ConstraintBody {
 
 /// Calc definition: `calc def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcDef {
     pub identification: Identification,
     pub body: CalcDefBody,
@@ -49,6 +54,7 @@ pub struct CalcDef {
 
 /// Calculation usage: `calc` Identification (`:` type)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcUsage {
     pub identification: Identification,
     pub type_name: Option<String>,
@@ -56,6 +62,7 @@ pub struct CalcUsage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CalcDefBody {
     Semicolon,
     Brace {
@@ -64,6 +71,7 @@ pub enum CalcDefBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CalcDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
@@ -76,6 +84,7 @@ pub enum CalcDefBodyElement {
 
 /// Return declaration: `return` name `:` type `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReturnDecl {
     pub name: String,
     pub type_name: String,
@@ -87,6 +96,7 @@ pub struct ReturnDecl {
 
 /// View definition: `view def` Identification ViewDefinitionBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -95,6 +105,7 @@ pub struct ViewDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewDefBody {
     Semicolon,
     Brace {
@@ -103,6 +114,7 @@ pub enum ViewDefBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// Unmodeled view-definition body element captured as raw text (used for library parsing).
@@ -114,6 +126,7 @@ pub enum ViewDefBodyElement {
 
 /// View rendering usage: `render` name `:` type (`;` or body).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewRenderingUsage {
     pub name: String,
     pub type_name: Option<String>,
@@ -122,6 +135,7 @@ pub struct ViewRenderingUsage {
 
 /// Viewpoint definition: `viewpoint def` Identification RequirementBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewpointDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -131,6 +145,7 @@ pub struct ViewpointDef {
 
 /// Rendering definition: `rendering def` Definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderingDef {
     pub identification: Identification,
     pub specializes: Option<String>,
@@ -139,6 +154,7 @@ pub struct RenderingDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderingDefBody {
     Semicolon,
     Brace {
@@ -147,6 +163,7 @@ pub enum RenderingDefBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderingDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
@@ -157,6 +174,7 @@ pub enum RenderingDefBodyElement {
 
 /// View usage: `view` name `:` type? ViewBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewUsage {
     pub name: String,
     pub type_name: Option<String>,
@@ -164,6 +182,7 @@ pub struct ViewUsage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBody {
     Semicolon,
     Brace {
@@ -172,6 +191,7 @@ pub enum ViewBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBodyElement {
     Error(Node<ParseErrorNode>),
     /// Unmodeled view body element captured as raw text (used for library parsing).
@@ -185,6 +205,7 @@ pub enum ViewBodyElement {
 
 /// Expose in view body: `expose` (MembershipImport | NamespaceImport) RelationshipBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExposeMember {
     /// Full target path (e.g. vehicle, vehicle::*, vehicle::*::**, SystemModel::vehicle::**).
     pub target: String,
@@ -193,6 +214,7 @@ pub struct ExposeMember {
 
 /// Satisfy in view body: `satisfy` QualifiedName RelationshipBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SatisfyViewMember {
     pub viewpoint_ref: String,
     pub body: ConnectBody,
@@ -200,6 +222,7 @@ pub struct SatisfyViewMember {
 
 /// Viewpoint usage: `viewpoint` ConstraintUsageDeclaration RequirementBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewpointUsage {
     pub name: String,
     pub type_name: String,
@@ -208,6 +231,7 @@ pub struct ViewpointUsage {
 
 /// Rendering usage: `rendering` Usage.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderingUsage {
     pub name: String,
     pub type_name: Option<String>,

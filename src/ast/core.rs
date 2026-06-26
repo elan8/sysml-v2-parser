@@ -3,6 +3,7 @@
 /// Source location: byte offset, line, column, and length in the source file.
 /// Line and column are **1-based**. Use [`Span::to_lsp_range`] for 0-based LSP ranges.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Span {
     pub offset: usize,
     pub line: u32,
@@ -45,6 +46,7 @@ mod tests {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Node<T> {
     pub span: Span,
     pub value: T,
@@ -84,6 +86,7 @@ impl<T> AstNode for Node<T> {
 
 /// Classified binary operator for semantic diagnostics.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BinaryOperator {
     Eq,
     Ne,
@@ -171,6 +174,7 @@ impl BinaryOperator {
 
 /// KerML type-check operator (`istype`, `hastype`, `as`).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TypeCheckKind {
     Istype,
     Hastype,
@@ -179,6 +183,7 @@ pub enum TypeCheckKind {
 
 /// Classified unary operator.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum UnaryOperator {
     Plus,
     Minus,
@@ -211,6 +216,7 @@ impl UnaryOperator {
 
 /// Expression: literals, feature refs, member access, index, bracket/unit, etc.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Expression {
     LiteralInteger(i64),
     LiteralReal(String),

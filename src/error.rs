@@ -5,6 +5,7 @@
 
 /// Severity of a parse diagnostic (for language server integration).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DiagnosticSeverity {
     Error,
     Warning,
@@ -12,6 +13,7 @@ pub enum DiagnosticSeverity {
 
 /// High-level diagnostic taxonomy for parser/evaluator reporting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DiagnosticCategory {
     ParseError,
     UnsupportedGrammarForm,

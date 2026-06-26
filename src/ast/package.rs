@@ -26,12 +26,14 @@ use crate::ast::core::Node;
 
 /// A package declaration: `package` Identification PackageBody
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Package {
     pub identification: Identification,
     pub body: PackageBody,
 }
 /// Package body: either `;` or `{` PackageBodyElement* `}`
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PackageBody {
     /// Semicolon form: no body elements.
     Semicolon,
@@ -42,6 +44,7 @@ pub enum PackageBody {
 }
 /// Library package: `library` (optional `standard`) `package` Identification PackageBody (BNF LibraryPackage).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LibraryPackage {
     pub is_standard: bool,
     pub identification: Identification,
@@ -49,6 +52,7 @@ pub struct LibraryPackage {
 }
 /// Top-level element inside a namespace or package body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PackageBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
