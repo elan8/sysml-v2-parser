@@ -7,10 +7,10 @@ use crate::ast::{
     AttributeBody, AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConstraintDefBody,
     ConstraintDefBodyElement, DefinitionBody, DefinitionBodyElement, OccurrenceBodyElement,
     OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
-    PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RenderingDefBody,
-    RenderingDefBodyElement, RequirementDefBody, RequirementDefBodyElement, RootNamespace,
-    StateDefBody, StateDefBodyElement, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
-    ViewBodyElement, ViewDefBody, ViewDefBodyElement,
+    PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RefBody,
+    RenderingDefBody, RenderingDefBodyElement, RequirementDefBody, RequirementDefBodyElement,
+    RootNamespace, StateDefBody, StateDefBodyElement, UseCaseDefBody, UseCaseDefBodyElement,
+    ViewBody, ViewBodyElement, ViewDefBody, ViewDefBodyElement,
 };
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
@@ -33,9 +33,36 @@ fn collect_requirement_body_errors(body: &RequirementDefBody, errors: &mut Vec<P
 fn collect_action_def_body_errors(body: &ActionDefBody, errors: &mut Vec<ParseError>) {
     if let ActionDefBody::Brace { elements } = body {
         for element in elements {
+            match &element.value {
+                ActionDefBodyElement::Error(n) => {
+                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+                }
+                ActionDefBodyElement::RefDecl(n) => {
+                    collect_ref_body_errors(&n.value.body, errors);
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+fn collect_ref_body_errors(body: &RefBody, errors: &mut Vec<ParseError>) {
+    if let RefBody::Brace { elements } = body {
+        for element in elements {
             if let ActionDefBodyElement::Error(n) = &element.value {
                 errors.push(parse_error_from_recovery_node(&element.span, &n.value));
             }
+        }
+    }
+}
+
+fn collect_constraint_body_element_errors(
+    elements: &[crate::ast::Node<ConstraintDefBodyElement>],
+    errors: &mut Vec<ParseError>,
+) {
+    for element in elements {
+        if let ConstraintDefBodyElement::Error(n) = &element.value {
+            errors.push(parse_error_from_recovery_node(&element.span, &n.value));
         }
     }
 }
@@ -278,6 +305,11 @@ fn collect_part_usage_body_errors(body: &PartUsageBody, errors: &mut Vec<ParseEr
                 PartUsageBodyElement::OccurrenceUsage(n) => {
                     collect_occurrence_usage_body_errors(&n.value.body, errors)
                 }
+                PartUsageBodyElement::Satisfy(n) => {
+                    if let Some(elems) = &n.value.body_elements {
+                        collect_constraint_body_element_errors(elems, errors);
+                    }
+                }
                 _ => {}
             }
         }
@@ -404,6 +436,11 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
                 }
                 PackageBodyElement::FlowUsage(n) => {
                     collect_definition_body_errors(&n.value.body, errors)
+                }
+                PackageBodyElement::Satisfy(n) => {
+                    if let Some(elems) = &n.value.body_elements {
+                        collect_constraint_body_element_errors(elems, errors);
+                    }
                 }
                 _ => {}
             }

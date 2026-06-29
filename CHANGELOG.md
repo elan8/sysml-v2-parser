@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-06-29
+
+### Added
+
+- **`InOutDecl.value`**: `in`/`out`/`inout` parameter declarations now carry an optional `value: Option<Node<Expression>>` field. The parser recognises `= expr` default-value initialisers after the type annotation and stores them; the error-recovery path yields `None`.
+- **`RefBody::Brace { elements }`**: the unit variant `RefBody::Brace` is replaced by a struct variant carrying `elements: Vec<Node<ActionDefBodyElement>>`. Action-context ref bodies (`ref action name: Type { … }`) are fully parsed into structured elements via `parse_structured_brace_members`; other ref-body contexts (state, part, interface, connection) remain opaque and produce an empty element list.
+- **`Satisfy.body_elements`**: `Satisfy` gains `body_elements: Option<Vec<Node<ConstraintDefBodyElement>>>`. Braced satisfy bodies now expose their structured constraint members instead of discarding them; semicolon-terminated satisfies yield `None`.
+- **`Import.target_span`**: `Import` gains `target_span: Span` recording the source span of the qualified name (excluding `::*` / `::**` suffix), enabling semantic-token providers to highlight only the name portion.
+- **`PARSE_AST_VERSION`** bumped from `1` → `2` to invalidate caches built against the 0.26.x schema.
+
+### Fixed
+
+- **Error collection for `RefBody::Brace { elements }`**: `collect_action_def_body_errors` now recurses into `ActionDefBodyElement::RefDecl` bodies via the new `collect_ref_body_errors` helper, surfacing `ParseErrorNode`s nested inside action ref bodies as LSP diagnostics.
+- **Error collection for `Satisfy.body_elements`**: `collect_part_usage_body_errors` and `collect_package_body_errors` now walk `Satisfy.body_elements` via `collect_constraint_body_element_errors`, surfacing constraint-body recovery errors inside braced satisfy statements.
+
 ## [0.26.0] - 2026-06-26
 
 ### Added
