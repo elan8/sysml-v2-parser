@@ -437,7 +437,7 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                     name: "driveshaft".to_string(),
                     type_name: "Driveshaft".to_string(),
                     value: None,
-                    body: RefBody::Brace,
+                    body: RefBody::Brace { elements: vec![] },
                     name_span: None,
                     type_ref_span: None,
                 }))),
@@ -545,7 +545,7 @@ fn part_vehicle1_c1() -> PartUsage {
                         body_elements: vec![n(InterfaceUsageBodyElement::RefRedef {
                             name: "driveshaft".to_string(),
                             value: expr_path("vehicle1_c1.driveshaft"),
-                            body: RefBody::Brace,
+                            body: RefBody::Brace { elements: vec![] },
                         })],
                     },
                 ))),

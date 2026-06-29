@@ -559,7 +559,7 @@ fn ref_body_parse(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| RefBody::Semicolon),
-        map(consume_part_usage_structured_brace, |_| RefBody::Brace),
+        map(consume_part_usage_structured_brace, |_| RefBody::Brace { elements: vec![] }),
     ))
     .parse(input)
 }
@@ -698,7 +698,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
         ws_and_comments,
         alt((
             map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(consume_part_usage_structured_brace, |_| RefBody::Brace),
+            map(consume_part_usage_structured_brace, |_| RefBody::Brace { elements: vec![] }),
         )),
     )
     .parse(input)?;

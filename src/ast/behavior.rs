@@ -85,6 +85,8 @@ pub struct InOutDecl {
     pub direction: InOut,
     pub name: String,
     pub type_name: String,
+    /// Optional default value: `= expr` initializer on in/out parameters.
+    pub value: Option<Node<Expression>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

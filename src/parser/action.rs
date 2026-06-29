@@ -8,7 +8,7 @@ use crate::ast::{
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::path_expression;
+use crate::parser::expr::{expression, path_expression};
 use crate::parser::lex::{
     name, qualified_name, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
 };
@@ -143,14 +143,31 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
         input = next;
     }
 
-    let (input, body) = preceded(
-        ws_and_comments,
-        alt((
-            map(tag(&b";"[..]), |_| crate::ast::RefBody::Semicolon),
-            map(consume_action_structured_brace, |_| crate::ast::RefBody::Brace),
-        )),
-    )
-    .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, body) = if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        (input, crate::ast::RefBody::Semicolon)
+    } else {
+        let (input, elements) = parse_structured_brace_members(
+            input,
+            ACTION_BODY_STARTERS,
+            "action ref body",
+            "recovered_action_ref_body_element",
+            action_def_body_element,
+            |start, end| {
+                let recovery = build_recovery_error_node_from_span(
+                    start,
+                    end,
+                    ACTION_BODY_STARTERS,
+                    "action ref body",
+                    "recovered_action_ref_body_element",
+                );
+                let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+                node_from_to(start, end, ActionDefBodyElement::Error(node))
+            },
+        )?;
+        (input, crate::ast::RefBody::Brace { elements })
+    };
 
     Ok((
         input,
@@ -220,6 +237,13 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
             type_name = "action".to_string();
         }
 
+        // Optional `= expr` default value (e.g. `in a : Real = 0.0;`).
+        let (input, value) = opt(preceded(
+            preceded(ws_and_comments, tag(&b"="[..])),
+            preceded(ws_and_comments, expression),
+        ))
+        .parse(input)?;
+
         // Optional `default { ... }` initializer used in the standard library.
         let (input, _) = opt((
             preceded(ws_and_comments, tag(&b"default"[..])),
@@ -238,9 +262,9 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
             )),
         )
         .parse(input)?;
-        Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (param_name, type_name)))
+        Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (param_name, type_name, value)))
     })();
-    let (input, (param_name, type_name)) = match parsed {
+    let (input, (param_name, type_name, value)) = match parsed {
         Ok(v) => v,
         Err(_) => {
             // Best-effort fallback: consume to `;` or start of a braced body.
@@ -262,7 +286,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
             .parse(input)?;
             // If we can't parse a structured `: Type`, keep the raw text as a best-effort
             // stand-in so downstream tools still have something to display.
-            (input, (name_guess, raw_text))
+            (input, (name_guess, raw_text, None))
         }
     };
     Ok((
@@ -274,6 +298,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                 direction,
                 name: param_name,
                 type_name,
+                value,
             },
         ),
     ))

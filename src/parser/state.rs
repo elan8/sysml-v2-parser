@@ -200,7 +200,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         ws_and_comments,
         alt((
             map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(consume_state_structured_brace, |_| RefBody::Brace),
+            map(consume_state_structured_brace, |_| RefBody::Brace { elements: vec![] }),
         )),
     )
     .parse(input)?;

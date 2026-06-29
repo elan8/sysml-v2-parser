@@ -124,6 +124,9 @@ pub struct Satisfy {
     pub source: Node<Expression>,
     pub target: Node<Expression>,
     pub body: ConnectBody,
+    /// Structured elements from a braced satisfy body, e.g. constraint members.
+    /// `None` when the body is a semicolon terminator.
+    pub body_elements: Option<Vec<Node<ConstraintDefBodyElement>>>,
 }
 
 /// Bare requirement Usage.

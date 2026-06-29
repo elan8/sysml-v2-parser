@@ -92,7 +92,7 @@ fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
                 advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
-            |_| RefBody::Brace,
+            |_| RefBody::Brace { elements: vec![] },
         ),
     ))
     .parse(input)

@@ -1,4 +1,4 @@
-use super::behavior::{Allocate, InOut, InOutDecl, StateDefBody, StateUsage};
+use super::behavior::{ActionDefBodyElement, Allocate, InOut, InOutDecl, StateDefBody, StateUsage};
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::view::{CalcUsage, ConstraintDefBody};
@@ -492,12 +492,16 @@ pub struct RefDecl {
     pub type_ref_span: Option<Span>,
 }
 
-/// Body of a ref declaration: `;` or `{` ... `}`.
+/// Body of a ref declaration: `;` or `{` members `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RefBody {
     Semicolon,
-    Brace,
+    /// Braced body. `elements` is populated for action-context ref bodies;
+    /// other contexts (state, part, interface) produce an empty vec.
+    Brace {
+        elements: Vec<Node<ActionDefBodyElement>>,
+    },
 }
 
 // ---------------------------------------------------------------------------

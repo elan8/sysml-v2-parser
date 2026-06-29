@@ -616,13 +616,15 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
         // We preserve AST shape by mirroring source/target.
         (input, source.clone())
     };
-    let (input, body) = alt((
+    let (input, (body, body_elements)) = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            crate::ast::ConnectBody::Semicolon
+            (crate::ast::ConnectBody::Semicolon, None)
         }),
         map(structured_constraint_body, |structured| match structured {
-            StructuredConstraintBody::Semicolon => crate::ast::ConnectBody::Semicolon,
-            StructuredConstraintBody::Brace { .. } => crate::ast::ConnectBody::Brace,
+            StructuredConstraintBody::Semicolon => (crate::ast::ConnectBody::Semicolon, None),
+            StructuredConstraintBody::Brace { elements } => {
+                (crate::ast::ConnectBody::Brace, Some(elements))
+            }
         }),
     ))
     .parse(input)?;
@@ -635,6 +637,7 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
                 source,
                 target,
                 body,
+                body_elements,
             },
         ),
     ))
