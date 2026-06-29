@@ -138,6 +138,7 @@ pub(crate) const STATE_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
+    b"@",
     b"abstract",
     b"action",
     b"actor",
@@ -167,10 +168,10 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
 
 pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[b"doc", b"@", b"in", b"out", b"inout"];
 
-pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[b"doc", b"in", b"out", b"inout", b"return"];
+pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[b"@", b"doc", b"in", b"out", b"inout", b"return"];
 
 pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] =
-    &[b"doc", b"filter", b"render", b"ref", b"abstract"];
+    &[b"@", b"doc", b"filter", b"render", b"ref", b"abstract"];
 
 pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] =
     &[b"doc", b"expose", b"filter", b"render", b"satisfy"];

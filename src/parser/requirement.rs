@@ -574,9 +574,22 @@ pub(crate) fn textual_representation(
             )
         }
     };
-    let (input, _) = preceded(ws_and_comments, tag(&b"language"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, (language_span, language)) = with_span(string_value).parse(input)?;
+    // `language STRING_VALUE` is required by the grammar but we parse it
+    // resiliently so that a missing or empty language tag produces a node
+    // with language_span = None (triggering MISSING_REP_LANGUAGE in the
+    // error collector) rather than a hard parse failure.
+    let (input, (language_span, language)) = {
+        let peek = input;
+        let (peek, _) = ws_and_comments(peek)?;
+        if crate::parser::lex::starts_with_keyword(peek.fragment(), b"language") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"language"[..])).parse(input)?;
+            let (input, _) = ws1(input)?;
+            let (input, (ls, lang)) = with_span(string_value).parse(input)?;
+            (input, (Some(ls), lang))
+        } else {
+            (input, (None, String::new()))
+        }
+    };
     // Use ws so we don't consume the body as a block comment.
     let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
     let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
@@ -590,7 +603,7 @@ pub(crate) fn textual_representation(
             TextualRepresentation {
                 rep_identification,
                 language,
-                language_span: Some(language_span),
+                language_span,
                 text,
             },
         ),

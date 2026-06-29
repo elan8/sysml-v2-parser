@@ -77,6 +77,7 @@ pub enum CalcDefBodyElement {
     Doc(Node<DocComment>),
     InOutDecl(Node<InOutDecl>),
     ReturnDecl(Node<ReturnDecl>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // formula
     /// Unmodeled calc-body element captured as raw text (used for library parsing).
     Other(String),
@@ -120,6 +121,7 @@ pub enum ViewDefBodyElement {
     /// Unmodeled view-definition body element captured as raw text (used for library parsing).
     Other(String),
     Doc(Node<DocComment>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
 }

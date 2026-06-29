@@ -239,6 +239,12 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::Doc,
         )
         .parse(input)?
+    } else if input.fragment().starts_with(b"@") {
+        map(
+            crate::parser::metadata_annotation::metadata_annotation,
+            CalcDefBodyElement::MetadataAnnotation,
+        )
+        .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"in")
         || starts_with_keyword(input.fragment(), b"out")
         || starts_with_keyword(input.fragment(), b"inout")

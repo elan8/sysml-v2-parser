@@ -1,10 +1,10 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    ActorDecl, ActorRedefinitionAssignment, ActorUsage, FirstSuccession, IncludeUseCase, Node,
-    Objective, ParseErrorNode, RefRedefinition, RequirementUsage, ReturnRef, SubjectRef, ThenDone,
-    ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement,
-    UseCaseUsage, Visibility,
+    ActorDecl, ActorRedefinitionAssignment, ActorUsage, CaseReturnDecl, FirstSuccession,
+    IncludeUseCase, Node, Objective, ParseErrorNode, RefRedefinition, RequirementUsage, ReturnRef,
+    SubjectRef, ThenDone, ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody,
+    UseCaseDefBodyElement, UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
 use crate::parser::body::parse_structured_brace_members;
@@ -15,6 +15,7 @@ use crate::parser::lex::{
     starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments, USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
+use crate::parser::with_span;
 use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
 use crate::parser::usage::usage_header;
 use crate::parser::Input;
@@ -192,6 +193,64 @@ fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition
     Ok((
         input,
         node_from_to(start, input, RefRedefinition { name: n, body }),
+    ))
+}
+
+/// Parses `return [attribute] <name> [: <type>] [= <expr>] ;`
+/// or `return :>> <name> [= <expr>] ;`.
+///
+/// Handles the common verification/analysis case body forms where `return` declares
+/// the output parameter (e.g. `return verdict : VerdictKind = ...`).
+/// This is tried before `return_ref` so that `return ref` forms still reach `return_ref`.
+fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    // Reject `return ref ...` — that's handled by return_ref.
+    let (after_ws, _) = ws_and_comments(input)?;
+    if crate::parser::lex::starts_with_keyword(after_ws.fragment(), b"ref") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // Handle `return :>> name ...` redefine form.
+    let (input, is_redefine) = if after_ws.fragment().starts_with(b":>>") {
+        let (input, _) = ws_and_comments(input)?;
+        let (input, _) = tag(&b":>>"[..]).parse(input)?;
+        (input, true)
+    } else {
+        (input, false)
+    };
+    // Skip optional `attribute` keyword.
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = opt(nom::bytes::complete::tag(&b"attribute"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (name_span, n)) = with_span(name).parse(input)?;
+    // Optional `: type`.
+    let (input, _) = ws_and_comments(input)?;
+    let (input, type_name) = if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
+        let (input, _) = tag(&b":"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        let (input, tn) = crate::parser::lex::qualified_name(input)?;
+        (input, Some(tn))
+    } else {
+        (input, None)
+    };
+    // Consume the rest of the statement (= expr ;) opaquely.
+    let (input, _) = skip_statement_or_block(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            CaseReturnDecl {
+                name: n,
+                name_span: Some(name_span),
+                type_name,
+                is_redefine,
+            },
+        ),
     ))
 }
 
@@ -415,54 +474,63 @@ pub(crate) fn use_case_def_body_element(
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     let (input, elem) = alt((
-        map(doc_comment, UseCaseDefBodyElement::Doc),
-        map(
-            crate::parser::metadata_annotation::annotation,
-            UseCaseDefBodyElement::Annotation,
-        ),
-        map(
-            crate::parser::metadata_annotation::metadata_keyword_usage,
-            UseCaseDefBodyElement::MetadataKeywordUsage,
-        ),
-        map(
-            |i| attribute_def(i, false),
-            UseCaseDefBodyElement::AttributeDef,
-        ),
-        map(subject_decl, UseCaseDefBodyElement::SubjectDecl),
-        map(subject_ref, UseCaseDefBodyElement::SubjectRef),
-        map(actor_usage, UseCaseDefBodyElement::ActorUsage),
-        map(
-            actor_redefinition_assignment,
-            UseCaseDefBodyElement::ActorRedefinitionAssignment,
-        ),
-        map(objective, UseCaseDefBodyElement::Objective),
-        map(first_succession, UseCaseDefBodyElement::FirstSuccession),
-        map(then_done, UseCaseDefBodyElement::ThenDone),
-        map(
-            then_include_use_case,
-            UseCaseDefBodyElement::ThenIncludeUseCase,
-        ),
-        map(then_use_case_usage, UseCaseDefBodyElement::ThenUseCaseUsage),
-        map(include_use_case, UseCaseDefBodyElement::IncludeUseCase),
-        map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
-        map(return_ref, UseCaseDefBodyElement::ReturnRef),
-        map(
-            crate::parser::action::assign_stmt,
-            UseCaseDefBodyElement::Assign,
-        ),
-        map(
-            crate::parser::action::for_loop,
-            UseCaseDefBodyElement::ForLoop,
-        ),
-        map(
-            crate::parser::action::then_action,
-            UseCaseDefBodyElement::ThenAction,
-        ),
-        map(
-            crate::parser::flow::flow_usage_member,
-            UseCaseDefBodyElement::FlowUsage,
-        ),
-        other_use_case_body_element,
+        alt((
+            map(doc_comment, UseCaseDefBodyElement::Doc),
+            map(
+                crate::parser::metadata_annotation::metadata_annotation,
+                UseCaseDefBodyElement::MetadataAnnotation,
+            ),
+            map(
+                crate::parser::metadata_annotation::annotation,
+                UseCaseDefBodyElement::Annotation,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                UseCaseDefBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                |i| attribute_def(i, false),
+                UseCaseDefBodyElement::AttributeDef,
+            ),
+            map(subject_decl, UseCaseDefBodyElement::SubjectDecl),
+            map(subject_ref, UseCaseDefBodyElement::SubjectRef),
+            map(actor_usage, UseCaseDefBodyElement::ActorUsage),
+            map(
+                actor_redefinition_assignment,
+                UseCaseDefBodyElement::ActorRedefinitionAssignment,
+            ),
+            map(objective, UseCaseDefBodyElement::Objective),
+            map(first_succession, UseCaseDefBodyElement::FirstSuccession),
+        )),
+        alt((
+            map(then_done, UseCaseDefBodyElement::ThenDone),
+            map(
+                then_include_use_case,
+                UseCaseDefBodyElement::ThenIncludeUseCase,
+            ),
+            map(then_use_case_usage, UseCaseDefBodyElement::ThenUseCaseUsage),
+            map(include_use_case, UseCaseDefBodyElement::IncludeUseCase),
+            map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
+            map(case_return_decl, UseCaseDefBodyElement::CaseReturnDecl),
+            map(return_ref, UseCaseDefBodyElement::ReturnRef),
+            map(
+                crate::parser::action::assign_stmt,
+                UseCaseDefBodyElement::Assign,
+            ),
+            map(
+                crate::parser::action::for_loop,
+                UseCaseDefBodyElement::ForLoop,
+            ),
+            map(
+                crate::parser::action::then_action,
+                UseCaseDefBodyElement::ThenAction,
+            ),
+            map(
+                crate::parser::flow::flow_usage_member,
+                UseCaseDefBodyElement::FlowUsage,
+            ),
+            other_use_case_body_element,
+        )),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

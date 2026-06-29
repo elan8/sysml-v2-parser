@@ -9,10 +9,39 @@ use crate::ast::{
     OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
     PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RefBody,
     RenderingDefBody, RenderingDefBodyElement, RequirementDefBody, RequirementDefBodyElement,
-    RootNamespace, StateDefBody, StateDefBodyElement, UseCaseDefBody, UseCaseDefBodyElement,
-    ViewBody, ViewBodyElement, ViewDefBody, ViewDefBodyElement,
+    RootNamespace, StateDefBody, StateDefBodyElement, TextualRepresentation, UseCaseDefBody,
+    UseCaseDefBodyElement, ViewBody, ViewBodyElement, ViewDefBody, ViewDefBodyElement,
 };
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
+
+fn textual_rep_language_diagnostic(
+    node_span: &crate::ast::Span,
+    rep: &TextualRepresentation,
+) -> Option<ParseError> {
+    use crate::parser::diagnostic_catalog;
+    if rep.language_span.is_none() {
+        return Some(
+            ParseError::new("rep body is missing the required 'language' keyword and string value")
+                .with_location(node_span.offset, node_span.line, node_span.column)
+                .with_length(node_span.len.max(1))
+                .with_code(diagnostic_catalog::MISSING_REP_LANGUAGE)
+                .with_severity(DiagnosticSeverity::Error)
+                .with_category(DiagnosticCategory::ParseError),
+        );
+    }
+    if rep.language.trim().is_empty() {
+        let ls = rep.language_span.as_ref().unwrap();
+        return Some(
+            ParseError::new("rep language value must be a non-empty string")
+                .with_location(ls.offset, ls.line, ls.column)
+                .with_length(ls.len.max(1))
+                .with_code(diagnostic_catalog::INVALID_REP_LANGUAGE)
+                .with_severity(DiagnosticSeverity::Error)
+                .with_category(DiagnosticCategory::ParseError),
+        );
+    }
+    None
+}
 
 fn collect_requirement_body_errors(body: &RequirementDefBody, errors: &mut Vec<ParseError>) {
     if let RequirementDefBody::Brace { elements } = body {
@@ -23,6 +52,11 @@ fn collect_requirement_body_errors(body: &RequirementDefBody, errors: &mut Vec<P
                 }
                 RequirementDefBodyElement::Frame(n) => {
                     collect_requirement_body_errors(&n.value.body, errors)
+                }
+                RequirementDefBodyElement::TextualRep(n) => {
+                    if let Some(diag) = textual_rep_language_diagnostic(&element.span, &n.value) {
+                        errors.push(diag);
+                    }
                 }
                 _ => {}
             }
@@ -440,6 +474,11 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
                 PackageBodyElement::Satisfy(n) => {
                     if let Some(elems) = &n.value.body_elements {
                         collect_constraint_body_element_errors(elems, errors);
+                    }
+                }
+                PackageBodyElement::TextualRep(n) => {
+                    if let Some(diag) = textual_rep_language_diagnostic(&element.span, &n.value) {
+                        errors.push(diag);
                     }
                 }
                 _ => {}

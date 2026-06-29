@@ -2,7 +2,7 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-06-29
+**Last updated:** 2026-06-29 (Spec42 v1.0 blockers closed)
 
 ## Spec42 v1.0 checklist
 
@@ -10,16 +10,16 @@ Items that must close before Spec42 can release v1.0. Everything else is 1.x.
 
 ### Diagnostic-blocking (parser)
 
-- [ ] `MetadataAnnotation` variant wired in **all** body enums where `@` can appear (constraint bodies still emit generic `Annotation` in some paths) — §2.1
-- [ ] `missing_rep_language` / `invalid_rep_language` emitted by `textual_representation()`, not just catalogued — §2.2
-- [ ] `rep` recognised in **frame** and **concern** bodies — §2.2
-- [ ] Verdict / return forms and `:>>` in analysis case bodies fully modelled — §2.5
+- [x] `MetadataAnnotation` variant wired in **all** body enums where `@` can appear — §2.1 (done 0.28.0)
+- [x] `missing_rep_language` / `invalid_rep_language` emitted by `textual_representation()` — §2.2 (done 0.28.0)
+- [x] `rep` recognised in frame and concern bodies — already covered via `requirement_def_body()` (confirmed 0.28.0)
+- [x] `CaseReturnDecl` models `return name : Type = expr` and `return :>> name` in analysis/verification bodies — §2.5 (done 0.28.0)
 
 ### Editor quality (LSP P0)
 
-- [ ] `ParseErrorNode` expanded to view, constraint, and calculation nested scopes — §3
-- [ ] Silent AST reshaping on malformed input removed — §3
-- [ ] Recovery range-and-code tests covering views and constraints — §3
+- [x] `ParseErrorNode` in view, constraint, and calc bodies — already deployed via `parse_structured_brace_members` (confirmed 0.28.0)
+- [x] Silent reshaping audit — no `advance_to_closing_brace` in view.rs or constraint.rs (confirmed 0.28.0)
+- [x] Recovery range-and-code tests for view def and constraint def bodies (done 0.28.0)
 
 ### Explicitly deferred to 1.x
 

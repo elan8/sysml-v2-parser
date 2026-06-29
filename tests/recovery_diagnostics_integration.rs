@@ -793,3 +793,102 @@ fn fixture_enum_usage_in_part_def_has_no_unexpected_keyword() {
         result.errors
     );
 }
+
+#[test]
+fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
+    // A malformed token inside a view def body must produce a ParseErrorNode
+    // and not abort parsing of the subsequent `render` member.
+    let input = r#"package P {
+    view def MyView {
+        @@@ invalid_token_here;
+        render r : SomeRendering;
+    }
+}"#;
+    let (result, elements) = package_elements(input);
+
+    let view = match &elements[0].value {
+        PackageBodyElement::ViewDef(v) => &v.value,
+        other => panic!("expected view def, got {other:?}"),
+    };
+    let view_body = match &view.body {
+        sysml_v2_parser::ast::ViewDefBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+
+    // The body must contain an Error node for the bad token.
+    assert!(
+        view_body.iter().any(|e| matches!(
+            e.value,
+            sysml_v2_parser::ast::ViewDefBodyElement::Error(_)
+        )),
+        "view def body should contain a ParseErrorNode for the bad token"
+    );
+
+    // The `render` member after the bad token must still parse.
+    assert!(
+        view_body.iter().any(|e| matches!(
+            e.value,
+            sysml_v2_parser::ast::ViewDefBodyElement::ViewRendering(_)
+        )),
+        "render member after bad token should still be parsed"
+    );
+
+    // The error must surface as a diagnostic (not silently dropped).
+    assert!(
+        !result.errors.is_empty(),
+        "at least one diagnostic expected for malformed view def body"
+    );
+}
+
+#[test]
+fn constraint_def_recovery_inserts_error_node_and_keeps_later_sibling() {
+    // A malformed token in a constraint def body must produce a ParseErrorNode
+    // and not abort parsing of the subsequent constraint or sibling.
+    let input = r#"package P {
+    constraint def MyConstraint {
+        @@@ bad_token;
+        thrust >= weight;
+    }
+    part def Sibling;
+}"#;
+    let (result, elements) = package_elements(input);
+
+    let constraint = match &elements[0].value {
+        PackageBodyElement::ConstraintDef(c) => &c.value,
+        other => panic!("expected constraint def, got {other:?}"),
+    };
+    let c_body = match &constraint.body {
+        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+
+    // Error node must be present for the bad token.
+    assert!(
+        c_body.iter().any(|e| matches!(
+            e.value,
+            sysml_v2_parser::ast::ConstraintDefBodyElement::Error(_)
+        )),
+        "constraint def body should contain a ParseErrorNode"
+    );
+
+    // Expression member after the bad token should still parse.
+    assert!(
+        c_body.iter().any(|e| matches!(
+            e.value,
+            sysml_v2_parser::ast::ConstraintDefBodyElement::Expression(_)
+        )),
+        "expression after bad token should still parse"
+    );
+
+    // Sibling part def after the constraint must parse.
+    assert!(
+        elements.iter().any(|e| matches!(e.value, PackageBodyElement::PartDef(_))),
+        "sibling part def after malformed constraint should still parse"
+    );
+
+    // Error surfaces as a diagnostic.
+    assert!(
+        !result.errors.is_empty(),
+        "at least one diagnostic expected for malformed constraint def body"
+    );
+}

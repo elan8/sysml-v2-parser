@@ -30,6 +30,10 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
         map(doc_comment, ViewDefBodyElement::Doc),
+        map(
+            crate::parser::metadata_annotation::metadata_annotation,
+            ViewDefBodyElement::MetadataAnnotation,
+        ),
         map(view_filter_member, ViewDefBodyElement::Filter),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
         map(

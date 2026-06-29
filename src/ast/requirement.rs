@@ -343,6 +343,19 @@ pub struct RefRedefinition {
     pub body: String,
 }
 
+/// `return [attribute] <name> [: <type>] [= <expr>] ;`
+/// or `return :>> <name> [= <expr>] ;`
+/// — return parameter declaration in analysis/verification case bodies.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CaseReturnDecl {
+    pub name: String,
+    pub name_span: Option<Span>,
+    pub type_name: Option<String>,
+    /// True for `return :>> name` redefine form.
+    pub is_redefine: bool,
+}
+
 /// `return ref <name><multiplicity?> { ... }` used in SysML v2 release libraries.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -362,6 +375,7 @@ pub enum UseCaseDefBodyElement {
     /// Unmodeled use-case / analysis-case body element captured as raw text (used for library parsing).
     Other(String),
     Annotation(Node<Annotation>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     AttributeDef(Node<AttributeDef>),
     Doc(Node<DocComment>),
@@ -378,6 +392,7 @@ pub enum UseCaseDefBodyElement {
     IncludeUseCase(Node<IncludeUseCase>),
     RefRedefinition(Node<RefRedefinition>),
     ReturnRef(Node<ReturnRef>),
+    CaseReturnDecl(Node<CaseReturnDecl>),
     Assign(Node<AssignStmt>),
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),

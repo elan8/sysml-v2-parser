@@ -726,3 +726,141 @@ fn requirement_metadata_def_body_no_errors() {
         );
     }
 }
+
+#[test]
+fn metadata_annotation_in_use_case_and_view_bodies() {
+    let src = fixture("metadata-annotation-usecase-view.sysml");
+    let root = parse(&src).expect("parse");
+    let pkg = first_package(&root);
+    let elements = package_body_elements(pkg);
+
+    // use case def body
+    let use_case = match &elements[0].value {
+        PackageBodyElement::UseCaseDef(u) => &u.value,
+        other => panic!("expected use case def, got {other:?}"),
+    };
+    let uc_body = match &use_case.body {
+        UseCaseDefBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let ann = match &uc_body[0].value {
+        UseCaseDefBodyElement::MetadataAnnotation(a) => &a.value,
+        other => panic!("expected MetadataAnnotation in use case body, got {other:?}"),
+    };
+    assert_eq!(ann.name, "SomeMetaclass");
+    assert!(ann.head_span.is_some(), "head_span should be set");
+
+    // view def body
+    let view = match &elements[1].value {
+        PackageBodyElement::ViewDef(v) => &v.value,
+        other => panic!("expected view def, got {other:?}"),
+    };
+    let v_body = match &view.body {
+        ViewDefBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let ann = match &v_body[0].value {
+        ViewDefBodyElement::MetadataAnnotation(a) => &a.value,
+        other => panic!("expected MetadataAnnotation in view def body, got {other:?}"),
+    };
+    assert_eq!(ann.name, "AnotherMetaclass");
+    assert!(ann.head_span.is_some(), "head_span should be set");
+
+    // calc def body
+    let calc = match &elements[2].value {
+        PackageBodyElement::CalcDef(c) => &c.value,
+        other => panic!("expected calc def, got {other:?}"),
+    };
+    let c_body = match &calc.body {
+        CalcDefBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let ann = match &c_body[0].value {
+        CalcDefBodyElement::MetadataAnnotation(a) => &a.value,
+        other => panic!("expected MetadataAnnotation in calc def body, got {other:?}"),
+    };
+    assert_eq!(ann.name, "YetAnotherMetaclass");
+    assert!(ann.head_span.is_some(), "head_span should be set");
+}
+
+#[test]
+fn case_return_decl_in_verification_and_analysis_bodies() {
+    let src = fixture("analysis-case-return-decl.sysml");
+    let root = parse(&src).expect("parse");
+    let pkg = first_package(&root);
+    let elements = package_body_elements(pkg);
+
+    // verification case def — multiple return decls
+    let vcase = match &elements[0].value {
+        PackageBodyElement::VerificationCaseDef(v) => &v.value,
+        other => panic!("expected verification case def, got {other:?}"),
+    };
+    let vc_body = match &vcase.body {
+        UseCaseDefBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+
+    // element 1: `return verdict : VerdictKind = ...`
+    let ret1 = match &vc_body[1].value {
+        UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
+        other => panic!("expected CaseReturnDecl (plain return), got {other:?}"),
+    };
+    assert_eq!(ret1.name, "verdict");
+    assert!(!ret1.is_redefine);
+    assert_eq!(ret1.type_name.as_deref(), Some("VerdictKind"));
+    assert!(ret1.name_span.is_some(), "name_span should be set");
+
+    // element 2: `return :>> result = ...`
+    let ret2 = match &vc_body[2].value {
+        UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
+        other => panic!("expected CaseReturnDecl (:>> form), got {other:?}"),
+    };
+    assert_eq!(ret2.name, "result");
+    assert!(ret2.is_redefine);
+
+    // analysis case def — one return decl
+    let acase = match &elements[1].value {
+        PackageBodyElement::AnalysisCaseDef(a) => &a.value,
+        other => panic!("expected analysis case def, got {other:?}"),
+    };
+    let ac_body = match &acase.body {
+        UseCaseDefBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let ret3 = match &ac_body[1].value {
+        UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
+        other => panic!("expected CaseReturnDecl in analysis body, got {other:?}"),
+    };
+    assert_eq!(ret3.name, "thrust");
+    assert_eq!(ret3.type_name.as_deref(), Some("ForceValue"));
+}
+
+#[test]
+fn rep_missing_language_emits_diagnostic() {
+    let src = fixture("rep-missing-language.sysml");
+    let result = sysml_v2_parser::parse_for_editor(&src);
+    let codes: Vec<&str> = result
+        .errors
+        .iter()
+        .filter_map(|e| e.code.as_deref())
+        .collect();
+    assert!(
+        codes.contains(&"missing_rep_language"),
+        "expected missing_rep_language diagnostic, got: {codes:?}"
+    );
+}
+
+#[test]
+fn rep_empty_language_emits_invalid_diagnostic() {
+    let src = r#"package P { rep language "" /* body */ }"#;
+    let result = sysml_v2_parser::parse_for_editor(src);
+    let codes: Vec<&str> = result
+        .errors
+        .iter()
+        .filter_map(|e| e.code.as_deref())
+        .collect();
+    assert!(
+        codes.contains(&"invalid_rep_language"),
+        "expected invalid_rep_language diagnostic, got: {codes:?}"
+    );
+}
