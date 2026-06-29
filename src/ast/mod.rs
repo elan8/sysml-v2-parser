@@ -43,6 +43,13 @@ fn dummy_node<T: Clone>(_n: &Node<T>, value: T) -> Node<T> {
     Node::new(Span::dummy(), value)
 }
 
+fn normalize_import(imp: &crate::ast::Import) -> crate::ast::Import {
+    crate::ast::Import {
+        target_span: Span::dummy(),
+        ..imp.clone()
+    }
+}
+
 fn normalize_root_element_node(el: &Node<RootElement>) -> Node<RootElement> {
     let value = match &el.value {
         RootElement::Package(p) => RootElement::Package(dummy_node(p, normalize_package(&p.value))),
@@ -52,7 +59,7 @@ fn normalize_root_element_node(el: &Node<RootElement>) -> Node<RootElement> {
         RootElement::Namespace(n) => {
             RootElement::Namespace(dummy_node(n, normalize_namespace_decl(&n.value)))
         }
-        RootElement::Import(n) => RootElement::Import(dummy_node(n, n.value.clone())),
+        RootElement::Import(n) => RootElement::Import(dummy_node(n, normalize_import(&n.value))),
     };
     dummy_node(el, value)
 }
@@ -108,7 +115,7 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::LibraryPackage(n) => {
             PackageBodyElement::LibraryPackage(dummy_node(n, normalize_library_package(&n.value)))
         }
-        PackageBodyElement::Import(n) => PackageBodyElement::Import(dummy_node(n, n.value.clone())),
+        PackageBodyElement::Import(n) => PackageBodyElement::Import(dummy_node(n, normalize_import(&n.value))),
         PackageBodyElement::PartDef(n) => {
             PackageBodyElement::PartDef(dummy_node(n, normalize_part_def(&n.value)))
         }

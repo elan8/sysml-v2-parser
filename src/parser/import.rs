@@ -4,6 +4,7 @@ use crate::ast::{FilterPackageMember, Import, Node, Visibility};
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::expr::expression;
 use crate::parser::lex::{qualified_name, ws1, ws_and_comments};
+use crate::parser::span::with_span;
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -46,7 +47,7 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let (input, _) = tag(&b"import"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
-    let (input, qname) = qualified_name.parse(input)?;
+    let (input, (qname_span, qname)) = with_span(qualified_name).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     // KerML: NamespaceImport = QualifiedName '::' '*' (::**)? | FilterPackage; MembershipImport = QualifiedName (::**)?
     let (input, target, is_import_all, is_recursive, filter_members) =
@@ -121,6 +122,7 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
                 visibility,
                 is_import_all,
                 target,
+                target_span: qname_span,
                 is_recursive,
                 filter_members,
             },

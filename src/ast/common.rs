@@ -55,6 +55,9 @@ pub struct Import {
     pub is_import_all: bool,
     /// Import target, e.g. "SI::kg" or "Definitions::*".
     pub target: String,
+    /// Source span of the qualified name in `target` (excludes `::*` / `::**` suffix).
+    /// Used by semantic-token providers to highlight only the name portion.
+    pub target_span: Span,
     /// KerML: optional recursive import after :: (e.g. QualifiedName::** or QualifiedName::*::**).
     pub is_recursive: bool,
     /// KerML FilterPackage form: one or more `[ expr ]` members. When present, this is a namespace import of a filter package.
