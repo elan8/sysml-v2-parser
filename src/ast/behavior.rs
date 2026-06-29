@@ -306,7 +306,7 @@ pub enum StateDefBodyElement {
     Ref(Node<RefDecl>),
     RequirementUsage(Node<RequirementUsage>),
     StateUsage(Node<StateUsage>),
-    Transition(Node<Transition>),
+    Transition(Box<Node<Transition>>),
 }
 
 /// Entry action: `entry` (`;` or body).

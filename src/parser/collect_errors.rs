@@ -30,7 +30,7 @@ fn textual_rep_language_diagnostic(
         );
     }
     if rep.language.trim().is_empty() {
-        let ls = rep.language_span.as_ref().unwrap();
+        let ls = rep.language_span.as_ref()?;
         return Some(
             ParseError::new("rep language value must be a non-empty string")
                 .with_location(ls.offset, ls.line, ls.column)

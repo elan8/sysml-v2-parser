@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-06-29
+
+### Added
+
+- **`MetadataAnnotation` in use-case, view-def, and calc-def bodies**: `UseCaseDefBodyElement`, `ViewDefBodyElement`, and `CalcDefBodyElement` now carry a `MetadataAnnotation` variant. `@Name` annotations in those bodies are parsed via the structured `metadata_annotation()` path (previously fell through to the generic `Annotation` fallback or were silently skipped). Recovery starters updated: `b"@"` added to `USE_CASE_BODY_STARTERS`, `VIEW_DEF_BODY_STARTERS`, and `CALC_DEF_BODY_STARTERS`.
+- **`CaseReturnDecl`**: new AST node modelling `return [attribute] name [: Type] [= expr] ;` and `return :>> name [= expr] ;` in analysis and verification case bodies. Adds `UseCaseDefBodyElement::CaseReturnDecl`. Fields: `name: String`, `name_span: Option<Span>`, `type_name: Option<String>`, `is_redefine: bool`. Previously these forms fell through to `Other`.
+- **Rep language diagnostics**: `textual_representation()` now parses `language STRING_VALUE` resiliently. A missing `language` keyword produces a `TextualRepresentation` node with `language_span = None`; an empty language string is flagged. `collect_errors` emits `missing_rep_language` or `invalid_rep_language` (both already in `diagnostic_catalog.rs`) for these cases. Wired in requirement body and package body collectors.
+- **`PARSE_AST_VERSION`** bumped from `2` → `3` to invalidate caches built against the 0.27.x schema.
+- **Recovery tests for view-def and constraint-def bodies**: `view_def_recovery_inserts_error_node_and_keeps_later_render` and `constraint_def_recovery_inserts_error_node_and_keeps_later_sibling` added to `tests/recovery_diagnostics_integration.rs`, verifying that a malformed token produces a `ParseErrorNode`, surfaces as a diagnostic, and does not abort parsing of subsequent members.
+
+### Fixed
+
+- **`textual_representation()` resilience**: the `language STRING_VALUE` clause is now parsed with soft-failure so a missing `language` keyword produces a structured node (with `language_span = None`) rather than a hard nom error, enabling the error collector to emit a targeted `missing_rep_language` diagnostic.
+
 ## [0.27.0] - 2026-06-29
 
 ### Added

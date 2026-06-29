@@ -296,7 +296,7 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
             node_from_to(start, input, StateDefBodyElement::StateUsage(n))
         }),
         map(transition, |n| {
-            node_from_to(start, input, StateDefBodyElement::Transition(n))
+            node_from_to(start, input, StateDefBodyElement::Transition(Box::new(n)))
         }),
     ));
     parser.parse(input)

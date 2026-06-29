@@ -1,4 +1,6 @@
-use crate::ast::{FlowDef, FlowUsage, FlowUsageKind, Node};
+use crate::ast::{Expression, FlowDef, FlowUsage, FlowUsageKind, Node};
+
+type FlowEndpoints<'a> = nom::IResult<Input<'a>, (Option<Node<Expression>>, Option<Node<Expression>>)>;
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
@@ -59,15 +61,7 @@ fn optional_payload(input: Input<'_>) -> IResult<Input<'_>, Option<Node<crate::a
     }
 }
 
-fn flow_endpoints(
-    input: Input<'_>,
-) -> IResult<
-    Input<'_>,
-    (
-        Option<Node<crate::ast::Expression>>,
-        Option<Node<crate::ast::Expression>>,
-    ),
-> {
+fn flow_endpoints(input: Input<'_>) -> FlowEndpoints<'_> {
     let (peek, _) = ws_and_comments(input)?;
     let fragment = peek.fragment();
     if fragment.starts_with(b";") || fragment.starts_with(b"{") {
