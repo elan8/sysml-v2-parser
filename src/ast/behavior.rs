@@ -41,6 +41,9 @@ pub enum ActionDefBodyElement {
     FlowUsage(Node<FlowUsage>),
     FirstStmt(Node<FirstStmt>),
     MergeStmt(Node<MergeStmt>),
+    DecisionStmt(Node<DecisionStmt>),
+    JoinStmt(Node<JoinStmt>),
+    ForkStmt(Node<ForkStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
     Assign(Node<AssignStmt>),
@@ -58,7 +61,7 @@ pub enum ActionDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssignStmt {
     pub is_then: bool,
-    pub lhs: String,
+    pub lhs: Node<Expression>,
     pub rhs: String,
 }
 
@@ -67,7 +70,7 @@ pub struct AssignStmt {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ForLoop {
     pub var: String,
-    pub range: String,
+    pub range: Node<Expression>,
     pub body: ActionDefBody,
 }
 
@@ -115,6 +118,41 @@ pub enum TransitionAccept {
     Shorthand(Node<Expression>),
 }
 
+/// Transition `do` effect: a structured action-usage form (SysML v2 `EffectBehaviorUsage`)
+/// or a bare expression shorthand.
+///
+/// Examples: `do action powerUp : PowerUp;`, `do send new TimeoutSignal() via commPort`,
+/// `do accept Ack via commPort`, `do assign x := y`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TransitionEffect {
+    /// `action` name (`:` type)? — perform an owned/named action.
+    Perform {
+        name: Option<String>,
+        type_name: Option<String>,
+    },
+    /// `accept` payload (`:` type)? (`via` expr)?
+    Accept {
+        payload: Node<Expression>,
+        type_name: Option<String>,
+        via: Option<Node<Expression>>,
+    },
+    /// `send` payload (`:` type)? ((`via` expr)? (`to` expr)? | `to` expr)
+    Send {
+        payload: Node<Expression>,
+        type_name: Option<String>,
+        via: Option<Node<Expression>>,
+        to: Option<Node<Expression>>,
+    },
+    /// `assign` lhs `:=` rhs
+    Assign {
+        lhs: Node<Expression>,
+        rhs: Node<Expression>,
+    },
+    /// Bare expression shorthand (e.g. a reference to an existing action usage).
+    Expression(Node<Expression>),
+}
+
 /// Action usage: `action` name `:` type_name (`accept` param_name `:` param_type)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -157,6 +195,9 @@ pub enum ActionUsageBodyElement {
     FlowUsage(Node<FlowUsage>),
     FirstStmt(Node<FirstStmt>),
     MergeStmt(Node<MergeStmt>),
+    DecisionStmt(Node<DecisionStmt>),
+    JoinStmt(Node<JoinStmt>),
+    ForkStmt(Node<ForkStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
     Assign(Node<AssignStmt>),
@@ -219,6 +260,30 @@ pub struct FirstStmt {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MergeStmt {
     pub merge: Node<Expression>,
+    pub body: FirstMergeBody,
+}
+
+/// Decision node: `decide` expr body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DecisionStmt {
+    pub decide: Node<Expression>,
+    pub body: FirstMergeBody,
+}
+
+/// Join node: `join` expr body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct JoinStmt {
+    pub join: Node<Expression>,
+    pub body: FirstMergeBody,
+}
+
+/// Fork node: `fork` expr body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ForkStmt {
+    pub fork: Node<Expression>,
     pub body: FirstMergeBody,
 }
 
@@ -298,6 +363,10 @@ pub enum StateDefBodyElement {
     Other(String),
     /// `entry` (`;` or body) - entry action.
     Entry(Node<EntryAction>),
+    /// `do` (`;` or body) - do action.
+    Do(Node<DoAction>),
+    /// `exit` (`;` or body) - exit action.
+    Exit(Node<ExitAction>),
     /// `then` name `;` - initial state.
     Then(Node<ThenStmt>),
     /// `final` / `final state` name `;` - explicit final state.
@@ -314,6 +383,24 @@ pub enum StateDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EntryAction {
     /// For `entry action name body` form; None for plain `entry` body.
+    pub action_name: Option<String>,
+    pub body: StateDefBody,
+}
+
+/// Do action: `do` (`;` or body).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DoAction {
+    /// For `do action name body` form; None for plain `do` body.
+    pub action_name: Option<String>,
+    pub body: StateDefBody,
+}
+
+/// Exit action: `exit` (`;` or body).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExitAction {
+    /// For `exit action name body` form; None for plain `exit` body.
     pub action_name: Option<String>,
     pub body: StateDefBody,
 }
@@ -355,7 +442,7 @@ pub struct Transition {
     /// Structured or shorthand accept trigger after `first` source.
     pub accept: Option<TransitionAccept>,
     pub guard: Option<Node<Expression>>,
-    pub effect: Option<Node<Expression>>,
+    pub effect: Option<TransitionEffect>,
     pub target: Node<Expression>,
     pub body: ConnectBody,
 }

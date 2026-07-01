@@ -2,7 +2,7 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-06-29 (Spec42 v1.0 blockers closed)
+**Last updated:** 2026-07-01 (state/action/connector grammar-fidelity pass — see § 5)
 
 ## Spec42 v1.0 checklist
 
@@ -41,6 +41,7 @@ Items that must close before Spec42 can release v1.0. Everything else is 1.x.
 | Wire **Spec42 graph builders / collectors** | [§ 1 — Spec42 cross-repo](#1-spec42-cross-repo-follow-up) (**done** in Spec42 0.29.0) |
 | Improve **editor / LSP** behavior | [§ 3 — Language server](#3-language-server--recovery) |
 | Go deeper on **grammar fidelity** | [§ 4 — Grammar & compliance](#4-grammar-depth--compliance) |
+| See the **state/action/connector fidelity pass** (2026-07) and its open follow-ups | [§ 5 — State machine, action & connector grammar fidelity](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit) |
 | Read the **original Spec42 parser spec** | [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md) |
 
 ### Regression gates (every parser PR)
@@ -218,6 +219,37 @@ Consolidated from [SYSML_V2_COMPLIANCE_GAP.md](./SYSML_V2_COMPLIANCE_GAP.md) and
 | `package_body_element` sub-dispatchers | **Done** (P2) | Maintain when adding keywords |
 | AST shape dedup (`DefinitionDecl` internal) | P5+ | Drive from grammar work |
 | Semantic conformance (types, resolution) | Out of scope | Spec42 / other tools |
+
+---
+
+## 5. State machine, action & connector grammar fidelity (2026-07 audit)
+
+An ad-hoc spec-vs-parser audit (state body `entry`/`do`/`exit`, then broadened to
+control nodes, transitions, requirements, and connectors) found and closed several
+gaps where valid SysML v2 textual syntax fell through to opaque `Other`/`Error`
+recovery nodes instead of a real AST shape. Closed in this pass:
+
+| Item | AST / parser | Notes |
+| ---- | ------------- | ----- |
+| State `entry`/`do`/`exit` actions | `EntryAction`, `DoAction`, `ExitAction`, `StateDefBodyElement::{Entry,Do,Exit}` — [state.rs](../src/parser/state.rs) | Previously only `entry` was implemented |
+| Control nodes `decide`/`join`/`fork` | `DecisionStmt`, `JoinStmt`, `ForkStmt` — [action.rs](../src/parser/action.rs) | Keyword list had a typo (`decision` instead of spec's `decide`); `join`/`fork` had no parser at all |
+| `assert not` / negated satisfy | `AssertConstraintMember.is_negated`, `Satisfy.is_negated` — [occurrence_body.rs](../src/parser/occurrence_body.rs), [requirement.rs](../src/parser/requirement.rs) | `satisfy()` now accepts optional `assert`/`not` prefixes; bare `not satisfy X by Y;` (spec §7.x example) also parses |
+| Transition `do` effect | `TransitionEffect::{Perform,Accept,Send,Assign,Expression}` — [state.rs](../src/parser/state.rs) | Previously a raw `expression`; now recognizes `do action name : Type`, `do accept/send payload (via/to expr)?`, `do assign lhs := rhs` |
+| `for` loop range | `ForLoop.range: Node<Expression>` (was `String`) — [action.rs](../src/parser/action.rs) | Falls back to raw text only when the expression grammar can't parse the range (see open item below) |
+| `assign` LHS | `AssignStmt.lhs: Node<Expression>` (was `String`) — [action.rs](../src/parser/action.rs) | RHS is still raw `String` (out of scope for this pass) |
+| N-ary connector/interface | `ConnectStmt.extra_ends: Vec<Node<Expression>>` — [interface.rs](../src/parser/interface.rs), [connection.rs](../src/parser/connection.rs) | `connect (a, b, c);` now parses; binary `from ... to ...` unaffected |
+
+### Open follow-ups discovered during this pass (not yet started)
+
+- **`if` / `while` / `terminate` control nodes** — listed in `ACTION_BODY_STARTERS` but have no parser function at all; fall through to generic recovery. Larger effort than `decide`/`join`/`fork` (branches, loop condition, structured sub-bodies).
+- **Standalone `succession` usage** (`succession first A then B;` directly in a definition/occurrence body) — currently swallowed as opaque text via `DEFINITION_BODY_OPAQUE_STARTERS` in [occurrence_body.rs](../src/parser/occurrence_body.rs). Needs a new `SuccessionUsage` AST node; distinct from the existing action-body `FirstStmt`/`MergeStmt`.
+- **Transition trigger `accept ... via port`** — the trigger clause (before `if`/`do`) has no `via` support (only the `do`-effect `accept`/`send` forms gained `via`/`to` in this pass). Real spec examples (`accept TurnOn via commPort`) currently fail to parse as part of a transition.
+- **`satisfy requirement <name> : <Type> by <expr>`** naming form — only the bare `satisfy <ref> (by <expr>)?;` shorthand is implemented; the fuller `'requirement' UsageDeclaration` alternative from `SatisfyRequirementUsage` is not.
+- **`assert constraint` / `satisfy` body wiring is inconsistent across scopes** — `assert_constraint_member` is only reachable via `occurrence def` bodies (not `part def`); `satisfy` is only reachable at package level. Needs an audit of which body-element dispatchers should include them.
+- **Expression grammar has no KerML arrow-invocation operator** (`x->size()`, `powerProfile->size()-1`) — confirmed missing from [expr.rs](../src/parser/expr.rs). This is why `ForLoop.range` keeps a raw-text fallback path instead of always requiring a structured expression; a real fix means extending the expression grammar itself, not just `for_loop`.
+- **`AssignStmt.rhs` is still a raw `String`** — only the LHS was structured in this pass (scope decision, not an oversight).
+
+None of these block anything currently shipped; listed here so they aren't lost. No Spec42 diagnostic currently depends on them (cross-check against § 1 before prioritizing).
 
 ---
 

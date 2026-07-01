@@ -421,12 +421,16 @@ pub enum PortBodyElement {
     Other(String),
 }
 
-/// Connect statement in interface def or usage: `connect` from `to` to body.
+/// Connect statement in interface def or usage: `connect` from `to` to body, or the SysML v2
+/// n-ary form `connect (a, b, c, ...) body` (`NaryConnectorPart`/`NaryInterfacePart`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectStmt {
     pub from: Node<Expression>,
     pub to: Node<Expression>,
+    /// Additional ends beyond `from`/`to` from the parenthesized n-ary form; empty for the
+    /// ordinary binary `from ... to ...` form.
+    pub extra_ends: Vec<Node<Expression>>,
     pub body: ConnectBody,
 }
 
@@ -628,6 +632,8 @@ pub enum OccurrenceUsageBody {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssertConstraintMember {
     pub body: ConstraintDefBody,
+    /// `true` for a negated assert: `assert not constraint ...`.
+    pub is_negated: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

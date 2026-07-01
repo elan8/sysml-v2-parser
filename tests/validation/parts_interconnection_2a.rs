@@ -444,11 +444,13 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                 n(InterfaceDefBodyElement::ConnectStmt(n(ConnectStmt {
                     from: n(Expression::FeatureRef("shaftPort_a".to_string())),
                     to: expr_path("driveshaft.shaftPort_b"),
+                    extra_ends: vec![],
                     body: ConnectBody::Brace,
                 }))),
                 n(InterfaceDefBodyElement::ConnectStmt(n(ConnectStmt {
                     from: expr_path("driveshaft.shaftPort_c"),
                     to: n(Expression::FeatureRef("shaftPort_d".to_string())),
+                    extra_ends: vec![],
                     body: ConnectBody::Semicolon,
                 }))),
             ],

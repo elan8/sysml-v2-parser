@@ -878,6 +878,15 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::MergeStmt(n) => {
             ActionDefBodyElement::MergeStmt(dummy_node(n, n.value.clone()))
         }
+        ActionDefBodyElement::DecisionStmt(n) => {
+            ActionDefBodyElement::DecisionStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionDefBodyElement::JoinStmt(n) => {
+            ActionDefBodyElement::JoinStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionDefBodyElement::ForkStmt(n) => {
+            ActionDefBodyElement::ForkStmt(dummy_node(n, n.value.clone()))
+        }
         ActionDefBodyElement::StateUsage(n) => {
             ActionDefBodyElement::StateUsage(dummy_node(n, n.value.clone()))
         }
@@ -958,6 +967,15 @@ fn normalize_action_usage_body_element_node(
         }
         ActionUsageBodyElement::MergeStmt(n) => {
             ActionUsageBodyElement::MergeStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::DecisionStmt(n) => {
+            ActionUsageBodyElement::DecisionStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::JoinStmt(n) => {
+            ActionUsageBodyElement::JoinStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::ForkStmt(n) => {
+            ActionUsageBodyElement::ForkStmt(dummy_node(n, n.value.clone()))
         }
         ActionUsageBodyElement::StateUsage(n) => {
             ActionUsageBodyElement::StateUsage(dummy_node(n, n.value.clone()))

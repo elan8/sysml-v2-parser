@@ -612,7 +612,12 @@ pub(crate) fn textual_representation(
 
 pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"satisfy"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = opt(preceded(tag(&b"assert"[..]), ws1)).parse(input)?;
+    let (input, is_negated) = opt(preceded(tag(&b"not"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
+    let (input, _) = tag(&b"satisfy"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, source) = expression(input)?;
     let (input, target) = if let Ok((input, _)) = preceded(
@@ -651,6 +656,7 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
                 target,
                 body,
                 body_elements,
+                is_negated,
             },
         ),
     ))

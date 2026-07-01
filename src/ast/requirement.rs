@@ -127,6 +127,8 @@ pub struct Satisfy {
     /// Structured elements from a braced satisfy body, e.g. constraint members.
     /// `None` when the body is a semicolon terminator.
     pub body_elements: Option<Vec<Node<ConstraintDefBodyElement>>>,
+    /// `true` for a negated satisfy usage: `(assert)? not satisfy ...`.
+    pub is_negated: bool,
 }
 
 /// Bare requirement Usage.

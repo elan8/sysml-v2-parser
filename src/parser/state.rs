@@ -1,10 +1,10 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    EntryAction, FinalState, Node, RefBody, RefDecl, StateDef, StateDefBody, StateDefBodyElement,
-    StateUsage, ThenStmt, Transition,
+    DoAction, EntryAction, ExitAction, FinalState, Node, RefBody, RefDecl, StateDef, StateDefBody,
+    StateDefBodyElement, StateUsage, ThenStmt, Transition, TransitionEffect,
 };
-use crate::parser::body::parse_structured_brace_members;
+use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
@@ -156,6 +156,44 @@ fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     ))
 }
 
+/// Do action: `do` (`;` or body)  or  `do action` name body
+fn do_action(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
+    let start = input;
+    let (input, _) = tag(&b"do"[..]).parse(input)?;
+    let (input, action_name) = opt((
+        preceded(ws_and_comments, tag(&b"action"[..])),
+        preceded(ws1, name),
+    ))
+    .parse(input)?;
+    let action_name = action_name.map(|(_, n)| n);
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, UNTIL_BODY)?;
+    let (input, body) = state_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, DoAction { action_name, body }),
+    ))
+}
+
+/// Exit action: `exit` (`;` or body)  or  `exit action` name body
+fn exit_action(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
+    let start = input;
+    let (input, _) = tag(&b"exit"[..]).parse(input)?;
+    let (input, action_name) = opt((
+        preceded(ws_and_comments, tag(&b"action"[..])),
+        preceded(ws1, name),
+    ))
+    .parse(input)?;
+    let action_name = action_name.map(|(_, n)| n);
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = take_until_terminator(input, UNTIL_BODY)?;
+    let (input, body) = state_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, ExitAction { action_name, body }),
+    ))
+}
+
 /// Ref in state body: `ref` (`state`)? name (`:` type)? (`:>>` / `:>` redeclarations)? body
 fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
@@ -280,6 +318,12 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
         map(entry_action, |n| {
             node_from_to(start, input, StateDefBodyElement::Entry(n))
         }),
+        map(do_action, |n| {
+            node_from_to(start, input, StateDefBodyElement::Do(n))
+        }),
+        map(exit_action, |n| {
+            node_from_to(start, input, StateDefBodyElement::Exit(n))
+        }),
         map(then_stmt, |n| {
             node_from_to(start, input, StateDefBodyElement::Then(n))
         }),
@@ -332,6 +376,121 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     ))
 }
 
+/// Optional trailing `{ ActionBodyItem* }` on a transition effect action usage; contents are
+/// not retained (mirrors how nested action-usage bodies are treated elsewhere in this module).
+fn transition_effect_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    map(
+        delimited(
+            tag(&b"{"[..]),
+            advance_to_closing_brace,
+            preceded(ws_and_comments, tag(&b"}"[..])),
+        ),
+        |_| (),
+    )
+    .parse(input)
+}
+
+/// Optional `: Type` suffix on an effect payload/declaration.
+fn transition_effect_type_suffix(input: Input<'_>) -> IResult<Input<'_>, Option<String>> {
+    opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)
+}
+
+/// `do action` effect: `action` name (`:` type)? — SysML v2 `PerformActionUsageDeclaration`'s
+/// `'action' UsageDeclaration` form, e.g. `do action powerUp : PowerUp;`.
+fn transition_effect_perform(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
+    let (input, _) = preceded(tag(&b"action"[..]), ws1).parse(input)?;
+    let (input, action_name) = name(input)?;
+    let (input, type_name) = transition_effect_type_suffix(input)?;
+    Ok((
+        input,
+        TransitionEffect::Perform {
+            name: Some(action_name),
+            type_name,
+        },
+    ))
+}
+
+/// `do accept` effect: `accept` payload (`:` type)? (`via` expr)?, e.g.
+/// `do accept Ack via commPort`.
+fn transition_effect_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
+    let (input, _) = preceded(tag(&b"accept"[..]), ws1).parse(input)?;
+    let (input, payload) = expression(input)?;
+    let (input, type_name) = transition_effect_type_suffix(input)?;
+    let (input, via) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"via"[..])),
+        preceded(ws1, expression),
+    ))
+    .parse(input)?;
+    Ok((
+        input,
+        TransitionEffect::Accept {
+            payload,
+            type_name,
+            via,
+        },
+    ))
+}
+
+/// `do send` effect: `send` payload (`:` type)? (`via` expr)? (`to` expr)? — SysML v2
+/// `SenderReceiverPart`, e.g. `do send new TimeoutSignal() via commPort`.
+fn transition_effect_send(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
+    let (input, _) = preceded(tag(&b"send"[..]), ws1).parse(input)?;
+    let (input, payload) = expression(input)?;
+    let (input, type_name) = transition_effect_type_suffix(input)?;
+    let (input, via) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"via"[..])),
+        preceded(ws1, expression),
+    ))
+    .parse(input)?;
+    let (input, to) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"to"[..])),
+        preceded(ws1, expression),
+    ))
+    .parse(input)?;
+    Ok((
+        input,
+        TransitionEffect::Send {
+            payload,
+            type_name,
+            via,
+            to,
+        },
+    ))
+}
+
+/// `do assign` effect: `assign` lhs `:=` rhs.
+fn transition_effect_assign(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
+    let (input, _) = preceded(tag(&b"assign"[..]), ws1).parse(input)?;
+    let (input, lhs) = expression(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b":="[..])).parse(input)?;
+    let (input, rhs) = preceded(ws_and_comments, expression).parse(input)?;
+    Ok((input, TransitionEffect::Assign { lhs, rhs }))
+}
+
+/// Transition `do` effect: structured `action`/`accept`/`send`/`assign` action usage, or a bare
+/// expression shorthand (e.g. a reference to an existing action usage).
+fn transition_effect(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
+    let (input, _) = ws_and_comments(input)?;
+    let (input, effect) = alt((
+        transition_effect_perform,
+        transition_effect_accept,
+        transition_effect_send,
+        transition_effect_assign,
+        map(expression, TransitionEffect::Expression),
+    ))
+    .parse(input)?;
+    let (input, _) = opt(preceded(ws_and_comments, transition_effect_brace)).parse(input)?;
+    // Lenient: some models write a trailing `;` after the effect action usage even though
+    // the grammar's TransitionUsage has no separator before `then` (matches spec examples,
+    // e.g. `do action powerUp : PowerUp;\nthen on;`).
+    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
+    Ok((input, effect))
+}
+
 pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition>> {
     let start = input;
     let (input, _) = tag(&b"transition"[..]).parse(input)?;
@@ -371,10 +530,10 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     let guard = guard.map(|(_, expr)| expr);
     let (input, effect) = opt((
         preceded(ws_and_comments, tag(&b"do"[..])),
-        preceded(ws1, expression),
+        preceded(ws1, transition_effect),
     ))
     .parse(input)?;
-    let effect = effect.map(|(_, expr)| expr);
+    let effect = effect.map(|(_, eff)| eff);
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = expression(input)?;

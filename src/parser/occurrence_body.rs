@@ -18,7 +18,7 @@ use crate::parser::usage::{optional_typings, specialization_clauses};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::map;
+use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -316,6 +316,9 @@ fn assert_constraint_member(input: Input<'_>) -> IResult<Input<'_>, Node<AssertC
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"assert"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, is_negated) = opt(preceded(tag(&b"not"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
     let (input, body) = structured_constraint_body(input)?;
     let body = match body {
@@ -324,6 +327,6 @@ fn assert_constraint_member(input: Input<'_>) -> IResult<Input<'_>, Node<AssertC
     };
     Ok((
         input,
-        node_from_to(start, input, AssertConstraintMember { body }),
+        node_from_to(start, input, AssertConstraintMember { body, is_negated }),
     ))
 }

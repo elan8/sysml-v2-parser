@@ -2,8 +2,8 @@
 
 use crate::ast::{
     ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, AssignStmt, FirstMergeBody, FirstStmt, ForLoop, InOut, InOutDecl,
-    MergeStmt, Node, ParseErrorNode, ThenAction,
+    ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstStmt, ForLoop, ForkStmt,
+    InOut, InOutDecl, JoinStmt, MergeStmt, Node, ParseErrorNode, ThenAction,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -43,7 +43,7 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"calc",
     b"event",
     b"accept",
-    b"decision",
+    b"decide",
     b"fork",
     b"join",
     b"send",
@@ -56,9 +56,6 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
 
 const CONTROL_NODE_KEYWORDS: &[&[u8]] = &[
     b"accept",
-    b"decision",
-    b"fork",
-    b"join",
     b"send",
     b"terminate",
     b"while",
@@ -359,45 +356,20 @@ fn consume_action_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
     Ok((input, ()))
 }
 
-fn slice_text(start: Input<'_>, end: Input<'_>) -> String {
-    let delta = end
-        .location_offset()
-        .saturating_sub(start.location_offset());
-    let bytes = start.fragment();
-    let take = delta.min(bytes.len());
-    String::from_utf8_lossy(&bytes[..take]).trim().to_string()
-}
-
 pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, is_then) = opt(map(preceded(tag(&b"then"[..]), ws1), |_| true)).parse(input)?;
     let is_then = is_then.unwrap_or(false);
     let (input, _) = tag(&b"assign"[..]).parse(input)?;
-    let (mut input, _) = ws1(input)?;
+    let (input, _) = ws1(input)?;
 
-    // LHS: consume up to `:=`
-    let frag = input.fragment();
-    let mut pos = 0usize;
-    while pos + 1 < frag.len() {
-        if frag[pos] == b':' && frag[pos + 1] == b'=' {
-            break;
-        }
-        pos += 1;
-    }
-    if pos + 1 >= frag.len() {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let (after_lhs, _) = nom::bytes::complete::take(pos).parse(input)?;
-    let lhs = slice_text(input, after_lhs);
-    let (after_colon_eq, _) = tag(&b":="[..]).parse(after_lhs)?;
-    input = after_colon_eq;
+    // LHS: structured feature-chain target (SysML v2 `AssignmentTargetParameter`).
+    let (input, lhs) = path_expression(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b":="[..])).parse(input)?;
 
     // RHS: consume up to `;`
-    let (after_rhs, rhs) = take_until_terminator(input, b";")?;
+    let (after_rhs, rhs) = preceded(ws_and_comments, |i| take_until_terminator(i, b";")).parse(input)?;
     let (after_semi, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(after_rhs)?;
 
     Ok((
@@ -414,8 +386,19 @@ pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
     let (input, var) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"in"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, range) = take_until_terminator(input, b"{")?;
-    let (input, body) = action_def_body_brace(input)?;
+    // Prefer a structured expression (e.g. `1..10`, `someCollection`); fall back to raw text
+    // for constructs the expression grammar doesn't yet cover (e.g. `x->size()`).
+    let (input, range) = match expression(input) {
+        Ok(ok) => ok,
+        Err(_) => {
+            let (next, raw) = take_until_terminator(input, b"{")?;
+            (
+                next,
+                node_from_to(input, next, crate::ast::Expression::FeatureRef(raw.trim().to_string())),
+            )
+        }
+    };
+    let (input, body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
     Ok((
         input,
         node_from_to(start, input, ForLoop { var, range, body }),
@@ -487,6 +470,9 @@ fn action_def_body_element(
         ),
         map(first_stmt, ActionDefBodyElement::FirstStmt),
         map(merge_stmt, ActionDefBodyElement::MergeStmt),
+        map(decision_stmt, ActionDefBodyElement::DecisionStmt),
+        map(join_stmt, ActionDefBodyElement::JoinStmt),
+        map(fork_stmt, ActionDefBodyElement::ForkStmt),
         map(state_usage, ActionDefBodyElement::StateUsage),
         map(control_node_action_usage, |a| {
             ActionDefBodyElement::ActionUsage(Box::new(a))
@@ -567,6 +553,69 @@ fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
     ))
 }
 
+/// Decision node: `decide` path body
+fn decision_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"decide"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, decide_expr) = path_expression(input)?;
+    let (input, body) = first_merge_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            DecisionStmt {
+                decide: decide_expr,
+                body,
+            },
+        ),
+    ))
+}
+
+/// Join node: `join` path body
+fn join_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"join"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, join_expr) = path_expression(input)?;
+    let (input, body) = first_merge_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            JoinStmt {
+                join: join_expr,
+                body,
+            },
+        ),
+    ))
+}
+
+/// Fork node: `fork` path body
+fn fork_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"fork"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, fork_expr) = path_expression(input)?;
+    let (input, body) = first_merge_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ForkStmt {
+                fork: fork_expr,
+                body,
+            },
+        ),
+    ))
+}
+
 /// Action usage body: `;` or `{` ActionUsageBodyElement* `}`
 pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
     let (input, _) = ws_and_comments(input)?;
@@ -626,6 +675,9 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         ),
         map(first_stmt, ActionUsageBodyElement::FirstStmt),
         map(merge_stmt, ActionUsageBodyElement::MergeStmt),
+        map(decision_stmt, ActionUsageBodyElement::DecisionStmt),
+        map(join_stmt, ActionUsageBodyElement::JoinStmt),
+        map(fork_stmt, ActionUsageBodyElement::ForkStmt),
         map(state_usage, ActionUsageBodyElement::StateUsage),
         map(control_node_action_usage, |a| {
             ActionUsageBodyElement::ActionUsage(Box::new(a))

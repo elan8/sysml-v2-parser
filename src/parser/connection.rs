@@ -141,14 +141,45 @@ fn connect_body(input: Input<'_>) -> IResult<Input<'_>, crate::ast::ConnectBody>
     .parse(input)
 }
 
+/// Connect ends: the n-ary `'(' end (',' end)+ ')'` form (`NaryConnectorPart`), or the ordinary
+/// binary `from ... to ...` form. Returns `(from, to, extra_ends)`.
+fn connect_ends(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (Node<crate::ast::Expression>, Node<crate::ast::Expression>, Vec<Node<crate::ast::Expression>>)> {
+    alt((
+        map(
+            (
+                preceded(ws_and_comments, tag(&b"("[..])),
+                preceded(ws_and_comments, path_expression),
+                nom::multi::many1(preceded(
+                    preceded(ws_and_comments, tag(&b","[..])),
+                    preceded(ws_and_comments, path_expression),
+                )),
+                preceded(ws_and_comments, tag(&b")"[..])),
+            ),
+            |(_, first, mut rest, _)| {
+                let to = rest.remove(0);
+                (first, to, rest)
+            },
+        ),
+        map(
+            (
+                path_expression,
+                preceded(ws_and_comments, tag(&b"to"[..])),
+                preceded(ws_and_comments, path_expression),
+            ),
+            |(from, _, to)| (from, to, Vec::new()),
+        ),
+    ))
+    .parse(input)
+}
+
 fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"connect"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, from_expr) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-    let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+    let (input, (from_expr, to_expr, extra_ends)) = connect_ends(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -158,6 +189,7 @@ fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectStmt>> {
             ConnectStmt {
                 from: from_expr,
                 to: to_expr,
+                extra_ends,
                 body,
             },
         ),
