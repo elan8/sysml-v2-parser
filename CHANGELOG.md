@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-07-01
+
+### Added
+
+- **State `do`/`exit` actions**: `StateDefBodyElement` gains `Do(Node<DoAction>)` and `Exit(Node<ExitAction>)` variants, mirroring the existing `Entry` handling. Previously `do action ...` / `exit action ...` in a state body fell through to error recovery; only `entry` was recognised. `b"do"` / `b"exit"` added to `STATE_BODY_STARTERS`.
+- **Control nodes `decide` / `join` / `fork`**: new `DecisionStmt`, `JoinStmt`, `ForkStmt` AST nodes and `ActionDefBodyElement`/`ActionUsageBodyElement` variants, parsed the same way as the existing `MergeStmt`. The action-body keyword lists previously listed the non-spec keyword `decision` instead of `decide`, and had no parser at all for `join`/`fork`.
+- **Negated `assert` / `satisfy`**: `AssertConstraintMember` and `Satisfy` both gain `is_negated: bool`. `assert not constraint { ... }` and `(assert)? not satisfy X (by Y)?;` now parse; previously `not` after `assert` was unhandled and `assert`-prefixed `satisfy` had no parse path at all (only the bare `satisfy X by Y;` shorthand worked).
+- **Structured transition `do` effect**: new `TransitionEffect` enum (`Perform`, `Accept`, `Send`, `Assign`, `Expression`) replaces the raw `Node<Expression>` previously stored on `Transition.effect`. Recognises `do action name : Type`, `do accept payload (: Type)? (via expr)?`, `do send payload (: Type)? (via expr)? (to expr)?`, and `do assign lhs := rhs`; falls back to a bare expression for anything else.
+- **`ConnectStmt.extra_ends`**: `ConnectStmt` gains `extra_ends: Vec<Node<Expression>>` for the SysML v2 n-ary connector/interface form `connect (a, b, c, ...)`. The ordinary binary `from ... to ...` form is unaffected (`extra_ends` is empty).
+- **`PARSE_AST_VERSION`** bumped from `3` → `4` to invalidate caches built against the 0.28.x schema.
+
+### Changed
+
+- **`ForLoop.range`**: changed from `String` to `Node<Expression>`. The `for x in <range> { ... }` range now parses as a structured expression (e.g. `1..10`); falls back to raw text only when the expression grammar can't parse the range (e.g. KerML `->` arrow-invocation syntax, not yet modelled — see `docs/PARSER_BACKLOG_ROADMAP.md` § 5).
+- **`AssignStmt.lhs`**: changed from `String` to `Node<Expression>`, parsed via `path_expression` (matches spec's `AssignmentTargetParameter` feature-chain shape). `AssignStmt.rhs` remains a raw `String` (out of scope for this pass).
+
+See `docs/PARSER_BACKLOG_ROADMAP.md` § 5 for the full list of gaps this closes and the related follow-ups intentionally left open (`if`/`while`/`terminate` control nodes, standalone `succession` usage, transition trigger `accept ... via`, full `satisfy requirement name : Type` form, `assert`/`satisfy` scope wiring, KerML arrow-invocation expressions).
+
 ## [0.28.0] - 2026-06-29
 
 ### Added
