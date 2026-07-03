@@ -187,6 +187,11 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(requirement_usage, PartDefBodyElement::RequirementUsage),
             map(item_def_required, PartDefBodyElement::ItemDef),
             map(item_usage, PartDefBodyElement::ItemUsage),
+            map(
+                crate::parser::occurrence_body::assert_constraint_member,
+                PartDefBodyElement::AssertConstraint,
+            ),
+            map(satisfy, PartDefBodyElement::Satisfy),
             map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
         )),
     ))

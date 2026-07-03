@@ -3,7 +3,8 @@
 use crate::ast::{
     ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
     ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstStmt, ForLoop, ForkStmt,
-    InOut, InOutDecl, JoinStmt, MergeStmt, Node, ParseErrorNode, ThenAction,
+    IfStmt, InOut, InOutDecl, JoinStmt, MergeStmt, Node, ParseErrorNode, TerminateStmt, ThenAction,
+    WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -368,8 +369,7 @@ pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStm
     let (input, lhs) = path_expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":="[..])).parse(input)?;
 
-    // RHS: consume up to `;`
-    let (after_rhs, rhs) = preceded(ws_and_comments, |i| take_until_terminator(i, b";")).parse(input)?;
+    let (after_rhs, rhs) = preceded(ws_and_comments, expression).parse(input)?;
     let (after_semi, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(after_rhs)?;
 
     Ok((
@@ -386,8 +386,9 @@ pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
     let (input, var) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"in"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    // Prefer a structured expression (e.g. `1..10`, `someCollection`); fall back to raw text
-    // for constructs the expression grammar doesn't yet cover (e.g. `x->size()`).
+    // Prefer a structured expression (e.g. `1..10`, `someCollection`, `x->size()`); fall back
+    // to raw text only for range forms the expression grammar still doesn't cover, kept as a
+    // defensive net rather than removed (arrow-invocation was the last known common gap here).
     let (input, range) = match expression(input) {
         Ok(ok) => ok,
         Err(_) => {
@@ -474,12 +475,19 @@ fn action_def_body_element(
         map(join_stmt, ActionDefBodyElement::JoinStmt),
         map(fork_stmt, ActionDefBodyElement::ForkStmt),
         map(state_usage, ActionDefBodyElement::StateUsage),
-        map(control_node_action_usage, |a| {
-            ActionDefBodyElement::ActionUsage(Box::new(a))
-        }),
-        map(visibility_action_usage, |a| {
-            ActionDefBodyElement::ActionUsage(Box::new(a))
-        }),
+        // nom's alt() caps out at 21 branches; nest the newer control nodes plus the
+        // remaining fallbacks in a sub-alt() to stay under that limit.
+        nom::branch::alt((
+            map(terminate_stmt, ActionDefBodyElement::TerminateStmt),
+            map(while_stmt, ActionDefBodyElement::WhileStmt),
+            map(if_stmt, ActionDefBodyElement::IfStmt),
+            map(control_node_action_usage, |a| {
+                ActionDefBodyElement::ActionUsage(Box::new(a))
+            }),
+            map(visibility_action_usage, |a| {
+                ActionDefBodyElement::ActionUsage(Box::new(a))
+            }),
+        )),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -616,6 +624,57 @@ fn fork_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
     ))
 }
 
+/// Terminate control node: `terminate;` or `terminate target;`
+fn terminate_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<TerminateStmt>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"terminate"[..]).parse(input)?;
+    let (input, target) = opt(preceded(ws1, path_expression)).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((input, node_from_to(start, input, TerminateStmt { target })))
+}
+
+/// While-loop control node: `while` condition `{` ... `}` (bare condition, no `decide`/`join`/`fork`-style parens).
+fn while_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"while"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, condition) = expression(input)?;
+    let (input, body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, WhileStmt { condition, body }),
+    ))
+}
+
+/// If control node: `if` condition `{` thenBody `}` (`else` `{` elseBody `}`)?
+fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"if"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, condition) = expression(input)?;
+    let (input, then_body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
+    let (input, else_body) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"else"[..])),
+        preceded(ws_and_comments, action_def_body_brace),
+    ))
+    .parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            IfStmt {
+                condition,
+                then_body,
+                else_body,
+            },
+        ),
+    ))
+}
+
 /// Action usage body: `;` or `{` ActionUsageBodyElement* `}`
 pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
     let (input, _) = ws_and_comments(input)?;
@@ -679,12 +738,19 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         map(join_stmt, ActionUsageBodyElement::JoinStmt),
         map(fork_stmt, ActionUsageBodyElement::ForkStmt),
         map(state_usage, ActionUsageBodyElement::StateUsage),
-        map(control_node_action_usage, |a| {
-            ActionUsageBodyElement::ActionUsage(Box::new(a))
-        }),
-        map(visibility_action_usage, |a| {
-            ActionUsageBodyElement::ActionUsage(Box::new(a))
-        }),
+        // nom's alt() caps out at 21 branches; nest the newer control nodes plus the
+        // remaining fallbacks in a sub-alt() to stay under that limit.
+        nom::branch::alt((
+            map(terminate_stmt, ActionUsageBodyElement::TerminateStmt),
+            map(while_stmt, ActionUsageBodyElement::WhileStmt),
+            map(if_stmt, ActionUsageBodyElement::IfStmt),
+            map(control_node_action_usage, |a| {
+                ActionUsageBodyElement::ActionUsage(Box::new(a))
+            }),
+            map(visibility_action_usage, |a| {
+                ActionUsageBodyElement::ActionUsage(Box::new(a))
+            }),
+        )),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

@@ -523,6 +523,16 @@ fn postfix<'a>(
         let expr = Expression::MemberAccess(Box::new(current), member);
         return postfix(input, start, node_from_to(start, input, expr));
     }
+    if input.fragment().starts_with(b"->") {
+        let (input, _) = tag(&b"->"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        let (input, member) = name(input)?;
+        // KerML arrow-invocation, e.g. `collection->size()` or `powerProfile->size()-1`.
+        // Reuses MemberAccess/Invocation rather than a dedicated Expression variant; a
+        // following `(...)` is picked up by the recursive postfix() call's `(` branch above.
+        let expr = Expression::MemberAccess(Box::new(current), member);
+        return postfix(input, start, node_from_to(start, input, expr));
+    }
     if let Ok((after_kind, kind)) = type_check_kind_token(input) {
         if let Ok((after_type, type_name)) = qualified_name(after_kind) {
             let expr = node_from_to(
@@ -774,6 +784,57 @@ mod tests {
                 assert!(matches!(&right.value, Expression::FeatureRef(s) if s == "c"));
             }
             other => panic!("expected implies, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn expression_parses_arrow_invocation_as_member_access_and_call() {
+        let input = span_input("powerProfile->size()");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::Invocation { callee, args } => {
+                assert!(args.is_empty());
+                match &callee.value {
+                    Expression::MemberAccess(base, member) => {
+                        assert_eq!(member, "size");
+                        assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "powerProfile"));
+                    }
+                    other => panic!("expected MemberAccess callee, got {other:?}"),
+                }
+            }
+            other => panic!("expected Invocation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn expression_parses_chained_arrow_invocation_with_lower_precedence_minus() {
+        let input = span_input("a->b->c()-1");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::BinaryOp { op, left, right } => {
+                assert_eq!(op, &BinaryOperator::Sub);
+                assert!(matches!(&right.value, Expression::LiteralInteger(1)));
+                match &left.value {
+                    Expression::Invocation { callee, args } => {
+                        assert!(args.is_empty());
+                        match &callee.value {
+                            Expression::MemberAccess(base, member) => {
+                                assert_eq!(member, "c");
+                                match &base.value {
+                                    Expression::MemberAccess(inner_base, inner_member) => {
+                                        assert_eq!(inner_member, "b");
+                                        assert!(matches!(&inner_base.value, Expression::FeatureRef(s) if s == "a"));
+                                    }
+                                    other => panic!("expected nested MemberAccess, got {other:?}"),
+                                }
+                            }
+                            other => panic!("expected MemberAccess callee, got {other:?}"),
+                        }
+                    }
+                    other => panic!("expected Invocation on lhs of subtraction, got {other:?}"),
+                }
+            }
+            other => panic!("expected BinaryOp subtract, got {other:?}"),
         }
     }
 }

@@ -2,7 +2,7 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-03 (§2.3 — `doc` support added for port usage, connection def, and interface usage connect bodies; `connection def` body recovery migrated to the shared structured-body loop)
+**Last updated:** 2026-07-03 (§5 — all 7 open follow-ups from the 2026-07 audit closed: if/while/terminate, standalone succession, transition trigger `via`, satisfy inline requirement form, assert/satisfy scope wiring, arrow-invocation operator, AssignStmt.rhs. §2.3 — `doc` support added for port usage, connection def, and interface usage connect bodies; `connection def` body recovery migrated to the shared structured-body loop)
 
 ## Spec42 v1.0 checklist
 
@@ -240,17 +240,20 @@ recovery nodes instead of a real AST shape. Closed in this pass:
 | `assign` LHS | `AssignStmt.lhs: Node<Expression>` (was `String`) — [action.rs](../src/parser/action.rs) | RHS is still raw `String` (out of scope for this pass) |
 | N-ary connector/interface | `ConnectStmt.extra_ends: Vec<Node<Expression>>` — [interface.rs](../src/parser/interface.rs), [connection.rs](../src/parser/connection.rs) | `connect (a, b, c);` now parses; binary `from ... to ...` unaffected |
 
-### Open follow-ups discovered during this pass (not yet started)
+### Open follow-ups from this pass — closed 2026-07-03
 
-- **`if` / `while` / `terminate` control nodes** — listed in `ACTION_BODY_STARTERS` but have no parser function at all; fall through to generic recovery. Larger effort than `decide`/`join`/`fork` (branches, loop condition, structured sub-bodies).
-- **Standalone `succession` usage** (`succession first A then B;` directly in a definition/occurrence body) — currently swallowed as opaque text via `DEFINITION_BODY_OPAQUE_STARTERS` in [occurrence_body.rs](../src/parser/occurrence_body.rs). Needs a new `SuccessionUsage` AST node; distinct from the existing action-body `FirstStmt`/`MergeStmt`.
-- **Transition trigger `accept ... via port`** — the trigger clause (before `if`/`do`) has no `via` support (only the `do`-effect `accept`/`send` forms gained `via`/`to` in this pass). Real spec examples (`accept TurnOn via commPort`) currently fail to parse as part of a transition.
-- **`satisfy requirement <name> : <Type> by <expr>`** naming form — only the bare `satisfy <ref> (by <expr>)?;` shorthand is implemented; the fuller `'requirement' UsageDeclaration` alternative from `SatisfyRequirementUsage` is not.
-- **`assert constraint` / `satisfy` body wiring is inconsistent across scopes** — `assert_constraint_member` is only reachable via `occurrence def` bodies (not `part def`); `satisfy` is only reachable at package level. Needs an audit of which body-element dispatchers should include them.
-- **Expression grammar has no KerML arrow-invocation operator** (`x->size()`, `powerProfile->size()-1`) — confirmed missing from [expr.rs](../src/parser/expr.rs). This is why `ForLoop.range` keeps a raw-text fallback path instead of always requiring a structured expression; a real fix means extending the expression grammar itself, not just `for_loop`.
-- **`AssignStmt.rhs` is still a raw `String`** — only the LHS was structured in this pass (scope decision, not an oversight).
+All seven items below were closed in a follow-up pass. Kept here (marked done) so the
+audit trail from the original pass isn't lost.
 
-None of these block anything currently shipped; listed here so they aren't lost. No Spec42 diagnostic currently depends on them (cross-check against § 1 before prioritizing).
+- ~~**`if` / `while` / `terminate` control nodes**~~ — **Done.** `IfStmt`, `WhileStmt`, `TerminateStmt` + matching `ActionDefBodyElement`/`ActionUsageBodyElement` variants — [action.rs](../src/parser/action.rs), [behavior.rs](../src/ast/behavior.rs). `if`/`while` bodies are fully structured (`ActionDefBody`, reusing `action_def_body_brace`), not the opaque `FirstMergeBody` `decide`/`join`/`fork` use. `terminate` accepts an optional target expression. Both dispatcher `alt()`s needed nesting into a sub-`alt()` to stay under nom's 21-branch limit.
+- ~~**Standalone `succession` usage**~~ — **Done.** New `SuccessionUsage` AST node, `occurrence_body.rs`. Also supports the multiplicity-bearing form actually used by the SysML Systems Library (`succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;` in `Flows.sysml`) — discovered via the strict library gate failing on the first cut of this parser, which only handled the bare form.
+- ~~**Transition trigger `accept ... via port`**~~ — **Done.** `TransitionAccept::Payload`/`Shorthand` now each carry `Option<Node<Expression>>` for `via` — [payload.rs](../src/parser/payload.rs).
+- ~~**`satisfy requirement <name> : <Type> by <expr>`**~~ — **Done.** `Satisfy.inline_requirement: Option<InlineSatisfyRequirement>`, reusing `optional_typings()` from [usage.rs](../src/parser/usage.rs) — [requirement.rs](../src/parser/requirement.rs).
+- ~~**`assert constraint` / `satisfy` body wiring inconsistent across scopes**~~ — **Done.** Both now reachable from `part def` bodies (`PartDefBodyElement::AssertConstraint`/`Satisfy`) and `satisfy` also from `occurrence def` bodies (`OccurrenceBodyElement::Satisfy`) — [part/body.rs](../src/parser/part/body.rs), [occurrence_body.rs](../src/parser/occurrence_body.rs).
+- ~~**KerML arrow-invocation operator** (`x->size()`)~~ — **Done.** New `->` branch in `postfix()` — [expr.rs](../src/parser/expr.rs). Desugars into the existing `Expression::MemberAccess`/`Invocation` shapes rather than a new variant, so no downstream exhaustive matches needed updating.
+- ~~**`AssignStmt.rhs` still a raw `String`**~~ — **Done**, unblocked by the arrow-invocation operator above — [action.rs](../src/parser/action.rs), [behavior.rs](../src/ast/behavior.rs).
+
+No Spec42 diagnostic currently depends on any of these; cross-check against § 1 before wiring Spec42-side consumers.
 
 ---
 

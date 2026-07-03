@@ -2,19 +2,21 @@
 
 use crate::ast::{
     AssertConstraintMember, ConstraintDefBody, DefinitionBody, DefinitionBodyElement, Node,
-    OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode,
+    OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode, SuccessionUsage,
 };
 use crate::parser::attribute::attribute_usage;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
+use crate::parser::expr::path_expression;
+use crate::parser::interface::connect_body;
 use crate::parser::lex::{capture_opaque_member, name, recover_body_element, ws1, ws_and_comments};
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::part::part_usage;
-use crate::parser::requirement::doc_comment;
-use crate::parser::usage::{optional_typings, specialization_clauses};
+use crate::parser::requirement::{doc_comment, satisfy};
+use crate::parser::usage::{multiplicity as multiplicity_parser, optional_typings, specialization_clauses};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -26,6 +28,7 @@ use nom::Parser;
 pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"doc",
     b"assert",
+    b"satisfy",
     b"attribute",
     b"flow",
     b"message",
@@ -45,8 +48,10 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"connection",
 ];
 
+// Note: "succession" is intentionally NOT in this list — `succession_usage()` in
+// `occurrence_body_element` now parses the standalone succession usage for real (see below).
 const DEFINITION_BODY_OPAQUE_STARTERS: &[&[u8]] =
-    &[b"end", b"ref", b"abstract", b"private", b"in", b"connection", b"succession"];
+    &[b"end", b"ref", b"abstract", b"private", b"in", b"connection"];
 
 /// `;` or brace body with occurrence-style members (`attribute`, `part`, `occurrence`, …).
 pub(crate) fn occurrence_definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
@@ -289,6 +294,8 @@ pub(crate) fn occurrence_body_element(
         ),
         map(attribute_usage, OccurrenceBodyElement::AttributeUsage),
         map(flow_usage_member, OccurrenceBodyElement::FlowUsage),
+        map(succession_usage, OccurrenceBodyElement::SuccessionUsage),
+        map(satisfy, OccurrenceBodyElement::Satisfy),
         map(part_usage, |p| {
             OccurrenceBodyElement::PartUsage(Box::new(p))
         }),
@@ -312,7 +319,46 @@ pub(crate) fn occurrence_body_element(
     Ok((input, node_from_to(start, input, elem)))
 }
 
-fn assert_constraint_member(input: Input<'_>) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
+/// Standalone succession usage: `succession` multiplicity? (`first` multiplicity? source)?
+/// `then` multiplicity? target `;` or `{ ... }`. Distinct from `succession flow X to Y;`
+/// (handled by `flow_usage_member`, which requires the `flow` keyword right after
+/// `succession`) and from the action-body `first ... then ...` control node (`FirstStmt`,
+/// only valid inside an action body). Real usage from the SysML Systems Library
+/// (`Flows.sysml`): `succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`.
+fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"succession"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    let (input, _) =
+        opt(preceded(ws_and_comments, preceded(tag(&b"first"[..]), ws1))).parse(input)?;
+    let (input, source_multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    let (input, source) = preceded(ws_and_comments, path_expression).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, target_multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    let (input, target) = preceded(ws_and_comments, path_expression).parse(input)?;
+    let (input, body) = connect_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            SuccessionUsage {
+                multiplicity,
+                source,
+                source_multiplicity,
+                target,
+                target_multiplicity,
+                body,
+            },
+        ),
+    ))
+}
+
+pub(crate) fn assert_constraint_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"assert"[..])).parse(input)?;
     let (input, _) = ws1(input)?;

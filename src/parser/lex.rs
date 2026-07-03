@@ -70,6 +70,7 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"@",
     b"abstract",
     b"allocate",
+    b"assert",
     b"attribute",
     b"bind",
     b"calc",

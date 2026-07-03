@@ -381,6 +381,12 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::EnumerationUsage(n) => PartDefBodyElement::EnumerationUsage(
             dummy_node(n, normalize_enumeration_usage(&n.value)),
         ),
+        PartDefBodyElement::AssertConstraint(n) => {
+            PartDefBodyElement::AssertConstraint(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::Satisfy(n) => {
+            PartDefBodyElement::Satisfy(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }
@@ -894,6 +900,15 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::ForkStmt(n) => {
             ActionDefBodyElement::ForkStmt(dummy_node(n, n.value.clone()))
         }
+        ActionDefBodyElement::TerminateStmt(n) => {
+            ActionDefBodyElement::TerminateStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionDefBodyElement::WhileStmt(n) => {
+            ActionDefBodyElement::WhileStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionDefBodyElement::IfStmt(n) => {
+            ActionDefBodyElement::IfStmt(dummy_node(n, n.value.clone()))
+        }
         ActionDefBodyElement::StateUsage(n) => {
             ActionDefBodyElement::StateUsage(dummy_node(n, n.value.clone()))
         }
@@ -983,6 +998,15 @@ fn normalize_action_usage_body_element_node(
         }
         ActionUsageBodyElement::ForkStmt(n) => {
             ActionUsageBodyElement::ForkStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::TerminateStmt(n) => {
+            ActionUsageBodyElement::TerminateStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::WhileStmt(n) => {
+            ActionUsageBodyElement::WhileStmt(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::IfStmt(n) => {
+            ActionUsageBodyElement::IfStmt(dummy_node(n, n.value.clone()))
         }
         ActionUsageBodyElement::StateUsage(n) => {
             ActionUsageBodyElement::StateUsage(dummy_node(n, n.value.clone()))

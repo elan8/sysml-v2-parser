@@ -2524,3 +2524,204 @@ end b : B;
         members[2].value
     );
 }
+
+#[test]
+fn test_part_def_body_accepts_assert_constraint_and_satisfy() {
+    // Regression: `assert_constraint_member` was only reachable from occurrence-def bodies,
+    // and `satisfy` only from package level. Neither was reachable inside a `part def` body.
+    let input = r#"package P {
+requirement def MyReq;
+part def Foo {
+  assert constraint { true; }
+  satisfy MyReq;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = elements
+        .iter()
+        .find_map(|el| match &el.value {
+            PackageBodyElement::PartDef(p) => Some(p),
+            _ => None,
+        })
+        .expect("expected part def");
+    let body_elements = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    assert!(
+        body_elements
+            .iter()
+            .any(|el| matches!(el.value, PartDefBodyElement::AssertConstraint(_))),
+        "expected an AssertConstraint member inside part def body, got {:?}",
+        body_elements
+    );
+    assert!(
+        body_elements
+            .iter()
+            .any(|el| matches!(el.value, PartDefBodyElement::Satisfy(_))),
+        "expected a Satisfy member inside part def body, got {:?}",
+        body_elements
+    );
+}
+
+#[test]
+fn test_occurrence_def_body_accepts_satisfy() {
+    // Regression: `satisfy` was only reachable at package level, not inside `occurrence def`
+    // bodies (which already supported `assert constraint`).
+    let input = r#"package P {
+requirement def MyReq;
+occurrence def Foo {
+  satisfy MyReq;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let occurrence_def = elements
+        .iter()
+        .find_map(|el| match &el.value {
+            PackageBodyElement::OccurrenceDef(o) => Some(o),
+            _ => None,
+        })
+        .expect("expected occurrence def");
+    let body_elements = match &occurrence_def.value.body {
+        sysml_v2_parser::ast::DefinitionBody::Brace { elements } => elements,
+        other => panic!("expected occurrence def brace body, got {:?}", other),
+    };
+    assert!(
+        body_elements.iter().any(|el| matches!(
+            &el.value,
+            DefinitionBodyElement::OccurrenceMember(member)
+                if matches!(member.value, OccurrenceBodyElement::Satisfy(_))
+        )),
+        "expected a Satisfy member inside occurrence def body, got {:?}",
+        body_elements
+    );
+}
+
+#[test]
+fn test_package_level_satisfy_still_parses_after_part_def_scope_wiring() {
+    // "Didn't break the neighbor" check: package-level `satisfy` wiring must be unaffected
+    // by adding `satisfy` to part-def/occurrence-def body dispatchers.
+    let input = r#"package P {
+requirement def MyReq;
+satisfy MyReq;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|el| matches!(el.value, PackageBodyElement::Satisfy(_))),
+        "expected package-level Satisfy to still parse, got {:?}",
+        elements
+    );
+}
+
+#[test]
+fn test_satisfy_accepts_inline_requirement_name_and_type() {
+    // Regression: only the bare `satisfy <ref> (by <expr>)?;` shorthand was implemented.
+    // The fuller `satisfy requirement <name> : <Type> by <expr>;` form now also parses,
+    // reusing the shared `optional_typings` fragment from usage.rs.
+    let input = r#"package P {
+requirement def ReqType;
+part def Foo {
+  satisfy requirement myReq : ReqType by someExpr;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = elements
+        .iter()
+        .find_map(|el| match &el.value {
+            PackageBodyElement::PartDef(p) => Some(p),
+            _ => None,
+        })
+        .expect("expected part def");
+    let body_elements = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let satisfy = body_elements
+        .iter()
+        .find_map(|el| match &el.value {
+            PartDefBodyElement::Satisfy(s) => Some(&s.value),
+            _ => None,
+        })
+        .expect("expected a Satisfy member");
+    let inline = satisfy
+        .inline_requirement
+        .as_ref()
+        .expect("expected inline_requirement to be populated for the `requirement` form");
+    assert_eq!(inline.name, "myReq");
+    assert_eq!(inline.type_name.as_deref(), Some("ReqType"));
+    assert!(matches!(&satisfy.target.value, Expression::FeatureRef(n) if n == "someExpr"));
+}
+
+#[test]
+fn test_satisfy_bare_shorthand_still_has_no_inline_requirement() {
+    // "Didn't break the neighbor" check: the existing bare shorthand must keep
+    // `inline_requirement: None`.
+    let input = r#"package P {
+requirement def MyReq;
+part def Foo {
+  satisfy MyReq;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = elements
+        .iter()
+        .find_map(|el| match &el.value {
+            PackageBodyElement::PartDef(p) => Some(p),
+            _ => None,
+        })
+        .expect("expected part def");
+    let body_elements = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let satisfy = body_elements
+        .iter()
+        .find_map(|el| match &el.value {
+            PartDefBodyElement::Satisfy(s) => Some(&s.value),
+            _ => None,
+        })
+        .expect("expected a Satisfy member");
+    assert!(satisfy.inline_requirement.is_none());
+}

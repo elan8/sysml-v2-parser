@@ -56,9 +56,10 @@ fn transition_accept_retained_with_spans() {
         .as_ref()
         .expect("shorthand accept");
     match accept {
-        TransitionAccept::Shorthand(expr) => {
+        TransitionAccept::Shorthand(expr, via) => {
             assert!(matches!(expr.value, Expression::FeatureRef(ref n) if n == "StartPressed"));
             assert!(expr.span.len > 0);
+            assert!(via.is_none(), "fixture has no `via` clause on this trigger");
         }
         _ => panic!("expected shorthand accept"),
     }
@@ -67,11 +68,12 @@ fn transition_accept_retained_with_spans() {
         .as_ref()
         .expect("typed accept");
     match typed {
-        TransitionAccept::Payload(p) => {
+        TransitionAccept::Payload(p, via) => {
             assert_eq!(p.name, "evt");
             assert_eq!(p.type_name.as_deref(), Some("StartEvent"));
             assert!(p.name_span.len > 0);
             assert!(p.type_span.is_some());
+            assert!(via.is_none(), "fixture has no `via` clause on this trigger");
         }
         _ => panic!("expected typed accept"),
     }

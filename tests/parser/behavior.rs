@@ -199,3 +199,311 @@ action def Run :> BaseAction, LoggedAction;
     );
     assert!(action_def.value.specializes_span.is_some());
 }
+
+#[test]
+fn test_assign_stmt_rhs_parses_as_structured_expression() {
+    // Regression: `AssignStmt.rhs` used to be a raw `String` captured via
+    // `take_until_terminator`. Now that the expression grammar supports the KerML
+    // arrow-invocation operator (`->`), the RHS is a real `Node<Expression>`.
+    let input = r#"package P {
+action def Compute {
+  in collection;
+  attribute total : Integer;
+  assign total := collection->size();
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let action_def = match &elements[0].value {
+        PackageBodyElement::ActionDef(a) => a,
+        other => panic!("expected action def, got {:?}", other),
+    };
+    let body_elements = match &action_def.value.body {
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => elements,
+        other => panic!("expected action def brace body, got {:?}", other),
+    };
+    let assign = body_elements
+        .iter()
+        .find_map(|el| match &el.value {
+            sysml_v2_parser::ast::ActionDefBodyElement::Assign(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("action def body should contain an AssignStmt");
+    match &assign.rhs.value {
+        Expression::Invocation { callee, args } => {
+            assert!(args.is_empty());
+            match &callee.value {
+                Expression::MemberAccess(base, member) => {
+                    assert_eq!(member, "size");
+                    assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "collection"));
+                }
+                other => panic!("expected MemberAccess callee, got {:?}", other),
+            }
+        }
+        other => panic!("expected rhs to be a structured Invocation expression, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_for_loop_range_uses_structured_arrow_invocation_not_raw_text_fallback() {
+    // Regression: `for_loop()` falls back to a raw-text `Expression::FeatureRef` when
+    // `expression()` can't parse the range. Arrow-invocation (`->`) used to be the common
+    // case that hit this fallback; now that expr.rs supports `->`, the range should parse
+    // as a structured Invocation, not the raw fallback text.
+    let input = r#"package P {
+action def Iterate {
+  in powerProfile;
+  for x in powerProfile->size() {
+    assign x := x + 1;
+  }
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let action_def = match &elements[0].value {
+        PackageBodyElement::ActionDef(a) => a,
+        other => panic!("expected action def, got {:?}", other),
+    };
+    let body_elements = match &action_def.value.body {
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => elements,
+        other => panic!("expected action def brace body, got {:?}", other),
+    };
+    let for_loop = body_elements
+        .iter()
+        .find_map(|el| match &el.value {
+            sysml_v2_parser::ast::ActionDefBodyElement::ForLoop(f) => Some(&f.value),
+            _ => None,
+        })
+        .expect("action def body should contain a ForLoop");
+    match &for_loop.range.value {
+        Expression::Invocation { callee, .. } => {
+            assert!(
+                matches!(&callee.value, Expression::MemberAccess(_, member) if member == "size"),
+                "expected range to be powerProfile->size() as a structured MemberAccess/Invocation, got {:?}",
+                callee.value
+            );
+        }
+        other => panic!(
+            "expected structured Invocation range (not the raw-text FeatureRef fallback), got {:?}",
+            other
+        ),
+    }
+}
+
+fn action_def_body_elements(
+    result: &sysml_v2_parser::ast::RootNamespace,
+) -> Vec<sysml_v2_parser::ast::ActionDefBodyElement> {
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let action_def = match &elements[0].value {
+        PackageBodyElement::ActionDef(a) => a,
+        other => panic!("expected action def, got {:?}", other),
+    };
+    match &action_def.value.body {
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
+            elements.iter().map(|el| el.value.clone()).collect()
+        }
+        other => panic!("expected action def brace body, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_terminate_stmt_parses_bare_and_targeted_forms() {
+    // Regression: `terminate` was listed in ACTION_BODY_STARTERS but had no parser function,
+    // so it fell through to generic error recovery.
+    let input = r#"package P {
+action def Run {
+  action step;
+  terminate;
+  terminate step;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let body_elements = action_def_body_elements(&result);
+    let terminates: Vec<_> = body_elements
+        .iter()
+        .filter_map(|el| match el {
+            sysml_v2_parser::ast::ActionDefBodyElement::TerminateStmt(t) => Some(&t.value),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(terminates.len(), 2, "expected two TerminateStmt nodes, got {:?}", body_elements);
+    assert!(terminates[0].target.is_none(), "bare `terminate;` should have no target");
+    assert!(
+        matches!(&terminates[1].target, Some(t) if matches!(&t.value, Expression::FeatureRef(s) if s == "step")),
+        "expected `terminate step;` to target `step`, got {:?}",
+        terminates[1].target
+    );
+}
+
+#[test]
+fn test_while_stmt_parses_condition_and_nested_body() {
+    // Regression: `while` was listed in ACTION_BODY_STARTERS but had no parser function.
+    let input = r#"package P {
+action def Run {
+  attribute x : Integer;
+  while x < 10 {
+    assign x := x + 1;
+  }
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let body_elements = action_def_body_elements(&result);
+    let while_stmt = body_elements
+        .iter()
+        .find_map(|el| match el {
+            sysml_v2_parser::ast::ActionDefBodyElement::WhileStmt(w) => Some(&w.value),
+            _ => None,
+        })
+        .expect("expected a WhileStmt node");
+    assert!(matches!(&while_stmt.condition.value, Expression::BinaryOp { .. }));
+    match &while_stmt.body {
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
+            assert!(
+                elements.iter().any(|el| matches!(
+                    el.value,
+                    sysml_v2_parser::ast::ActionDefBodyElement::Assign(_)
+                )),
+                "while body should retain the nested assign statement, got {:?}",
+                elements
+            );
+        }
+        other => panic!("expected structured while body, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_if_stmt_parses_then_and_optional_else_with_nested_control_node() {
+    // Regression: `if` was listed in ACTION_BODY_STARTERS but had no parser function.
+    let input = r#"package P {
+action def Run {
+  attribute x : Integer;
+  if x > 0 {
+    decide x;
+  } else {
+    assign x := 0;
+  }
+  if x > 0 {
+    assign x := x - 1;
+  }
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let body_elements = action_def_body_elements(&result);
+    let if_stmts: Vec<_> = body_elements
+        .iter()
+        .filter_map(|el| match el {
+            sysml_v2_parser::ast::ActionDefBodyElement::IfStmt(i) => Some(&i.value),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(if_stmts.len(), 2, "expected two IfStmt nodes, got {:?}", body_elements);
+
+    let with_else = &if_stmts[0];
+    match &with_else.then_body {
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
+            assert!(
+                elements.iter().any(|el| matches!(
+                    el.value,
+                    sysml_v2_parser::ast::ActionDefBodyElement::DecisionStmt(_)
+                )),
+                "then-body should retain the nested decide control node (proves real recursion), got {:?}",
+                elements
+            );
+        }
+        other => panic!("expected structured then-body, got {:?}", other),
+    }
+    assert!(with_else.else_body.is_some(), "expected an else-body to be present");
+    match with_else.else_body.as_ref().unwrap() {
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
+            assert!(elements.iter().any(|el| matches!(
+                el.value,
+                sysml_v2_parser::ast::ActionDefBodyElement::Assign(_)
+            )));
+        }
+        other => panic!("expected structured else-body, got {:?}", other),
+    }
+
+    let without_else = &if_stmts[1];
+    assert!(without_else.else_body.is_none(), "expected no else-body for the second if");
+}
+
+#[test]
+fn test_transition_trigger_accept_supports_via_port() {
+    // Regression: the transition TRIGGER form (`first source accept X ... then target;`) had
+    // no `via` support at all — only the `do`-effect `accept`/`send` forms did. Real spec
+    // examples like `accept TurnOn via commPort` failed to parse the `via` clause.
+    let input = r#"package P {
+state def S {
+  state Idle;
+  state Running;
+  transition first Idle accept StartPressed via commPort then Running;
+  transition second first Idle accept evt : StartEvent via commPort then Running;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let state_def = match &elements[0].value {
+        PackageBodyElement::StateDef(sd) => &sd.value,
+        other => panic!("expected state def, got {:?}", other),
+    };
+    let transitions: Vec<_> = match &state_def.body {
+        sysml_v2_parser::ast::StateDefBody::Brace { elements } => elements
+            .iter()
+            .filter_map(|el| match &el.value {
+                sysml_v2_parser::ast::StateDefBodyElement::Transition(t) => Some(&t.value),
+                _ => None,
+            })
+            .collect(),
+        other => panic!("expected state def brace body, got {:?}", other),
+    };
+    assert_eq!(transitions.len(), 2);
+
+    let shorthand_accept = transitions[0].accept.as_ref().expect("shorthand accept");
+    match shorthand_accept {
+        sysml_v2_parser::ast::TransitionAccept::Shorthand(expr, via) => {
+            assert!(matches!(&expr.value, Expression::FeatureRef(n) if n == "StartPressed"));
+            let via = via.as_ref().expect("expected via clause on shorthand accept");
+            assert!(matches!(&via.value, Expression::FeatureRef(n) if n == "commPort"));
+        }
+        other => panic!("expected shorthand accept, got {:?}", other),
+    }
+
+    let typed_accept = transitions[1].accept.as_ref().expect("typed accept");
+    match typed_accept {
+        sysml_v2_parser::ast::TransitionAccept::Payload(payload, via) => {
+            assert_eq!(payload.name, "evt");
+            assert_eq!(payload.type_name.as_deref(), Some("StartEvent"));
+            let via = via.as_ref().expect("expected via clause on typed accept");
+            assert!(matches!(&via.value, Expression::FeatureRef(n) if n == "commPort"));
+        }
+        other => panic!("expected typed accept, got {:?}", other),
+    }
+}

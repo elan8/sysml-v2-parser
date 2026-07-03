@@ -44,6 +44,9 @@ pub enum ActionDefBodyElement {
     DecisionStmt(Node<DecisionStmt>),
     JoinStmt(Node<JoinStmt>),
     ForkStmt(Node<ForkStmt>),
+    TerminateStmt(Node<TerminateStmt>),
+    WhileStmt(Node<WhileStmt>),
+    IfStmt(Node<IfStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
     Assign(Node<AssignStmt>),
@@ -62,7 +65,7 @@ pub enum ActionDefBodyElement {
 pub struct AssignStmt {
     pub is_then: bool,
     pub lhs: Node<Expression>,
-    pub rhs: String,
+    pub rhs: Node<Expression>,
 }
 
 /// For-loop node (SysML v2 ForLoopNode) - modeled minimally.
@@ -114,8 +117,10 @@ pub struct PayloadClause {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TransitionAccept {
-    Payload(PayloadClause),
-    Shorthand(Node<Expression>),
+    /// `(payload, via)` — `via` is the optional `via <port>` clause after the trigger.
+    Payload(PayloadClause, Option<Node<Expression>>),
+    /// `(expr, via)` — `via` is the optional `via <port>` clause after the trigger.
+    Shorthand(Node<Expression>, Option<Node<Expression>>),
 }
 
 /// Transition `do` effect: a structured action-usage form (SysML v2 `EffectBehaviorUsage`)
@@ -198,6 +203,9 @@ pub enum ActionUsageBodyElement {
     DecisionStmt(Node<DecisionStmt>),
     JoinStmt(Node<JoinStmt>),
     ForkStmt(Node<ForkStmt>),
+    TerminateStmt(Node<TerminateStmt>),
+    WhileStmt(Node<WhileStmt>),
+    IfStmt(Node<IfStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
     Assign(Node<AssignStmt>),
@@ -293,6 +301,31 @@ pub struct ForkStmt {
 pub enum FirstMergeBody {
     Semicolon,
     Brace,
+}
+
+/// Terminate control node: `terminate;` or `terminate target;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TerminateStmt {
+    /// Optional target being terminated; bare `terminate;` terminates the enclosing action.
+    pub target: Option<Node<Expression>>,
+}
+
+/// While-loop control node: `while` condition `{` ActionDefBodyElement* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WhileStmt {
+    pub condition: Node<Expression>,
+    pub body: ActionDefBody,
+}
+
+/// If control node: `if` condition `{` thenBody `}` (`else` `{` elseBody `}`)?.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct IfStmt {
+    pub condition: Node<Expression>,
+    pub then_body: ActionDefBody,
+    pub else_body: Option<ActionDefBody>,
 }
 
 // ---------------------------------------------------------------------------

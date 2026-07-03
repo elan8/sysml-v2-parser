@@ -129,6 +129,19 @@ pub struct Satisfy {
     pub body_elements: Option<Vec<Node<ConstraintDefBodyElement>>>,
     /// `true` for a negated satisfy usage: `(assert)? not satisfy ...`.
     pub is_negated: bool,
+    /// Present for the fuller `satisfy requirement <name> : <Type> by <expr>;` form
+    /// (`SatisfyRequirementUsage` in the KerML grammar); `None` for the bare
+    /// `satisfy <ref> (by <expr>)?;` shorthand.
+    pub inline_requirement: Option<InlineSatisfyRequirement>,
+}
+
+/// Inline named/typed requirement usage after `satisfy requirement`, e.g.
+/// `satisfy requirement myReq : ReqType by someExpr;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InlineSatisfyRequirement {
+    pub name: String,
+    pub type_name: Option<String>,
 }
 
 /// Bare requirement Usage.

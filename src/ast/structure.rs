@@ -74,6 +74,12 @@ pub enum PartDefBodyElement {
     CalcUsage(Node<CalcUsage>),
     /// Enumeration usage (`enum` keyword) inside a part definition body.
     EnumerationUsage(Node<EnumerationUsage>),
+    /// `assert (not)? constraint { ... }` inside a part definition body (previously only
+    /// reachable from occurrence definition bodies).
+    AssertConstraint(Node<AssertConstraintMember>),
+    /// `satisfy <ref> (by <expr>)?;` inside a part definition body (previously only reachable
+    /// at package level).
+    Satisfy(Node<Satisfy>),
 }
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.
@@ -652,6 +658,29 @@ pub enum OccurrenceBodyElement {
     AttributeUsage(Node<AttributeUsage>),
     PartUsage(Box<Node<PartUsage>>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
+    SuccessionUsage(Node<SuccessionUsage>),
+    /// `satisfy <ref> (by <expr>)?;` inside an occurrence definition body (previously only
+    /// reachable at package level).
+    Satisfy(Node<Satisfy>),
+}
+
+/// Standalone succession usage directly in a definition/occurrence body (distinct from the
+/// action-body `first ... then ...` control node and from `succession flow X to Y;`):
+/// `succession` multiplicity? (`first` multiplicity? source)? `then` multiplicity? target
+/// `;` or `{` ... `}`. E.g. `succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`
+/// (SysML Systems Library `Flows.sysml`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SuccessionUsage {
+    /// Multiplicity of the succession feature itself, e.g. `[seBeforeNum]`.
+    pub multiplicity: Option<String>,
+    pub source: Node<Expression>,
+    /// Multiplicity on the `first` end, e.g. `[0..1]`.
+    pub source_multiplicity: Option<String>,
+    pub target: Node<Expression>,
+    /// Multiplicity on the `then` end, e.g. `[0..1]`.
+    pub target_multiplicity: Option<String>,
+    pub body: ConnectBody,
 }
 
 // ---------------------------------------------------------------------------

@@ -20,7 +20,7 @@ use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::usage::{
-    feature_usage_header, multiplicity, specialization_clauses, usage_header,
+    feature_usage_header, multiplicity, optional_typings, specialization_clauses, usage_header,
 };
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, span_from_to};
@@ -619,7 +619,34 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
         .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = tag(&b"satisfy"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, source) = expression(input)?;
+    let (input, (source, inline_requirement)) = if let Ok((after_kw, _)) =
+        preceded(tag(&b"requirement"[..]), ws1).parse(input)
+    {
+        // Fuller `satisfy requirement <name> : <Type>` form (SysML `SatisfyRequirementUsage`),
+        // reusing the shared typing fragment from usage.rs rather than hand-rolling it.
+        let inline_start = after_kw;
+        let (after_name, req_name) = name(after_kw)?;
+        let (after_type, type_suffix) = optional_typings(after_name)?;
+        let type_name = type_suffix.map(|(_, type_name)| type_name);
+        let source = node_from_to(
+            inline_start,
+            after_type,
+            crate::ast::Expression::FeatureRef(req_name.clone()),
+        );
+        (
+            after_type,
+            (
+                source,
+                Some(crate::ast::InlineSatisfyRequirement {
+                    name: req_name,
+                    type_name,
+                }),
+            ),
+        )
+    } else {
+        let (input, source) = expression(input)?;
+        (input, (source, None))
+    };
     let (input, target) = if let Ok((input, _)) = preceded(
         ws_and_comments,
         tag::<_, _, nom::error::Error<Input>>(&b"by"[..]),
@@ -657,6 +684,7 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
                 body,
                 body_elements,
                 is_negated,
+                inline_requirement,
             },
         ),
     ))

@@ -135,3 +135,94 @@ fn flow_def_doc_only_body_regression() {
         "expected doc member in flow def body"
     );
 }
+
+#[test]
+fn flow_def_body_parses_standalone_succession_usage() {
+    // Regression: bare `succession first A then B;` directly in a definition body was
+    // swallowed as opaque text via `DEFINITION_BODY_OPAQUE_STARTERS` (which listed
+    // "succession"). It's now a real `SuccessionUsage` node.
+    let pkg = parse_package(
+        "package P { flow def Sequence { succession first stepA then stepB; } }",
+    );
+    let flow = match &brace_package_elements(&pkg)[0].value {
+        PackageBodyElement::FlowDef(flow) => flow,
+        _ => panic!("expected FlowDef"),
+    };
+    let elements = brace_definition_elements(&flow.value.body);
+    let succession = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            DefinitionBodyElement::OccurrenceMember(member) => match &member.value {
+                OccurrenceBodyElement::SuccessionUsage(s) => Some(&s.value),
+                _ => None,
+            },
+            _ => None,
+        })
+        .expect("expected a SuccessionUsage node, not an opaque Other(String)");
+    assert!(matches!(&succession.source.value, Expression::FeatureRef(n) if n == "stepA"));
+    assert!(matches!(&succession.target.value, Expression::FeatureRef(n) if n == "stepB"));
+}
+
+#[test]
+fn flow_def_body_still_parses_succession_flow_as_flow_usage_not_succession_usage() {
+    // "Didn't break the neighbor" check: `succession flow X to Y;` must keep routing through
+    // `flow_usage_member` (FlowUsageKind::SuccessionFlow), not the new `succession_usage()`.
+    let pkg = parse_package(
+        "package P { part def Image; part def Camera { part image : Image; } part def Target { part image : Image; } flow def Relay { succession flow focus.image to shoot.image; } }",
+    );
+    let flow = brace_package_elements(&pkg)
+        .iter()
+        .find_map(|element| match &element.value {
+            PackageBodyElement::FlowDef(flow) => Some(flow),
+            _ => None,
+        })
+        .expect("expected FlowDef");
+    let elements = brace_definition_elements(&flow.value.body);
+    assert!(
+        elements.iter().any(|element| matches!(
+            &element.value,
+            DefinitionBodyElement::OccurrenceMember(member)
+                if matches!(&member.value, OccurrenceBodyElement::FlowUsage(_))
+        )),
+        "succession flow should still parse as FlowUsage, got {:?}",
+        elements
+    );
+    assert!(
+        !elements.iter().any(|element| matches!(
+            &element.value,
+            DefinitionBodyElement::OccurrenceMember(member)
+                if matches!(&member.value, OccurrenceBodyElement::SuccessionUsage(_))
+        )),
+        "succession flow must not be misclassified as a standalone SuccessionUsage"
+    );
+}
+
+#[test]
+fn flow_def_body_parses_succession_usage_with_multiplicities_like_systems_library() {
+    // Regression for the exact real-world form used by the SysML Systems Library's
+    // `Flows.sysml` (`succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`):
+    // a multiplicity on the succession itself, and on both the `first` and `then` ends.
+    let pkg = parse_package(
+        "package P { flow def M { attribute seBeforeNum : Natural; succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self; } }",
+    );
+    let flow = match &brace_package_elements(&pkg)[0].value {
+        PackageBodyElement::FlowDef(flow) => flow,
+        _ => panic!("expected FlowDef"),
+    };
+    let elements = brace_definition_elements(&flow.value.body);
+    let succession = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            DefinitionBodyElement::OccurrenceMember(member) => match &member.value {
+                OccurrenceBodyElement::SuccessionUsage(s) => Some(&s.value),
+                _ => None,
+            },
+            _ => None,
+        })
+        .expect("expected a SuccessionUsage node");
+    assert_eq!(succession.multiplicity.as_deref(), Some("[seBeforeNum]"));
+    assert_eq!(succession.source_multiplicity.as_deref(), Some("[0..1]"));
+    assert_eq!(succession.target_multiplicity.as_deref(), Some("[0..1]"));
+    assert!(matches!(&succession.source.value, Expression::FeatureRef(n) if n == "sourceEvent"));
+    assert!(matches!(&succession.target.value, Expression::FeatureRef(n) if n == "self"));
+}

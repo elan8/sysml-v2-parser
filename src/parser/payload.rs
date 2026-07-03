@@ -30,7 +30,8 @@ pub(crate) fn typed_payload_clause(input: Input<'_>) -> IResult<Input<'_>, Paylo
     ))
 }
 
-/// After `accept` keyword: `name : Type` or shorthand expression.
+/// After `accept` keyword: `name : Type` or shorthand expression, with an optional trailing
+/// `via <port>` clause (e.g. `accept TurnOn via commPort`).
 pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
     let (input, _) = preceded(ws_and_comments, tag(&b"accept"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -40,20 +41,28 @@ pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, Transiti
         preceded(ws_and_comments, with_span(qualified_name)),
     ))
     .parse(input)?;
+    let (input, via) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"via"[..])),
+        preceded(ws1, expression),
+    ))
+    .parse(input)?;
     if let (Expression::FeatureRef(name), Some((type_span, type_name))) =
         (&expr_node.value, type_suffix)
     {
         return Ok((
             input,
-            TransitionAccept::Payload(PayloadClause {
-                name: name.clone(),
-                type_name: Some(type_name),
-                name_span: expr_node.span.clone(),
-                type_span: Some(type_span),
-            }),
+            TransitionAccept::Payload(
+                PayloadClause {
+                    name: name.clone(),
+                    type_name: Some(type_name),
+                    name_span: expr_node.span.clone(),
+                    type_span: Some(type_span),
+                },
+                via,
+            ),
         ));
     }
-    Ok((input, TransitionAccept::Shorthand(expr_node)))
+    Ok((input, TransitionAccept::Shorthand(expr_node, via)))
 }
 
 /// Standalone control-node statement: `accept|send` payload (`;` or body).
