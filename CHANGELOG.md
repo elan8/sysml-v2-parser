@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-07-03
+
+Closes all 7 open follow-ups listed in `docs/PARSER_BACKLOG_ROADMAP.md` § 5 from the 0.29.0
+state/action/connector audit, plus three unrelated `doc`-comment parsing gaps found while
+fixing a Babel42 Components-tab bug report.
+
+### Added
+
+- **`doc` support in port usage bodies**: `PortBodyElement` gains a `Doc(Node<DocComment>)` variant. Previously a `doc /* ... */` block inside a `port name : Type { ... }` *usage* body (as opposed to a `port def` body, which already supported it) failed to parse, and error recovery misclassified the doc text as a "bare feature declaration in part definition body".
+- **`doc` support in `connection def` bodies**: `ConnectionDefBodyElement` gains `Doc(Node<DocComment>)`. `connection_def_body_element()` also gains an `Error(Node<ParseErrorNode>)` variant; `connection_member_body` is migrated from a hand-rolled recovery loop (whose only fallback silently discarded every member *after* an unrecognized one, not just the bad one) to the shared `parse_structured_brace_members` helper, matching `port_body_brace`.
+- **`doc` support in interface usage connect bodies**: `InterfaceUsageBodyElement` gains `Doc(Node<DocComment>)`. Previously a `doc` block inside `interface ... connect ... to ... { ... }` caused the entire interface usage to be discarded as a generic recovery `Error` node one level up (`connect_body_with_elements` had no recovery path at all).
+- **`if` / `while` / `terminate` control nodes**: new `IfStmt`, `WhileStmt`, `TerminateStmt` AST nodes and matching `ActionDefBodyElement`/`ActionUsageBodyElement` variants. `if`/`while` bodies are fully structured (`ActionDefBody`, reusing `action_def_body_brace` for real recursion, including nested control nodes), not the opaque `FirstMergeBody` that `decide`/`join`/`fork` use. `terminate` accepts an optional target expression (`terminate;` / `terminate someAction;`). Both `alt()` dispatchers needed nesting into a sub-`alt()` to stay under nom's 21-branch tuple limit.
+- **Standalone `succession` usage**: new `SuccessionUsage` AST node (`OccurrenceBodyElement::SuccessionUsage`) for `succession (first)? source then target;` written directly in a definition/occurrence body — distinct from the action-body `FirstStmt`/`MergeStmt` control node and from `succession flow X to Y;`. Also models the multiplicity-bearing form actually used by the SysML Systems Library (`succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;` in `Flows.sysml`): `SuccessionUsage.multiplicity`/`source_multiplicity`/`target_multiplicity`. Previously swallowed as opaque `Other(String)` text via `DEFINITION_BODY_OPAQUE_STARTERS`.
+- **Transition trigger `via`**: `TransitionAccept::Payload`/`Shorthand` each gain an `Option<Node<Expression>>` for a trailing `via <port>` clause (e.g. `accept TurnOn via commPort`). Previously only the `do`-effect `accept`/`send` forms supported `via`; the trigger clause (before `if`/`do`) did not.
+- **`satisfy requirement <name> : <Type> by <expr>`**: `Satisfy` gains `inline_requirement: Option<InlineSatisfyRequirement>` for the fuller named/typed requirement-usage form, reusing `optional_typings()` from `usage.rs`. The bare `satisfy <ref> (by <expr>)?;` shorthand is unaffected (`inline_requirement: None`).
+- **`assert constraint` / `satisfy` reachable from more scopes**: `PartDefBodyElement` gains `AssertConstraint(Node<AssertConstraintMember>)` and `Satisfy(Node<Satisfy>)` — both previously only reachable from `occurrence def` bodies (`assert constraint`) or package level (`satisfy`), not `part def` bodies. `OccurrenceBodyElement` gains `Satisfy(Node<Satisfy>)` (occurrence def bodies already had `AssertConstraint`). `b"assert"` added to `PART_BODY_STARTERS`; `b"satisfy"` added to `OCCURRENCE_BODY_STARTERS`.
+- **KerML arrow-invocation operator**: `postfix()` in `expr.rs` now parses `->name` / `->name(args)` (e.g. `collection->size()`, `powerProfile->size()-1`) at the same precedence level as `.` member access, desugaring into the existing `Expression::MemberAccess`/`Invocation` shapes — no new `Expression` variant, so no downstream exhaustive matches needed updating.
+- **`PARSE_AST_VERSION`** bumped from `4` → `5` to invalidate caches built against the 0.29.x schema.
+
+### Changed
+
+- **`AssignStmt.rhs`**: changed from `String` to `Node<Expression>`, unblocked by the arrow-invocation operator above (real models commonly write `x := collection->size();`, which previously required the raw-text fallback).
+- **`ForLoop.range` raw-text fallback**: retained as a defensive net (not removed — recovery/fallback paths are kept per project convention), but the arrow-invocation operator above means it's no longer hit for the common case; doc comment updated accordingly.
+
 ## [0.29.0] - 2026-07-01
 
 ### Added
