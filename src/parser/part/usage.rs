@@ -529,8 +529,21 @@ pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     ))
 }
 
-/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef)
+/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), or `doc`.
 fn interface_usage_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
+    alt((
+        interface_usage_ref_redef,
+        map(doc_comment, |doc| {
+            let span = doc.span.clone();
+            Node::new(span, InterfaceUsageBodyElement::Doc(doc))
+        }),
+    ))
+    .parse(input)
+}
+
+fn interface_usage_ref_redef(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
     let start = input;

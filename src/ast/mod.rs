@@ -641,6 +641,7 @@ fn normalize_port_body_element_node(el: &Node<PortBodyElement>) -> Node<PortBody
         PortBodyElement::PortUsage(n) => {
             PortBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
+        PortBodyElement::Doc(n) => PortBodyElement::Doc(dummy_node(n, n.value.clone())),
         PortBodyElement::Other(text) => PortBodyElement::Other(text.clone()),
     };
     dummy_node(el, value)
@@ -734,6 +735,9 @@ fn normalize_connection_def_body_element_node(
         }
         ConnectionDefBodyElement::ConnectStmt(n) => {
             ConnectionDefBodyElement::ConnectStmt(dummy_node(n, n.value.clone()))
+        }
+        ConnectionDefBodyElement::Doc(n) => {
+            ConnectionDefBodyElement::Doc(dummy_node(n, n.value.clone()))
         }
     };
     dummy_node(el, value)

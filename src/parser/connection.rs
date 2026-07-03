@@ -13,6 +13,7 @@ use crate::parser::lex::{
     take_until_terminator, ws1, ws_and_comments, CONNECTION_DEF_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
+use crate::parser::requirement::doc_comment;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -205,6 +206,7 @@ fn connection_def_body_element(
         map(end_decl, ConnectionDefBodyElement::EndDecl),
         map(ref_decl, ConnectionDefBodyElement::RefDecl),
         map(connect_stmt, ConnectionDefBodyElement::ConnectStmt),
+        map(doc_comment, ConnectionDefBodyElement::Doc),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

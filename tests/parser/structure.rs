@@ -1079,6 +1079,72 @@ port rightWheelToRoadPort;
 }
 
 #[test]
+fn test_port_usage_body_preserves_doc_with_colon_and_comma_list() {
+    // Regression for a real-world model (sysml-robot-vacuum-cleaner) where a `doc /* ... */`
+    // block inside a port *usage* body (not a port def) failed to parse because
+    // `PortBodyElement`/`port_body_element` had no `doc_comment` alternative. The parser then
+    // fell back to error recovery, which misclassified the doc text — e.g. a line like
+    // "Addresses: front ToF 0x29, ..." — as a "bare feature declaration in part definition body".
+    let input = r#"package P {
+part def SensorAssembly {
+port sensorBusOut : I2cPort {
+doc /*
+Sensor harness mate to main PCB J_SENSOR_I2C (6-pin JST-GH).
+3.3 V logic at 400 kHz; SDA/SCL open-drain with 3.3 V pull-ups.
+Addresses: front ToF 0x29, left ToF 0x2A, right ToF 0x2B, IMU 0x68.
+*/
+}
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let part_def = match &pkg.value.body {
+        PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBodyElement::PartDef(d) => d,
+            other => panic!("expected part def, got {:?}", other),
+        },
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let port_usage = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements
+            .iter()
+            .find_map(|el| match &el.value {
+                PartDefBodyElement::PortUsage(p) => Some(p),
+                _ => None,
+            })
+            .expect("part def should contain nested port usage"),
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let members = match &port_usage.value.body {
+        sysml_v2_parser::ast::PortBody::Brace { elements } => elements,
+        other => panic!("expected structured port body, got {:?}", other),
+    };
+    assert_eq!(
+        members.len(),
+        1,
+        "port usage body should parse exactly one member (the doc block), got {:?}",
+        members
+    );
+    match &members[0].value {
+        PortBodyElement::Doc(doc) => {
+            assert!(
+                doc.value.text.contains("Addresses: front ToF 0x29"),
+                "doc text should retain the colon-and-comma-list line verbatim, got {:?}",
+                doc.value.text
+            );
+        }
+        PortBodyElement::Error(err) => panic!(
+            "doc block inside port usage body should not produce a recovery error node, got {:?}",
+            err
+        ),
+        other => panic!("expected Doc member, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_port_usage_normalizes_subset_redefine_aliases() {
     let input = r#"package P {
 part def Carrier {
@@ -2259,3 +2325,134 @@ fn part_def_body_attribute_usage(
     }
 }
 
+#[test]
+fn test_connection_def_body_preserves_doc_and_subsequent_members() {
+    // Regression: `ConnectionDefBodyElement`/`connection_def_body_element` had no `doc_comment`
+    // alternative, and "doc" was missing from `CONNECTION_DEF_BODY_STARTERS`. A `doc /* ... */`
+    // block inside a `connection def` body would fail to parse, fall past the recognized-keyword
+    // recovery path, and hit the last-resort `advance_to_closing_brace` fallback — silently
+    // discarding not just the doc, but every member declared after it in the same body.
+    let input = r#"package P {
+part def A;
+part def B;
+connection def Foo {
+doc /* Addresses: front ToF 0x29, left ToF 0x2A. */
+end a : A;
+end b : B;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let connection_def = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements
+            .iter()
+            .find_map(|el| match &el.value {
+                PackageBodyElement::ConnectionDef(d) => Some(d),
+                _ => None,
+            })
+            .expect("package should contain a connection def"),
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let members = match &connection_def.value.body {
+        sysml_v2_parser::ast::ConnectionDefBody::Brace { elements } => elements,
+        other => panic!("expected structured connection def body, got {:?}", other),
+    };
+    assert_eq!(
+        members.len(),
+        3,
+        "connection def body should retain the doc block and both end decls after it, got {:?}",
+        members
+    );
+    match &members[0].value {
+        sysml_v2_parser::ast::ConnectionDefBodyElement::Doc(doc) => {
+            assert!(
+                doc.value.text.contains("Addresses: front ToF 0x29"),
+                "doc text should retain the colon-and-comma-list line verbatim, got {:?}",
+                doc.value.text
+            );
+        }
+        other => panic!("expected Doc member, got {:?}", other),
+    }
+    assert!(
+        matches!(
+            &members[1].value,
+            sysml_v2_parser::ast::ConnectionDefBodyElement::EndDecl(_)
+        ),
+        "expected first `end` decl after the doc block, got {:?}",
+        members[1].value
+    );
+    assert!(
+        matches!(
+            &members[2].value,
+            sysml_v2_parser::ast::ConnectionDefBodyElement::EndDecl(_)
+        ),
+        "expected second `end` decl after the doc block, got {:?}",
+        members[2].value
+    );
+}
+
+#[test]
+fn test_interface_usage_connect_body_preserves_doc() {
+    // Regression: `InterfaceUsageBodyElement`/`interface_usage_body_element` only supported
+    // `ref :>> name = value` redefinitions, with no `doc_comment` alternative and no recovery
+    // path in `connect_body_with_elements`. A `doc /* ... */` block inside an `interface ...
+    // connect ... to ... { ... }` usage body caused a hard parse failure that discarded the
+    // *entire* interface usage, replacing it with a generic "unexpected token in part usage
+    // body" error node.
+    let input = r#"package P {
+part def A { port p1; }
+part def B { port p2; }
+part vehicle {
+part a : A;
+part b : B;
+interface connect a.p1 to b.p2 {
+doc /* Addresses: front ToF 0x29, left ToF 0x2A. */
+}
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let part_usage = match &pkg.value.body {
+        PackageBody::Brace { elements } => match &elements[2].value {
+            PackageBodyElement::PartUsage(p) => p,
+            other => panic!("expected part usage, got {:?}", other),
+        },
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let interface_usage = match &part_usage.value.body {
+        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements
+            .iter()
+            .find_map(|el| match &el.value {
+                PartUsageBodyElement::InterfaceUsage(i) => Some(i),
+                _ => None,
+            })
+            .expect("part usage should contain an interface usage, not an Error node"),
+        other => panic!("expected part usage brace body, got {:?}", other),
+    };
+    let body_elements = match &interface_usage.value {
+        sysml_v2_parser::ast::InterfaceUsage::TypedConnect { body_elements, .. } => body_elements,
+        other => panic!("expected TypedConnect interface usage, got {:?}", other),
+    };
+    assert_eq!(
+        body_elements.len(),
+        1,
+        "interface usage connect body should retain the doc block, got {:?}",
+        body_elements
+    );
+    match &body_elements[0].value {
+        InterfaceUsageBodyElement::Doc(doc) => {
+            assert!(
+                doc.value.text.contains("Addresses: front ToF 0x29"),
+                "doc text should retain the colon-and-comma-list line verbatim, got {:?}",
+                doc.value.text
+            );
+        }
+        other => panic!("expected Doc member, got {:?}", other),
+    }
+}

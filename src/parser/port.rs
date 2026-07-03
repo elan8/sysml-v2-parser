@@ -44,6 +44,7 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
     let (input, elem) = alt((
         map(port_usage, PortBodyElement::PortUsage),
         map(in_out_decl, PortBodyElement::InOutDecl),
+        map(doc_comment, PortBodyElement::Doc),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

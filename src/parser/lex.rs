@@ -178,7 +178,7 @@ pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] =
 pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] =
     &[b"doc", b"expose", b"filter", b"render", b"satisfy"];
 
-pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[b"connect", b"end", b"ref"];
+pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[b"connect", b"end", b"ref", b"doc"];
 
 /// Skip optional whitespace (space, tab, newline).
 pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {

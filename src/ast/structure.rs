@@ -418,6 +418,7 @@ pub enum PortBodyElement {
     Error(Node<ParseErrorNode>),
     InOutDecl(Node<InOutDecl>),
     PortUsage(Node<PortUsage>),
+    Doc(Node<DocComment>),
     Other(String),
 }
 
@@ -539,6 +540,7 @@ pub enum ConnectionDefBodyElement {
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
+    Doc(Node<DocComment>),
 }
 
 // ---------------------------------------------------------------------------
@@ -718,6 +720,7 @@ pub enum InterfaceUsageBodyElement {
         value: Node<Expression>,
         body: RefBody,
     },
+    Doc(Node<DocComment>),
 }
 
 /// Connect at part usage level: `connect` from `to` to body.
