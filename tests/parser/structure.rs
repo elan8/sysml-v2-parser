@@ -2456,3 +2456,71 @@ doc /* Addresses: front ToF 0x29, left ToF 0x2A. */
         other => panic!("expected Doc member, got {:?}", other),
     }
 }
+
+#[test]
+fn test_connection_def_body_recovers_per_element_instead_of_truncating() {
+    // Regression: `connection_member_body` used to have its own hand-rolled loop whose only
+    // fallback for a genuinely unrecognized member was `advance_to_closing_brace`, which jumps
+    // straight to the closing `}` and discards every member declared after the bad one (not just
+    // the bad one itself). Migrating to the shared `parse_structured_brace_members` helper (the
+    // same one `port_body_brace` uses) means an unrecognized member now becomes a single `Error`
+    // node and parsing resumes for the remaining members.
+    let input = r#"package P {
+part def A;
+part def B;
+connection def Foo {
+end a : A;
+bogus nonsense;
+end b : B;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let connection_def = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements
+            .iter()
+            .find_map(|el| match &el.value {
+                PackageBodyElement::ConnectionDef(d) => Some(d),
+                _ => None,
+            })
+            .expect("package should contain a connection def"),
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let members = match &connection_def.value.body {
+        sysml_v2_parser::ast::ConnectionDefBody::Brace { elements } => elements,
+        other => panic!("expected structured connection def body, got {:?}", other),
+    };
+    assert_eq!(
+        members.len(),
+        3,
+        "expected end a, a recovered Error for `bogus nonsense;`, and end b, got {:?}",
+        members
+    );
+    assert!(
+        matches!(
+            &members[0].value,
+            sysml_v2_parser::ast::ConnectionDefBodyElement::EndDecl(_)
+        ),
+        "expected first member to be `end a : A`, got {:?}",
+        members[0].value
+    );
+    assert!(
+        matches!(
+            &members[1].value,
+            sysml_v2_parser::ast::ConnectionDefBodyElement::Error(_)
+        ),
+        "expected the unrecognized `bogus nonsense;` member to become an Error node, got {:?}",
+        members[1].value
+    );
+    assert!(
+        matches!(
+            &members[2].value,
+            sysml_v2_parser::ast::ConnectionDefBodyElement::EndDecl(_)
+        ),
+        "expected `end b : B` to still parse after the recovered error, got {:?}",
+        members[2].value
+    );
+}

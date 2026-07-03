@@ -2,7 +2,7 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-01 (state/action/connector grammar-fidelity pass — see § 5)
+**Last updated:** 2026-07-03 (§2.3 — `doc` support added for port usage, connection def, and interface usage connect bodies; `connection def` body recovery migrated to the shared structured-body loop)
 
 ## Spec42 v1.0 checklist
 
@@ -159,8 +159,9 @@ Items from [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DIAGNOSTICS-PARS
 | `state.rs` | 0 (was 2) | Medium (transition connect bodies unified) |
 | `part/usage.rs` | 0 (was 3) | Medium |
 | `usecase.rs` | 0 (was 2) | Lower — structured case bodies + return-ref expressions |
+| `connection.rs` (top-level `connection def` body loop) | 0 (was 1, 2026-07) | Was untracked in this table; `connection_member_body` had its own hand-rolled loop whose only fallback for an unrecognized member was `advance_to_closing_brace`, silently discarding every member declared *after* the bad one, not just the bad one — worse than a plain opaque skip. Migrated to `parse_structured_brace_members` (added `ConnectionDefBodyElement::Error`); now recovers per-element like `port_body_brace`. Nested `ref`/`connect`-statement bodies inside a connection def (`ref_body`, `connect_body`) still use `advance_to_closing_brace` and remain opaque — smaller, separate scope. |
 
-**Direction:** Per construct family, replace silent skip with `ParseErrorNode` + partial member lists ([LANGUAGE_SERVER_BACKLOG.md](./LANGUAGE_SERVER_BACKLOG.md) P0). One family per PR; track remaining sites here.
+**Direction:** Per construct family, replace silent skip with `ParseErrorNode` + partial member lists ([LANGUAGE_SERVER_BACKLOG.md](./LANGUAGE_SERVER_BACKLOG.md) P0). One family per PR; track remaining sites here. When auditing a family, also check for **whole-body-truncation** fallbacks like the one fixed in `connection.rs` — not just `advance_to_closing_brace` call counts, since a hand-rolled recovery loop can have the same effect without calling that function directly.
 
 ### 2.4 Expression AST
 

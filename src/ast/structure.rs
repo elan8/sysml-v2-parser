@@ -541,6 +541,7 @@ pub enum ConnectionDefBodyElement {
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
     Doc(Node<DocComment>),
+    Error(Node<ParseErrorNode>),
 }
 
 // ---------------------------------------------------------------------------

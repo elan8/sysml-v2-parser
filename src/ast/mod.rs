@@ -739,6 +739,9 @@ fn normalize_connection_def_body_element_node(
         ConnectionDefBodyElement::Doc(n) => {
             ConnectionDefBodyElement::Doc(dummy_node(n, n.value.clone()))
         }
+        ConnectionDefBodyElement::Error(n) => {
+            ConnectionDefBodyElement::Error(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }

@@ -39,7 +39,9 @@ A recent example: library declarations such as `abstract connection name : Type[
 
 **Part/port bodies (June 2026):** part def/usage bodies retain structured member AST; port def/usage use `parse_structured_brace_members` with `PortBody::Brace { elements }` (nested ports, in/out, doc, recovery).
 
-**Still local or opaque:** deep action/state/requirement body members beyond definition-level structured loops; alias/import paths; connect bodies in interface parsing.
+**Connection def bodies (2026-07):** `connection_member_body` migrated from a hand-rolled loop (whose only fallback for an unrecognized member was `advance_to_closing_brace` — silently discarding every member *after* the bad one, not just the bad one) to `parse_structured_brace_members` with a new `ConnectionDefBodyElement::Error` variant, matching the `port_body_brace` pattern. Also added `doc` support to `ConnectionDefBodyElement` and `InterfaceUsageBodyElement` (the latter had no recovery path at all — a `doc` block inside an `interface ... connect ... { }` usage body previously caused the whole interface usage to be discarded as a generic `Error` node one level up).
+
+**Still local or opaque:** deep action/state/requirement body members beyond definition-level structured loops; alias/import paths; the *nested* `ref`/`connect`-statement bodies inside a connection def (`ref_body`, `connect_body` in [connection.rs](../src/parser/connection.rs)) still use `advance_to_closing_brace` — smaller in scope than the connection-def-body loop fixed above, since these are leaf statement bodies, not multi-member containers.
 
 **P2 (in progress):** extend structured member grammars per family beyond doc + recovery stubs.
 

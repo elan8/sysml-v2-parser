@@ -5,13 +5,14 @@ use crate::ast::{
     ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, EndDecl, Node,
     RefBody, RefDecl,
 };
-use crate::parser::body::advance_to_closing_brace;
+use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, starts_with_any_keyword,
-    take_until_terminator, ws1, ws_and_comments, CONNECTION_DEF_BODY_STARTERS,
+    identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
+    CONNECTION_DEF_BODY_STARTERS,
 };
+use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::with_span;
@@ -212,50 +213,39 @@ fn connection_def_body_element(
     Ok((input, node_from_to(start, input, elem)))
 }
 
+fn connection_def_body_recovery(
+    start: Input<'_>,
+    end: Input<'_>,
+) -> Node<ConnectionDefBodyElement> {
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        CONNECTION_DEF_BODY_STARTERS,
+        "connection definition body",
+        "recovered_connection_def_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        ConnectionDefBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
 pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, ConnectionDefBody> {
-    let (mut input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
         return Ok((input, ConnectionDefBody::Semicolon));
     }
-    let (next, _) = tag(&b"{"[..]).parse(input)?;
-    input = next;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, ConnectionDefBody::Brace { elements }));
-        }
-        match connection_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), CONNECTION_DEF_BODY_STARTERS) => {
-                let (next, _) = recover_body_element(input, CONNECTION_DEF_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                input = next;
-            }
-            Err(_) => {
-                let (input, _) = advance_to_closing_brace(input)?;
-                let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                return Ok((input, ConnectionDefBody::Brace { elements }));
-            }
-        }
-    }
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        CONNECTION_DEF_BODY_STARTERS,
+        "connection definition body",
+        "recovered_connection_def_body_element",
+        connection_def_body_element,
+        connection_def_body_recovery,
+    )?;
+    Ok((input, ConnectionDefBody::Brace { elements }))
 }
 
 /// Connection definition: `connection def` Identification body.
