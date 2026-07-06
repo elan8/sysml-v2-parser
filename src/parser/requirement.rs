@@ -91,6 +91,7 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 specializes_span: prefix.specializes_span,
+                is_abstract: prefix.is_abstract,
                 body,
             },
         ),
@@ -205,9 +206,18 @@ pub(crate) fn parse_requirement_usage_payload<'a>(
     input: Input<'a>,
     default_name: Option<&str>,
 ) -> IResult<Input<'a>, RequirementUsage> {
+    parse_requirement_usage_payload_with_abstract(input, default_name, false)
+}
+
+pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
+    input: Input<'a>,
+    default_name: Option<&str>,
+    already_abstract: bool,
+) -> IResult<Input<'a>, RequirementUsage> {
     let (input, _) = ws_and_comments(input)?;
     // Support usage extension keywords where this parser already tolerates them.
-    let (input, _) = many0(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, abstract_kws) = many0(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let is_abstract = already_abstract || !abstract_kws.is_empty();
     let (input, name) = {
         let (peek, _) = ws_and_comments(input)?;
         if let Some(default) = default_name {
@@ -242,6 +252,7 @@ pub(crate) fn parse_requirement_usage_payload<'a>(
                 .subsets
                 .map(|(target, _)| target)
                 .or(header.subsets),
+            is_abstract,
             body,
         },
     ))
@@ -711,9 +722,11 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
 pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, abstract_kw) =
+        nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"requirement"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, val) = parse_requirement_usage_payload(input, None)?;
+    let (input, val) =
+        parse_requirement_usage_payload_with_abstract(input, None, abstract_kw.is_some())?;
     Ok((input, node_from_to(start, input, val)))
 }

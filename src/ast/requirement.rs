@@ -17,6 +17,8 @@ pub struct RequirementDef {
     pub specializes: Option<String>,
     /// Span of the `:> <type>` fragment (for semantic tokens), when present.
     pub specializes_span: Option<Span>,
+    /// True for `abstract requirement def ...`.
+    pub is_abstract: bool,
     pub body: RequirementDefBody,
 }
 
@@ -151,6 +153,8 @@ pub struct RequirementUsage {
     pub name: String,
     pub type_name: Option<String>,
     pub subsets: Option<String>,
+    /// True for `abstract requirement ...`.
+    pub is_abstract: bool,
     pub body: RequirementDefBody,
 }
 
@@ -210,6 +214,8 @@ pub struct CaseDef {
     pub identification: Identification,
     pub specializes: Option<String>,
     pub specializes_span: Option<Span>,
+    /// True for `abstract case def ...`.
+    pub is_abstract: bool,
     pub body: UseCaseDefBody,
 }
 
@@ -219,6 +225,8 @@ pub struct CaseDef {
 pub struct CaseUsage {
     pub name: String,
     pub type_name: Option<String>,
+    /// True for `abstract case ...`.
+    pub is_abstract: bool,
     pub body: UseCaseDefBody,
 }
 
@@ -229,6 +237,8 @@ pub struct AnalysisCaseDef {
     pub identification: Identification,
     pub specializes: Option<String>,
     pub specializes_span: Option<Span>,
+    /// True for `abstract analysis def ...`.
+    pub is_abstract: bool,
     pub body: UseCaseDefBody,
 }
 
@@ -238,6 +248,8 @@ pub struct AnalysisCaseDef {
 pub struct AnalysisCaseUsage {
     pub name: String,
     pub type_name: Option<String>,
+    /// True for `abstract analysis ...`.
+    pub is_abstract: bool,
     pub body: UseCaseDefBody,
 }
 
@@ -248,6 +260,8 @@ pub struct VerificationCaseDef {
     pub identification: Identification,
     pub specializes: Option<String>,
     pub specializes_span: Option<Span>,
+    /// True for `abstract verification def ...`.
+    pub is_abstract: bool,
     pub body: UseCaseDefBody,
 }
 
@@ -257,6 +271,8 @@ pub struct VerificationCaseDef {
 pub struct VerificationCaseUsage {
     pub name: String,
     pub type_name: Option<String>,
+    /// True for `abstract verification ...`.
+    pub is_abstract: bool,
     pub body: UseCaseDefBody,
 }
 
@@ -266,6 +282,8 @@ pub struct VerificationCaseUsage {
 pub struct UseCaseUsage {
     pub name: String,
     pub type_name: Option<String>,
+    /// True for `abstract use case ...`.
+    pub is_abstract: bool,
     pub body: UseCaseDefBody,
 }
 
@@ -287,6 +305,8 @@ pub struct UseCaseDef {
     pub identification: Identification,
     pub specializes: Option<String>,
     pub specializes_span: Option<Span>,
+    /// True for `abstract use case def ...`.
+    pub is_abstract: bool,
     pub body: UseCaseDefBody,
 }
 

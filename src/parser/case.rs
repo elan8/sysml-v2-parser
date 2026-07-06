@@ -27,6 +27,7 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 specializes_span: prefix.specializes_span,
+                is_abstract: prefix.is_abstract,
                 body,
             },
         ),
@@ -36,10 +37,10 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
 pub(crate) fn case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CaseUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, abstract_kw) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"case"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, usage) = case_like_usage_body(input)?;
+    let (input, usage) = case_like_usage_body(input, abstract_kw.is_some())?;
     Ok((input, node_from_to(start, input, usage)))
 }
 
@@ -59,6 +60,7 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 specializes_span: prefix.specializes_span,
+                is_abstract: prefix.is_abstract,
                 body,
             },
         ),
@@ -68,10 +70,10 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
 pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AnalysisCaseUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, abstract_kw) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"analysis"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, usage) = case_like_usage_body(input)?;
+    let (input, usage) = case_like_usage_body(input, abstract_kw.is_some())?;
     Ok((
         input,
         node_from_to(
@@ -80,6 +82,7 @@ pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<A
             AnalysisCaseUsage {
                 name: usage.name,
                 type_name: usage.type_name,
+                is_abstract: usage.is_abstract,
                 body: usage.body,
             },
         ),
@@ -104,6 +107,7 @@ pub(crate) fn verification_case_def(
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 specializes_span: prefix.specializes_span,
+                is_abstract: prefix.is_abstract,
                 body,
             },
         ),
@@ -115,10 +119,10 @@ pub(crate) fn verification_case_usage(
 ) -> IResult<Input<'_>, Node<VerificationCaseUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, abstract_kw) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"verification"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, usage) = case_like_usage_body(input)?;
+    let (input, usage) = case_like_usage_body(input, abstract_kw.is_some())?;
     Ok((
         input,
         node_from_to(
@@ -127,13 +131,14 @@ pub(crate) fn verification_case_usage(
             VerificationCaseUsage {
                 name: usage.name,
                 type_name: usage.type_name,
+                is_abstract: usage.is_abstract,
                 body: usage.body,
             },
         ),
     ))
 }
 
-fn case_like_usage_body(input: Input<'_>) -> IResult<Input<'_>, CaseUsage> {
+fn case_like_usage_body(input: Input<'_>, is_abstract: bool) -> IResult<Input<'_>, CaseUsage> {
     let (input, name) = name(input)?;
     let (input, header) = usage_header(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
@@ -143,6 +148,7 @@ fn case_like_usage_body(input: Input<'_>) -> IResult<Input<'_>, CaseUsage> {
         CaseUsage {
             name,
             type_name: header.type_name,
+            is_abstract,
             body,
         },
     ))

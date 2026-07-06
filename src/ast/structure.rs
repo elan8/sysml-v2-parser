@@ -275,11 +275,29 @@ pub enum PartUsageBodyElement {
     VariantUsage(Node<VariantUsage>),
 }
 
-/// Variant reference inside a variation part usage: `variant` name `;`.
+/// Variant member inside a variation part usage/def body: either an untyped reference to a
+/// separately-declared usage (`variant name;`), or a typed usage declared inline with a kind
+/// keyword (`variant part name : Type { ... }`, `variant attribute name = expr;`, etc.).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VariantUsage {
+    /// The variant's own name — the referenced usage's name for the untyped form, or the
+    /// nested usage's own name for the typed form.
     pub name: String,
+    /// Present when declared with a kind keyword (`variant part ...;`); `None` for the untyped
+    /// reference form (`variant name;`).
+    pub typed: Option<VariantTypedUsage>,
+}
+
+/// The nested usage of a typed `variant` member (BNF `VariantUsageElement`, restricted here to
+/// the kinds most commonly used for variability modeling).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum VariantTypedUsage {
+    Part(Box<Node<PartUsage>>),
+    Attribute(Box<Node<AttributeUsage>>),
+    Item(Box<Node<ItemUsage>>),
+    Port(Box<Node<PortUsage>>),
 }
 
 /// Enacted performance: `perform` action_path `{` body `}` inside a part usage.

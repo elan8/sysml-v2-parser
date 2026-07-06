@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-07-06
+
+Extends `variant` members in variation part bodies to support typed inline declarations
+(SysML §7.6.7), and surfaces the leading `abstract` prefix on requirement, case, analysis,
+verification, and use-case definitions/usages as `is_abstract` on the AST node (previously
+accepted at parse time but discarded).
+
+### Added
+
+- **`VariantUsage.typed` / `VariantTypedUsage`**: typed `variant` members inside variation part
+  def/usage bodies — `variant part name : Type { … }`, `variant attribute name = expr;`,
+  `variant item …`, `variant port …` — in addition to the existing untyped reference form
+  (`variant name;`, `typed: None`). `VariantTypedUsage` carries `Part`, `Attribute`, `Item`, or
+  `Port` nested usage nodes. `variant_usage()` tries each kind parser before falling back to the
+  untyped name-and-semicolon form.
+- **`is_abstract` on requirement and case families**: `RequirementDef`, `RequirementUsage`,
+  `CaseDef`, `CaseUsage`, `AnalysisCaseDef`, `AnalysisCaseUsage`, `VerificationCaseDef`,
+  `VerificationCaseUsage`, `UseCaseDef`, and `UseCaseUsage` each gain `is_abstract: bool` (`true`
+  for `abstract requirement def …`, `abstract analysis …`, etc.). Definition parsers read the
+  flag from `parse_definition_prefix`; usage parsers capture a leading `abstract` keyword before
+  the kind keyword.
+- **Regression tests** [`tests/abstract_requirement_analysis_flags.rs`](tests/abstract_requirement_analysis_flags.rs)
+  for `is_abstract` on requirement/analysis/verification/use-case defs and usages; extended
+  [`tests/variation_variant_body.rs`](tests/variation_variant_body.rs) with the spec's
+  `TransmissionChoices` typed `variant part` example.
+- **`PARSE_AST_VERSION`** bumped from `6` → `7` to invalidate caches built against the 0.31.x
+  schema.
+
 ## [0.31.0] - 2026-07-06
 
 Fixes S42-LIM-014: `variant` members inside a `variation part def` body now parse as structured

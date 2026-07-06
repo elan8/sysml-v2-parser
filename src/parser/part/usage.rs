@@ -732,15 +732,77 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     ))
 }
 
+/// `variant` member: either a typed usage declared inline with a kind keyword
+/// (`variant part name : Type { ... }`, `variant attribute name = expr;`, `variant item ...`,
+/// `variant port ...`), or an untyped reference to a separately-declared usage
+/// (`variant name;`).
 pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
     let start = input;
     let (input, _) = tag(&b"variant"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+
+    if let Ok((next, usage)) = part_usage(input) {
+        let name = usage.value.name.clone();
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    name,
+                    typed: Some(VariantTypedUsage::Part(Box::new(usage))),
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) = attribute_usage(input) {
+        let name = usage.value.name.clone();
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    name,
+                    typed: Some(VariantTypedUsage::Attribute(Box::new(usage))),
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) = item_usage(input) {
+        let name = usage.value.name.clone();
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    name,
+                    typed: Some(VariantTypedUsage::Item(Box::new(usage))),
+                },
+            ),
+        ));
+    }
+    if let Ok((next, usage)) = port_usage(input) {
+        let name = usage.value.name.clone();
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    name,
+                    typed: Some(VariantTypedUsage::Port(Box::new(usage))),
+                },
+            ),
+        ));
+    }
+
     let (input, name) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
-        node_from_to(start, input, VariantUsage { name }),
+        node_from_to(start, input, VariantUsage { name, typed: None }),
     ))
 }
 

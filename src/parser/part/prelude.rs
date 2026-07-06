@@ -5,7 +5,7 @@ pub(crate) use crate::ast::{
     ConnectionUsageMember, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
     InterfaceUsageBodyElement, Node, OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement,
     PartUsage, PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,
-    VariantUsage,
+    VariantTypedUsage, VariantUsage,
     PerformInOutBinding, RefBody, RefDecl,
 };
 pub(crate) use crate::parser::attribute::{

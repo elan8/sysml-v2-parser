@@ -121,7 +121,11 @@ fn then_include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<ThenInclud
     ))
 }
 
-fn use_case_usage_tail(input: Input<'_>, ident: String) -> IResult<Input<'_>, UseCaseUsage> {
+fn use_case_usage_tail(
+    input: Input<'_>,
+    ident: String,
+    is_abstract: bool,
+) -> IResult<Input<'_>, UseCaseUsage> {
     let (input, header) = usage_header(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = use_case_def_body(input)?;
@@ -130,6 +134,7 @@ fn use_case_usage_tail(input: Input<'_>, ident: String) -> IResult<Input<'_>, Us
         UseCaseUsage {
             name: ident,
             type_name: header.type_name,
+            is_abstract,
             body,
         },
     ))
@@ -142,7 +147,7 @@ fn use_case_usage_in_body(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUs
     let (input, _) = tag(&b"case"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
-    let (input, usage) = use_case_usage_tail(input, ident)?;
+    let (input, usage) = use_case_usage_tail(input, ident, false)?;
     Ok((input, node_from_to(start, input, usage)))
 }
 
@@ -412,13 +417,14 @@ fn keyword_use_case_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
 pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, abstract_kw) =
+        nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"use"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"case"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
-    let (input, usage) = use_case_usage_tail(input, ident)?;
+    let (input, usage) = use_case_usage_tail(input, ident, abstract_kw.is_some())?;
     Ok((input, node_from_to(start, input, usage)))
 }
 
@@ -440,6 +446,7 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 specializes_span: prefix.specializes_span,
+                is_abstract: prefix.is_abstract,
                 body,
             },
         ),
