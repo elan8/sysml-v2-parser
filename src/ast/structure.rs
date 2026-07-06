@@ -80,6 +80,8 @@ pub enum PartDefBodyElement {
     /// `satisfy <ref> (by <expr>)?;` inside a part definition body (previously only reachable
     /// at package level).
     Satisfy(Node<Satisfy>),
+    /// `variant` name `;` — a variant member inside a `variation part def` body.
+    VariantUsage(Node<VariantUsage>),
 }
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.

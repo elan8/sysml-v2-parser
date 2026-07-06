@@ -1,7 +1,7 @@
 use super::prelude::*;
 use super::usage::{
     allocate_, connect_, interface_usage, part_ref_usage, part_usage, perform_action_decl,
-    perform_usage,
+    perform_usage, variant_usage,
 };
 
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
@@ -155,6 +155,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 PartDefBodyElement::FlowUsage,
             ),
             map(part_def, PartDefBodyElement::PartDef),
+            map(variant_usage, PartDefBodyElement::VariantUsage),
             map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
             map(individual_usage, |n| {
                 PartDefBodyElement::OccurrenceUsage(Box::new(n))

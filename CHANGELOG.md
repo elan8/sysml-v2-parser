@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-07-06
+
+Fixes S42-LIM-014: `variant` members inside a `variation part def` body now parse as structured
+AST nodes instead of falling through to error recovery. Part usage bodies already supported this
+since 0.25.2 (`PartUsageBodyElement::VariantUsage`); part definition bodies did not.
+
+### Added
+
+- **`PartDefBodyElement::VariantUsage`**: `variant` *name* `;` inside a `variation part def` brace body (e.g. `variation part def NavigationSensorSuiteChoice :> SensorAssembly { variant tofImuOnly; … }`). `part_def_body_element()` dispatches via the existing `variant_usage` parser (now `pub(crate)`); `b"variant"` was already in `PART_BODY_STARTERS` from 0.25.2 so recovery did not abort, but unrecognized members were previously misclassified as recovery errors rather than owned `VariantUsage` nodes.
+- **Regression test** [`tests/variation_variant_body.rs`](tests/variation_variant_body.rs) for a three-variant `variation part def` body with no recovery `Error` nodes.
+- **`PARSE_AST_VERSION`** bumped from `5` → `6` to invalidate caches built against the 0.30.x schema.
+
 ## [0.30.0] - 2026-07-03
 
 Closes all 7 open follow-ups listed in `docs/PARSER_BACKLOG_ROADMAP.md` § 5 from the 0.29.0

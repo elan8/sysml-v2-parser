@@ -732,7 +732,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     ))
 }
 
-fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
+pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
     let start = input;
     let (input, _) = tag(&b"variant"[..]).parse(input)?;
     let (input, _) = ws1(input)?;

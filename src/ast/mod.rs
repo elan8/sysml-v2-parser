@@ -387,6 +387,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::Satisfy(n) => {
             PartDefBodyElement::Satisfy(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::VariantUsage(n) => {
+            PartDefBodyElement::VariantUsage(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }
