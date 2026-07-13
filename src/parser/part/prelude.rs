@@ -19,7 +19,7 @@ pub(crate) use crate::parser::connection::connection_member_body;
 pub(crate) use crate::parser::constraint::calc_usage;
 pub(crate) use crate::parser::enumeration::enum_usage;
 pub(crate) use crate::parser::expr::{expression, path_expression};
-pub(crate) use crate::parser::interface::{connect_body, interface_def};
+pub(crate) use crate::parser::interface::{connect_body, interface_def_required};
 pub(crate) use crate::parser::item::{item_def_required, item_usage};
 pub(crate) use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, starts_with_any_keyword,

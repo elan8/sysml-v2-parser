@@ -219,17 +219,35 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
 
 /// Interface definition: `interface` `def` Identification body
 ///
-/// `def` is mandatory: `interface_def` is dispatched alongside `interface_usage` in part-def
-/// bodies, and `interface_usage` only recognizes connector forms (`connect ... to ...`), so an
-/// optional `def` would let a non-connector interface usage (e.g. `interface foo : IfaceType;`)
-/// be silently misclassified as a definition. See PAR-001 for the same class of bug in
-/// `attribute_def`.
+/// `def` is optional here: the standard library uses bare, `def`-less `interface` usages at
+/// namespace level (e.g. `abstract interface interfaces: Interface[0..*] nonunique :>
+/// connections { ... }` in `Systems Library/Interfaces.sysml`), and there is no dedicated
+/// package-level `interface_usage` dispatch to catch them instead — this parser currently folds
+/// that legal form into `InterfaceDef`. Use [`interface_def_required`] in any body context that
+/// also dispatches `interface_usage`.
 pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
+    parse_interface_def(input, false)
+}
+
+/// Interface definition with a mandatory `def` keyword: for body contexts (e.g. part-def bodies)
+/// that also dispatch `interface_usage`. `interface_usage` only recognizes connector forms
+/// (`connect ... to ...`), so an optional `def` would let a non-connector interface usage (e.g.
+/// `interface foo : IfaceType;`) be silently misclassified as a definition — the same bug class
+/// as PAR-001 in `attribute_def`.
+pub(crate) fn interface_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
+    parse_interface_def(input, true)
+}
+
+fn parse_interface_def(
+    input: Input<'_>,
+    require_def: bool,
+) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(
-        input,
-        DefinitionPrefixOptions::new(b"interface").def_required(),
-    )?;
+    let mut options = DefinitionPrefixOptions::new(b"interface");
+    if require_def {
+        options = options.def_required();
+    }
+    let (input, prefix) = parse_definition_prefix(input, options)?;
     let (input, body) = interface_def_body(input)?;
     Ok((
         input,

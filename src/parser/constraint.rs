@@ -22,15 +22,17 @@ use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
 
-/// `def` is mandatory: defense-in-depth against the PAR-001 bug class if a `constraint_usage`
-/// sharing this keyword is ever dispatched alongside `constraint_def` in the same body.
+/// `def` is intentionally optional: the standard library uses bare, `def`-less `constraint`
+/// usages at namespace level (e.g. `abstract constraint constraintChecks: ConstraintCheck[0..*]
+/// nonunique :> booleanEvaluations { ... }` in `Systems Library/Constraints.sysml`), and there is
+/// no dedicated `constraint_usage` parser to catch them instead — this parser currently folds
+/// that legal form into `ConstraintDef`. Do not add `.def_required()` here without first adding
+/// real constraint-usage support.
 pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConstraintDef>> {
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
-        DefinitionPrefixOptions::new(b"constraint")
-            .with_private()
-            .def_required(),
+        DefinitionPrefixOptions::new(b"constraint").with_private(),
     )?;
     let (input, body) = constraint_def_body(input)?;
     Ok((
@@ -181,17 +183,16 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     ))
 }
 
-/// `def` is mandatory: `calc_def` and `calc_usage` share the `calc` keyword and are already
-/// dispatched together in some usage-body contexts; requiring `def` here avoids the PAR-001 bug
-/// class regardless of which contexts combine them.
+/// `def` is intentionally optional: the standard library uses bare, `def`-less `calc` usages at
+/// namespace level (e.g. `abstract calc calculations: Calculation[0..*] nonunique :> actions,
+/// evaluations { ... }` in `Systems Library/Calculations.sysml`). `calc_def` and `calc_usage` are
+/// never dispatched together in the same alt today (`calc_usage` is only used standalone in part
+/// bodies), so this is not the PAR-001 bug class, but do not add `.def_required()` here without
+/// checking package-level content first.
 pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(
-        input,
-        DefinitionPrefixOptions::new(b"calc")
-            .with_private()
-            .def_required(),
-    )?;
+    let (input, prefix) =
+        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"calc").with_private())?;
     let (input, body) = calc_def_body(input)?;
     Ok((
         input,

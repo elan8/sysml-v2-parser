@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Fixes PAR-001: `attribute def` vs. `attribute` usage were ambiguous in every body that permits
 both (part, port, requirement, metadata), and the same class of bug existed for non-connector
 `interface` members in part-def bodies. Both are now classified solely by an explicit, mandatory
-`def` keyword rather than inferred from typing, modifiers, or fallback parser ordering.
+`def` keyword in those ambiguous body contexts, rather than inferred from typing, modifiers, or
+fallback parser ordering.
 
 ### Fixed
 
@@ -28,23 +29,31 @@ both (part, port, requirement, metadata), and the same class of bug existed for 
   merge logic kept only the target and discarded the value (e.g. `attribute v :> ISQ::speed = 0.9
   [m/s];` lost its default). The captured value is now threaded through as a fallback when no
   separate value expression follows.
-- **`interface_def` requires `def`**: same bug class as `attribute_def`. `interface_usage` only
-  recognizes connector forms (`connect ... to ...`), so a non-connector interface member without
-  `def` (e.g. `interface foo : SomeInterfaceType;`) fell through and was silently accepted as an
-  `InterfaceDef`. `interface_def` now requires `def` unconditionally; a non-connector interface
-  usage form is not yet supported by this parser and correctly surfaces as an explicit
-  recovery/error element with a diagnostic instead of a false `InterfaceDef`.
+- **`interface_def_required` for part-def bodies**: same bug class as `attribute_def`.
+  `interface_usage` only recognizes connector forms (`connect ... to ...`), so a non-connector
+  interface member without `def` (e.g. `interface foo : SomeInterfaceType;`) fell through and was
+  silently accepted as an `InterfaceDef`. Part-def bodies now dispatch a new
+  `interface_def_required` (mirroring the existing `item_def`/`item_def_required` split) that
+  mandates `def`; a non-connector interface usage form is not yet supported by this parser and
+  correctly surfaces as an explicit recovery/error element with a diagnostic instead of a false
+  `InterfaceDef`. Package-level `interface_def` keeps `def` optional — the standard library uses
+  bare, `def`-less `interface` usages at namespace level (e.g. `abstract interface interfaces:
+  Interface[0..*] nonunique :> connections { ... }` in `Systems Library/Interfaces.sysml`) that
+  this parser currently folds into `InterfaceDef`, and there's no dedicated package-level
+  `interface_usage` dispatch to catch them instead.
 - **`PARSE_AST_VERSION`** bumped from `7` → `8`: definition/usage classification changed for the
   cases above, so cached parses built against 0.32.x schema must be invalidated.
-- **`port_def`, `constraint_def`, `calc_def` now require `def`**: hardened defensively. None of
-  these had a live usage counterpart dispatched in the same body today, so this rejects only
-  previously-invalid input (no valid program's classification changes) — it closes the gap before
-  a future package-level `port`/`calc`/`constraint` usage form can trigger the PAR-001 bug class
-  silently. `connection_def` was reviewed and intentionally left with an optional `def`: the
-  hash-annotation prefix (`#derivation connection { ... }`) is itself a valid definitional marker
-  in place of `def`, so requiring `def` there would reject legal syntax — this was caught by
-  `derivation_connection_parses_without_recovery_diagnostics` failing during this change and
-  reverted.
+
+An earlier draft of this fix also made `port_def`, `constraint_def`, and `calc_def` require `def`
+unconditionally. That broke the full SysML v2 release validation suite (`cargo test --test
+validation -- --include-ignored` with `SYSML_V2_RELEASE_DIR` set): the standard library uses the
+same bare, `def`-less usage pattern at namespace level for `port`, `constraint`, and `calc` (e.g.
+`abstract port ports : Port[0..*] nonunique :> objects { ... }` in `Systems Library/Ports.sysml`,
+and similarly in `Calculations.sysml`/`Constraints.sysml`), and none of these three have a
+dedicated usage-form parser to fall back to at that level. All three were reverted to optional
+`def`, same as `connection_def` (which was correctly left alone from the start — its
+hash-annotation prefix, e.g. `#derivation connection { ... }`, is itself a valid definitional
+marker in place of `def`).
 
 ### Added
 
@@ -53,6 +62,15 @@ both (part, port, requirement, metadata), and the same class of bug existed for 
   and initialized forms without `def`) and
   `test_part_def_body_never_misclassifies_non_connector_interface_as_definition` in
   [`tests/parser/structure.rs`](tests/parser/structure.rs).
+
+### Notes
+
+- Verified against the full SysML v2 release validation suite (`cargo test --test validation --
+  --include-ignored` with `SYSML_V2_RELEASE_DIR` pointing at a fetched
+  `Systems-Modeling/SysML-v2-Release` checkout, matching `.github/workflows/ci.yml`'s `validation`
+  job) in addition to the default `cargo test`. Regenerated
+  [`tests/validation/snapshots/parts_tree_1a.txt`](tests/validation/snapshots/parts_tree_1a.txt)
+  for the expected attribute reclassification in `01-Parts Tree/1a-Parts Tree.sysml`.
 
 ## [0.32.0] - 2026-07-06
 

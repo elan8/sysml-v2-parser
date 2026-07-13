@@ -211,15 +211,14 @@ fn port_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortDefBody> {
 
 /// Port definition: 'port' 'def' Identification ( (':>' | 'specializes') qualified_name )? body
 ///
-/// `def` is mandatory. `port_def` is only dispatched at package top level today, where nothing
-/// else can be confused with it, but making `def` optional would reintroduce the PAR-001 bug
-/// class the moment a package-level `port_usage` dispatch is added alongside it.
+/// `def` is intentionally optional: the standard library uses bare, `def`-less `port` usages at
+/// package/namespace level (e.g. `abstract port ports : Port[0..*] nonunique :> objects { ... }`
+/// in `Systems Library/Ports.sysml`), and there is no dedicated package-level `port_usage`
+/// dispatch to catch them instead — this parser currently folds that legal form into `PortDef`.
+/// Do not add `.def_required()` here without first adding real package-level port-usage support.
 pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(
-        input,
-        DefinitionPrefixOptions::new(b"port").def_required(),
-    )?;
+    let (input, prefix) = parse_definition_prefix(input, DefinitionPrefixOptions::new(b"port"))?;
     let (input, body) = port_def_body(input)?;
     Ok((
         input,
