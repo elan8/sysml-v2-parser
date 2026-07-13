@@ -245,7 +245,7 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
     assert!(
         elements.iter().any(|e| matches!(
             &e.value,
-            sysml_v2_parser::ast::PartDefBodyElement::AttributeDef(a)
+            sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a)
                 if a.value.typing.is_some()
         )),
         "later modeled members should still parse"

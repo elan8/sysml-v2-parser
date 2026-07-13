@@ -362,6 +362,111 @@ part def Accumulator {
 }
 
 #[test]
+fn test_part_def_body_distinguishes_attribute_def_from_usage_by_def_keyword() {
+    // PAR-001 acceptance case: only the explicit `def` keyword makes an AttributeDef; every
+    // other legal form in a part-definition body, typed or not, is an AttributeUsage.
+    let input = r#"package P {
+part def Sensor {
+    attribute def LocalValueType;
+    attribute typed : Temperature;
+    attribute untyped;
+    attribute initialized : Temperature = 20;
+}
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "typed and untyped attribute usages without `def` should not produce recovery diagnostics: {:?}",
+        result.errors
+    );
+    let RootElement::Package(pkg) = &result.root.elements[0].value else {
+        panic!("expected package");
+    };
+    let PackageBody::Brace { elements } = &pkg.value.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("expected part def");
+    let PartDefBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+
+    let defs: Vec<_> = elements
+        .iter()
+        .filter_map(|e| match &e.value {
+            PartDefBodyElement::AttributeDef(a) => Some(&a.value),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        defs.len(),
+        1,
+        "exactly one member has the `def` keyword and should be an AttributeDef: {:?}",
+        elements.iter().map(|e| format!("{:?}", e.value)).collect::<Vec<_>>()
+    );
+    assert_eq!(defs[0].name, "LocalValueType");
+
+    let usages: Vec<_> = elements
+        .iter()
+        .filter_map(|e| match &e.value {
+            PartDefBodyElement::AttributeUsage(a) => Some(&a.value),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        usages.len(),
+        3,
+        "typed, untyped, and initialized forms without `def` should all be AttributeUsage: {:?}",
+        elements.iter().map(|e| format!("{:?}", e.value)).collect::<Vec<_>>()
+    );
+    assert!(usages.iter().any(|u| u.name == "typed" && u.typing.as_deref() == Some("Temperature")));
+    assert!(usages.iter().any(|u| u.name == "untyped" && u.typing.is_none()));
+    assert!(usages.iter().any(|u| u.name == "initialized"
+        && u.typing.as_deref() == Some("Temperature")
+        && u.value.is_some()));
+}
+
+#[test]
+fn test_part_def_body_never_misclassifies_non_connector_interface_as_definition() {
+    // Same bug class as PAR-001: `interface_def` had an optional `def`, and `interface_usage`
+    // only recognizes connector forms (`connect ... to ...`). A plain typed, non-connector
+    // interface declaration used to fall through interface_usage and get silently accepted as
+    // an InterfaceDef. It must never be classified as a definition; today the parser doesn't yet
+    // support this usage form (tracked separately, see PAR-002), so it must surface as an
+    // explicit recovery/error element instead of a false InterfaceDef.
+    let input = "package P {\npart def Home {\ninterface foo : SomeInterfaceType;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    let RootElement::Package(pkg) = &result.root.elements[0].value else {
+        panic!("expected package");
+    };
+    let PackageBody::Brace { elements } = &pkg.value.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("expected part def");
+    let PartDefBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    assert!(
+        !elements
+            .iter()
+            .any(|e| matches!(e.value, PartDefBodyElement::InterfaceDef(_))),
+        "non-connector interface usage must never be misclassified as InterfaceDef: {:?}",
+        elements.iter().map(|e| format!("{:?}", e.value)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn test_part_def_accepts_nested_part_definition() {
     let input = r#"package P {
 part def Accumulator {

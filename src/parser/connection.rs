@@ -249,6 +249,13 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
 }
 
 /// Connection definition: `connection def` Identification body.
+///
+/// `def` is intentionally optional: a leading `#annotation` (e.g. `#derivation connection { ...
+/// }`) is itself a valid definitional marker in place of `def`, per the hash-annotation forms
+/// used for derivation/satisfy/requirement-style connections. `connection_def` is only dispatched
+/// at package top level today, where nothing else shares the `connection` keyword, so this is
+/// not the PAR-001 bug class — do not add `.def_required()` here without also accounting for the
+/// annotation-prefixed def-less form.
 pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
     let start = input;
     let (input, prefix) = parse_definition_prefix(

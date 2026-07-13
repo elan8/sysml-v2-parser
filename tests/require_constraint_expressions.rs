@@ -163,7 +163,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
         panic!("req brace");
     };
     let mut attrs = elements.iter().filter_map(|e| match &e.value {
-        RequirementDefBodyElement::AttributeDef(a) => Some(&a.value),
+        RequirementDefBodyElement::AttributeUsage(a) => Some(&a.value),
         _ => None,
     });
     let n = attrs.next().expect("attribute n");
@@ -174,7 +174,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
 
     let v = attrs.next().expect("attribute v");
     assert_eq!(v.name, "v");
-    assert_eq!(v.typing.as_deref(), Some("ISQ::speed"));
+    assert_eq!(v.subsets.as_deref(), Some("ISQ::speed"));
     let q = v.value.as_ref().expect("quantity default");
     assert!(matches!(&q.value, Expression::LiteralWithUnit { .. }));
 }

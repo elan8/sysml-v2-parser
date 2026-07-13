@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-07-13
+
+Fixes PAR-001: `attribute def` vs. `attribute` usage were ambiguous in every body that permits
+both (part, port, requirement, metadata), and the same class of bug existed for non-connector
+`interface` members in part-def bodies. Both are now classified solely by an explicit, mandatory
+`def` keyword rather than inferred from typing, modifiers, or fallback parser ordering.
+
+### Fixed
+
+- **`attribute_def` requires `def`**: previously, `attribute_def` was tried before
+  `attribute_usage` in part/port/requirement/metadata bodies and only deferred to
+  `attribute_usage` for two narrow cases (`redefines`/`:>>`, or a fully untyped `attribute name =
+  value`). A plain typed declaration without `def` — e.g. `attribute temperature :
+  Temperature;` — fell through and was silently accepted as an `AttributeDef`. `attribute_def`
+  now unconditionally requires `def` whenever it's dispatched alongside `attribute_usage`, so
+  classification no longer depends on typing or value presence.
+- **`attribute_usage` no longer drops a value bound in a leading `:>` (subsets) clause**: exposed
+  by the fix above — `subsetting()` parses `target = value` as one unit, but `attribute_usage`'s
+  merge logic kept only the target and discarded the value (e.g. `attribute v :> ISQ::speed = 0.9
+  [m/s];` lost its default). The captured value is now threaded through as a fallback when no
+  separate value expression follows.
+- **`interface_def` requires `def`**: same bug class as `attribute_def`. `interface_usage` only
+  recognizes connector forms (`connect ... to ...`), so a non-connector interface member without
+  `def` (e.g. `interface foo : SomeInterfaceType;`) fell through and was silently accepted as an
+  `InterfaceDef`. `interface_def` now requires `def` unconditionally; a non-connector interface
+  usage form is not yet supported by this parser and correctly surfaces as an explicit
+  recovery/error element with a diagnostic instead of a false `InterfaceDef`.
+- **`PARSE_AST_VERSION`** bumped from `7` → `8`: definition/usage classification changed for the
+  cases above, so cached parses built against 0.32.x schema must be invalidated.
+- **`port_def`, `constraint_def`, `calc_def` now require `def`**: hardened defensively. None of
+  these had a live usage counterpart dispatched in the same body today, so this rejects only
+  previously-invalid input (no valid program's classification changes) — it closes the gap before
+  a future package-level `port`/`calc`/`constraint` usage form can trigger the PAR-001 bug class
+  silently. `connection_def` was reviewed and intentionally left with an optional `def`: the
+  hash-annotation prefix (`#derivation connection { ... }`) is itself a valid definitional marker
+  in place of `def`, so requiring `def` there would reject legal syntax — this was caught by
+  `derivation_connection_parses_without_recovery_diagnostics` failing during this change and
+  reverted.
+
+### Added
+
+- Regression tests: `test_part_def_body_distinguishes_attribute_def_from_usage_by_def_keyword`
+  (the `Sensor` acceptance case — one `AttributeDef`, three `AttributeUsage`s for typed, untyped,
+  and initialized forms without `def`) and
+  `test_part_def_body_never_misclassifies_non_connector_interface_as_definition` in
+  [`tests/parser/structure.rs`](tests/parser/structure.rs).
+
 ## [0.32.0] - 2026-07-06
 
 Extends `variant` members in variation part bodies to support typed inline declarations

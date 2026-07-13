@@ -331,10 +331,10 @@ fn test_requirement_body_keeps_structured_attributes_and_later_require_constrain
     assert!(
         body_elements.iter().any(|e| matches!(
             &e.value,
-            sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(a)
+            sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
                 if a.value.typing.is_some()
         )),
-        "typed attribute members in requirement definitions should be attribute definitions"
+        "typed attribute members without an explicit `def` keyword should be attribute usages"
     );
     assert!(
         body_elements.iter().any(|e| matches!(
@@ -611,7 +611,7 @@ requirement def R {
     };
     assert!(elements.iter().any(|e| matches!(
         &e.value,
-        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(a)
+        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
             if a.value.typing.is_some()
     )));
     assert!(elements.iter().any(|e| matches!(
@@ -658,7 +658,7 @@ requirement def VehicleMassRequirement {
     };
     assert!(elements.iter().any(|e| matches!(
         &e.value,
-        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(a)
+        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
             if a.value.typing.is_some()
     )));
     assert!(elements.iter().any(|e| matches!(

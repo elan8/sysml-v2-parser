@@ -218,10 +218,18 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
 }
 
 /// Interface definition: `interface` `def` Identification body
+///
+/// `def` is mandatory: `interface_def` is dispatched alongside `interface_usage` in part-def
+/// bodies, and `interface_usage` only recognizes connector forms (`connect ... to ...`), so an
+/// optional `def` would let a non-connector interface usage (e.g. `interface foo : IfaceType;`)
+/// be silently misclassified as a definition. See PAR-001 for the same class of bug in
+/// `attribute_def`.
 pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
-    let (input, prefix) =
-        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"interface"))?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"interface").def_required(),
+    )?;
     let (input, body) = interface_def_body(input)?;
     Ok((
         input,

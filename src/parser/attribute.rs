@@ -5,8 +5,7 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    capture_opaque_member, identification, name, starts_with_keyword, subset_operator, ws1,
-    ws_and_comments,
+    capture_opaque_member, identification, name, subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -269,10 +268,13 @@ pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBo
     Ok((input, AttributeBody::Brace { elements }))
 }
 
-/// Attribute definition: 'attribute' name ( ':>' | ':' )? qualified_name? body
+/// Attribute definition: 'attribute' 'def' name ( ':>' | ':' )? qualified_name? body
 ///
-/// When `disambiguate_from_usage` is true (definition bodies that also accept usages), untyped
-/// `attribute name = value` is left for [`attribute_usage`]. Package-level attributes pass false.
+/// When `disambiguate_from_usage` is true (definition bodies that also accept usages), any
+/// declaration without an explicit `def` keyword is left for [`attribute_usage`] — the `def`
+/// keyword is the sole discriminator between an `AttributeDef` and an `AttributeUsage`, never
+/// inferred from typing, modifiers, or the presence of a value. Package-level attributes pass
+/// false, since only definitions are legal there.
 pub(crate) fn attribute_def(
     input: Input<'_>,
     disambiguate_from_usage: bool,
@@ -293,6 +295,12 @@ pub(crate) fn attribute_def(
     let (input, _) = ws1(input)?;
     let (input, has_def) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let has_def = has_def.is_some();
+    if disambiguate_from_usage && !has_def {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let ident_start = input;
     let (input, ident) = identification(input)?;
     let name_span = ident
@@ -307,31 +315,11 @@ pub(crate) fn attribute_def(
             nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
         })?;
     let short_name = ident.short_name.clone();
-    if disambiguate_from_usage {
-        let (peek_input, _) = ws_and_comments(input)?;
-        let peek = peek_input.fragment();
-        if starts_with_keyword(peek, b"redefines") || starts_with_keyword(peek, b":>>") {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                peek_input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-    }
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
         .map(|(span, s)| (Some(span), Some(s)))
         .unwrap_or((None, None));
     let (input, _) = ignored_feature_modifiers(input)?;
-    if disambiguate_from_usage && !has_def && typing.is_none() {
-        let (peek_input, _) = ws_and_comments(input)?;
-        let peek = peek_input.fragment();
-        if peek.starts_with(b"=") || peek.starts_with(b":=") {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                peek_input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-    }
     let (input, leading_clauses) = specialization_clauses(input)?;
     let leading_subset = leading_clauses.subsets;
     let (typing_span, typing, leading_value) = if typing.is_none() {
@@ -460,6 +448,10 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         };
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, _) = ignored_feature_modifiers(input)?;
+    let leading_subsets_value = leading_clauses
+        .subsets
+        .as_ref()
+        .and_then(|(_, value)| value.clone());
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
@@ -474,6 +466,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         .map(|(target, _)| target);
     let references = trailing_clauses.references.or(leading_clauses.references);
     let crosses = trailing_clauses.crosses.or(leading_clauses.crosses);
+    let value = value.or(leading_subsets_value);
     let (input, body) = attribute_body(input)?;
     Ok((
         input,

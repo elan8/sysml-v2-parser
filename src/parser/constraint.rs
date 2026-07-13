@@ -22,11 +22,15 @@ use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
 
+/// `def` is mandatory: defense-in-depth against the PAR-001 bug class if a `constraint_usage`
+/// sharing this keyword is ever dispatched alongside `constraint_def` in the same body.
 pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConstraintDef>> {
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
-        DefinitionPrefixOptions::new(b"constraint").with_private(),
+        DefinitionPrefixOptions::new(b"constraint")
+            .with_private()
+            .def_required(),
     )?;
     let (input, body) = constraint_def_body(input)?;
     Ok((
@@ -177,10 +181,17 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     ))
 }
 
+/// `def` is mandatory: `calc_def` and `calc_usage` share the `calc` keyword and are already
+/// dispatched together in some usage-body contexts; requiring `def` here avoids the PAR-001 bug
+/// class regardless of which contexts combine them.
 pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let (input, prefix) =
-        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"calc").with_private())?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"calc")
+            .with_private()
+            .def_required(),
+    )?;
     let (input, body) = calc_def_body(input)?;
     Ok((
         input,
