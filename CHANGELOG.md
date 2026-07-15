@@ -35,6 +35,19 @@ is done.
   `expected`, `found`, `suggestion`, `category`) are sufficient for the recovery markers needed by
   the rest of this backlog — no new fields added.
 
+### PAR-004 (item 6 of 6): standalone `FeatureChain` type
+
+- **Added `ast::FeatureChain`**: a dot-separated feature chain (e.g.
+  `engine.fuelCmdPort.flowRate`) had no dedicated AST node distinct from a `::`-qualified name —
+  only `Expression::FeatureRef`/`Expression::MemberAccess` folded chains into nested expression
+  nodes with no reusable, standalone shape. New `FeatureChain { segments: Vec<String>, span: Span
+  }` in `src/ast/feature_chain.rs`, with a `parser::feature_chain` parser in
+  `src/parser/feature_chain.rs` built on the existing `name`/`ws_and_comments` lexer helpers.
+  Deliberately **not** wired into `Expression` or `src/parser/expr.rs` — PAR-005 (complete
+  expression AST) is expected to adopt this type for its own `path_expression` parsing once it
+  lands, without needing to touch `expr.rs`. The parser function is unused today
+  (`#[allow(dead_code)]`) until a relationship parser or PAR-005 calls it.
+
 ## [0.34.0] - 2026-07-15
 
 ### Fixed
