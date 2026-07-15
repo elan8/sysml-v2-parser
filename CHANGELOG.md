@@ -131,6 +131,37 @@ is done.
   one, even before this change), so it uses `Span::dummy()`.
 - Bumps `PARSE_AST_VERSION` to 12.
 
+### PAR-004 (item 2 of 6): typed `SubsettingKind`/`SubsettingRelationship`
+
+- **Added `ast::SubsettingKind`/`ast::SubsettingRelationship`**: `{ target: String, kind, span:
+  Span, is_implied: bool }`, mirroring `TypingRelationship`'s shape and its
+  `PartialEq`-ignores-`span` convention. Replaces the separate `subsets`/`redefines`/
+  `references`/`crosses` `Option<String>` fields with `Option<Node<SubsettingRelationship>>` —
+  kept as **separate fields per clause kind, not collapsed into one**, since not every struct
+  supports all four (`ConnectionUsageMember` only has `subsets`/`redefines`; `ExhibitState` only
+  has `redefines`) — on `AttributeUsage`, `PartUsage`, `PortUsage`, `ConnectionUsageMember`,
+  `ExhibitState`, `OccurrenceUsage`, and `RequirementUsage` (the last two found via the same
+  grep-for-the-same-shape sweep used for item 1's `specializes` fields; not in the original
+  brief's explicit list, but they share the exact pattern). `PartUsage`/`PortUsage.subsets` keeps
+  its existing `(target, optional value expression)` tuple shape — just the target is now a typed
+  node instead of a bare string.
+- Most call sites route through `usage.rs`'s `specialization_clauses` (the `subsetting`/
+  `redefinition`/`reference_subsetting`/`cross_subsetting` parsers now build the relationship node
+  directly, with a real span from operator through target) or `definition_prefix`'s shared
+  plumbing, so the ripple was mostly mechanical. A few ad hoc `:>`/`:>>` prefix shapes parsed
+  directly outside `usage.rs` (`attribute.rs`'s `attribute_feature_binding`/`metadata_binding`,
+  `part/body.rs`'s `exhibit_state`/`connection_usage_member`) needed their own local
+  `subsetting_relationship_node` helper and span capture.
+- **Side improvement to the previous entry's noted quirk**: `attribute_def`'s leading-`:>`-subset-
+  as-typing fallback used `Span::dummy()` for the resulting `TypingRelationship` because the
+  leading subset clause it read from had no span of its own. Now that subsetting clauses carry
+  real spans (this item), that fallback reuses the `SubsettingRelationship` node's own span
+  instead of a dummy one.
+- Regenerated the `functional_allocation_4a` and `parts_tree_1a` validation snapshot fixtures
+  (schema-only Debug-format diff; confirmed target text, kind, and real spans before
+  regenerating).
+- Bumps `PARSE_AST_VERSION` to 13.
+
 ## [0.34.0] - 2026-07-15
 
 ### Fixed
