@@ -9,13 +9,20 @@
 //! `flow`, `individual`, `interface` (via `interface_def_required`), `item` (via
 //! `item_def_required`), `metadata`, `occurrence`, `requirement`, `state`, and `view`/
 //! `viewpoint`/`rendering` all already do this. `connection`, `constraint`/`calc`, and `port` are
-//! deliberately left `Optional` — see the "do not add `.def_required()` here" comments in
-//! `connection.rs`/`constraint.rs`/`port.rs` — because the real Systems Library uses bare,
-//! `def`-less declarations for those keywords at namespace level with no dedicated
-//! package-level usage parser to fall back to; adding `.def_required()` there breaks the full
-//! `SYSML_V2_RELEASE_DIR` validation gate (this was tried and reverted, see CHANGELOG 0.33.0).
-//! Any new body-enum wiring (PAR-002) that adds a `def`/usage pair sharing a keyword must use
-//! this module rather than hand-rolling another bespoke guard.
+//! deliberately left `Optional` at their package-level (non-`_required`) entry points — see the
+//! "do not add `.def_required()` here" comments in `connection.rs`/`constraint.rs`/`port.rs` —
+//! because the real Systems Library uses bare, `def`-less declarations for those keywords at
+//! namespace level (with `abstract`/multiplicity/`nonunique`/subsets modifiers a competing usage
+//! parser doesn't fully cover) with no dedicated package-level usage parser able to fall back to
+//! instead; adding `.def_required()` there breaks the full `SYSML_V2_RELEASE_DIR` validation gate
+//! (this was tried and reverted for `port`/`constraint`/`calc`, see CHANGELOG 0.33.0, and tried
+//! and reverted again for `connection` specifically during the PAR-006b audit -- see
+//! `connection.rs::connection_def`'s doc comment for that investigation). Any new body-enum
+//! wiring (PAR-002) that adds a `def`/usage pair sharing a keyword must use this module rather
+//! than hand-rolling another bespoke guard, but a package-level `_def`/`_usage` pair sharing a
+//! keyword is not automatically the PAR-001 bug class if the `_def` parser's grammar is already a
+//! strict superset of the `_usage` parser's -- confirm which shapes only the usage parser accepts
+//! before assuming a guard is missing.
 
 use crate::ast::{Identification, Node, TypingRelationship};
 use crate::parser::definition_header::parse_definition_header_after_ident;

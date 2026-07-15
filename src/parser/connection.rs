@@ -282,12 +282,38 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
 
 /// Connection definition: `connection def` Identification body.
 ///
-/// `def` is intentionally optional: a leading `#annotation` (e.g. `#derivation connection { ...
-/// }`) is itself a valid definitional marker in place of `def`, per the hash-annotation forms
-/// used for derivation/satisfy/requirement-style connections. `connection_def` is only dispatched
-/// at package top level today, where nothing else shares the `connection` keyword, so this is
-/// not the PAR-001 bug class — do not add `.def_required()` here without also accounting for the
-/// annotation-prefixed def-less form.
+/// `def` is intentionally optional, same rationale (and same real-library evidence) as
+/// `port_def`/`calc_def`/`constraint_def`: the Systems Library uses bare, `def`-less `connection`
+/// declarations at namespace level with `abstract`, multiplicity, `nonunique`, and `:>` subsets
+/// before the body (e.g. `abstract connection connections: Connection[0..*] nonunique :>
+/// linkObjects, parts { ... }` in `Systems Library/Connections.sysml`), a shape
+/// `connection_usage_member` (`src/parser/part/body.rs`) does not parse (no `abstract`/
+/// multiplicity/`nonunique` support, and its `:>`/`:>>` handling is trailing-after-body only).
+/// `parse_definition_prefix`'s header parsing (`specialization::
+/// parse_optional_definition_header_after_identification`, a generic text-scan for `: Type[mult]
+/// nonunique :> target`) already accepts this whole shape, and identification's `name` is
+/// optional, so `connection_def` is effectively a grammar superset of `connection_usage_member`
+/// for every practical package-level input.
+///
+/// **PAR-006b audit note**: `connection_usage_member` is also dispatched at package level
+/// (`package.rs::try_package_body_structure`, right after `connection_def`, added by PAR-002).
+/// This was investigated as a possible PAR-001-class def/usage ambiguity (an earlier draft of
+/// this comment claimed "nothing else shares the `connection` keyword" at package level, which
+/// PAR-002 made stale). Making `def` conditionally required here (mirroring the `connection`
+/// keyword inside part bodies, where `connection_def_required` is safe because
+/// `connection_usage_member`'s narrower grammar is the *only* usage form dispatched there) was
+/// tried and broke `test_systems_library_node_types_no_extended`/
+/// `test_full_library_node_types_no_extended` in the `SYSML_V2_RELEASE_DIR` gate: the real bare
+/// `abstract connection ... nonunique :> ...` forms above stopped parsing as `ConnectionDef` and,
+/// since `connection_usage_member` can't parse them either, fell all the way through to
+/// `ExtendedLibraryDecl`. That is a worse outcome than the status quo, not a fix -- there is no
+/// live misclassification bug here (`connection_def` never rejects input that
+/// `connection_usage_member` would otherwise have correctly claimed instead; it simply accepts a
+/// strict superset), so `connection_usage_member`'s package-level dispatch arm is best understood
+/// as a narrow fallback for shapes outside that superset, not a competing classification. Do not
+/// add `.def_required()` here without first widening `connection_usage_member` to cover
+/// `abstract`/multiplicity/`nonunique`/leading `:>` subsets, matching the port/calc/constraint
+/// precedent from CHANGELOG 0.33.0.
 pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
     parse_connection_def(input, DefinitionPrefixOptions::new(b"connection").with_hash_annotation())
 }
