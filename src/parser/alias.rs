@@ -1,10 +1,10 @@
 //! Alias definition parsing.
 
-use crate::ast::{AliasBody, AliasDef, Node};
+use crate::ast::{AliasBody, AliasDef, Node, RelationshipTarget};
 use crate::parser::body::advance_to_closing_brace;
-use crate::parser::lex::{identification, qualified_name, ws1, ws_and_comments};
+use crate::parser::lex::{identification, qualified_name_segments, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::Input;
+use crate::parser::{span_from_to, Input};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
@@ -37,7 +37,13 @@ pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> 
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"for"[..])).parse(input)?;
-    let (input, target) = preceded(ws1, qualified_name).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let target_start = input;
+    let (input, target_segments) = qualified_name_segments(input)?;
+    let target = RelationshipTarget {
+        segments: target_segments,
+        span: span_from_to(target_start, input),
+    };
     let (input, body) = alias_body(input)?;
     Ok((
         input,

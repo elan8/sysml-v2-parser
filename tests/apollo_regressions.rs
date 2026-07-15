@@ -754,8 +754,11 @@ fn part_redefinition_value_parses_parenthesized_tuple_of_engines() {
         .value
         .as_ref()
         .expect("tuple value should parse");
-    let Expression::Tuple(items) = &value.value else {
-        panic!("expected Expression::Tuple, got {:?}", value.value);
+    let Expression::Tuple(items) = &value.value.expression.value else {
+        panic!(
+            "expected Expression::Tuple, got {:?}",
+            value.value.expression.value
+        );
     };
     assert_eq!(items.len(), 5);
     let expected = ["engine1", "engine2", "engine3", "engine4", "engine5"];

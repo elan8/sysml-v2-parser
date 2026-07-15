@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: typed `FeatureValue` on `AttributeDef`/`AttributeUsage`/`PartUsage`/`RefDecl`
+
+Closes gaps-doc item 1 ("Parser work still required" backlog, post-PAR-006). `value:
+Option<Node<Expression>>` on these four structs discarded which of the BNF `FeatureValue`
+production's five legal forms had actually matched -- bare `= expr` (bind), bare `:= expr`
+(assign), `default = expr`, `default := expr`, and bare `default expr` -- even though
+`value_part` (`attribute.rs`) and `usage_value_part` (`part/usage.rs`) already syntactically
+distinguished all five via `alt()` before calling `expression()` and throwing that information
+away. The field is now `Option<Node<FeatureValue>>`, where a new `FeatureValue`
+(`src/ast/feature_value.rs`) carries `kind: FeatureValueKind` (`Bind` for `=`, `Assign` for `:=`;
+bare `default expr` is `Bind`, matching `=`'s semantics), `is_default: bool` (independent of
+`kind` -- `default =`, `default :=`, and bare `default expr` all set this), and the wrapped
+`expression: Node<Expression>`.
+
+The two near-duplicate parsers were collapsed into one shared `feature_value_part`
+(`src/parser/feature_value.rs`), used by both `attribute.rs` and `part::usage`. A few other call
+sites construct a `RefDecl`/`AttributeDef`/`AttributeUsage`'s `value` from a bare expression parsed
+by a *different*, `=`-only grammar production (the `subsets target = expr` shorthand's optional
+value, and the ad hoc `ref` value parses in `action.rs`/`state.rs`/`part/usage.rs`'s
+`part_ref_usage` that predate this shared type): these now go through a new
+`wrap_bind_expression` helper that packages the bare expression as a non-`default`
+`FeatureValueKind::Bind` `FeatureValue`, since `=` is the only operator those productions ever
+accepted.
+
+Fixed a real, previously-undetected parsing bug found while writing this item's regression test:
+`usage::optional_typings` treated any `:`-prefixed lookahead as the start of a `: Type` typing
+clause unless it was `:>` or `:>>`, but never excluded `:=` -- so `attribute foo := 1;` inside a
+usage context (e.g. a part definition body) mis-parsed the `:` of `:=` as a typing colon, failed
+to find a valid type name after it, and the whole attribute usage fell through to error recovery.
+`optional_typings` now also excludes `:=` from that lookahead, matching its existing `:>`/`:>>`
+exclusions.
+
+`PARSE_AST_VERSION` bumped 16 -> 17 for the breaking AST-schema change. Added a regression test
+covering all five `FeatureValue` forms across all four in-scope structs (`tests/parser/
+structure.rs`), including the `:=`-in-part-def-body fix above. Regenerated the `parts_tree_1a`
+validation snapshot whose `Debug` output changed shape from this field-type change; full
+`cargo test`, `cargo clippy -- -W clippy::all` (zero new warnings/errors), and the
+`SYSML_V2_RELEASE_DIR` validation gate (including full/systems library suites) are green.
+
 ### Changed: structured relationship targets on `TypingRelationship`/`SubsettingRelationship`
 
 Closes gaps-doc item 2 ("Parser work still required" backlog, post-PAR-006).
@@ -73,6 +112,95 @@ helper reusing the existing `qualified_name` lexer, handling the `~`-conjugated 
 variant through this path, so no AST schema change or `PARSE_AST_VERSION` bump was needed. The
 existing combined library-shorthand form (`: Type[mult] nonunique :> Base`) is unaffected: when a
 `:>`/`specializes` clause is present it still wins, matching prior (tested) behavior.
+
+### Changed: modifier-completeness audit -- `derived`/`constant`/direction swept onto `PartUsage`/`PortUsage`, `end` added
+
+Closes gaps-doc item 3 ("Parser work still required" backlog, post-PAR-006), a completeness audit
+of eight usage-prefix modifier concepts against `sysml-v2-release/bnf/*.kebnf`. Re-verified each
+finding against the current codebase (post Items 1/2) before writing any code:
+
+- **`unique`/`readonly`**: confirmed no textual grammar production anywhere in
+  `sysml-v2-release/bnf/*.kebnf` (only `nonunique` exists as a real keyword; `readonly` appears
+  only in the separate graphical-notation BNF, `SysML-graphical-bnf.kgbnf`, not the textual one).
+  Out of scope, matching the PAR-003b precedent of not inventing fields with no textual syntax.
+- **`variable`**: re-checked the grammar directly -- no `variable`/`'var'` keyword production
+  exists anywhere in `SysML-textual-bnf.kebnf`. KerML's own `EndFeaturePrefix`/`BasicFeaturePrefix`
+  productions (`KerML-textual-bnf.kebnf`) do have `isVariable ?= 'var'`/`'const' { isVariable =
+  true }`, but this parser targets the SysML textual notation (`SysML-textual-bnf.kebnf`'s
+  `RefPrefix` uses `'derived'`/`'constant'` instead, already typed as `is_derived`/`is_constant`),
+  not KerML's textual notation. Out of scope; no field added.
+- **Reference/composite ownership**: confirmed `RefDecl` already structurally captures this
+  distinction -- every body enum that can contain a `ref`-declared feature carries a dedicated
+  `Ref(Node<RefDecl>)` (or `RefDecl(Node<RefDecl>)`) variant, populated by a separate `ref`-keyword
+  parser path (`part_ref_usage`, `action_ref_decl`, `connection.rs`/`interface.rs`/`state.rs`'s
+  `ref_decl`/`state_ref`), coexisting alongside the ordinary `PartUsage`/`ItemUsage`/etc. member
+  variants in the same enums. Which variant a member parses into already *is* the reference-vs-
+  composite distinction; the BNF's only `isComposite` production is on unrelated action control-node
+  keywords (`merge`/`decide`/`join`/`fork`), not feature ownership. Not a gap; no field added.
+- **`derived`/`constant`**: were typed as `is_derived`/`is_constant: bool` on `AttributeUsage` only.
+  BNF `RefPrefix` (§8.2.2.6.2) is reachable through `OccurrenceUsagePrefix -> BasicUsagePrefix ->
+  RefPrefix` for every occurrence-based usage kind, confirmed for `PartUsage`
+  (`PartUsage = OccurrenceUsagePrefix 'part' Usage`) and `PortUsage`
+  (`PortUsage = OccurrenceUsagePrefix 'port' Usage`) specifically. Added `is_derived`/`is_constant:
+  bool` to both, parsed via the same `derived`/`constant` keyword-prefix pattern `AttributeUsage`
+  already used (`part/usage.rs::part_usage`, `port.rs::port_usage`). `ItemUsage` already had
+  `direction: Option<InOut>` from a prior increment and needed no change.
+- **`direction`**: swept `Option<InOut>` onto `PartUsage`/`PortUsage` alongside `derived`/`constant`
+  above (same `RefPrefix` production carries all three), reusing the existing
+  `attribute::direction_prefix` parser. `AttributeUsage`, `PerformInOutBinding`, `ItemUsage`, and
+  the `RequirementUsage`-family already had it from prior increments.
+- **`end`** (`isEnd ?= 'end'`): confirmed a genuine gap. BNF `UnextendedUsagePrefix : Usage =
+  EndUsagePrefix | BasicUsagePrefix` makes `end` and `RefPrefix`'s `derived`/`constant`/direction
+  mutually exclusive alternatives (not combinable), reachable only through the full `UsagePrefix`
+  production, used by exactly four usage kinds: `AttributeUsage`, `EnumerationUsage`,
+  `BindingConnectorAsUsage`, `SuccessionAsUsage`. Added `is_end: bool` to `AttributeUsage`
+  (`structure.rs`) and `EnumerationUsage` (`requirement.rs`), parsed in `attribute_usage` and
+  `enum_usage` respectively as a mutually-exclusive alternative to the `derived`/`constant` prefix
+  (matching the BNF's `isEnd` XOR `RefPrefix` structure). Left `Bind`/`SuccessionUsage` (the AST
+  types for `BindingConnectorAsUsage`/`SuccessionAsUsage`) unchanged: no occurrence of a
+  keyword-prefixed `end bind`/`end succession`/anonymous `end`-prefixed succession was found
+  anywhere in the Systems Library, Kernel Library, or example sources the validation gate exercises,
+  and their prefix-parsing entry points are more structurally invasive to extend; flagged as a
+  narrower follow-up if a real model ever needs it, rather than speculatively wired now.
+  Separately confirmed this is unrelated to the existing `EndDecl`/`end_decl` construct
+  (`connection.rs`/`interface.rs`), which models a different grammar production entirely (a
+  named connector-end declaration, `end name : Type;` / `DefaultInterfaceEnd`) that this parser
+  already handles.
+
+`PARSE_AST_VERSION` bumped 17 -> 18 for the breaking AST-schema change (new fields on
+`PartUsage`/`PortUsage`/`AttributeUsage`/`EnumerationUsage`). Added regression tests covering all
+new fields and their defaults (`src/parser/attribute.rs`, `tests/parser/structure.rs`).
+Regenerated the two `sysml-v2-release` validation snapshots (`parts_tree_1a`,
+`functional_allocation_4a`) whose `Debug` output changed shape from the new fields; full
+`cargo test`, `cargo clippy -- -W clippy::all` (zero new warnings), and the `SYSML_V2_RELEASE_DIR`
+validation gate (including the full/systems library suites) are green.
+
+### Changed: structured `AliasDef.target`
+
+Closes gaps-doc item 4a ("Parser work still required" backlog, post-PAR-006). `AliasDef.target`
+(the `for` clause of `alias m for ISQ::mass;`) had the same lossy-textual-target problem item 2
+already fixed for `TypingRelationship`/`SubsettingRelationship`: it was a plain `String` built by
+`qualified_name`'s `::`-join, with no span and no way to distinguish `::`-qualified segments from
+one another once joined. It's now a single `RelationshipTarget`
+(`src/ast/relationship_target.rs`, introduced by item 2), holding the same ordered
+`Vec<RelationshipTargetSegment>`/`Option<SegmentSeparator>` shape plus its own span. Unlike
+`TypingRelationship`/`SubsettingRelationship::target`, this is a bare `RelationshipTarget`, not a
+`Vec<Node<RelationshipTarget>>` -- an alias target is always exactly one qualified name per the
+BNF's `memberElement = [QualifiedName]` (no comma-separated multi-target concept exists for
+`alias ... for`), so the plural wrapper item 2 introduced for `:`/`:>` clauses doesn't apply here.
+
+`src/parser/alias.rs::alias_def` now builds the target via the existing `lex::qualified_name_segments`
+(the same segment-building helper item 2's `specialization_target`/`conjugated_qualified_name`
+already use) instead of the joined-`String` `qualified_name`, and records the target's own span
+around just the qualified-name text (not the whole `alias ... ;` clause).
+
+`PARSE_AST_VERSION` bumped 18 -> 19 for the breaking AST-schema change. Added regression tests
+covering both a `::`-qualified alias target (`alias m for ISQ::mass;`) and a bare single-segment
+name (`tests/parser/structure.rs`). Regenerated the `function_based_behavior_3a` validation
+snapshot (the Systems Library's `alias Torque for ISQ::TorqueValue;` re-export shorthand) whose
+`Debug` output changed shape from this field-type change; full `cargo test`,
+`cargo clippy -- -W clippy::all` (zero new warnings), and the `SYSML_V2_RELEASE_DIR` validation
+gate (including the full/systems library suites) are green.
 
 ## [0.35.0] - 2026-07-15
 

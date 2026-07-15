@@ -8,6 +8,7 @@ pub use kerml_fallback::*;
 mod behavior;
 mod common;
 mod feature_chain;
+mod feature_value;
 mod package;
 mod relationship_target;
 mod requirement;
@@ -18,6 +19,7 @@ mod view;
 pub use behavior::*;
 pub use common::*;
 pub use feature_chain::*;
+pub use feature_value::*;
 pub use package::*;
 pub use relationship_target::*;
 pub use requirement::*;
@@ -501,6 +503,7 @@ fn normalize_enumeration_usage(u: &EnumerationUsage) -> EnumerationUsage {
         type_name: u.type_name.clone(),
         multiplicity: u.multiplicity.clone(),
         body: u.body.clone(),
+        is_end: u.is_end,
     }
 }
 
@@ -522,6 +525,7 @@ fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
         nonunique: a.nonunique,
         is_derived: a.is_derived,
         is_constant: a.is_constant,
+        is_end: a.is_end,
     }
 }
 
@@ -529,6 +533,9 @@ fn normalize_part_usage(p: &PartUsage) -> PartUsage {
     PartUsage {
         usage_prefix: p.usage_prefix.clone(),
         is_individual: p.is_individual,
+        direction: p.direction,
+        is_derived: p.is_derived,
+        is_constant: p.is_constant,
         name: p.name.clone(),
         type_name: p.type_name.clone(),
         multiplicity: p.multiplicity.clone(),
@@ -776,6 +783,9 @@ fn normalize_part_usage_body_element_node(
 
 fn normalize_port_usage(p: &PortUsage) -> PortUsage {
     PortUsage {
+        direction: p.direction,
+        is_derived: p.is_derived,
+        is_constant: p.is_constant,
         name: p.name.clone(),
         type_name: p.type_name.clone(),
         multiplicity: p.multiplicity.clone(),

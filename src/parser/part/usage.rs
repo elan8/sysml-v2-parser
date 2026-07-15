@@ -1,23 +1,6 @@
 ﻿use super::body::exhibit_state;
 use super::prelude::*;
-
-/// Value part for usages: `= expr` | `:= expr` | `default = expr` | `default := expr` | `default expr`.
-fn usage_value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expression>> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = alt((
-        preceded(tag(&b"="[..]), ws_and_comments),
-        preceded(tag(&b":="[..]), ws_and_comments),
-        preceded(
-            preceded(tag(&b"default"[..]), ws1),
-            alt((
-                preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
-                ws_and_comments,
-            )),
-        ),
-    ))
-    .parse(input)?;
-    expression(input)
-}
+use crate::parser::feature_value_part as usage_value_part;
 
 fn usage_ordered_modifier(input: Input<'_>) -> IResult<Input<'_>, bool> {
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
@@ -43,6 +26,9 @@ pub(crate) fn part_usage_redefines_only<'a>(
             PartUsage {
                 usage_prefix: None,
                 is_individual: false,
+                direction: None,
+                is_derived: false,
+                is_constant: false,
                 name: String::new(),
                 type_name: String::new(),
                 multiplicity: multiplicity_opt,
@@ -109,6 +95,9 @@ pub(crate) fn part_usage_named<'a>(
             PartUsage {
                 usage_prefix: None,
                 is_individual: false,
+                direction: None,
+                is_derived: false,
+                is_constant: false,
                 name: name_str,
                 type_name,
                 multiplicity: multiplicity_opt,
@@ -125,9 +114,18 @@ pub(crate) fn part_usage_named<'a>(
 }
 
 /// Part usage: 'part' ( ':>>' qualified_name | (':>>')? name ':' type_name? ... ) multiplicity? ... body
+///
+/// Prefix keywords follow BNF `RefPrefix`/`OccurrenceUsagePrefix` order (§8.2.2.6.2, §8.2.2.9.2,
+/// reached via `PartUsage = OccurrenceUsagePrefix 'part' Usage` -> `OccurrenceUsagePrefix :
+/// BasicUsagePrefix ...` -> `BasicUsagePrefix : RefPrefix ...`): direction, `derived`,
+/// (`abstract`|`variation`), `constant`, then `individual`.
 pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
+    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
     let (input, usage_prefix) = opt(alt((
         map(preceded(tag(&b"abstract"[..]), ws1), |_| {
             DefinitionPrefix::Abstract
@@ -137,6 +135,9 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         }),
     )))
     .parse(input)?;
+    let (input, is_constant) = opt(preceded(tag(&b"constant"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
     let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
@@ -151,17 +152,26 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         let (input, mut usage) = anonymous_part_usage(start, input)?;
         usage.value.usage_prefix = usage_prefix;
         usage.value.is_individual = is_individual;
+        usage.value.direction = direction;
+        usage.value.is_derived = is_derived;
+        usage.value.is_constant = is_constant;
         return Ok((input, usage));
     }
     if let Ok((input, usage)) = part_usage_redefines_only(start, input) {
         let mut usage = usage;
         usage.value.usage_prefix = usage_prefix;
         usage.value.is_individual = is_individual;
+        usage.value.direction = direction;
+        usage.value.is_derived = is_derived;
+        usage.value.is_constant = is_constant;
         return Ok((input, usage));
     }
     let (input, mut usage) = part_usage_named(start, input)?;
     usage.value.usage_prefix = usage_prefix;
     usage.value.is_individual = is_individual;
+    usage.value.direction = direction;
+    usage.value.is_derived = is_derived;
+    usage.value.is_constant = is_constant;
     Ok((input, usage))
 }
 
@@ -197,6 +207,9 @@ fn anonymous_part_usage<'a>(
             PartUsage {
                 usage_prefix: None,
                 is_individual: false,
+                direction: None,
+                is_derived: false,
+                is_constant: false,
                 name: String::new(),
                 type_name,
                 multiplicity: multiplicity_opt,
@@ -728,6 +741,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
         preceded(ws_and_comments, expression),
     ))
     .parse(input)?;
+    let value = value.map(crate::parser::feature_value::wrap_bind_expression);
     let type_name = type_name.unwrap_or_default();
     let (input, body) = preceded(
         ws_and_comments,

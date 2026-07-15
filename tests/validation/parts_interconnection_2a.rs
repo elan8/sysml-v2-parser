@@ -255,6 +255,9 @@ fn port_def_vehicle_to_road() -> PackageBodyElement {
         specializes: None,
         body: PortDefBody::Brace {
             elements: vec![n(PortDefBodyElement::PortUsage(n(PortUsage {
+                direction: None,
+                is_derived: false,
+                is_constant: false,
                 name: "wheelToRoadPort".to_string(),
                 type_name: Some("WheelToRoadPort".to_string()),
                 multiplicity: Some(mult(2)),
@@ -279,6 +282,9 @@ fn part_def_vehicle_a() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "fuelCmdPort".to_string(),
                     type_name: Some("FuelCmdPort".to_string()),
                     multiplicity: None,
@@ -291,6 +297,9 @@ fn part_def_vehicle_a() -> PackageBodyElement {
                     type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "vehicleToRoadPort".to_string(),
                     type_name: Some("VehicleToRoadPort".to_string()),
                     multiplicity: None,
@@ -315,6 +324,9 @@ fn part_def_rear_axle_assembly() -> PackageBodyElement {
         specializes: Some(spec("AxleAssembly")),
         body: PartDefBody::Brace {
             elements: vec![n(PartDefBodyElement::PortUsage(n(PortUsage {
+                direction: None,
+                is_derived: false,
+                is_constant: false,
                 name: "shaftPort_d".to_string(),
                 type_name: Some("ShaftPort_d".to_string()),
                 multiplicity: None,
@@ -339,6 +351,9 @@ fn part_def_half_axle() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "axleToDiffPort".to_string(),
                     type_name: Some("AxlePort".to_string()),
                     multiplicity: None,
@@ -351,6 +366,9 @@ fn part_def_half_axle() -> PackageBodyElement {
                     type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "axleToWheelPort".to_string(),
                     type_name: Some("AxleToWheelPort".to_string()),
                     multiplicity: None,
@@ -376,6 +394,9 @@ fn part_def_engine() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "fuelCmdPort".to_string(),
                     type_name: Some("FuelCmdPort".to_string()),
                     multiplicity: None,
@@ -388,6 +409,9 @@ fn part_def_engine() -> PackageBodyElement {
                     type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "drivePwrPort".to_string(),
                     type_name: Some("DrivePwrPort".to_string()),
                     multiplicity: None,
@@ -413,6 +437,9 @@ fn part_def_transmission() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "clutchPort".to_string(),
                     type_name: Some("ClutchPort".to_string()),
                     multiplicity: None,
@@ -425,6 +452,9 @@ fn part_def_transmission() -> PackageBodyElement {
                     type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "shaftPort_a".to_string(),
                     type_name: Some("ShaftPort_a".to_string()),
                     multiplicity: None,
@@ -450,6 +480,9 @@ fn part_def_driveshaft() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "shaftPort_b".to_string(),
                     type_name: Some("ShaftPort_b".to_string()),
                     multiplicity: None,
@@ -462,6 +495,9 @@ fn part_def_driveshaft() -> PackageBodyElement {
                     type_ref_span: None,
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "shaftPort_c".to_string(),
                     type_name: Some("ShaftPort_c".to_string()),
                     multiplicity: None,
@@ -561,6 +597,9 @@ fn part_vehicle1_c1() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
         name: "vehicle1_c1".to_string(),
         type_name: "VehicleA".to_string(),
         multiplicity: None,
@@ -580,6 +619,9 @@ fn part_vehicle1_c1() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "engine".to_string(),
                     type_name: "Engine".to_string(),
                     multiplicity: None,
@@ -603,6 +645,9 @@ fn part_vehicle1_c1() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "transmission".to_string(),
                     type_name: "Transmission".to_string(),
                     multiplicity: None,
@@ -617,6 +662,9 @@ fn part_vehicle1_c1() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "driveshaft".to_string(),
                     type_name: "Driveshaft".to_string(),
                     multiplicity: None,
@@ -655,6 +703,9 @@ fn part_vehicle1_c1() -> PartUsage {
                     body: Some(ConnectBody::Semicolon),
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "vehicleToRoadPort".to_string(),
                     type_name: None,
                     multiplicity: None,
@@ -665,6 +716,9 @@ fn part_vehicle1_c1() -> PartUsage {
                     body: PortBody::Brace {
                         elements: vec![
                             n(PortBodyElement::PortUsage(n(PortUsage {
+                                direction: None,
+                                is_derived: false,
+                                is_constant: false,
                                 name: "leftWheelToRoadPort".to_string(),
                                 type_name: None,
                                 multiplicity: None,
@@ -680,6 +734,9 @@ fn part_vehicle1_c1() -> PartUsage {
                                 type_ref_span: None,
                             }))),
                             n(PortBodyElement::PortUsage(n(PortUsage {
+                                direction: None,
+                                is_derived: false,
+                                is_constant: false,
                                 name: "rightWheelToRoadPort".to_string(),
                                 type_name: None,
                                 multiplicity: None,
@@ -708,6 +765,9 @@ fn part_rear_axle_assembly() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
         name: "rearAxleAssembly".to_string(),
         type_name: "RearAxleAssembly".to_string(),
         multiplicity: None,
@@ -757,6 +817,9 @@ fn part_rear_axle_assembly() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "rearWheel".to_string(),
                     type_name: "Wheel".to_string(),
                     multiplicity: Some(mult(2)),
@@ -771,6 +834,9 @@ fn part_rear_axle_assembly() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "leftWheel".to_string(),
                     type_name: "".to_string(),
                     multiplicity: None,
@@ -781,6 +847,9 @@ fn part_rear_axle_assembly() -> PartUsage {
                     body: PartUsageBody::Brace {
                         elements: vec![
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                                direction: None,
+                                is_derived: false,
+                                is_constant: false,
                                 name: "wheelToAxlePort".to_string(),
                                 type_name: Some("WheelToAxlePort".to_string()),
                                 multiplicity: None,
@@ -793,6 +862,9 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 type_ref_span: None,
                             }))),
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                                direction: None,
+                                is_derived: false,
+                                is_constant: false,
                                 name: "wheelToRoadPort".to_string(),
                                 type_name: Some("WheelToRoadPort".to_string()),
                                 multiplicity: None,
@@ -812,6 +884,9 @@ fn part_rear_axle_assembly() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "rightWheel".to_string(),
                     type_name: "".to_string(),
                     multiplicity: None,
@@ -822,6 +897,9 @@ fn part_rear_axle_assembly() -> PartUsage {
                     body: PartUsageBody::Brace {
                         elements: vec![
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                                direction: None,
+                                is_derived: false,
+                                is_constant: false,
                                 name: "wheelToAxlePort".to_string(),
                                 type_name: Some("WheelToAxlePort".to_string()),
                                 multiplicity: None,
@@ -834,6 +912,9 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 type_ref_span: None,
                             }))),
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                                direction: None,
+                                is_derived: false,
+                                is_constant: false,
                                 name: "wheelToRoadPort".to_string(),
                                 type_name: Some("WheelToRoadPort".to_string()),
                                 multiplicity: None,
@@ -859,6 +940,9 @@ fn part_differential() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
         name: "differential".to_string(),
         type_name: "Differential".to_string(),
         multiplicity: None,
@@ -871,6 +955,9 @@ fn part_differential() -> PartUsage {
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "shaftPort_d".to_string(),
                     type_name: Some("ShaftPort_d".to_string()),
                     multiplicity: None,
@@ -883,6 +970,9 @@ fn part_differential() -> PartUsage {
                     type_ref_span: None,
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "leftDiffPort".to_string(),
                     type_name: Some("DiffPort".to_string()),
                     multiplicity: None,
@@ -895,6 +985,9 @@ fn part_differential() -> PartUsage {
                     type_ref_span: None,
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "rightDiffPort".to_string(),
                     type_name: Some("DiffPort".to_string()),
                     multiplicity: None,
@@ -915,6 +1008,9 @@ fn part_rear_axle() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
         name: "rearAxle".to_string(),
         type_name: "RearAxle".to_string(),
         multiplicity: None,
@@ -929,6 +1025,9 @@ fn part_rear_axle() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "leftHalfAxle".to_string(),
                     type_name: "HalfAxle".to_string(),
                     multiplicity: None,
@@ -943,6 +1042,9 @@ fn part_rear_axle() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    direction: None,
+                    is_derived: false,
+                    is_constant: false,
                     name: "rightHalfAxle".to_string(),
                     type_name: "HalfAxle".to_string(),
                     multiplicity: None,

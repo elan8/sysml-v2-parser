@@ -224,6 +224,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         preceded(ws_and_comments, expression),
     ))
     .parse(input)?;
+    let value = value.map(crate::parser::feature_value::wrap_bind_expression);
 
     if !input.fragment().is_empty()
         && !input.fragment().starts_with(b";")

@@ -593,7 +593,7 @@ fn meta_cast_expression_parses_in_attribute_binding() {
         panic!("expected value expression");
     };
     assert!(matches!(
-        &expr.value,
+        &expr.value.expression.value,
         Expression::MetaCast { metaclass, .. } if metaclass == "SysML::Usage"
     ));
 }
@@ -674,7 +674,7 @@ fn metadata_def_shorthand_base_type_meta_cast() {
         panic!("expected value expression");
     };
     assert!(matches!(
-        &expr.value,
+        &expr.value.expression.value,
         Expression::MetaCast { metaclass, .. } if metaclass == "SysML::Usage"
     ));
 }

@@ -176,6 +176,10 @@ pub struct EnumerationUsage {
     pub type_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
     pub body: AttributeBody,
+    /// `end` keyword from `EndUsagePrefix` (BNF §8.2.2.6.2, `isEnd ?= 'end'`), reached through
+    /// the same `UsagePrefix` production `AttributeUsage.is_end` uses (`UsagePrefix 'enum'
+    /// Usage`). See `structure::AttributeUsage::is_end` for the full BNF citation.
+    pub is_end: bool,
 }
 
 /// Dependency: `dependency` (Identification `from`)? client(s) `to` supplier(s) RelationshipBody.

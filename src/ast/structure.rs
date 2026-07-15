@@ -1,10 +1,12 @@
 use super::behavior::{ActionDefBodyElement, Allocate, InOut, InOutDecl, StateDefBody, StateUsage};
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
+use super::feature_value::FeatureValue;
 use super::view::{CalcUsage, ConstraintDefBody};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
+use super::relationship_target::RelationshipTarget;
 
 /// Part definition: `part def` Identification (`:>` specializes)? Body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -173,7 +175,7 @@ pub struct AttributeDef {
     /// the span without the node.
     pub typing: Option<Node<TypingRelationship>>,
     /// Default or binding after `=` / `:=` / `default =` before the body terminator.
-    pub value: Option<Node<Expression>>,
+    pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
     /// Span of the defined name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -233,6 +235,15 @@ pub struct PartUsage {
     /// Optional `abstract` or `variation` prefix on a part usage.
     pub usage_prefix: Option<DefinitionPrefix>,
     pub is_individual: bool,
+    /// Direction prefix when parsed as `in`/`out`/`inout part ...` (BNF `RefPrefix`, reachable
+    /// through `OccurrenceUsagePrefix` -> `BasicUsagePrefix` -> `RefPrefix`, same production
+    /// chain `AttributeUsage.direction` uses).
+    pub direction: Option<InOut>,
+    /// `derived` keyword from `RefPrefix` -- see `AttributeUsage::is_derived` for the BNF
+    /// citation; the same `OccurrenceUsagePrefix` chain applies to part usages.
+    pub is_derived: bool,
+    /// `constant` keyword from `RefPrefix` -- see `AttributeUsage::is_constant`.
+    pub is_constant: bool,
     pub name: String,
     /// Type after `:`, e.g. "Vehicle", "AxleAssembly".
     pub type_name: String,
@@ -244,7 +255,7 @@ pub struct PartUsage {
     /// Redefines target, e.g. `frontAxleAssembly` or `vehicle1::mass`.
     pub redefines: Option<Node<SubsettingRelationship>>,
     /// Value expression (= expr, default = expr, := expr).
-    pub value: Option<Node<Expression>>,
+    pub value: Option<Node<FeatureValue>>,
     pub body: PartUsageBody,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -427,7 +438,7 @@ pub struct AttributeUsage {
     /// Crosses target after `=>` / `crosses`.
     pub crosses: Option<Node<SubsettingRelationship>>,
     /// Value expression.
-    pub value: Option<Node<Expression>>,
+    pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -446,6 +457,12 @@ pub struct AttributeUsage {
     pub is_derived: bool,
     /// `constant` keyword from `RefPrefix` -- usage-only, same rationale as `is_derived`.
     pub is_constant: bool,
+    /// `end` keyword from `EndUsagePrefix` (BNF §8.2.2.6.2, `isEnd ?= 'end'`) -- an alternative
+    /// to `RefPrefix` reached through the same `UsagePrefix` production `AttributeUsage` uses
+    /// (`UsagePrefix 'attribute' Usage`). Distinct from the unrelated `EndDecl`/`end_decl`
+    /// construct (`connection.rs`/`interface.rs`), which is a separate named-connector-end
+    /// declaration (`end name : Type;`), not this boolean prefix modifier.
+    pub is_end: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -495,6 +512,13 @@ pub enum PortDefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortUsage {
+    /// Direction prefix when parsed as `in`/`out`/`inout port ...` (BNF `RefPrefix`, reachable
+    /// through `OccurrenceUsagePrefix` -> `BasicUsagePrefix` -> `RefPrefix`).
+    pub direction: Option<InOut>,
+    /// `derived` keyword from `RefPrefix`. See `AttributeUsage::is_derived`.
+    pub is_derived: bool,
+    /// `constant` keyword from `RefPrefix`. See `AttributeUsage::is_constant`.
+    pub is_constant: bool,
     pub name: String,
     pub type_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
@@ -613,7 +637,7 @@ pub struct RefDecl {
     pub name: String,
     pub type_name: String,
     /// Optional binding value: `= expr` (SysML shorthand binding for references).
-    pub value: Option<Node<Expression>>,
+    pub value: Option<Node<FeatureValue>>,
     pub body: RefBody,
     /// Span of the name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -894,7 +918,15 @@ pub struct Connect {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AliasDef {
     pub identification: Identification,
-    pub target: String,
+    /// The aliased element's qualified name, e.g. `ISQ::mass` in `alias m for ISQ::mass;`.
+    ///
+    /// Structured the same way as [`crate::ast::TypingRelationship::target`]/
+    /// [`crate::ast::SubsettingRelationship::target`] (parser work item 2) rather than a plain
+    /// joined `String`, so `::`-qualified segments stay distinguishable and the target carries
+    /// its own span. Unlike those fields this is a single [`crate::ast::RelationshipTarget`], not
+    /// a `Vec` -- an alias target (`[QualifiedName]` per the grammar) is always exactly one
+    /// qualified name, with no comma-separated multi-target concept (parser work item 4a).
+    pub target: RelationshipTarget,
     pub body: AliasBody,
 }
 

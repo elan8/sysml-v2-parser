@@ -6,7 +6,6 @@ use crate::ast::{
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
-use crate::parser::expr::expression;
 use crate::parser::lex::{
     capture_opaque_member, identification, name, subset_operator, ws1, ws_and_comments,
 };
@@ -214,24 +213,6 @@ fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
     Ok((input, result))
 }
 
-/// Value part: `= expr` | `:= expr` | `default = expr` | `default := expr` (BNF FeatureValue).
-fn value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expression>> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = alt((
-        preceded(tag(&b"="[..]), ws_and_comments),
-        preceded(tag(&b":="[..]), ws_and_comments),
-        preceded(
-            preceded(tag(&b"default"[..]), ws1),
-            alt((
-                preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
-                ws_and_comments,
-            )),
-        ),
-    ))
-    .parse(input)?;
-    expression(input)
-}
-
 enum MetadataBindingPrefix {
     Subsets,
     Redefines,
@@ -293,7 +274,8 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
         .unwrap_or((None, None));
     let (input, mods1) = feature_modifiers(input)?;
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
+        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+            .parse(input)?;
     let (input, mods2) = feature_modifiers(input)?;
     let mods = mods1.merge(mods2);
     let (input, body) = attribute_body(input)?;
@@ -338,6 +320,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
                 nonunique: mods.nonunique,
                 is_derived: false,
                 is_constant: false,
+                is_end: false,
             },
         ),
     ))
@@ -454,8 +437,9 @@ pub(crate) fn attribute_def(
         (typing_span, typing, None)
     };
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
-    let value = value.or(leading_value);
+        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+            .parse(input)?;
+    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
     let value_span = value.as_ref().map(|node| node.span.clone());
     let (input, _) = specialization_clauses(input)?;
     let (input, mods2) = feature_modifiers(input)?;
@@ -535,16 +519,30 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         ws1,
     ))
     .parse(input)?;
+    // `UnextendedUsagePrefix : Usage = EndUsagePrefix | BasicUsagePrefix` (BNF §8.2.2.6.2):
+    // `end` and the `RefPrefix` keywords below are mutually exclusive alternatives, not
+    // combinable -- a usage is either an `EndUsagePrefix` (`end` + optional cross-feature
+    // member, not modeled here since attribute usages have no cross-feature member syntax) or a
+    // `RefPrefix` (`derived`/`constant`). Distinct from the unrelated `EndDecl`/`end_decl`
+    // construct (a separate named-connector-end declaration, `end name : Type;`).
+    let (input, is_end) = nom::combinator::opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
+    let is_end = is_end.is_some();
     // RefPrefix (BNF §8.2.2.6.2): `derived`? (`abstract`|`variation`)? `constant`? -- usage-only
     // prefix keywords, no `Definition` equivalent. `abstract`/`variation` aren't legal on an
     // attribute usage per the Systems Library's actual usage (attributes are never abstract), so
     // only `derived`/`constant` are recognized here; anything else falls through unconsumed.
-    let (input, is_derived) =
-        nom::combinator::opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
-    let is_derived = is_derived.is_some();
-    let (input, is_constant) =
-        nom::combinator::opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?;
-    let is_constant = is_constant.is_some();
+    // Skipped entirely when `end` already matched, since the two are alternatives.
+    let (input, is_derived, is_constant) = if is_end {
+        (input, false, false)
+    } else {
+        let (input, is_derived) =
+            nom::combinator::opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
+        let is_derived = is_derived.is_some();
+        let (input, is_constant) =
+            nom::combinator::opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?;
+        let is_constant = is_constant.is_some();
+        (input, is_derived, is_constant)
+    };
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, usage_head) = alt((
@@ -612,7 +610,8 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         .as_ref()
         .and_then(|(_, value)| value.clone());
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
+        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+            .parse(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
     let (input, mods2) = feature_modifiers(input)?;
     let mods = mods0.merge(mods1).merge(mods2);
@@ -626,7 +625,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         .map(|(target, _)| target);
     let references = trailing_clauses.references.or(leading_clauses.references);
     let crosses = trailing_clauses.crosses.or(leading_clauses.crosses);
-    let value = value.or(leading_subsets_value);
+    let value = value.or(leading_subsets_value.map(crate::parser::feature_value::wrap_bind_expression));
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -650,6 +649,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 nonunique: mods.nonunique,
                 is_derived,
                 is_constant,
+                is_end,
             },
         ),
     ))
@@ -693,7 +693,8 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
         .unwrap_or((None, None));
     let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
+        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+            .parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
@@ -736,6 +737,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 nonunique: mods.nonunique,
                 is_derived: false,
                 is_constant: false,
+                is_end: false,
             },
         ),
     ))
@@ -817,7 +819,8 @@ pub(crate) fn attribute_usage_shorthand(
     let (input, _) = typings(input)?;
     // Keep shorthand values on the shared expression path so precedence/parentheses are preserved.
     let (input, value) =
-        nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
+        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+            .parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -841,6 +844,7 @@ pub(crate) fn attribute_usage_shorthand(
                 nonunique: false,
                 is_derived: false,
                 is_constant: false,
+                is_end: false,
             },
         ),
     ))
@@ -968,5 +972,28 @@ mod attribute_body_tests {
         assert!(!node.value.nonunique);
         assert!(!node.value.is_derived);
         assert!(!node.value.is_constant);
+    }
+
+    // --- gaps-doc item 3: `end` (`EndUsagePrefix`) retained as a typed field ---
+
+    #[test]
+    fn attribute_usage_retains_end_prefix() {
+        let text = "end attribute mass: Real;";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_end);
+        // `end` and `derived`/`constant` are mutually exclusive alternatives per BNF
+        // `UnextendedUsagePrefix : Usage = EndUsagePrefix | BasicUsagePrefix`.
+        assert!(!node.value.is_derived);
+        assert!(!node.value.is_constant);
+        assert_eq!(node.value.name, "mass");
+    }
+
+    #[test]
+    fn attribute_usage_without_end_prefix_defaults_to_false() {
+        let text = "attribute mass: Real;";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(!node.value.is_end);
     }
 }

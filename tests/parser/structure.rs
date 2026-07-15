@@ -257,7 +257,7 @@ fn test_expression_allows_qualified_names_and_invocation_arguments() {
         .value
         .as_ref()
         .expect("expected value expression");
-    match &value.value {
+    match &value.value.expression.value {
         sysml_v2_parser::ast::Expression::BinaryOp { op, right, .. } => {
             assert_eq!(op, &sysml_v2_parser::ast::BinaryOperator::Add);
             match &right.value {
@@ -269,6 +269,185 @@ fn test_expression_allows_qualified_names_and_invocation_arguments() {
         }
         other => panic!("expected binary expression, got {other:?}"),
     }
+}
+
+#[test]
+fn test_feature_value_distinguishes_operator_and_default_keyword() {
+    // Covers all five legal `FeatureValue` forms (BNF): bare `=`, bare `:=`, `default =`,
+    // `default :=`, and bare `default expr` -- across AttributeDef, AttributeUsage, PartUsage,
+    // and RefDecl, the four in-scope structs whose `value` field is now `Option<Node<FeatureValue>>`.
+    let input = r#"package P {
+attribute bindAttr = 1;
+attribute assignAttr := 2;
+attribute defaultBindAttr default = 3;
+attribute defaultAssignAttr default := 4;
+attribute defaultBareAttr default 5;
+part def D {
+  attribute bindUsage = 1;
+  attribute assignUsage := 2;
+  attribute defaultBindUsage default = 3;
+  attribute defaultAssignUsage default := 4;
+  attribute defaultBareUsage default 5;
+  part bindPart : Q = 1;
+  part assignPart : Q := 2;
+  part defaultBindPart : Q default = 3;
+  part defaultAssignPart : Q default := 4;
+  part defaultBarePart : Q default 5;
+  ref bindRef : Q = 1;
+}
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    let root = result.root;
+    let pkg = match &root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace package body");
+    };
+
+    fn attribute_def_value<'a>(
+        elements: &'a [Node<PackageBodyElement>],
+        name: &str,
+    ) -> &'a FeatureValue {
+        let value_opt: &Option<Node<FeatureValue>> = elements
+            .iter()
+            .find_map(|e| match &e.value {
+                PackageBodyElement::AttributeDef(a) if a.value.name == name => {
+                    Some(&a.value.value)
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("expected AttributeDef {name}"));
+        &value_opt
+            .as_ref()
+            .unwrap_or_else(|| panic!("expected value on AttributeDef {name}"))
+            .value
+    }
+
+    let bind = attribute_def_value(elements, "bindAttr");
+    assert_eq!(bind.kind, FeatureValueKind::Bind);
+    assert!(!bind.is_default);
+
+    let assign = attribute_def_value(elements, "assignAttr");
+    assert_eq!(assign.kind, FeatureValueKind::Assign);
+    assert!(!assign.is_default);
+
+    let default_bind = attribute_def_value(elements, "defaultBindAttr");
+    assert_eq!(default_bind.kind, FeatureValueKind::Bind);
+    assert!(default_bind.is_default);
+
+    let default_assign = attribute_def_value(elements, "defaultAssignAttr");
+    assert_eq!(default_assign.kind, FeatureValueKind::Assign);
+    assert!(default_assign.is_default);
+
+    let default_bare = attribute_def_value(elements, "defaultBareAttr");
+    assert_eq!(default_bare.kind, FeatureValueKind::Bind);
+    assert!(default_bare.is_default);
+
+    let part_def = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) if p.value.identification.name.as_deref() == Some("D") => {
+                Some(&p.value)
+            }
+            _ => None,
+        })
+        .expect("expected part def D");
+    let PartDefBody::Brace { elements: part_elements } = &part_def.body else {
+        panic!("expected part def brace body");
+    };
+
+    fn attribute_usage_value<'a>(
+        elements: &'a [Node<PartDefBodyElement>],
+        name: &str,
+    ) -> &'a FeatureValue {
+        let value_opt: &Option<Node<FeatureValue>> = elements
+            .iter()
+            .find_map(|e| match &e.value {
+                PartDefBodyElement::AttributeUsage(a) if a.value.name == name => {
+                    Some(&a.value.value)
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("expected AttributeUsage {name}"));
+        &value_opt
+            .as_ref()
+            .unwrap_or_else(|| panic!("expected value on AttributeUsage {name}"))
+            .value
+    }
+
+    let bind = attribute_usage_value(part_elements, "bindUsage");
+    assert_eq!(bind.kind, FeatureValueKind::Bind);
+    assert!(!bind.is_default);
+
+    let assign = attribute_usage_value(part_elements, "assignUsage");
+    assert_eq!(assign.kind, FeatureValueKind::Assign);
+    assert!(!assign.is_default);
+
+    let default_bind = attribute_usage_value(part_elements, "defaultBindUsage");
+    assert_eq!(default_bind.kind, FeatureValueKind::Bind);
+    assert!(default_bind.is_default);
+
+    let default_assign = attribute_usage_value(part_elements, "defaultAssignUsage");
+    assert_eq!(default_assign.kind, FeatureValueKind::Assign);
+    assert!(default_assign.is_default);
+
+    let default_bare = attribute_usage_value(part_elements, "defaultBareUsage");
+    assert_eq!(default_bare.kind, FeatureValueKind::Bind);
+    assert!(default_bare.is_default);
+
+    fn part_usage_value<'a>(
+        elements: &'a [Node<PartDefBodyElement>],
+        name: &str,
+    ) -> &'a FeatureValue {
+        let value_opt: &Option<Node<FeatureValue>> = elements
+            .iter()
+            .find_map(|e| match &e.value {
+                PartDefBodyElement::PartUsage(p) if p.value.name == name => Some(&p.value.value),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("expected PartUsage {name}"));
+        &value_opt
+            .as_ref()
+            .unwrap_or_else(|| panic!("expected value on PartUsage {name}"))
+            .value
+    }
+
+    let bind = part_usage_value(part_elements, "bindPart");
+    assert_eq!(bind.kind, FeatureValueKind::Bind);
+    assert!(!bind.is_default);
+
+    let assign = part_usage_value(part_elements, "assignPart");
+    assert_eq!(assign.kind, FeatureValueKind::Assign);
+    assert!(!assign.is_default);
+
+    let default_bind = part_usage_value(part_elements, "defaultBindPart");
+    assert_eq!(default_bind.kind, FeatureValueKind::Bind);
+    assert!(default_bind.is_default);
+
+    let default_assign = part_usage_value(part_elements, "defaultAssignPart");
+    assert_eq!(default_assign.kind, FeatureValueKind::Assign);
+    assert!(default_assign.is_default);
+
+    let default_bare = part_usage_value(part_elements, "defaultBarePart");
+    assert_eq!(default_bare.kind, FeatureValueKind::Bind);
+    assert!(default_bare.is_default);
+
+    let ref_decl = part_elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartDefBodyElement::Ref(r) if r.value.name == "bindRef" => Some(&r.value),
+            _ => None,
+        })
+        .expect("expected ref decl bindRef");
+    let ref_value = ref_decl
+        .value
+        .as_ref()
+        .expect("expected value on RefDecl bindRef");
+    assert_eq!(ref_value.value.kind, FeatureValueKind::Bind);
+    assert!(!ref_value.value.is_default);
 }
 
 #[test]
@@ -2829,4 +3008,189 @@ part def Foo {
         })
         .expect("expected a Satisfy member");
     assert!(satisfy.inline_requirement.is_none());
+}
+
+// --- gaps-doc item 3: `derived`/`constant`/direction swept onto PartUsage/PortUsage, `end` onto
+// EnumerationUsage. See `AttributeUsage.is_derived`/`is_constant`/`is_end` for the BNF citations
+// (`RefPrefix`/`EndUsagePrefix`, §8.2.2.6.2) this sweep applies to the same production chain via
+// `OccurrenceUsagePrefix : OccurrenceUsage = BasicUsagePrefix ...` -> `BasicUsagePrefix : RefPrefix ...`.
+
+#[test]
+fn test_part_usage_retains_derived_constant_and_direction_prefixes() {
+    let input = r#"package P {
+part def Foo {
+  derived part total : Bar = a + b;
+  constant part fixed : Bar;
+  in part input1 : Bar;
+}
+}"#;
+    let diag = parse_with_diagnostics(input);
+    assert!(
+        !diag
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("recovered_part_def_body_element")),
+        "unexpected recovery: {:?}",
+        diag.errors
+    );
+    let derived = part_def_body_part_usage(&diag.root, 0, 0);
+    assert!(derived.is_derived);
+    assert!(!derived.is_constant);
+    assert_eq!(derived.direction, None);
+
+    let constant = part_def_body_part_usage(&diag.root, 0, 1);
+    assert!(constant.is_constant);
+    assert!(!constant.is_derived);
+
+    let directed = part_def_body_part_usage(&diag.root, 0, 2);
+    assert_eq!(directed.direction, Some(InOut::In));
+    assert!(!directed.is_derived);
+    assert!(!directed.is_constant);
+}
+
+#[test]
+fn test_part_usage_without_prefixes_defaults_to_false_and_none() {
+    let input = r#"package P {
+part def Foo {
+  part plain : Bar;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let plain = part_def_body_part_usage(&result, 0, 0);
+    assert!(!plain.is_derived);
+    assert!(!plain.is_constant);
+    assert_eq!(plain.direction, None);
+}
+
+#[test]
+fn test_port_usage_retains_derived_constant_and_direction_prefixes() {
+    let input = r#"package P {
+part brushSystem : BrushSystem {
+  part mainBrush : MainBrush {
+    derived port sensor1 : SensorPort;
+    out port output1 : OutPort;
+  }
+}
+}"#;
+    let diag = parse_with_diagnostics(input);
+    assert!(
+        !diag
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("recovered_part_usage_body_element")),
+        "unexpected recovery: {:?}",
+        diag.errors
+    );
+    let derived_port = nested_port_usage_in_part_usage(&diag.root, 0, 0, 0);
+    assert!(derived_port.is_derived);
+    assert!(!derived_port.is_constant);
+    assert_eq!(derived_port.direction, None);
+
+    let directed_port = nested_port_usage_in_part_usage(&diag.root, 0, 0, 1);
+    assert_eq!(directed_port.direction, Some(InOut::Out));
+    assert!(!directed_port.is_derived);
+}
+
+#[test]
+fn test_enumeration_usage_retains_end_prefix() {
+    let input = r#"package P {
+part def Foo {
+  end enum status : Status;
+}
+}"#;
+    let diag = parse_with_diagnostics(input);
+    assert!(
+        !diag
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("recovered_part_def_body_element")),
+        "unexpected recovery: {:?}",
+        diag.errors
+    );
+    let pkg = package_from_root(&diag.root);
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[0].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let body = match &part_def.value.body {
+        PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let enum_usage = body
+        .iter()
+        .find_map(|el| match &el.value {
+            PartDefBodyElement::EnumerationUsage(u) => Some(&u.value),
+            _ => None,
+        })
+        .expect("expected an EnumerationUsage member");
+    assert!(enum_usage.is_end);
+    assert_eq!(enum_usage.name, "status");
+}
+
+fn alias_def_target<'a>(pkg_elements: &'a [Node<PackageBodyElement>]) -> &'a AliasDef {
+    pkg_elements
+        .iter()
+        .find_map(|el| match &el.value {
+            PackageBodyElement::AliasDef(n) => Some(&n.value),
+            _ => None,
+        })
+        .expect("expected an AliasDef member")
+}
+
+#[test]
+fn test_alias_def_target_is_structured_qualified_name() {
+    let input = r#"package P {
+alias m for ISQ::mass;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let alias_def = alias_def_target(elements);
+    assert_eq!(
+        alias_def.target.segments,
+        vec![
+            RelationshipTargetSegment {
+                name: "ISQ".to_string(),
+                separator: None,
+            },
+            RelationshipTargetSegment {
+                name: "mass".to_string(),
+                separator: Some(SegmentSeparator::ColonColon),
+            },
+        ]
+    );
+    assert_eq!(alias_def.target.to_display_string(), "ISQ::mass");
+    assert_eq!(alias_def.body, AliasBody::Semicolon);
+}
+
+#[test]
+fn test_alias_def_target_bare_name_single_segment() {
+    let input = r#"package P {
+alias shortName for LongOriginalName;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let alias_def = alias_def_target(elements);
+    assert_eq!(
+        alias_def.target.segments,
+        vec![RelationshipTargetSegment::simple("LongOriginalName")]
+    );
+    assert_eq!(alias_def.target.to_display_string(), "LongOriginalName");
 }

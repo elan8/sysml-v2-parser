@@ -101,10 +101,15 @@ pub(crate) fn enum_def(input: Input<'_>) -> IResult<Input<'_>, Node<EnumDef>> {
     ))
 }
 
-/// Enumeration usage in a definition or usage body: `enum` name multiplicity? (`:` type)? body.
+/// Enumeration usage in a definition or usage body: `end`? `enum` name multiplicity? (`:` type)?
+/// body. `end` is `EndUsagePrefix` (BNF §8.2.2.6.2, `isEnd ?= 'end'`), reached through the same
+/// `UsagePrefix 'enum' Usage` production `AttributeUsage.is_end` documents; unrelated to the
+/// separate `EndDecl`/`end_decl` named-connector-end construct.
 pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<EnumerationUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, is_end) = opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
+    let is_end = is_end.is_some();
     let (input, _) = tag(&b"enum"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name) = name(input)?;
@@ -121,6 +126,7 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
                 type_name: header.type_name,
                 multiplicity,
                 body,
+                is_end,
             },
         ),
     ))

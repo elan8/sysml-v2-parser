@@ -177,7 +177,10 @@ pub(crate) fn optional_typings(
 ) -> IResult<Input<'_>, Option<(Span, bool, Vec<Node<RelationshipTarget>>)>> {
     let (peek, _) = ws_and_comments(input)?;
     let fragment = peek.fragment();
-    if (fragment.starts_with(b":") && !fragment.starts_with(b":>") && !fragment.starts_with(b":>>"))
+    if (fragment.starts_with(b":")
+        && !fragment.starts_with(b":>")
+        && !fragment.starts_with(b":>>")
+        && !fragment.starts_with(b":="))
         || starts_with_keyword(fragment, b"defined")
         || starts_with_keyword(fragment, b"typed")
     {

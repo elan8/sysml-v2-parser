@@ -130,6 +130,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
         preceded(ws_and_comments, expression),
     ))
     .parse(input)?;
+    let value = value.map(crate::parser::feature_value::wrap_bind_expression);
 
     // Accept and skip shorthand redeclaration forms like `:>> Performance::self;`
     // (we don't model this binding yet, but we must consume it to avoid cascading errors).

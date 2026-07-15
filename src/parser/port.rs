@@ -82,7 +82,12 @@ fn port_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
     Ok((input, PortBody::Brace { elements }))
 }
 
-/// Port usage: 'port' ( (`:>>`|`redefines`) target | name ) ( ':' type )? multiplicity? clauses? body
+/// Port usage: (direction)? (`derived`)? (`constant`)? 'port' ( (`:>>`|`redefines`) target | name )
+/// ( ':' type )? multiplicity? clauses? body
+///
+/// The optional direction/`derived`/`constant` prefixes are BNF `RefPrefix` (§8.2.2.6.2), reached
+/// via `PortUsage = OccurrenceUsagePrefix 'port' Usage` -> `BasicUsagePrefix` -> `RefPrefix` --
+/// same production chain `PartUsage`'s equivalent prefixes use.
 pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     enum PortUsageHead {
         PrefixRedefines {
@@ -97,6 +102,13 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
 
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
+    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
+    let (input, is_constant) = opt(preceded(tag(&b"constant"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = tag(&b"port"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, usage_head) = alt((
@@ -147,6 +159,9 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
             start,
             input,
             PortUsage {
+                direction,
+                is_derived,
+                is_constant,
                 name: name_str,
                 type_name,
                 multiplicity,
