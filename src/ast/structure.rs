@@ -445,7 +445,6 @@ pub enum PortBodyElement {
     InOutDecl(Node<InOutDecl>),
     PortUsage(Node<PortUsage>),
     Doc(Node<DocComment>),
-    Other(String),
 }
 
 /// Connect statement in interface def or usage: `connect` from `to` to body, or the SysML v2

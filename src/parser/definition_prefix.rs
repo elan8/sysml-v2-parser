@@ -1,4 +1,21 @@
 //! Shared definition prelude: modifiers, keyword, `def`, identification, header.
+//!
+//! `DefinitionPrefixOptions::def_required()` is the reusable form of the PAR-001
+//! disambiguation fix (see `attribute::attribute_def`'s `disambiguate_from_usage` parameter for
+//! the original, still-bespoke instance): any body parser that dispatches a `*_def` parser
+//! alongside a matching `*_usage` parser for the same keyword MUST set `.def_required()` so a
+//! `def`-less declaration is left for the usage parser rather than silently misclassified as a
+//! definition. `action`, `allocation`, `case`/`analysis`/`verification`/`use case`, `enum`,
+//! `flow`, `individual`, `interface` (via `interface_def_required`), `item` (via
+//! `item_def_required`), `metadata`, `occurrence`, `requirement`, `state`, and `view`/
+//! `viewpoint`/`rendering` all already do this. `connection`, `constraint`/`calc`, and `port` are
+//! deliberately left `Optional` — see the "do not add `.def_required()` here" comments in
+//! `connection.rs`/`constraint.rs`/`port.rs` — because the real Systems Library uses bare,
+//! `def`-less declarations for those keywords at namespace level with no dedicated
+//! package-level usage parser to fall back to; adding `.def_required()` there breaks the full
+//! `SYSML_V2_RELEASE_DIR` validation gate (this was tried and reverted, see CHANGELOG 0.33.0).
+//! Any new body-enum wiring (PAR-002) that adds a `def`/usage pair sharing a keyword must use
+//! this module rather than hand-rolling another bespoke guard.
 
 use crate::ast::{Identification, Span};
 use crate::parser::definition_header::parse_definition_header_after_ident;

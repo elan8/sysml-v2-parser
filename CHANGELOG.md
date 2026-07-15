@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Working backlog for the gaps-doc PAR-002..006 items (definitions/usages in every owning context,
+typed declaration modifiers, typed relationship AST nodes, complete expression AST, non-semantic
+recovery). Entries below land incrementally; the version stays unreleased until the whole backlog
+is done.
+
+### PAR-006a: recovery-guard foundation
+
+- **Confirmed the PAR-001 disambiguation fix was already generalized**: `attribute_def`'s
+  `disambiguate_from_usage` parameter (the original PAR-001 fix) has a reusable form,
+  `DefinitionPrefixOptions::def_required()` in `src/parser/definition_prefix.rs`, already adopted
+  by `action`, `allocation`, `case`/`analysis`/`verification`/`use case`, `enum`, `flow`,
+  `individual`, `interface` (`interface_def_required`), `item` (`item_def_required`), `metadata`,
+  `occurrence`, `requirement`, `state`, and `view`/`viewpoint`/`rendering`. Documented this
+  explicitly in `definition_prefix.rs` so PAR-002's new body-enum wiring reuses it instead of
+  hand-rolling another bespoke guard, and documented which keywords (`connection`,
+  `constraint`/`calc`, `port`) deliberately keep `def` optional and why (the real Systems
+  Library uses bare, `def`-less forms for those at namespace level; making `def` required there
+  was tried and reverted per the 0.33.0 entry below).
+- **Removed dead `PortBodyElement::Other(String)` variant**: the enum declared it, but no parser
+  ever constructed it (`port_body_element` in `src/parser/port.rs` only ever produces
+  `PortUsage`/`InOutDecl`/`Doc`/`Error`); recovery already falls through to a real
+  `Error(Node<ParseErrorNode>)`, not this variant. This was flagged as a potential silent-fallback
+  gap during PAR-006 triage but turned out to be unreachable code, not a live bug — removed rather
+  than "fixed".
+- Reviewed `ParseErrorNode` (`src/ast/common.rs`): its existing fields (`message`, `code`,
+  `expected`, `found`, `suggestion`, `category`) are sufficient for the recovery markers needed by
+  the rest of this backlog — no new fields added.
+
 ## [0.34.0] - 2026-07-15
 
 ### Fixed
