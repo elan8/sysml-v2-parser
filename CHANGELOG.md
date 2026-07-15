@@ -12,6 +12,69 @@ typed declaration modifiers, typed relationship AST nodes, complete expression A
 recovery). Entries below land incrementally; the version stays unreleased until the whole backlog
 is done.
 
+### PAR-006b: final disambiguation/recovery audit
+
+Closing audit pass for PAR-006 (make recovery non-semantic), on top of the foundation
+`def_required()` documentation landed as PAR-006a. Systematically grepped every `alt(...)`
+body-element dispatch site across `src/parser/*.rs` and `src/parser/part/*.rs` for `*_def`/
+`*_usage` pairs sharing a keyword, and every `Other`/opaque-capture recovery variant, to confirm
+none silently misclassify or silently swallow input.
+
+- **Investigated a possible new PAR-001-class gap, found and documented a real (but different)
+  issue**: `package.rs::try_package_body_structure` dispatches `connection_def` then
+  `connection_usage_member` at package level, and `connection_def`'s own doc comment claimed
+  "nothing else shares the `connection` keyword" at package level -- stale as of PAR-002, which
+  added that `connection_usage_member` dispatch. Tried making `connection_def` require `def`
+  unless hash-annotated (new `DefKeywordMode::RequiredUnlessAnnotated` in
+  `definition_prefix.rs`, since reverted) to close the apparent gap. This broke the
+  `SYSML_V2_RELEASE_DIR` gate (`test_systems_library_node_types_no_extended`/
+  `test_full_library_node_types_no_extended`): the real Systems Library uses bare, `def`-less
+  `connection` declarations with `abstract`/multiplicity/`nonunique`/leading `:>` subsets (e.g.
+  `abstract connection connections: Connection[0..*] nonunique :> linkObjects, parts { ... }` in
+  `Systems Library/Connections.sysml`) that `connection_usage_member`'s narrower grammar can't
+  parse, so they fell all the way through to `ExtendedLibraryDecl` instead of `ConnectionDef` --
+  worse than the status quo, not a fix. Root cause: `connection_def`'s generic header parsing
+  (`parse_optional_definition_header_after_identification`, a text-scan for `: Type[mult]
+  nonunique :> target`) is already a grammar superset of `connection_usage_member` for every
+  practical package-level input, so `connection_usage_member`'s package-level dispatch arm is a
+  narrow fallback, not a competing classification -- there is no live misclassification bug.
+  Documented this finding on `connection.rs::connection_def` and in `definition_prefix.rs`'s
+  module doc instead of forcing a guard; same precedent class as the `port`/`calc`/`constraint`
+  "tried and reverted" note from CHANGELOG 0.33.0.
+- **Confirmed every other `def_required()` site already covers its ambiguous pair**: reviewed
+  `action`, `allocation`, `case`/`analysis`/`verification`/use-case, `enum`, `flow`,
+  `individual`, `interface`, `item`, `metadata`, `occurrence`, `port` (nested-body via
+  `port_def_required`), `requirement`, `state`, and `view`/`viewpoint`/`rendering` dispatch sites
+  across `action.rs`, `connection.rs`, `interface.rs`, `part/body.rs`, `part/usage.rs`,
+  `package.rs`, `port.rs`, `requirement.rs`, `state.rs`, `usecase.rs`, `view.rs` -- all correctly
+  guarded, none missing the pattern documented in `definition_prefix.rs`. `attribute_def`'s
+  bespoke `disambiguate_from_usage` parameter (the original PAR-001 mechanism, predates
+  `def_required()`) is likewise applied everywhere `attribute_usage` is a dispatch sibling.
+- **Confirmed recovery `Other`/opaque-capture variants are a consistent, bounded pattern, not
+  silent catch-alls**: `RequirementDefBodyElement::Other`, `UseCaseDefBodyElement::Other`,
+  `StateDefBodyElement::Other`, `CalcDefBodyElement::Other`/`ConstraintDefBodyElement::Other`,
+  `ViewDefBodyElement::Other`/`ViewBodyElement::Other`, and `PartDefBodyElement::Other` all use
+  the same gate: `build_recovery_error_node`'s diagnostic classifier decides whether content
+  looks like a genuine syntax error (known diagnostic codes like `missing_member_name`/
+  `missing_type_reference`/`unexpected_keyword_in_scope` -> `Error(ParseErrorNode)` with a real
+  diagnostic) versus an unrecognized-but-plausible, not-yet-modeled library construct (falls
+  through to `Other(preview)`, a bounded text snippet, not an unbounded silent accept). This is
+  the same design already reviewed once by PAR-006a (which found and removed the one genuinely
+  dead/unreachable `Other` variant, `PortBodyElement::Other`) -- no further dead code or silent
+  catch-alls found this pass.
+- Added a regression test in `src/parser/connection.rs`
+  (`connection_def_accepts_the_bare_abstract_multiplicity_nonunique_subsets_form_that_makes_
+  def_required_unsafe`) that locks in the specific real-library shape
+  (`abstract connection connections: Connection[0..*] nonunique :> linkObjects, parts { ... }`)
+  that made the `def_required_unless_annotated` attempt above unsafe, so a future attempt to
+  tighten `connection_def` gets an immediate, specific failure pointing back at this note instead
+  of only failing the much slower full-library gate.
+- Gate: `cargo test` and `SYSML_V2_RELEASE_DIR` `cargo test --test validation --
+  --include-ignored` both green. No functional parser change landed this increment -- the
+  `def_required_unless_annotated` fix attempt was reverted once it broke the gate; only the audit
+  documentation and the new regression test describing the audited, already-correct behavior were
+  kept.
+
 ### PAR-005: complete the expression AST
 
 Six items against `src/ast/core.rs`'s `Expression` enum and `src/parser/expr.rs`

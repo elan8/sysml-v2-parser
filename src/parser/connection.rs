@@ -411,3 +411,35 @@ mod par_002_widening_tests {
         assert!(result.is_ok(), "attribute_usage should also accept {text:?}");
     }
 }
+
+#[cfg(test)]
+mod par_006b_audit_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    /// PAR-006b audit: `connection_def` must keep accepting this exact real-Systems-Library shape
+    /// (`Systems Library/Connections.sysml`) -- a bare, `def`-less, un-annotated `connection`
+    /// usage with `abstract`, multiplicity, `nonunique`, and leading `:>` subsets before the
+    /// body. This is the shape that made a `def_required_unless_annotated()` guard on
+    /// `connection_def` unsafe (see the doc comment on `connection_def` above): tightening `def`
+    /// requirements here without first widening `connection_usage_member` to cover this shape
+    /// sends it to `ExtendedLibraryDecl` instead, which is what broke the
+    /// `SYSML_V2_RELEASE_DIR` gate (`test_systems_library_node_types_no_extended`) during this
+    /// audit. This test exists so any future attempt to tighten `connection_def` fails fast,
+    /// locally, and points back at this note instead of only failing the much slower full-library
+    /// gate.
+    #[test]
+    fn connection_def_accepts_the_bare_abstract_multiplicity_nonunique_subsets_form_that_makes_def_required_unsafe(
+    ) {
+        let text = "abstract connection connections: Connection[0..*] nonunique :> linkObjects, parts { }";
+        let result = connection_def(input(text));
+        assert!(
+            result.is_ok(),
+            "connection_def should still accept the bare Systems-Library connection form, got {result:?}"
+        );
+    }
+}
