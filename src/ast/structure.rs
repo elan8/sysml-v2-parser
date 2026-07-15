@@ -108,6 +108,10 @@ pub enum PartDefBodyElement {
     /// `calc def` nested inside a part definition body, using `calc_def_required` (PAR-002:
     /// previously only `CalcUsage` was reachable here).
     CalcDef(Node<crate::ast::view::CalcDef>),
+    /// `enum def` nested inside a part definition body (PAR-002: previously only
+    /// `EnumerationUsage` was reachable here; `enum_def` is `def_required()`-guarded internally
+    /// so no ordering risk stacking it ahead of `enum_usage`, already dispatched above).
+    EnumDef(Node<EnumDef>),
     AllocationDef(Node<crate::ast::behavior::AllocationDef>),
     AllocationUsage(Node<crate::ast::behavior::AllocationUsage>),
     ViewDef(Node<crate::ast::view::ViewDef>),
@@ -339,6 +343,8 @@ pub enum PartUsageBodyElement {
     /// `connection def` nested inside a part usage body, using `connection_def_required`. See
     /// `StateDef`.
     ConnectionDef(Node<ConnectionDef>),
+    /// `enum def` nested inside a part usage body. See `StateDef`.
+    EnumDef(Node<EnumDef>),
 }
 
 /// Variant member inside a variation part usage/def body: either an untyped reference to a

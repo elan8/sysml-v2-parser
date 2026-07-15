@@ -894,6 +894,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         // today, so no ordering risk for them either.
         alt((
             map(state_def, PartUsageBodyElement::StateDef),
+            map(
+                crate::parser::enumeration::enum_def,
+                PartUsageBodyElement::EnumDef,
+            ),
             map(metadata_def, PartUsageBodyElement::MetadataDef),
             map(requirement_def, PartUsageBodyElement::RequirementDef),
             map(occurrence_def, PartUsageBodyElement::OccurrenceDef),
@@ -952,6 +956,13 @@ mod par_002_nested_def_tests {
                 .expect("state def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PartUsageBodyElement::StateDef(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_enum_def() {
+        let (rest, node) = part_usage_body_element(input("enum def MyEnum;")).expect("enum def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::EnumDef(_)));
     }
 
     #[test]

@@ -237,6 +237,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             // siblings here: a bare (`def`-less) declaration always falls through to the usage
             // arm above/below instead.
             map(state_def, PartDefBodyElement::StateDef),
+            map(crate::parser::enumeration::enum_def, PartDefBodyElement::EnumDef),
             map(requirement_def, PartDefBodyElement::RequirementDef),
             map(occurrence_def, PartDefBodyElement::OccurrenceDef),
             map(metadata_usage, PartDefBodyElement::MetadataUsage),
@@ -465,6 +466,13 @@ mod par_002_nested_def_tests {
     }
 
     #[test]
+    fn part_def_body_accepts_nested_enum_def_not_misparsed_as_usage() {
+        let (rest, node) = part_def_body_element(input("enum def MyEnum;")).expect("enum def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::EnumDef(_)));
+    }
+
+    #[test]
     fn part_def_body_accepts_nested_metadata_def() {
         let text = "metadata def MyMeta;";
         let (rest, node) = part_def_body_element(input(text)).expect("metadata def");
@@ -542,6 +550,21 @@ mod par_002_nested_def_tests {
             crate::ast::PackageBodyElement::StateDef(_)
         ));
         assert!(matches!(part_node.value, PartDefBodyElement::StateDef(_)));
+    }
+
+    #[test]
+    fn enum_def_is_same_variant_kind_at_package_level_and_nested_in_part() {
+        use crate::parser::package::package_body_element;
+
+        let text = "enum def MyEnum;";
+        let (_, package_node) =
+            package_body_element(input(text)).expect("package-level enum def");
+        let (_, part_node) = part_def_body_element(input(text)).expect("nested enum def");
+        assert!(matches!(
+            package_node.value,
+            crate::ast::PackageBodyElement::EnumDef(_)
+        ));
+        assert!(matches!(part_node.value, PartDefBodyElement::EnumDef(_)));
     }
 
     #[test]

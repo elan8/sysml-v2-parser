@@ -256,6 +256,14 @@ is done.
   header blob for `def`-optional definitions (e.g. `port p1: MyPortType;` parses as `PortDef` with
   `specializes: None`, losing the type). Found and documented in PAR-002 increment 3; not this
   increment's concern.
+- **Final read-through against the gaps doc's PAR-002 section caught one real gap this backlog's
+  own tracking list had dropped**: `PartDefBodyElement` had `EnumerationUsage` but no `EnumDef` --
+  called out explicitly in the original triage ("has ... `EnumerationUsage` but not `EnumDef`")
+  but never actually landed in increments 1-2. Added `EnumDef` to both `PartDefBodyElement` and
+  `PartUsageBodyElement` (`enum_def` is `def_required()`-guarded internally, so no new disambiguation
+  work needed), plus a `enum_def_is_same_variant_kind_at_package_level_and_nested_in_part`
+  acceptance test. With this fix, every def/usage pair from the original per-enum gap list is
+  confirmed present.
 
 ### PAR-006a: recovery-guard foundation
 

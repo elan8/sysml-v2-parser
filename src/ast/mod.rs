@@ -486,6 +486,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::VerificationCaseUsage(n) => {
             PartDefBodyElement::VerificationCaseUsage(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::EnumDef(n) => {
+            PartDefBodyElement::EnumDef(dummy_node(n, normalize_enum_def(&n.value)))
+        }
     };
     dummy_node(el, value)
 }
@@ -735,6 +738,9 @@ fn normalize_part_usage_body_element_node(
         }
         PartUsageBodyElement::ConnectionDef(n) => {
             PartUsageBodyElement::ConnectionDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::EnumDef(n) => {
+            PartUsageBodyElement::EnumDef(dummy_node(n, normalize_enum_def(&n.value)))
         }
     };
     dummy_node(el, value)
