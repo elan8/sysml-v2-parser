@@ -1,6 +1,7 @@
 //! Span, Node, Expression, and shared AST traits.
 
 use super::feature_chain::FeatureChain;
+use super::relationship_target::RelationshipTarget;
 
 /// Source location: byte offset, line, column, and length in the source file.
 /// Line and column are **1-based**. Use [`Span::to_lsp_range`] for 0-based LSP ranges.
@@ -460,15 +461,16 @@ pub enum TypingKind {
 /// ISQ::mass;` (typing) or the `Vehicle` in `part def Car :> Vehicle;` (subclassification)
 /// (PAR-004 item 1, folding in PAR-003's conjugation concept from item 4).
 ///
-/// The target is kept as a plain qualified-name `String` for now — PAR-004's own doc language
-/// asks to "distinguish typing from subclassification", not to stop the target from being a
-/// string. The gap this closes is the AST node carrying a `kind`/span/conjugation/implied marker
-/// that a raw string field cannot.
+/// The target is a list of [`RelationshipTarget`]s (parser work item 2, post-PAR-006) rather than
+/// a single joined `String`: a `:` / `:>` clause can name more than one comma-separated target
+/// (e.g. `:> Base, Other`), and each target's `::`- vs. `.`-separated segments are kept distinct
+/// instead of being collapsed into one opaque string. Almost always has exactly one element --
+/// use [`TypingRelationship::first_target`] for that common case.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypingRelationship {
-    /// Qualified name of the type/supertype target, e.g. `"ISQ::mass"`.
-    pub target: String,
+    /// The type/supertype target(s), e.g. `[ISQ::mass]`. Always has at least one element.
+    pub target: Vec<Node<RelationshipTarget>>,
     pub kind: TypingKind,
     /// Span of the whole relationship fragment (operator/keyword through target), when known.
     pub span: Span,
@@ -496,6 +498,26 @@ impl PartialEq for TypingRelationship {
 
 impl Eq for TypingRelationship {}
 
+impl TypingRelationship {
+    /// The single target for the overwhelmingly common case of a `:`/`:>` clause naming exactly
+    /// one type. Returns the first target when a rare comma-separated multi-target clause is
+    /// present, and `None` only if `target` is unexpectedly empty.
+    pub fn first_target(&self) -> Option<&RelationshipTarget> {
+        self.target.first().map(|n| &n.value)
+    }
+
+    /// All targets rebuilt into a single `", "`-joined display string (e.g.
+    /// `"Base"` or `"Base, Other"`), for callers that only need the textual form and don't care
+    /// about per-target `::`/`.` segment structure.
+    pub fn target_display(&self) -> String {
+        self.target
+            .iter()
+            .map(|n| n.value.to_display_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
 /// Which subsetting-family clause a [`SubsettingRelationship`] came from (PAR-004 item 2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -520,8 +542,10 @@ pub enum SubsettingKind {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubsettingRelationship {
-    /// Qualified name (or dotted feature-chain) of the subsetted/redefined/crossed target.
-    pub target: String,
+    /// The subsetted/redefined/crossed target(s), e.g. `[rearWheel]`. A clause can name more than
+    /// one comma-separated target; almost always has exactly one element -- use
+    /// [`SubsettingRelationship::first_target`] for that common case.
+    pub target: Vec<Node<RelationshipTarget>>,
     pub kind: SubsettingKind,
     /// Span of the whole relationship fragment (operator/keyword through target).
     pub span: Span,
@@ -534,6 +558,26 @@ pub struct SubsettingRelationship {
 impl PartialEq for SubsettingRelationship {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target && self.kind == other.kind && self.is_implied == other.is_implied
+    }
+}
+
+impl SubsettingRelationship {
+    /// The single target for the overwhelmingly common case of a subsetting-family clause naming
+    /// exactly one target. Returns the first target when a rare comma-separated multi-target
+    /// clause is present, and `None` only if `target` is unexpectedly empty.
+    pub fn first_target(&self) -> Option<&RelationshipTarget> {
+        self.target.first().map(|n| &n.value)
+    }
+
+    /// All targets rebuilt into a single `", "`-joined display string (e.g.
+    /// `"wheel"` or `"a, b"`), for callers that only need the textual form and don't care about
+    /// per-target `::`/`.` segment structure.
+    pub fn target_display(&self) -> String {
+        self.target
+            .iter()
+            .map(|n| n.value.to_display_string())
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 }
 

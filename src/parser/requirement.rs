@@ -20,7 +20,8 @@ use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::usage::{
-    feature_usage_header, multiplicity, optional_typings, specialization_clauses, usage_header,
+    feature_usage_header, multiplicity, optional_typings, specialization_clauses,
+    targets_display_string, usage_header,
 };
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, span_from_to};
@@ -637,7 +638,8 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
         let inline_start = after_kw;
         let (after_name, req_name) = name(after_kw)?;
         let (after_type, type_suffix) = optional_typings(after_name)?;
-        let type_name = type_suffix.map(|(_, is_conjugated, type_name)| {
+        let type_name = type_suffix.map(|(_, is_conjugated, targets)| {
+            let type_name = targets_display_string(&targets);
             if is_conjugated {
                 format!("~{type_name}")
             } else {

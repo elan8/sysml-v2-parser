@@ -119,8 +119,8 @@ fn test_parse_surveillance_drone() {
         })
         .find(|p: &&PartDef| {
             p.identification.name.as_deref() == Some("SurveillanceQuadrotorDroneWithBehavior")
-                && p.specializes.as_ref().map(|n| n.value.target.as_str())
-                    == Some("SurveillanceQuadrotorDrone")
+                && p.specializes.as_ref().map(|n| n.value.target_display())
+                    == Some("SurveillanceQuadrotorDrone".to_string())
         });
     let part_def = part_def_specializes_span
         .expect("fixture should contain part def SurveillanceQuadrotorDroneWithBehavior :> SurveillanceQuadrotorDrone");

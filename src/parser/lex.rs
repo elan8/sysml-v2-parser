@@ -523,6 +523,48 @@ pub(crate) fn qualified_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     Ok((input, s))
 }
 
+/// Like [`qualified_name`], but returns the individual `::`-separated segments (with separator
+/// markers) instead of joining them into one opaque string. Used to build
+/// [`crate::ast::RelationshipTarget`]s for typing/subclassification/subsetting targets, which need
+/// to keep `::`-qualification distinguishable from `.`-feature-chaining (see
+/// `crate::ast::relationship_target` module docs).
+pub(crate) fn qualified_name_segments(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<crate::ast::RelationshipTargetSegment>> {
+    use crate::ast::{RelationshipTargetSegment, SegmentSeparator};
+
+    let (input, _) = ws_and_comments(input)?;
+    let (input, opt_dollar) = opt(tag(&b"$"[..])).parse(input)?;
+    let (input, _) = opt(preceded(tag(&b"::"[..]), ws_and_comments)).parse(input)?;
+    let (input, first) = name(input)?;
+    let (input, rest_segments) = many0(preceded(
+        preceded(ws_and_comments, tag(&b"::"[..])),
+        preceded(ws_and_comments, name),
+    ))
+    .parse(input)?;
+    let mut segments = Vec::new();
+    if opt_dollar.is_some() {
+        segments.push(RelationshipTargetSegment {
+            name: "$".to_string(),
+            separator: None,
+        });
+        segments.push(RelationshipTargetSegment {
+            name: first,
+            separator: Some(SegmentSeparator::ColonColon),
+        });
+    } else {
+        segments.push(RelationshipTargetSegment {
+            name: first,
+            separator: None,
+        });
+    }
+    segments.extend(rest_segments.into_iter().map(|name| RelationshipTargetSegment {
+        name,
+        separator: Some(SegmentSeparator::ColonColon),
+    }));
+    Ok((input, segments))
+}
+
 /// Skip any content until we see '}' at the same brace level (tracks nesting, skips comments).
 pub(crate) fn skip_until_brace_end(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let frag = input.fragment();

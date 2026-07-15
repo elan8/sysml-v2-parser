@@ -185,6 +185,7 @@ pub(crate) fn parse_definition_prefix(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::usage::targets_display_string;
     use nom_locate::LocatedSpan;
 
     fn span_input(text: &str) -> Input<'_> {
@@ -198,7 +199,7 @@ mod tests {
             parse_definition_prefix(input, DefinitionPrefixOptions::new(b"item")).expect("prefix");
         assert!(prefix.is_abstract);
         assert_eq!(prefix.identification.name.as_deref(), Some("Foo"));
-        assert_eq!(prefix.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Base"));
+        assert_eq!(prefix.specializes.as_ref().map(|n| targets_display_string(&n.value.target)), Some("Base".to_string()));
         assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
     }
 
@@ -211,7 +212,7 @@ mod tests {
         )
         .expect("prefix");
         assert_eq!(prefix.identification.name.as_deref(), Some("connections"));
-        assert_eq!(prefix.specializes.as_ref().map(|n| n.value.target.as_str()), Some("linkObjects, parts"));
+        assert_eq!(prefix.specializes.as_ref().map(|n| targets_display_string(&n.value.target)), Some("linkObjects, parts".to_string()));
         assert!(rest.fragment().starts_with(b"{"));
     }
 
@@ -225,7 +226,7 @@ mod tests {
         .expect("prefix");
         assert_eq!(prefix.annotation.as_deref(), Some("MyConn"));
         assert!(prefix.is_abstract);
-        assert_eq!(prefix.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Base"));
+        assert_eq!(prefix.specializes.as_ref().map(|n| targets_display_string(&n.value.target)), Some("Base".to_string()));
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -254,6 +255,6 @@ mod tests {
         )
         .expect("prefix");
         assert!(!prefix.is_abstract);
-        assert_eq!(prefix.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Y"));
+        assert_eq!(prefix.specializes.as_ref().map(|n| targets_display_string(&n.value.target)), Some("Y".to_string()));
     }
 }

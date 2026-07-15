@@ -2,7 +2,7 @@
 
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Node,
-    SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
+    RelationshipTarget, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -24,7 +24,7 @@ fn typing_relationship_node(
     span: crate::ast::Span,
     kind: TypingKind,
     is_conjugated: bool,
-    target: String,
+    target: Vec<Node<RelationshipTarget>>,
 ) -> Node<TypingRelationship> {
     Node::new(
         span.clone(),
@@ -39,14 +39,19 @@ fn typing_relationship_node(
 }
 
 /// Shorthand for the common `:` / `typed by` case (`TypingKind::Typing`).
-fn typing_node(span: crate::ast::Span, is_conjugated: bool, target: String) -> Node<TypingRelationship> {
+fn typing_node(
+    span: crate::ast::Span,
+    is_conjugated: bool,
+    target: Vec<Node<RelationshipTarget>>,
+) -> Node<TypingRelationship> {
     typing_relationship_node(span, TypingKind::Typing, is_conjugated, target)
 }
 
 /// Wrap a subsetting-family target in a `SubsettingRelationship` node, mirroring
 /// `usage::subsetting_relationship_node` for the ad hoc `:>`/`:>>` prefix shapes parsed directly
 /// in this file (`attribute_feature_binding`, `metadata_binding`) rather than through
-/// `usage::specialization_clauses`.
+/// `usage::specialization_clauses`. `target` is a single bare feature name (no `::`/`.`
+/// segments) -- these ad hoc shapes only ever parse a plain `name`, never a qualified name.
 fn subsetting_relationship_node(
     span: crate::ast::Span,
     kind: SubsettingKind,
@@ -55,7 +60,7 @@ fn subsetting_relationship_node(
     Node::new(
         span.clone(),
         SubsettingRelationship {
-            target,
+            target: vec![Node::new(span.clone(), RelationshipTarget::single(target, span.clone()))],
             kind,
             span,
             is_implied: false,
@@ -121,10 +126,6 @@ const METADATA_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 const METADATA_OPAQUE_STARTERS: &[&[u8]] = &[b"derived", b"item", b"abstract", b"ref"];
-
-fn local_name_from_qualified_name(qname: &str) -> String {
-    qname.rsplit("::").next().unwrap_or(qname).to_string()
-}
 
 fn is_reserved_shorthand_starter(name: &str) -> bool {
     matches!(
@@ -573,7 +574,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 (
                     input,
                     None,
-                    local_name_from_qualified_name(&redefines.value.target),
+                    redefines
+                        .value
+                        .first_target()
+                        .and_then(|t| t.local_name())
+                        .unwrap_or_default()
+                        .to_string(),
                     typing_span,
                     typing,
                     Some(redefines_span),
@@ -843,6 +849,7 @@ pub(crate) fn attribute_usage_shorthand(
 #[cfg(test)]
 mod attribute_body_tests {
     use super::*;
+    use crate::parser::usage::targets_display_string;
     use crate::parser::Input;
     use nom_locate::LocatedSpan;
 
@@ -856,12 +863,18 @@ mod attribute_body_tests {
         let (rest, node) = attribute_feature_binding(input(text)).expect("feature binding");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
-            node.value.redefines.as_ref().map(|n| n.value.target.as_str()),
-            Some("unitConversion")
+            node.value
+                .redefines
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("unitConversion".to_string())
         );
         assert_eq!(
-            node.value.typing.as_ref().map(|n| n.value.target.as_str()),
-            Some("ConversionByPrefix")
+            node.value
+                .typing
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("ConversionByPrefix".to_string())
         );
         let AttributeBody::Brace { elements } = &node.value.body else {
             panic!("expected brace body");
@@ -876,8 +889,11 @@ mod attribute_body_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "zeroDegreeCelsiusInKelvin");
         assert_eq!(
-            node.value.typing.as_ref().map(|n| n.value.target.as_str()),
-            Some("ThermodynamicTemperatureValue")
+            node.value
+                .typing
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("ThermodynamicTemperatureValue".to_string())
         );
         assert!(node.value.value.is_some());
     }

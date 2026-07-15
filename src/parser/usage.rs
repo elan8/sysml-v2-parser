@@ -1,9 +1,12 @@
 //! Shared usage grammar fragments from `UsageDeclaration` / `FeatureSpecializationPart`.
 
-use crate::ast::{Expression, Multiplicity, Node, Span, SubsettingKind, SubsettingRelationship};
+use crate::ast::{
+    Expression, Multiplicity, Node, RelationshipTarget, RelationshipTargetSegment,
+    SegmentSeparator, Span, SubsettingKind, SubsettingRelationship,
+};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    crosses_operator, name, qualified_name, redefine_operator, references_operator,
+    crosses_operator, name, qualified_name_segments, redefine_operator, references_operator,
     starts_with_keyword, subset_operator, typed_by_operator, ws_and_comments,
 };
 use crate::parser::{span_from_to, Input};
@@ -145,14 +148,15 @@ pub(crate) fn multiplicity_node(input: Input<'_>) -> IResult<Input<'_>, Node<Mul
 
 /// Typings: `:` / `defined by` one or more qualified names, with optional conjugated `~`.
 ///
-/// Returns `(span, is_conjugated, joined_name)`: `is_conjugated` reflects the first (and, per
-/// SysML v2, realistically only) target's leading `~`; `joined_name` has any `~` stripped from
-/// every segment (callers that only need the display string, e.g. a `type_name: String` field
-/// with no place to store the flag, can re-add `~` themselves when `is_conjugated` is true —
-/// same external string either way, just routed through a typed boolean now instead of a folded
-/// character. Callers that have a real `TypingRelationship` node to populate (`AttributeDef`/
-/// `AttributeUsage.typing`) should use `is_conjugated` directly instead of re-embedding `~`.
-pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, (Span, bool, String)> {
+/// Returns `(span, is_conjugated, targets)`: `is_conjugated` reflects the first (and, per
+/// SysML v2, realistically only) target's leading `~`; each target in `targets` has any `~`
+/// stripped (callers that have a real `TypingRelationship` node to populate should use
+/// `is_conjugated` directly instead of re-embedding `~` into a target). `targets` almost always
+/// has exactly one element -- a comma-separated multi-target `:`/`defined by` clause is rare but
+/// legal and is no longer collapsed into a single joined string (parser work item 2).
+pub(crate) fn typings(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (Span, bool, Vec<Node<RelationshipTarget>>)> {
     let before = input;
     let (input, _) = preceded(ws_and_comments, typed_by_operator).parse(input)?;
     let (input, (first_conjugated, first)) =
@@ -162,18 +166,15 @@ pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, (Span, bool, Strin
         preceded(ws_and_comments, conjugated_qualified_name),
     ))
     .parse(input)?;
-    let mut names = vec![first];
-    names.extend(rest.into_iter().map(|(_, name)| name));
-    Ok((
-        input,
-        (span_from_to(before, input), first_conjugated, names.join(", ")),
-    ))
+    let mut targets = vec![first];
+    targets.extend(rest.into_iter().map(|(_, target)| target));
+    Ok((input, (span_from_to(before, input), first_conjugated, targets)))
 }
 
 /// Optional typings that remain strict once a typing starter is present.
 pub(crate) fn optional_typings(
     input: Input<'_>,
-) -> IResult<Input<'_>, Option<(Span, bool, String)>> {
+) -> IResult<Input<'_>, Option<(Span, bool, Vec<Node<RelationshipTarget>>)>> {
     let (peek, _) = ws_and_comments(input)?;
     let fragment = peek.fragment();
     if (fragment.starts_with(b":") && !fragment.starts_with(b":>") && !fragment.starts_with(b":>>"))
@@ -186,46 +187,74 @@ pub(crate) fn optional_typings(
     Ok((input, None))
 }
 
-/// Parses an optional leading `~` and a qualified name; returns `(was_conjugated, name)` with
-/// the `~` stripped from `name` rather than folded into it.
-fn conjugated_qualified_name(input: Input<'_>) -> IResult<Input<'_>, (bool, String)> {
-    let (input, conjugated) = opt(tag(&b"~"[..])).parse(input)?;
-    let (input, name) = qualified_name(input)?;
-    Ok((input, (conjugated.is_some(), name)))
+/// Join relationship targets into a single `", "`-separated display string, for the plain
+/// `type_name: String` fields several usage structs carry (distinct from
+/// `TypingRelationship`/`SubsettingRelationship.target`, which keep the structured
+/// `Vec<Node<RelationshipTarget>>` -- see `crate::ast::relationship_target` module docs). Matches
+/// this crate's historical joined-string behavior for those display-only fields.
+pub(crate) fn targets_display_string(targets: &[Node<RelationshipTarget>]) -> String {
+    targets
+        .iter()
+        .map(|t| t.value.to_display_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
-fn specialization_target(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, base) = qualified_name(input)?;
+/// Build a `Node<RelationshipTarget>` from segments and the span they cover.
+fn relationship_target_node(
+    segments: Vec<RelationshipTargetSegment>,
+    span: Span,
+) -> Node<RelationshipTarget> {
+    Node::new(span.clone(), RelationshipTarget { segments, span })
+}
+
+/// Parses an optional leading `~` and a qualified name; returns `(was_conjugated, target)` with
+/// the `~` stripped from the target's segments rather than folded into them.
+fn conjugated_qualified_name(input: Input<'_>) -> IResult<Input<'_>, (bool, Node<RelationshipTarget>)> {
+    let before = input;
+    let (input, conjugated) = opt(tag(&b"~"[..])).parse(input)?;
+    let (input, segments) = qualified_name_segments(input)?;
+    let span = span_from_to(before, input);
+    Ok((input, (conjugated.is_some(), relationship_target_node(segments, span))))
+}
+
+/// A single subsetting-family target: a `::`-qualified name optionally continued with
+/// `.`-separated feature-chain segments, e.g. `Vehicle::mass.value`.
+fn specialization_target(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipTarget>> {
+    let before = input;
+    let (input, mut segments) = qualified_name_segments(input)?;
     let (input, dotted) = many0(preceded(
         preceded(ws_and_comments, tag(&b"."[..])),
         preceded(ws_and_comments, name),
     ))
     .parse(input)?;
-    if dotted.is_empty() {
-        return Ok((input, base));
-    }
-    Ok((input, format!("{base}.{}", dotted.join("."))))
+    segments.extend(dotted.into_iter().map(|name| RelationshipTargetSegment {
+        name,
+        separator: Some(SegmentSeparator::Dot),
+    }));
+    let span = span_from_to(before, input);
+    Ok((input, relationship_target_node(segments, span)))
 }
 
-fn specialization_targets(input: Input<'_>) -> IResult<Input<'_>, String> {
+/// One or more comma-separated [`specialization_target`]s, e.g. the `Base, Other` in
+/// `:> Base, Other`. Previously joined into a single `", "`-separated string, losing the fact
+/// there were multiple distinct targets (parser work item 2).
+fn specialization_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<Node<RelationshipTarget>>> {
     let (input, first) = specialization_target(input)?;
     let (input, rest) = many0(preceded(
         preceded(ws_and_comments, tag(&b","[..])),
         preceded(ws_and_comments, specialization_target),
     ))
     .parse(input)?;
-    if rest.is_empty() {
-        return Ok((input, first));
-    }
     let mut targets = vec![first];
     targets.extend(rest);
-    Ok((input, targets.join(", ")))
+    Ok((input, targets))
 }
 
-/// Build a `SubsettingRelationship` node from a target string and the span of the whole clause
+/// Build a `SubsettingRelationship` node from target(s) and the span of the whole clause
 /// (operator/keyword through target).
 fn subsetting_relationship_node(
-    target: String,
+    target: Vec<Node<RelationshipTarget>>,
     kind: SubsettingKind,
     span: Span,
 ) -> Node<SubsettingRelationship> {
@@ -379,7 +408,7 @@ fn skip_intersects_clause(input: Input<'_>) -> IResult<Input<'_>, ()> {
 fn merge_usage_header(
     leading: SpecializationClauses,
     trailing: SpecializationClauses,
-    type_result: Option<(Span, bool, String)>,
+    type_result: Option<(Span, bool, Vec<Node<RelationshipTarget>>)>,
 ) -> UsageHeader {
     let subsets = trailing
         .subsets
@@ -389,7 +418,8 @@ fn merge_usage_header(
     let references = trailing.references.or(leading.references);
     let crosses = trailing.crosses.or(leading.crosses);
     UsageHeader {
-        type_name: type_result.map(|(_, is_conjugated, name)| {
+        type_name: type_result.map(|(_, is_conjugated, targets)| {
+            let name = targets_display_string(&targets);
             if is_conjugated {
                 format!("~{name}")
             } else {
@@ -441,31 +471,34 @@ mod tests {
     #[test]
     fn typings_accepts_defined_by_and_multiple_targets() {
         let input = span_input("defined by ~Ports::Fuel, Ports::Command ;");
-        let (rest, (_, is_conjugated, typing)) = typings(input).expect("typings");
+        let (rest, (_, is_conjugated, targets)) = typings(input).expect("typings");
         assert!(is_conjugated, "first target's leading `~` should be captured");
-        assert_eq!(typing, "Ports::Fuel, Ports::Command");
+        assert_eq!(targets_display_string(&targets), "Ports::Fuel, Ports::Command");
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
     #[test]
     fn typings_accepts_typed_by_keyword_alias() {
         let input = span_input("typed by ~Ports::Fuel, Ports::Command ;");
-        let (rest, (_, is_conjugated, typing)) = typings(input).expect("typings");
+        let (rest, (_, is_conjugated, targets)) = typings(input).expect("typings");
         assert!(is_conjugated);
-        assert_eq!(typing, "Ports::Fuel, Ports::Command");
+        assert_eq!(targets_display_string(&targets), "Ports::Fuel, Ports::Command");
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
     /// Helper for asserting a `Node<SubsettingRelationship>`'s target/kind in one line.
-    fn rel_target_kind(rel: &Node<SubsettingRelationship>) -> (&str, SubsettingKind) {
-        (rel.value.target.as_str(), rel.value.kind)
+    fn rel_target_kind(rel: &Node<SubsettingRelationship>) -> (String, SubsettingKind) {
+        (targets_display_string(&rel.value.target), rel.value.kind)
     }
 
     #[test]
     fn subsetting_accepts_keyword_alias_with_value() {
         let input = span_input("subsets wheel = rearWheel[1];");
         let (_, (target, value)) = subsetting(input).expect("subsetting");
-        assert_eq!(rel_target_kind(&target), ("wheel", SubsettingKind::Subsets));
+        assert_eq!(
+            rel_target_kind(&target),
+            ("wheel".to_string(), SubsettingKind::Subsets)
+        );
         assert!(!target.value.is_implied);
         assert!(value.is_some());
     }
@@ -476,11 +509,11 @@ mod tests {
         let (rest, clauses) = specialization_clauses(input).expect("specialization clauses");
         assert_eq!(
             clauses.subsets.as_ref().map(|(rel, _)| rel_target_kind(rel)),
-            Some(("latest", SubsettingKind::Subsets))
+            Some(("latest".to_string(), SubsettingKind::Subsets))
         );
         assert_eq!(
             clauses.redefines.as_ref().map(rel_target_kind),
-            Some(("newest", SubsettingKind::Redefines))
+            Some(("newest".to_string(), SubsettingKind::Redefines))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
@@ -491,11 +524,11 @@ mod tests {
         let (rest, clauses) = specialization_clauses(input).expect("specialization clauses");
         assert_eq!(
             clauses.subsets.as_ref().map(|(rel, _)| rel_target_kind(rel)),
-            Some(("electricGrid.outlets", SubsettingKind::Subsets))
+            Some(("electricGrid.outlets".to_string(), SubsettingKind::Subsets))
         );
         assert_eq!(
             clauses.redefines.as_ref().map(rel_target_kind),
-            Some(("Vehicle::mass.value", SubsettingKind::Redefines))
+            Some(("Vehicle::mass.value".to_string(), SubsettingKind::Redefines))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
@@ -506,9 +539,63 @@ mod tests {
         let (rest, clauses) = specialization_clauses(input).expect("specialization clauses");
         assert_eq!(
             clauses.subsets.as_ref().map(|(rel, _)| rel_target_kind(rel)),
-            Some(("CoordinateTransformation, List", SubsettingKind::Subsets))
+            Some(("CoordinateTransformation, List".to_string(), SubsettingKind::Subsets))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
+    }
+
+    /// Regression (parser work item 2): a comma-separated multi-target `:>` clause used to be
+    /// collapsed into a single `", "`-joined `String`, losing the fact there were two distinct
+    /// targets. `SubsettingRelationship::target` must now hold one `RelationshipTarget` per
+    /// comma-separated name.
+    #[test]
+    fn specialization_clauses_multi_target_stays_structured_not_joined() {
+        let input = span_input(":> CoordinateTransformation, List {");
+        let (_, clauses) = specialization_clauses(input).expect("specialization clauses");
+        let (rel, _value) = clauses.subsets.expect("subsets clause");
+        assert_eq!(rel.value.target.len(), 2, "expected two distinct targets, not one joined string");
+        assert_eq!(
+            rel.value.target[0].value.segments,
+            vec![RelationshipTargetSegment {
+                name: "CoordinateTransformation".to_string(),
+                separator: None,
+            }]
+        );
+        assert_eq!(
+            rel.value.target[1].value.segments,
+            vec![RelationshipTargetSegment {
+                name: "List".to_string(),
+                separator: None,
+            }]
+        );
+        assert_eq!(
+            rel.value.first_target().map(RelationshipTarget::to_display_string),
+            Some("CoordinateTransformation".to_string())
+        );
+    }
+
+    /// Regression (parser work item 2): `Vehicle::mass.value`'s `::` and `.` joins must stay
+    /// distinguishable in the segment list, not collapse into one opaque string.
+    #[test]
+    fn specialization_target_distinguishes_colon_colon_from_dot_segments() {
+        let input = span_input(":>> Vehicle::mass.value ;");
+        let (_, target) = redefinition(input).expect("redefinition");
+        let first = target.value.first_target().expect("one target");
+        assert_eq!(
+            first.segments,
+            vec![
+                RelationshipTargetSegment { name: "Vehicle".to_string(), separator: None },
+                RelationshipTargetSegment {
+                    name: "mass".to_string(),
+                    separator: Some(SegmentSeparator::ColonColon),
+                },
+                RelationshipTargetSegment {
+                    name: "value".to_string(),
+                    separator: Some(SegmentSeparator::Dot),
+                },
+            ]
+        );
+        assert_eq!(first.to_display_string(), "Vehicle::mass.value");
     }
 
     #[test]
@@ -518,11 +605,11 @@ mod tests {
         assert_eq!(header.type_name.as_deref(), Some("Engine"));
         assert_eq!(
             header.subsets.as_ref().map(rel_target_kind),
-            Some(("BasePart", SubsettingKind::Subsets))
+            Some(("BasePart".to_string(), SubsettingKind::Subsets))
         );
         assert_eq!(
             header.redefines.as_ref().map(rel_target_kind),
-            Some(("oldPart", SubsettingKind::Redefines))
+            Some(("oldPart".to_string(), SubsettingKind::Redefines))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
@@ -534,7 +621,7 @@ mod tests {
         assert_eq!(header.type_name.as_deref(), Some("Engine"));
         assert_eq!(
             header.subsets.as_ref().map(rel_target_kind),
-            Some(("base", SubsettingKind::Subsets))
+            Some(("base".to_string(), SubsettingKind::Subsets))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
@@ -545,7 +632,7 @@ mod tests {
         let (rest, target) = reference_subsetting(input).expect("references");
         assert_eq!(
             rel_target_kind(&target),
-            ("portA", SubsettingKind::References)
+            ("portA".to_string(), SubsettingKind::References)
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
@@ -554,7 +641,7 @@ mod tests {
     fn cross_subsetting_accepts_symbol() {
         let input = span_input("=> other ;");
         let (rest, target) = cross_subsetting(input).expect("crosses");
-        assert_eq!(rel_target_kind(&target), ("other", SubsettingKind::Crosses));
+        assert_eq!(rel_target_kind(&target), ("other".to_string(), SubsettingKind::Crosses));
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -565,11 +652,11 @@ mod tests {
         assert_eq!(header.type_name.as_deref(), Some("T"));
         assert_eq!(
             header.references.as_ref().map(rel_target_kind),
-            Some(("a", SubsettingKind::References))
+            Some(("a".to_string(), SubsettingKind::References))
         );
         assert_eq!(
             header.crosses.as_ref().map(rel_target_kind),
-            Some(("b", SubsettingKind::Crosses))
+            Some(("b".to_string(), SubsettingKind::Crosses))
         );
         assert!(header.subsets.is_none());
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -581,11 +668,11 @@ mod tests {
         let (rest, clauses) = specialization_clauses(input).expect("clauses");
         assert_eq!(
             clauses.references.as_ref().map(rel_target_kind),
-            Some(("a, b", SubsettingKind::References))
+            Some(("a, b".to_string(), SubsettingKind::References))
         );
         assert_eq!(
             clauses.crosses.as_ref().map(rel_target_kind),
-            Some(("c, d", SubsettingKind::Crosses))
+            Some(("c, d".to_string(), SubsettingKind::Crosses))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }

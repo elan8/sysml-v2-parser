@@ -70,7 +70,8 @@ pub(crate) fn part_usage_named<'a>(
     let (input, ordered_before_type) = usage_ordered_modifier(input)?;
     let (input, type_result) = optional_typings(input)?;
     let (type_ref_span, type_name) = type_result
-        .map(|(s, is_conjugated, t)| {
+        .map(|(s, is_conjugated, targets)| {
+            let t = targets_display_string(&targets);
             (Some(s), if is_conjugated { format!("~{t}") } else { t })
         })
         .unwrap_or((None, String::new()));
@@ -170,7 +171,8 @@ fn anonymous_part_usage<'a>(
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, multiplicity_before) = opt(multiplicity_node).parse(input)?;
     let (input, ordered_before_type) = usage_ordered_modifier(input)?;
-    let (input, (type_ref_span, is_conjugated, type_name)) = typings(input)?;
+    let (input, (type_ref_span, is_conjugated, targets)) = typings(input)?;
+    let type_name = targets_display_string(&targets);
     let type_name = if is_conjugated {
         format!("~{type_name}")
     } else {

@@ -19,6 +19,7 @@ use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
     multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
+    targets_display_string,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -81,10 +82,6 @@ fn port_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
     Ok((input, PortBody::Brace { elements }))
 }
 
-fn local_name_from_qualified_name(qname: &str) -> String {
-    qname.rsplit("::").next().unwrap_or(qname).to_string()
-}
-
 /// Port usage: 'port' ( (`:>>`|`redefines`) target | name ) ( ':' type )? multiplicity? clauses? body
 pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     enum PortUsageHead {
@@ -119,7 +116,12 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
             redefines,
         } => (
             input,
-            local_name_from_qualified_name(&redefines.value.target),
+            redefines
+                .value
+                .first_target()
+                .and_then(|t| t.local_name())
+                .unwrap_or_default()
+                .to_string(),
             name_span,
             Some(redefines),
         ),
@@ -127,7 +129,8 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     };
     let (input, type_result) = optional_typings(input)?;
     let (type_ref_span, type_name) = type_result
-        .map(|(span, is_conjugated, name)| {
+        .map(|(span, is_conjugated, targets)| {
+            let name = targets_display_string(&targets);
             (
                 Some(span),
                 Some(if is_conjugated { format!("~{name}") } else { name }),
@@ -269,6 +272,7 @@ fn parse_port_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
 #[cfg(test)]
 mod par_002_widening_tests {
     use super::*;
+    use crate::parser::usage::targets_display_string;
     use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
@@ -311,7 +315,7 @@ mod par_002_widening_tests {
             .value
             .specializes
             .expect("type reference must not be dropped");
-        assert_eq!(typing.value.target, "MyPortType");
+        assert_eq!(targets_display_string(&typing.value.target), "MyPortType");
         assert_eq!(typing.value.kind, crate::ast::TypingKind::Typing);
     }
 

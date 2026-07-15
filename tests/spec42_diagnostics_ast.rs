@@ -196,7 +196,7 @@ fn verification_local_attribute_has_name_span() {
     };
     assert_eq!(attr.name, "count");
     assert!(attr.name_span.is_some());
-    assert_eq!(attr.typing.as_ref().map(|n| n.value.target.as_str()), Some("Integer"));
+    assert_eq!(attr.typing.as_ref().map(|n| n.value.target_display()), Some("Integer".to_string()));
 }
 
 #[test]
@@ -643,8 +643,8 @@ fn metadata_def_shorthand_annotated_element() {
             _ => None,
         })
         .expect("annotatedElement shorthand binding");
-    assert_eq!(attr.subsets.as_ref().map(|n| n.value.target.as_str()), Some("annotatedElement"));
-    assert_eq!(attr.typing.as_ref().map(|n| n.value.target.as_str()), Some("SysML::RequirementUsage"));
+    assert_eq!(attr.subsets.as_ref().map(|n| n.value.target_display()), Some("annotatedElement".to_string()));
+    assert_eq!(attr.typing.as_ref().map(|n| n.value.target_display()), Some("SysML::RequirementUsage".to_string()));
 }
 
 #[test]
@@ -669,7 +669,7 @@ fn metadata_def_shorthand_base_type_meta_cast() {
             _ => None,
         })
         .expect("baseType shorthand binding");
-    assert_eq!(attr.redefines.as_ref().map(|n| n.value.target.as_str()), Some("baseType"));
+    assert_eq!(attr.redefines.as_ref().map(|n| n.value.target_display()), Some("baseType".to_string()));
     let Some(expr) = attr.value.as_ref() else {
         panic!("expected value expression");
     };

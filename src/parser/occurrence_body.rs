@@ -16,7 +16,10 @@ use crate::parser::node_from_to;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::part::part_usage;
 use crate::parser::requirement::{doc_comment, satisfy};
-use crate::parser::usage::{multiplicity_node as multiplicity_parser, optional_typings, specialization_clauses};
+use crate::parser::usage::{
+    multiplicity_node as multiplicity_parser, optional_typings, specialization_clauses,
+    targets_display_string,
+};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -169,7 +172,8 @@ fn occurrence_usage_tail(
     let (input, name_str) = name(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, type_name) = optional_typings(input)?;
-    let type_name = type_name.map(|(_, is_conjugated, name)| {
+    let type_name = type_name.map(|(_, is_conjugated, targets)| {
+        let name = targets_display_string(&targets);
         if is_conjugated {
             format!("~{name}")
         } else {

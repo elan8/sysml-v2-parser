@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: structured relationship targets on `TypingRelationship`/`SubsettingRelationship`
+
+Closes gaps-doc item 2 ("Parser work still required" backlog, post-PAR-006).
+`TypingRelationship::target` and `SubsettingRelationship::target` were plain `String`s built by
+two lossy joins: `.`-dotted feature-chain segments and `::`-qualified namespace/type segments were
+joined into one string with no way to tell them apart afterward (`specialization_target` in
+`usage.rs`), and comma-separated multi-target clauses (e.g. `:> Base, Other`) were joined with
+`", "`, losing the fact there were multiple distinct targets (`specialization_targets`). Both
+fields are now `Vec<Node<RelationshipTarget>>`, where a new `RelationshipTarget` (`src/ast/
+relationship_target.rs`) holds an ordered `Vec<RelationshipTargetSegment>`, each segment carrying
+its own `name` and an `Option<SegmentSeparator>` (`ColonColon` or `Dot`) recording how it joins to
+the previous segment. `first_target()`/`target_display()` convenience methods on both relationship
+structs keep the overwhelmingly common single-target case simple for existing callers that only
+need the display string.
+
+This is a new, narrow type deliberately kept separate from the existing `FeatureChain`
+(`src/ast/feature_chain.rs`, wired into `Expression::FeatureChainRef` for expression-level dot-chain
+parsing) -- `FeatureChain` intentionally excludes `::`-qualification and other expression-postfix
+concerns, and widening it would have pulled relationship-target parsing into `expr.rs`'s complexity
+for no benefit.
+
+Parser changes: `usage.rs`'s `specialization_target`/`specialization_targets` (subsetting-family
+`:>`/`:>>`/`::>`/`=>` targets, dot-chains allowed), `typings`/`conjugated_qualified_name` (`:`/
+`defined by` targets, no dot-chains), and `specialization.rs`'s
+`parse_optional_definition_specialization`/`typing_target_from_header`/
+`specializes_from_header_text` (definition-level `:>`/`specializes` and the package-level bare
+`: Type` header fallback from the entry above) all now build `RelationshipTarget` segments via a
+new `lex::qualified_name_segments` instead of losing structure through `qualified_name`'s joined
+`String`. Every `TypingRelationship`/`SubsettingRelationship` construction site from the prior
+PAR-004 work (`attribute.rs`, `part/body.rs`) was updated to match. Plain `type_name: String`
+display fields on usage structs (e.g. `PartUsage.type_name`, unrelated to these two relationship
+types) keep their prior joined-string behavior via a new `targets_display_string` helper, so this
+change is AST-shape-only for those fields -- no parsing behavior changed for them.
+`PARSE_AST_VERSION` bumped 15 -> 16 for the breaking AST-schema change.
+
+Added regression tests locking in that a multi-target `:>` clause stays as two distinct
+`RelationshipTarget`s rather than one joined string, and that `Vehicle::mass.value`'s `::` and `.`
+joins stay distinguishable in the segment list (`src/parser/usage.rs`). Regenerated the two
+`sysml-v2-release` validation snapshots (`parts_tree_1a`, `functional_allocation_4a`) whose
+`Debug` output changed shape from this field-type change; both were confirmed to still parse
+correctly against the real Systems Library and Full Library gates
+(`SYSML_V2_RELEASE_DIR=... cargo test --test validation -- --include-ignored`).
+
 ### Fixed: package-level bare `: Type` header silently dropped the type reference
 
 Found while scoping PAR-002 work (flagged there as out of scope, fixed separately): the shared

@@ -89,7 +89,8 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
 /// Build a `SubsettingRelationship` node from a target and the span of the whole clause,
 /// mirroring `usage::subsetting_relationship_node` for the ad hoc `:>`/`:>>` trailing-clause
 /// shapes parsed directly in this file (`exhibit_state`, `connection_usage_member`) rather than
-/// through `usage::specialization_clauses`.
+/// through `usage::specialization_clauses`. `target` is a single bare feature name (no `::`/`.`
+/// segments) -- these ad hoc shapes only ever parse a plain `name`, never a qualified name.
 fn subsetting_relationship_node(
     span: crate::ast::Span,
     kind: crate::ast::SubsettingKind,
@@ -98,7 +99,10 @@ fn subsetting_relationship_node(
     Node::new(
         span.clone(),
         crate::ast::SubsettingRelationship {
-            target,
+            target: vec![Node::new(
+                span.clone(),
+                crate::ast::RelationshipTarget::single(target, span.clone()),
+            )],
             kind,
             span,
             is_implied: false,

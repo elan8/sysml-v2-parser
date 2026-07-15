@@ -6,8 +6,9 @@ use sysml_v2_parser::ast::{
     InterfaceUsageBodyElement, Multiplicity, Node, Package, PackageBody, PackageBodyElement,
     PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
     PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
-    RefDecl, RootElement, RootNamespace, Span, SubsettingKind, SubsettingRelationship,
-    TypingKind, TypingRelationship, Visibility,
+    RefDecl, RelationshipTarget, RelationshipTargetSegment, RootElement, RootNamespace,
+    SegmentSeparator, Span, SubsettingKind, SubsettingRelationship, TypingKind,
+    TypingRelationship, Visibility,
 };
 use sysml_v2_parser::parse;
 
@@ -21,10 +22,41 @@ fn mult(v: i64) -> Node<Multiplicity> {
     })
 }
 
+/// Build a single [`RelationshipTarget`] from a `::`/`.`-joined display string, e.g.
+/// `"Vehicle::mass.value"` -> `[Vehicle, ::mass, .value]`, mirroring how the real parser splits
+/// a target into segments (all `::`-segments first, then any `.`-segments after).
+fn relationship_target(text: &str) -> Node<RelationshipTarget> {
+    let mut parts = text.splitn(2, '.');
+    let qualified = parts.next().unwrap_or_default();
+    let dotted_rest = parts.next();
+    let mut segments: Vec<RelationshipTargetSegment> = qualified
+        .split("::")
+        .enumerate()
+        .map(|(i, name)| RelationshipTargetSegment {
+            name: name.to_string(),
+            separator: if i == 0 {
+                None
+            } else {
+                Some(SegmentSeparator::ColonColon)
+            },
+        })
+        .collect();
+    if let Some(rest) = dotted_rest {
+        segments.extend(rest.split('.').map(|name| RelationshipTargetSegment {
+            name: name.to_string(),
+            separator: Some(SegmentSeparator::Dot),
+        }));
+    }
+    n(RelationshipTarget {
+        segments,
+        span: Span::dummy(),
+    })
+}
+
 /// `:> target` subclassification relationship, e.g. `spec("Axle")` for `:> Axle`.
 fn spec(target: &str) -> Node<TypingRelationship> {
     n(TypingRelationship {
-        target: target.to_string(),
+        target: vec![relationship_target(target)],
         kind: TypingKind::Subclassification,
         span: Span::dummy(),
         is_conjugated: false,
@@ -35,7 +67,7 @@ fn spec(target: &str) -> Node<TypingRelationship> {
 /// `:>>` / `redefines` target, e.g. `redef("cylinders")` for `redefines cylinders`.
 fn redef(target: &str) -> Node<SubsettingRelationship> {
     n(SubsettingRelationship {
-        target: target.to_string(),
+        target: vec![relationship_target(target)],
         kind: SubsettingKind::Redefines,
         span: Span::dummy(),
         is_implied: false,
@@ -45,7 +77,7 @@ fn redef(target: &str) -> Node<SubsettingRelationship> {
 /// `:>` / `subsets` target, e.g. `subs("wheelToRoadPort")` for `subsets wheelToRoadPort`.
 fn subs(target: &str) -> Node<SubsettingRelationship> {
     n(SubsettingRelationship {
-        target: target.to_string(),
+        target: vec![relationship_target(target)],
         kind: SubsettingKind::Subsets,
         span: Span::dummy(),
         is_implied: false,

@@ -559,7 +559,7 @@ requirement VehicleReq; subsets BaseReq;
         PackageBodyElement::RequirementUsage(r) => r,
         other => panic!("expected requirement usage, got {:?}", other),
     };
-    assert_eq!(req.value.subsets.as_ref().map(|n| n.value.target.as_str()), Some("BaseReq"));
+    assert_eq!(req.value.subsets.as_ref().map(|n| n.value.target_display()), Some("BaseReq".to_string()));
 }
 
 #[test]
@@ -580,7 +580,7 @@ requirement VehicleReq; subsets BaseReq :> LatestReq;
         PackageBodyElement::RequirementUsage(r) => r,
         other => panic!("expected requirement usage, got {:?}", other),
     };
-    assert_eq!(req.value.subsets.as_ref().map(|n| n.value.target.as_str()), Some("LatestReq"));
+    assert_eq!(req.value.subsets.as_ref().map(|n| n.value.target_display()), Some("LatestReq".to_string()));
 }
 
 #[test]

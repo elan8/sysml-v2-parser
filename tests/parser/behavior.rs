@@ -172,7 +172,7 @@ action def Run specializes BaseAction;
         PackageBodyElement::ActionDef(p) => p,
         other => panic!("expected action def, got {:?}", other),
     };
-    assert_eq!(action_def.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("BaseAction"));
+    assert_eq!(action_def.value.specializes.as_ref().map(|n| n.value.target_display()), Some("BaseAction".to_string()));
 }
 
 #[test]
@@ -194,8 +194,8 @@ action def Run :> BaseAction, LoggedAction;
         other => panic!("expected action definition, got {:?}", other),
     };
     assert_eq!(
-        action_def.value.specializes.as_ref().map(|n| n.value.target.as_str()),
-        Some("BaseAction, LoggedAction")
+        action_def.value.specializes.as_ref().map(|n| n.value.target_display()),
+        Some("BaseAction, LoggedAction".to_string())
     );
     assert!(action_def.value.specializes.is_some());
 }
