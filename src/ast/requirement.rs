@@ -6,7 +6,7 @@ use super::structure::{
     MetadataKeywordUsage,
 };
 use super::view::ConstraintDefBodyElement;
-use crate::ast::core::{Expression, Multiplicity, Node, Span, TypingRelationship};
+use crate::ast::core::{Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship};
 
 /// Requirement definition: `requirement def` Identification (`:>` specializes)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -150,7 +150,7 @@ pub struct InlineSatisfyRequirement {
 pub struct RequirementUsage {
     pub name: String,
     pub type_name: Option<String>,
-    pub subsets: Option<String>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// True for `abstract requirement ...`.
     pub is_abstract: bool,
     pub body: RequirementDefBody,

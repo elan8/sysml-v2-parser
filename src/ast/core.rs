@@ -363,6 +363,49 @@ impl PartialEq for TypingRelationship {
 
 impl Eq for TypingRelationship {}
 
+/// Which subsetting-family clause a [`SubsettingRelationship`] came from (PAR-004 item 2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SubsettingKind {
+    /// `:>` / `subsets`.
+    Subsets,
+    /// `::>` / `references` (reference subsetting).
+    References,
+    /// `:>>` / `redefines`.
+    Redefines,
+    /// `=>` / `crosses` (cross subsetting).
+    Crosses,
+}
+
+/// A subsetting-family relationship target: subsetting, reference subsetting, redefinition, or
+/// cross subsetting, e.g. the `rearWheel` in `subsets wheel = rearWheel[1]` (PAR-004 item 2).
+///
+/// Kept as a separate `Option<Node<SubsettingRelationship>>` field per clause kind on each owning
+/// struct (not collapsed into one field) because not every struct supports all four clause kinds
+/// (e.g. `ExhibitState` only has `redefines`), and a struct can have more than one of these
+/// clauses present at once (e.g. both `subsets` and `redefines`).
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SubsettingRelationship {
+    /// Qualified name (or dotted feature-chain) of the subsetted/redefined/crossed target.
+    pub target: String,
+    pub kind: SubsettingKind,
+    /// Span of the whole relationship fragment (operator/keyword through target).
+    pub span: Span,
+    /// True for a relationship the parser infers rather than one explicitly written in source.
+    /// Always `false` today, matching [`TypingRelationship::is_implied`]'s rationale.
+    pub is_implied: bool,
+}
+
+/// Equality ignores `span`, matching [`TypingRelationship`]'s convention.
+impl PartialEq for SubsettingRelationship {
+    fn eq(&self, other: &Self) -> bool {
+        self.target == other.target && self.kind == other.kind && self.is_implied == other.is_implied
+    }
+}
+
+impl Eq for SubsettingRelationship {}
+
 impl Multiplicity {
     /// Renders the multiplicity back to canonical bracket text, e.g. `[1]`, `[0..1]`, `[1..*]`.
     /// Literal integer bounds and the unbounded `*` render exactly; other bound expressions fall

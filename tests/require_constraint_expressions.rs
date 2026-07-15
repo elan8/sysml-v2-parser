@@ -174,7 +174,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
 
     let v = attrs.next().expect("attribute v");
     assert_eq!(v.name, "v");
-    assert_eq!(v.subsets.as_deref(), Some("ISQ::speed"));
+    assert_eq!(v.subsets.as_ref().map(|n| n.value.target.as_str()), Some("ISQ::speed"));
     let q = v.value.as_ref().expect("quantity default");
     assert!(matches!(&q.value, Expression::LiteralWithUnit { .. }));
 }

@@ -79,7 +79,7 @@ fn requirement_usage_supports_trailing_subsets_after_body() {
         _ => None,
     });
     let req = req.expect("requirement usage should parse in part body");
-    assert_eq!(req.subsets.as_deref(), Some("goals"));
+    assert_eq!(req.subsets.as_ref().map(|n| n.value.target.as_str()), Some("goals"));
 }
 
 #[test]
@@ -254,7 +254,7 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         .collect();
     assert_eq!(occurrences.len(), 2);
     assert_eq!(occurrences[0].portion_kind.as_deref(), Some("timeslice"));
-    assert_eq!(occurrences[0].subsets.as_deref(), None);
+    assert_eq!(occurrences[0].subsets.as_ref().map(|n| n.value.target.as_str()), None);
     assert_eq!(occurrences[1].portion_kind.as_deref(), Some("timeslice"));
 
     let OccurrenceUsageBody::Brace {
@@ -303,7 +303,7 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
             _ => None,
         })
         .expect("snapshot should parse in then timeslice body");
-    assert_eq!(snapshot.subsets.as_deref(), Some("system"));
+    assert_eq!(snapshot.subsets.as_ref().map(|n| n.value.target.as_str()), Some("system"));
     assert_eq!(snapshot.type_name.as_deref(), Some("MissionSystem"));
 }
 
@@ -341,7 +341,7 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         _ => panic!("expected nested part usage"),
     };
     assert_eq!(
-        apollo1.subsets.as_ref().map(|(name, _)| name.as_str()),
+        apollo1.subsets.as_ref().map(|(name, _)| name.value.target.as_str()),
         Some("missions")
     );
 
@@ -364,7 +364,7 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         crew_members[0]
             .subsets
             .as_ref()
-            .map(|(name, _)| name.as_str()),
+            .map(|(name, _)| name.value.target.as_str()),
         Some("crew")
     );
 }
@@ -407,7 +407,7 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    assert_eq!(exhibit.redefines.as_deref(), Some("missionPhases"));
+    assert_eq!(exhibit.redefines.as_ref().map(|n| n.value.target.as_str()), Some("missionPhases"));
 }
 
 #[test]
@@ -491,7 +491,7 @@ fn part_usage_accepts_multiplicity_before_type() {
     assert_eq!(suit.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[2]".to_string()));
     assert_eq!(suit.type_name, "ExtravehicularMobilityUnit");
     assert_eq!(
-        suit.subsets.as_ref().map(|(name, _)| name.as_str()),
+        suit.subsets.as_ref().map(|(name, _)| name.value.target.as_str()),
         Some("constituentSystems")
     );
 }
@@ -592,7 +592,7 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
         connection.type_name.as_deref(),
         Some("CapabilityToGoalDerivation")
     );
-    assert_eq!(connection.subsets.as_deref(), Some("capabilityToGoals"));
+    assert_eq!(connection.subsets.as_ref().map(|n| n.value.target.as_str()), Some("capabilityToGoals"));
     let ConnectionDefBody::Brace { elements } = &connection.body else {
         panic!("expected connection body");
     };
@@ -688,7 +688,7 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
     assert_eq!(csm.name, "csm");
     assert!(csm.is_individual);
     assert_eq!(csm.type_name, "CSM-107");
-    assert_eq!(csm.redefines.as_deref(), Some("commandServiceModule"));
+    assert_eq!(csm.redefines.as_ref().map(|n| n.value.target.as_str()), Some("commandServiceModule"));
     assert!(elements
         .iter()
         .any(|e| matches!(e.value, PartDefBodyElement::InterfaceUsage(_))));
@@ -742,7 +742,7 @@ fn part_redefinition_value_parses_parenthesized_tuple_of_engines() {
     let engines = elements
         .iter()
         .find_map(|e| match &e.value {
-            PartDefBodyElement::PartUsage(p) if p.value.redefines.as_deref() == Some("engines") => {
+            PartDefBodyElement::PartUsage(p) if p.value.redefines.as_ref().map(|n| n.value.target.as_str()) == Some("engines") => {
                 Some(&**p)
             }
             _ => None,
@@ -813,13 +813,13 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
         "expected both attribute redefinitions as usages"
     );
     assert_eq!(attrs[0].name, "propellantMass");
-    assert_eq!(attrs[0].redefines.as_deref(), Some("propellantMass"));
+    assert_eq!(attrs[0].redefines.as_ref().map(|n| n.value.target.as_str()), Some("propellantMass"));
     assert!(
         attrs[0].value.is_some(),
         "propellantMass should keep assigned value"
     );
     assert_eq!(attrs[1].name, "dryMass");
-    assert_eq!(attrs[1].redefines.as_deref(), Some("dryMass"));
+    assert_eq!(attrs[1].redefines.as_ref().map(|n| n.value.target.as_str()), Some("dryMass"));
     assert!(
         attrs[1].value.is_some(),
         "dryMass should keep assigned value"

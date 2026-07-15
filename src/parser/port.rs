@@ -86,7 +86,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     enum PortUsageHead {
         PrefixRedefines {
             name_span: crate::ast::Span,
-            redefines: String,
+            redefines: Node<crate::ast::SubsettingRelationship>,
         },
         Named {
             name_span: crate::ast::Span,
@@ -115,7 +115,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
             redefines,
         } => (
             input,
-            local_name_from_qualified_name(&redefines),
+            local_name_from_qualified_name(&redefines.value.target),
             name_span,
             Some(redefines),
         ),

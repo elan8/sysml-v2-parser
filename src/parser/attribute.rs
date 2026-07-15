@@ -1,8 +1,8 @@
 //! Attribute definition and usage parsing.
 
 use crate::ast::{
-    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Node, TypingKind,
-    TypingRelationship,
+    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Node,
+    SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -41,6 +41,26 @@ fn typing_relationship_node(
 /// Shorthand for the common `:` / `typed by` case (`TypingKind::Typing`).
 fn typing_node(span: crate::ast::Span, is_conjugated: bool, target: String) -> Node<TypingRelationship> {
     typing_relationship_node(span, TypingKind::Typing, is_conjugated, target)
+}
+
+/// Wrap a subsetting-family target in a `SubsettingRelationship` node, mirroring
+/// `usage::subsetting_relationship_node` for the ad hoc `:>`/`:>>` prefix shapes parsed directly
+/// in this file (`attribute_feature_binding`, `metadata_binding`) rather than through
+/// `usage::specialization_clauses`.
+fn subsetting_relationship_node(
+    span: crate::ast::Span,
+    kind: SubsettingKind,
+    target: String,
+) -> Node<SubsettingRelationship> {
+    Node::new(
+        span.clone(),
+        SubsettingRelationship {
+            target,
+            kind,
+            span,
+            is_implied: false,
+        },
+    )
 }
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -226,6 +246,10 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
             nom::error::ErrorKind::Tag,
         )));
     }
+    // Covers the whole `(':>>' | ':>')? name` fragment -- the leading operator token itself
+    // (before `name_span`) isn't separately tracked here, matching how this ad hoc prefix shape
+    // (distinct from `usage::specialization_clauses`) has always worked.
+    let prefix_span = crate::parser::span_from_to(start, input);
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
@@ -236,8 +260,22 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     let (input, _) = ignored_feature_modifiers(input)?;
     let (input, body) = attribute_body(input)?;
     let (subsets, redefines) = match prefix {
-        Some(MetadataBindingPrefix::Subsets) => (Some(name_str.clone()), None),
-        Some(MetadataBindingPrefix::Redefines) => (None, Some(name_str.clone())),
+        Some(MetadataBindingPrefix::Subsets) => (
+            Some(subsetting_relationship_node(
+                prefix_span,
+                SubsettingKind::Subsets,
+                name_str.clone(),
+            )),
+            None,
+        ),
+        Some(MetadataBindingPrefix::Redefines) => (
+            None,
+            Some(subsetting_relationship_node(
+                prefix_span,
+                SubsettingKind::Redefines,
+                name_str.clone(),
+            )),
+        ),
         None => (None, None),
     };
     Ok((
@@ -352,18 +390,19 @@ pub(crate) fn attribute_def(
     let leading_subset = leading_clauses.subsets;
     let (typing_span, typing, leading_value) = if typing.is_none() {
         leading_subset
-            .map(|(name, value)| {
+            .map(|(rel, value)| {
                 // A leading `:>` subset clause with no separate `:` typing doubles as this
                 // attribute def's type (existing behavior); it's a subclassification-shaped
-                // target, but no span is tracked for it at this call site (same as before this
-                // field was typed), so the relationship node's own span is a dummy.
+                // target. Reuses the SubsettingRelationship node's own span, which does cover
+                // the `:>`/`subsets` fragment (unlike the dummy span this used before subsetting
+                // clauses were themselves typed with real spans).
                 (
-                    None,
+                    Some(rel.span.clone()),
                     Some(typing_relationship_node(
-                        crate::ast::Span::dummy(),
+                        rel.span.clone(),
                         TypingKind::Subclassification,
                         false,
-                        name,
+                        rel.value.target,
                     )),
                     value,
                 )
@@ -436,7 +475,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         },
         PrefixRedefines {
             redefines_span: crate::ast::Span,
-            redefines: String,
+            redefines: Node<SubsettingRelationship>,
         },
     }
 
@@ -480,7 +519,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 (
                     input,
                     None,
-                    local_name_from_qualified_name(&redefines),
+                    local_name_from_qualified_name(&redefines.value.target),
                     typing_span,
                     typing,
                     Some(redefines_span),
@@ -578,6 +617,9 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
             nom::error::ErrorKind::Tag,
         )));
     }
+    // See attribute_feature_binding's identical comment: covers the whole
+    // `(':>>' | ':>')? name` fragment, not just the operator token.
+    let prefix_span = crate::parser::span_from_to(start, input);
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
@@ -587,8 +629,22 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     let (subsets, redefines) = match prefix {
-        Some(MetadataBindingPrefix::Subsets) => (Some(name_str.clone()), None),
-        Some(MetadataBindingPrefix::Redefines) => (None, Some(name_str.clone())),
+        Some(MetadataBindingPrefix::Subsets) => (
+            Some(subsetting_relationship_node(
+                prefix_span,
+                SubsettingKind::Subsets,
+                name_str.clone(),
+            )),
+            None,
+        ),
+        Some(MetadataBindingPrefix::Redefines) => (
+            None,
+            Some(subsetting_relationship_node(
+                prefix_span,
+                SubsettingKind::Redefines,
+                name_str.clone(),
+            )),
+        ),
         None => (None, None),
     };
     Ok((
@@ -730,7 +786,10 @@ mod attribute_body_tests {
         let text = ":>> unitConversion: ConversionByPrefix { :>> prefix = kilo; :>> referenceUnit = m; }";
         let (rest, node) = attribute_feature_binding(input(text)).expect("feature binding");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.redefines.as_deref(), Some("unitConversion"));
+        assert_eq!(
+            node.value.redefines.as_ref().map(|n| n.value.target.as_str()),
+            Some("unitConversion")
+        );
         assert_eq!(
             node.value.typing.as_ref().map(|n| n.value.target.as_str()),
             Some("ConversionByPrefix")

@@ -6,7 +6,8 @@ use sysml_v2_parser::ast::{
     InterfaceUsageBodyElement, Multiplicity, Node, Package, PackageBody, PackageBodyElement,
     PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
     PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
-    RefDecl, RootElement, RootNamespace, Span, TypingKind, TypingRelationship, Visibility,
+    RefDecl, RootElement, RootNamespace, Span, SubsettingKind, SubsettingRelationship,
+    TypingKind, TypingRelationship, Visibility,
 };
 use sysml_v2_parser::parse;
 
@@ -27,6 +28,26 @@ fn spec(target: &str) -> Node<TypingRelationship> {
         kind: TypingKind::Subclassification,
         span: Span::dummy(),
         is_conjugated: false,
+        is_implied: false,
+    })
+}
+
+/// `:>>` / `redefines` target, e.g. `redef("cylinders")` for `redefines cylinders`.
+fn redef(target: &str) -> Node<SubsettingRelationship> {
+    n(SubsettingRelationship {
+        target: target.to_string(),
+        kind: SubsettingKind::Redefines,
+        span: Span::dummy(),
+        is_implied: false,
+    })
+}
+
+/// `:>` / `subsets` target, e.g. `subs("wheelToRoadPort")` for `subsets wheelToRoadPort`.
+fn subs(target: &str) -> Node<SubsettingRelationship> {
+    n(SubsettingRelationship {
+        target: target.to_string(),
+        kind: SubsettingKind::Subsets,
+        span: Span::dummy(),
         is_implied: false,
     })
 }
@@ -575,7 +596,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     type_name: None,
                     multiplicity: None,
                     subsets: None,
-                    redefines: Some("VehicleA::vehicleToRoadPort".to_string()),
+                    redefines: Some(redef("VehicleA::vehicleToRoadPort")),
                     references: None,
                     crosses: None,
                     body: PortBody::Brace {
@@ -585,7 +606,7 @@ fn part_vehicle1_c1() -> PartUsage {
                                 type_name: None,
                                 multiplicity: None,
                                 subsets: Some((
-                                    "wheelToRoadPort".to_string(),
+                                    subs("wheelToRoadPort"),
                                     Some(expr_index("wheelToRoadPort", 1)),
                                 )),
                                 redefines: None,
@@ -600,7 +621,7 @@ fn part_vehicle1_c1() -> PartUsage {
                                 type_name: None,
                                 multiplicity: None,
                                 subsets: Some((
-                                    "wheelToRoadPort".to_string(),
+                                    subs("wheelToRoadPort"),
                                     Some(expr_index("wheelToRoadPort", 2)),
                                 )),
                                 redefines: None,
@@ -691,7 +712,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     type_name: "".to_string(),
                     multiplicity: None,
                     ordered: false,
-                    subsets: Some(("rearWheel".to_string(), Some(expr_index("rearWheel", 1)))),
+                    subsets: Some((subs("rearWheel"), Some(expr_index("rearWheel", 1)))),
                     redefines: None,
                     value: None,
                     body: PartUsageBody::Brace {
@@ -732,7 +753,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     type_name: "".to_string(),
                     multiplicity: None,
                     ordered: false,
-                    subsets: Some(("rearWheel".to_string(), Some(expr_index("rearWheel", 2)))),
+                    subsets: Some((subs("rearWheel"), Some(expr_index("rearWheel", 2)))),
                     redefines: None,
                     value: None,
                     body: PartUsageBody::Brace {

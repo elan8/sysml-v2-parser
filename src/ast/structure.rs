@@ -2,7 +2,7 @@ use super::behavior::{ActionDefBodyElement, Allocate, InOut, InOutDecl, StateDef
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::view::{CalcUsage, ConstraintDefBody};
-use crate::ast::core::{Expression, Multiplicity, Node, Span, TypingRelationship};
+use crate::ast::core::{Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship};
 
 /// Part definition: `part def` Identification (`:>` specializes)? Body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,8 +99,8 @@ pub struct ConnectionUsageMember {
     pub name: Option<String>,
     pub type_name: Option<String>,
     pub body: ConnectionDefBody,
-    pub subsets: Option<String>,
-    pub redefines: Option<String>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
 }
 
 /// Exhibit state usage: `exhibit state` name `:` type (`;` or body).
@@ -109,7 +109,7 @@ pub struct ConnectionUsageMember {
 pub struct ExhibitState {
     pub name: String,
     pub type_name: Option<String>,
-    pub redefines: Option<String>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: StateDefBody,
 }
 
@@ -187,9 +187,9 @@ pub struct PartUsage {
     pub multiplicity: Option<Node<Multiplicity>>,
     pub ordered: bool,
     /// Optional `subsets` feature and value expression.
-    pub subsets: Option<(String, Option<Node<Expression>>)>,
-    /// Redefines target, e.g. Some("frontAxleAssembly") or Some("vehicle1::mass").
-    pub redefines: Option<String>,
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    /// Redefines target, e.g. `frontAxleAssembly` or `vehicle1::mass`.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// Value expression (= expr, default = expr, := expr).
     pub value: Option<Node<Expression>>,
     pub body: PartUsageBody,
@@ -345,13 +345,13 @@ pub struct AttributeUsage {
     /// (PAR-004 item 1). `typing_span` duplicates the node's own `span`.
     pub typing: Option<Node<TypingRelationship>>,
     /// Subsets target after `:>` / `subsets`.
-    pub subsets: Option<String>,
-    /// Redefines target, e.g. Some("Vehicle::mass").
-    pub redefines: Option<String>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Redefines target, e.g. `Vehicle::mass`.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// References target after `::>` / `references`.
-    pub references: Option<String>,
+    pub references: Option<Node<SubsettingRelationship>>,
     /// Crosses target after `=>` / `crosses`.
-    pub crosses: Option<String>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
     /// Value expression.
     pub value: Option<Node<Expression>>,
     pub body: AttributeBody,
@@ -411,12 +411,12 @@ pub struct PortUsage {
     pub type_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// Subsets feature and optional value expression.
-    pub subsets: Option<(String, Option<Node<Expression>>)>,
-    pub redefines: Option<String>,
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// References target after `::>` / `references`.
-    pub references: Option<String>,
+    pub references: Option<Node<SubsettingRelationship>>,
     /// Crosses target after `=>` / `crosses`.
-    pub crosses: Option<String>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
     pub body: PortBody,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -632,10 +632,10 @@ pub struct OccurrenceUsage {
     pub portion_kind: Option<String>,
     pub name: String,
     pub type_name: Option<String>,
-    pub subsets: Option<String>,
-    pub redefines: Option<String>,
-    pub references: Option<String>,
-    pub crosses: Option<String>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Node<SubsettingRelationship>>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
     pub body: OccurrenceUsageBody,
 }
 

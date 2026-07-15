@@ -643,7 +643,7 @@ fn metadata_def_shorthand_annotated_element() {
             _ => None,
         })
         .expect("annotatedElement shorthand binding");
-    assert_eq!(attr.subsets.as_deref(), Some("annotatedElement"));
+    assert_eq!(attr.subsets.as_ref().map(|n| n.value.target.as_str()), Some("annotatedElement"));
     assert_eq!(attr.typing.as_ref().map(|n| n.value.target.as_str()), Some("SysML::RequirementUsage"));
 }
 
@@ -669,7 +669,7 @@ fn metadata_def_shorthand_base_type_meta_cast() {
             _ => None,
         })
         .expect("baseType shorthand binding");
-    assert_eq!(attr.redefines.as_deref(), Some("baseType"));
+    assert_eq!(attr.redefines.as_ref().map(|n| n.value.target.as_str()), Some("baseType"));
     let Some(expr) = attr.value.as_ref() else {
         panic!("expected value expression");
     };

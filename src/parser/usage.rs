@@ -1,6 +1,6 @@
 //! Shared usage grammar fragments from `UsageDeclaration` / `FeatureSpecializationPart`.
 
-use crate::ast::{Expression, Multiplicity, Node, Span};
+use crate::ast::{Expression, Multiplicity, Node, Span, SubsettingKind, SubsettingRelationship};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     crosses_operator, name, qualified_name, redefine_operator, references_operator,
@@ -16,20 +16,20 @@ use nom::Parser;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct SpecializationClauses {
-    pub subsets: Option<(String, Option<Node<Expression>>)>,
-    pub redefines: Option<String>,
-    pub references: Option<String>,
-    pub crosses: Option<String>,
+    pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Node<SubsettingRelationship>>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
     pub had_any: bool,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct UsageHeader {
     pub type_name: Option<String>,
-    pub subsets: Option<String>,
-    pub redefines: Option<String>,
-    pub references: Option<String>,
-    pub crosses: Option<String>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub references: Option<Node<SubsettingRelationship>>,
+    pub crosses: Option<Node<SubsettingRelationship>>,
     pub had_specialization: bool,
 }
 
@@ -222,12 +222,31 @@ fn specialization_targets(input: Input<'_>) -> IResult<Input<'_>, String> {
     Ok((input, targets.join(", ")))
 }
 
+/// Build a `SubsettingRelationship` node from a target string and the span of the whole clause
+/// (operator/keyword through target).
+fn subsetting_relationship_node(
+    target: String,
+    kind: SubsettingKind,
+    span: Span,
+) -> Node<SubsettingRelationship> {
+    Node::new(
+        span.clone(),
+        SubsettingRelationship {
+            target,
+            kind,
+            span,
+            is_implied: false,
+        },
+    )
+}
+
 /// Subsettings: `:>` / `subsets` target, with optional `= expression` value.
 pub(crate) fn subsetting(
     input: Input<'_>,
-) -> IResult<Input<'_>, (String, Option<Node<Expression>>)> {
+) -> IResult<Input<'_>, (Node<SubsettingRelationship>, Option<Node<Expression>>)> {
+    let before = input;
     let (input, _) = preceded(ws_and_comments, subset_operator).parse(input)?;
-    preceded(
+    let (input, (target, value)) = preceded(
         ws_and_comments,
         (
             specialization_targets,
@@ -237,48 +256,73 @@ pub(crate) fn subsetting(
             )),
         ),
     )
-    .parse(input)
+    .parse(input)?;
+    let span = span_from_to(before, input);
+    let node = subsetting_relationship_node(target, SubsettingKind::Subsets, span);
+    Ok((input, (node, value)))
 }
 
 /// Redefinitions: `:>>` / `redefines` target.
-pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, String> {
-    preceded(
+pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
+    let before = input;
+    let (input, target) = preceded(
         preceded(ws_and_comments, redefine_operator),
         preceded(ws_and_comments, specialization_targets),
     )
-    .parse(input)
+    .parse(input)?;
+    let span = span_from_to(before, input);
+    Ok((
+        input,
+        subsetting_relationship_node(target, SubsettingKind::Redefines, span),
+    ))
 }
 
 /// Prefix redefinition: `:>>` / `redefines` qualified_name (for usage heads).
-pub(crate) fn prefix_redefinition_target(input: Input<'_>) -> IResult<Input<'_>, (Span, String)> {
+pub(crate) fn prefix_redefinition_target(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (Span, Node<SubsettingRelationship>)> {
     let before = input;
     let (input, target) = redefinition(input)?;
     Ok((input, (span_from_to(before, input), target)))
 }
 
 /// Reference subsetting: `::>` / `references` target.
-pub(crate) fn reference_subsetting(input: Input<'_>) -> IResult<Input<'_>, String> {
-    preceded(
+pub(crate) fn reference_subsetting(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
+    let before = input;
+    let (input, target) = preceded(
         preceded(ws_and_comments, references_operator),
         preceded(ws_and_comments, specialization_targets),
     )
-    .parse(input)
+    .parse(input)?;
+    let span = span_from_to(before, input);
+    Ok((
+        input,
+        subsetting_relationship_node(target, SubsettingKind::References, span),
+    ))
 }
 
 /// Cross subsetting: `=>` / `crosses` target.
-pub(crate) fn cross_subsetting(input: Input<'_>) -> IResult<Input<'_>, String> {
-    preceded(
+pub(crate) fn cross_subsetting(input: Input<'_>) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
+    let before = input;
+    let (input, target) = preceded(
         preceded(ws_and_comments, crosses_operator),
         preceded(ws_and_comments, specialization_targets),
     )
-    .parse(input)
+    .parse(input)?;
+    let span = span_from_to(before, input);
+    Ok((
+        input,
+        subsetting_relationship_node(target, SubsettingKind::Crosses, span),
+    ))
 }
 
 enum SpecializationClause {
-    Subsets((String, Option<Node<Expression>>)),
-    Redefines(String),
-    References(String),
-    Crosses(String),
+    Subsets((Node<SubsettingRelationship>, Option<Node<Expression>>)),
+    Redefines(Node<SubsettingRelationship>),
+    References(Node<SubsettingRelationship>),
+    Crosses(Node<SubsettingRelationship>),
 }
 
 /// Parse zero or more subsetting/redefinition clauses in any order.
@@ -412,11 +456,17 @@ mod tests {
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
+    /// Helper for asserting a `Node<SubsettingRelationship>`'s target/kind in one line.
+    fn rel_target_kind(rel: &Node<SubsettingRelationship>) -> (&str, SubsettingKind) {
+        (rel.value.target.as_str(), rel.value.kind)
+    }
+
     #[test]
     fn subsetting_accepts_keyword_alias_with_value() {
         let input = span_input("subsets wheel = rearWheel[1];");
         let (_, (target, value)) = subsetting(input).expect("subsetting");
-        assert_eq!(target, "wheel");
+        assert_eq!(rel_target_kind(&target), ("wheel", SubsettingKind::Subsets));
+        assert!(!target.value.is_implied);
         assert!(value.is_some());
     }
 
@@ -425,10 +475,13 @@ mod tests {
         let input = span_input("subsets base redefines old :> latest :>> newest ;");
         let (rest, clauses) = specialization_clauses(input).expect("specialization clauses");
         assert_eq!(
-            clauses.subsets.as_ref().map(|(name, _)| name.as_str()),
-            Some("latest")
+            clauses.subsets.as_ref().map(|(rel, _)| rel_target_kind(rel)),
+            Some(("latest", SubsettingKind::Subsets))
         );
-        assert_eq!(clauses.redefines.as_deref(), Some("newest"));
+        assert_eq!(
+            clauses.redefines.as_ref().map(rel_target_kind),
+            Some(("newest", SubsettingKind::Redefines))
+        );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -437,10 +490,13 @@ mod tests {
         let input = span_input(":> electricGrid.outlets :>> Vehicle::mass.value ;");
         let (rest, clauses) = specialization_clauses(input).expect("specialization clauses");
         assert_eq!(
-            clauses.subsets.as_ref().map(|(name, _)| name.as_str()),
-            Some("electricGrid.outlets")
+            clauses.subsets.as_ref().map(|(rel, _)| rel_target_kind(rel)),
+            Some(("electricGrid.outlets", SubsettingKind::Subsets))
         );
-        assert_eq!(clauses.redefines.as_deref(), Some("Vehicle::mass.value"));
+        assert_eq!(
+            clauses.redefines.as_ref().map(rel_target_kind),
+            Some(("Vehicle::mass.value", SubsettingKind::Redefines))
+        );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -449,8 +505,8 @@ mod tests {
         let input = span_input(":> CoordinateTransformation, List {");
         let (rest, clauses) = specialization_clauses(input).expect("specialization clauses");
         assert_eq!(
-            clauses.subsets.as_ref().map(|(name, _)| name.as_str()),
-            Some("CoordinateTransformation, List")
+            clauses.subsets.as_ref().map(|(rel, _)| rel_target_kind(rel)),
+            Some(("CoordinateTransformation, List", SubsettingKind::Subsets))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
     }
@@ -460,8 +516,14 @@ mod tests {
         let input = span_input(": Engine :> BasePart :>> oldPart ;");
         let (rest, header) = usage_header(input).expect("usage header");
         assert_eq!(header.type_name.as_deref(), Some("Engine"));
-        assert_eq!(header.subsets.as_deref(), Some("BasePart"));
-        assert_eq!(header.redefines.as_deref(), Some("oldPart"));
+        assert_eq!(
+            header.subsets.as_ref().map(rel_target_kind),
+            Some(("BasePart", SubsettingKind::Subsets))
+        );
+        assert_eq!(
+            header.redefines.as_ref().map(rel_target_kind),
+            Some(("oldPart", SubsettingKind::Redefines))
+        );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -470,7 +532,10 @@ mod tests {
         let input = span_input("subsets base : Engine ;");
         let (rest, header) = usage_header(input).expect("usage header");
         assert_eq!(header.type_name.as_deref(), Some("Engine"));
-        assert_eq!(header.subsets.as_deref(), Some("base"));
+        assert_eq!(
+            header.subsets.as_ref().map(rel_target_kind),
+            Some(("base", SubsettingKind::Subsets))
+        );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -478,7 +543,10 @@ mod tests {
     fn reference_subsetting_accepts_keyword() {
         let input = span_input("references portA ;");
         let (rest, target) = reference_subsetting(input).expect("references");
-        assert_eq!(target, "portA");
+        assert_eq!(
+            rel_target_kind(&target),
+            ("portA", SubsettingKind::References)
+        );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -486,7 +554,7 @@ mod tests {
     fn cross_subsetting_accepts_symbol() {
         let input = span_input("=> other ;");
         let (rest, target) = cross_subsetting(input).expect("crosses");
-        assert_eq!(target, "other");
+        assert_eq!(rel_target_kind(&target), ("other", SubsettingKind::Crosses));
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -495,8 +563,14 @@ mod tests {
         let input = span_input(": T references a crosses b ;");
         let (rest, header) = usage_header(input).expect("usage header");
         assert_eq!(header.type_name.as_deref(), Some("T"));
-        assert_eq!(header.references.as_deref(), Some("a"));
-        assert_eq!(header.crosses.as_deref(), Some("b"));
+        assert_eq!(
+            header.references.as_ref().map(rel_target_kind),
+            Some(("a", SubsettingKind::References))
+        );
+        assert_eq!(
+            header.crosses.as_ref().map(rel_target_kind),
+            Some(("b", SubsettingKind::Crosses))
+        );
         assert!(header.subsets.is_none());
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
@@ -505,8 +579,14 @@ mod tests {
     fn specialization_clauses_multi_target_references() {
         let input = span_input("references a, b crosses c, d ;");
         let (rest, clauses) = specialization_clauses(input).expect("clauses");
-        assert_eq!(clauses.references.as_deref(), Some("a, b"));
-        assert_eq!(clauses.crosses.as_deref(), Some("c, d"));
+        assert_eq!(
+            clauses.references.as_ref().map(rel_target_kind),
+            Some(("a, b", SubsettingKind::References))
+        );
+        assert_eq!(
+            clauses.crosses.as_ref().map(rel_target_kind),
+            Some(("c, d", SubsettingKind::Crosses))
+        );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 }

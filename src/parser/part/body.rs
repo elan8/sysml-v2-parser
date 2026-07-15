@@ -86,6 +86,26 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
     Ok((input, PartDefBody::Brace { elements }))
 }
 
+/// Build a `SubsettingRelationship` node from a target and the span of the whole clause,
+/// mirroring `usage::subsetting_relationship_node` for the ad hoc `:>`/`:>>` trailing-clause
+/// shapes parsed directly in this file (`exhibit_state`, `connection_usage_member`) rather than
+/// through `usage::specialization_clauses`.
+fn subsetting_relationship_node(
+    span: crate::ast::Span,
+    kind: crate::ast::SubsettingKind,
+    target: String,
+) -> Node<crate::ast::SubsettingRelationship> {
+    Node::new(
+        span.clone(),
+        crate::ast::SubsettingRelationship {
+            target,
+            kind,
+            span,
+            is_implied: false,
+        },
+    )
+}
+
 /// Exhibit state usage: `exhibit state` name (`:` type)? (`;` or body)
 pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
     let start = input;
@@ -101,11 +121,16 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     ))
     .parse(input)?;
     let (input, body) = crate::parser::state::state_def_body(input)?;
+    let before_redefines = input;
     let (input, redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    let redefines = redefines.map(|target| {
+        let span = crate::parser::span_from_to(before_redefines, input);
+        subsetting_relationship_node(span, crate::ast::SubsettingKind::Redefines, target)
+    });
     let input = if redefines.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
@@ -228,17 +253,27 @@ fn connection_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<Connecti
         }
     };
     let (input, body) = connection_member_body(input)?;
+    let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    let subsets = trailing_subsets.map(|target| {
+        let span = crate::parser::span_from_to(before_subsets, input);
+        subsetting_relationship_node(span, crate::ast::SubsettingKind::Subsets, target)
+    });
+    let before_redefines = input;
     let (input, trailing_redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
-    let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
+    let redefines = trailing_redefines.map(|target| {
+        let span = crate::parser::span_from_to(before_redefines, input);
+        subsetting_relationship_node(span, crate::ast::SubsettingKind::Redefines, target)
+    });
+    let input = if subsets.is_some() || redefines.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
     } else {
@@ -254,8 +289,8 @@ fn connection_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<Connecti
                 name,
                 type_name,
                 body,
-                subsets: trailing_subsets,
-                redefines: trailing_redefines,
+                subsets,
+                redefines,
             },
         ),
     ))
