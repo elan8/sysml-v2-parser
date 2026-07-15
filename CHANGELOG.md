@@ -142,6 +142,48 @@ is done.
   `ConnectionUsage`, `RefDecl` usage, `EnumerationUsage`) still unaddressed. `PartDefBodyElement`
   itself is now believed complete against the gaps-doc's original list for that enum.
 
+### PAR-002 (increment 3 of N): standalone usages in `PackageBodyElement`
+
+- **Added `AttributeUsage`, `ItemUsage`, `PortUsage`, `ConnectionUsage`, `Ref`, `EnumerationUsage`
+  to `PackageBodyElement`** (`src/ast/package.rs`), wired into `try_package_body_annotations`/
+  `try_package_body_structure`/`try_package_body_behavior` (`src/parser/package.rs`), each tried
+  immediately after its existing `def`-optional definition counterpart (`attribute_def(.., false)`,
+  `port_def`, `item_def`, `connection_def`, `enum_def`). `Ref` reuses `part_ref_usage` (now
+  re-exported as `crate::parser::part::part_ref_usage`/`connection_usage_member`), which despite
+  the name has no part-specific grammar. Confirmed via BNF: `PackageMember` explicitly allows
+  `DefinitionElement | UsageElement`, so bare usages are legal package content, not just
+  definitions -- contrary to `attribute_def`'s old doc comment claiming "only definitions are
+  legal" at package level.
+- **Important finding, confirmed empirically via the validation gate and targeted unit tests**:
+  for the four keywords whose standalone `_def` parser is deliberately `def`-optional at package
+  level (`attribute`, `port`, `item`, `connection`), that `_def` parser's header grammar
+  (`parse_optional_definition_header_after_identification` in `src/parser/specialization.rs`)
+  already swallows a plain `name: Type;` shape as part of its own (loosely-validated) header text,
+  so ordinary typed usages like `port p1: MyPortType;` are captured as the `Def` variant before
+  the new `Usage` variant is ever reached -- not a regression introduced here (this parsing
+  predates this increment; the validation gate stayed green with no snapshot changes, confirming
+  no stdlib content shifted variant). The new `Usage` variants are real and correctly reachable,
+  but only for shapes the `Def` grammar cannot parse at all: attribute's `:>>`-prefixed
+  redefinition head (`attribute :>> mass = 5;`, only `attribute_usage`'s `PrefixRedefines` shape
+  handles a bare `:>>` immediately after the keyword), port's `:>>`-prefixed head likewise,
+  item's `subsets`/`references`/`crosses` clauses (not part of `item_def`'s header grammar), and
+  connection's anonymous no-name form (`connection: LinkType;`, `connection_def`'s
+  `Identification` requires a name/short_name). Verified each via a dedicated
+  `package_body_accepts_standalone_*_usage` test using exactly one of these distinguishing shapes,
+  not the common `name: Type;` form (which would have silently asserted against dead code).
+- **Not fixed, and intentionally out of scope here**: the `Def`-swallows-typed-usage behavior
+  above (losing the `: Type` reference into `specializes: None` on `port p1: MyPortType;`, e.g.)
+  looks like a real pre-existing accuracy bug in `parse_optional_definition_header_after_identification`'s
+  typing-colon-blob handling, but fixing it is a separate, higher-risk change (it's shared header
+  logic used by many definition kinds, not `Usage`-wiring) outside this increment's scope. Flagging
+  it here rather than silently working around it.
+- **PAR-002 acceptance-criterion test added**: `attribute_usage_with_redefines_is_same_variant_kind_at_package_level_and_nested_in_part`
+  (`src/parser/package.rs`) parses the same `:>>`-prefixed attribute usage at package level and
+  nested in a part body, asserting the same AST variant kind both times.
+- **`connection_usage_member` and `part_ref_usage` made `pub(crate)`** and re-exported from
+  `crate::parser::part` so `src/parser/package.rs` can reuse them instead of duplicating the
+  parsing logic.
+
 ### PAR-006a: recovery-guard foundation
 
 - **Confirmed the PAR-001 disambiguation fix was already generalized**: `attribute_def`'s

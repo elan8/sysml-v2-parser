@@ -6,9 +6,9 @@ mod def;
 mod prelude;
 mod usage;
 
-pub(crate) use body::part_def_body;
+pub(crate) use body::{connection_usage_member, part_def_body};
 pub(crate) use def::{part_def, part_def_or_usage};
-pub(crate) use usage::{bind_, part_usage, perform_action_decl};
+pub(crate) use usage::{bind_, part_ref_usage, part_usage, perform_action_decl};
 
 use crate::ast::{Node, PartDef, PartUsage};
 

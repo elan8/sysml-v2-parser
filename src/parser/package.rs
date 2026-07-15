@@ -8,7 +8,7 @@ use crate::ast::{
 use crate::parser::action::{action_def, action_usage};
 use crate::parser::alias::alias_def;
 use crate::parser::allocation::{allocate_usage, allocation_def, allocation_usage};
-use crate::parser::attribute::attribute_def;
+use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::case::{
     analysis_case_def, analysis_case_usage, case_def, case_usage, verification_case_def,
@@ -17,13 +17,13 @@ use crate::parser::case::{
 use crate::parser::connection::connection_def;
 use crate::parser::constraint::{calc_def, constraint_def};
 use crate::parser::dependency::dependency;
-use crate::parser::enumeration::enum_def;
+use crate::parser::enumeration::{enum_def, enum_usage};
 use crate::parser::expr::expression;
 use crate::parser::flow::{flow_def, flow_usage};
 use crate::parser::import::import_;
 use crate::parser::individual::individual_def;
 use crate::parser::interface::interface_def;
-use crate::parser::item::item_def;
+use crate::parser::item::{item_def, item_usage};
 use crate::parser::lex::{
     name, qualified_name, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
     starts_with_keyword, ws1, ws_and_comments, PACKAGE_BODY_STARTERS,
@@ -34,7 +34,7 @@ use crate::parser::occurrence::{
     individual_usage, occurrence_def, occurrence_usage, snapshot_usage, timeslice_usage,
 };
 use crate::parser::part::{part_def_or_usage, PartDefOrUsage};
-use crate::parser::port::port_def;
+use crate::parser::port::{port_def, port_usage};
 use crate::parser::requirement::{
     comment_annotation, concern_usage, doc_comment, requirement_def, requirement_usage, satisfy,
     textual_representation,
@@ -616,6 +616,17 @@ fn try_package_body_annotations<'a>(
         |i| attribute_def(i, false),
         PackageBodyElement::AttributeDef
     );
+    // PAR-002: standalone attribute usage at package level (BNF `PackageMember` allows
+    // `DefinitionElement | UsageElement`). Tried after `attribute_def(.., false)` above, which
+    // is itself `def`-optional and already captures the def-less bare form; this only adds
+    // coverage for usage-only shapes (e.g. `subsets`/`references`/`crosses`/`redefines` clauses)
+    // that `attribute_def`'s grammar doesn't accept.
+    try_package_body_dispatch!(
+        input,
+        start,
+        attribute_usage,
+        PackageBodyElement::AttributeUsage
+    );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,
@@ -649,6 +660,10 @@ fn try_package_body_structure<'a>(
         PartDefOrUsage::Usage(n) => PackageBodyElement::PartUsage(n),
     });
     try_package_body_dispatch!(input, start, port_def, PackageBodyElement::PortDef);
+    // PAR-002: standalone port usage at package level, tried after `port_def` above (which is
+    // `def`-optional per its own doc comment and already captures the bare def-less form) -- see
+    // `AttributeUsage` above for the same rationale.
+    try_package_body_dispatch!(input, start, port_usage, PackageBodyElement::PortUsage);
     try_package_body_dispatch!(
         input,
         start,
@@ -661,6 +676,14 @@ fn try_package_body_structure<'a>(
         connection_def,
         PackageBodyElement::ConnectionDef
     );
+    // PAR-002: standalone connection usage at package level, tried after `connection_def` above
+    // for the same reason as `port_usage`.
+    try_package_body_dispatch!(
+        input,
+        start,
+        crate::parser::part::connection_usage_member,
+        PackageBodyElement::ConnectionUsage
+    );
     try_package_body_dispatch!(input, start, dependency, PackageBodyElement::Dependency);
     try_package_body_dispatch!(
         input,
@@ -670,6 +693,23 @@ fn try_package_body_structure<'a>(
     );
     try_package_body_dispatch!(input, start, metadata_def, PackageBodyElement::MetadataDef);
     try_package_body_dispatch!(input, start, enum_def, PackageBodyElement::EnumDef);
+    // PAR-002: standalone enumeration usage at package level, tried after `enum_def` above for
+    // the same reason as `port_usage`.
+    try_package_body_dispatch!(
+        input,
+        start,
+        enum_usage,
+        PackageBodyElement::EnumerationUsage
+    );
+    // PAR-002: standalone `ref` declaration at package level (BNF `PackageMember` allows a bare
+    // `UsageElement`, and `ref` features are a legal usage shape). Reuses `part_ref_usage`, which
+    // despite its name has no part-specific grammar (`ref` (part)? name (: type)? (= value)?).
+    try_package_body_dispatch!(
+        input,
+        start,
+        crate::parser::part::part_ref_usage,
+        PackageBodyElement::Ref
+    );
     try_package_body_dispatch!(
         input,
         start,
@@ -736,6 +776,9 @@ fn try_package_body_behavior<'a>(
     try_package_body_dispatch!(input, start, state_def, PackageBodyElement::StateDef);
     try_package_body_dispatch!(input, start, state_usage, PackageBodyElement::StateUsage);
     try_package_body_dispatch!(input, start, item_def, PackageBodyElement::ItemDef);
+    // PAR-002: standalone item usage at package level, tried after `item_def` above (`def`-
+    // optional per its own dispatch here) for the same reason as `port_usage`/`AttributeUsage`.
+    try_package_body_dispatch!(input, start, item_usage, PackageBodyElement::ItemUsage);
     try_package_body_dispatch!(
         input,
         start,
@@ -1048,5 +1091,89 @@ mod tests {
             "package_body_brace should parse fixture body, got {:?}",
             result
         );
+    }
+
+    // --- PAR-002 increment 3: standalone usages at package level ---
+
+    fn parse_input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn package_body_accepts_standalone_attribute_usage_with_redefines() {
+        // `redefines` is a shape `attribute_def` doesn't accept but `attribute_usage` does --
+        // exercises the actual value-add of wiring `AttributeUsage` in behind `AttributeDef`.
+        let (rest, node) =
+            package_body_element(parse_input("attribute :>> mass = 5;")).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PackageBodyElement::AttributeUsage(_)));
+    }
+
+    #[test]
+    fn package_body_accepts_standalone_port_usage() {
+        let (rest, node) =
+            package_body_element(parse_input("port :>> p1: MyPortType;")).expect("port usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PackageBodyElement::PortUsage(_)));
+    }
+
+    #[test]
+    fn package_body_accepts_standalone_item_usage() {
+        let (rest, node) =
+            package_body_element(parse_input("item i1 subsets otherItem;")).expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PackageBodyElement::ItemUsage(_)));
+    }
+
+    #[test]
+    fn package_body_accepts_standalone_enumeration_usage() {
+        let (rest, node) =
+            package_body_element(parse_input("enum e1: MyEnum;")).expect("enum usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            PackageBodyElement::EnumerationUsage(_)
+        ));
+    }
+
+    #[test]
+    fn package_body_accepts_standalone_ref_declaration() {
+        let (rest, node) =
+            package_body_element(parse_input("ref r1: MyType;")).expect("ref declaration");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PackageBodyElement::Ref(_)));
+    }
+
+    #[test]
+    fn package_body_accepts_standalone_connection_usage() {
+        let (rest, node) =
+            package_body_element(parse_input("connection: LinkType;")).expect("connection usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PackageBodyElement::ConnectionUsage(_)));
+    }
+
+    /// PAR-002 acceptance criterion, increment 3: the same legal `:>>`-prefixed attribute usage
+    /// (a shape `attribute_def` cannot parse at all -- it has no leading-redefines-operator head)
+    /// yields the same AST variant kind at package level and nested in a part body.
+    #[test]
+    fn attribute_usage_with_redefines_is_same_variant_kind_at_package_level_and_nested_in_part() {
+        use crate::parser::part::part_def_body;
+        let text = "attribute :>> mass = 5;";
+        let (_, package_node) =
+            package_body_element(parse_input(text)).expect("package-level attribute usage");
+        assert!(matches!(
+            package_node.value,
+            PackageBodyElement::AttributeUsage(_)
+        ));
+        let part_text = format!("{{ {text} }}");
+        let (_, body) = part_def_body(parse_input(&part_text)).expect("nested attribute usage");
+        let crate::ast::PartDefBody::Brace { elements } = body else {
+            panic!("expected brace body");
+        };
+        assert_eq!(elements.len(), 1);
+        assert!(matches!(
+            elements[0].value,
+            crate::ast::PartDefBodyElement::AttributeUsage(_)
+        ));
     }
 }

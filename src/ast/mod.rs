@@ -263,6 +263,24 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::ExtendedLibraryDecl(n) => {
             PackageBodyElement::ExtendedLibraryDecl(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::AttributeUsage(n) => {
+            PackageBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
+        }
+        PackageBodyElement::ItemUsage(n) => {
+            PackageBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::PortUsage(n) => {
+            PackageBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
+        }
+        PackageBodyElement::ConnectionUsage(n) => {
+            PackageBodyElement::ConnectionUsage(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::Ref(n) => {
+            PackageBodyElement::Ref(dummy_node(n, normalize_ref_decl(&n.value)))
+        }
+        PackageBodyElement::EnumerationUsage(n) => {
+            PackageBodyElement::EnumerationUsage(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }

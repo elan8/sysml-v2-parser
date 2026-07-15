@@ -286,7 +286,9 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
     Ok((input, node_from_to(start, input, elem)))
 }
 
-fn connection_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
+pub(crate) fn connection_usage_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"connection"[..]).parse(input)?;

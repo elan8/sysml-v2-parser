@@ -11,12 +11,13 @@ use super::kerml_fallback::{
 };
 use super::requirement::{
     ActorDecl, AnalysisCaseDef, AnalysisCaseUsage, CaseDef, CaseUsage, ConcernUsage, Dependency,
-    RequirementDef, RequirementUsage, Satisfy, UseCaseDef, UseCaseUsage, VerificationCaseDef,
-    VerificationCaseUsage,
+    EnumerationUsage, ItemUsage, RequirementDef, RequirementUsage, Satisfy, UseCaseDef,
+    UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
 };
 use super::structure::{
-    AliasDef, AttributeDef, ConnectionDef, EnumDef, IndividualDef, InterfaceDef, ItemDef,
-    MetadataDef, MetadataUsage, OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, PortDef,
+    AliasDef, AttributeDef, AttributeUsage, ConnectionDef, ConnectionUsageMember, EnumDef,
+    IndividualDef, InterfaceDef, ItemDef, MetadataDef, MetadataUsage, OccurrenceDef,
+    OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
     CalcDef, ConstraintDef, RenderingDef, RenderingUsage, ViewDef, ViewUsage, ViewpointDef,
@@ -111,4 +112,18 @@ pub enum PackageBodyElement {
     KermlSemanticDecl(Node<KermlSemanticDecl>),
     KermlFeatureDecl(Node<KermlFeatureDecl>),
     ExtendedLibraryDecl(Node<ExtendedLibraryDecl>),
+    /// Standalone attribute usage at package level (PAR-002: `PackageMember` in the BNF allows
+    /// `DefinitionElement | UsageElement`, so a bare attribute usage is legal package content,
+    /// not just attribute definitions).
+    AttributeUsage(Node<AttributeUsage>),
+    /// Standalone item usage at package level. See `AttributeUsage`.
+    ItemUsage(Node<ItemUsage>),
+    /// Standalone port usage at package level. See `AttributeUsage`.
+    PortUsage(Node<PortUsage>),
+    /// Standalone connection usage at package level. See `AttributeUsage`.
+    ConnectionUsage(Node<ConnectionUsageMember>),
+    /// Standalone `ref` declaration at package level. See `AttributeUsage`.
+    Ref(Node<RefDecl>),
+    /// Standalone enumeration usage at package level. See `AttributeUsage`.
+    EnumerationUsage(Node<EnumerationUsage>),
 }
