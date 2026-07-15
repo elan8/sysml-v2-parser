@@ -7,6 +7,7 @@ pub use core::*;
 pub use kerml_fallback::*;
 mod behavior;
 mod common;
+mod feature_chain;
 mod package;
 mod requirement;
 mod root;
@@ -15,6 +16,7 @@ mod view;
 
 pub use behavior::*;
 pub use common::*;
+pub use feature_chain::*;
 pub use package::*;
 pub use requirement::*;
 pub use root::*;

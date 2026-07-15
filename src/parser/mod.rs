@@ -28,6 +28,7 @@ pub mod diagnostic_catalog;
 mod diagnostics;
 mod enumeration;
 mod expr;
+mod feature_chain;
 mod flow;
 mod import;
 mod individual;
