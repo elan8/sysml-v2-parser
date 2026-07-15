@@ -48,6 +48,32 @@ is done.
   lands, without needing to touch `expr.rs`. The parser function is unused today
   (`#[allow(dead_code)]`) until a relationship parser or PAR-005 calls it.
 
+### PAR-004/PAR-003 (item 5 of 6): structured `Multiplicity` bounds
+
+- **Added `ast::Multiplicity`**: multiplicity brackets (`[1..*]`, `[0..1]`, `[3]`) were stored as
+  raw `Option<String>` bracket text on 9 fields across `PartUsage`, `PortUsage`, `SuccessionUsage`
+  (three fields), `ItemUsage`, `EnumerationUsage`, `IncludeUseCase`, and `ReturnRef` — no
+  structured access to lower/upper bounds. New `Multiplicity { lower: Option<Box<Node<Expression>>>,
+  upper: Option<Box<Node<Expression>>>, span: Span }`, populated by a new
+  `parser::usage::multiplicity_node` that reuses the existing `expression()` parser for bound
+  expressions. A bare `[3]` sets `lower == upper == Some(3)`; `[1..*]` sets `upper = None`
+  (unbounded). `Multiplicity`'s `PartialEq` ignores `span`, matching `Node<T>`'s existing
+  convention, so hand-built expected ASTs in tests don't need to reproduce real spans.
+- **Found and fixed a real parsing regression while building this**: an initial version handed the
+  whole bracket content to `expression()` in one call. That broke `[1..*]` — `expression()`'s
+  binary-operator chain commits once it matches `..` as a range comparison operator and does not
+  backtrack when the right-hand side (`*`) fails to parse as a primary expression, so it hard-errors
+  instead of returning just the left operand. Caught by
+  `part_usage_ordered_before_colon_parses_without_recovery` in `tests/apollo_regressions.rs`, which
+  parses `part engines[1..*] ordered : RocketEngine;` — a real Systems Library shape. Fixed by
+  scanning for the closing `]` and an optional top-level `..` first, then handing each isolated
+  bound substring to `expression()` separately, rather than the whole bracket content at once. This
+  is exactly the class of regression this backlog's process discipline (run the full validation
+  gate after every change, not just once at the end) is meant to catch.
+- **Bumps `PARSE_AST_VERSION` to 10**: changes the schema of 9 existing struct fields
+  (`Option<String>` → `Option<Node<Multiplicity>>`), invalidating parse caches built against the
+  0.34.x schema.
+
 ## [0.34.0] - 2026-07-15
 
 ### Fixed
