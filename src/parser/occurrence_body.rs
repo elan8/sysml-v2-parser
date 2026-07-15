@@ -16,7 +16,7 @@ use crate::parser::node_from_to;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::part::part_usage;
 use crate::parser::requirement::{doc_comment, satisfy};
-use crate::parser::usage::{multiplicity as multiplicity_parser, optional_typings, specialization_clauses};
+use crate::parser::usage::{multiplicity_node as multiplicity_parser, optional_typings, specialization_clauses};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;

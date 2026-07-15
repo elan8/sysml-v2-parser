@@ -3,12 +3,22 @@
 use sysml_v2_parser::ast::{
     Bind, Connect, ConnectBody, ConnectStmt, EndDecl, Expression, Identification, Import,
     InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
-    InterfaceUsageBodyElement, Node, Package, PackageBody, PackageBodyElement, PartDef,
-    PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PortBody,
-    PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl,
-    RootElement, RootNamespace, Span, Visibility,
+    InterfaceUsageBodyElement, Multiplicity, Node, Package, PackageBody, PackageBodyElement,
+    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
+    PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
+    RefDecl, RootElement, RootNamespace, Span, Visibility,
 };
 use sysml_v2_parser::parse;
+
+/// Bare bracket multiplicity `[n]`, e.g. `mult(2)` for `[2]` (lower == upper == n).
+fn mult(v: i64) -> Node<Multiplicity> {
+    let bound = Some(Box::new(n(Expression::LiteralInteger(v))));
+    n(Multiplicity {
+        lower: bound.clone(),
+        upper: bound,
+        span: Span::dummy(),
+    })
+}
 
 fn id(name: &str) -> Identification {
     Identification {
@@ -159,7 +169,7 @@ fn port_def_vehicle_to_road() -> PackageBodyElement {
             elements: vec![n(PortDefBodyElement::PortUsage(n(PortUsage {
                 name: "wheelToRoadPort".to_string(),
                 type_name: Some("WheelToRoadPort".to_string()),
-                multiplicity: Some("[2]".to_string()),
+                multiplicity: Some(mult(2)),
                 subsets: None,
                 redefines: None,
                 references: None,
@@ -669,7 +679,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     is_individual: false,
                     name: "rearWheel".to_string(),
                     type_name: "Wheel".to_string(),
-                    multiplicity: Some("[2]".to_string()),
+                    multiplicity: Some(mult(2)),
                     ordered: true,
                     subsets: None,
                     redefines: None,

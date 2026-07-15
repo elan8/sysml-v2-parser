@@ -1,6 +1,6 @@
 //! Shared usage grammar fragments from `UsageDeclaration` / `FeatureSpecializationPart`.
 
-use crate::ast::{Expression, Node, Span};
+use crate::ast::{Expression, Multiplicity, Node, Span};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     crosses_operator, name, qualified_name, redefine_operator, references_operator,
@@ -42,6 +42,104 @@ pub(crate) fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
     Ok((
         input,
         format!("[{}]", String::from_utf8_lossy(content.fragment()).trim()),
+    ))
+}
+
+/// Byte offset of the `]` that closes multiplicity content starting at `frag` (the `[` is
+/// already consumed), tracking nested `[...]` depth so a bound expression like `a#(0)` — which
+/// itself contains no brackets, but future bound expressions might — doesn't confuse an inner
+/// `]` for the closing one. Returns `None` if unterminated.
+fn find_multiplicity_close(frag: &[u8]) -> Option<usize> {
+    let mut depth = 0i32;
+    for (i, &b) in frag.iter().enumerate() {
+        match b {
+            b'[' => depth += 1,
+            b']' => {
+                if depth == 0 {
+                    return Some(i);
+                }
+                depth -= 1;
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Byte offset of the first top-level `..` within `frag[..limit]` (not inside a nested
+/// `[...]`), or `None` if this is a bare bound with no range.
+fn find_top_level_range_dots(frag: &[u8], limit: usize) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut i = 0usize;
+    while i + 1 < limit {
+        match frag[i] {
+            b'[' => depth += 1,
+            b']' => depth -= 1,
+            _ => {}
+        }
+        if depth == 0 && frag[i] == b'.' && frag[i + 1] == b'.' {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Parse one already-isolated multiplicity bound slice: `*` (unbounded, renders as `None`) or a
+/// bound expression via [`expression`]. The slice is exactly the bound's text (whitespace
+/// aside), so any trailing remainder after a successful expression parse is ignored rather than
+/// enforced with `all_consuming` — there isn't anything else it could legally contain.
+fn parse_multiplicity_bound_text(
+    slice: Input<'_>,
+) -> Result<Option<Box<Node<Expression>>>, nom::Err<nom::error::Error<Input<'_>>>> {
+    let (rest, _) = ws_and_comments(slice)?;
+    if rest.fragment().first() == Some(&b'*') {
+        return Ok(None);
+    }
+    let (_, expr) = expression(rest)?;
+    Ok(Some(Box::new(expr)))
+}
+
+/// Multiplicity part, parsed into structured bounds: `'[' ('*' | bound ('..' ('*' | bound))?) ']'`.
+/// A bare `[3]` yields `lower == upper == Some(3)`; `[1..*]` yields `upper == None`. Bound text is
+/// isolated by scanning for the closing `]` and an optional top-level `..` first (rather than
+/// handing the whole bracket content to [`expression`] in one call), because `expression`'s
+/// binary-operator chain commits once it matches `..` as a range operator and does not backtrack
+/// if the right-hand side (`*`) fails to parse as a primary expression (PAR-004/PAR-003 item 5).
+pub(crate) fn multiplicity_node(input: Input<'_>) -> IResult<Input<'_>, Node<Multiplicity>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"["[..]).parse(input)?;
+    let frag = input.fragment();
+    let close_rel = find_multiplicity_close(frag).ok_or_else(|| {
+        nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::TakeUntil))
+    })?;
+    let dots_rel = find_top_level_range_dots(frag, close_rel);
+    let (lower, upper, input) = if let Some(d) = dots_rel {
+        let (rest, left_slice) = nom::bytes::complete::take(d).parse(input)?;
+        let (rest, _) = tag(&b".."[..]).parse(rest)?;
+        let right_len = close_rel - d - 2;
+        let (rest, right_slice) = nom::bytes::complete::take(right_len).parse(rest)?;
+        let lower = parse_multiplicity_bound_text(left_slice)?;
+        let upper = parse_multiplicity_bound_text(right_slice)?;
+        (lower, upper, rest)
+    } else {
+        let (rest, content_slice) = nom::bytes::complete::take(close_rel).parse(input)?;
+        let bound = parse_multiplicity_bound_text(content_slice)?;
+        (bound.clone(), bound, rest)
+    };
+    let (input, _) = tag(&b"]"[..]).parse(input)?;
+    let span = span_from_to(start, input);
+    Ok((
+        input,
+        Node::new(
+            span.clone(),
+            Multiplicity {
+                lower,
+                upper,
+                span,
+            },
+        ),
     ))
 }
 
@@ -393,5 +491,57 @@ mod tests {
         assert_eq!(clauses.references.as_deref(), Some("a, b"));
         assert_eq!(clauses.crosses.as_deref(), Some("c, d"));
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+}
+
+#[cfg(test)]
+mod multiplicity_node_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn parse_ok(src: &str) -> (String, Multiplicity) {
+        let input = LocatedSpan::new(src.as_bytes());
+        let (rest, node) = multiplicity_node(input).expect("multiplicity_node should parse");
+        (
+            String::from_utf8_lossy(rest.fragment()).into_owned(),
+            node.value,
+        )
+    }
+
+    #[test]
+    fn bare_number_sets_lower_and_upper_equal() {
+        let (_, m) = parse_ok("[3]");
+        assert_eq!(m.to_bracket_string(), "[3]");
+        assert_eq!(m.lower, m.upper);
+    }
+
+    #[test]
+    fn range_with_upper_bound() {
+        let (_, m) = parse_ok("[0..1]");
+        assert_eq!(m.to_bracket_string(), "[0..1]");
+    }
+
+    #[test]
+    fn range_with_unbounded_star_upper_does_not_hard_fail() {
+        // Regression: expression()'s binary-operator chain commits once it matches `..` as a
+        // range comparison operator and does not backtrack when the right-hand side (`*`) fails
+        // to parse as a primary expression — multiplicity_node must not hand the whole bracket
+        // content to expression() in one call, or this panics/hard-errors instead of parsing.
+        let (rest, m) = parse_ok("[1..*] ordered : RocketEngine;");
+        assert_eq!(m.to_bracket_string(), "[1..*]");
+        assert_eq!(rest.trim_start(), "ordered : RocketEngine;");
+    }
+
+    #[test]
+    fn bare_unbounded_star() {
+        let (_, m) = parse_ok("[*]");
+        assert_eq!(m.to_bracket_string(), "[*]");
+        assert!(m.lower.is_none() && m.upper.is_none());
+    }
+
+    #[test]
+    fn bare_feature_ref_bound() {
+        let (_, m) = parse_ok("[seBeforeNum]");
+        assert_eq!(m.to_bracket_string(), "[seBeforeNum]");
     }
 }

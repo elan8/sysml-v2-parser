@@ -2,7 +2,7 @@ use super::behavior::{ActionDefBodyElement, Allocate, InOut, InOutDecl, StateDef
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::view::{CalcUsage, ConstraintDefBody};
-use crate::ast::core::{Expression, Node, Span};
+use crate::ast::core::{Expression, Multiplicity, Node, Span};
 
 /// Part definition: `part def` Identification (`:>` specializes)? Body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -185,8 +185,8 @@ pub struct PartUsage {
     pub name: String,
     /// Type after `:`, e.g. "Vehicle", "AxleAssembly".
     pub type_name: String,
-    /// Multiplicity, e.g. Some("[2]").
-    pub multiplicity: Option<String>,
+    /// Multiplicity, e.g. `[2]` parsed into structured lower/upper bounds.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub ordered: bool,
     /// Optional `subsets` feature and value expression.
     pub subsets: Option<(String, Option<Node<Expression>>)>,
@@ -411,7 +411,7 @@ pub enum PortDefBodyElement {
 pub struct PortUsage {
     pub name: String,
     pub type_name: Option<String>,
-    pub multiplicity: Option<String>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Subsets feature and optional value expression.
     pub subsets: Option<(String, Option<Node<Expression>>)>,
     pub redefines: Option<String>,
@@ -692,13 +692,13 @@ pub enum OccurrenceBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SuccessionUsage {
     /// Multiplicity of the succession feature itself, e.g. `[seBeforeNum]`.
-    pub multiplicity: Option<String>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub source: Node<Expression>,
     /// Multiplicity on the `first` end, e.g. `[0..1]`.
-    pub source_multiplicity: Option<String>,
+    pub source_multiplicity: Option<Node<Multiplicity>>,
     pub target: Node<Expression>,
     /// Multiplicity on the `then` end, e.g. `[0..1]`.
-    pub target_multiplicity: Option<String>,
+    pub target_multiplicity: Option<Node<Multiplicity>>,
     pub body: ConnectBody,
 }
 

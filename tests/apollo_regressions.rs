@@ -488,7 +488,7 @@ fn part_usage_accepts_multiplicity_before_type() {
         _ => panic!("expected part usage"),
     };
     assert_eq!(suit.name, "spaceSuits");
-    assert_eq!(suit.multiplicity.as_deref(), Some("[2]"));
+    assert_eq!(suit.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[2]".to_string()));
     assert_eq!(suit.type_name, "ExtravehicularMobilityUnit");
     assert_eq!(
         suit.subsets.as_ref().map(|(name, _)| name.as_str()),
@@ -748,7 +748,7 @@ fn part_redefinition_value_parses_parenthesized_tuple_of_engines() {
             _ => None,
         })
         .expect("engines part usage");
-    assert_eq!(engines.value.multiplicity.as_deref(), Some("[5]"));
+    assert_eq!(engines.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[5]".to_string()));
     let value = engines
         .value
         .value
@@ -891,6 +891,6 @@ fn part_def_body_item_usage_parses() {
         })
         .expect("item usage in part def body");
     assert_eq!(item.name, "concerns");
-    assert_eq!(item.multiplicity.as_deref(), Some("[*]"));
+    assert_eq!(item.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[*]".to_string()));
     assert_eq!(item.type_name.as_deref(), Some("Concern"));
 }

@@ -17,7 +17,7 @@ use crate::parser::lex::{
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
-use crate::parser::usage::usage_header;
+use crate::parser::usage::{multiplicity_node, usage_header};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
 use nom::branch::alt;
@@ -33,31 +33,6 @@ fn slice_text(start: Input<'_>, end: Input<'_>) -> String {
     let bytes = start.fragment();
     let take = delta.min(bytes.len());
     String::from_utf8_lossy(&bytes[..take]).trim().to_string()
-}
-
-fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, _) = ws_and_comments(input)?;
-    let frag = input.fragment();
-    if !frag.starts_with(b"[") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    // Reuse the generic block skipper by treating the [...] as a statement up to a `]`.
-    let mut i = 0usize;
-    while i < frag.len() && frag[i] != b']' {
-        i += 1;
-    }
-    if i >= frag.len() {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Eof,
-        )));
-    }
-    let s = String::from_utf8_lossy(&frag[..=i]).trim().to_string();
-    let (input, _) = nom::bytes::complete::take(i + 1usize).parse(input)?;
-    Ok((input, s))
 }
 
 fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
@@ -93,7 +68,7 @@ fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>
     let (input, _) = preceded(ws_and_comments, tag(&b"include"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, n) = name(input)?;
-    let (input, mult) = opt(multiplicity).parse(input)?;
+    let (input, mult) = opt(multiplicity_node).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = use_case_def_body(input)?;
     Ok((
@@ -287,7 +262,7 @@ fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, n) = name(input)?;
-    let (input, mult) = opt(multiplicity).parse(input)?;
+    let (input, mult) = opt(multiplicity_node).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (body, return_expression)) = return_ref_body(input)?;
     Ok((

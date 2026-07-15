@@ -6,7 +6,7 @@ use super::structure::{
     MetadataKeywordUsage,
 };
 use super::view::ConstraintDefBodyElement;
-use crate::ast::core::{Expression, Node, Span};
+use crate::ast::core::{Expression, Multiplicity, Node, Span};
 
 /// Requirement definition: `requirement def` Identification (`:>` specializes)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -164,7 +164,7 @@ pub struct RequirementUsage {
 pub struct ItemUsage {
     pub name: String,
     pub type_name: Option<String>,
-    pub multiplicity: Option<String>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub body: AttributeBody,
     /// Set when parsed as `in`/`out`/`inout item` in port def bodies.
     pub direction: Option<InOut>,
@@ -176,7 +176,7 @@ pub struct ItemUsage {
 pub struct EnumerationUsage {
     pub name: String,
     pub type_name: Option<String>,
-    pub multiplicity: Option<String>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub body: AttributeBody,
 }
 
@@ -336,8 +336,8 @@ pub struct ThenDone {}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IncludeUseCase {
     pub name: String,
-    /// Optional multiplicity suffix like `[0..*]` captured as raw text including brackets.
-    pub multiplicity: Option<String>,
+    /// Optional multiplicity suffix like `[0..*]`, parsed into structured lower/upper bounds.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub body: UseCaseDefBody,
 }
 
@@ -396,7 +396,7 @@ pub struct CaseReturnDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReturnRef {
     pub name: String,
-    pub multiplicity: Option<String>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Raw body text (balanced `{ ... }` including nested braces).
     pub body: String,
     /// Structured `return <expr>;` inside the body when parsed.

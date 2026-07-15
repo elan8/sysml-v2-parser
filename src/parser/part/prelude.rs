@@ -36,7 +36,7 @@ pub(crate) use crate::parser::requirement::{
 };
 pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
 pub(crate) use crate::parser::usage::{
-    multiplicity, optional_typings, prefix_redefinition_target, redefinition,
+    multiplicity_node, optional_typings, prefix_redefinition_target, redefinition,
     specialization_clauses, subsetting, typings,
 };
 pub(crate) use crate::parser::with_span;

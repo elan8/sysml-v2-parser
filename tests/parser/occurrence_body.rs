@@ -220,9 +220,21 @@ fn flow_def_body_parses_succession_usage_with_multiplicities_like_systems_librar
             _ => None,
         })
         .expect("expected a SuccessionUsage node");
-    assert_eq!(succession.multiplicity.as_deref(), Some("[seBeforeNum]"));
-    assert_eq!(succession.source_multiplicity.as_deref(), Some("[0..1]"));
-    assert_eq!(succession.target_multiplicity.as_deref(), Some("[0..1]"));
+    assert_eq!(succession.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[seBeforeNum]".to_string()));
+    assert_eq!(
+        succession
+            .source_multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[0..1]".to_string())
+    );
+    assert_eq!(
+        succession
+            .target_multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[0..1]".to_string())
+    );
     assert!(matches!(&succession.source.value, Expression::FeatureRef(n) if n == "sourceEvent"));
     assert!(matches!(&succession.target.value, Expression::FeatureRef(n) if n == "self"));
 }

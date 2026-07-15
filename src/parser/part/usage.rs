@@ -31,7 +31,7 @@ pub(crate) fn part_usage_redefines_only<'a>(
     input: Input<'a>,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, (_, redefines_qname)) = prefix_redefinition_target(input)?;
-    let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
+    let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let (input, ordered) = usage_ordered_modifier(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
@@ -66,18 +66,18 @@ pub(crate) fn part_usage_named<'a>(
     let (input, _) = opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
+    let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let (input, ordered_before_type) = usage_ordered_modifier(input)?;
     let (input, type_result) = optional_typings(input)?;
     let (type_ref_span, type_name) = type_result
         .map(|(s, t)| (Some(s), t))
         .unwrap_or((None, String::new()));
-    let (input, trailing_multiplicity_opt) = opt(multiplicity).parse(input)?;
+    let (input, trailing_multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(trailing_multiplicity_opt);
     let (input, ordered_after_type) = usage_ordered_modifier(input)?;
     let ordered = ordered_before_type || ordered_after_type;
     let (input, leading_clauses) = specialization_clauses(input)?;
-    let (input, post_clause_multiplicity) = opt(multiplicity).parse(input)?;
+    let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
     let (input, ordered_after_clauses) = usage_ordered_modifier(input)?;
     let ordered = ordered || ordered_after_clauses;
@@ -166,15 +166,15 @@ fn anonymous_part_usage<'a>(
     start: Input<'a>,
     input: Input<'a>,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
-    let (input, multiplicity_before) = opt(multiplicity).parse(input)?;
+    let (input, multiplicity_before) = opt(multiplicity_node).parse(input)?;
     let (input, ordered_before_type) = usage_ordered_modifier(input)?;
     let (input, (type_ref_span, type_name)) = typings(input)?;
-    let (input, multiplicity_after) = opt(multiplicity).parse(input)?;
+    let (input, multiplicity_after) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_before.or(multiplicity_after);
     let (input, ordered_after_type) = usage_ordered_modifier(input)?;
     let ordered = ordered_before_type || ordered_after_type;
     let (input, clauses) = specialization_clauses(input)?;
-    let (input, post_clause_multiplicity) = opt(multiplicity).parse(input)?;
+    let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
     let (input, ordered_after_clauses) = usage_ordered_modifier(input)?;
     let ordered = ordered || ordered_after_clauses;
@@ -628,7 +628,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     };
     let (input, named_interface) = opt((
         name,
-        opt(multiplicity),
+        opt(multiplicity_node),
         preceded(ws_and_comments, tag(&b":"[..])),
         preceded(ws_and_comments, qualified_name),
     ))

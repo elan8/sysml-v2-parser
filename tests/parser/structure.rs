@@ -1320,7 +1320,7 @@ part def Carrier {
         port_usage.value.type_name.as_deref(),
         Some("~Ports::FuelPort, Ports::CommandPort")
     );
-    assert_eq!(port_usage.value.multiplicity.as_deref(), Some("[1]"));
+    assert_eq!(port_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
     assert_eq!(
         port_usage
             .value
@@ -1363,7 +1363,7 @@ part def Carrier {
         port_usage.value.type_name.as_deref(),
         Some("~Ports::FuelPort, Ports::CommandPort")
     );
-    assert_eq!(port_usage.value.multiplicity.as_deref(), Some("[1]"));
+    assert_eq!(port_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
     assert_eq!(
         port_usage
             .value
@@ -1960,7 +1960,7 @@ part def Carrier {
         part_usage.value.type_name,
         "Vehicle::Engine, Vehicle::PoweredComponent"
     );
-    assert_eq!(part_usage.value.multiplicity.as_deref(), Some("[1]"));
+    assert_eq!(part_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
     assert_eq!(
         part_usage
             .value
@@ -2004,7 +2004,7 @@ part def Carrier {
         part_usage.value.type_name,
         "Vehicle::Engine, Vehicle::PoweredComponent"
     );
-    assert_eq!(part_usage.value.multiplicity.as_deref(), Some("[1]"));
+    assert_eq!(part_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
     assert_eq!(
         part_usage
             .value
@@ -2085,7 +2085,7 @@ part def Carrier {
     };
     assert!(part_usage.value.name.is_empty());
     assert_eq!(part_usage.value.type_name, "Vehicle::Engine");
-    assert_eq!(part_usage.value.multiplicity.as_deref(), Some("[2]"));
+    assert_eq!(part_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[2]".to_string()));
 }
 
 #[test]
@@ -2099,7 +2099,7 @@ part def FourCylinderEngine :> Engine {
     let part_usage = part_def_body_part_usage(&result, 0, 0);
     assert!(part_usage.name.is_empty());
     assert_eq!(part_usage.redefines.as_deref(), Some("cylinders"));
-    assert_eq!(part_usage.multiplicity.as_deref(), Some("[4]"));
+    assert_eq!(part_usage.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[4]".to_string()));
 }
 
 #[test]
@@ -2123,7 +2123,7 @@ part def logicalDriveUnit {
     let part_usage = nested_part_usage_in_part_usage(&diag.root, 0, 0, 0);
     assert_eq!(part_usage.name, "tire1");
     assert_eq!(part_usage.redefines.as_deref(), Some("motorTire"));
-    assert_eq!(part_usage.multiplicity.as_deref(), Some("[1]"));
+    assert_eq!(part_usage.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
 }
 
 #[test]

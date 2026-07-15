@@ -285,6 +285,56 @@ pub enum Expression {
     Null,
 }
 
+/// Multiplicity bounds, e.g. `[1..*]`, `[0..1]`, `[3]` (PAR-004/PAR-003 item 5).
+///
+/// A bare bound like `[3]` means `lower == upper == Some(3)`. An unbounded `*` (as in `[1..*]` or
+/// bare `[*]`) is represented as `None` for that side.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Multiplicity {
+    /// Lower bound expression, e.g. `1` in `[1..*]`. `None` when the lower bound is unbounded
+    /// (bare `[*]` with no explicit lower bound).
+    pub lower: Option<Box<Node<Expression>>>,
+    /// Upper bound expression, e.g. `*` renders as `None` (unbounded); `10` in `[1..10]` is
+    /// `Some(10)`.
+    pub upper: Option<Box<Node<Expression>>>,
+    /// Span of the whole `[...]` fragment, including the brackets.
+    pub span: Span,
+}
+
+/// Equality ignores `span`, matching `Node<T>`'s convention elsewhere in this crate: hand-built
+/// expected ASTs in tests don't need to reproduce real source spans to compare equal.
+impl PartialEq for Multiplicity {
+    fn eq(&self, other: &Self) -> bool {
+        self.lower == other.lower && self.upper == other.upper
+    }
+}
+
+impl Eq for Multiplicity {}
+
+impl Multiplicity {
+    /// Renders the multiplicity back to canonical bracket text, e.g. `[1]`, `[0..1]`, `[1..*]`.
+    /// Literal integer bounds and the unbounded `*` render exactly; other bound expressions fall
+    /// back to their `Debug` form. Intended for tests/diagnostics, not for round-tripping source.
+    pub fn to_bracket_string(&self) -> String {
+        fn bound_str(bound: &Option<Box<Node<Expression>>>) -> String {
+            match bound {
+                None => "*".to_string(),
+                Some(node) => match &node.value {
+                    Expression::LiteralInteger(i) => i.to_string(),
+                    Expression::FeatureRef(name) => name.clone(),
+                    other => format!("{other:?}"),
+                },
+            }
+        }
+        if self.lower == self.upper {
+            format!("[{}]", bound_str(&self.lower))
+        } else {
+            format!("[{}..{}]", bound_str(&self.lower), bound_str(&self.upper))
+        }
+    }
+}
+
 impl Expression {
     /// Whether this expression node is a literal Boolean.
     pub fn is_boolean_literal(&self) -> bool {
