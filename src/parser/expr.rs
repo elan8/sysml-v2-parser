@@ -828,7 +828,7 @@ pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expre
     }
     let span = crate::parser::span_from_to(start, rest);
     let expr = if segments.len() == 1 {
-        Expression::FeatureRef(segments.into_iter().next().unwrap())
+        Expression::FeatureRef(segments.remove(0))
     } else {
         Expression::FeatureChainRef(FeatureChain { segments, span })
     };
