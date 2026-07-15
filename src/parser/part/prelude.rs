@@ -25,15 +25,19 @@ pub(crate) use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, starts_with_any_keyword,
     starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
 };
+pub(crate) use crate::parser::flow::flow_def;
+pub(crate) use crate::parser::metadata::{metadata_def, metadata_usage};
 pub(crate) use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 pub(crate) use crate::parser::node_from_to;
 pub(crate) use crate::parser::occurrence::{
-    individual_usage, occurrence_usage, snapshot_usage, then_timeslice_usage, timeslice_usage,
+    individual_usage, occurrence_def, occurrence_usage, snapshot_usage, then_timeslice_usage,
+    timeslice_usage,
 };
 pub(crate) use crate::parser::port::port_usage;
 pub(crate) use crate::parser::requirement::{
-    comment_annotation, doc_comment, requirement_usage, satisfy,
+    comment_annotation, doc_comment, requirement_def, requirement_usage, satisfy,
 };
+pub(crate) use crate::parser::state::state_def;
 pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
 pub(crate) use crate::parser::usage::{
     multiplicity_node, optional_typings, prefix_redefinition_target, redefinition,

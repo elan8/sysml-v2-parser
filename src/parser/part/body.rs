@@ -175,6 +175,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(allocate_, PartDefBodyElement::Allocate),
             map(connection_usage_member, PartDefBodyElement::Connection),
             map(connect_, PartDefBodyElement::Connect),
+            // `flow_def` (def_required internally) must be tried before `flow_usage_member`:
+            // the latter has no guard against a bare `def` keyword being consumed as a flow
+            // usage's name, which misparses `flow def DataFlow;` as `FlowUsage { name: "def" }`.
+            map(flow_def, PartDefBodyElement::FlowDef),
             map(
                 crate::parser::flow::flow_usage_member,
                 PartDefBodyElement::FlowUsage,
@@ -211,6 +215,19 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             ),
             map(enum_usage, PartDefBodyElement::EnumerationUsage),
             map(requirement_usage, PartDefBodyElement::RequirementUsage),
+        )),
+        alt((
+            // PAR-002: nested `def` kinds that were previously only reachable at package level.
+            // Each of these parsers already applies `DefinitionPrefixOptions::def_required()`
+            // internally (state, requirement, occurrence, flow -- see their own modules), so
+            // there is no PAR-001-class ambiguity risk stacking them ahead of their usage-only
+            // siblings here: a bare (`def`-less) declaration always falls through to the usage
+            // arm above/below instead.
+            map(state_def, PartDefBodyElement::StateDef),
+            map(requirement_def, PartDefBodyElement::RequirementDef),
+            map(occurrence_def, PartDefBodyElement::OccurrenceDef),
+            map(metadata_usage, PartDefBodyElement::MetadataUsage),
+            map(metadata_def, PartDefBodyElement::MetadataDef),
             map(item_def_required, PartDefBodyElement::ItemDef),
             map(item_usage, PartDefBodyElement::ItemUsage),
             map(
@@ -378,4 +395,124 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod par_002_nested_def_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_state_def() {
+        let text = "state def Modes { state on; state off; }";
+        let (rest, node) = part_def_body_element(input(text)).expect("state def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            matches!(node.value, PartDefBodyElement::StateDef(_)),
+            "expected StateDef, got {:?}",
+            node.value
+        );
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_metadata_def() {
+        let text = "metadata def MyMeta;";
+        let (rest, node) = part_def_body_element(input(text)).expect("metadata def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            matches!(node.value, PartDefBodyElement::MetadataDef(_)),
+            "expected MetadataDef, got {:?}",
+            node.value
+        );
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_flow_def() {
+        let text = "flow def DataFlow;";
+        let (rest, node) = part_def_body_element(input(text)).expect("flow def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            matches!(node.value, PartDefBodyElement::FlowDef(_)),
+            "expected FlowDef, got {:?}",
+            node.value
+        );
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_requirement_def() {
+        let text = "requirement def SafetyReq;";
+        let (rest, node) = part_def_body_element(input(text)).expect("requirement def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            matches!(node.value, PartDefBodyElement::RequirementDef(_)),
+            "expected RequirementDef, got {:?}",
+            node.value
+        );
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_occurrence_def() {
+        let text = "occurrence def Failure;";
+        let (rest, node) = part_def_body_element(input(text)).expect("occurrence def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            matches!(node.value, PartDefBodyElement::OccurrenceDef(_)),
+            "expected OccurrenceDef, got {:?}",
+            node.value
+        );
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_metadata_usage_and_still_prefers_def() {
+        // Bare `metadata` (no `def`) must still dispatch to MetadataUsage, not misfire into
+        // MetadataDef (metadata_def uses def_required() internally, so this also exercises that
+        // guard rather than relying purely on dispatch order).
+        let (rest, node) =
+            part_def_body_element(input("metadata approvedBy;")).expect("metadata usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(
+            matches!(node.value, PartDefBodyElement::MetadataUsage(_)),
+            "expected MetadataUsage, got {:?}",
+            node.value
+        );
+    }
+
+    /// PAR-002 acceptance criterion: the same legal declaration retains the same semantic AST
+    /// variant kind whether it appears at package level or nested in a part definition body.
+    #[test]
+    fn state_def_is_same_variant_kind_at_package_level_and_nested_in_part() {
+        use crate::parser::package::package_body_element;
+
+        let text = "state def Modes { state on; state off; }";
+        let (_, package_node) =
+            package_body_element(input(text)).expect("package-level state def");
+        let (_, part_node) = part_def_body_element(input(text)).expect("nested state def");
+        assert!(matches!(
+            package_node.value,
+            crate::ast::PackageBodyElement::StateDef(_)
+        ));
+        assert!(matches!(part_node.value, PartDefBodyElement::StateDef(_)));
+    }
+
+    #[test]
+    fn requirement_def_is_same_variant_kind_at_package_level_and_nested_in_part() {
+        use crate::parser::package::package_body_element;
+
+        let text = "requirement def SafetyReq;";
+        let (_, package_node) =
+            package_body_element(input(text)).expect("package-level requirement def");
+        let (_, part_node) = part_def_body_element(input(text)).expect("nested requirement def");
+        assert!(matches!(
+            package_node.value,
+            crate::ast::PackageBodyElement::RequirementDef(_)
+        ));
+        assert!(matches!(
+            part_node.value,
+            PartDefBodyElement::RequirementDef(_)
+        ));
+    }
 }

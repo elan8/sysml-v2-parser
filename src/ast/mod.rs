@@ -393,6 +393,24 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::VariantUsage(n) => {
             PartDefBodyElement::VariantUsage(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::StateDef(n) => {
+            PartDefBodyElement::StateDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::MetadataDef(n) => {
+            PartDefBodyElement::MetadataDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::MetadataUsage(n) => {
+            PartDefBodyElement::MetadataUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::FlowDef(n) => {
+            PartDefBodyElement::FlowDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::RequirementDef(n) => {
+            PartDefBodyElement::RequirementDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::OccurrenceDef(n) => {
+            PartDefBodyElement::OccurrenceDef(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }

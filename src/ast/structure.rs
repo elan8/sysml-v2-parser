@@ -82,6 +82,23 @@ pub enum PartDefBodyElement {
     Satisfy(Node<Satisfy>),
     /// `variant` name `;` — a variant member inside a `variation part def` body.
     VariantUsage(Node<VariantUsage>),
+    /// `state def` nested inside a part definition body (PAR-002: previously only reachable
+    /// via the `exhibit state` usage wrapper, never as a standalone nested definition).
+    StateDef(Node<crate::ast::behavior::StateDef>),
+    /// `metadata def` nested inside a part definition body (PAR-002: previously only
+    /// `MetadataAnnotation`/`MetadataKeywordUsage` were reachable here).
+    MetadataDef(Node<MetadataDef>),
+    /// `metadata` usage (no `def`) nested inside a part definition body. See `MetadataDef`.
+    MetadataUsage(Node<MetadataUsage>),
+    /// `flow def` nested inside a part definition body (PAR-002: previously only `FlowUsage`
+    /// was reachable here).
+    FlowDef(Node<crate::ast::behavior::FlowDef>),
+    /// `requirement def` nested inside a part definition body (PAR-002: previously only
+    /// `RequirementUsage` was reachable here).
+    RequirementDef(Node<crate::ast::requirement::RequirementDef>),
+    /// `occurrence def` nested inside a part definition body (PAR-002: previously only
+    /// `OccurrenceUsage` was reachable here).
+    OccurrenceDef(Node<OccurrenceDef>),
 }
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.

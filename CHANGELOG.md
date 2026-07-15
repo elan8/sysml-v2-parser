@@ -63,6 +63,46 @@ is done.
   marginal value versus the relationship/target spans that matter for semantic tokens and
   diagnostics. Left as-is; flagging here rather than silently skipping.
 
+### PAR-002 (increment 1 of N): nested `def` kinds in `PartDefBodyElement`
+
+- **Added `StateDef`, `MetadataDef`, `MetadataUsage`, `FlowDef`, `RequirementDef`,
+  `OccurrenceDef` to `PartDefBodyElement`** (`src/ast/structure.rs`), wired into
+  `part_def_body_element` (`src/parser/part/body.rs`) using the existing standalone
+  `state_def`/`metadata_def`/`metadata_usage`/`flow_def`/`requirement_def`/`occurrence_def`
+  parsers -- no new parsers needed, these already existed and were already reachable at package
+  level (`PackageBodyElement` already had all six), just not nested inside a part definition body.
+  Before this, `state def`, `metadata def`, `flow def`, `requirement def`, and `occurrence def`
+  written inside a `part def { ... }` body could only be reached indirectly (`exhibit state` for
+  state, or not at all for the others) or fell through to `Other`/`Error`.
+- **`def_required()` reuse, no new guard needed**: `state_def`, `requirement_def`, and
+  `occurrence_def` already call `DefinitionPrefixOptions::def_required()` internally (per
+  PAR-006a), so wiring them in required no extra disambiguation work -- a bare (`def`-less)
+  declaration always still falls through to the sibling usage arm.
+- **Found and fixed a real ambiguity bug while wiring `flow_def`**: `flow_usage_member` (used for
+  bare `FlowUsage` dispatch) has no guard against the `def` keyword and was misparsing `flow def
+  DataFlow;` as `FlowUsage { name: "def" }` when tried first. Fixed by reordering `flow_def` ahead
+  of `flow_usage_member` in `part_def_body_element`'s `alt`, matching the order package-level
+  dispatch (`try_package_body_structure` in `src/parser/package.rs`) already used. Caught by the
+  new `part_def_body_accepts_nested_flow_def` test before it could regress silently -- exactly the
+  PAR-001-class bug this backlog's process discipline is meant to catch.
+- **PAR-002 acceptance-criterion tests added**: `state_def_is_same_variant_kind_at_package_level_and_nested_in_part`
+  and `requirement_def_is_same_variant_kind_at_package_level_and_nested_in_part`
+  (`src/parser/part/body.rs`) parse the same snippet at package level and nested in a part body,
+  asserting the same AST variant kind both times.
+- **Scope remaining for `PartDefBodyElement`** (not done in this increment, see gaps doc /
+  PAR-002 task description): `ConnectionDef` (only `ConnectionUsageMember`, a usage shape, exists
+  today), `AllocationDef`/`AllocationUsage`, `ViewDef`/`ViewUsage`, `ViewpointDef`/`ViewpointUsage`,
+  `RenderingDef`/`RenderingUsage`, `CaseDef`/`CaseUsage`, `UseCaseDef`/`UseCaseUsage`,
+  `AnalysisCaseDef`/`AnalysisCaseUsage`, `VerificationCaseDef`/`VerificationCaseUsage`, `PortDef`
+  (has `PortUsage` only -- needs a new `port_def_required()` variant since the standalone `port_def`
+  deliberately keeps `def` optional, see its own doc comment, so it cannot be wired in as-is without
+  reintroducing a PAR-001-class ambiguity against `port_usage`), `CalcDef` (same issue: `calc_def`
+  deliberately keeps `def` optional at namespace level, needs a `calc_def_required()` variant before
+  it can be safely nested). `PartUsageBodyElement` (zero Def-kind variants), `PortDefBodyElement`/
+  `PortBodyElement`, `InterfaceDefBodyElement`/`ConnectionDefBodyElement` are still unaddressed.
+  `PackageBodyElement`'s own gaps (standalone `AttributeUsage`/`ItemUsage`/`PortUsage`,
+  `ConnectionUsage`, `RefDecl` usage, `EnumerationUsage`) are also still unaddressed.
+
 ### PAR-006a: recovery-guard foundation
 
 - **Confirmed the PAR-001 disambiguation fix was already generalized**: `attribute_def`'s
