@@ -30,7 +30,6 @@ pub(crate) fn metadata_def(input: Input<'_>) -> IResult<Input<'_>, Node<Metadata
                 is_abstract: prefix.is_abstract,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

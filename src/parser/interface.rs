@@ -257,7 +257,6 @@ fn parse_interface_def(
             InterfaceDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

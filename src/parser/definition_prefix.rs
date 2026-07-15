@@ -17,7 +17,7 @@
 //! Any new body-enum wiring (PAR-002) that adds a `def`/usage pair sharing a keyword must use
 //! this module rather than hand-rolling another bespoke guard.
 
-use crate::ast::{Identification, Span};
+use crate::ast::{Identification, Node, TypingRelationship};
 use crate::parser::definition_header::parse_definition_header_after_ident;
 use crate::parser::lex::{identification, ws1, ws_and_comments};
 use crate::parser::Input;
@@ -99,8 +99,7 @@ impl DefinitionPrefixOptions {
 #[derive(Debug, Clone)]
 pub struct DefinitionPrefixResult {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub annotation: Option<String>,
     pub is_abstract: bool,
 }
@@ -164,14 +163,12 @@ pub(crate) fn parse_definition_prefix(
     let (input, identification) = identification(input)?;
     let (input, header) = parse_definition_header_after_ident(input)?;
     let specializes = header.specializes;
-    let specializes_span = header.specializes_span;
 
     Ok((
         input,
         DefinitionPrefixResult {
             identification,
             specializes,
-            specializes_span,
             annotation,
             is_abstract,
         },
@@ -194,7 +191,7 @@ mod tests {
             parse_definition_prefix(input, DefinitionPrefixOptions::new(b"item")).expect("prefix");
         assert!(prefix.is_abstract);
         assert_eq!(prefix.identification.name.as_deref(), Some("Foo"));
-        assert_eq!(prefix.specializes.as_deref(), Some("Base"));
+        assert_eq!(prefix.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Base"));
         assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
     }
 
@@ -207,7 +204,7 @@ mod tests {
         )
         .expect("prefix");
         assert_eq!(prefix.identification.name.as_deref(), Some("connections"));
-        assert_eq!(prefix.specializes.as_deref(), Some("linkObjects, parts"));
+        assert_eq!(prefix.specializes.as_ref().map(|n| n.value.target.as_str()), Some("linkObjects, parts"));
         assert!(rest.fragment().starts_with(b"{"));
     }
 
@@ -221,7 +218,7 @@ mod tests {
         .expect("prefix");
         assert_eq!(prefix.annotation.as_deref(), Some("MyConn"));
         assert!(prefix.is_abstract);
-        assert_eq!(prefix.specializes.as_deref(), Some("Base"));
+        assert_eq!(prefix.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Base"));
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -250,6 +247,6 @@ mod tests {
         )
         .expect("prefix");
         assert!(!prefix.is_abstract);
-        assert_eq!(prefix.specializes.as_deref(), Some("Y"));
+        assert_eq!(prefix.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Y"));
     }
 }

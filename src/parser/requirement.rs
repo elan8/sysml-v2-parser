@@ -90,7 +90,6 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
             RequirementDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 is_abstract: prefix.is_abstract,
                 body,
             },

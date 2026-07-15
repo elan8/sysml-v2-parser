@@ -205,7 +205,7 @@ fn test_enum_def_with_specialization_and_assigned_literals_maps_dedicated() {
     let PackageBodyElement::EnumDef(enum_def) = &elements[0].value else {
         panic!("expected enum def");
     };
-    assert_eq!(enum_def.value.specializes.as_deref(), Some("Level"));
+    assert_eq!(enum_def.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Level"));
     assert!(
         !elements
             .iter()
@@ -789,9 +789,9 @@ part def A specializes B;
         PackageBodyElement::PartDef(p) => p,
         other => panic!("expected part def, got {:?}", other),
     };
-    assert_eq!(part_def.value.specializes.as_deref(), Some("B"));
+    assert_eq!(part_def.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("B"));
     assert!(
-        part_def.value.specializes_span.is_some(),
+        part_def.value.specializes.is_some(),
         "specializes span should be present for keyword form"
     );
 }
@@ -814,9 +814,9 @@ part def A :> B, C, D;
         PackageBodyElement::PartDef(part) => part,
         other => panic!("expected part definition, got {:?}", other),
     };
-    assert_eq!(part_def.value.specializes.as_deref(), Some("B, C, D"));
+    assert_eq!(part_def.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("B, C, D"));
     assert!(
-        part_def.value.specializes_span.is_some(),
+        part_def.value.specializes.is_some(),
         "specializes span should be present for multi-target form"
     );
 }
@@ -839,7 +839,7 @@ port def ControlPort specializes BasePort;
         PackageBodyElement::PortDef(p) => p,
         other => panic!("expected port def, got {:?}", other),
     };
-    assert_eq!(port_def.value.specializes.as_deref(), Some("BasePort"));
+    assert_eq!(port_def.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("BasePort"));
 }
 
 #[test]
@@ -861,10 +861,10 @@ port def ControlPort :> BasePort, DiagnosticPort;
         other => panic!("expected port definition, got {:?}", other),
     };
     assert_eq!(
-        port_def.value.specializes.as_deref(),
+        port_def.value.specializes.as_ref().map(|n| n.value.target.as_str()),
         Some("BasePort, DiagnosticPort")
     );
-    assert!(port_def.value.specializes_span.is_some());
+    assert!(port_def.value.specializes.is_some());
 }
 
 #[test]
@@ -886,7 +886,7 @@ individual def Rover specializes MobileRobot;
         other => panic!("expected individual def, got {:?}", other),
     };
     assert_eq!(
-        individual_def.value.specializes.as_deref(),
+        individual_def.value.specializes.as_ref().map(|n| n.value.target.as_str()),
         Some("MobileRobot")
     );
 }

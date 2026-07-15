@@ -95,7 +95,6 @@ pub(crate) fn enum_def(input: Input<'_>) -> IResult<Input<'_>, Node<EnumDef>> {
             EnumDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

@@ -2,7 +2,7 @@ use super::behavior::{ActionDefBodyElement, Allocate, InOut, InOutDecl, StateDef
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::view::{CalcUsage, ConstraintDefBody};
-use crate::ast::core::{Expression, Multiplicity, Node, Span};
+use crate::ast::core::{Expression, Multiplicity, Node, Span, TypingRelationship};
 
 /// Part definition: `part def` Identification (`:>` specializes)? Body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,9 +14,7 @@ pub struct PartDef {
     pub is_individual: bool,
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("Axle") for `part def FrontAxle :> Axle`.
-    pub specializes: Option<String>,
-    /// Span of the `:> <type>` fragment (for semantic tokens), when present.
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: PartDefBody,
 }
 
@@ -160,8 +158,7 @@ pub enum AttributeBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
 }
 
@@ -170,8 +167,7 @@ pub struct ItemDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IndividualDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
 }
 
@@ -376,8 +372,7 @@ pub struct AttributeUsage {
 pub struct PortDef {
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("ClutchPort") for `port def ManualClutchPort :> ClutchPort`.
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: PortDefBody,
 }
 
@@ -469,8 +464,7 @@ pub struct ConnectStmt {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InterfaceDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: InterfaceDefBody,
 }
 
@@ -544,8 +538,7 @@ pub enum RefBody {
 pub struct ConnectionDef {
     pub annotation: Option<String>,
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConnectionDefBody,
 }
 
@@ -579,8 +572,7 @@ pub enum ConnectionDefBodyElement {
 pub struct MetadataDef {
     pub is_abstract: bool,
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
 }
 
@@ -603,8 +595,7 @@ pub struct MetadataUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: EnumerationBody,
 }
 
@@ -625,8 +616,7 @@ pub enum EnumerationBody {
 pub struct OccurrenceDef {
     pub is_abstract: bool,
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,
 }
 

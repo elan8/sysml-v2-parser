@@ -28,7 +28,6 @@ pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
             FlowDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

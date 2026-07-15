@@ -6,7 +6,7 @@ use super::structure::{
     MetadataKeywordUsage,
 };
 use super::view::ConstraintDefBodyElement;
-use crate::ast::core::{Expression, Multiplicity, Node, Span};
+use crate::ast::core::{Expression, Multiplicity, Node, Span, TypingRelationship};
 
 /// Requirement definition: `requirement def` Identification (`:>` specializes)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,9 +14,7 @@ use crate::ast::core::{Expression, Multiplicity, Node, Span};
 pub struct RequirementDef {
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("UserRequirement") for `requirement def Need :> UserRequirement`.
-    pub specializes: Option<String>,
-    /// Span of the `:> <type>` fragment (for semantic tokens), when present.
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     /// True for `abstract requirement def ...`.
     pub is_abstract: bool,
     pub body: RequirementDefBody,
@@ -212,8 +210,7 @@ pub struct ConcernUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CaseDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     /// True for `abstract case def ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -235,8 +232,7 @@ pub struct CaseUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AnalysisCaseDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     /// True for `abstract analysis def ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -258,8 +254,7 @@ pub struct AnalysisCaseUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerificationCaseDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     /// True for `abstract verification def ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -303,8 +298,7 @@ pub struct ActorDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UseCaseDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     /// True for `abstract use case def ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,

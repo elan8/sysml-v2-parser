@@ -2,32 +2,24 @@
 //!
 //! Consolidates typed headers and specialization without changing public AST shapes.
 
-use crate::ast::Span;
+use crate::ast::{Node, TypingRelationship};
 use crate::parser::specialization::parse_optional_definition_header_after_identification;
 use crate::parser::usage::{feature_usage_header, usage_header, UsageHeader};
 use crate::parser::Input;
 use nom::IResult;
 
 /// Parsed subclassification / typed header after `identification`.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct DefinitionHeaderParts {
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
 }
 
 /// Parse optional definition header after identification (typing + `:>` / `specializes`).
 pub(crate) fn parse_definition_header_after_ident(
     input: Input<'_>,
 ) -> IResult<Input<'_>, DefinitionHeaderParts> {
-    let (input, (specializes, specializes_span)) =
-        parse_optional_definition_header_after_identification(input)?;
-    Ok((
-        input,
-        DefinitionHeaderParts {
-            specializes,
-            specializes_span,
-        },
-    ))
+    let (input, specializes) = parse_optional_definition_header_after_identification(input)?;
+    Ok((input, DefinitionHeaderParts { specializes }))
 }
 
 /// Feature usage header parts (typing, subsets, redefines, references, crosses).

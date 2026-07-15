@@ -420,7 +420,6 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
             UseCaseDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 is_abstract: prefix.is_abstract,
                 body,
             },

@@ -23,7 +23,7 @@ pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
+    let (input, specializes) = parse_optional_definition_specialization(input)?;
     let (input, body) = part_def_body(input)?;
     Ok((
         input,
@@ -35,7 +35,6 @@ pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
                 is_individual,
                 identification,
                 specializes,
-                specializes_span,
                 body,
             },
         ),
@@ -63,7 +62,7 @@ pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefO
     if let Ok((input, _)) = tag::<_, _, nom::error::Error<Input>>(&b"def"[..]).parse(input) {
         let (input, _) = ws1(input)?;
         let (input, identification) = identification(input)?;
-        let (input, (specializes, specializes_span)) =
+        let (input, specializes) =
             parse_optional_definition_specialization(input)?;
         let (input, body) = part_def_body(input)?;
         return Ok((
@@ -76,7 +75,6 @@ pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefO
                     is_individual,
                     identification,
                     specializes,
-                    specializes_span,
                     body,
                 },
             )),

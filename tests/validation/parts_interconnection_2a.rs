@@ -6,7 +6,7 @@ use sysml_v2_parser::ast::{
     InterfaceUsageBodyElement, Multiplicity, Node, Package, PackageBody, PackageBodyElement,
     PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
     PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
-    RefDecl, RootElement, RootNamespace, Span, Visibility,
+    RefDecl, RootElement, RootNamespace, Span, TypingKind, TypingRelationship, Visibility,
 };
 use sysml_v2_parser::parse;
 
@@ -17,6 +17,17 @@ fn mult(v: i64) -> Node<Multiplicity> {
         lower: bound.clone(),
         upper: bound,
         span: Span::dummy(),
+    })
+}
+
+/// `:> target` subclassification relationship, e.g. `spec("Axle")` for `:> Axle`.
+fn spec(target: &str) -> Node<TypingRelationship> {
+    n(TypingRelationship {
+        target: target.to_string(),
+        kind: TypingKind::Subclassification,
+        span: Span::dummy(),
+        is_conjugated: false,
+        is_implied: false,
     })
 }
 
@@ -104,7 +115,6 @@ fn definitions_package() -> Package {
                     definition_prefix: None,
                     identification: id("AxleAssembly"),
                     specializes: None,
-                    specializes_span: None,
                     body: PartDefBody::Semicolon,
                 }))),
                 n(part_def_rear_axle_assembly()),
@@ -113,15 +123,13 @@ fn definitions_package() -> Package {
                     definition_prefix: None,
                     identification: id("Axle"),
                     specializes: None,
-                    specializes_span: None,
                     body: PartDefBody::Semicolon,
                 }))),
                 n(PackageBodyElement::PartDef(n(PartDef {
                     is_individual: false,
                     definition_prefix: None,
                     identification: id("RearAxle"),
-                    specializes: Some("Axle".to_string()),
-                    specializes_span: None,
+                    specializes: Some(spec("Axle")),
                     body: PartDefBody::Semicolon,
                 }))),
                 n(part_def_half_axle()),
@@ -133,7 +141,6 @@ fn definitions_package() -> Package {
                     definition_prefix: None,
                     identification: id("Differential"),
                     specializes: None,
-                    specializes_span: None,
                     body: PartDefBody::Brace { elements: vec![] },
                 }))),
                 n(PackageBodyElement::PartDef(n(PartDef {
@@ -141,7 +148,6 @@ fn definitions_package() -> Package {
                     definition_prefix: None,
                     identification: id("Wheel"),
                     specializes: None,
-                    specializes_span: None,
                     body: PartDefBody::Semicolon,
                 }))),
                 n(interface_def_engine_to_transmission()),
@@ -155,7 +161,6 @@ fn port_def_semicolon(name: &str) -> PackageBodyElement {
     PackageBodyElement::PortDef(n(PortDef {
         identification: id(name),
         specializes: None,
-        specializes_span: None,
         body: PortDefBody::Semicolon,
     }))
 }
@@ -164,7 +169,6 @@ fn port_def_vehicle_to_road() -> PackageBodyElement {
     PackageBodyElement::PortDef(n(PortDef {
         identification: id("VehicleToRoadPort"),
         specializes: None,
-        specializes_span: None,
         body: PortDefBody::Brace {
             elements: vec![n(PortDefBodyElement::PortUsage(n(PortUsage {
                 name: "wheelToRoadPort".to_string(),
@@ -188,7 +192,6 @@ fn part_def_vehicle_a() -> PackageBodyElement {
         definition_prefix: None,
         identification: id("VehicleA"),
         specializes: None,
-        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
@@ -225,8 +228,7 @@ fn part_def_rear_axle_assembly() -> PackageBodyElement {
         is_individual: false,
         definition_prefix: None,
         identification: id("RearAxleAssembly"),
-        specializes: Some("AxleAssembly".to_string()),
-        specializes_span: None,
+        specializes: Some(spec("AxleAssembly")),
         body: PartDefBody::Brace {
             elements: vec![n(PartDefBodyElement::PortUsage(n(PortUsage {
                 name: "shaftPort_d".to_string(),
@@ -250,7 +252,6 @@ fn part_def_half_axle() -> PackageBodyElement {
         definition_prefix: None,
         identification: id("HalfAxle"),
         specializes: None,
-        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
@@ -288,7 +289,6 @@ fn part_def_engine() -> PackageBodyElement {
         definition_prefix: None,
         identification: id("Engine"),
         specializes: None,
-        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
@@ -326,7 +326,6 @@ fn part_def_transmission() -> PackageBodyElement {
         definition_prefix: None,
         identification: id("Transmission"),
         specializes: None,
-        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
@@ -364,7 +363,6 @@ fn part_def_driveshaft() -> PackageBodyElement {
         definition_prefix: None,
         identification: id("Driveshaft"),
         specializes: None,
-        specializes_span: None,
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
@@ -400,7 +398,6 @@ fn interface_def_engine_to_transmission() -> PackageBodyElement {
     PackageBodyElement::InterfaceDef(n(InterfaceDef {
         identification: id("EngineToTransmissionInterface"),
         specializes: None,
-        specializes_span: None,
         body: InterfaceDefBody::Brace {
             elements: vec![
                 n(InterfaceDefBodyElement::EndDecl(n(EndDecl {
@@ -426,7 +423,6 @@ fn interface_def_driveshaft() -> PackageBodyElement {
     PackageBodyElement::InterfaceDef(n(InterfaceDef {
         identification: id("DriveshaftInterface"),
         specializes: None,
-        specializes_span: None,
         body: InterfaceDefBody::Brace {
             elements: vec![
                 n(InterfaceDefBodyElement::EndDecl(n(EndDecl {

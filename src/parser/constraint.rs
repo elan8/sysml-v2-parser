@@ -43,7 +43,6 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
             ConstraintDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

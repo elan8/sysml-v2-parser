@@ -286,7 +286,6 @@ fn normalize_part_def(p: &PartDef) -> PartDef {
         is_individual: p.is_individual,
         identification: p.identification.clone(),
         specializes: p.specializes.clone(),
-        specializes_span: None,
         body: normalize_part_def_body(&p.body),
     }
 }
@@ -661,7 +660,6 @@ fn normalize_port_def(p: &PortDef) -> PortDef {
     PortDef {
         identification: p.identification.clone(),
         specializes: p.specializes.clone(),
-        specializes_span: None,
         body: normalize_port_def_body(&p.body),
     }
 }
@@ -706,7 +704,6 @@ fn normalize_interface_def(i: &InterfaceDef) -> InterfaceDef {
     InterfaceDef {
         identification: i.identification.clone(),
         specializes: i.specializes.clone(),
-        specializes_span: None,
         body: normalize_interface_def_body(&i.body),
     }
 }
@@ -716,7 +713,6 @@ fn normalize_connection_def(c: &ConnectionDef) -> ConnectionDef {
         annotation: c.annotation.clone(),
         identification: c.identification.clone(),
         specializes: c.specializes.clone(),
-        specializes_span: None,
         body: normalize_connection_def_body(&c.body),
     }
 }
@@ -761,7 +757,6 @@ fn normalize_metadata_def(m: &MetadataDef) -> MetadataDef {
         is_abstract: m.is_abstract,
         identification: m.identification.clone(),
         specializes: m.specializes.clone(),
-        specializes_span: None,
         body: m.body.clone(),
     }
 }
@@ -770,7 +765,6 @@ fn normalize_enum_def(e: &EnumDef) -> EnumDef {
     EnumDef {
         identification: e.identification.clone(),
         specializes: e.specializes.clone(),
-        specializes_span: None,
         body: e.body.clone(),
     }
 }
@@ -780,7 +774,6 @@ fn normalize_occurrence_def(o: &OccurrenceDef) -> OccurrenceDef {
         is_abstract: o.is_abstract,
         identification: o.identification.clone(),
         specializes: o.specializes.clone(),
-        specializes_span: None,
         body: o.body.clone(),
     }
 }
@@ -842,7 +835,6 @@ fn normalize_action_def(a: &ActionDef) -> ActionDef {
     ActionDef {
         identification: a.identification.clone(),
         specializes: a.specializes.clone(),
-        specializes_span: None,
         body: normalize_action_def_body(&a.body),
     }
 }

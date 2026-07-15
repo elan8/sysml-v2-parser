@@ -1,6 +1,6 @@
 //! Definition subclassification (`:>` / `specializes`) parsing.
 
-use crate::ast::Span;
+use crate::ast::{Node, TypingKind, TypingRelationship};
 use crate::parser::lex::{
     qualified_name, specialization_operator, starts_with_keyword, take_until_terminator,
     ws_and_comments,
@@ -13,10 +13,27 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
+/// Wrap a subclassification target string in a `TypingRelationship` node. Definition-level
+/// `specializes` clauses are always subclassification (never `:` typing) and never conjugated —
+/// `qualified_name` doesn't accept a leading `~` here, unlike usage-level typing (see
+/// `parser::usage::conjugated_qualified_name`).
+fn subclassification_node(target: String, span: crate::ast::Span) -> Node<TypingRelationship> {
+    Node::new(
+        span.clone(),
+        TypingRelationship {
+            target,
+            kind: TypingKind::Subclassification,
+            span,
+            is_conjugated: false,
+            is_implied: false,
+        },
+    )
+}
+
 /// Optional definition subclassification: `:> Base` or `specializes Base`, with optional `, Base2`.
 pub(crate) fn parse_optional_definition_specialization(
     input: Input<'_>,
-) -> IResult<Input<'_>, (Option<String>, Option<Span>)> {
+) -> IResult<Input<'_>, Option<Node<TypingRelationship>>> {
     let before_specializes = input;
     let (input, opt_first) = opt((
         preceded(ws_and_comments, specialization_operator),
@@ -24,7 +41,7 @@ pub(crate) fn parse_optional_definition_specialization(
     ))
     .parse(input)?;
     let Some((_, first)) = opt_first else {
-        return Ok((input, (None, None)));
+        return Ok((input, None));
     };
     let (input, rest) = many0(preceded(
         preceded(ws_and_comments, tag(&b","[..])),
@@ -38,13 +55,8 @@ pub(crate) fn parse_optional_definition_specialization(
         bases.extend(rest);
         bases.join(", ")
     };
-    Ok((
-        input,
-        (
-            Some(specializes),
-            Some(span_from_to(before_specializes, input)),
-        ),
-    ))
+    let span = span_from_to(before_specializes, input);
+    Ok((input, Some(subclassification_node(specializes, span))))
 }
 
 fn starts_with_typing_colon(fragment: &[u8]) -> bool {
@@ -79,7 +91,7 @@ fn specializes_from_header_text(header: &str) -> Option<String> {
 /// - library shorthand `abstract connection name : Type[multiplicity] :> redefines { ... }`
 pub(crate) fn parse_optional_definition_header_after_identification(
     input: Input<'_>,
-) -> IResult<Input<'_>, (Option<String>, Option<Span>)> {
+) -> IResult<Input<'_>, Option<Node<TypingRelationship>>> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b":>") || starts_with_keyword(input.fragment(), b"specializes")
     {
@@ -89,12 +101,13 @@ pub(crate) fn parse_optional_definition_header_after_identification(
         let before_header = input;
         let (input, header) = take_until_terminator(input, b";{")?;
         let specializes = specializes_from_header_text(&header);
-        let specializes_span = specializes
-            .as_ref()
-            .map(|_| span_from_to(before_header, input));
-        return Ok((input, (specializes, specializes_span)));
+        let node = specializes.map(|target| {
+            let span = span_from_to(before_header, input);
+            subclassification_node(target, span)
+        });
+        return Ok((input, node));
     }
-    Ok((input, (None, None)))
+    Ok((input, None))
 }
 
 #[cfg(test)]
@@ -109,18 +122,24 @@ mod tests {
     #[test]
     fn header_after_ident_skips_typing_and_extracts_specializes() {
         let input = span_input(": Connection[0..*] nonunique :> linkObjects, parts");
-        let (rest, (specializes, _)) =
+        let (rest, specializes) =
             parse_optional_definition_header_after_identification(input).expect("header");
         assert!(rest.fragment().is_empty());
-        assert_eq!(specializes.as_deref(), Some("linkObjects, parts"));
+        assert_eq!(
+            specializes.map(|n| n.value.target),
+            Some("linkObjects, parts".to_string())
+        );
     }
 
     #[test]
     fn header_after_ident_parses_direct_specializes() {
         let input = span_input(":> Base, Other");
-        let (rest, (specializes, _)) =
+        let (rest, specializes) =
             parse_optional_definition_header_after_identification(input).expect("header");
         assert!(rest.fragment().is_empty());
-        assert_eq!(specializes.as_deref(), Some("Base, Other"));
+        assert_eq!(
+            specializes.map(|n| n.value.target),
+            Some("Base, Other".to_string())
+        );
     }
 }

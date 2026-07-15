@@ -3,15 +3,14 @@ use super::common::FilterMember;
 use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::RequirementDefBody;
 use super::structure::MetadataAnnotation;
-use crate::ast::core::{Expression, Node, Span};
+use crate::ast::core::{Expression, Node, TypingRelationship};
 
 /// Constraint definition: `constraint def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConstraintDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConstraintDefBody,
 }
 
@@ -100,8 +99,7 @@ pub struct ReturnDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: ViewDefBody,
 }
 
@@ -140,8 +138,7 @@ pub struct ViewRenderingUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewpointDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: RequirementDefBody,
 }
 
@@ -150,8 +147,7 @@ pub struct ViewpointDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderingDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: RenderingDefBody,
 }
 

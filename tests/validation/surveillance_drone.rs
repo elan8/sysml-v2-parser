@@ -119,15 +119,16 @@ fn test_parse_surveillance_drone() {
         })
         .find(|p: &&PartDef| {
             p.identification.name.as_deref() == Some("SurveillanceQuadrotorDroneWithBehavior")
-                && p.specializes.as_deref() == Some("SurveillanceQuadrotorDrone")
+                && p.specializes.as_ref().map(|n| n.value.target.as_str())
+                    == Some("SurveillanceQuadrotorDrone")
         });
     let part_def = part_def_specializes_span
         .expect("fixture should contain part def SurveillanceQuadrotorDroneWithBehavior :> SurveillanceQuadrotorDrone");
     assert!(
-        part_def.specializes_span.is_some(),
+        part_def.specializes.is_some(),
         "specializes_span must be set when parsing ':> SurveillanceQuadrotorDrone' on line 363"
     );
-    let span = part_def.specializes_span.as_ref().unwrap();
+    let span = &part_def.specializes.as_ref().unwrap().value.span;
     assert_eq!(
         span.line, 363,
         "specializes_span should point to line 363 (':> SurveillanceQuadrotorDrone')"

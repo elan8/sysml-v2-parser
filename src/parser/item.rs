@@ -39,7 +39,6 @@ fn parse_item_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             ItemDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

@@ -312,6 +312,57 @@ impl PartialEq for Multiplicity {
 
 impl Eq for Multiplicity {}
 
+/// Whether a [`TypingRelationship`] is a `:` typing/definition relationship or a `:>`
+/// subclassification/specialization relationship (PAR-004 item 1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TypingKind {
+    /// `:` / `defined by` / `typed by` — this feature is typed by the target.
+    Typing,
+    /// `:>` / `specializes` — this definition/usage specializes (subclassifies) the target.
+    Subclassification,
+}
+
+/// A typing or subclassification relationship target, e.g. the `ISQ::mass` in `attribute mass :
+/// ISQ::mass;` (typing) or the `Vehicle` in `part def Car :> Vehicle;` (subclassification)
+/// (PAR-004 item 1, folding in PAR-003's conjugation concept from item 4).
+///
+/// The target is kept as a plain qualified-name `String` for now — PAR-004's own doc language
+/// asks to "distinguish typing from subclassification", not to stop the target from being a
+/// string. The gap this closes is the AST node carrying a `kind`/span/conjugation/implied marker
+/// that a raw string field cannot.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TypingRelationship {
+    /// Qualified name of the type/supertype target, e.g. `"ISQ::mass"`.
+    pub target: String,
+    pub kind: TypingKind,
+    /// Span of the whole relationship fragment (operator/keyword through target), when known.
+    pub span: Span,
+    /// True when the target was written with a leading `~` (conjugated typing/definition
+    /// identity), e.g. `~PortConjugate` in `port p : ~PortConjugate;`. The `~` is stripped from
+    /// `target` once captured here.
+    pub is_conjugated: bool,
+    /// True for a relationship the parser infers rather than one explicitly written in source.
+    /// Always `false` today — nothing in this parser currently produces implied relationships —
+    /// but the field exists so a future implied-relationship producer doesn't need another AST
+    /// migration.
+    pub is_implied: bool,
+}
+
+/// Equality ignores `span`, matching `Node<T>`'s and `Multiplicity`'s conventions elsewhere in
+/// this crate: hand-built expected ASTs in tests don't need to reproduce real source spans.
+impl PartialEq for TypingRelationship {
+    fn eq(&self, other: &Self) -> bool {
+        self.target == other.target
+            && self.kind == other.kind
+            && self.is_conjugated == other.is_conjugated
+            && self.is_implied == other.is_implied
+    }
+}
+
+impl Eq for TypingRelationship {}
+
 impl Multiplicity {
     /// Renders the multiplicity back to canonical bracket text, e.g. `[1]`, `[0..1]`, `[1..*]`.
     /// Literal integer bounds and the unbounded `*` render exactly; other bound expressions fall

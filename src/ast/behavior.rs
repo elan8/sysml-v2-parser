@@ -3,15 +3,14 @@ use super::requirement::RequirementUsage;
 use super::structure::{
     Annotation, Bind, DefinitionBody, MetadataAnnotation, MetadataKeywordUsage, Perform, RefDecl,
 };
-use crate::ast::core::{Expression, Node, Span};
+use crate::ast::core::{Expression, Node, Span, TypingRelationship};
 
 /// Action definition: `action def` Identification body (in/out params).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: ActionDefBody,
 }
 
@@ -227,8 +226,7 @@ pub struct ActionBodyDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FlowDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,
 }
 
@@ -346,8 +344,7 @@ pub struct Allocate {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AllocationDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,
 }
 
@@ -371,8 +368,7 @@ pub struct AllocationUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StateDef {
     pub identification: Identification,
-    pub specializes: Option<String>,
-    pub specializes_span: Option<Span>,
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: StateDefBody,
 }
 

@@ -170,7 +170,7 @@ fn test_stdlib_requirement_usecase_enum_map_to_dedicated_nodes() {
     let PackageBodyElement::RequirementDef(req) = &elements[0].value else {
         panic!("expected requirement def");
     };
-    assert_eq!(req.value.specializes.as_deref(), Some("BaseType"));
+    assert_eq!(req.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("BaseType"));
     assert!(matches!(
         elements[1].value,
         PackageBodyElement::UseCaseDef(_)
@@ -178,7 +178,7 @@ fn test_stdlib_requirement_usecase_enum_map_to_dedicated_nodes() {
     let PackageBodyElement::UseCaseDef(uc) = &elements[1].value else {
         panic!("expected use case def");
     };
-    assert_eq!(uc.value.specializes.as_deref(), Some("Case"));
+    assert_eq!(uc.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Case"));
     assert!(matches!(elements[2].value, PackageBodyElement::EnumDef(_)));
 }
 
@@ -202,12 +202,12 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
     let PackageBodyElement::PartDef(part) = &elements[0].value else {
         panic!("expected part def");
     };
-    assert_eq!(part.value.specializes.as_deref(), Some("Item"));
+    assert_eq!(part.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Item"));
     assert!(matches!(elements[1].value, PackageBodyElement::PortDef(_)));
     let PackageBodyElement::PortDef(port) = &elements[1].value else {
         panic!("expected port def");
     };
-    assert_eq!(port.value.specializes.as_deref(), Some("Object"));
+    assert_eq!(port.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("Object"));
     assert!(matches!(
         elements[2].value,
         PackageBodyElement::ViewpointDef(_)
@@ -215,7 +215,7 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
     let PackageBodyElement::ViewpointDef(vp) = &elements[2].value else {
         panic!("expected viewpoint def");
     };
-    assert_eq!(vp.value.specializes.as_deref(), Some("RequirementCheck"));
+    assert_eq!(vp.value.specializes.as_ref().map(|n| n.value.target.as_str()), Some("RequirementCheck"));
     assert!(
         !elements
             .iter()

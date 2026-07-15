@@ -272,7 +272,6 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
                 annotation: prefix.annotation,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

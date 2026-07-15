@@ -26,7 +26,6 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
             CaseDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 is_abstract: prefix.is_abstract,
                 body,
             },
@@ -59,7 +58,6 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
             AnalysisCaseDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 is_abstract: prefix.is_abstract,
                 body,
             },
@@ -106,7 +104,6 @@ pub(crate) fn verification_case_def(
             VerificationCaseDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 is_abstract: prefix.is_abstract,
                 body,
             },

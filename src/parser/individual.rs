@@ -25,7 +25,6 @@ pub(crate) fn individual_def(input: Input<'_>) -> IResult<Input<'_>, Node<Indivi
             IndividualDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                specializes_span: prefix.specializes_span,
                 body,
             },
         ),
