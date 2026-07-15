@@ -39,6 +39,30 @@ is done.
   includes it -- SysML defs have no textual "sufficient" marker. All three are out of this parser's
   scope; noted here rather than inventing fields with no parseable syntax behind them.
 
+### PAR-003b (items 3-4): effective name and source-range assessment (no code change)
+
+- **"Effective name" is out of parser scope, confirmed by design, not by omission**: KerML defines
+  `Element::effectiveName` as the name a feature *without its own declared name* inherits from what
+  it redefines -- resolving it requires walking the redefinition/conjugation chain across
+  potentially other files/packages, which is exactly the kind of cross-reference resolution this
+  crate deliberately does not do (it is a syntax parser producing one file's AST, not a resolver).
+  `Identification` (`src/ast/common.rs`) already exposes the two concepts that *are* syntactic --
+  `name` and `short_name` -- and that's the full extent of what a single parse can determine.
+  Recorded here explicitly per the task's own guidance not to force invented scope.
+- **Source ranges for `subsets`/`references`/`crosses` targets: already closed by PAR-004**.
+  `SubsettingRelationship` (`src/ast/core.rs`) has carried a real `span` field (covering the
+  operator/keyword through the target) since PAR-004 item 2, and `references`/`crosses` on
+  `AttributeUsage` are typed as `Option<Node<SubsettingRelationship>>`, so they inherit the same
+  span coverage as `subsets`. No further work needed for relationship-target spans.
+- **Keyword-only spans (`abstract`, `ordered`, `direction`, etc.) intentionally left as bools**:
+  these are captured as plain `bool`/enum fields (e.g. `PartUsage.ordered: bool`,
+  `AttributeUsage.direction: Option<InOut>`) with no separate span for the keyword token itself.
+  Judgment call: adding a dedicated `Span` next to every single-keyword flag across the AST would
+  be a wide, low-value restructuring (these tokens are typically one word, immediately adjacent to
+  already-spanned constructs, and no consumer has asked for standalone keyword highlighting) for
+  marginal value versus the relationship/target spans that matter for semantic tokens and
+  diagnostics. Left as-is; flagging here rather than silently skipping.
+
 ### PAR-006a: recovery-guard foundation
 
 - **Confirmed the PAR-001 disambiguation fix was already generalized**: `attribute_def`'s
