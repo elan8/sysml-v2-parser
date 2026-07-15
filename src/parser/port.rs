@@ -222,8 +222,26 @@ fn port_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortDefBody> {
 /// dispatch to catch them instead — this parser currently folds that legal form into `PortDef`.
 /// Do not add `.def_required()` here without first adding real package-level port-usage support.
 pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
+    parse_port_def(input, false)
+}
+
+/// Port definition with required `def` keyword, for contexts (e.g. nested inside a part
+/// definition body) where a bare `port` usage form is already dispatched separately via
+/// [`port_usage`] -- requiring `def` here prevents a `def`-less port usage from being
+/// misclassified as a definition, the same bug class as PAR-001 in `attribute_def`. Unlike
+/// [`port_def`] (kept `def`-optional for the package-level bare form documented on that
+/// function), this variant is safe to stack ahead of `port_usage` in an `alt(...)` dispatch.
+pub(crate) fn port_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
+    parse_port_def(input, true)
+}
+
+fn parse_port_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<PortDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(input, DefinitionPrefixOptions::new(b"port"))?;
+    let mut options = DefinitionPrefixOptions::new(b"port");
+    if require_def {
+        options = options.def_required();
+    }
+    let (input, prefix) = parse_definition_prefix(input, options)?;
     let (input, body) = port_def_body(input)?;
     Ok((
         input,

@@ -99,6 +99,31 @@ pub enum PartDefBodyElement {
     /// `occurrence def` nested inside a part definition body (PAR-002: previously only
     /// `OccurrenceUsage` was reachable here).
     OccurrenceDef(Node<OccurrenceDef>),
+    /// `connection def` nested inside a part definition body (PAR-002: previously only
+    /// `ConnectionUsageMember`, a usage shape, was reachable here).
+    ConnectionDef(Node<ConnectionDef>),
+    /// `port def` nested inside a part definition body, using `port_def_required` (PAR-002:
+    /// previously only `PortUsage` was reachable here).
+    PortDef(Node<PortDef>),
+    /// `calc def` nested inside a part definition body, using `calc_def_required` (PAR-002:
+    /// previously only `CalcUsage` was reachable here).
+    CalcDef(Node<crate::ast::view::CalcDef>),
+    AllocationDef(Node<crate::ast::behavior::AllocationDef>),
+    AllocationUsage(Node<crate::ast::behavior::AllocationUsage>),
+    ViewDef(Node<crate::ast::view::ViewDef>),
+    ViewUsage(Node<crate::ast::view::ViewUsage>),
+    ViewpointDef(Node<crate::ast::view::ViewpointDef>),
+    ViewpointUsage(Node<crate::ast::view::ViewpointUsage>),
+    RenderingDef(Node<crate::ast::view::RenderingDef>),
+    RenderingUsage(Node<crate::ast::view::RenderingUsage>),
+    CaseDef(Node<crate::ast::requirement::CaseDef>),
+    CaseUsage(Node<crate::ast::requirement::CaseUsage>),
+    UseCaseDef(Node<crate::ast::requirement::UseCaseDef>),
+    UseCaseUsage(Node<crate::ast::requirement::UseCaseUsage>),
+    AnalysisCaseDef(Node<crate::ast::requirement::AnalysisCaseDef>),
+    AnalysisCaseUsage(Node<crate::ast::requirement::AnalysisCaseUsage>),
+    VerificationCaseDef(Node<crate::ast::requirement::VerificationCaseDef>),
+    VerificationCaseUsage(Node<crate::ast::requirement::VerificationCaseUsage>),
 }
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.

@@ -275,11 +275,25 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
 /// not the PAR-001 bug class — do not add `.def_required()` here without also accounting for the
 /// annotation-prefixed def-less form.
 pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
+    parse_connection_def(input, DefinitionPrefixOptions::new(b"connection").with_hash_annotation())
+}
+
+/// Connection definition with required `def` keyword, for contexts (e.g. nested inside a part
+/// definition body) where a bare `connection` usage form (`connection_usage_member`) is already
+/// dispatched separately -- requiring `def` here prevents a `def`-less connection usage from
+/// being misclassified as a definition, the same bug class as PAR-001 in `attribute_def`. Does
+/// not support the hash-annotation def-less form ([`connection_def`] does); nothing in the
+/// nested-part-body grammar currently needs that combination.
+pub(crate) fn connection_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
+    parse_connection_def(input, DefinitionPrefixOptions::new(b"connection").def_required())
+}
+
+fn parse_connection_def(
+    input: Input<'_>,
+    options: DefinitionPrefixOptions,
+) -> IResult<Input<'_>, Node<ConnectionDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(
-        input,
-        DefinitionPrefixOptions::new(b"connection").with_hash_annotation(),
-    )?;
+    let (input, prefix) = parse_definition_prefix(input, options)?;
     let (input, body) = connection_member_body(input)?;
     Ok((
         input,

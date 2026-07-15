@@ -411,6 +411,63 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::OccurrenceDef(n) => {
             PartDefBodyElement::OccurrenceDef(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::ConnectionDef(n) => {
+            PartDefBodyElement::ConnectionDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::PortDef(n) => {
+            PartDefBodyElement::PortDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::CalcDef(n) => {
+            PartDefBodyElement::CalcDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::AllocationDef(n) => {
+            PartDefBodyElement::AllocationDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::AllocationUsage(n) => {
+            PartDefBodyElement::AllocationUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::ViewDef(n) => {
+            PartDefBodyElement::ViewDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::ViewUsage(n) => {
+            PartDefBodyElement::ViewUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::ViewpointDef(n) => {
+            PartDefBodyElement::ViewpointDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::ViewpointUsage(n) => {
+            PartDefBodyElement::ViewpointUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::RenderingDef(n) => {
+            PartDefBodyElement::RenderingDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::RenderingUsage(n) => {
+            PartDefBodyElement::RenderingUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::CaseDef(n) => {
+            PartDefBodyElement::CaseDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::CaseUsage(n) => {
+            PartDefBodyElement::CaseUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::UseCaseDef(n) => {
+            PartDefBodyElement::UseCaseDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::UseCaseUsage(n) => {
+            PartDefBodyElement::UseCaseUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::AnalysisCaseDef(n) => {
+            PartDefBodyElement::AnalysisCaseDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::AnalysisCaseUsage(n) => {
+            PartDefBodyElement::AnalysisCaseUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::VerificationCaseDef(n) => {
+            PartDefBodyElement::VerificationCaseDef(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::VerificationCaseUsage(n) => {
+            PartDefBodyElement::VerificationCaseUsage(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }

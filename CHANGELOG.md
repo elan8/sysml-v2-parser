@@ -103,6 +103,45 @@ is done.
   `PackageBodyElement`'s own gaps (standalone `AttributeUsage`/`ItemUsage`/`PortUsage`,
   `ConnectionUsage`, `RefDecl` usage, `EnumerationUsage`) are also still unaddressed.
 
+### PAR-002 (increment 2 of N): remaining `PartDefBodyElement` def/usage pairs
+
+- **Added `ConnectionDef`, `PortDef`, `CalcDef`, `AllocationDef`/`AllocationUsage`,
+  `ViewDef`/`ViewUsage`, `ViewpointDef`/`ViewpointUsage`, `RenderingDef`/`RenderingUsage`,
+  `CaseDef`/`CaseUsage`, `UseCaseDef`/`UseCaseUsage`, `AnalysisCaseDef`/`AnalysisCaseUsage`,
+  `VerificationCaseDef`/`VerificationCaseUsage` to `PartDefBodyElement`** (`src/ast/structure.rs`),
+  wired into `part_def_body_element` (`src/parser/part/body.rs`).
+- **Built three new `_required()` def parsers before wiring, per the flagged risk**:
+  `port_def_required` (`src/parser/port.rs`), `calc_def_required` (`src/parser/constraint.rs`),
+  and `connection_def_required` (`src/parser/connection.rs`), each a thin wrapper around a shared
+  `parse_*_def(input, options)` helper that the existing `port_def`/`calc_def`/`connection_def`
+  (still `def`-optional, unchanged, still used at package level) now also delegate to. Mirrors
+  `interface_def_required`/`item_def_required` in shape. `connection_def_required` intentionally
+  does not support the hash-annotation def-less form that `connection_def` does -- nothing in the
+  nested-part-body grammar needs that combination today.
+- **Found and fixed three more real ambiguity bugs of the same class as `flow_def` in increment
+  1**, each caught by a `_not_misparsed_as_*` unit test before landing: `port_usage`,
+  `calc_usage`, and `connection_usage_member` all call a bare `name`/`identification` parse
+  immediately after their keyword with no guard against the literal token `def`, so stacking the
+  new `_def_required` parsers *after* them (the naive wiring) would have made `port def Foo;`,
+  `calc def Foo;`, and `connection def Foo;` silently misparse as usages named `"def"`. Fixed by
+  ordering every new def parser *before* its usage sibling in `part_def_body_element`'s `alt`,
+  matching the precedent already set for `flow_def`/`flow_usage_member`. `allocation_usage`,
+  `view_usage`, `viewpoint_usage`, and `rendering_usage` have the identical bare-`name` shape and
+  were ordered def-before-usage from the start to avoid the same risk proactively.
+- **`case`/`analysis`/`verification`/`use case` needed no new guard**: their `_def` parsers already
+  use `DefinitionPrefixOptions::def_required()` (per PAR-006a), and their `_usage` counterparts go
+  through `case_like_usage_body`/`use_case_usage_tail`, not a bare `name` call, so no ordering fix
+  was needed for this family (still placed def-before-usage for consistency).
+- **PAR-002 acceptance-criterion tests added**: `connection_def_is_same_variant_kind_at_package_level_and_nested_in_part`
+  and `case_def_is_same_variant_kind_at_package_level_and_nested_in_part`
+  (`src/parser/part/body.rs`), covering the two families most at risk of the ambiguity bug class
+  found in this increment.
+- **Scope remaining, updated**: `PartUsageBodyElement` (zero Def-kind variants), `PortDefBodyElement`/
+  `PortBodyElement`, `InterfaceDefBodyElement`/`ConnectionDefBodyElement` still unaddressed.
+  `PackageBodyElement`'s gaps (standalone `AttributeUsage`/`ItemUsage`/`PortUsage`,
+  `ConnectionUsage`, `RefDecl` usage, `EnumerationUsage`) still unaddressed. `PartDefBodyElement`
+  itself is now believed complete against the gaps-doc's original list for that enum.
+
 ### PAR-006a: recovery-guard foundation
 
 - **Confirmed the PAR-001 disambiguation fix was already generalized**: `attribute_def`'s

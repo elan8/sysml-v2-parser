@@ -189,9 +189,26 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
 /// bodies), so this is not the PAR-001 bug class, but do not add `.def_required()` here without
 /// checking package-level content first.
 pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
+    parse_calc_def(input, false)
+}
+
+/// Calc definition with required `def` keyword, for contexts (e.g. nested inside a part
+/// definition body) where `calc_usage` is already dispatched in the same `alt(...)` -- requiring
+/// `def` here prevents a `def`-less calc usage from being misclassified as a definition, the same
+/// bug class as PAR-001 in `attribute_def`. Unlike [`calc_def`] (kept `def`-optional for the
+/// namespace-level bare form documented on that function), this variant is safe to stack ahead of
+/// `calc_usage`.
+pub(crate) fn calc_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
+    parse_calc_def(input, true)
+}
+
+fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let (input, prefix) =
-        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"calc").with_private())?;
+    let mut options = DefinitionPrefixOptions::new(b"calc").with_private();
+    if require_def {
+        options = options.def_required();
+    }
+    let (input, prefix) = parse_definition_prefix(input, options)?;
     let (input, body) = calc_def_body(input)?;
     Ok((
         input,

@@ -169,10 +169,19 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             ),
             map(annotation, PartDefBodyElement::Annotation),
             map(exhibit_state, PartDefBodyElement::ExhibitState),
+            // `calc_def_required` must be tried before `calc_usage`: `calc_usage` has no guard
+            // against a bare `def` keyword (same bug class as `flow_usage_member`/`port_usage`
+            // above), so `calc def Foo {}` would otherwise misparse as `CalcUsage` named "def".
+            map(calc_def_required, PartDefBodyElement::CalcDef),
             map(calc_usage, PartDefBodyElement::CalcUsage),
             map(perform_action_decl, PartDefBodyElement::Perform),
             map(perform_usage, PartDefBodyElement::Perform),
             map(allocate_, PartDefBodyElement::Allocate),
+            // `connection_def_required` must be tried before `connection_usage_member`: the
+            // latter has no guard against a bare `def` keyword (same bug class as
+            // `flow_usage_member`/`port_usage`/`calc_usage` above), so `connection def Foo {}`
+            // would otherwise misparse as a connection usage named "def".
+            map(connection_def_required, PartDefBodyElement::ConnectionDef),
             map(connection_usage_member, PartDefBodyElement::Connection),
             map(connect_, PartDefBodyElement::Connect),
             // `flow_def` (def_required internally) must be tried before `flow_usage_member`:
@@ -205,6 +214,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             }),
             map(interface_usage, PartDefBodyElement::InterfaceUsage),
             map(interface_def_required, PartDefBodyElement::InterfaceDef),
+            // `port_def_required` must be tried before `port_usage`: `port_usage` has no guard
+            // against a bare `def` keyword (same bug class caught for `flow_usage_member` above),
+            // so `port def Foo {}` would otherwise misparse as `PortUsage { name: "def" }`.
+            map(port_def_required, PartDefBodyElement::PortDef),
             map(port_usage, PartDefBodyElement::PortUsage),
             map(part_ref_usage, PartDefBodyElement::Ref),
             map(|i| attribute_def(i, true), PartDefBodyElement::AttributeDef),
@@ -236,6 +249,37 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             ),
             map(satisfy, PartDefBodyElement::Satisfy),
             map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
+        )),
+        alt((
+            // PAR-002: remaining nested `def`/usage pairs, previously only reachable at package
+            // level. Each `_def` parser here already requires the `def` keyword internally (see
+            // each module), so per-pair ordering is `def` before `usage` throughout -- several of
+            // these `_usage` parsers (`allocation_usage`, `view_usage`, `viewpoint_usage`,
+            // `rendering_usage`) call a bare `name(input)` right after their keyword with no
+            // guard against `def`, the same risk pattern already fixed for `flow`/`port`/`calc`/
+            // `connection` above, so getting this order right matters here too.
+            map(allocation_def, PartDefBodyElement::AllocationDef),
+            map(allocation_usage, PartDefBodyElement::AllocationUsage),
+            map(view_def, PartDefBodyElement::ViewDef),
+            map(view_usage, PartDefBodyElement::ViewUsage),
+            map(viewpoint_def, PartDefBodyElement::ViewpointDef),
+            map(viewpoint_usage, PartDefBodyElement::ViewpointUsage),
+            map(rendering_def, PartDefBodyElement::RenderingDef),
+            map(rendering_usage, PartDefBodyElement::RenderingUsage),
+            map(analysis_case_def, PartDefBodyElement::AnalysisCaseDef),
+            map(analysis_case_usage, PartDefBodyElement::AnalysisCaseUsage),
+            map(
+                verification_case_def,
+                PartDefBodyElement::VerificationCaseDef,
+            ),
+            map(
+                verification_case_usage,
+                PartDefBodyElement::VerificationCaseUsage,
+            ),
+            map(case_def, PartDefBodyElement::CaseDef),
+            map(case_usage, PartDefBodyElement::CaseUsage),
+            map(use_case_def, PartDefBodyElement::UseCaseDef),
+            map(use_case_usage, PartDefBodyElement::UseCaseUsage),
         )),
     ))
     .parse(input)?;
@@ -514,5 +558,155 @@ mod par_002_nested_def_tests {
             part_node.value,
             PartDefBodyElement::RequirementDef(_)
         ));
+    }
+
+    // --- PAR-002 increment 2: connection/port/calc/allocation/view/viewpoint/rendering/
+    // case/analysis-case/verification-case/use-case defs nested in part bodies ---
+
+    #[test]
+    fn part_def_body_accepts_nested_connection_def() {
+        let (rest, node) =
+            part_def_body_element(input("connection def MyConn;")).expect("connection def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::ConnectionDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_connection_usage_not_misparsed_as_def() {
+        // Bare (`def`-less) connection usage must still dispatch to the usage shape, not be
+        // swallowed by `connection_def_required` (which requires `def`) nor misparse "def" as a
+        // usage name via `connection_usage_member`.
+        let (rest, node) =
+            part_def_body_element(input("connection link: Link;")).expect("connection usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::Connection(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_port_def_not_misparsed_as_usage() {
+        let (rest, node) = part_def_body_element(input("port def MyPort;")).expect("port def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::PortDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_port_usage() {
+        let (rest, node) = part_def_body_element(input("port p1: MyPort;")).expect("port usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::PortUsage(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_calc_def_not_misparsed_as_usage() {
+        let (rest, node) = part_def_body_element(input("calc def MyCalc;")).expect("calc def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::CalcDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_calc_usage() {
+        let (rest, node) = part_def_body_element(input("calc c1: MyCalc;")).expect("calc usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::CalcUsage(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_allocation_def() {
+        let (rest, node) =
+            part_def_body_element(input("allocation def MyAlloc;")).expect("allocation def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::AllocationDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_view_def() {
+        let (rest, node) = part_def_body_element(input("view def MyView;")).expect("view def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::ViewDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_viewpoint_def() {
+        let (rest, node) =
+            part_def_body_element(input("viewpoint def MyViewpoint;")).expect("viewpoint def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::ViewpointDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_rendering_def() {
+        let (rest, node) =
+            part_def_body_element(input("rendering def MyRendering;")).expect("rendering def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::RenderingDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_case_def() {
+        let (rest, node) = part_def_body_element(input("case def MyCase;")).expect("case def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::CaseDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_analysis_case_def() {
+        let (rest, node) = part_def_body_element(input("analysis def MyAnalysis;"))
+            .expect("analysis case def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::AnalysisCaseDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_verification_case_def() {
+        let (rest, node) = part_def_body_element(input("verification def MyVerification;"))
+            .expect("verification case def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            PartDefBodyElement::VerificationCaseDef(_)
+        ));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_use_case_def() {
+        let (rest, node) =
+            part_def_body_element(input("use case def MyUseCase;")).expect("use case def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::UseCaseDef(_)));
+    }
+
+    /// PAR-002 acceptance criterion, increment 2: same variant kind at package level vs. nested
+    /// in a part body, for the def kinds most at risk of the bare-`def`-keyword ambiguity bug
+    /// (connection/port/calc all had a real instance of it fixed in this increment).
+    #[test]
+    fn connection_def_is_same_variant_kind_at_package_level_and_nested_in_part() {
+        use crate::parser::package::package_body_element;
+
+        let text = "connection def MyConn;";
+        let (_, package_node) =
+            package_body_element(input(text)).expect("package-level connection def");
+        let (_, part_node) = part_def_body_element(input(text)).expect("nested connection def");
+        assert!(matches!(
+            package_node.value,
+            crate::ast::PackageBodyElement::ConnectionDef(_)
+        ));
+        assert!(matches!(
+            part_node.value,
+            PartDefBodyElement::ConnectionDef(_)
+        ));
+    }
+
+    #[test]
+    fn case_def_is_same_variant_kind_at_package_level_and_nested_in_part() {
+        use crate::parser::package::package_body_element;
+
+        let text = "case def MyCase;";
+        let (_, package_node) = package_body_element(input(text)).expect("package-level case def");
+        let (_, part_node) = part_def_body_element(input(text)).expect("nested case def");
+        assert!(matches!(
+            package_node.value,
+            crate::ast::PackageBodyElement::CaseDef(_)
+        ));
+        assert!(matches!(part_node.value, PartDefBodyElement::CaseDef(_)));
     }
 }
