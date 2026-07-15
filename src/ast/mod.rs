@@ -775,6 +775,12 @@ fn normalize_port_body_element_node(el: &Node<PortBodyElement>) -> Node<PortBody
             PortBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
         PortBodyElement::Doc(n) => PortBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PortBodyElement::AttributeUsage(n) => {
+            PortBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
+        }
+        PortBodyElement::ItemUsage(n) => {
+            PortBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }
@@ -818,6 +824,12 @@ fn normalize_port_def_body_element_node(el: &Node<PortDefBodyElement>) -> Node<P
         PortDefBodyElement::PortUsage(n) => {
             PortDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
+        PortDefBodyElement::ItemDef(n) => {
+            PortDefBodyElement::ItemDef(dummy_node(n, n.value.clone()))
+        }
+        PortDefBodyElement::EnumerationUsage(n) => PortDefBodyElement::EnumerationUsage(
+            dummy_node(n, normalize_enumeration_usage(&n.value)),
+        ),
         PortDefBodyElement::Other(s) => PortDefBodyElement::Other(s.clone()),
     };
     dummy_node(el, value)
@@ -870,6 +882,24 @@ fn normalize_connection_def_body_element_node(
         }
         ConnectionDefBodyElement::Error(n) => {
             ConnectionDefBodyElement::Error(dummy_node(n, n.value.clone()))
+        }
+        ConnectionDefBodyElement::AttributeDef(n) => ConnectionDefBodyElement::AttributeDef(
+            dummy_node(n, normalize_attribute_def(&n.value)),
+        ),
+        ConnectionDefBodyElement::AttributeUsage(n) => ConnectionDefBodyElement::AttributeUsage(
+            dummy_node(n, normalize_attribute_usage(&n.value)),
+        ),
+        ConnectionDefBodyElement::ItemDef(n) => {
+            ConnectionDefBodyElement::ItemDef(dummy_node(n, n.value.clone()))
+        }
+        ConnectionDefBodyElement::ItemUsage(n) => {
+            ConnectionDefBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
+        }
+        ConnectionDefBodyElement::PortDef(n) => {
+            ConnectionDefBodyElement::PortDef(dummy_node(n, normalize_port_def(&n.value)))
+        }
+        ConnectionDefBodyElement::PortUsage(n) => {
+            ConnectionDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
     };
     dummy_node(el, value)
@@ -928,6 +958,24 @@ fn normalize_interface_def_body_element_node(
         }
         InterfaceDefBodyElement::ConnectStmt(n) => {
             InterfaceDefBodyElement::ConnectStmt(dummy_node(n, n.value.clone()))
+        }
+        InterfaceDefBodyElement::AttributeDef(n) => InterfaceDefBodyElement::AttributeDef(
+            dummy_node(n, normalize_attribute_def(&n.value)),
+        ),
+        InterfaceDefBodyElement::AttributeUsage(n) => InterfaceDefBodyElement::AttributeUsage(
+            dummy_node(n, normalize_attribute_usage(&n.value)),
+        ),
+        InterfaceDefBodyElement::ItemDef(n) => {
+            InterfaceDefBodyElement::ItemDef(dummy_node(n, n.value.clone()))
+        }
+        InterfaceDefBodyElement::ItemUsage(n) => {
+            InterfaceDefBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
+        }
+        InterfaceDefBodyElement::PortDef(n) => {
+            InterfaceDefBodyElement::PortDef(dummy_node(n, normalize_port_def(&n.value)))
+        }
+        InterfaceDefBodyElement::PortUsage(n) => {
+            InterfaceDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
     };
     dummy_node(el, value)

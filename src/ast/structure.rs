@@ -475,7 +475,12 @@ pub enum PortDefBodyElement {
     Error(Node<ParseErrorNode>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
+    /// `item def` nested inside a port definition body, using `item_def_required` (PAR-002:
+    /// previously only `ItemUsage` was reachable here).
+    ItemDef(Node<ItemDef>),
     ItemUsage(Node<ItemUsage>),
+    /// Enumeration usage nested inside a port definition body (PAR-002 widening).
+    EnumerationUsage(Node<EnumerationUsage>),
     PortUsage(Node<PortUsage>),
     Other(String),
 }
@@ -520,6 +525,11 @@ pub enum PortBodyElement {
     InOutDecl(Node<InOutDecl>),
     PortUsage(Node<PortUsage>),
     Doc(Node<DocComment>),
+    /// Attribute usage nested inside a port usage body (PAR-002 widening; this enum previously
+    /// had no attribute/item coverage at all).
+    AttributeUsage(Node<AttributeUsage>),
+    /// Item usage nested inside a port usage body. See `AttributeUsage`.
+    ItemUsage(Node<ItemUsage>),
 }
 
 /// Connect statement in interface def or usage: `connect` from `to` to body, or the SysML v2
@@ -566,6 +576,15 @@ pub enum InterfaceDefBodyElement {
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
+    /// PAR-002 widening: this enum previously had no attribute/item/port coverage at all.
+    AttributeDef(Node<AttributeDef>),
+    AttributeUsage(Node<AttributeUsage>),
+    /// `item def`, using `item_def_required`. See `AttributeDef`.
+    ItemDef(Node<ItemDef>),
+    ItemUsage(Node<ItemUsage>),
+    /// `port def`, using `port_def_required`. See `AttributeDef`.
+    PortDef(Node<PortDef>),
+    PortUsage(Node<PortUsage>),
 }
 
 /// End declaration in interface def: `end` name `:` type `;`.
@@ -640,6 +659,15 @@ pub enum ConnectionDefBodyElement {
     ConnectStmt(Node<ConnectStmt>),
     Doc(Node<DocComment>),
     Error(Node<ParseErrorNode>),
+    /// PAR-002 widening: this enum previously had no attribute/item/port coverage at all.
+    AttributeDef(Node<AttributeDef>),
+    AttributeUsage(Node<AttributeUsage>),
+    /// `item def`, using `item_def_required`. See `AttributeDef`.
+    ItemDef(Node<ItemDef>),
+    ItemUsage(Node<ItemUsage>),
+    /// `port def`, using `port_def_required`. See `AttributeDef`.
+    PortDef(Node<PortDef>),
+    PortUsage(Node<PortUsage>),
 }
 
 // ---------------------------------------------------------------------------

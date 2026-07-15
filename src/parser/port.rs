@@ -6,7 +6,8 @@ use crate::ast::{
 };
 use crate::parser::action::in_out_decl;
 use crate::parser::attribute::{attribute_def, attribute_usage, directed_attribute_usage};
-use crate::parser::item::directed_item_usage;
+use crate::parser::enumeration::enum_usage;
+use crate::parser::item::{directed_item_usage, item_def_required, item_usage};
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -45,6 +46,9 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
         map(port_usage, PortBodyElement::PortUsage),
         map(in_out_decl, PortBodyElement::InOutDecl),
         map(doc_comment, PortBodyElement::Doc),
+        // PAR-002 widening: this body previously had no attribute/item coverage at all.
+        map(attribute_usage, PortBodyElement::AttributeUsage),
+        map(item_usage, PortBodyElement::ItemUsage),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -167,6 +171,11 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         map(doc_comment, PortDefBodyElement::Doc),
         map(|i| attribute_def(i, true), PortDefBodyElement::AttributeDef),
         map(attribute_usage, PortDefBodyElement::AttributeUsage),
+        // `item_def_required` must be tried before the existing bare `directed_item_usage`/
+        // `item_usage` arms above -- same def-before-usage discipline as the other body enums
+        // wired in prior increments.
+        map(item_def_required, PortDefBodyElement::ItemDef),
+        map(enum_usage, PortDefBodyElement::EnumerationUsage),
         map(port_usage, PortDefBodyElement::PortUsage),
         map(
             |i| capture_opaque_member(i, PORT_DEF_OPAQUE_STARTERS),
@@ -255,4 +264,58 @@ fn parse_port_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod par_002_widening_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn port_body_accepts_nested_attribute_usage() {
+        let (rest, node) =
+            port_body_element(input("attribute mass: Real;")).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PortBodyElement::AttributeUsage(_)));
+    }
+
+    #[test]
+    fn port_body_accepts_nested_item_usage() {
+        let (rest, node) = port_body_element(input("item i1: MyItem;")).expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PortBodyElement::ItemUsage(_)));
+    }
+
+    #[test]
+    fn port_def_body_accepts_nested_item_def_not_misparsed_as_usage() {
+        let (rest, node) =
+            port_def_body_element(input("item def MyItem;")).expect("item def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PortDefBodyElement::ItemDef(_)));
+    }
+
+    #[test]
+    fn port_def_body_accepts_nested_enum_usage() {
+        let (rest, node) = port_def_body_element(input("enum e1: MyEnum;")).expect("enum usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PortDefBodyElement::EnumerationUsage(_)));
+    }
+
+    /// PAR-002 acceptance criterion: the same `item def` declaration yields the same AST variant
+    /// kind nested in a port definition body as it already does nested in a part definition body
+    /// (proven in a prior increment via `PartDefBodyElement::ItemDef`).
+    #[test]
+    fn item_def_is_same_variant_kind_in_port_def_body_as_item_def_required_parser() {
+        let text = "item def MyItem;";
+        let (_, port_node) = port_def_body_element(input(text)).expect("nested in port def body");
+        assert!(matches!(port_node.value, PortDefBodyElement::ItemDef(_)));
+        // Directly confirms `item_def_required` (the same parser reused across every body enum
+        // wired in this backlog) accepts the identical snippet.
+        let result = item_def_required(input(text));
+        assert!(result.is_ok(), "item_def_required should also accept {text:?}");
+    }
 }

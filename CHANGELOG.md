@@ -214,6 +214,49 @@ is done.
   `RequirementUsage`/other Usage-kind gaps on `PartUsageBodyElement` were out of scope for this
   increment (task asked specifically for Def-kind variants here).
 
+### PAR-002 (increment 5 of 5, final): widen `PortDefBodyElement`/`PortBodyElement`/
+`InterfaceDefBodyElement`/`ConnectionDefBodyElement`
+
+- **`PortDefBodyElement`**: added `ItemDef` (`item_def_required`) and `EnumerationUsage`
+  (`enum_usage`); it already had `AttributeDef`/`AttributeUsage`/`ItemUsage`/`PortUsage` from
+  before this backlog. **`PortBodyElement`**: had zero attribute/item coverage -- added
+  `AttributeUsage` (`attribute_usage`) and `ItemUsage` (`item_usage`).
+- **`InterfaceDefBodyElement`** and **`ConnectionDefBodyElement`**: both had only
+  `Doc`/`EndDecl`/`RefDecl`/`ConnectStmt`(+`Error` on the latter) -- no attribute/item/port
+  coverage at all. Added `AttributeDef`/`AttributeUsage`, `ItemDef`/`ItemUsage`, `PortDef`/
+  `PortUsage` to both, reusing the exact same parsers already wired into `PartDefBodyElement`/
+  `PartUsageBodyElement`/`PackageBodyElement` in increments 1-4 (`attribute_def`/`attribute_usage`,
+  `item_def_required`/`item_usage`, `port_def_required`/`port_usage`) -- no new parsers needed
+  anywhere in this increment.
+- **Def-before-usage discipline applied proactively** (no new bugs found this time, unlike
+  increments 1-2): `item_def_required` placed before `item_usage`/`directed_item_usage`,
+  `port_def_required` before `port_usage`, in every body wired this increment. `port_usage` and
+  `item_usage` are the same parsers already confirmed (in increments 1-2 and this one) to lack a
+  guard against a bare `def` token, so the ordering matters everywhere they're dispatched, not
+  just in the bodies where the bug was originally found.
+- **New cross-module imports**: `interface.rs` and `connection.rs` now import from
+  `attribute.rs`/`item.rs`/`port.rs`. Checked for import cycles first (`port.rs`/`item.rs`/
+  `attribute.rs` import nothing back from `interface.rs`/`connection.rs`) -- none introduced.
+- **PAR-002 acceptance-criterion tests added**: one per widened file
+  (`item_def_is_same_variant_kind_in_port_def_body_as_item_def_required_parser` in
+  `src/parser/port.rs`, `port_def_is_same_variant_kind_in_interface_def_body_as_port_def_required_parser`
+  in `src/parser/interface.rs`, `attribute_usage_is_same_variant_kind_in_connection_def_body_as_shared_parser`
+  in `src/parser/connection.rs`), each confirming the shared parser accepts the identical snippet
+  the new body-enum variant wraps.
+- **PAR-002 is now believed complete against the gaps-doc's literal list**: every body enum named
+  in the gaps doc's PAR-002 section and the coordinator's backlog (`PackageBodyElement`,
+  `PartDefBodyElement`, `PartUsageBodyElement`, `PortDefBodyElement`, `PortBodyElement`,
+  `InterfaceDefBodyElement`, `ConnectionDefBodyElement`) now carries the definition/usage variants
+  called out as missing, wired with the `def_required()`/`_required` disambiguation guard
+  established in PAR-006a everywhere a bare-`def`-vulnerable usage sibling exists in the same
+  dispatch.
+- **Known out-of-scope follow-up, not fixed here** (flagged for a separate task, not chased in
+  this backlog per the coordinator): `parse_optional_definition_header_after_identification`
+  (`src/parser/specialization.rs`) silently drops a plain `: Type` reference into an unparsed
+  header blob for `def`-optional definitions (e.g. `port p1: MyPortType;` parses as `PortDef` with
+  `specializes: None`, losing the type). Found and documented in PAR-002 increment 3; not this
+  increment's concern.
+
 ### PAR-006a: recovery-guard foundation
 
 - **Confirmed the PAR-001 disambiguation fix was already generalized**: `attribute_def`'s

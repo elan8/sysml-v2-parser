@@ -5,13 +5,16 @@ use crate::ast::{
     ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, InterfaceDef, InterfaceDefBody,
     InterfaceDefBodyElement, Node, RefBody, RefDecl,
 };
+use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
+use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
     identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
+use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -210,6 +213,19 @@ fn interface_def_body_element(
         map(end_decl, InterfaceDefBodyElement::EndDecl),
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),
+        // PAR-002 widening: this body previously had no attribute/item/port coverage at all.
+        // `item_def_required`/`port_def_required` tried before their usage siblings, same
+        // def-before-usage discipline as the other body enums wired in prior increments (their
+        // usage parsers have no guard against a bare `def` token).
+        map(
+            |i| attribute_def(i, true),
+            InterfaceDefBodyElement::AttributeDef,
+        ),
+        map(attribute_usage, InterfaceDefBodyElement::AttributeUsage),
+        map(item_def_required, InterfaceDefBodyElement::ItemDef),
+        map(item_usage, InterfaceDefBodyElement::ItemUsage),
+        map(port_def_required, InterfaceDefBodyElement::PortDef),
+        map(port_usage, InterfaceDefBodyElement::PortUsage),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -280,4 +296,74 @@ fn parse_interface_def(
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod par_002_widening_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn interface_def_body_accepts_nested_attribute_usage() {
+        let (rest, node) =
+            interface_def_body_element(input("attribute mass: Real;")).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            InterfaceDefBodyElement::AttributeUsage(_)
+        ));
+    }
+
+    #[test]
+    fn interface_def_body_accepts_nested_item_def_not_misparsed_as_usage() {
+        let (rest, node) =
+            interface_def_body_element(input("item def MyItem;")).expect("item def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, InterfaceDefBodyElement::ItemDef(_)));
+    }
+
+    #[test]
+    fn interface_def_body_accepts_nested_item_usage() {
+        let (rest, node) =
+            interface_def_body_element(input("item i1: MyItem;")).expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, InterfaceDefBodyElement::ItemUsage(_)));
+    }
+
+    #[test]
+    fn interface_def_body_accepts_nested_port_def_not_misparsed_as_usage() {
+        let (rest, node) =
+            interface_def_body_element(input("port def MyPort;")).expect("port def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, InterfaceDefBodyElement::PortDef(_)));
+    }
+
+    #[test]
+    fn interface_def_body_accepts_nested_port_usage() {
+        let (rest, node) =
+            interface_def_body_element(input("port p1: MyPort;")).expect("port usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, InterfaceDefBodyElement::PortUsage(_)));
+    }
+
+    /// PAR-002 acceptance criterion: `port def` yields the same underlying parse (via the shared
+    /// `port_def_required` parser) whether reached through `InterfaceDefBodyElement::PortDef` or
+    /// any other body enum wired to the same parser in prior increments (e.g.
+    /// `PartDefBodyElement::PortDef`).
+    #[test]
+    fn port_def_is_same_variant_kind_in_interface_def_body_as_port_def_required_parser() {
+        let text = "port def MyPort;";
+        let (_, iface_node) =
+            interface_def_body_element(input(text)).expect("nested in interface def body");
+        assert!(matches!(
+            iface_node.value,
+            InterfaceDefBodyElement::PortDef(_)
+        ));
+        let result = port_def_required(input(text));
+        assert!(result.is_ok(), "port_def_required should also accept {text:?}");
+    }
 }

@@ -5,15 +5,18 @@ use crate::ast::{
     ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, ConnectionEnd,
     EndDecl, Node, RefBody, RefDecl,
 };
+use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
+use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
     identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
     CONNECTION_DEF_BODY_STARTERS,
 };
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::node_from_to;
+use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -226,6 +229,17 @@ fn connection_def_body_element(
         map(ref_decl, ConnectionDefBodyElement::RefDecl),
         map(connect_stmt, ConnectionDefBodyElement::ConnectStmt),
         map(doc_comment, ConnectionDefBodyElement::Doc),
+        // PAR-002 widening: this body previously had no attribute/item/port coverage at all.
+        // Same def-before-usage discipline as `InterfaceDefBodyElement`/other body enums.
+        map(
+            |i| attribute_def(i, true),
+            ConnectionDefBodyElement::AttributeDef,
+        ),
+        map(attribute_usage, ConnectionDefBodyElement::AttributeUsage),
+        map(item_def_required, ConnectionDefBodyElement::ItemDef),
+        map(item_usage, ConnectionDefBodyElement::ItemUsage),
+        map(port_def_required, ConnectionDefBodyElement::PortDef),
+        map(port_usage, ConnectionDefBodyElement::PortUsage),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -308,4 +322,66 @@ fn parse_connection_def(
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod par_002_widening_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn connection_def_body_accepts_nested_attribute_usage() {
+        let (rest, node) = connection_def_body_element(input("attribute mass: Real;"))
+            .expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            ConnectionDefBodyElement::AttributeUsage(_)
+        ));
+    }
+
+    #[test]
+    fn connection_def_body_accepts_nested_item_def_not_misparsed_as_usage() {
+        let (rest, node) =
+            connection_def_body_element(input("item def MyItem;")).expect("item def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, ConnectionDefBodyElement::ItemDef(_)));
+    }
+
+    #[test]
+    fn connection_def_body_accepts_nested_port_def_not_misparsed_as_usage() {
+        let (rest, node) =
+            connection_def_body_element(input("port def MyPort;")).expect("port def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, ConnectionDefBodyElement::PortDef(_)));
+    }
+
+    #[test]
+    fn connection_def_body_accepts_nested_port_usage() {
+        let (rest, node) =
+            connection_def_body_element(input("port p1: MyPort;")).expect("port usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, ConnectionDefBodyElement::PortUsage(_)));
+    }
+
+    /// PAR-002 acceptance criterion: `attribute` usage yields the same underlying parse (via the
+    /// shared `attribute_usage` parser, also wired into `PartDefBodyElement`/`PackageBodyElement`
+    /// in prior increments) whether reached through `ConnectionDefBodyElement::AttributeUsage` or
+    /// any other body enum.
+    #[test]
+    fn attribute_usage_is_same_variant_kind_in_connection_def_body_as_shared_parser() {
+        let text = "attribute mass: Real;";
+        let (_, conn_node) =
+            connection_def_body_element(input(text)).expect("nested in connection def body");
+        assert!(matches!(
+            conn_node.value,
+            ConnectionDefBodyElement::AttributeUsage(_)
+        ));
+        let result = attribute_usage(input(text));
+        assert!(result.is_ok(), "attribute_usage should also accept {text:?}");
+    }
 }
