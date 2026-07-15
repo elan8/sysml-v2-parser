@@ -2,7 +2,9 @@ use super::behavior::{ActionDefBodyElement, Allocate, InOut, InOutDecl, StateDef
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::view::{CalcUsage, ConstraintDefBody};
-use crate::ast::core::{Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship};
+use crate::ast::core::{
+    ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
+};
 
 /// Part definition: `part def` Identification (`:>` specializes)? Body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -450,11 +452,11 @@ pub enum PortBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectStmt {
-    pub from: Node<Expression>,
-    pub to: Node<Expression>,
+    pub from: Node<ConnectionEnd>,
+    pub to: Node<ConnectionEnd>,
     /// Additional ends beyond `from`/`to` from the parenthesized n-ary form; empty for the
     /// ordinary binary `from ... to ...` form.
-    pub extra_ends: Vec<Node<Expression>>,
+    pub extra_ends: Vec<Node<ConnectionEnd>>,
     pub body: ConnectBody,
 }
 
@@ -769,8 +771,8 @@ pub enum InterfaceUsageBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Connect {
-    pub from: Node<Expression>,
-    pub to: Node<Expression>,
+    pub from: Node<ConnectionEnd>,
+    pub to: Node<ConnectionEnd>,
     pub body: ConnectBody,
 }
 

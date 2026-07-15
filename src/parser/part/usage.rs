@@ -528,12 +528,25 @@ pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
             start,
             input,
             Connect {
-                from: from_expr,
-                to: to_expr,
+                from: connection_end(from_expr),
+                to: connection_end(to_expr),
                 body,
             },
         ),
     ))
+}
+
+/// Wrap a parsed endpoint expression in a `ConnectionEnd` node, reusing the expression's own
+/// span (see `ast::core::ConnectionEnd`'s doc comment).
+fn connection_end(expr: Node<Expression>) -> Node<ConnectionEnd> {
+    let span = expr.span.clone();
+    Node::new(
+        span.clone(),
+        ConnectionEnd {
+            expression: expr,
+            span,
+        },
+    )
 }
 
 /// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), or `doc`.

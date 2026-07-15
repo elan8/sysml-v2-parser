@@ -2,8 +2,8 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    ConnectBody, ConnectStmt, EndDecl, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
-    Node, RefBody, RefDecl,
+    ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, InterfaceDef, InterfaceDefBody,
+    InterfaceDefBodyElement, Node, RefBody, RefDecl,
 };
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -125,11 +125,26 @@ pub(crate) fn connect_body(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> 
     .parse(input)
 }
 
+/// Wrap a parsed endpoint expression in a `ConnectionEnd` node, reusing the expression's own
+/// span (see `ast::core::ConnectionEnd`'s doc comment). This file's ends are semantically
+/// "interface ends" (`InterfaceEnd` is a type alias for `ConnectionEnd` -- checked that an
+/// interface end carries nothing beyond a generic connection end, see that alias's doc comment).
+fn connect_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
+    let span = expr.span.clone();
+    Node::new(
+        span.clone(),
+        ConnectionEnd {
+            expression: expr,
+            span,
+        },
+    )
+}
+
 /// Connect ends: the n-ary `'(' end (',' end)+ ')'` form (`NaryInterfacePart`), or the ordinary
 /// binary `from ... to ...` form. Returns `(from, to, extra_ends)`.
 fn connect_ends(
     input: Input<'_>,
-) -> IResult<Input<'_>, (Node<crate::ast::Expression>, Node<crate::ast::Expression>, Vec<Node<crate::ast::Expression>>)> {
+) -> IResult<Input<'_>, (Node<ConnectionEnd>, Node<ConnectionEnd>, Vec<Node<ConnectionEnd>>)> {
     alt((
         map(
             (
@@ -143,7 +158,11 @@ fn connect_ends(
             ),
             |(_, first, mut rest, _)| {
                 let to = rest.remove(0);
-                (first, to, rest)
+                (
+                    connect_end(first),
+                    connect_end(to),
+                    rest.into_iter().map(connect_end).collect(),
+                )
             },
         ),
         map(
@@ -152,7 +171,7 @@ fn connect_ends(
                 preceded(ws_and_comments, tag(&b"to"[..])),
                 preceded(ws_and_comments, path_expression),
             ),
-            |(from, _, to)| (from, to, Vec::new()),
+            |(from, _, to)| (connect_end(from), connect_end(to), Vec::new()),
         ),
     ))
     .parse(input)

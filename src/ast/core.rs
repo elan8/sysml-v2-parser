@@ -406,6 +406,40 @@ impl PartialEq for SubsettingRelationship {
 
 impl Eq for SubsettingRelationship {}
 
+/// A connector/interface endpoint, wrapping the endpoint's path expression with its own span
+/// (PAR-004 item 3). Distinguishes an endpoint from an arbitrary standalone
+/// [`Expression`]/[`Node<Expression>`] appearing elsewhere in the AST, even though today the
+/// endpoint's own `span` and the inner `Node<Expression>`'s span are identical (the expression
+/// itself already carries a real span from `path_expression` parsing).
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ConnectionEnd {
+    pub expression: Node<Expression>,
+    pub span: Span,
+}
+
+/// Equality ignores `span`, matching [`TypingRelationship`]'s convention.
+impl PartialEq for ConnectionEnd {
+    fn eq(&self, other: &Self) -> bool {
+        self.expression == other.expression
+    }
+}
+
+impl Eq for ConnectionEnd {}
+
+/// An interface end (`InterfaceUsage`'s `connect`/bare-path endpoints, and `ConnectStmt`'s ends
+/// when reached through `interface def`/`interface` bodies).
+///
+/// Checked against `ConnectStmt`'s actual usage sites (`src/parser/interface.rs` and
+/// `src/parser/connection.rs`, both of which build a `ConnectStmt` from the same shared
+/// `connect_ends` parser) and `InterfaceUsage::TypedConnect`/`Connection`
+/// (`src/parser/part/usage.rs`): an interface end carries nothing beyond what a generic
+/// connection end carries — both are just a path expression with a span. A distinct struct would
+/// have no fields of its own, so this is a type alias rather than a duplicate type; it exists so
+/// call sites can name "interface end" vs. "connection end" for readability without pretending
+/// they're semantically different today.
+pub type InterfaceEnd = ConnectionEnd;
+
 impl Multiplicity {
     /// Renders the multiplicity back to canonical bracket text, e.g. `[1]`, `[0..1]`, `[1..*]`.
     /// Literal integer bounds and the unbounded `*` render exactly; other bound expressions fall

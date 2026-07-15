@@ -73,6 +73,15 @@ fn expr_path(path: &str) -> Node<Expression> {
     n(expr)
 }
 
+/// Wraps a `Node<Expression>` endpoint in a `Node<ConnectionEnd>` for `Connect`/`ConnectStmt`.
+fn end(expr: Node<Expression>) -> Node<sysml_v2_parser::ast::ConnectionEnd> {
+    let span = expr.span.clone();
+    n(sysml_v2_parser::ast::ConnectionEnd {
+        expression: expr,
+        span,
+    })
+}
+
 /// Index expression base#(n).
 fn expr_index(base: &str, index_val: i64) -> Node<Expression> {
     n(Expression::Index {
@@ -469,14 +478,14 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                     type_ref_span: None,
                 }))),
                 n(InterfaceDefBodyElement::ConnectStmt(n(ConnectStmt {
-                    from: n(Expression::FeatureRef("shaftPort_a".to_string())),
-                    to: expr_path("driveshaft.shaftPort_b"),
+                    from: end(n(Expression::FeatureRef("shaftPort_a".to_string()))),
+                    to: end(expr_path("driveshaft.shaftPort_b")),
                     extra_ends: vec![],
                     body: ConnectBody::Brace,
                 }))),
                 n(InterfaceDefBodyElement::ConnectStmt(n(ConnectStmt {
-                    from: expr_path("driveshaft.shaftPort_c"),
-                    to: n(Expression::FeatureRef("shaftPort_d".to_string())),
+                    from: end(expr_path("driveshaft.shaftPort_c")),
+                    to: end(n(Expression::FeatureRef("shaftPort_d".to_string()))),
                     extra_ends: vec![],
                     body: ConnectBody::Semicolon,
                 }))),
@@ -682,13 +691,13 @@ fn part_rear_axle_assembly() -> PartUsage {
                     part_rear_axle(),
                 )))),
                 n(PartUsageBodyElement::Connect(n(Connect {
-                    from: expr_path("rearAxle.leftHalfAxle.axleToWheelPort"),
-                    to: expr_path("leftWheel.wheelToAxlePort"),
+                    from: end(expr_path("rearAxle.leftHalfAxle.axleToWheelPort")),
+                    to: end(expr_path("leftWheel.wheelToAxlePort")),
                     body: ConnectBody::Semicolon,
                 }))),
                 n(PartUsageBodyElement::Connect(n(Connect {
-                    from: expr_path("rearAxle.rightHalfAxle.axleToWheelPort"),
-                    to: expr_path("rightWheel.wheelToAxlePort"),
+                    from: end(expr_path("rearAxle.rightHalfAxle.axleToWheelPort")),
+                    to: end(expr_path("rightWheel.wheelToAxlePort")),
                     body: ConnectBody::Semicolon,
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {

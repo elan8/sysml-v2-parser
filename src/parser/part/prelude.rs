@@ -1,7 +1,7 @@
 //! Shared imports for part submodules.
 
 pub(crate) use crate::ast::{
-    Allocate, AttributeBody, AttributeUsage, Bind, CalcUsage, Connect, ConnectBody,
+    Allocate, AttributeBody, AttributeUsage, Bind, CalcUsage, Connect, ConnectBody, ConnectionEnd,
     ConnectionUsageMember, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
     InterfaceUsageBodyElement, Node, OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement,
     PartUsage, PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,
