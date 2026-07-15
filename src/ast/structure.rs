@@ -320,6 +320,25 @@ pub enum PartUsageBodyElement {
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// `variant` name `;` inside a variation part usage body.
     VariantUsage(Node<VariantUsage>),
+    /// `state def` nested inside a part usage body (PAR-002: usage bodies legally contain
+    /// nested definitions per BNF `UsageBody = DefinitionBody`, previously zero Def-kind
+    /// variants existed on this enum at all).
+    StateDef(Node<crate::ast::behavior::StateDef>),
+    /// `metadata def` nested inside a part usage body. See `StateDef`.
+    MetadataDef(Node<MetadataDef>),
+    /// `flow def` nested inside a part usage body. See `StateDef`.
+    FlowDef(Node<crate::ast::behavior::FlowDef>),
+    /// `requirement def` nested inside a part usage body. See `StateDef`.
+    RequirementDef(Node<crate::ast::requirement::RequirementDef>),
+    /// `occurrence def` nested inside a part usage body. See `StateDef`.
+    OccurrenceDef(Node<OccurrenceDef>),
+    /// `port def` nested inside a part usage body, using `port_def_required`. See `StateDef`.
+    PortDef(Node<PortDef>),
+    /// `calc def` nested inside a part usage body, using `calc_def_required`. See `StateDef`.
+    CalcDef(Node<crate::ast::view::CalcDef>),
+    /// `connection def` nested inside a part usage body, using `connection_def_required`. See
+    /// `StateDef`.
+    ConnectionDef(Node<ConnectionDef>),
 }
 
 /// Variant member inside a variation part usage/def body: either an untyped reference to a

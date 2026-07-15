@@ -184,6 +184,36 @@ is done.
   `crate::parser::part` so `src/parser/package.rs` can reuse them instead of duplicating the
   parsing logic.
 
+### PAR-002 (increment 4 of N): nested `def` kinds in `PartUsageBodyElement`
+
+- **`PartUsageBodyElement` had zero `Def`-kind variants before this increment.** Added `StateDef`,
+  `MetadataDef`, `FlowDef`, `RequirementDef`, `OccurrenceDef`, `PortDef`, `CalcDef`,
+  `ConnectionDef` (`src/ast/structure.rs`), wired into `part_usage_body_element`
+  (`src/parser/part/usage.rs`) using the same parsers already wired for `PartDefBodyElement` in
+  increments 1-2 (`state_def`, `metadata_def`, `flow_def`, `requirement_def`, `occurrence_def`,
+  `port_def_required`, `calc_def_required`, `connection_def_required`). Justified by BNF
+  `UsageBody = DefinitionBody`: a usage body legally contains nested definitions, not just nested
+  usages, the same as a definition body does.
+- **Same ordering discipline applied proactively**: `port_def_required`/`flow_def` placed before
+  `port_usage`/`flow_usage_member` (both lack a guard against a bare `def` token, per the bugs
+  found and fixed in increment 2), avoided from the start rather than caught after the fact this
+  time. `calc_def_required`/`connection_def_required`/`state_def`/`metadata_def`/
+  `requirement_def`/`occurrence_def` had no usage sibling already dispatched in this body, so no
+  ordering risk for those.
+- **nom `alt` tuple-arity limit hit and fixed**: adding 8 more branches pushed the flat `alt(...)`
+  past nom's ~21-element tuple ceiling (a real compile error, not a lint). Restructured into three
+  top-level nested `alt` groups (annotations/state/behavior-ish forms; the new def-kind group;
+  port/ref/bind/satisfy/interface/connect/flow) rather than one flat list -- same technique
+  already used in `part_def_body_element`.
+- **PAR-002 acceptance-criterion test added**:
+  `state_def_is_same_variant_kind_in_part_usage_body_as_in_part_def_body`
+  (`src/parser/part/usage.rs`) confirms the same `state def` declaration yields `StateDef` whether
+  nested in a part *usage* body or a part *definition* body.
+- **Scope remaining**: `PortDefBodyElement`/`PortBodyElement`, `InterfaceDefBodyElement`/
+  `ConnectionDefBodyElement` still unaddressed (item 4 of the coordinator's remaining list).
+  `RequirementUsage`/other Usage-kind gaps on `PartUsageBodyElement` were out of scope for this
+  increment (task asked specifically for Def-kind variants here).
+
 ### PAR-006a: recovery-guard foundation
 
 - **Confirmed the PAR-001 disambiguation fix was already generalized**: `attribute_def`'s

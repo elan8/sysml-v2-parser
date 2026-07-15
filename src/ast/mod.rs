@@ -712,6 +712,30 @@ fn normalize_part_usage_body_element_node(
         PartUsageBodyElement::VariantUsage(n) => {
             PartUsageBodyElement::VariantUsage(dummy_node(n, n.value.clone()))
         }
+        PartUsageBodyElement::StateDef(n) => {
+            PartUsageBodyElement::StateDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::MetadataDef(n) => {
+            PartUsageBodyElement::MetadataDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::FlowDef(n) => {
+            PartUsageBodyElement::FlowDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::RequirementDef(n) => {
+            PartUsageBodyElement::RequirementDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::OccurrenceDef(n) => {
+            PartUsageBodyElement::OccurrenceDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::PortDef(n) => {
+            PartUsageBodyElement::PortDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::CalcDef(n) => {
+            PartUsageBodyElement::CalcDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::ConnectionDef(n) => {
+            PartUsageBodyElement::ConnectionDef(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }

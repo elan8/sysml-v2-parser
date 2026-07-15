@@ -838,59 +838,87 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
     );
     let (input, elem) = alt((
         alt((
-            map(doc_comment, PartUsageBodyElement::Doc),
+            alt((
+                map(doc_comment, PartUsageBodyElement::Doc),
+                map(
+                    crate::parser::metadata_annotation::metadata_keyword_usage,
+                    PartUsageBodyElement::MetadataKeywordUsage,
+                ),
+                map(
+                    metadata_annotation,
+                    PartUsageBodyElement::MetadataAnnotation,
+                ),
+                map(annotation, PartUsageBodyElement::Annotation),
+            )),
             map(
-                crate::parser::metadata_annotation::metadata_keyword_usage,
-                PartUsageBodyElement::MetadataKeywordUsage,
+                exhibit_state_as_state_usage,
+                PartUsageBodyElement::StateUsage,
             ),
+            map(perform_action_decl, PartUsageBodyElement::Perform),
+            map(perform_usage, PartUsageBodyElement::Perform),
+            map(allocate_, PartUsageBodyElement::Allocate),
+            map(variant_usage, PartUsageBodyElement::VariantUsage),
+            map(attribute_usage, PartUsageBodyElement::AttributeUsage),
             map(
-                metadata_annotation,
-                PartUsageBodyElement::MetadataAnnotation,
+                attribute_usage_shorthand,
+                PartUsageBodyElement::AttributeUsage,
             ),
-            map(annotation, PartUsageBodyElement::Annotation),
+            alt((
+                map(enum_usage, PartUsageBodyElement::EnumerationUsage),
+                map(part_usage, |p| PartUsageBodyElement::PartUsage(Box::new(p))),
+            )),
+            map(individual_usage, |n| {
+                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+            map(snapshot_usage, |n| {
+                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+            map(timeslice_usage, |n| {
+                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+            map(then_timeslice_usage, |n| {
+                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+            map(occurrence_usage, |n| {
+                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
+            }),
         )),
-        map(
-            exhibit_state_as_state_usage,
-            PartUsageBodyElement::StateUsage,
-        ),
-        map(perform_action_decl, PartUsageBodyElement::Perform),
-        map(perform_usage, PartUsageBodyElement::Perform),
-        map(allocate_, PartUsageBodyElement::Allocate),
-        map(variant_usage, PartUsageBodyElement::VariantUsage),
-        map(attribute_usage, PartUsageBodyElement::AttributeUsage),
-        map(
-            attribute_usage_shorthand,
-            PartUsageBodyElement::AttributeUsage,
-        ),
+        // PAR-002: nested `def` kinds -- usage bodies legally contain nested definitions per BNF
+        // `UsageBody = DefinitionBody`. `port_def_required`/`calc_def_required`/
+        // `connection_def_required` must be tried before `port_usage`/(no calc or connection
+        // usage exists in this body yet, so no ordering risk for those two) -- `port_usage` has
+        // no guard against a bare `def` keyword (same bug class fixed for `PartDefBodyElement`
+        // in a prior increment), so `port def Foo;` would otherwise misparse as a port usage
+        // named "def". `state_def`/`metadata_def`/`requirement_def`/`occurrence_def` are all
+        // `def_required()`-guarded internally and have no usage sibling dispatched in this body
+        // today, so no ordering risk for them either.
         alt((
-            map(enum_usage, PartUsageBodyElement::EnumerationUsage),
-            map(part_usage, |p| PartUsageBodyElement::PartUsage(Box::new(p))),
+            map(state_def, PartUsageBodyElement::StateDef),
+            map(metadata_def, PartUsageBodyElement::MetadataDef),
+            map(requirement_def, PartUsageBodyElement::RequirementDef),
+            map(occurrence_def, PartUsageBodyElement::OccurrenceDef),
+            map(calc_def_required, PartUsageBodyElement::CalcDef),
+            map(
+                connection_def_required,
+                PartUsageBodyElement::ConnectionDef,
+            ),
+            map(port_def_required, PartUsageBodyElement::PortDef),
         )),
-        map(individual_usage, |n| {
-            PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(snapshot_usage, |n| {
-            PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(timeslice_usage, |n| {
-            PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(then_timeslice_usage, |n| {
-            PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(occurrence_usage, |n| {
-            PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(port_usage, PartUsageBodyElement::PortUsage),
-        map(part_ref_usage, PartUsageBodyElement::Ref),
-        map(bind_, PartUsageBodyElement::Bind),
-        map(satisfy, PartUsageBodyElement::Satisfy),
-        map(interface_usage, PartUsageBodyElement::InterfaceUsage),
-        map(connect_, PartUsageBodyElement::Connect),
-        map(
-            crate::parser::flow::flow_usage_member,
-            PartUsageBodyElement::FlowUsage,
-        ),
+        alt((
+            map(port_usage, PartUsageBodyElement::PortUsage),
+            map(part_ref_usage, PartUsageBodyElement::Ref),
+            map(bind_, PartUsageBodyElement::Bind),
+            map(satisfy, PartUsageBodyElement::Satisfy),
+            map(interface_usage, PartUsageBodyElement::InterfaceUsage),
+            map(connect_, PartUsageBodyElement::Connect),
+            // `flow_def` must be tried before `flow_usage_member`: the latter has no guard
+            // against a bare `def` keyword either (see comment above).
+            map(flow_def, PartUsageBodyElement::FlowDef),
+            map(
+                crate::parser::flow::flow_usage_member,
+                PartUsageBodyElement::FlowUsage,
+            ),
+        )),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -906,4 +934,114 @@ fn exhibit_state_as_state_usage(
         body: exhibit.value.body,
     };
     Ok((input, Node::new(exhibit.span, state)))
+}
+
+#[cfg(test)]
+mod par_002_nested_def_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_state_def() {
+        let (rest, node) =
+            part_usage_body_element(input("state def Modes { state on; state off; }"))
+                .expect("state def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::StateDef(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_metadata_def() {
+        let (rest, node) =
+            part_usage_body_element(input("metadata def MyMeta;")).expect("metadata def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::MetadataDef(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_flow_def_not_misparsed_as_usage() {
+        let (rest, node) =
+            part_usage_body_element(input("flow def DataFlow;")).expect("flow def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::FlowDef(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_requirement_def() {
+        let (rest, node) =
+            part_usage_body_element(input("requirement def SafetyReq;")).expect("requirement def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            PartUsageBodyElement::RequirementDef(_)
+        ));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_occurrence_def() {
+        let (rest, node) =
+            part_usage_body_element(input("occurrence def Failure;")).expect("occurrence def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::OccurrenceDef(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_port_def_not_misparsed_as_usage() {
+        let (rest, node) = part_usage_body_element(input("port def MyPort;")).expect("port def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::PortDef(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_port_usage() {
+        let (rest, node) =
+            part_usage_body_element(input("port p1: MyPort;")).expect("port usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::PortUsage(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_calc_def() {
+        let (rest, node) = part_usage_body_element(input("calc def MyCalc;")).expect("calc def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::CalcDef(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_nested_connection_def() {
+        let (rest, node) =
+            part_usage_body_element(input("connection def MyConn;")).expect("connection def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::ConnectionDef(_)));
+    }
+
+    /// PAR-002 acceptance criterion, increment 4: the same `state def` declaration yields the
+    /// same AST variant kind nested in a part *usage* body as it already does nested in a part
+    /// *definition* body (proven in a prior increment) and at package level.
+    #[test]
+    fn state_def_is_same_variant_kind_in_part_usage_body_as_in_part_def_body() {
+        let text = "state def Modes { state on; state off; }";
+        let (_, usage_node) =
+            part_usage_body_element(input(text)).expect("nested in part usage body");
+        assert!(matches!(usage_node.value, PartUsageBodyElement::StateDef(_)));
+        let (_, def_node) = crate::parser::part::part_def_or_usage(input(&format!(
+            "part def X {{ {text} }}"
+        )))
+        .expect("part def parses");
+        let crate::parser::part::PartDefOrUsage::Def(def_node) = def_node else {
+            panic!("expected a part def");
+        };
+        let crate::ast::PartDefBody::Brace { elements } = &def_node.value.body else {
+            panic!("expected brace body");
+        };
+        assert_eq!(elements.len(), 1);
+        assert!(matches!(
+            elements[0].value,
+            crate::ast::PartDefBodyElement::StateDef(_)
+        ));
+    }
 }
