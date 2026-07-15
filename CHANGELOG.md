@@ -74,6 +74,35 @@ is done.
   (`Option<String>` → `Option<Node<Multiplicity>>`), invalidating parse caches built against the
   0.34.x schema.
 
+### PAR-004 (item 1 of 6, scoped): typed `TypingRelationship` for definition-level `specializes`
+
+- **Added `ast::TypingKind`/`ast::TypingRelationship`**: `{ target: String, kind, span: Span,
+  is_conjugated: bool, is_implied: bool }`, per the design brief's combined shape (folding in
+  PAR-003's conjugation concept). Replaces the `specializes: Option<String>` /
+  `specializes_span: Option<Span>` field pair — previously carrying no span, kind, or conjugation
+  information — with a single `specializes: Option<Node<TypingRelationship>>` field on all 21
+  structs sharing that exact pair (`PartDef`, `ItemDef`, `IndividualDef`, `PortDef`,
+  `InterfaceDef`, `ConnectionDef`, `MetadataDef`, `EnumDef`, `OccurrenceDef`, `ActionDef`,
+  `FlowDef`, `AllocationDef`, `StateDef`, `RequirementDef`, `CaseDef`, `AnalysisCaseDef`,
+  `VerificationCaseDef`, `UseCaseDef`, `ConstraintDef`, `ViewDef`, `ViewpointDef`,
+  `RenderingDef`). Tractable as one change because all 21 structs source `specializes` from a
+  single parser choke point (`specialization.rs`'s `parse_optional_definition_specialization`),
+  which now builds the `TypingRelationship` node directly — `kind` is always
+  `Subclassification` and `is_conjugated` is always `false`, matching prior behavior exactly
+  (definition-level `:>`/`specializes` clauses don't accept a leading `~` today).
+- **Deviation from the brief, noted for a follow-up slice**: `PartUsage`/`PortUsage`'s
+  `type_name: String` (required, not `Option<String>`) doesn't match the
+  `typing`/`specializes: Option<String>` pair shape the brief describes, so it was left
+  untouched. `AttributeDef.typing` / `AttributeUsage.typing` — the actual `:` typing side,
+  populated by a different code path (`attribute.rs` and `usage.rs`'s
+  `typings()`/`conjugated_qualified_name`, which is where real `~` conjugation parsing already
+  happens) — were also not migrated in this pass; conjugation there remains a literal
+  `~`-prefixed string, unchanged from before this session.
+- Regenerated the `function_based_behavior_3a` and `parts_tree_1a` validation snapshot fixtures
+  (schema-only Debug-format diff; confirmed target text/spans/kind are correct before
+  regenerating).
+- Bumps `PARSE_AST_VERSION` to 11.
+
 ## [0.34.0] - 2026-07-15
 
 ### Fixed
