@@ -377,8 +377,14 @@ pub(crate) fn directed_attribute_usage(
 }
 
 /// Attribute usage:
-/// - `attribute` name ( (`:>` | `:`) type )? ( `redefines` qualified_name )? ( '=' value )? body
+/// - (`private` | `protected` | `public`)? `attribute` name ( (`:>` | `:`) type )? ( `redefines`
+///   qualified_name )? ( '=' value )? body
 /// - `attribute :>>` qualified_name ( '=' value )? body
+///
+/// The visibility prefix is accepted (and discarded, like `attribute_def`'s) so a `def`-less
+/// declaration such as `private attribute foo: Type = value;` still dispatches here instead of
+/// falling through to an opaque/recovered element. This shape is used in the official Systems
+/// Library catalog (e.g. `IntervalScale`'s `private attribute zeroDegreeCelsiusInKelvin: ...`).
 pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
     enum AttributeUsageHead {
         Named {
@@ -393,6 +399,15 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
 
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, _) = nom::combinator::opt(preceded(
+        alt((
+            tag(&b"private"[..]),
+            tag(&b"protected"[..]),
+            tag(&b"public"[..]),
+        )),
+        ws1,
+    ))
+    .parse(input)?;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, usage_head) = alt((
@@ -678,5 +693,30 @@ mod attribute_body_tests {
             panic!("expected brace body");
         };
         assert_eq!(elements.len(), 2);
+    }
+
+    #[test]
+    fn attribute_usage_accepts_leading_visibility_modifier() {
+        let text = "private attribute zeroDegreeCelsiusInKelvin: ThermodynamicTemperatureValue = 273.15 [K];";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "zeroDegreeCelsiusInKelvin");
+        assert_eq!(
+            node.value.typing.as_deref(),
+            Some("ThermodynamicTemperatureValue")
+        );
+        assert!(node.value.value.is_some());
+    }
+
+    #[test]
+    fn attribute_body_element_dispatches_visibility_prefixed_declaration_to_usage_not_def() {
+        let text = "private attribute zeroDegreeCelsiusInKelvin: ThermodynamicTemperatureValue = 273.15 [K];";
+        let (_, node) = attribute_body_element(input(text)).expect("attribute body element");
+        match node.value {
+            AttributeBodyElement::AttributeUsage(usage) => {
+                assert_eq!(usage.value.name, "zeroDegreeCelsiusInKelvin");
+            }
+            other => panic!("expected AttributeUsage, got {other:?}"),
+        }
     }
 }

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-07-15
+
+### Fixed
+
+- **`attribute_usage` accepts a leading visibility modifier**: 0.33.0 made `attribute_def` require
+  an explicit `def` keyword whenever it's dispatched alongside `attribute_usage`, but
+  `attribute_usage` itself never learned to accept `private`/`protected`/`public` the way
+  `attribute_def` already did. A `def`-less, visibility-prefixed declaration — e.g. `private
+  attribute zeroDegreeCelsiusInKelvin: ThermodynamicTemperatureValue = 273.15 [K];`, the shape
+  used by the official Systems Library's `IntervalScale` catalog entries in
+  `SysML Quantities and Units Library/SI.sysml` — correctly failed `attribute_def` (no `def`) but
+  then also failed `attribute_usage` (no visibility handling) and fell through to an opaque
+  recovered element instead of a proper `AttributeUsage`. `attribute_usage` now accepts and
+  discards the same optional visibility prefix as `attribute_def`.
+
 ## [0.33.0] - 2026-07-13
 
 Fixes PAR-001: `attribute def` vs. `attribute` usage were ambiguous in every body that permits
