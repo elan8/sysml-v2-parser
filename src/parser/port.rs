@@ -298,6 +298,23 @@ mod par_002_widening_tests {
         assert!(matches!(node.value, PortDefBodyElement::ItemDef(_)));
     }
 
+    /// Regression: the package-level, `def`-less `port p1: MyPortType;` shape used to lose its
+    /// type reference entirely -- `parse_definition_prefix`'s shared header parsing swallowed the
+    /// `: MyPortType` clause before it reached `PortDef.specializes`, leaving it `None`. It must
+    /// now come through as a `Typing`-kind relationship (see `specialization.rs`).
+    #[test]
+    fn port_def_captures_bare_type_reference_at_package_level() {
+        let (rest, node) = port_def(input("port p1: MyPortType;")).expect("port def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.identification.name.as_deref(), Some("p1"));
+        let typing = node
+            .value
+            .specializes
+            .expect("type reference must not be dropped");
+        assert_eq!(typing.value.target, "MyPortType");
+        assert_eq!(typing.value.kind, crate::ast::TypingKind::Typing);
+    }
+
     #[test]
     fn port_def_body_accepts_nested_enum_usage() {
         let (rest, node) = port_def_body_element(input("enum e1: MyEnum;")).expect("enum usage");

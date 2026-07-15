@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: package-level bare `: Type` header silently dropped the type reference
+
+Found while scoping PAR-002 work (flagged there as out of scope, fixed separately): the shared
+`parse_definition_prefix`/`parse_optional_definition_header_after_identification` header parsing
+used by the package-level, `def`-optional `port`, `item`, `connection`, and `constraint`/`calc`
+def parsers (kept `DefKeywordMode::Optional` per `definition_prefix.rs`'s module doc, to accept
+the real Systems Library's bare `def`-less namespace-level forms) captured a `:>`/`specializes`
+clause when present but otherwise discarded the entire `: Type` header text once
+`specializes_from_header_text` found no `:>`, with nothing downstream to catch the loss. A
+package-level declaration with only a plain type, e.g. `port p1: MyPortType;`, parsed successfully
+but produced `PortDef { specializes: None, .. }` -- the `MyPortType` reference vanished with no
+diagnostic.
+
+`specialization.rs::parse_optional_definition_header_after_identification` now falls back to
+parsing the bare type as a `Typing`-kind `TypingRelationship` (via a new `typing_target_from_header`
+helper reusing the existing `qualified_name` lexer, handling the `~`-conjugated form too) when no
+`:>`/`specializes` clause is present, instead of returning `None`. This reuses the existing
+`specializes: Option<Node<TypingRelationship>>` field already on `PortDef`/`ItemDef`/
+`ConnectionDef`/etc. -- `TypingRelationship::kind` already distinguished `Typing` from
+`Subclassification` (PAR-004 item 1) but nothing previously populated a package-level `Typing`
+variant through this path, so no AST schema change or `PARSE_AST_VERSION` bump was needed. The
+existing combined library-shorthand form (`: Type[mult] nonunique :> Base`) is unaffected: when a
+`:>`/`specializes` clause is present it still wins, matching prior (tested) behavior.
+
 ## [0.35.0] - 2026-07-15
 
 Closes the gaps-doc PAR-002..006 backlog (definitions/usages in every owning context, typed
