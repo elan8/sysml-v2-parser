@@ -619,7 +619,7 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
         },
         Expression::Invocation { callee, args } => Expression::Invocation {
             callee: Box::new(normalize_expression_node(callee)),
-            args: args.iter().map(normalize_expression_node).collect(),
+            args: args.iter().map(normalize_argument).collect(),
         },
         Expression::Tuple(items) => {
             Expression::Tuple(items.iter().map(normalize_expression_node).collect())
@@ -651,8 +651,34 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
             selector: selector.clone(),
         },
         Expression::Null => Expression::Null,
+        Expression::Parenthesized(inner) => {
+            Expression::Parenthesized(Box::new(normalize_expression_node(inner)))
+        }
+        Expression::Constructor { type_name, args } => Expression::Constructor {
+            type_name: type_name.clone(),
+            args: args.iter().map(normalize_argument).collect(),
+        },
+        Expression::FeatureChainRef(chain) => Expression::FeatureChainRef(FeatureChain {
+            segments: chain.segments.clone(),
+            span: Span::dummy(),
+        }),
+        Expression::CollectionOp { op, base, args } => Expression::CollectionOp {
+            op: op.clone(),
+            base: Box::new(normalize_expression_node(base)),
+            args: args.iter().map(normalize_argument).collect(),
+        },
+        Expression::MetadataAccess(inner) => {
+            Expression::MetadataAccess(Box::new(normalize_expression_node(inner)))
+        }
     };
     Node::new(Span::dummy(), value)
+}
+
+fn normalize_argument(arg: &Argument) -> Argument {
+    Argument {
+        name: arg.name.clone(),
+        value: normalize_expression_node(&arg.value),
+    }
 }
 
 fn normalize_part_usage_body_element_node(

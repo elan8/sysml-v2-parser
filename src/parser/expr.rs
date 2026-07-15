@@ -1,6 +1,9 @@
 //! Expression and path parsing for values and bind/connect.
 
-use crate::ast::{BinaryOperator, Expression, Node, TypeCheckKind, UnaryOperator};
+use crate::ast::{
+    Argument, BinaryOperator, CollectionOperator, Expression, FeatureChain, Node, TypeCheckKind,
+    UnaryOperator,
+};
 use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
@@ -163,17 +166,70 @@ fn metadata_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>
     ))
 }
 
+/// A single `ArgumentList` entry: positional (`ArgumentValue`) or named
+/// (`NAME '=' ArgumentValue`, KerML `NamedArgument`). Only treats `NAME '='` as named when the
+/// `=` is a lone assignment token, not the start of `==`/`===`, so equality expressions like
+/// `a == b` are never misread as a named argument.
+fn argument(input: Input<'_>) -> IResult<Input<'_>, Argument> {
+    let (input, _) = ws_and_comments(input)?;
+    if let Ok((after_name, arg_name)) = name(input) {
+        let (after_ws, _) = ws_and_comments(after_name)?;
+        let frag = after_ws.fragment();
+        if frag.first() == Some(&b'=') && frag.get(1) != Some(&b'=') {
+            let (after_eq, _) = tag(&b"="[..]).parse(after_ws)?;
+            let (after_eq, _) = ws_and_comments(after_eq)?;
+            let (rest, value) = expression(after_eq)?;
+            return Ok((
+                rest,
+                Argument {
+                    name: Some(arg_name),
+                    value,
+                },
+            ));
+        }
+    }
+    let (rest, value) = expression(input)?;
+    Ok((rest, Argument { name: None, value }))
+}
+
+/// Parses the interior of an `ArgumentList` (`PositionalArgumentList | NamedArgumentList`) after
+/// the opening `(` has already been consumed, through and including the closing `)`.
+fn argument_list_tail(input: Input<'_>) -> IResult<Input<'_>, Vec<Argument>> {
+    let (next, _) = ws_and_comments(input)?;
+    if next.fragment().starts_with(b")") {
+        let (next, _) = tag(&b")"[..]).parse(next)?;
+        return Ok((next, Vec::new()));
+    }
+    let mut args = Vec::new();
+    let mut input = next;
+    loop {
+        let (next, arg) = argument(input)?;
+        args.push(arg);
+        let (next, _) = ws_and_comments(next)?;
+        if next.fragment().starts_with(b")") {
+            let (next, _) = tag(&b")"[..]).parse(next)?;
+            return Ok((next, args));
+        }
+        let (next, _) = tag(&b","[..]).parse(next)?;
+        let (next, _) = ws_and_comments(next)?;
+        input = next;
+    }
+}
+
 fn constructor_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"new"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, type_name) = qualified_name(input)?;
-    let current = node_from_to(
-        start,
-        input,
-        Expression::FeatureRef(format!("new {type_name}")),
-    );
+    let (input, _) = ws_and_comments(input)?;
+    let (input, args) = if input.fragment().starts_with(b"(") {
+        let (input, _) = tag(&b"("[..]).parse(input)?;
+        argument_list_tail(input)?
+    } else {
+        (input, Vec::new())
+    };
+    let current = node_from_to(start, input, Expression::Constructor { type_name, args });
     postfix(input, start, current)
 }
 
@@ -297,8 +353,13 @@ fn parenthesized(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     if input.fragment().starts_with(b")") {
         let (input, _) = tag(&b")"[..]).parse(input)?;
         // Include `(` … `)` in the span so consumers (e.g. Spec42 `text_from_span`) round-trip
-        // the full parenthesized source, not only the inner expression.
-        return Ok((input, node_from_to(start, input, first.value)));
+        // the full parenthesized source, not only the inner expression. Wrap in `Parenthesized`
+        // (PAR-005 item 6) so the fact source had explicit grouping parens survives parsing
+        // instead of being lost when only the inner expression's span was recomputed.
+        return Ok((
+            input,
+            node_from_to(start, input, Expression::Parenthesized(Box::new(first))),
+        ));
     }
     let (input, _) = tag(&b","[..]).parse(input)?;
     let mut elements = vec![first];
@@ -398,8 +459,12 @@ fn sequence_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>>
     ))
     .parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b")"[..])).parse(input)?;
-    let mut args = vec![first];
-    args.extend(rest);
+    let mut exprs = vec![first];
+    exprs.extend(rest);
+    let args = exprs
+        .into_iter()
+        .map(|value| Argument { name: None, value })
+        .collect();
     Ok((
         input,
         node_from_to(
@@ -471,32 +536,12 @@ fn postfix<'a>(
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"(") {
         let (input, _) = tag(&b"("[..]).parse(input)?;
-        let (mut input, _) = ws_and_comments(input)?;
-        let mut args = Vec::new();
-        if input.fragment().starts_with(b")") {
-            let (next, _) = tag(&b")"[..]).parse(input)?;
-            let expr = Expression::Invocation {
-                callee: Box::new(current),
-                args,
-            };
-            return postfix(next, start, node_from_to(start, next, expr));
-        }
-        loop {
-            let (next, arg) = expression(input)?;
-            args.push(arg);
-            let (next, _) = ws_and_comments(next)?;
-            if next.fragment().starts_with(b")") {
-                let (next, _) = tag(&b")"[..]).parse(next)?;
-                let expr = Expression::Invocation {
-                    callee: Box::new(current),
-                    args,
-                };
-                return postfix(next, start, node_from_to(start, next, expr));
-            }
-            let (next, _) = tag(&b","[..]).parse(next)?;
-            let (next, _) = ws_and_comments(next)?;
-            input = next;
-        }
+        let (input, args) = argument_list_tail(input)?;
+        let expr = Expression::Invocation {
+            callee: Box::new(current),
+            args,
+        };
+        return postfix(input, start, node_from_to(start, input, expr));
     }
     if input.fragment().starts_with(b"#") {
         let (input, _) = tag(&b"#"[..]).parse(input)?;
@@ -520,16 +565,35 @@ fn postfix<'a>(
         let (input, _) = tag(&b"."[..]).parse(input)?;
         let (input, _) = ws_and_comments(input)?;
         let (input, member) = name(input)?;
-        let expr = Expression::MemberAccess(Box::new(current), member);
+        // `expr.metadata` is a dedicated KerML production (MetadataAccessExpression, BNF
+        // 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`), distinct from ordinary member
+        // access -- PAR-005 item 4.
+        let expr = if member == "metadata" {
+            Expression::MetadataAccess(Box::new(current))
+        } else {
+            Expression::MemberAccess(Box::new(current), member)
+        };
         return postfix(input, start, node_from_to(start, input, expr));
     }
     if input.fragment().starts_with(b"->") {
         let (input, _) = tag(&b"->"[..]).parse(input)?;
         let (input, _) = ws_and_comments(input)?;
         let (input, member) = name(input)?;
-        // KerML arrow-invocation, e.g. `collection->size()` or `powerProfile->size()-1`.
-        // Reuses MemberAccess/Invocation rather than a dedicated Expression variant; a
-        // following `(...)` is picked up by the recursive postfix() call's `(` branch above.
+        let (after_name, _) = ws_and_comments(input)?;
+        // KerML arrow-invocation, e.g. `collection->size()`, `xs->select(p)`, `xs->collect(f)`.
+        // When followed by a call, capture it as a dedicated `CollectionOp` (PAR-005 item 2) so
+        // the specific operator survives without string-matching a generic Invocation's callee.
+        if after_name.fragment().starts_with(b"(") {
+            let (after_paren, _) = tag(&b"("[..]).parse(after_name)?;
+            let (after_args, args) = argument_list_tail(after_paren)?;
+            let expr = Expression::CollectionOp {
+                op: CollectionOperator::from_name(&member),
+                base: Box::new(current),
+                args,
+            };
+            return postfix(after_args, start, node_from_to(start, after_args, expr));
+        }
+        // Bare arrow access with no call (rare) -- fall back to plain member access.
         let expr = Expression::MemberAccess(Box::new(current), member);
         return postfix(input, start, node_from_to(start, input, expr));
     }
@@ -738,13 +802,18 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
 
 /// Path expression: qualified name and/or member access (for bind/connect).
 /// Supports `A`, `A::B::C`, `A.B.C`, and combinations like `A::B.C`.
+///
+/// A single segment (no `.` chain) stays [`Expression::FeatureRef`]. A genuine multi-segment
+/// dotted chain (`A.B.C`, or `A::B.C`) is captured as [`Expression::FeatureChainRef`] using the
+/// standalone [`FeatureChain`] type built for exactly this by PAR-004 item 6 (PAR-005 item 3) --
+/// the first segment carries the full leading qualified name (which may itself contain `::`),
+/// and each subsequent `.`-separated segment is a plain feature name.
 pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     // `qualified_name` covers `::`-separated chains (common in SysML examples for feature chains).
-    // We keep it as a single FeatureRef string, then allow additional `.` member access.
     let (input, first) = crate::parser::lex::qualified_name(input)?;
-    let mut expr = Expression::FeatureRef(first);
+    let mut segments = vec![first];
     let mut rest = input;
     loop {
         let (next, _) = ws_and_comments(rest)?;
@@ -754,10 +823,15 @@ pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expre
         let (next, _) = tag(&b"."[..]).parse(next)?;
         let (next, _) = ws_and_comments(next)?;
         let (next, member) = name(next)?;
-        expr =
-            Expression::MemberAccess(Box::new(Node::new(crate::ast::Span::dummy(), expr)), member);
+        segments.push(member);
         rest = next;
     }
+    let span = crate::parser::span_from_to(start, rest);
+    let expr = if segments.len() == 1 {
+        Expression::FeatureRef(segments.into_iter().next().unwrap())
+    } else {
+        Expression::FeatureChainRef(FeatureChain { segments, span })
+    };
     Ok((rest, node_from_to(start, rest, expr)))
 }
 
@@ -788,21 +862,16 @@ mod tests {
     }
 
     #[test]
-    fn expression_parses_arrow_invocation_as_member_access_and_call() {
+    fn expression_parses_arrow_invocation_as_collection_op() {
         let input = span_input("powerProfile->size()");
         let (_, node) = expression(input).expect("expression");
         match &node.value {
-            Expression::Invocation { callee, args } => {
+            Expression::CollectionOp { op, base, args } => {
+                assert_eq!(op, &CollectionOperator::Size);
                 assert!(args.is_empty());
-                match &callee.value {
-                    Expression::MemberAccess(base, member) => {
-                        assert_eq!(member, "size");
-                        assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "powerProfile"));
-                    }
-                    other => panic!("expected MemberAccess callee, got {other:?}"),
-                }
+                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "powerProfile"));
             }
-            other => panic!("expected Invocation, got {other:?}"),
+            other => panic!("expected CollectionOp, got {other:?}"),
         }
     }
 
@@ -815,26 +884,193 @@ mod tests {
                 assert_eq!(op, &BinaryOperator::Sub);
                 assert!(matches!(&right.value, Expression::LiteralInteger(1)));
                 match &left.value {
-                    Expression::Invocation { callee, args } => {
+                    Expression::CollectionOp { op, base, args } => {
+                        assert_eq!(op, &CollectionOperator::Other("c".to_string()));
                         assert!(args.is_empty());
-                        match &callee.value {
-                            Expression::MemberAccess(base, member) => {
-                                assert_eq!(member, "c");
-                                match &base.value {
-                                    Expression::MemberAccess(inner_base, inner_member) => {
-                                        assert_eq!(inner_member, "b");
-                                        assert!(matches!(&inner_base.value, Expression::FeatureRef(s) if s == "a"));
-                                    }
-                                    other => panic!("expected nested MemberAccess, got {other:?}"),
-                                }
+                        match &base.value {
+                            Expression::MemberAccess(inner_base, inner_member) => {
+                                assert_eq!(inner_member, "b");
+                                assert!(matches!(&inner_base.value, Expression::FeatureRef(s) if s == "a"));
                             }
-                            other => panic!("expected MemberAccess callee, got {other:?}"),
+                            other => panic!("expected MemberAccess base (bare arrow access), got {other:?}"),
                         }
                     }
-                    other => panic!("expected Invocation on lhs of subtraction, got {other:?}"),
+                    other => panic!("expected CollectionOp on lhs of subtraction, got {other:?}"),
                 }
             }
             other => panic!("expected BinaryOp subtract, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn constructor_expression_parses_positional_args() {
+        let input = span_input("new A(x, y)");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::Constructor { type_name, args } => {
+                assert_eq!(type_name, "A");
+                assert_eq!(args.len(), 2);
+                assert!(args.iter().all(|a| a.name.is_none()));
+                assert!(matches!(&args[0].value.value, Expression::FeatureRef(s) if s == "x"));
+                assert!(matches!(&args[1].value.value, Expression::FeatureRef(s) if s == "y"));
+            }
+            other => panic!("expected Constructor, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructor_expression_parses_named_args() {
+        // Real shape from the Systems Library (RiskMetadata.sysml):
+        // `new RiskLevel(probability = LevelEnum::low)`.
+        let input = span_input("new RiskLevel(probability = LevelEnum::low)");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::Constructor { type_name, args } => {
+                assert_eq!(type_name, "RiskLevel");
+                assert_eq!(args.len(), 1);
+                assert_eq!(args[0].name.as_deref(), Some("probability"));
+                assert!(
+                    matches!(&args[0].value.value, Expression::FeatureRef(s) if s == "LevelEnum::low")
+                );
+            }
+            other => panic!("expected Constructor, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructor_expression_without_args_has_empty_arg_list() {
+        let input = span_input("new A");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::Constructor { type_name, args } => {
+                assert_eq!(type_name, "A");
+                assert!(args.is_empty());
+            }
+            other => panic!("expected Constructor, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn invocation_parses_mixed_named_and_positional_args() {
+        // Real shape from ParameterTest.sysml: `F(q = 1, p = a)`.
+        let input = span_input("F(q = 1, p = a)");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::Invocation { args, .. } => {
+                assert_eq!(args.len(), 2);
+                assert_eq!(args[0].name.as_deref(), Some("q"));
+                assert!(matches!(&args[0].value.value, Expression::LiteralInteger(1)));
+                assert_eq!(args[1].name.as_deref(), Some("p"));
+                assert!(matches!(&args[1].value.value, Expression::FeatureRef(s) if s == "a"));
+            }
+            other => panic!("expected Invocation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn invocation_named_argument_is_not_confused_with_equality() {
+        // `a == b` must stay a plain positional equality expression, not `a`-named-`= b`.
+        let input = span_input("F(a == b)");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::Invocation { args, .. } => {
+                assert_eq!(args.len(), 1);
+                assert!(args[0].name.is_none());
+                assert!(matches!(
+                    &args[0].value.value,
+                    Expression::BinaryOp {
+                        op: BinaryOperator::Eq,
+                        ..
+                    }
+                ));
+            }
+            other => panic!("expected Invocation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn collection_op_collect_parses_with_args() {
+        let input = span_input("items->collect(f)");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::CollectionOp { op, base, args } => {
+                assert_eq!(op, &CollectionOperator::Collect);
+                assert_eq!(args.len(), 1);
+                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "items"));
+            }
+            other => panic!("expected CollectionOp, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn path_expression_single_segment_stays_feature_ref() {
+        let input = span_input("engine");
+        let (_, node) = path_expression(input).expect("path_expression");
+        assert!(matches!(&node.value, Expression::FeatureRef(s) if s == "engine"));
+    }
+
+    #[test]
+    fn path_expression_multi_segment_becomes_feature_chain_ref() {
+        let input = span_input("engine.fuelCmdPort.flowRate");
+        let (_, node) = path_expression(input).expect("path_expression");
+        match &node.value {
+            Expression::FeatureChainRef(chain) => {
+                assert_eq!(
+                    chain.segments,
+                    vec![
+                        "engine".to_string(),
+                        "fuelCmdPort".to_string(),
+                        "flowRate".to_string(),
+                    ]
+                );
+            }
+            other => panic!("expected FeatureChainRef, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn path_expression_leading_qualified_name_then_dot_chain() {
+        let input = span_input("Foo::bar.baz");
+        let (_, node) = path_expression(input).expect("path_expression");
+        match &node.value {
+            Expression::FeatureChainRef(chain) => {
+                assert_eq!(
+                    chain.segments,
+                    vec!["Foo::bar".to_string(), "baz".to_string()]
+                );
+            }
+            other => panic!("expected FeatureChainRef, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn metadata_access_expression_parses() {
+        let input = span_input("x.metadata");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::MetadataAccess(base) => {
+                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "x"));
+            }
+            other => panic!("expected MetadataAccess, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parenthesized_expression_preserves_explicit_parens_marker() {
+        let input = span_input("(a + b)");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::Parenthesized(inner) => {
+                assert!(matches!(&inner.value, Expression::BinaryOp { .. }));
+            }
+            other => panic!("expected Parenthesized, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn non_parenthesized_binary_expression_has_no_parenthesized_wrapper() {
+        let input = span_input("a + b");
+        let (_, node) = expression(input).expect("expression");
+        assert!(matches!(&node.value, Expression::BinaryOp { .. }));
     }
 }

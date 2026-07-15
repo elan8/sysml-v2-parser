@@ -1,8 +1,12 @@
 //! Parser for the standalone [`crate::ast::FeatureChain`] type (PAR-004 item 6).
 //!
-//! See `src/ast/feature_chain.rs` for why this exists as a standalone type rather than a variant
-//! of `Expression`. Not called from `src/parser/expr.rs` today; PAR-005 is expected to wire it in
-//! for `path_expression` parsing.
+//! See `src/ast/feature_chain.rs` for how [`crate::ast::FeatureChain`] is used by
+//! `Expression::FeatureChainRef` since PAR-005 item 3. This particular combinator (`NAME ('.'
+//! NAME)*`, no `::` support) is still not called from `path_expression`
+//! (`src/parser/expr.rs`) -- `path_expression` needs its first segment to allow a `::`-qualified
+//! name (e.g. `Foo::bar.baz`), which this parser doesn't support, so `path_expression` builds its
+//! `FeatureChain` inline instead. Kept as a standalone, reusable building block for any future
+//! caller that only needs a pure dot-chain with no leading qualified name.
 
 use super::lex::{name, ws_and_comments};
 use super::span::span_from_to;

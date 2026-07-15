@@ -13,11 +13,11 @@ pub mod parser;
 pub use ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
     ActionUsageBodyElement, AliasBody, AliasDef, AllocationDef, AllocationUsage, AnalysisCaseDef,
-    AnalysisCaseUsage, Annotation, AstNode, AttributeBody, AttributeDef, AttributeUsage, Bind,
-    CaseDef, CaseUsage, CommentAnnotation, Connect, ConnectBody, ConnectStmt, ConnectionDef,
-    ConnectionDefBody, ConnectionDefBodyElement, DocComment, EndDecl, Expression, FilterMember,
-    FilterPackageMember, FirstMergeBody, FirstStmt, FlowDef, FlowUsage, FlowUsageKind,
-    Identification,
+    AnalysisCaseUsage, Annotation, Argument, AstNode, AttributeBody, AttributeDef, AttributeUsage,
+    Bind, CaseDef, CaseUsage, CollectionOperator, CommentAnnotation, Connect, ConnectBody,
+    ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, DocComment, EndDecl,
+    Expression, FeatureChain, FilterMember, FilterPackageMember, FirstMergeBody, FirstStmt,
+    FlowDef, FlowUsage, FlowUsageKind, Identification,
     Import, InOut, InOutDecl, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
     InterfaceUsage, InterfaceUsageBodyElement, ItemUsage, MergeStmt, NamespaceDecl, Node,
     OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, Package, PackageBody,
@@ -32,7 +32,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 14;
+pub const PARSE_AST_VERSION: u32 = 15;
 pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
 
 /// Parse a SysML v2 textual input into a root namespace AST.

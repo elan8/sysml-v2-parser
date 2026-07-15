@@ -237,17 +237,14 @@ action def Compute {
         })
         .expect("action def body should contain an AssignStmt");
     match &assign.rhs.value {
-        Expression::Invocation { callee, args } => {
+        // PAR-005 item 2: `->size()` is now a dedicated `CollectionOp`, not a generic
+        // `Invocation` wrapping `MemberAccess`.
+        Expression::CollectionOp { op, base, args } => {
+            assert_eq!(op, &sysml_v2_parser::ast::CollectionOperator::Size);
             assert!(args.is_empty());
-            match &callee.value {
-                Expression::MemberAccess(base, member) => {
-                    assert_eq!(member, "size");
-                    assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "collection"));
-                }
-                other => panic!("expected MemberAccess callee, got {:?}", other),
-            }
+            assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "collection"));
         }
-        other => panic!("expected rhs to be a structured Invocation expression, got {:?}", other),
+        other => panic!("expected rhs to be a structured CollectionOp expression, got {:?}", other),
     }
 }
 
@@ -290,15 +287,13 @@ action def Iterate {
         })
         .expect("action def body should contain a ForLoop");
     match &for_loop.range.value {
-        Expression::Invocation { callee, .. } => {
-            assert!(
-                matches!(&callee.value, Expression::MemberAccess(_, member) if member == "size"),
-                "expected range to be powerProfile->size() as a structured MemberAccess/Invocation, got {:?}",
-                callee.value
-            );
+        // PAR-005 item 2: `->size()` is now a dedicated `CollectionOp`, not a generic
+        // `Invocation` wrapping `MemberAccess`.
+        Expression::CollectionOp { op, .. } => {
+            assert_eq!(op, &sysml_v2_parser::ast::CollectionOperator::Size);
         }
         other => panic!(
-            "expected structured Invocation range (not the raw-text FeatureRef fallback), got {:?}",
+            "expected structured CollectionOp range (not the raw-text FeatureRef fallback), got {:?}",
             other
         ),
     }

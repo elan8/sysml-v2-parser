@@ -12,6 +12,80 @@ typed declaration modifiers, typed relationship AST nodes, complete expression A
 recovery). Entries below land incrementally; the version stays unreleased until the whole backlog
 is done.
 
+### PAR-005: complete the expression AST
+
+Six items against `src/ast/core.rs`'s `Expression` enum and `src/parser/expr.rs`
+(`PARSE_AST_VERSION` bumped 14 -> 15 for the schema change).
+
+- **Item 1 (constructor expressions) + item 3 (feature-chain expressions), landed together**:
+  `new Type(...)` is now `Expression::Constructor { type_name: String, args: Vec<Argument> }`
+  instead of the synthetic `FeatureRef("new TypeName")` string. `type_name` stays a plain
+  qualified-name `String` (consistent with `TypeCheck`/`MetaCast`/`Classification`, which already
+  represent qualified type references this way -- a constructor names a *type*, not a dot
+  feature-access path). Separately, `path_expression` (`bind`/`connect`/`allocate`/interface-
+  connect endpoints) now produces `Expression::FeatureChainRef(FeatureChain)` for genuine
+  multi-segment dotted chains (e.g. `engine.fuelCmdPort.flowRate`, `rearAxleAssembly.leftWheel
+  .wheelToRoadPort` from `2a-Parts Interconnection.sysml`), adopting the standalone `FeatureChain`
+  type PAR-004 item 6 built for exactly this and left unwired. A single segment stays
+  `FeatureRef`. The general `expression()` grammar's postfix `.` chaining (ordinary value
+  expressions, e.g. inside a calc/constraint body) intentionally still folds into nested
+  `MemberAccess` -- it's interleaved with `(...)`/`#(...)`/`::`/`meta`/`->op(...)` postfix
+  operators a pure feature chain doesn't carry, so widening it further is out of this item's scope.
+  **Bug found and fixed along the way**: `FeatureChain` derived `PartialEq` including its `span`
+  field, unlike every other span-bearing AST type in this crate (`Node<T>`, `Multiplicity`,
+  `TypingRelationship` all have custom `PartialEq` that ignores span so hand-built expected ASTs
+  in tests don't need real source spans). Left as derived, it broke the `2a-Parts Interconnection`
+  validation fixture the moment a real span reached the field. Fixed with the same custom-impl
+  convention (`src/ast/feature_chain.rs`).
+- **Item 2 (collection operators)**: `base->op(...)` (`->collect`, `->select`, `->size()`,
+  `->includes()`, etc.) is now `Expression::CollectionOp { op: CollectionOperator, base, args }`
+  instead of desugaring into an untyped `MemberAccess` + `Invocation` pair. `CollectionOperator`
+  covers the names actually seen in the SysML v2 release tree (`collect`, `select`, `selectOne`,
+  `size`, `isEmpty`, `notEmpty`, `includes`, `including`, `excludes`, `excluding`, `excludingAt`,
+  `excludingOnce`, `equals`, `forAll`, `exists`, `sum`, `sort`, `filter`, `reduce`) plus `Other
+  (String)` so no arrow-invoked name is ever lost or misclassified. A bare `->name` with no
+  trailing `(...)` (rare) still falls back to plain `MemberAccess`, matching prior behavior for
+  that shape.
+- **Item 5 (argument relationships), real bug found and fixed**: `ArgumentList` in the KerML BNF
+  (8.2.5.8.3) is `PositionalArgumentList | NamedArgumentList` -- named arguments
+  (`NAME '=' ArgumentValue`) are legal, real syntax, not just positional. Confirmed against actual
+  Systems Library / example usage (`new RiskLevel(probability = LevelEnum::low)` in
+  `RiskMetadata.sysml`; `F(q = 1, p = a)` in `ParameterTest.sysml`; `new IgnitionCmd
+  (ignitionOnOff=IgnitionOnOff::on)` in the Simple Vehicle Model). Before this change, `expression()`
+  had no way to parse `name = value` inside `(...)` (`=` isn't a binary operator token), so every
+  one of these real constructs silently fell into parser recovery for the entire enclosing
+  declaration -- a data-loss bug, not just a missing-feature gap. Fixed by giving
+  `Expression::Invocation`/`Expression::Constructor`/`Expression::CollectionOp` a shared
+  `args: Vec<Argument>` (`Argument { name: Option<String>, value: Node<Expression> }`) and a new
+  `argument_list_tail` parser that tries `NAME '='` (rejecting `==`/`===` so equality expressions
+  are never misread as a named argument) before falling back to a positional `expression()`.
+  Return-parameter relationships (`ReturnRef.return_expression`, `src/ast/requirement.rs`) stay
+  scoped to requirement/verification bodies as before -- generalizing a return-parameter concept
+  onto every invocation is a materially larger design change, out of this item's scope.
+- **Item 4 (metadata access), real grammar gap, not previously covered by `Classification`/
+  `MetaCast`**: checked `KerML-textual-bnf.kebnf` before assuming a gap existed (per the PAR-003b
+  precedent of not inventing nodes for non-existent productions) and found
+  `MetadataAccessExpression = ownedRelationship += ElementReferenceMember '.' 'metadata'` is a
+  real, separate production -- distinct from `@Metaclass` (`Classification`, tests classification)
+  and `expr meta Metaclass` (`MetaCast`, reflective cast). Added `Expression::MetadataAccess
+  (Box<Node<Expression>>)`, parsed as a `.metadata` postfix suffix (literal keyword, not a
+  general member name) in `postfix()`.
+- **Item 6 (parenthesized marker)**: `Expression::Parenthesized(Box<Node<Expression>>)`. Chose the
+  wrapping-variant design over a bool flag threaded onto every variant since the blast radius was
+  small and contained (only `parenthesized()` in `expr.rs` produces it, and the two exhaustive
+  matches on `Expression` in the whole crate -- `src/ast/mod.rs::normalize_expression_node` and
+  `expr.rs` itself -- were the only places needing a new arm). `Expression::Tuple` (multi-element
+  parenthesized sequences) doesn't get this wrapper -- it's inherently only expressible with
+  parens, so there's nothing extra to mark.
+- **All six items ripple-checked against the two exhaustive `Expression` matches in the crate**
+  (`src/ast/mod.rs::normalize_expression_node`, `src/parser/expr.rs`'s own tests) -- both are the
+  full extent of exhaustive matching on `Expression` outside `expr.rs`; the handful of other
+  `Expression::` references across the crate (`action.rs`, `bnf_surface.rs`, `payload.rs`,
+  `requirement.rs`) only construct or single-arm-match specific variants and needed no changes.
+- New public exports: `Argument`, `CollectionOperator`, `FeatureChain` added to the crate root
+  `pub use` list in `src/lib.rs` (previously `FeatureChain` wasn't re-exported at all, since
+  PAR-004 built it but deliberately left it unwired).
+
 ### PAR-003b (item 1 of 4): typed `ordered`/`nonunique`/`derived`/`constant` on attributes
 
 - **`AttributeDef`/`AttributeUsage` gain typed `ordered: bool` / `nonunique: bool` fields**: the

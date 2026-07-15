@@ -1,5 +1,7 @@
 //! Span, Node, Expression, and shared AST traits.
 
+use super::feature_chain::FeatureChain;
+
 /// Source location: byte offset, line, column, and length in the source file.
 /// Line and column are **1-based**. Use [`Span::to_lsp_range`] for 0-based LSP ranges.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -252,7 +254,7 @@ pub enum Expression {
     /// Function-like invocation, e.g. `ComputeMargin(a, b)`.
     Invocation {
         callee: Box<Node<Expression>>,
-        args: Vec<Node<Expression>>,
+        args: Vec<Argument>,
     },
     /// Comma-separated sequence in parentheses, e.g. `(engine1, engine2)` for ordered composition values.
     Tuple(Vec<Node<Expression>>),
@@ -283,6 +285,137 @@ pub enum Expression {
     },
     /// KerML null or empty sequence ().
     Null,
+    /// Explicitly parenthesized expression, e.g. `(a + b)`. Preserves the fact that the source
+    /// had explicit grouping parens (PAR-005 item 6) instead of only recomputing the span of the
+    /// inner expression. The inner node's own span excludes the parens; this variant's span
+    /// (carried by the enclosing `Node`) includes them.
+    Parenthesized(Box<Node<Expression>>),
+    /// Constructor/instantiation expression: `new Type(...)` (KerML `ConstructorExpression`,
+    /// BNF 8.2.5.8.3). `type_name` is the qualified type name (consistent with how
+    /// [`Expression::TypeCheck`]/[`Expression::MetaCast`]/[`Expression::Classification`] already
+    /// represent qualified type references as plain strings rather than [`FeatureChain`] --
+    /// `new Foo::Bar(...)` names a *type*, not a dot-separated feature access path).
+    Constructor {
+        type_name: String,
+        args: Vec<Argument>,
+    },
+    /// Multi-segment dotted feature-chain reference, e.g. `engine.fuelCmdPort.flowRate`
+    /// (PAR-005 item 3, using the standalone [`FeatureChain`] type built for exactly this by
+    /// PAR-004 item 6). A single, unchained name stays [`Expression::FeatureRef`].
+    FeatureChainRef(FeatureChain),
+    /// KerML collection-operator invocation via `->`, e.g. `xs->collect(f)`, `xs->select(p)`,
+    /// `xs->size()`, `xs->includes(x)` (PAR-005 item 2). Distinguished from a generic
+    /// [`Expression::Invocation`] so the specific operator is recoverable from the AST without
+    /// string-matching the callee name.
+    CollectionOp {
+        op: CollectionOperator,
+        base: Box<Node<Expression>>,
+        args: Vec<Argument>,
+    },
+    /// Metadata-access expression: `expr.metadata` (KerML `MetadataAccessExpression`, BNF
+    /// 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`). Distinct from [`Expression::Classification`]
+    /// (`@Metaclass`, tests whether an element is classified by a metaclass) and
+    /// [`Expression::MetaCast`] (`expr meta Metaclass`, reflective cast) -- this accesses the
+    /// metadata Feature/Element object itself for the referenced element.
+    MetadataAccess(Box<Node<Expression>>),
+}
+
+/// A single invocation/constructor argument: positional or named (KerML `ArgumentList`,
+/// BNF 8.2.5.8.3: `PositionalArgumentList | NamedArgumentList`), e.g. `F(a, b)` (positional) vs.
+/// `F(x = a, y = b)` (named, via `NamedArgument: ParameterRedefinition '=' ArgumentValue`).
+/// PAR-005 item 5: named arguments are real, used syntax in the SysML textual notation (e.g.
+/// `new RiskLevel(probability = LevelEnum::low)` in the Systems Library) and previously caused
+/// the whole enclosing declaration to fall into parser recovery because only positional
+/// expressions were accepted inside `(...)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Argument {
+    /// `Some(name)` for a named argument (the redefined parameter name to the left of `=`);
+    /// `None` for a positional argument.
+    pub name: Option<String>,
+    pub value: Node<Expression>,
+}
+
+/// Known KerML/SysML collection-operator names reachable via `base->op(...)` (PAR-005 item 2).
+/// Not exhaustive of every Kernel/Systems Library function -- `Other` preserves any arrow-invoked
+/// name this list doesn't special-case, so no arrow invocation is ever lost or misclassified as a
+/// plain member call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum CollectionOperator {
+    Collect,
+    Select,
+    SelectOne,
+    Size,
+    IsEmpty,
+    NotEmpty,
+    Includes,
+    Including,
+    Excludes,
+    Excluding,
+    ExcludingAt,
+    ExcludingOnce,
+    Equals,
+    ForAll,
+    Exists,
+    Sum,
+    Sort,
+    Filter,
+    Reduce,
+    /// Any other arrow-invoked name not special-cased above, e.g. `->minimize`, `->maximize`.
+    Other(String),
+}
+
+impl CollectionOperator {
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            "collect" => Self::Collect,
+            "select" => Self::Select,
+            "selectOne" => Self::SelectOne,
+            "size" => Self::Size,
+            "isEmpty" => Self::IsEmpty,
+            "notEmpty" => Self::NotEmpty,
+            "includes" => Self::Includes,
+            "including" => Self::Including,
+            "excludes" => Self::Excludes,
+            "excluding" => Self::Excluding,
+            "excludingAt" => Self::ExcludingAt,
+            "excludingOnce" => Self::ExcludingOnce,
+            "equals" => Self::Equals,
+            "forAll" => Self::ForAll,
+            "exists" => Self::Exists,
+            "sum" => Self::Sum,
+            "sort" => Self::Sort,
+            "filter" => Self::Filter,
+            "reduce" => Self::Reduce,
+            other => Self::Other(other.to_string()),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Collect => "collect",
+            Self::Select => "select",
+            Self::SelectOne => "selectOne",
+            Self::Size => "size",
+            Self::IsEmpty => "isEmpty",
+            Self::NotEmpty => "notEmpty",
+            Self::Includes => "includes",
+            Self::Including => "including",
+            Self::Excludes => "excludes",
+            Self::Excluding => "excluding",
+            Self::ExcludingAt => "excludingAt",
+            Self::ExcludingOnce => "excludingOnce",
+            Self::Equals => "equals",
+            Self::ForAll => "forAll",
+            Self::Exists => "exists",
+            Self::Sum => "sum",
+            Self::Sort => "sort",
+            Self::Filter => "filter",
+            Self::Reduce => "reduce",
+            Self::Other(s) => s.as_str(),
+        }
+    }
 }
 
 /// Multiplicity bounds, e.g. `[1..*]`, `[0..1]`, `[3]` (PAR-004/PAR-003 item 5).

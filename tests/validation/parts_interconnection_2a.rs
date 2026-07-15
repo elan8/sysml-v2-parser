@@ -63,8 +63,30 @@ fn n<T>(v: T) -> Node<T> {
     Node::new(Span::dummy(), v)
 }
 
-/// Path expression from dot-separated path (e.g. "engine.fuelCmdPort").
+/// Path expression from dot-separated path (e.g. "engine.fuelCmdPort"), for endpoints parsed via
+/// `path_expression` (`src/parser/expr.rs`: bind/connect/allocate/interface-connect lhs/rhs). A
+/// single segment stays `FeatureRef`; a genuine multi-segment dotted chain becomes
+/// `FeatureChainRef` (PAR-005 item 3).
 fn expr_path(path: &str) -> Node<Expression> {
+    let segments: Vec<String> = path.split('.').map(str::to_string).collect();
+    let expr = if segments.len() == 1 {
+        Expression::FeatureRef(segments.into_iter().next().unwrap())
+    } else {
+        Expression::FeatureChainRef(sysml_v2_parser::ast::FeatureChain {
+            segments,
+            span: Span::dummy(),
+        })
+    };
+    n(expr)
+}
+
+/// Dot-separated path built as nested `MemberAccess` (not `FeatureChainRef`), for the (rarer)
+/// call sites parsed via the general `expression()` grammar rather than `path_expression` --
+/// e.g. `ref :>> name = value;` (`interface_usage_ref_redef`, `src/parser/part/usage.rs`) parses
+/// `value` with `expression`, whose postfix `.` chaining still folds into `MemberAccess` (PAR-005
+/// only adopted `FeatureChain` for `path_expression`, not the general postfix chain -- see
+/// `src/parser/expr.rs` module notes).
+fn expr_member_chain(path: &str) -> Node<Expression> {
     let segments: Vec<&str> = path.split('.').collect();
     let mut expr = Expression::FeatureRef(segments[0].to_string());
     for seg in segments.iter().skip(1) {
@@ -582,7 +604,7 @@ fn part_vehicle1_c1() -> PartUsage {
                         body: ConnectBody::Brace,
                         body_elements: vec![n(InterfaceUsageBodyElement::RefRedef {
                             name: "driveshaft".to_string(),
-                            value: expr_path("vehicle1_c1.driveshaft"),
+                            value: expr_member_chain("vehicle1_c1.driveshaft"),
                             body: RefBody::Brace { elements: vec![] },
                         })],
                     },
