@@ -135,6 +135,11 @@ pub struct AttributeDef {
     pub typing_span: Option<Span>,
     /// Span of the default/binding expression value, when present.
     pub value_span: Option<Span>,
+    /// `ordered` keyword from `MultiplicityPart` (BNF §8.2.2.6.6). Legal on a feature
+    /// declaration generally; previously consumed and discarded by `ignored_feature_modifiers`.
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
+    pub nonunique: bool,
 }
 
 /// Body of an attribute (def or usage): `;` or `{` AttributeBodyElement* `}`.
@@ -365,6 +370,15 @@ pub struct AttributeUsage {
     pub redefines_span: Option<Span>,
     /// Direction prefix when parsed as `in`/`out`/`inout attribute ...` (e.g. in port def bodies).
     pub direction: Option<InOut>,
+    /// `ordered` keyword from `MultiplicityPart` (BNF §8.2.2.6.6).
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart`.
+    pub nonunique: bool,
+    /// `derived` keyword from `RefPrefix` (BNF §8.2.2.6.2) -- usage-only, no `Definition`
+    /// equivalent (`AttributeDefinition` uses `DefinitionPrefix`, which has no `derived`).
+    pub is_derived: bool,
+    /// `constant` keyword from `RefPrefix` -- usage-only, same rationale as `is_derived`.
+    pub is_constant: bool,
 }
 
 // ---------------------------------------------------------------------------

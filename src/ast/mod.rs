@@ -277,6 +277,8 @@ fn normalize_attribute_def(a: &AttributeDef) -> AttributeDef {
         name_span: None,
         typing_span: None,
         value_span: None,
+        ordered: a.ordered,
+        nonunique: a.nonunique,
     }
 }
 
@@ -418,6 +420,10 @@ fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
         typing_span: None,
         redefines_span: None,
         direction: a.direction,
+        ordered: a.ordered,
+        nonunique: a.nonunique,
+        is_derived: a.is_derived,
+        is_constant: a.is_constant,
     }
 }
 

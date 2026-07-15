@@ -12,6 +12,33 @@ typed declaration modifiers, typed relationship AST nodes, complete expression A
 recovery). Entries below land incrementally; the version stays unreleased until the whole backlog
 is done.
 
+### PAR-003b (item 1 of 4): typed `ordered`/`nonunique`/`derived`/`constant` on attributes
+
+- **`AttributeDef`/`AttributeUsage` gain typed `ordered: bool` / `nonunique: bool` fields**: the
+  `MultiplicityPart` modifiers (BNF §8.2.2.6.6) were previously consumed and thrown away by
+  `ignored_feature_modifiers` at all 8 call sites across `src/parser/attribute.rs` (attribute def,
+  attribute usage, the `:>>`/`:>` feature-binding shape, and the metadata binding shape). Replaced
+  with `feature_modifiers`, which returns a small `FeatureModifiers { ordered, nonunique }` struct
+  that callers OR-merge across the (up to three) positions a modifier can legally appear in a
+  single declaration, so a later empty match can't silently clear an earlier `true`. Confirmed via
+  the validation gate that the Systems Library fixtures actually exercise `ordered` (4 real
+  occurrences surfaced in `tests/validation/snapshots/parts_tree_1a.txt` once regenerated).
+- **`AttributeUsage` gains typed `is_derived: bool` / `is_constant: bool`**: `attribute_usage` now
+  parses the `derived`/`constant` keywords from `RefPrefix` (BNF §8.2.2.6.2) before the `attribute`
+  keyword. These are usage-only per the grammar -- `AttributeDefinition` uses `DefinitionPrefix`,
+  which has no `derived`/`constant` production, so `AttributeDef` does not get these fields.
+- **Scope judgment -- `readonly`, `variable`, `sufficient` are not textual keywords**: checked the
+  reserved-word list and every relevant production in `sysml-v2-release/bnf/SysML-textual-bnf.kebnf`
+  (and the KerML grammar it builds on). `readonly` never appears as a keyword anywhere in the SysML
+  or KerML textual grammars -- `Feature::isReadOnly` is a computed/semantic property, not something
+  a `def`/`derived`/`constant`-style prefix keyword expresses syntactically, so there is nothing
+  for this parser to capture. `variable` likewise has no SysML textual production (KerML's
+  `'var'`/`'const'` pair only appears in an unrelated parameter-declaration context that SysML
+  doesn't use). `sufficient` corresponds to KerML's `all` keyword on `ClassifierDeclaration`, but
+  `DefinitionDeclaration` in the SysML grammar (`Identification SubclassificationPart?`) never
+  includes it -- SysML defs have no textual "sufficient" marker. All three are out of this parser's
+  scope; noted here rather than inventing fields with no parseable syntax behind them.
+
 ### PAR-006a: recovery-guard foundation
 
 - **Confirmed the PAR-001 disambiguation fix was already generalized**: `attribute_def`'s

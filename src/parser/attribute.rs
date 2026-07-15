@@ -162,19 +162,55 @@ fn is_reserved_shorthand_starter(name: &str) -> bool {
     )
 }
 
-fn ignored_feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = many0(preceded(
+/// Multiplicity-adjacent modifiers from `MultiplicityPart` (BNF §8.2.2.6.6): an optional
+/// multiplicity range plus `ordered`/`nonunique` (and their negations `nonordered`/`unique`).
+/// Returns `(ordered, nonunique)`, OR-merged across every occurrence -- callers that invoke this
+/// more than once per declaration (leading and trailing modifier positions) fold the results
+/// together rather than letting a later call silently overwrite an earlier `true`.
+#[derive(Default, Clone, Copy)]
+struct FeatureModifiers {
+    ordered: bool,
+    nonunique: bool,
+}
+
+impl FeatureModifiers {
+    fn merge(self, other: FeatureModifiers) -> FeatureModifiers {
+        FeatureModifiers {
+            ordered: self.ordered || other.ordered,
+            nonunique: self.nonunique || other.nonunique,
+        }
+    }
+}
+
+fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
+    #[derive(Clone)]
+    enum Modifier {
+        Multiplicity,
+        Ordered,
+        NonUnique,
+        Unique,
+        NonOrdered,
+    }
+    let (input, mods) = many0(preceded(
         ws_and_comments,
         alt((
-            value((), multiplicity),
-            value((), tag(&b"nonunique"[..])),
-            value((), tag(&b"unique"[..])),
-            value((), tag(&b"ordered"[..])),
-            value((), tag(&b"nonordered"[..])),
+            value(Modifier::Multiplicity, multiplicity),
+            value(Modifier::NonUnique, tag(&b"nonunique"[..])),
+            value(Modifier::Unique, tag(&b"unique"[..])),
+            value(Modifier::Ordered, tag(&b"ordered"[..])),
+            value(Modifier::NonOrdered, tag(&b"nonordered"[..])),
         )),
     ))
     .parse(input)?;
-    Ok((input, ()))
+    let mut result = FeatureModifiers::default();
+    for m in mods {
+        match m {
+            Modifier::Ordered => result.ordered = true,
+            Modifier::NonUnique => result.nonunique = true,
+            Modifier::Multiplicity | Modifier::Unique | Modifier::NonOrdered => {}
+        }
+    }
+    Ok((input, result))
 }
 
 /// Value part: `= expr` | `:= expr` | `default = expr` | `default := expr` (BNF FeatureValue).
@@ -254,10 +290,11 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
         .unwrap_or((None, None));
-    let (input, _) = ignored_feature_modifiers(input)?;
+    let (input, mods1) = feature_modifiers(input)?;
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
-    let (input, _) = ignored_feature_modifiers(input)?;
+    let (input, mods2) = feature_modifiers(input)?;
+    let mods = mods1.merge(mods2);
     let (input, body) = attribute_body(input)?;
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
@@ -296,6 +333,10 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
                 typing_span,
                 redefines_span: None,
                 direction: None,
+                ordered: mods.ordered,
+                nonunique: mods.nonunique,
+                is_derived: false,
+                is_constant: false,
             },
         ),
     ))
@@ -385,7 +426,7 @@ pub(crate) fn attribute_def(
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
         .unwrap_or((None, None));
-    let (input, _) = ignored_feature_modifiers(input)?;
+    let (input, mods1) = feature_modifiers(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let leading_subset = leading_clauses.subsets;
     let (typing_span, typing, leading_value) = if typing.is_none() {
@@ -416,7 +457,8 @@ pub(crate) fn attribute_def(
     let value = value.or(leading_value);
     let value_span = value.as_ref().map(|node| node.span.clone());
     let (input, _) = specialization_clauses(input)?;
-    let (input, _) = ignored_feature_modifiers(input)?;
+    let (input, mods2) = feature_modifiers(input)?;
+    let mods = mods1.merge(mods2);
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -432,6 +474,8 @@ pub(crate) fn attribute_def(
                 name_span,
                 typing_span,
                 value_span,
+                ordered: mods.ordered,
+                nonunique: mods.nonunique,
             },
         ),
     ))
@@ -490,6 +534,16 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         ws1,
     ))
     .parse(input)?;
+    // RefPrefix (BNF §8.2.2.6.2): `derived`? (`abstract`|`variation`)? `constant`? -- usage-only
+    // prefix keywords, no `Definition` equivalent. `abstract`/`variation` aren't legal on an
+    // attribute usage per the Systems Library's actual usage (attributes are never abstract), so
+    // only `derived`/`constant` are recognized here; anything else falls through unconsumed.
+    let (input, is_derived) =
+        nom::combinator::opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
+    let is_derived = is_derived.is_some();
+    let (input, is_constant) =
+        nom::combinator::opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?;
+    let is_constant = is_constant.is_some();
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, usage_head) = alt((
@@ -505,7 +559,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         }),
     ))
     .parse(input)?;
-    let (input, name_span, name_str, typing_span, typing, redefines_span, redefines) =
+    let (input, name_span, name_str, typing_span, typing, redefines_span, redefines, mods0) =
         match usage_head {
             AttributeUsageHead::PrefixRedefines {
                 redefines_span,
@@ -515,7 +569,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 let (typing_span, typing) = typing_result
                     .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
                     .unwrap_or((None, None));
-                let (input, _) = ignored_feature_modifiers(input)?;
+                let (input, mods0) = feature_modifiers(input)?;
                 (
                     input,
                     None,
@@ -524,6 +578,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     typing,
                     Some(redefines_span),
                     Some(redefines),
+                    mods0,
                 )
             }
             AttributeUsageHead::Named { name_span, name } => {
@@ -531,7 +586,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 let (typing_span, typing) = typing_result
                     .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
                     .unwrap_or((None, None));
-                let (input, _) = ignored_feature_modifiers(input)?;
+                let (input, mods0) = feature_modifiers(input)?;
                 (
                     input,
                     Some(name_span),
@@ -540,11 +595,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     typing,
                     None,
                     None,
+                    mods0,
                 )
             }
         };
     let (input, leading_clauses) = specialization_clauses(input)?;
-    let (input, _) = ignored_feature_modifiers(input)?;
+    let (input, mods1) = feature_modifiers(input)?;
     let leading_subsets_value = leading_clauses
         .subsets
         .as_ref()
@@ -552,7 +608,8 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
-    let (input, _) = ignored_feature_modifiers(input)?;
+    let (input, mods2) = feature_modifiers(input)?;
+    let mods = mods0.merge(mods1).merge(mods2);
     let redefines = trailing_clauses
         .redefines
         .or(leading_clauses.redefines)
@@ -583,6 +640,10 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 typing_span,
                 redefines_span,
                 direction: None,
+                ordered: mods.ordered,
+                nonunique: mods.nonunique,
+                is_derived,
+                is_constant,
             },
         ),
     ))
@@ -624,7 +685,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
         .unwrap_or((None, None));
-    let (input, _) = ignored_feature_modifiers(input)?;
+    let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
@@ -665,6 +726,10 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 typing_span,
                 redefines_span: None,
                 direction: None,
+                ordered: mods.ordered,
+                nonunique: mods.nonunique,
+                is_derived: false,
+                is_constant: false,
             },
         ),
     ))
@@ -766,6 +831,10 @@ pub(crate) fn attribute_usage_shorthand(
                 typing_span: None,
                 redefines_span: None,
                 direction: None,
+                ordered: false,
+                nonunique: false,
+                is_derived: false,
+                is_constant: false,
             },
         ),
     ))
@@ -823,5 +892,65 @@ mod attribute_body_tests {
             }
             other => panic!("expected AttributeUsage, got {other:?}"),
         }
+    }
+
+    // --- PAR-003b item 1: ordered/nonunique/derived/constant retained as typed fields ---
+
+    #[test]
+    fn attribute_usage_retains_ordered_modifier() {
+        let text = "attribute readings: Real[0..*] ordered;";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.ordered);
+        assert!(!node.value.nonunique);
+    }
+
+    #[test]
+    fn attribute_usage_retains_nonunique_modifier() {
+        let text = "attribute tags: String[0..*] nonunique;";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.nonunique);
+        assert!(!node.value.ordered);
+    }
+
+    #[test]
+    fn attribute_def_retains_ordered_and_nonunique_modifiers() {
+        let text = "attribute def Samples :> Real[0..*] ordered nonunique;";
+        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.ordered);
+        assert!(node.value.nonunique);
+    }
+
+    #[test]
+    fn attribute_usage_retains_derived_prefix() {
+        let text = "derived attribute total: Real = a + b;";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_derived);
+        assert!(!node.value.is_constant);
+        assert_eq!(node.value.name, "total");
+    }
+
+    #[test]
+    fn attribute_usage_retains_constant_prefix() {
+        let text = "constant attribute pi: Real = 3.14159;";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_constant);
+        assert!(!node.value.is_derived);
+        assert_eq!(node.value.name, "pi");
+    }
+
+    #[test]
+    fn attribute_usage_without_modifiers_defaults_to_false() {
+        let text = "attribute mass: Real;";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(!node.value.ordered);
+        assert!(!node.value.nonunique);
+        assert!(!node.value.is_derived);
+        assert!(!node.value.is_constant);
     }
 }
