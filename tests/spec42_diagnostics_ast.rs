@@ -196,7 +196,7 @@ fn verification_local_attribute_has_name_span() {
     };
     assert_eq!(attr.name, "count");
     assert!(attr.name_span.is_some());
-    assert_eq!(attr.typing.as_deref(), Some("Integer"));
+    assert_eq!(attr.typing.as_ref().map(|n| n.value.target.as_str()), Some("Integer"));
 }
 
 #[test]
@@ -644,7 +644,7 @@ fn metadata_def_shorthand_annotated_element() {
         })
         .expect("annotatedElement shorthand binding");
     assert_eq!(attr.subsets.as_deref(), Some("annotatedElement"));
-    assert_eq!(attr.typing.as_deref(), Some("SysML::RequirementUsage"));
+    assert_eq!(attr.typing.as_ref().map(|n| n.value.target.as_str()), Some("SysML::RequirementUsage"));
 }
 
 #[test]

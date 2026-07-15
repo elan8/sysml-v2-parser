@@ -1,6 +1,9 @@
 //! Attribute definition and usage parsing.
 
-use crate::ast::{AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Node};
+use crate::ast::{
+    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Node, TypingKind,
+    TypingRelationship,
+};
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::expr::expression;
@@ -14,6 +17,31 @@ use crate::parser::usage::{
 };
 use crate::parser::with_span;
 use crate::parser::Input;
+
+/// Wrap a typing/subclassification target (with its parsed conjugation flag) in a
+/// `TypingRelationship` node, mirroring `specialization::subclassification_node`.
+fn typing_relationship_node(
+    span: crate::ast::Span,
+    kind: TypingKind,
+    is_conjugated: bool,
+    target: String,
+) -> Node<TypingRelationship> {
+    Node::new(
+        span.clone(),
+        TypingRelationship {
+            target,
+            kind,
+            span,
+            is_conjugated,
+            is_implied: false,
+        },
+    )
+}
+
+/// Shorthand for the common `:` / `typed by` case (`TypingKind::Typing`).
+fn typing_node(span: crate::ast::Span, is_conjugated: bool, target: String) -> Node<TypingRelationship> {
+    typing_relationship_node(span, TypingKind::Typing, is_conjugated, target)
+}
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, value};
@@ -200,7 +228,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     }
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, s)| (Some(span), Some(s)))
+        .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
         .unwrap_or((None, None));
     let (input, _) = ignored_feature_modifiers(input)?;
     let (input, value) =
@@ -317,14 +345,29 @@ pub(crate) fn attribute_def(
     let short_name = ident.short_name.clone();
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, s)| (Some(span), Some(s)))
+        .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
         .unwrap_or((None, None));
     let (input, _) = ignored_feature_modifiers(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let leading_subset = leading_clauses.subsets;
     let (typing_span, typing, leading_value) = if typing.is_none() {
         leading_subset
-            .map(|(name, value)| (None, Some(name), value))
+            .map(|(name, value)| {
+                // A leading `:>` subset clause with no separate `:` typing doubles as this
+                // attribute def's type (existing behavior); it's a subclassification-shaped
+                // target, but no span is tracked for it at this call site (same as before this
+                // field was typed), so the relationship node's own span is a dummy.
+                (
+                    None,
+                    Some(typing_relationship_node(
+                        crate::ast::Span::dummy(),
+                        TypingKind::Subclassification,
+                        false,
+                        name,
+                    )),
+                    value,
+                )
+            })
             .unwrap_or((typing_span, typing, None))
     } else {
         (typing_span, typing, None)
@@ -431,7 +474,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             } => {
                 let (input, typing_result) = optional_typings(input)?;
                 let (typing_span, typing) = typing_result
-                    .map(|(span, s)| (Some(span), Some(s)))
+                    .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
                     .unwrap_or((None, None));
                 let (input, _) = ignored_feature_modifiers(input)?;
                 (
@@ -447,7 +490,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             AttributeUsageHead::Named { name_span, name } => {
                 let (input, typing_result) = optional_typings(input)?;
                 let (typing_span, typing) = typing_result
-                    .map(|(span, s)| (Some(span), Some(s)))
+                    .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
                     .unwrap_or((None, None));
                 let (input, _) = ignored_feature_modifiers(input)?;
                 (
@@ -537,7 +580,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     }
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, s)| (Some(span), Some(s)))
+        .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
         .unwrap_or((None, None));
     let (input, _) = ignored_feature_modifiers(input)?;
     let (input, value) =
@@ -688,7 +731,10 @@ mod attribute_body_tests {
         let (rest, node) = attribute_feature_binding(input(text)).expect("feature binding");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.redefines.as_deref(), Some("unitConversion"));
-        assert_eq!(node.value.typing.as_deref(), Some("ConversionByPrefix"));
+        assert_eq!(
+            node.value.typing.as_ref().map(|n| n.value.target.as_str()),
+            Some("ConversionByPrefix")
+        );
         let AttributeBody::Brace { elements } = &node.value.body else {
             panic!("expected brace body");
         };
@@ -702,7 +748,7 @@ mod attribute_body_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "zeroDegreeCelsiusInKelvin");
         assert_eq!(
-            node.value.typing.as_deref(),
+            node.value.typing.as_ref().map(|n| n.value.target.as_str()),
             Some("ThermodynamicTemperatureValue")
         );
         assert!(node.value.value.is_some());

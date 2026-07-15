@@ -103,6 +103,34 @@ is done.
   regenerating).
 - Bumps `PARSE_AST_VERSION` to 11.
 
+### PAR-004 (item 1, remaining slice) + PAR-003 (item 4): typed `:` typing and real `~` conjugation
+
+- **`AttributeDef.typing` / `AttributeUsage.typing`** now use the same
+  `Option<Node<TypingRelationship>>` shape as the `specializes` side, closing the deviation noted
+  in the previous entry.
+- **Real conjugation, not a folded string**: `usage::conjugated_qualified_name` used to return the
+  target with a literal `~` prefix folded into the string (`"~PortConjugate"`), so nothing could
+  query "is this conjugated" without re-parsing the string. It now returns `(bool, String)` — the
+  `~` is stripped from the string and exposed as a real flag — and `usage::typings`/
+  `optional_typings` thread that flag through as `(Span, bool, String)` instead of `(Span,
+  String)`. `TypingKind::Typing` relationships built from this (`attribute.rs`'s new
+  `typing_node`/`typing_relationship_node` helpers, mirroring `specialization.rs`'s
+  `subclassification_node`) set `is_conjugated` from the real flag instead of always `false`.
+- **No regression for untouched fields**: `optional_typings`/`typings` are also called by
+  `occurrence_body.rs`, `part/usage.rs`, `port.rs`, `requirement.rs`, and `usage.rs`'s own
+  `merge_usage_header` for fields that stay a plain `String`/`Option<String>` (`PartUsage`/
+  `PortUsage.type_name`, `UsageHeader.type_name`) — out of scope per the previous entry's noted
+  deviation. Each of those call sites now re-embeds `~name` from the `(bool, String)` pair when
+  building its string, so their external behavior is byte-for-byte unchanged; only the internal
+  representation moved from "folded in the string" to "tracked separately, then re-folded where a
+  typed home doesn't exist yet."
+- One pre-existing quirk preserved as-is (not introduced by this change): `attribute_def`'s
+  leading-`:>`-subset-as-typing fallback (used when an attribute has no separate `:` typing) now
+  builds a `TypingRelationship` with `kind: Subclassification` — correct, since that fallback
+  really is reading a `:>`-shaped clause — but has no span to attach (this code path never tracked
+  one, even before this change), so it uses `Span::dummy()`.
+- Bumps `PARSE_AST_VERSION` to 12.
+
 ## [0.34.0] - 2026-07-15
 
 ### Fixed

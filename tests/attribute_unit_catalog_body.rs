@@ -59,7 +59,7 @@ fn parses_conversion_by_prefix_in_attribute_body() {
     assert_eq!(usages.len(), 1, "expected one unitConversion binding");
     let conversion = usages[0];
     assert_eq!(conversion.redefines.as_deref(), Some("unitConversion"));
-    assert_eq!(conversion.typing.as_deref(), Some("ConversionByPrefix"));
+    assert_eq!(conversion.typing.as_ref().map(|n| n.value.target.as_str()), Some("ConversionByPrefix"));
     let AttributeBody::Brace { elements } = &conversion.body else {
         panic!("expected nested brace body");
     };
@@ -90,7 +90,7 @@ fn parses_conversion_by_convention_in_attribute_body() {
     assert_eq!(usages.len(), 1);
     let conversion = usages[0];
     assert_eq!(conversion.redefines.as_deref(), Some("unitConversion"));
-    assert_eq!(conversion.typing.as_deref(), Some("ConversionByConvention"));
+    assert_eq!(conversion.typing.as_ref().map(|n| n.value.target.as_str()), Some("ConversionByConvention"));
     let AttributeBody::Brace { elements } = &conversion.body else {
         panic!("expected nested brace body");
     };

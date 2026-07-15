@@ -168,7 +168,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
     });
     let n = attrs.next().expect("attribute n");
     assert_eq!(n.name, "n");
-    assert_eq!(n.typing.as_deref(), Some("Integer"));
+    assert_eq!(n.typing.as_ref().map(|n| n.value.target.as_str()), Some("Integer"));
     let v0 = n.value.as_ref().expect("default 0");
     assert!(matches!(v0.value, Expression::LiteralInteger(0)));
 

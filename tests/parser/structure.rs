@@ -424,10 +424,10 @@ part def Sensor {
         "typed, untyped, and initialized forms without `def` should all be AttributeUsage: {:?}",
         elements.iter().map(|e| format!("{:?}", e.value)).collect::<Vec<_>>()
     );
-    assert!(usages.iter().any(|u| u.name == "typed" && u.typing.as_deref() == Some("Temperature")));
+    assert!(usages.iter().any(|u| u.name == "typed" && u.typing.as_ref().map(|n| n.value.target.as_str()) == Some("Temperature")));
     assert!(usages.iter().any(|u| u.name == "untyped" && u.typing.is_none()));
     assert!(usages.iter().any(|u| u.name == "initialized"
-        && u.typing.as_deref() == Some("Temperature")
+        && u.typing.as_ref().map(|n| n.value.target.as_str()) == Some("Temperature")
         && u.value.is_some()));
 }
 
@@ -1546,7 +1546,7 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
         })
         .expect("typed attribute usage in part usage body");
     assert_eq!(attribute.name, "totalMassKg");
-    assert_eq!(attribute.typing.as_deref(), Some("MassValue"));
+    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target.as_str()), Some("MassValue"));
     assert!(attribute.value.is_some(), "attribute value should parse");
 }
 
@@ -1588,7 +1588,7 @@ fn test_attribute_usage_accepts_defined_by_typing() {
         })
         .expect("attribute usage");
     assert_eq!(attribute.name, "mass");
-    assert_eq!(attribute.typing.as_deref(), Some("ISQ::MassValue"));
+    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target.as_str()), Some("ISQ::MassValue"));
 }
 
 #[test]
@@ -1629,7 +1629,7 @@ fn test_attribute_usage_accepts_typed_by_default_value() {
         })
         .expect("attribute usage");
     assert_eq!(attribute.name, "speed");
-    assert_eq!(attribute.typing.as_deref(), Some("ISQ::SpeedValue"));
+    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target.as_str()), Some("ISQ::SpeedValue"));
     assert!(attribute.value.is_some(), "default value should parse");
 }
 
@@ -1672,7 +1672,7 @@ fn test_attribute_usage_prefix_redefines_accepts_defined_by_typing() {
         .expect("attribute usage");
     assert_eq!(attribute.name, "mass");
     assert_eq!(attribute.redefines.as_deref(), Some("Vehicle::mass"));
-    assert_eq!(attribute.typing.as_deref(), Some("ISQ::MassValue"));
+    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target.as_str()), Some("ISQ::MassValue"));
 }
 
 #[test]
@@ -1713,7 +1713,7 @@ fn test_attribute_usage_accepts_subsets_clause_without_ast_field() {
         })
         .expect("attribute usage");
     assert_eq!(attribute.name, "outlet");
-    assert_eq!(attribute.typing.as_deref(), Some("PowerPort"));
+    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target.as_str()), Some("PowerPort"));
 }
 
 #[test]
@@ -1742,7 +1742,7 @@ fn test_attribute_def_accepts_multiplicity_and_uniqueness_before_specialization(
         })
         .expect("attribute definition");
     assert_eq!(attribute.name, "length");
-    assert_eq!(attribute.typing.as_deref(), Some("LengthValue"));
+    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target.as_str()), Some("LengthValue"));
 }
 
 #[test]
@@ -1796,7 +1796,7 @@ fn test_attribute_def_accepts_default_value_without_equals_after_specialization(
             _ => None,
         })
         .expect("attribute definition");
-    assert_eq!(attribute.typing.as_deref(), Some("LengthValue"));
+    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target.as_str()), Some("LengthValue"));
     assert!(attribute.value.is_some(), "default value should parse");
 }
 

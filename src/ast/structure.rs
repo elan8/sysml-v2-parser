@@ -120,8 +120,10 @@ pub struct AttributeDef {
     pub name: String,
     /// Short name from `< ... >` when present (e.g. unit symbol `m`, `EUR`).
     pub short_name: Option<String>,
-    /// Type after `:>`, e.g. Some("ISQ::mass").
-    pub typing: Option<String>,
+    /// Type after `:>`, e.g. `Some(TypingRelationship { target: "ISQ::mass", .. })` (PAR-004
+    /// item 1). `typing_span` duplicates the node's own `span` for existing consumers that read
+    /// the span without the node.
+    pub typing: Option<Node<TypingRelationship>>,
     /// Default or binding after `=` / `:=` / `default =` before the body terminator.
     pub value: Option<Node<Expression>>,
     pub body: AttributeBody,
@@ -339,8 +341,9 @@ pub struct PerformInOutBinding {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeUsage {
     pub name: String,
-    /// Type after `:` or `:>`, e.g. Some("MassValue").
-    pub typing: Option<String>,
+    /// Type after `:` or `:>`, e.g. `Some(TypingRelationship { target: "MassValue", .. })`
+    /// (PAR-004 item 1). `typing_span` duplicates the node's own `span`.
+    pub typing: Option<Node<TypingRelationship>>,
     /// Subsets target after `:>` / `subsets`.
     pub subsets: Option<String>,
     /// Redefines target, e.g. Some("Vehicle::mass").

@@ -144,22 +144,36 @@ pub(crate) fn multiplicity_node(input: Input<'_>) -> IResult<Input<'_>, Node<Mul
 }
 
 /// Typings: `:` / `defined by` one or more qualified names, with optional conjugated `~`.
-pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, (Span, String)> {
+///
+/// Returns `(span, is_conjugated, joined_name)`: `is_conjugated` reflects the first (and, per
+/// SysML v2, realistically only) target's leading `~`; `joined_name` has any `~` stripped from
+/// every segment (callers that only need the display string, e.g. a `type_name: String` field
+/// with no place to store the flag, can re-add `~` themselves when `is_conjugated` is true —
+/// same external string either way, just routed through a typed boolean now instead of a folded
+/// character. Callers that have a real `TypingRelationship` node to populate (`AttributeDef`/
+/// `AttributeUsage.typing`) should use `is_conjugated` directly instead of re-embedding `~`.
+pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, (Span, bool, String)> {
     let before = input;
     let (input, _) = preceded(ws_and_comments, typed_by_operator).parse(input)?;
-    let (input, first) = preceded(ws_and_comments, conjugated_qualified_name).parse(input)?;
+    let (input, (first_conjugated, first)) =
+        preceded(ws_and_comments, conjugated_qualified_name).parse(input)?;
     let (input, rest) = many0(preceded(
         preceded(ws_and_comments, tag(&b","[..])),
         preceded(ws_and_comments, conjugated_qualified_name),
     ))
     .parse(input)?;
     let mut names = vec![first];
-    names.extend(rest);
-    Ok((input, (span_from_to(before, input), names.join(", "))))
+    names.extend(rest.into_iter().map(|(_, name)| name));
+    Ok((
+        input,
+        (span_from_to(before, input), first_conjugated, names.join(", ")),
+    ))
 }
 
 /// Optional typings that remain strict once a typing starter is present.
-pub(crate) fn optional_typings(input: Input<'_>) -> IResult<Input<'_>, Option<(Span, String)>> {
+pub(crate) fn optional_typings(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<(Span, bool, String)>> {
     let (peek, _) = ws_and_comments(input)?;
     let fragment = peek.fragment();
     if (fragment.starts_with(b":") && !fragment.starts_with(b":>") && !fragment.starts_with(b":>>"))
@@ -172,17 +186,12 @@ pub(crate) fn optional_typings(input: Input<'_>) -> IResult<Input<'_>, Option<(S
     Ok((input, None))
 }
 
-fn conjugated_qualified_name(input: Input<'_>) -> IResult<Input<'_>, String> {
+/// Parses an optional leading `~` and a qualified name; returns `(was_conjugated, name)` with
+/// the `~` stripped from `name` rather than folded into it.
+fn conjugated_qualified_name(input: Input<'_>) -> IResult<Input<'_>, (bool, String)> {
     let (input, conjugated) = opt(tag(&b"~"[..])).parse(input)?;
     let (input, name) = qualified_name(input)?;
-    Ok((
-        input,
-        if conjugated.is_some() {
-            format!("~{name}")
-        } else {
-            name
-        },
-    ))
+    Ok((input, (conjugated.is_some(), name)))
 }
 
 fn specialization_target(input: Input<'_>) -> IResult<Input<'_>, String> {
@@ -326,7 +335,7 @@ fn skip_intersects_clause(input: Input<'_>) -> IResult<Input<'_>, ()> {
 fn merge_usage_header(
     leading: SpecializationClauses,
     trailing: SpecializationClauses,
-    type_result: Option<(Span, String)>,
+    type_result: Option<(Span, bool, String)>,
 ) -> UsageHeader {
     let subsets = trailing
         .subsets
@@ -336,7 +345,13 @@ fn merge_usage_header(
     let references = trailing.references.or(leading.references);
     let crosses = trailing.crosses.or(leading.crosses);
     UsageHeader {
-        type_name: type_result.map(|(_, name)| name),
+        type_name: type_result.map(|(_, is_conjugated, name)| {
+            if is_conjugated {
+                format!("~{name}")
+            } else {
+                name
+            }
+        }),
         subsets,
         redefines,
         references,
@@ -382,16 +397,18 @@ mod tests {
     #[test]
     fn typings_accepts_defined_by_and_multiple_targets() {
         let input = span_input("defined by ~Ports::Fuel, Ports::Command ;");
-        let (rest, (_, typing)) = typings(input).expect("typings");
-        assert_eq!(typing, "~Ports::Fuel, Ports::Command");
+        let (rest, (_, is_conjugated, typing)) = typings(input).expect("typings");
+        assert!(is_conjugated, "first target's leading `~` should be captured");
+        assert_eq!(typing, "Ports::Fuel, Ports::Command");
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
     #[test]
     fn typings_accepts_typed_by_keyword_alias() {
         let input = span_input("typed by ~Ports::Fuel, Ports::Command ;");
-        let (rest, (_, typing)) = typings(input).expect("typings");
-        assert_eq!(typing, "~Ports::Fuel, Ports::Command");
+        let (rest, (_, is_conjugated, typing)) = typings(input).expect("typings");
+        assert!(is_conjugated);
+        assert_eq!(typing, "Ports::Fuel, Ports::Command");
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 

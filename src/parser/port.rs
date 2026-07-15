@@ -123,7 +123,12 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     };
     let (input, type_result) = optional_typings(input)?;
     let (type_ref_span, type_name) = type_result
-        .map(|(span, name)| (Some(span), Some(name)))
+        .map(|(span, is_conjugated, name)| {
+            (
+                Some(span),
+                Some(if is_conjugated { format!("~{name}") } else { name }),
+            )
+        })
         .unwrap_or((None, None));
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, clauses) = specialization_clauses(input)?;

@@ -169,7 +169,13 @@ fn occurrence_usage_tail(
     let (input, name_str) = name(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, type_name) = optional_typings(input)?;
-    let type_name = type_name.map(|(_, name)| name);
+    let type_name = type_name.map(|(_, is_conjugated, name)| {
+        if is_conjugated {
+            format!("~{name}")
+        } else {
+            name
+        }
+    });
     let (input, trailing_clauses) = specialization_clauses(input)?;
     let (input, body) = occurrence_usage_body(input)?;
     let (input, post_body_clauses) = specialization_clauses(input)?;
