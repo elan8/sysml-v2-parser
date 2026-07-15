@@ -162,6 +162,30 @@ is done.
   regenerating).
 - Bumps `PARSE_AST_VERSION` to 13.
 
+### PAR-004 (item 3 of 6): typed `ConnectionEnd`/`InterfaceEnd`
+
+- **Added `ast::ConnectionEnd`**: `{ expression: Node<Expression>, span: Span }`, and
+  `ast::InterfaceEnd` as a type alias for it. Replaces the plain `Node<Expression>` endpoints on
+  `Connect.from`/`to` and `ConnectStmt.from`/`to`/`extra_ends` with `Node<ConnectionEnd>`,
+  distinguishing a connector endpoint from an arbitrary standalone expression elsewhere in the
+  AST.
+- **`InterfaceEnd` is a type alias, not a duplicate struct**: checked `ConnectStmt`'s actual usage
+  sites (`src/parser/interface.rs` and `src/parser/connection.rs`, both building a `ConnectStmt`
+  from the same shared `connect_ends` parser shape) and
+  `InterfaceUsage::TypedConnect`/`Connection` (`src/parser/part/usage.rs`) — an interface end
+  carries nothing beyond what a generic connection end carries, both are just a path expression
+  with a span. A distinct struct would have no fields of its own.
+- **Deviation, noted for a follow-up**: scoped to `Connect`/`ConnectStmt` only, per the requested
+  scope. `InterfaceUsage::TypedConnect`/`Connection`'s own `from`/`to` fields (also
+  `Node<Expression>` today, and structurally the same "interface end" case) were left untouched —
+  a natural follow-up now that `InterfaceEnd` exists, not done here to keep this change to its
+  requested shape.
+- `connection.rs` and `interface.rs` each define their own `connect_ends` parser (duplicated, not
+  shared between the two files); both were updated in lockstep with a small
+  `connection_end`/`connect_end` wrapper. `part/usage.rs`'s `connect_` (the part-usage-level
+  `connect` statement, distinct from `connect_stmt`) needed its own wrapper too.
+- Bumps `PARSE_AST_VERSION` to 14.
+
 ## [0.34.0] - 2026-07-15
 
 ### Fixed
