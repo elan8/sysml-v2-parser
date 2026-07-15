@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Working backlog for the gaps-doc PAR-002..006 items (definitions/usages in every owning context,
-typed declaration modifiers, typed relationship AST nodes, complete expression AST, non-semantic
-recovery). Entries below land incrementally; the version stays unreleased until the whole backlog
-is done.
+## [0.35.0] - 2026-07-15
+
+Closes the gaps-doc PAR-002..006 backlog (definitions/usages in every owning context, typed
+declaration modifiers, typed relationship AST nodes, complete expression AST, non-semantic
+recovery), on top of 0.34.0's PAR-001 fix. Along the way this also found and fixed 7 real parser
+bugs beyond the original scope of each PAR item — 5 def/usage-ambiguity bugs in `flow`, `port`,
+`calc`, and `connection` (×2 contexts) parsers that lacked the PAR-001-style `def_required()`
+guard, and one case where named invocation arguments (`F(x = a)`, legal SysML v2 syntax) had no
+parse path at all and silently dropped the enclosing declaration into recovery. `PARSE_AST_VERSION`
+moved from 8 (at 0.34.0) to 15 across this backlog's many breaking AST-schema changes; see the
+individual entries below for what changed and why.
 
 ### PAR-006b: final disambiguation/recovery audit
 
