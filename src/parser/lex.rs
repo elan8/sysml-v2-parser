@@ -683,6 +683,34 @@ pub(crate) fn identification(input: Input<'_>) -> IResult<Input<'_>, Identificat
     ))
 }
 
+/// Optional `private` / `protected` / `public` visibility prefix, shared by every `*Def`/`*Usage`
+/// parser that needs to feed a [`crate::ast::Membership`] (parser work item 4b, post-PAR-006).
+/// Returns the span of the whole prefix (zero-width, positioned at `input`, when no prefix is
+/// written) alongside the matched [`crate::ast::Visibility`], so callers can build a `Membership`
+/// without re-deriving the span themselves. This consolidates what several parsers (`attribute_def`,
+/// `attribute_usage`, `filter_member`, `import`, ...) previously matched ad hoc with their own
+/// inline `alt((tag("private"), ...))`; matching and discarding the value is what left every
+/// `*Def`/`*Usage` struct with no visibility field before this item.
+pub(crate) fn visibility_prefix(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (crate::ast::Span, Option<crate::ast::Visibility>)> {
+    let start = input;
+    let (input, visibility) = opt(alt((
+        map(preceded(tag(&b"private"[..]), ws1), |_| {
+            crate::ast::Visibility::Private
+        }),
+        map(preceded(tag(&b"protected"[..]), ws1), |_| {
+            crate::ast::Visibility::Protected
+        }),
+        map(preceded(tag(&b"public"[..]), ws1), |_| {
+            crate::ast::Visibility::Public
+        }),
+    )))
+    .parse(input)?;
+    let span = crate::parser::span_from_to(start, input);
+    Ok((input, (span, visibility)))
+}
+
 /// Take input until we hit one of the terminator bytes (e.g. '{' or ';'), return as string (trimmed).
 pub(crate) fn take_until_terminator<'a>(
     input: Input<'a>,

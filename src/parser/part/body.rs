@@ -296,6 +296,7 @@ pub(crate) fn connection_usage_member(
 ) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"connection"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, name) = if input.fragment().starts_with(b":")
@@ -359,6 +360,7 @@ pub(crate) fn connection_usage_member(
                 body,
                 subsets,
                 redefines,
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
         ),
     ))

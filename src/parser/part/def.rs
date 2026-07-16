@@ -6,6 +6,7 @@ use super::usage::{part_usage_named, part_usage_redefines_only};
 pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, definition_prefix) = opt(alt((
         map(preceded(tag(&b"abstract"[..]), ws1), |_| {
             DefinitionPrefix::Abstract
@@ -36,6 +37,7 @@ pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
                 identification,
                 specializes,
                 body,
+                membership: Membership::owning(visibility, visibility_span),
             },
         ),
     ))
@@ -45,6 +47,7 @@ pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
 pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefOrUsage> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, definition_prefix) = opt(alt((
         map(preceded(tag(&b"abstract"[..]), ws1), |_| {
             DefinitionPrefix::Abstract
@@ -76,6 +79,7 @@ pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefO
                     identification,
                     specializes,
                     body,
+                    membership: Membership::owning(visibility, visibility_span),
                 },
             )),
         ));
@@ -84,10 +88,12 @@ pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefO
         let mut usage = usage;
         usage.value.usage_prefix = definition_prefix;
         usage.value.is_individual = is_individual;
+        usage.value.membership = Membership::feature(visibility, visibility_span);
         return Ok((input, PartDefOrUsage::Usage(usage)));
     }
     let (input, mut usage) = part_usage_named(start, input)?;
     usage.value.usage_prefix = definition_prefix;
     usage.value.is_individual = is_individual;
+    usage.value.membership = Membership::feature(visibility, visibility_span);
     Ok((input, PartDefOrUsage::Usage(usage)))
 }

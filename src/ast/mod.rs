@@ -9,6 +9,7 @@ mod behavior;
 mod common;
 mod feature_chain;
 mod feature_value;
+mod membership;
 mod package;
 mod relationship_target;
 mod requirement;
@@ -20,6 +21,7 @@ pub use behavior::*;
 pub use common::*;
 pub use feature_chain::*;
 pub use feature_value::*;
+pub use membership::*;
 pub use package::*;
 pub use relationship_target::*;
 pub use requirement::*;
@@ -301,6 +303,7 @@ fn normalize_attribute_def(a: &AttributeDef) -> AttributeDef {
         value_span: None,
         ordered: a.ordered,
         nonunique: a.nonunique,
+        membership: a.membership.clone(),
     }
 }
 
@@ -311,6 +314,7 @@ fn normalize_part_def(p: &PartDef) -> PartDef {
         identification: p.identification.clone(),
         specializes: p.specializes.clone(),
         body: normalize_part_def_body(&p.body),
+        membership: p.membership.clone(),
     }
 }
 
@@ -526,6 +530,7 @@ fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
         is_derived: a.is_derived,
         is_constant: a.is_constant,
         is_end: a.is_end,
+        membership: a.membership.clone(),
     }
 }
 
@@ -546,6 +551,7 @@ fn normalize_part_usage(p: &PartUsage) -> PartUsage {
         body: normalize_part_usage_body(&p.body),
         name_span: None,
         type_ref_span: None,
+        membership: p.membership.clone(),
     }
 }
 
@@ -796,6 +802,7 @@ fn normalize_port_usage(p: &PortUsage) -> PortUsage {
         body: normalize_port_body(&p.body),
         name_span: None,
         type_ref_span: None,
+        membership: p.membership.clone(),
     }
 }
 
@@ -834,6 +841,7 @@ fn normalize_port_def(p: &PortDef) -> PortDef {
         identification: p.identification.clone(),
         specializes: p.specializes.clone(),
         body: normalize_port_def_body(&p.body),
+        membership: p.membership.clone(),
     }
 }
 
@@ -893,6 +901,7 @@ fn normalize_connection_def(c: &ConnectionDef) -> ConnectionDef {
         identification: c.identification.clone(),
         specializes: c.specializes.clone(),
         body: normalize_connection_def_body(&c.body),
+        membership: c.membership.clone(),
     }
 }
 

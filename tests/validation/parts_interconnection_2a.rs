@@ -95,6 +95,17 @@ fn n<T>(v: T) -> Node<T> {
     Node::new(Span::dummy(), v)
 }
 
+/// This fixture's source has no `private`/`protected`/`public` prefixes anywhere, so every
+/// `PartDef`/`PartUsage` membership below is the no-explicit-visibility default -- see
+/// `Membership::owning`/`Membership::feature` (parser work item 4b).
+fn owning_membership() -> sysml_v2_parser::ast::Membership {
+    sysml_v2_parser::ast::Membership::owning(None, Span::dummy())
+}
+
+fn feature_membership() -> sysml_v2_parser::ast::Membership {
+    sysml_v2_parser::ast::Membership::feature(None, Span::dummy())
+}
+
 /// Path expression from dot-separated path (e.g. "engine.fuelCmdPort"), for endpoints parsed via
 /// `path_expression` (`src/parser/expr.rs`: bind/connect/allocate/interface-connect lhs/rhs). A
 /// single segment stays `FeatureRef`; a genuine multi-segment dotted chain becomes
@@ -200,6 +211,7 @@ fn definitions_package() -> Package {
                     identification: id("AxleAssembly"),
                     specializes: None,
                     body: PartDefBody::Semicolon,
+                    membership: owning_membership(),
                 }))),
                 n(part_def_rear_axle_assembly()),
                 n(PackageBodyElement::PartDef(n(PartDef {
@@ -208,6 +220,7 @@ fn definitions_package() -> Package {
                     identification: id("Axle"),
                     specializes: None,
                     body: PartDefBody::Semicolon,
+                    membership: owning_membership(),
                 }))),
                 n(PackageBodyElement::PartDef(n(PartDef {
                     is_individual: false,
@@ -215,6 +228,7 @@ fn definitions_package() -> Package {
                     identification: id("RearAxle"),
                     specializes: Some(spec("Axle")),
                     body: PartDefBody::Semicolon,
+                    membership: owning_membership(),
                 }))),
                 n(part_def_half_axle()),
                 n(part_def_engine()),
@@ -226,6 +240,7 @@ fn definitions_package() -> Package {
                     identification: id("Differential"),
                     specializes: None,
                     body: PartDefBody::Brace { elements: vec![] },
+                    membership: owning_membership(),
                 }))),
                 n(PackageBodyElement::PartDef(n(PartDef {
                     is_individual: false,
@@ -233,6 +248,7 @@ fn definitions_package() -> Package {
                     identification: id("Wheel"),
                     specializes: None,
                     body: PartDefBody::Semicolon,
+                    membership: owning_membership(),
                 }))),
                 n(interface_def_engine_to_transmission()),
                 n(interface_def_driveshaft()),
@@ -246,6 +262,7 @@ fn port_def_semicolon(name: &str) -> PackageBodyElement {
         identification: id(name),
         specializes: None,
         body: PortDefBody::Semicolon,
+        membership: owning_membership(),
     }))
 }
 
@@ -268,8 +285,10 @@ fn port_def_vehicle_to_road() -> PackageBodyElement {
                 body: PortBody::Semicolon,
                 name_span: None,
                 type_ref_span: None,
+                membership: feature_membership(),
             })))],
         },
+        membership: owning_membership(),
     }))
 }
 
@@ -295,6 +314,7 @@ fn part_def_vehicle_a() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     direction: None,
@@ -310,9 +330,11 @@ fn part_def_vehicle_a() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
             ],
         },
+        membership: owning_membership(),
     }))
 }
 
@@ -337,8 +359,10 @@ fn part_def_rear_axle_assembly() -> PackageBodyElement {
                 body: PortBody::Semicolon,
                 name_span: None,
                 type_ref_span: None,
+                membership: feature_membership(),
             })))],
         },
+        membership: owning_membership(),
     }))
 }
 
@@ -364,6 +388,7 @@ fn part_def_half_axle() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     direction: None,
@@ -379,9 +404,11 @@ fn part_def_half_axle() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
             ],
         },
+        membership: owning_membership(),
     }))
 }
 
@@ -407,6 +434,7 @@ fn part_def_engine() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     direction: None,
@@ -422,9 +450,11 @@ fn part_def_engine() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
             ],
         },
+        membership: owning_membership(),
     }))
 }
 
@@ -450,6 +480,7 @@ fn part_def_transmission() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     direction: None,
@@ -465,9 +496,11 @@ fn part_def_transmission() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
             ],
         },
+        membership: owning_membership(),
     }))
 }
 
@@ -493,6 +526,7 @@ fn part_def_driveshaft() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
                     direction: None,
@@ -508,9 +542,11 @@ fn part_def_driveshaft() -> PackageBodyElement {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
             ],
         },
+        membership: owning_membership(),
     }))
 }
 
@@ -632,6 +668,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     body: PartUsageBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 })))),
                 n(PartUsageBodyElement::InterfaceUsage(n(
                     InterfaceUsage::TypedConnect {
@@ -658,6 +695,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     body: PartUsageBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
@@ -675,6 +713,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     body: PartUsageBody::Brace { elements: vec![] },
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 })))),
                 n(PartUsageBodyElement::InterfaceUsage(n(
                     InterfaceUsage::TypedConnect {
@@ -732,6 +771,7 @@ fn part_vehicle1_c1() -> PartUsage {
                                 body: PortBody::Semicolon,
                                 name_span: None,
                                 type_ref_span: None,
+                                membership: feature_membership(),
                             }))),
                             n(PortBodyElement::PortUsage(n(PortUsage {
                                 direction: None,
@@ -750,14 +790,17 @@ fn part_vehicle1_c1() -> PartUsage {
                                 body: PortBody::Semicolon,
                                 name_span: None,
                                 type_ref_span: None,
+                                membership: feature_membership(),
                             }))),
                         ],
                     },
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
             ],
         },
+        membership: feature_membership(),
     }
 }
 
@@ -830,6 +873,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     body: PartUsageBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
@@ -860,6 +904,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 body: PortBody::Semicolon,
                                 name_span: None,
                                 type_ref_span: None,
+                                membership: feature_membership(),
                             }))),
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
                                 direction: None,
@@ -875,11 +920,13 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 body: PortBody::Semicolon,
                                 name_span: None,
                                 type_ref_span: None,
+                                membership: feature_membership(),
                             }))),
                         ],
                     },
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
@@ -910,6 +957,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 body: PortBody::Semicolon,
                                 name_span: None,
                                 type_ref_span: None,
+                                membership: feature_membership(),
                             }))),
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
                                 direction: None,
@@ -925,14 +973,17 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 body: PortBody::Semicolon,
                                 name_span: None,
                                 type_ref_span: None,
+                                membership: feature_membership(),
                             }))),
                         ],
                     },
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 })))),
             ],
         },
+        membership: feature_membership(),
     }
 }
 
@@ -968,6 +1019,7 @@ fn part_differential() -> PartUsage {
                     body: PortBody::Brace { elements: vec![] },
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
                     direction: None,
@@ -983,6 +1035,7 @@ fn part_differential() -> PartUsage {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
                     direction: None,
@@ -998,9 +1051,11 @@ fn part_differential() -> PartUsage {
                     body: PortBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 }))),
             ],
         },
+        membership: feature_membership(),
     }
 }
 
@@ -1038,6 +1093,7 @@ fn part_rear_axle() -> PartUsage {
                     body: PartUsageBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
@@ -1055,9 +1111,11 @@ fn part_rear_axle() -> PartUsage {
                     body: PartUsageBody::Semicolon,
                     name_span: None,
                     type_ref_span: None,
+                    membership: feature_membership(),
                 })))),
             ],
         },
+        membership: feature_membership(),
     }
 }
 

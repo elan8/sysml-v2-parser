@@ -7,6 +7,174 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `PARSE_AST_VERSION` was left at 20 instead of 21 after the Part extension
+
+Found while starting the next `Membership` continuation: the "extended to `PartDef`/`PartUsage`"
+entry below documents `PARSE_AST_VERSION` bumped 20 -> 21, but the actual constant in `src/lib.rs`
+was still 20 (only the prior 19 -> 20 bump for the `AttributeDef`/`AttributeUsage` entry had
+actually landed in code) -- a genuine documentation/code drift in this still-uncommitted working
+tree, not a re-interpretation of either entry's intent. Corrected `PARSE_AST_VERSION` to 21 to match
+what the Part entry always claimed, before bumping further for this session's own work below.
+
+### Changed: first-class `Membership` node extended to `ConnectionDef`/`ConnectionUsageMember`
+
+Continues the `Membership` rollout (see `ItemDef`/`ItemUsage` above) to `ConnectionDef` and
+`ConnectionUsageMember` (`src/ast/structure.rs`). Note the plan's original "`ConnectionUsage`" name
+does not exist in the current AST -- the struct backing a nested `connection` usage member (inside a
+part definition body or at package level) is `ConnectionUsageMember`, confirmed against
+`src/ast/structure.rs` before assuming otherwise (its parser is `connection_usage_member`, shared
+between `src/parser/part/body.rs`'s part-body dispatch and `src/parser/package.rs`'s package-level
+dispatch -- both call sites automatically pick up the new field with no changes needed of their own,
+since they only invoke the shared parser function). Same mechanical shape as every prior entry:
+non-optional `membership: Membership`, `kind: OwningMembership` on `ConnectionDef`, `kind:
+FeatureMembership` on `ConnectionUsageMember`.
+
+**Found the same genuine parsing gap a third time, in both directions again.** Neither
+`connection_def`/`connection_def_required` nor `connection_usage_member` accepted a visibility
+prefix before this increment -- confirmed the same way as `PortDef`/`ItemDef`: `package P { private
+connection def Foo; }` and `package P { part p: T { private connection c: C; } }` both failed to
+parse as visibility-prefixed declarations pre-change. Fixed using the same `.with_captured_visibility()`
+infrastructure from the `PortDef`/`PortUsage` increment: both `connection_def` (which also sets
+`.with_hash_annotation()` for its def-less `#annotation` form) and `connection_def_required` now set
+`.with_captured_visibility()` on their `DefinitionPrefixOptions`; `connection_usage_member` (a
+bespoke hand-rolled parser, not routed through `parse_definition_prefix`) calls the shared
+`lex::visibility_prefix` directly at its start, same as `port_usage`/`item_usage`/`part_usage`.
+
+Unlike `PortDef`/`PortUsage`, and matching `ItemDef`/`ItemUsage`, **no test-fixture struct-literal
+ripple was needed** -- `ConnectionDef`/`ConnectionUsageMember` have zero hand-built literal
+construction sites anywhere in the test suite (every existing consumer only pattern-matches and
+clones the whole value via `n.value.clone()` in `src/ast/mod.rs`'s normalize matches; only the
+dedicated `normalize_connection_def` helper needed a one-line `membership: c.membership.clone()`
+addition, since `ConnectionUsageMember`-bearing enum variants use the direct-clone path with no
+dedicated normalize function). `cargo test` and the full `SYSML_V2_RELEASE_DIR` validation gate
+(25/25) both stayed green with **zero validation snapshot regeneration required**.
+
+`PARSE_AST_VERSION` bumped 23 -> 24. Added seven regression tests locking in visibility capture
+(`private`/`protected`/`public` and the no-prefix default) for `connection_def` and
+`connection_usage_member` (`src/parser/connection.rs`). All three gates green: `cargo test`, `cargo
+clippy -- -W clippy::all` (same pre-existing warnings only, zero new), and the full
+`SYSML_V2_RELEASE_DIR` validation gate (25/25).
+
+Updates the scope-boundary list: `ConnectionDef`/`ConnectionUsageMember` are no longer in the "not
+yet covered" set. Still not covered: `RequirementUsage`-family, `ActionDef`/`ActionUsage`, etc., and
+`AliasDef`/`Import` -- same reasoning as before. This closes the three struct families explicitly
+scoped for this continuation (`PortDef`/`PortUsage`, `ItemDef`/`ItemUsage`,
+`ConnectionDef`/`ConnectionUsageMember`); further struct families remain a documented follow-up per
+the same "start narrow, extend as needed" discipline this whole `Membership` rollout has used.
+
+### Changed: first-class `Membership` node extended to `ItemDef`/`ItemUsage`
+
+Continues the `Membership` rollout (see `PortDef`/`PortUsage` above) to `ItemDef`
+(`src/ast/structure.rs`) and `ItemUsage` (`src/ast/requirement.rs` -- note the struct lives outside
+`structure.rs` despite the "Item" name; its parsers are in `src/parser/item.rs` regardless). Same
+mechanical shape as every prior entry in this rollout: non-optional `membership: Membership`, `kind:
+OwningMembership` on `ItemDef`, `kind: FeatureMembership` on `ItemUsage`.
+
+**Found the same genuine parsing gap again, in both directions.** Neither `item_def`/
+`item_def_required` (routed through `parse_definition_prefix`, previously with no visibility option
+set) nor the hand-rolled `item_usage` accepted a visibility prefix before this increment --
+confirmed the same way as `PortDef`/`PortUsage`: `package P { private item def Foo; }` and `package P
+{ part p: T { private item q: Q; } }` both failed to parse as visibility-prefixed declarations
+pre-change. Fixed using the exact infrastructure the `PortDef`/`PortUsage` increment introduced:
+`item_def`'s options now set `.with_captured_visibility()` (the `VisibilityPrefix::Captured` mode
+added last increment), and `item_usage` calls the shared `lex::visibility_prefix` directly at its
+start, same as `port_usage`/`part_usage`. `directed_item_usage` (the `in`/`out`/`inout item` form
+used in port definition bodies) needed no separate change -- it delegates to `item_usage` internally
+and inherits its `membership` field automatically; visibility must precede the direction keyword,
+same ordering constraint as every other prefix-stacked usage parser in this crate.
+
+Unlike the `PortDef`/`PortUsage` increment, **no test-fixture struct-literal ripple** was needed:
+`ItemDef`/`ItemUsage` have zero hand-built literal construction sites in
+`tests/validation/parts_interconnection_2a.rs` or anywhere else in the test suite (every existing
+consumer only pattern-matches and clones the whole value via `n.value.clone()` in `src/ast/mod.rs`'s
+normalize matches, which needed no changes since neither struct had spans to null out). `cargo test`
+and the full `SYSML_V2_RELEASE_DIR` validation gate (25/25) both stayed green with **zero validation
+snapshot regeneration required** -- the Systems/Full Library sources exercised by that gate contain
+no `item`/`item def` declaration whose `Debug` output the gate checks byte-for-byte against a stored
+snapshot.
+
+`PARSE_AST_VERSION` bumped 22 -> 23. Added six regression tests locking in visibility capture
+(`private`/`protected`/`public` and the no-prefix default) for both `item_def` and `item_usage`
+(`src/parser/item.rs`). All three gates green: `cargo test`, `cargo clippy -- -W clippy::all` (same
+pre-existing warnings only, zero new), and the full `SYSML_V2_RELEASE_DIR` validation gate (25/25).
+
+Updates the scope-boundary list: `ItemDef`/`ItemUsage` are no longer in the "not yet covered" set.
+Still not covered: `ConnectionDef`/`ConnectionUsageMember`, `RequirementUsage`-family,
+`ActionDef`/`ActionUsage`, etc., and `AliasDef`/`Import` -- same reasoning as before.
+
+### Changed: first-class `Membership` node extended to `PortDef`/`PortUsage`
+
+Continues the `Membership` rollout (see the `PartDef`/`PartUsage` entry below) to `PortDef`/
+`PortUsage` (`src/ast/structure.rs`, `src/parser/port.rs`). Same mechanical shape: a non-optional
+`membership: Membership` field, `kind: OwningMembership` on `PortDef`, `kind: FeatureMembership` on
+`PortUsage`, visibility captured at the point each parser previously matched-and-discarded (in
+`PortUsage`'s case, "previously" means "never matched at all" -- see the gap below) a
+`private`/`protected`/`public` prefix.
+
+**Found the same genuine parsing gap `PartDef` had, in two places this time.** Neither
+`port_def`/`port_def_required` nor `port_usage` accepted a visibility prefix before this increment
+-- confirmed by probing `package P { private port def Foo; }` and `package P { part p: T { private
+port q: Q; } }` against the pre-change parser: both fell through to recovery instead of parsing as a
+visibility-prefixed `PortDef`/`PortUsage`. Fixed as part of wiring `Membership` in, matching the
+`PartDef` precedent (BNF `DefinitionMember`/`UsageMember` productions both legally permit a
+visibility prefix wherever a `*Def`/`*Usage` is legal).
+
+`port_usage` (a bespoke hand-rolled parser, not routed through `parse_definition_prefix`) now calls
+the shared `lex::visibility_prefix` directly at its very start, same as `part_usage`. `port_def`/
+`port_def_required` (both routed through the shared `parse_definition_prefix`/
+`DefinitionPrefixOptions` helper, unlike `part_def`) needed a different mechanism: the existing
+`VisibilityPrefix::OptionalPrivate` mode on `DefinitionPrefixOptions` only matched-and-discarded a
+bare `private` (kept for its two pre-existing `constraint`/`calc` call sites, unchanged here), so a
+new `VisibilityPrefix::Captured` mode plus `DefinitionPrefixOptions::with_captured_visibility()`
+builder were added (`src/parser/definition_prefix.rs`) that call `lex::visibility_prefix` and thread
+the result through two new `DefinitionPrefixResult` fields (`visibility`, `visibility_span`) --
+`None`/zero-span for every other existing call site that doesn't opt in, so this is additive and
+does not change behavior for `constraint`/`calc`/`state`/`flow`/etc. `port_def`'s options now set
+`.with_captured_visibility()` for both the `def`-optional and `def`-required entry points.
+
+Fixed all 24 downstream `PortDef`/`PortUsage` struct-literal construction sites in
+`tests/validation/parts_interconnection_2a.rs` (2 `PortDef`, 22 `PortUsage`, including two nested
+inside another `PortUsage`'s body that a mechanical brace-matching pass initially missed and were
+fixed by hand). `PARSE_AST_VERSION` bumped 21 -> 22. Added six regression tests locking in
+visibility capture (`private`/`protected`/`public` and the no-prefix default) for both `port_def`
+and `port_usage` (`src/parser/port.rs`). Regenerated the `functional_allocation_4a` validation
+snapshot whose `Debug` output changed shape from the new field. All three gates green: `cargo test`,
+`cargo clippy -- -W clippy::all` (same pre-existing warnings only, zero new), and the full
+`SYSML_V2_RELEASE_DIR` validation gate (25/25).
+
+Updates the scope-boundary list: `PortDef`/`PortUsage` are no longer in the "not yet covered" set.
+Still not covered: `ConnectionDef`/`ConnectionUsageMember`, `ItemDef`/`ItemUsage`,
+`RequirementUsage`-family, `ActionDef`/`ActionUsage`, etc., and `AliasDef`/`Import` -- same reasoning
+as before.
+
+### Changed: first-class `Membership` node extended to `PartDef`/`PartUsage`
+
+Continues the "first-class `Membership` node" item above from `AttributeDef`/`AttributeUsage` to
+`PartDef`/`PartUsage`, following the exact mechanical shape that entry's scope-boundary note
+predicted: added the `membership: Membership` field (`OwningMembership` on `PartDef`,
+`FeatureMembership` on `PartUsage`), captured via `lex::visibility_prefix` (`src/parser/part/def.rs`,
+`src/parser/part/prelude.rs`, `src/parser/part/usage.rs`).
+
+**Found a genuine parsing gap, not just discarded data, while doing this**: unlike
+`attribute_def`/`attribute_usage`, `part_def` never parsed a `private`/`protected`/`public` prefix
+at all. Confirmed by probing `package P { private part def Foo; }` against the pre-change parser: it
+fell through to `ExtendedLibraryDecl` recovery instead of parsing as a visibility-prefixed
+`PartDef`. The BNF (`DefinitionMember : OwningMembership = MemberPrefix ownedRelatedElement +=
+DefinitionElement`) legally permits a visibility prefix before any definition, including
+`PartDefinition`, so this is now fixed as part of wiring `Membership` in, not scoped out.
+
+Fixed all 17 downstream `PartDef`/`PartUsage` struct-literal construction sites in
+`tests/validation/parts_interconnection_2a.rs` (a hand-built expected-AST fixture) that needed the
+new field. `PARSE_AST_VERSION` bumped 20 → 21. Regenerated the `parts_tree_1a` and
+`functional_allocation_4a` validation snapshots for the new field's `Debug` shape. All three gates
+green: `cargo test`, `cargo clippy -- -W clippy::all` (zero new warnings), and the full
+`SYSML_V2_RELEASE_DIR` validation gate (25/25, including the full/systems library suites).
+
+Updates the previous entry's scope-boundary list: `PartDef`/`PartUsage` are no longer in the "not
+yet covered" set. Still not covered: `PortDef`/`PortUsage`, `ConnectionDef`/`ConnectionUsage`,
+`ItemDef`/`ItemUsage`, `RequirementUsage`-family, `ActionDef`/`ActionUsage`, etc., and
+`AliasDef`/`Import` — same reasoning as before.
+
 ### Changed: typed `FeatureValue` on `AttributeDef`/`AttributeUsage`/`PartUsage`/`RefDecl`
 
 Closes gaps-doc item 1 ("Parser work still required" backlog, post-PAR-006). `value:
@@ -201,6 +369,86 @@ snapshot (the Systems Library's `alias Torque for ISQ::TorqueValue;` re-export s
 `Debug` output changed shape from this field-type change; full `cargo test`,
 `cargo clippy -- -W clippy::all` (zero new warnings), and the `SYSML_V2_RELEASE_DIR` validation
 gate (including the full/systems library suites) are green.
+
+### Changed: first-class `Membership` node (scoped start, `AttributeDef`/`AttributeUsage` only)
+
+Closes gaps-doc item 4b ("Parser work still required" backlog, post-PAR-006) -- the confirmed-scope
+"full architectural treatment" alternative rather than a minimal field patch, but landed as its own
+multi-increment sub-effort per the plan, following the same "start narrow, extend as needed"
+discipline PAR-004 used for `TypingRelationship`/`SubsettingRelationship`/`ConnectionEnd`/
+`InterfaceEnd`. Every def/usage element previously lived as a bare, undifferentiated child in its
+owning body's `Vec<Node<XBodyElement>>` -- ownership, visibility, and membership *kind* were not
+represented independently of which enum variant the element happened to parse into, and an explicit
+`private`/`protected`/`public` prefix (matched by `attribute_def`/`attribute_usage` for years, per
+this crate's history with `DefinitionPrefixOptions::with_private()`-style prefix parsing) was
+consumed and thrown away rather than captured anywhere.
+
+New types (`src/ast/membership.rs`): `MembershipKind` (`OwningMembership` -- a nested `*Def` that
+becomes a new named member of its owning namespace; `FeatureMembership` -- a nested `*Usage` that
+contributes a feature to its owning type; `Import` and `Alias`, reserved for the still-unmigrated
+`Import`/`AliasDef` struct families noted below, not yet constructed by any parser) and
+`Membership { kind, visibility: Option<Visibility>, span }`, reusing the existing `Visibility` enum
+(`src/ast/common.rs`). `Membership::owning`/`Membership::feature` are convenience constructors for
+the two kinds actually wired up this increment.
+
+**Design decision -- direct field, not a generic wrapper.** Of the two shapes considered (wrap every
+body-enum element in a generic `Member<T> { membership, element }`, vs. add a `membership: Membership`
+field directly to the shared element structs), this lands the direct-field approach: wrapping every
+`Vec<Node<XBodyElement>>` in the crate would have been the single largest mechanical change in this
+entire backlog for uniformity most consumers don't need, whereas a direct field lets each struct
+family be migrated independently and matches the deliberately incremental style every prior PAR/gaps
+item in this backlog has used.
+
+**Scope landed this increment: `AttributeDef` and `AttributeUsage` only** (`structure.rs`) -- chosen
+as the highest-traffic starting family, matching Item 1/4a's own working area and PAR-004's precedent
+of starting with the field shared by the most structs before extending outward. `AttributeDef` gets a
+non-optional `membership: Membership` with `kind: OwningMembership`; `AttributeUsage` gets the same
+with `kind: FeatureMembership`. Every one of `AttributeUsage`'s four construction sites in
+`attribute.rs` (`attribute_usage` -- the primary parser, now the only one that actually parses a
+visibility prefix; `attribute_feature_binding`, `metadata_binding`, and `attribute_usage_shorthand`
+-- three ad hoc shapes with no visibility syntax of their own) now build a `Membership`, the latter
+three always with `visibility: None` since their grammar productions have no visibility prefix to
+capture. `attribute_def`/`attribute_usage`'s inline `alt((tag("private"), tag("protected"),
+tag("public")))` visibility-matching (previously duplicated in each function, and in `filter_member`/
+`import`/`package.rs`) was consolidated into a new shared `lex::visibility_prefix` helper returning
+`(Span, Option<Visibility>)`, used by both.
+
+**Explicitly NOT covered by this increment** -- documented here as the scope boundary for a future
+continuation, per this backlog's "deviation noted, scoped explicitly" precedent:
+- Every other member-bearing `*Def`/`*Usage` struct family (`PortDef`/
+  `PortUsage`, `ConnectionDef`/`ConnectionUsage`, `ItemDef`/`ItemUsage`, `RequirementUsage`-family,
+  `ActionDef`/`ActionUsage`, etc.) -- none of these got a `membership` field yet as of this
+  increment (`PartDef`/`PartUsage` were extended in the very next entry above). Their body-enum
+  parsers largely already have the same discarded `private`/`protected`/`public`-prefix pattern
+  `attribute_def`/`attribute_usage` had (many share `DefinitionPrefixOptions`/ad hoc `alt()` prefixes
+  the same way), so the mechanical shape of the follow-up is expected to closely mirror this
+  increment's `AttributeDef`/`AttributeUsage` work -- add the field, call `lex::visibility_prefix` at
+  the same point the def/usage prefix is currently matched-and-discarded, wire the `Membership::owning`/
+  `Membership::feature` constructor at each construction site, fix the `src/ast/mod.rs` normalize-match
+  ripple, regenerate any validation snapshots whose `Debug` output shape changes.
+- `AliasDef`/`Import` -- `MembershipKind::Alias`/`MembershipKind::Import` variants exist (since the
+  gaps doc explicitly calls out aliasing as itself a membership form) but nothing constructs them yet;
+  `Import` already has its own `visibility: Option<Visibility>` field from before this item, so wiring
+  a `Membership` there would need to either replace or wrap that existing field -- left as a follow-up
+  design decision rather than guessed at here.
+- The generic `Member<T>` wrapper alternative was not built at all (see the design decision above);
+  if a future increment finds the per-struct-family approach doesn't scale (e.g. some body-enum
+  `Other`/`Error`/`Doc` variant genuinely needs membership info), reconsider then rather than building
+  the wrapper speculatively now.
+- No new `MembershipKind` variants beyond the four above were added speculatively; per this backlog's
+  `unique`/`readonly`/`variable` out-of-scope precedent (CHANGELOG 0.35.0's item 3 entry), further
+  kinds (e.g. a dedicated parameter/variant/return-parameter membership) should only be added once a
+  real parser site needs to distinguish them.
+
+`PARSE_AST_VERSION` bumped 19 -> 20 for the breaking AST-schema change (new non-optional field on
+`AttributeDef`/`AttributeUsage`). Added four regression tests locking in visibility capture (`private`/
+`protected`/`public` prefixes and the no-prefix default) and the `OwningMembership`/`FeatureMembership`
+kind split for `attribute_def`/`attribute_usage` (`src/parser/attribute.rs`). Regenerated the two
+`sysml-v2-release` validation snapshots (`parts_tree_1a`, `function_based_behavior_3a`) whose `Debug`
+output changed shape from the new field; full `cargo test`, `cargo clippy -- -W clippy::all` (the same
+5 pre-existing `large_enum_variant`/`type_complexity` warnings as before this change, confirmed via a
+throwaway `git worktree` checkout of the pre-change commit -- zero *new* warnings), and the
+`SYSML_V2_RELEASE_DIR` validation gate (including the full/systems library suites) are green.
 
 ## [0.35.0] - 2026-07-15
 

@@ -315,7 +315,12 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
 /// `abstract`/multiplicity/`nonunique`/leading `:>` subsets, matching the port/calc/constraint
 /// precedent from CHANGELOG 0.33.0.
 pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
-    parse_connection_def(input, DefinitionPrefixOptions::new(b"connection").with_hash_annotation())
+    parse_connection_def(
+        input,
+        DefinitionPrefixOptions::new(b"connection")
+            .with_hash_annotation()
+            .with_captured_visibility(),
+    )
 }
 
 /// Connection definition with required `def` keyword, for contexts (e.g. nested inside a part
@@ -325,7 +330,12 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
 /// not support the hash-annotation def-less form ([`connection_def`] does); nothing in the
 /// nested-part-body grammar currently needs that combination.
 pub(crate) fn connection_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
-    parse_connection_def(input, DefinitionPrefixOptions::new(b"connection").def_required())
+    parse_connection_def(
+        input,
+        DefinitionPrefixOptions::new(b"connection")
+            .def_required()
+            .with_captured_visibility(),
+    )
 }
 
 fn parse_connection_def(
@@ -345,6 +355,10 @@ fn parse_connection_def(
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: crate::ast::Membership::owning(
+                    prefix.visibility,
+                    prefix.visibility_span,
+                ),
             },
         ),
     ))
@@ -440,6 +454,88 @@ mod par_006b_audit_tests {
         assert!(
             result.is_ok(),
             "connection_def should still accept the bare Systems-Library connection form, got {result:?}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use crate::parser::part::connection_usage_member;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (continuation): Membership on ConnectionDef/ConnectionUsageMember ---
+
+    /// `connection_usage_member` previously never parsed a `private`/`protected`/`public` prefix
+    /// at all (same genuine gap as `part_def`/`port_def`/`port_usage`/`item_def`/`item_usage`).
+    #[test]
+    fn connection_usage_member_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            connection_usage_member(input("private connection c1: MyConnection;"))
+                .expect("connection usage member");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn connection_usage_member_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) =
+            connection_usage_member(input("connection c1: MyConnection;"))
+                .expect("connection usage member");
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    /// `connection_def`/`connection_def_required` previously never parsed a visibility prefix
+    /// either (same genuine gap as `part_def`/`port_def`/`item_def`).
+    #[test]
+    fn connection_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            connection_def(input("protected connection def MyConnection;")).expect("connection def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn connection_def_public_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            connection_def(input("public connection def MyConnection;")).expect("connection def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+    }
+
+    #[test]
+    fn connection_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) =
+            connection_def(input("connection def MyConnection;")).expect("connection def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
         );
     }
 }

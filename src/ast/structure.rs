@@ -2,6 +2,7 @@ use super::behavior::{ActionDefBodyElement, Allocate, InOut, InOutDecl, StateDef
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::feature_value::FeatureValue;
+use super::membership::Membership;
 use super::view::{CalcUsage, ConstraintDefBody};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
@@ -20,6 +21,14 @@ pub struct PartDef {
     /// Supertype after `:>`, e.g. Some("Axle") for `part def FrontAxle :> Axle`.
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: PartDefBody,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::OwningMembership`]. Unlike `AttributeDef`, `part_def` did not
+    /// previously parse a `private`/`protected`/`public` prefix at all (BNF `DefinitionMember :
+    /// OwningMembership = MemberPrefix ownedRelatedElement += DefinitionElement` legally allows
+    /// one before any definition, including `PartDefinition`) -- confirmed as a genuine parsing
+    /// gap (not just discarded data) by probing `package P { private part def Foo; }`, which fell
+    /// through to `ExtendedLibraryDecl` before this item. See `part::def::part_def`.
+    pub membership: Membership,
 }
 
 /// BNF BasicDefinitionPrefix: `abstract` | `variation`.
@@ -151,6 +160,11 @@ pub struct ConnectionUsageMember {
     pub body: ConnectionDefBody,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::FeatureMembership`]. See [`PortDef::membership`] for the
+    /// same "genuine new grammar coverage, not just discarded data" rationale --
+    /// `connection_usage_member` did not previously accept a visibility prefix either.
+    pub membership: Membership,
 }
 
 /// Exhibit state usage: `exhibit state` name `:` type (`;` or body).
@@ -188,6 +202,15 @@ pub struct AttributeDef {
     pub ordered: bool,
     /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
     pub nonunique: bool,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
+    /// [`MembershipKind::OwningMembership`] for a `*Def` -- a nested attribute definition becomes
+    /// a new named member of its owning namespace, not a feature of it. `visibility` captures an
+    /// explicit `private`/`protected`/`public` prefix when written (previously matched and
+    /// discarded by `attribute_def`'s parser); `None` means no explicit prefix was written (the
+    /// owning namespace's default visibility applies, not resolved here). Non-optional --
+    /// `attribute_def` unconditionally builds one, using `visibility: None` when no prefix was
+    /// written.
+    pub membership: Membership,
 }
 
 /// Body of an attribute (def or usage): `;` or `{` AttributeBodyElement* `}`.
@@ -217,6 +240,11 @@ pub struct ItemDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::OwningMembership`]. Like `PartDef`/`PortDef`, `item_def`/
+    /// `item_def_required` did not previously accept a visibility prefix at all -- confirmed as
+    /// a genuine parsing gap the same way. See `item::parse_item_def`.
+    pub membership: Membership,
 }
 
 /// Individual definition: `individual def` Identification `:>` type body.
@@ -261,6 +289,11 @@ pub struct PartUsage {
     pub name_span: Option<Span>,
     /// Span of the type reference after `:` (for semantic tokens).
     pub type_ref_span: Option<Span>,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::FeatureMembership`]. See [`PartDef::membership`] for the
+    /// same "genuine new grammar coverage, not just discarded data" rationale -- `part_usage` did
+    /// not previously accept a visibility prefix either.
+    pub membership: Membership,
 }
 
 /// Body of a part usage: `;` or `{` PartUsageBodyElement* `}`.
@@ -463,6 +496,13 @@ pub struct AttributeUsage {
     /// construct (`connection.rs`/`interface.rs`), which is a separate named-connector-end
     /// declaration (`end name : Type;`), not this boolean prefix modifier.
     pub is_end: bool,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
+    /// [`MembershipKind::FeatureMembership`] for a `*Usage` -- a nested attribute usage
+    /// contributes a feature to its owning type, as opposed to a `*Def`'s
+    /// [`MembershipKind::OwningMembership`]. See [`AttributeDef::membership`] for the
+    /// `visibility` capture rationale; the same "matched and previously discarded" prefix applies
+    /// here.
+    pub membership: Membership,
 }
 
 // ---------------------------------------------------------------------------
@@ -477,6 +517,13 @@ pub struct PortDef {
     /// Supertype after `:>`, e.g. Some("ClutchPort") for `port def ManualClutchPort :> ClutchPort`.
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: PortDefBody,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::OwningMembership`]. Like `PartDef`, `port_def`/
+    /// `port_def_required` did not previously accept a visibility prefix at all (BNF
+    /// `DefinitionMember : OwningMembership = MemberPrefix ownedRelatedElement +=
+    /// DefinitionElement` legally allows one before any definition) -- confirmed as a genuine
+    /// parsing gap the same way as `PartDef::membership`. See `port::parse_port_def`.
+    pub membership: Membership,
 }
 
 /// Body of a port definition: `;` or `{` PortDefBodyElement* `}`.
@@ -534,6 +581,11 @@ pub struct PortUsage {
     pub name_span: Option<Span>,
     /// Span of the type reference after `:`, if present (for semantic tokens).
     pub type_ref_span: Option<Span>,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::FeatureMembership`]. See [`PortDef::membership`] for the
+    /// same "genuine new grammar coverage, not just discarded data" rationale -- `port_usage` did
+    /// not previously accept a visibility prefix either.
+    pub membership: Membership,
 }
 
 /// Body of a port usage: `;` or `{` PortBodyElement* `}`.
@@ -669,6 +721,12 @@ pub struct ConnectionDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConnectionDefBody,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::OwningMembership`]. Like `PartDef`/`PortDef`/`ItemDef`,
+    /// `connection_def`/`connection_def_required` did not previously accept a visibility prefix
+    /// at all -- confirmed as a genuine parsing gap the same way. See
+    /// `connection::parse_connection_def`.
+    pub membership: Membership,
 }
 
 /// Body of a connection definition: `;` or `{` end/ref/connect* `}`.

@@ -1,7 +1,7 @@
 //! Attribute definition and usage parsing.
 
 use crate::ast::{
-    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Node,
+    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Membership, Node,
     RelationshipTarget, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
 };
 use crate::parser::body::parse_structured_brace_members;
@@ -321,6 +321,10 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
                 is_derived: false,
                 is_constant: false,
                 is_end: false,
+                // No visibility prefix exists on this ad hoc `(':>>' | ':>')? name` feature-binding
+                // shape (see `prefix_span`'s comment above) -- always `FeatureMembership`, no
+                // explicit visibility.
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))
@@ -372,15 +376,7 @@ pub(crate) fn attribute_def(
 ) -> IResult<Input<'_>, Node<AttributeDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(
-        alt((
-            tag(&b"private"[..]),
-            tag(&b"protected"[..]),
-            tag(&b"public"[..]),
-        )),
-        ws1,
-    ))
-    .parse(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -461,6 +457,7 @@ pub(crate) fn attribute_def(
                 value_span,
                 ordered: mods.ordered,
                 nonunique: mods.nonunique,
+                membership: Membership::owning(visibility, visibility_span),
             },
         ),
     ))
@@ -510,15 +507,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
 
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(
-        alt((
-            tag(&b"private"[..]),
-            tag(&b"protected"[..]),
-            tag(&b"public"[..]),
-        )),
-        ws1,
-    ))
-    .parse(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     // `UnextendedUsagePrefix : Usage = EndUsagePrefix | BasicUsagePrefix` (BNF §8.2.2.6.2):
     // `end` and the `RefPrefix` keywords below are mutually exclusive alternatives, not
     // combinable -- a usage is either an `EndUsagePrefix` (`end` + optional cross-feature
@@ -650,6 +639,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 is_derived,
                 is_constant,
                 is_end,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -738,6 +728,9 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 is_derived: false,
                 is_constant: false,
                 is_end: false,
+                // No visibility prefix on a metadata binding shape either (see
+                // `attribute_feature_binding`'s identical note above).
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))
@@ -845,6 +838,8 @@ pub(crate) fn attribute_usage_shorthand(
                 is_derived: false,
                 is_constant: false,
                 is_end: false,
+                // No visibility prefix on the no-`attribute`-keyword shorthand form.
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))
@@ -900,6 +895,59 @@ mod attribute_body_tests {
             Some("ThermodynamicTemperatureValue".to_string())
         );
         assert!(node.value.value.is_some());
+    }
+
+    // --- parser work item 4b: Membership captures the previously-discarded visibility prefix ---
+
+    #[test]
+    fn attribute_usage_visibility_prefix_is_captured_on_membership() {
+        let text = "private attribute zeroDegreeCelsiusInKelvin: ThermodynamicTemperatureValue = 273.15 [K];";
+        let (_, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn attribute_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let text = "attribute mass: Real;";
+        let (_, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn attribute_def_visibility_prefix_is_captured_on_membership() {
+        let text = "protected attribute def Samples: Real;";
+        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn attribute_def_public_visibility_prefix_is_captured_on_membership() {
+        let text = "public attribute def Samples: Real;";
+        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
     }
 
     #[test]

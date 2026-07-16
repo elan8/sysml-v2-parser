@@ -5,6 +5,7 @@ use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
     MetadataKeywordUsage,
 };
+use super::membership::Membership;
 use super::view::ConstraintDefBodyElement;
 use crate::ast::core::{Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship};
 
@@ -166,6 +167,12 @@ pub struct ItemUsage {
     pub body: AttributeBody,
     /// Set when parsed as `in`/`out`/`inout item` in port def bodies.
     pub direction: Option<InOut>,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::FeatureMembership`]. See
+    /// [`crate::ast::PortDef::membership`] for the same "genuine new grammar coverage, not just
+    /// discarded data" rationale -- `item_usage` did not previously accept a visibility prefix
+    /// either.
+    pub membership: Membership,
 }
 
 /// Enumeration usage inside a definition body: `enum` name (`:` type)? body.

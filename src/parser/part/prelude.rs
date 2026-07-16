@@ -3,9 +3,9 @@
 pub(crate) use crate::ast::{
     Allocate, AttributeBody, AttributeUsage, Bind, CalcUsage, Connect, ConnectBody, ConnectionEnd,
     ConnectionUsageMember, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
-    InterfaceUsageBodyElement, Node, OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement,
-    PartUsage, PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,
-    VariantTypedUsage, VariantUsage,
+    InterfaceUsageBodyElement, Membership, Node, OpaqueMemberDecl, PartDef, PartDefBody,
+    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, Perform, PerformBody,
+    PerformBodyElement, VariantTypedUsage, VariantUsage,
     PerformInOutBinding, RefBody, RefDecl,
 };
 pub(crate) use crate::parser::attribute::{

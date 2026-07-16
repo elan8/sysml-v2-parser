@@ -102,6 +102,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
 
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
     let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1))
         .parse(input)
@@ -172,6 +173,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -264,7 +266,7 @@ pub(crate) fn port_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<Por
 
 fn parse_port_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<PortDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"port");
+    let mut options = DefinitionPrefixOptions::new(b"port").with_captured_visibility();
     if require_def {
         options = options.def_required();
     }
@@ -279,6 +281,10 @@ fn parse_port_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: crate::ast::Membership::owning(
+                    prefix.visibility,
+                    prefix.visibility_span,
+                ),
             },
         ),
     ))
@@ -353,5 +359,68 @@ mod par_002_widening_tests {
         // wired in this backlog) accepts the identical snippet.
         let result = item_def_required(input(text));
         assert!(result.is_ok(), "item_def_required should also accept {text:?}");
+    }
+
+    // --- parser work item 4b (continuation): Membership on PortDef/PortUsage ---
+
+    #[test]
+    fn port_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = port_usage(input("private port p1: MyPort;")).expect("port usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn port_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = port_usage(input("port p1: MyPort;")).expect("port usage");
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    /// `port_def` previously never parsed a `private`/`protected`/`public` prefix at all (same
+    /// genuine gap as `part_def` -- BNF `DefinitionMember : OwningMembership = MemberPrefix
+    /// ownedRelatedElement += DefinitionElement` legally allows one before any definition).
+    #[test]
+    fn port_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) = port_def(input("protected port def MyPort;")).expect("port def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn port_def_public_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) = port_def(input("public port def MyPort;")).expect("port def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+    }
+
+    #[test]
+    fn port_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = port_def(input("port def MyPort;")).expect("port def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
     }
 }

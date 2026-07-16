@@ -39,6 +39,7 @@ pub(crate) fn part_usage_redefines_only<'a>(
                 body,
                 name_span: None,
                 type_ref_span: None,
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))
@@ -108,6 +109,7 @@ pub(crate) fn part_usage_named<'a>(
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))
@@ -122,6 +124,7 @@ pub(crate) fn part_usage_named<'a>(
 pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
     let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1))
         .parse(input)
@@ -155,6 +158,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         usage.value.direction = direction;
         usage.value.is_derived = is_derived;
         usage.value.is_constant = is_constant;
+        usage.value.membership = Membership::feature(visibility, visibility_span);
         return Ok((input, usage));
     }
     if let Ok((input, usage)) = part_usage_redefines_only(start, input) {
@@ -164,6 +168,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         usage.value.direction = direction;
         usage.value.is_derived = is_derived;
         usage.value.is_constant = is_constant;
+        usage.value.membership = Membership::feature(visibility, visibility_span);
         return Ok((input, usage));
     }
     let (input, mut usage) = part_usage_named(start, input)?;
@@ -172,6 +177,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
     usage.value.direction = direction;
     usage.value.is_derived = is_derived;
     usage.value.is_constant = is_constant;
+    usage.value.membership = Membership::feature(visibility, visibility_span);
     Ok((input, usage))
 }
 
@@ -220,6 +226,7 @@ fn anonymous_part_usage<'a>(
                 body,
                 name_span: None,
                 type_ref_span: Some(type_ref_span),
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))

@@ -24,7 +24,7 @@
 //! strict superset of the `_usage` parser's -- confirm which shapes only the usage parser accepts
 //! before assuming a guard is missing.
 
-use crate::ast::{Identification, Node, TypingRelationship};
+use crate::ast::{Identification, Node, TypingRelationship, Visibility};
 use crate::parser::definition_header::parse_definition_header_after_ident;
 use crate::parser::lex::{identification, ws1, ws_and_comments};
 use crate::parser::Input;
@@ -43,8 +43,16 @@ pub enum DefKeywordMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VisibilityPrefix {
     None,
-    /// Optional `private` before the keyword (`constraint def`, etc.).
+    /// Optional `private` before the keyword (`constraint def`, etc.). Matched and discarded --
+    /// does not populate `DefinitionPrefixResult::visibility`. Kept for the two pre-existing
+    /// `constraint`/`calc` call sites; new call sites that need to feed a
+    /// [`crate::ast::Membership`] should use [`Captured`](VisibilityPrefix::Captured) instead.
     OptionalPrivate,
+    /// Optional `private` / `protected` / `public` before the keyword, captured (not discarded)
+    /// via [`crate::parser::lex::visibility_prefix`] into `DefinitionPrefixResult::visibility`/
+    /// `visibility_span`, for callers building a [`crate::ast::Membership`] (parser work item 4b
+    /// continuation, `PortDef`/`ItemDef`/`ConnectionDef`).
+    Captured,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +105,14 @@ impl DefinitionPrefixOptions {
         self
     }
 
+    /// Capture (not discard) an optional `private`/`protected`/`public` prefix into
+    /// `DefinitionPrefixResult::visibility`/`visibility_span`. See
+    /// [`VisibilityPrefix::Captured`].
+    pub const fn with_captured_visibility(mut self) -> Self {
+        self.visibility = VisibilityPrefix::Captured;
+        self
+    }
+
     pub const fn with_hash_annotation(mut self) -> Self {
         self.annotation = AnnotationMode::HashIdentifier;
         self
@@ -109,6 +125,14 @@ pub struct DefinitionPrefixResult {
     pub specializes: Option<Node<TypingRelationship>>,
     pub annotation: Option<String>,
     pub is_abstract: bool,
+    /// `private`/`protected`/`public` prefix, captured only when
+    /// [`DefinitionPrefixOptions::with_captured_visibility`] was set; `None` for every other
+    /// caller's `VisibilityPrefix` mode (matching this crate's "record only what was explicitly
+    /// requested" convention -- see `Membership::visibility`'s own doc comment).
+    pub visibility: Option<Visibility>,
+    /// Span of the visibility prefix keyword when [`Captured`](VisibilityPrefix::Captured) and
+    /// present; a zero-width span at the prefix's position otherwise.
+    pub visibility_span: crate::ast::Span,
 }
 
 /// Parse from start of input through identification and optional subclassification header.
@@ -132,12 +156,20 @@ pub(crate) fn parse_definition_prefix(
         }
     };
 
-    let input = match options.visibility {
-        VisibilityPrefix::None => input,
+    let (input, visibility, visibility_span) = match options.visibility {
+        VisibilityPrefix::None => (
+            input,
+            None,
+            crate::parser::span_from_to(input, input),
+        ),
         VisibilityPrefix::OptionalPrivate => {
             let (input, _) = opt(preceded(tag(&b"private"[..]), ws1)).parse(input)?;
             let (input, _) = opt(preceded(tag(&b"private"[..]), ws1)).parse(input)?;
-            input
+            (input, None, crate::parser::span_from_to(input, input))
+        }
+        VisibilityPrefix::Captured => {
+            let (input, (span, vis)) = crate::parser::lex::visibility_prefix(input)?;
+            (input, vis, span)
         }
     };
 
@@ -178,6 +210,8 @@ pub(crate) fn parse_definition_prefix(
             specializes,
             annotation,
             is_abstract,
+            visibility,
+            visibility_span,
         },
     ))
 }
