@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.36.0] - 2026-07-16
+
+Closes the gaps-doc "Parser work still required" backlog (typed `FeatureValue`, structured
+relationship targets, a modifier-completeness audit, and a first-class `Membership` node), on top
+of 0.35.0's PAR-002..006 backlog. `PARSE_AST_VERSION` moved from 15 (at 0.35.0) to 34 across this
+backlog's many breaking AST-schema changes — most of it from the `Membership` rollout, which now
+covers 51 of 53 member-bearing structs crate-wide (the 2 exclusions are BNF-confirmed: no textual
+visibility position exists for them). Along the way this also found and fixed ~12 real parser bugs
+beyond each item's original scope: 11 instances of a `*_def` parser that legally accepts a
+`private`/`protected`/`public` prefix per the BNF but never parsed one (across `part`, `port`,
+`item`, `connection`, the requirement/case family, `action`, `alias`, `flow`, `allocation`,
+`state`/`individual`/`interface`, `metadata`/`enum`, `occurrence`/`succession`,
+`constraint`/`calc`, and the view family), plus a case where `:=` was mis-parsed as the start of a
+`:` typing clause. This release also includes a rustfmt/clippy technical-debt pass (see below) and
+folds in two small fixes that had landed on top of the 0.35.0 tag but were never separately
+published (`1eec56f` clippy fix, `1dfdcd3` header type-reference-drop fix). See the individual
+entries below for what changed and why.
+
 ### Technical debt: rustfmt and clippy cleanup
 
 Housekeeping pass after the PAR-002..006 and post-PAR-006 "Parser work still required" backlogs
