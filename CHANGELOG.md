@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-07-16
+
+- **PAR-007: `connection`/`interface` usage misclassified when typed with an inline `connect`
+  clause** — `connection link : Link connect a to b;` and
+  `interface iface : IfaceType connect a to b;` were silently accepted by `connection_def`/
+  `interface_def` as empty-bodied *definitions*, with the `connect ... to ...` clause discarded
+  entirely: the shared plain `: Type` header scan (`specialization::
+  parse_optional_definition_header_after_identification`) greedily consumes everything up to
+  `;`/`{`, extracts only a leading type name, and silently drops the rest. Fixed narrowly, not by
+  reordering dispatch or requiring `def` (an earlier PAR-006b attempt at the latter broke real
+  Systems Library parsing and was reverted — see `connection_def`'s doc comment): the header scan
+  now also returns the raw swallowed text
+  (`specialization::parse_optional_definition_header_with_raw`), and
+  `DefinitionPrefixOptions::reject_header_keyword` fails the definition parse when that text
+  contains a top-level `connect` keyword, so `connection_def`/`interface_def` correctly leave the
+  input for the usage parser instead. Widened `connection_usage_member`
+  (`part::body::connection_usage_member`) to parse an inline `connect` clause (binary and n-ary
+  `connect (a, b, c, ...)` forms), populating new `ConnectionUsageMember::connect_from`/
+  `connect_to`/`connect_extra_ends` fields. Added a package-level `interface_usage` dispatch arm
+  (`part::usage::interface_usage`, previously only reachable nested inside a part body) and a new
+  `PackageBodyElement::InterfaceUsage` variant, since no package-level interface-usage fallback
+  existed at all before this fix. `PARSE_AST_VERSION` is 36.
+
 ## [0.37.0] - 2026-07-16
 
 - **AttributeUsage multiplicity** — `AttributeUsage` now retains a structured

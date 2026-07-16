@@ -158,7 +158,7 @@ fn connection_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
 }
 
 /// `(from, to, extra_ends)` for a parsed connect statement.
-type ConnectEnds = (
+pub(crate) type ConnectEnds = (
     Node<ConnectionEnd>,
     Node<ConnectionEnd>,
     Vec<Node<ConnectionEnd>>,
@@ -166,7 +166,12 @@ type ConnectEnds = (
 
 /// Connect ends: the n-ary `'(' end (',' end)+ ')'` form (`NaryConnectorPart`), or the ordinary
 /// binary `from ... to ...` form. Returns `(from, to, extra_ends)`.
-fn connect_ends(input: Input<'_>) -> IResult<Input<'_>, ConnectEnds> {
+///
+/// `pub(crate)` so `part::body::connection_usage_member` can parse the same inline
+/// `connect ... to ...` clause a package-level `connection name : Type connect a to b;` usage
+/// needs (PAR-007 widening -- see `connection_def`'s doc comment for why this shape used to be
+/// misclassified as a definition instead of reaching this parser).
+pub(crate) fn connect_ends(input: Input<'_>) -> IResult<Input<'_>, ConnectEnds> {
     alt((
         map(
             (
@@ -308,20 +313,30 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
 /// `test_full_library_node_types_no_extended` in the `SYSML_V2_RELEASE_DIR` gate: the real bare
 /// `abstract connection ... nonunique :> ...` forms above stopped parsing as `ConnectionDef` and,
 /// since `connection_usage_member` can't parse them either, fell all the way through to
-/// `ExtendedLibraryDecl`. That is a worse outcome than the status quo, not a fix -- there is no
-/// live misclassification bug here (`connection_def` never rejects input that
-/// `connection_usage_member` would otherwise have correctly claimed instead; it simply accepts a
-/// strict superset), so `connection_usage_member`'s package-level dispatch arm is best understood
-/// as a narrow fallback for shapes outside that superset, not a competing classification. Do not
-/// add `.def_required()` here without first widening `connection_usage_member` to cover
+/// `ExtendedLibraryDecl`. That is a worse outcome than the status quo, not a fix. Do not add
+/// `.def_required()` here without first widening `connection_usage_member` to cover
 /// `abstract`/multiplicity/`nonunique`/leading `:>` subsets, matching the port/calc/constraint
 /// precedent from CHANGELOG 0.33.0.
+///
+/// **PAR-007 update**: the PAR-006b claim above that "there is no live misclassification bug
+/// here" was correct for the shapes it checked, but missed one: `connection link : Link connect
+/// a to b;` (a typed connector usage with an inline `connect ... to ...` clause) *was*
+/// misclassified. The plain `: Type` header scan (`specialization::
+/// parse_optional_definition_header_after_identification`) greedily consumes everything up to
+/// `;`/`{` and silently discards it once a leading type name is extracted, so `connection_def`
+/// matched this input too -- with an empty body, having swallowed and dropped the `connect`
+/// clause entirely -- rather than correctly leaving it for `connection_usage_member`. This is
+/// narrower and safer than a `.def_required()` guard: `.reject_header_keyword(b"connect")` only
+/// fails the parse when the discarded header text contains a top-level `connect` keyword, which
+/// the bare Systems-Library shape above never does, so that regression cannot recur (see
+/// `par_006b_audit_tests` below, still green).
 pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
     parse_connection_def(
         input,
         DefinitionPrefixOptions::new(b"connection")
             .with_hash_annotation()
-            .with_captured_visibility(),
+            .with_captured_visibility()
+            .reject_header_keyword(b"connect"),
     )
 }
 
@@ -336,7 +351,8 @@ pub(crate) fn connection_def_required(input: Input<'_>) -> IResult<Input<'_>, No
         input,
         DefinitionPrefixOptions::new(b"connection")
             .def_required()
-            .with_captured_visibility(),
+            .with_captured_visibility()
+            .reject_header_keyword(b"connect"),
     )
 }
 

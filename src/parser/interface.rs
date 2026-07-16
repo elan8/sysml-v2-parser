@@ -258,10 +258,14 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
 ///
 /// `def` is optional here: the standard library uses bare, `def`-less `interface` usages at
 /// namespace level (e.g. `abstract interface interfaces: Interface[0..*] nonunique :>
-/// connections { ... }` in `Systems Library/Interfaces.sysml`), and there is no dedicated
-/// package-level `interface_usage` dispatch to catch them instead — this parser currently folds
-/// that legal form into `InterfaceDef`. Use [`interface_def_required`] in any body context that
-/// also dispatches `interface_usage`.
+/// connections { ... }` in `Systems Library/Interfaces.sysml`), a shape a `def_required` usage
+/// parser can't recover. `parse_interface_def` sets `.reject_header_keyword(b"connect")` (mirror
+/// of `connection_def`'s PAR-007 fix, same rationale) so a package-level `interface iface :
+/// PowerInterface connect a to b;` usage -- which used to be misclassified as `InterfaceDef` with
+/// its `connect` clause silently discarded -- fails this parser and falls through to
+/// `interface_usage` (`part::usage::interface_usage`, now also dispatched at package level; see
+/// `package.rs`) instead of being swallowed here. The bare abstract/multiplicity Systems Library
+/// shape above never contains a `connect` keyword, so it is unaffected.
 pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
     parse_interface_def(input, false)
 }
@@ -280,7 +284,9 @@ fn parse_interface_def(
     require_def: bool,
 ) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"interface").with_captured_visibility();
+    let mut options = DefinitionPrefixOptions::new(b"interface")
+        .with_captured_visibility()
+        .reject_header_keyword(b"connect");
     if require_def {
         options = options.def_required();
     }

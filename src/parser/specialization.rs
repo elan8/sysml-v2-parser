@@ -141,36 +141,52 @@ fn specializes_from_header_text(header: &str) -> Option<Vec<Node<RelationshipTar
     Some(bases)
 }
 
-/// After `identification`, parse optional typed header and/or subclassification.
+/// After `identification`, parse optional typed header and/or subclassification, plus the raw
+/// text swallowed by the plain `: Type` scanning branch (`None` for every other branch, including
+/// when there is no header at all).
 ///
 /// Supports both:
 /// - `def Name :> Base` / `specializes Base`
 /// - library shorthand `abstract connection name : Type[multiplicity] :> redefines { ... }`
-pub(crate) fn parse_optional_definition_header_after_identification(
+///
+/// Callers such as `connection_def`/`interface_def` use the raw-text half of the result to
+/// detect a `connect ...` clause that got discarded as unstructured header text instead of being
+/// left for a sibling usage parser -- see `DefinitionPrefixOptions::reject_header_keyword`.
+pub(crate) fn parse_optional_definition_header_with_raw(
     input: Input<'_>,
-) -> IResult<Input<'_>, Option<Node<TypingRelationship>>> {
+) -> IResult<Input<'_>, (Option<Node<TypingRelationship>>, Option<String>)> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b":>") || starts_with_keyword(input.fragment(), b"specializes")
     {
-        return parse_optional_definition_specialization(input);
+        let (input, specializes) = parse_optional_definition_specialization(input)?;
+        return Ok((input, (specializes, None)));
     }
     if starts_with_typing_colon(input.fragment()) {
         let before_header = input;
         let (input, header) = take_until_terminator(input, b";{")?;
         let span = span_from_to(before_header, input);
         if let Some(targets) = specializes_from_header_text(&header) {
-            return Ok((input, Some(subclassification_node(targets, span))));
+            return Ok((
+                input,
+                (Some(subclassification_node(targets, span)), Some(header)),
+            ));
         }
         // No `:>`/`specializes` clause -- the whole header is a plain `: Type` typing clause
         // (e.g. `port p1: MyPortType;` at package level). Previously this fell through to
         // `None` here, silently dropping the type reference instead of surfacing it as a
         // `Typing`-kind relationship the way `:>` surfaces a `Subclassification`-kind one.
         if let Some((target, is_conjugated)) = typing_target_from_header(&header) {
-            return Ok((input, Some(typing_node(vec![target], span, is_conjugated))));
+            return Ok((
+                input,
+                (
+                    Some(typing_node(vec![target], span, is_conjugated)),
+                    Some(header),
+                ),
+            ));
         }
-        return Ok((input, None));
+        return Ok((input, (None, Some(header))));
     }
-    Ok((input, None))
+    Ok((input, (None, None)))
 }
 
 #[cfg(test)]
@@ -186,25 +202,31 @@ mod tests {
     #[test]
     fn header_after_ident_skips_typing_and_extracts_specializes() {
         let input = span_input(": Connection[0..*] nonunique :> linkObjects, parts");
-        let (rest, specializes) =
-            parse_optional_definition_header_after_identification(input).expect("header");
+        let (rest, (specializes, raw_header)) =
+            parse_optional_definition_header_with_raw(input).expect("header");
         assert!(rest.fragment().is_empty());
         assert_eq!(
             specializes.map(|n| targets_display_string(&n.value.target)),
             Some("linkObjects, parts".to_string())
+        );
+        assert_eq!(
+            raw_header.as_deref(),
+            Some(": Connection[0..*] nonunique :> linkObjects, parts")
         );
     }
 
     #[test]
     fn header_after_ident_parses_direct_specializes() {
         let input = span_input(":> Base, Other");
-        let (rest, specializes) =
-            parse_optional_definition_header_after_identification(input).expect("header");
+        let (rest, (specializes, raw_header)) =
+            parse_optional_definition_header_with_raw(input).expect("header");
         assert!(rest.fragment().is_empty());
         assert_eq!(
             specializes.map(|n| targets_display_string(&n.value.target)),
             Some("Base, Other".to_string())
         );
+        // The `:>`/`specializes` branch never goes through the raw text-scan path.
+        assert_eq!(raw_header, None);
     }
 
     /// Regression: `port p1: MyPortType;` at package level (bare `: Type`, no `:>`) used to
@@ -214,23 +236,40 @@ mod tests {
     #[test]
     fn header_after_ident_captures_bare_typing_colon_with_no_specializes() {
         let input = span_input(": MyPortType;");
-        let (rest, typing) =
-            parse_optional_definition_header_after_identification(input).expect("header");
+        let (rest, (typing, raw_header)) =
+            parse_optional_definition_header_with_raw(input).expect("header");
         assert_eq!(rest.fragment(), b";");
         let node = typing.expect("type reference must not be dropped");
         assert_eq!(targets_display_string(&node.value.target), "MyPortType");
         assert_eq!(node.value.kind, TypingKind::Typing);
         assert!(!node.value.is_conjugated);
+        assert_eq!(raw_header.as_deref(), Some(": MyPortType"));
     }
 
     #[test]
     fn header_after_ident_captures_bare_conjugated_typing_colon() {
         let input = span_input(": ~PortConjugate {");
-        let (_, typing) =
-            parse_optional_definition_header_after_identification(input).expect("header");
+        let (_, (typing, _raw_header)) =
+            parse_optional_definition_header_with_raw(input).expect("header");
         let node = typing.expect("type reference must not be dropped");
         assert_eq!(targets_display_string(&node.value.target), "PortConjugate");
         assert_eq!(node.value.kind, TypingKind::Typing);
         assert!(node.value.is_conjugated);
+    }
+
+    /// The `reject_header_keyword` mechanism (`DefinitionPrefixOptions`) relies on `contains_keyword`
+    /// finding `connect` inside the raw header text that would otherwise be silently discarded --
+    /// this is the exact shape that previously made `connection_def` misclassify a
+    /// `connection link : Link connect a to b;` usage as a definition.
+    #[test]
+    fn header_after_ident_raw_header_contains_a_swallowed_connect_clause() {
+        let input = span_input(": Link connect a to b;");
+        let (_, (_typing, raw_header)) =
+            parse_optional_definition_header_with_raw(input).expect("header");
+        assert_eq!(raw_header.as_deref(), Some(": Link connect a to b"));
+        assert!(crate::parser::lex::contains_keyword(
+            raw_header.expect("raw header").as_bytes(),
+            b"connect"
+        ));
     }
 }

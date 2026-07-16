@@ -308,6 +308,26 @@ pub(crate) fn starts_with_any_keyword(fragment: &[u8], keywords: &[&[u8]]) -> bo
         .any(|keyword| starts_with_keyword(fragment, keyword))
 }
 
+/// Whether `keyword` occurs anywhere in `fragment` at a word boundary (not as a substring of a
+/// longer identifier, e.g. `connect` does not match inside `Connection` or `reconnect`). Used to
+/// detect a keyword swallowed into text a caller is about to discard, as opposed to
+/// [`starts_with_keyword`]'s anchored-at-the-front check.
+pub(crate) fn contains_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
+    fn is_ident_byte(b: u8) -> bool {
+        b.is_ascii_alphanumeric() || b == b'_'
+    }
+    if keyword.is_empty() || fragment.len() < keyword.len() {
+        return false;
+    }
+    (0..=fragment.len() - keyword.len()).any(|i| {
+        &fragment[i..i + keyword.len()] == keyword
+            && (i == 0 || !is_ident_byte(fragment[i - 1]))
+            && fragment
+                .get(i + keyword.len())
+                .is_none_or(|b| !is_ident_byte(*b))
+    })
+}
+
 /// Count `{` / `}` outside comments (line and block) for EOF brace balance checks.
 pub(crate) fn brace_balance_outside_comments(bytes: &[u8]) -> (usize, usize) {
     let mut opens = 0usize;

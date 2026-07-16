@@ -324,6 +324,20 @@ pub(crate) fn connection_usage_member(
             (input, None)
         }
     };
+    // PAR-007 widening: an inline `connect from to to (, extra)*` clause between the type and the
+    // body, e.g. `connection link : Link connect sensorA.cmd to sensorB.cmd;`. Optional -- a
+    // plain `connection link : Link;` declaration with no explicit binding must keep parsing.
+    // This is the fallback `connection_def` now leaves for when its header scan detects a
+    // swallowed `connect` keyword (see `connection_def`'s doc comment).
+    let (input, connect) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"connect"[..])),
+        preceded(ws1, connect_ends),
+    ))
+    .parse(input)?;
+    let (connect_from, connect_to, connect_extra_ends) = match connect {
+        Some((from, to, extra)) => (Some(from), Some(to), extra),
+        None => (None, None, Vec::new()),
+    };
     let (input, body) = connection_member_body(input)?;
     let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
@@ -360,6 +374,9 @@ pub(crate) fn connection_usage_member(
             ConnectionUsageMember {
                 name,
                 type_name,
+                connect_from,
+                connect_to,
+                connect_extra_ends,
                 body,
                 subsets,
                 redefines,

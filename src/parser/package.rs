@@ -33,7 +33,7 @@ use crate::parser::node_from_to;
 use crate::parser::occurrence::{
     individual_usage, occurrence_def, occurrence_usage, snapshot_usage, timeslice_usage,
 };
-use crate::parser::part::{part_def_or_usage, PartDefOrUsage};
+use crate::parser::part::{interface_usage, part_def_or_usage, PartDefOrUsage};
 use crate::parser::port::{port_def, port_usage};
 use crate::parser::requirement::{
     comment_annotation, concern_usage, doc_comment, requirement_def, requirement_usage, satisfy,
@@ -670,6 +670,15 @@ fn try_package_body_structure<'a>(
         interface_def,
         PackageBodyElement::InterfaceDef
     );
+    // PAR-007: standalone interface usage at package level, tried after `interface_def` above
+    // now that `interface_def` rejects a swallowed `connect` clause instead of silently
+    // discarding it -- see `interface_def`'s doc comment and `PackageBodyElement::InterfaceUsage`.
+    try_package_body_dispatch!(
+        input,
+        start,
+        interface_usage,
+        PackageBodyElement::InterfaceUsage
+    );
     try_package_body_dispatch!(
         input,
         start,
@@ -1150,6 +1159,66 @@ mod tests {
             package_body_element(parse_input("connection: LinkType;")).expect("connection usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PackageBodyElement::ConnectionUsage(_)));
+    }
+
+    // --- PAR-007: connection/interface usage with an inline `connect ... to ...` clause ---
+    //
+    // Previously `connection link : Link connect a to b;` / `interface iface : IfaceType connect
+    // a to b;` at package level were misclassified as `ConnectionDef`/`InterfaceDef`: the plain
+    // `: Type` header scan swallowed and silently discarded the `connect ...` clause, so the
+    // `def` parser matched an empty-bodied definition instead of leaving the input for the usage
+    // parser. See `connection_def`/`interface_def`'s doc comments for the root cause and fix
+    // (`DefinitionPrefixOptions::reject_header_keyword`).
+
+    #[test]
+    fn package_body_accepts_connection_usage_with_inline_connect_clause() {
+        let (rest, node) =
+            package_body_element(parse_input("connection link : Link connect a to b;"))
+                .expect("connection usage with connect clause");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PackageBodyElement::ConnectionUsage(usage) = node.value else {
+            panic!("expected ConnectionUsage, got {:?}", node.value);
+        };
+        assert_eq!(usage.value.name.as_deref(), Some("link"));
+        assert_eq!(usage.value.type_name.as_deref(), Some("Link"));
+        assert!(usage.value.connect_from.is_some());
+        assert!(usage.value.connect_to.is_some());
+        assert!(usage.value.connect_extra_ends.is_empty());
+    }
+
+    #[test]
+    fn package_body_accepts_connection_usage_with_nary_connect_clause() {
+        let (rest, node) =
+            package_body_element(parse_input("connection link : Link connect (a, b, c);"))
+                .expect("connection usage with n-ary connect clause");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PackageBodyElement::ConnectionUsage(usage) = node.value else {
+            panic!("expected ConnectionUsage, got {:?}", node.value);
+        };
+        assert_eq!(usage.value.connect_extra_ends.len(), 1);
+    }
+
+    #[test]
+    fn package_body_accepts_interface_usage_with_inline_connect_clause() {
+        let (rest, node) =
+            package_body_element(parse_input("interface iface : IfaceType connect a to b;"))
+                .expect("interface usage with connect clause");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PackageBodyElement::InterfaceUsage(_)));
+    }
+
+    /// PAR-006b guard, exercised through the full package-body dispatch this time (not just
+    /// `connection_def` in isolation, as in `connection::par_006b_audit_tests`): the real
+    /// Systems-Library shape must still classify as `ConnectionDef`, not fall through to
+    /// `ConnectionUsage`, since it contains no `connect` keyword.
+    #[test]
+    fn package_body_still_accepts_bare_systems_library_connection_def_shape() {
+        let (rest, node) = package_body_element(parse_input(
+            "abstract connection connections: Connection[0..*] nonunique :> linkObjects, parts { }",
+        ))
+        .expect("bare Systems Library connection def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PackageBodyElement::ConnectionDef(_)));
     }
 
     /// PAR-002 acceptance criterion, increment 3: the same legal `:>>`-prefixed attribute usage

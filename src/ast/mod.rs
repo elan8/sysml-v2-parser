@@ -283,6 +283,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::ConnectionUsage(n) => {
             PackageBodyElement::ConnectionUsage(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::InterfaceUsage(n) => {
+            PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::Ref(n) => {
             PackageBodyElement::Ref(dummy_node(n, normalize_ref_decl(&n.value)))
         }

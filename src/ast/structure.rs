@@ -157,6 +157,16 @@ pub struct OpaqueMemberDecl {
 pub struct ConnectionUsageMember {
     pub name: Option<String>,
     pub type_name: Option<String>,
+    /// Optional inline `connect from to to (, extra)* ` clause (PAR-007 widening): a package- or
+    /// part-body-level `connection name : Type connect a to b;` usage. `None` for a plain
+    /// `connection name : Type;` declaration with no explicit binding. See `connect_to`/
+    /// `connect_extra_ends` for the rest of the ends and `connection_def`'s doc comment for why
+    /// this shape previously reached `ConnectionDef` instead of here.
+    pub connect_from: Option<Node<ConnectionEnd>>,
+    pub connect_to: Option<Node<ConnectionEnd>>,
+    /// Additional ends beyond `connect_from`/`connect_to`, from the n-ary
+    /// `connect (a, b, c, ...)` form. Always empty when `connect_from` is `None`.
+    pub connect_extra_ends: Vec<Node<ConnectionEnd>>,
     pub body: ConnectionDefBody,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,

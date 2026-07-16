@@ -26,7 +26,7 @@
 
 use crate::ast::{Identification, Node, TypingRelationship, Visibility};
 use crate::parser::definition_header::parse_definition_header_after_ident;
-use crate::parser::lex::{identification, ws1, ws_and_comments};
+use crate::parser::lex::{contains_keyword, identification, ws1, ws_and_comments};
 use crate::parser::Input;
 use nom::bytes::complete::{tag, take_while1};
 use nom::combinator::opt;
@@ -69,6 +69,10 @@ pub struct DefinitionPrefixOptions {
     pub abstract_allowed: bool,
     pub visibility: VisibilityPrefix,
     pub annotation: AnnotationMode,
+    /// When set, fail this definition parse if the plain `: Type` header scan swallows this
+    /// keyword as part of its discarded trailing text. See
+    /// [`DefinitionPrefixOptions::reject_header_keyword`].
+    pub reject_header_keyword: Option<&'static [u8]>,
 }
 
 impl DefinitionPrefixOptions {
@@ -80,6 +84,7 @@ impl DefinitionPrefixOptions {
             abstract_allowed: true,
             visibility: VisibilityPrefix::None,
             annotation: AnnotationMode::None,
+            reject_header_keyword: None,
         }
     }
 
@@ -108,6 +113,17 @@ impl DefinitionPrefixOptions {
 
     pub const fn with_hash_annotation(mut self) -> Self {
         self.annotation = AnnotationMode::HashIdentifier;
+        self
+    }
+
+    /// Reject (fail) this definition parse when the plain `: Type` header scan swallows
+    /// `keyword` as part of its discarded trailing text -- e.g. a `connect ... to ...` clause on
+    /// a `connection`/`interface` declaration line, which otherwise makes the `def` parser
+    /// silently accept and discard usage-only syntax instead of leaving it for the sibling usage
+    /// parser to claim. Do not use this for keywords that can legitimately co-occur with a plain
+    /// typing/subclassification header (it would wrongly reject those).
+    pub const fn reject_header_keyword(mut self, keyword: &'static [u8]) -> Self {
+        self.reject_header_keyword = Some(keyword);
         self
     }
 }
@@ -185,6 +201,18 @@ pub(crate) fn parse_definition_prefix(
 
     let (input, identification) = identification(input)?;
     let (input, header) = parse_definition_header_after_ident(input)?;
+    if let Some(keyword) = options.reject_header_keyword {
+        if header
+            .raw_header
+            .as_deref()
+            .is_some_and(|raw| contains_keyword(raw.as_bytes(), keyword))
+        {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Verify,
+            )));
+        }
+    }
     let specializes = header.specializes;
 
     Ok((

@@ -16,8 +16,8 @@ use super::requirement::{
 };
 use super::structure::{
     AliasDef, AttributeDef, AttributeUsage, ConnectionDef, ConnectionUsageMember, EnumDef,
-    IndividualDef, InterfaceDef, ItemDef, MetadataDef, MetadataUsage, OccurrenceDef,
-    OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
+    IndividualDef, InterfaceDef, InterfaceUsage, ItemDef, MetadataDef, MetadataUsage,
+    OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
     CalcDef, ConstraintDef, RenderingDef, RenderingUsage, ViewDef, ViewUsage, ViewpointDef,
@@ -122,6 +122,12 @@ pub enum PackageBodyElement {
     PortUsage(Node<PortUsage>),
     /// Standalone connection usage at package level. See `AttributeUsage`.
     ConnectionUsage(Node<ConnectionUsageMember>),
+    /// Standalone interface usage at package level (PAR-007: previously there was no
+    /// package-level `interface_usage` dispatch arm at all, so `interface iface : Type connect a
+    /// to b;` fell through to `interface_def` and was silently accepted as a definition with the
+    /// `connect` clause discarded -- see `interface_def`'s doc comment). See `AttributeUsage` for
+    /// the general PAR-002 rationale.
+    InterfaceUsage(Node<InterfaceUsage>),
     /// Standalone `ref` declaration at package level. See `AttributeUsage`.
     Ref(Node<RefDecl>),
     /// Standalone enumeration usage at package level. See `AttributeUsage`.
