@@ -32,7 +32,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 34;
+pub const PARSE_AST_VERSION: u32 = 35;
 pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
 
 /// Parse a SysML v2 textual input into a root namespace AST.

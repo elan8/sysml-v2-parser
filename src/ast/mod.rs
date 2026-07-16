@@ -528,6 +528,7 @@ fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
         typing_span: None,
         redefines_span: None,
         direction: a.direction,
+        multiplicity: a.multiplicity.clone(),
         ordered: a.ordered,
         nonunique: a.nonunique,
         is_derived: a.is_derived,

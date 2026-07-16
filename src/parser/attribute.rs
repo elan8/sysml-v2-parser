@@ -1,8 +1,9 @@
 //! Attribute definition and usage parsing.
 
 use crate::ast::{
-    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Membership, Node,
-    RelationshipTarget, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
+    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Membership,
+    Multiplicity, Node, RelationshipTarget, SubsettingKind, SubsettingRelationship, TypingKind,
+    TypingRelationship,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -12,7 +13,8 @@ use crate::parser::lex::{
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
-    multiplicity, optional_typings, prefix_redefinition_target, specialization_clauses, typings,
+    multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
+    typings,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -167,11 +169,11 @@ fn is_reserved_shorthand_starter(name: &str) -> bool {
 
 /// Multiplicity-adjacent modifiers from `MultiplicityPart` (BNF §8.2.2.6.6): an optional
 /// multiplicity range plus `ordered`/`nonunique` (and their negations `nonordered`/`unique`).
-/// Returns `(ordered, nonunique)`, OR-merged across every occurrence -- callers that invoke this
-/// more than once per declaration (leading and trailing modifier positions) fold the results
-/// together rather than letting a later call silently overwrite an earlier `true`.
-#[derive(Default, Clone, Copy)]
+/// Results are OR-merged / first-wins across every occurrence -- callers that invoke this more
+/// than once per declaration (leading and trailing modifier positions) fold the results together.
+#[derive(Default, Clone)]
 struct FeatureModifiers {
+    multiplicity: Option<Node<Multiplicity>>,
     ordered: bool,
     nonunique: bool,
 }
@@ -179,6 +181,7 @@ struct FeatureModifiers {
 impl FeatureModifiers {
     fn merge(self, other: FeatureModifiers) -> FeatureModifiers {
         FeatureModifiers {
+            multiplicity: self.multiplicity.or(other.multiplicity),
             ordered: self.ordered || other.ordered,
             nonunique: self.nonunique || other.nonunique,
         }
@@ -188,7 +191,7 @@ impl FeatureModifiers {
 fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
     #[derive(Clone)]
     enum Modifier {
-        Multiplicity,
+        Multiplicity(Node<Multiplicity>),
         Ordered,
         NonUnique,
         Unique,
@@ -197,7 +200,7 @@ fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
     let (input, mods) = many0(preceded(
         ws_and_comments,
         alt((
-            value(Modifier::Multiplicity, multiplicity),
+            map(multiplicity_node, Modifier::Multiplicity),
             value(Modifier::NonUnique, tag(&b"nonunique"[..])),
             value(Modifier::Unique, tag(&b"unique"[..])),
             value(Modifier::Ordered, tag(&b"ordered"[..])),
@@ -208,9 +211,13 @@ fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
     let mut result = FeatureModifiers::default();
     for m in mods {
         match m {
+            Modifier::Multiplicity(node) if result.multiplicity.is_none() => {
+                result.multiplicity = Some(node);
+            }
+            Modifier::Multiplicity(_) => {}
             Modifier::Ordered => result.ordered = true,
             Modifier::NonUnique => result.nonunique = true,
-            Modifier::Multiplicity | Modifier::Unique | Modifier::NonOrdered => {}
+            Modifier::Unique | Modifier::NonOrdered => {}
         }
     }
     Ok((input, result))
@@ -320,6 +327,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
                 typing_span,
                 redefines_span: None,
                 direction: None,
+                multiplicity: mods.multiplicity,
                 ordered: mods.ordered,
                 nonunique: mods.nonunique,
                 is_derived: false,
@@ -643,6 +651,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 typing_span,
                 redefines_span,
                 direction: None,
+                multiplicity: mods.multiplicity,
                 ordered: mods.ordered,
                 nonunique: mods.nonunique,
                 is_derived,
@@ -730,6 +739,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 typing_span,
                 redefines_span: None,
                 direction: None,
+                multiplicity: mods.multiplicity,
                 ordered: mods.ordered,
                 nonunique: mods.nonunique,
                 is_derived: false,
@@ -840,6 +850,7 @@ pub(crate) fn attribute_usage_shorthand(
                 typing_span: None,
                 redefines_span: None,
                 direction: None,
+                multiplicity: None,
                 ordered: false,
                 nonunique: false,
                 is_derived: false,
@@ -979,6 +990,8 @@ mod attribute_body_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.ordered);
         assert!(!node.value.nonunique);
+        let multiplicity = node.value.multiplicity.expect("multiplicity retained");
+        assert_eq!(multiplicity.value.to_bracket_string(), "[0..*]");
     }
 
     #[test]
@@ -988,6 +1001,23 @@ mod attribute_body_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.nonunique);
         assert!(!node.value.ordered);
+        assert_eq!(
+            node.value
+                .multiplicity
+                .as_ref()
+                .map(|m| m.value.to_bracket_string()),
+            Some("[0..*]".to_owned())
+        );
+    }
+
+    #[test]
+    fn attribute_usage_retains_multiplicity_without_type() {
+        let text = "attribute a [0..1] ordered;";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.ordered);
+        let multiplicity = node.value.multiplicity.expect("multiplicity retained");
+        assert_eq!(multiplicity.value.to_bracket_string(), "[0..1]");
     }
 
     #[test]
@@ -1024,6 +1054,7 @@ mod attribute_body_tests {
         let text = "attribute mass: Real;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.multiplicity.is_none());
         assert!(!node.value.ordered);
         assert!(!node.value.nonunique);
         assert!(!node.value.is_derived);

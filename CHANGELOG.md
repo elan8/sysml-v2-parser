@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-07-16
+
+- **AttributeUsage multiplicity** — `AttributeUsage` now retains a structured
+  `multiplicity: Option<Node<Multiplicity>>` from `MultiplicityPart` instead of
+  discarding the parsed range after reading `ordered`/`nonunique`. `PARSE_AST_VERSION`
+  is 35.
+
 ## [0.36.0] - 2026-07-16
 
 Closes the gaps-doc "Parser work still required" backlog (typed `FeatureValue`, structured

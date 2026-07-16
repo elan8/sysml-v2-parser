@@ -492,6 +492,8 @@ pub struct AttributeUsage {
     pub redefines_span: Option<Span>,
     /// Direction prefix when parsed as `in`/`out`/`inout attribute ...` (e.g. in port def bodies).
     pub direction: Option<InOut>,
+    /// Structured multiplicity range from `MultiplicityPart` (e.g. `[0..1]`), when present.
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// `ordered` keyword from `MultiplicityPart` (BNF §8.2.2.6.6).
     pub ordered: bool,
     /// `nonunique` keyword from `MultiplicityPart`.
