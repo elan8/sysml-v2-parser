@@ -826,7 +826,16 @@ pub struct EnumDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum EnumerationBody {
     Semicolon,
-    Brace { values: Vec<String> },
+    Brace { values: Vec<Node<EnumeratedValue>> },
+}
+
+/// One enumerated value inside an `enum def { ... }` body: optional `enum` keyword + name, with
+/// an optional inline body or `= expr` initializer that the parser discards (BNF
+/// EnumeratedValue). Only the name and its span are retained.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EnumeratedValue {
+    pub name: String,
 }
 
 // ---------------------------------------------------------------------------

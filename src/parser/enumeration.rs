@@ -1,6 +1,6 @@
 //! Enumeration definition parsing (BNF EnumerationDefinition).
 
-use crate::ast::{EnumDef, EnumerationBody, EnumerationUsage, Membership, Node};
+use crate::ast::{EnumDef, EnumeratedValue, EnumerationBody, EnumerationUsage, Membership, Node};
 use crate::parser::attribute::attribute_body;
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -15,11 +15,15 @@ use nom::sequence::{delimited, preceded};
 use nom::IResult;
 use nom::Parser;
 
-/// Enumerated value: optional `enum` keyword + name + `;`
-fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, String> {
+/// Enumerated value: optional `enum` keyword + name + `;`. The span covers the name only (not
+/// the discarded inline body or `= expr` initializer) so it stays stable regardless of which
+/// trailing form is present.
+fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue>> {
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"enum"[..]), ws1)).parse(input)?;
+    let name_start = input;
     let (input, n) = name(input)?;
+    let value_node = node_from_to(name_start, input, EnumeratedValue { name: n });
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"{") {
         let (input, _) = delimited(
@@ -28,7 +32,7 @@ fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, String> {
             preceded(ws_and_comments, tag(&b"}"[..])),
         )
         .parse(input)?;
-        Ok((input, n))
+        Ok((input, value_node))
     } else {
         let (input, _) = opt(preceded(
             preceded(ws_and_comments, tag(&b"="[..])),
@@ -36,7 +40,7 @@ fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, String> {
         ))
         .parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        Ok((input, n))
+        Ok((input, value_node))
     }
 }
 
@@ -185,5 +189,69 @@ mod membership_tests {
     fn enum_usage_without_visibility_prefix_has_no_membership_visibility() {
         let (_, node) = enum_usage(input("enum e1 : E1;")).expect("enum usage");
         assert_eq!(node.value.membership.visibility, None);
+    }
+}
+
+#[cfg(test)]
+mod enumerated_value_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // Regression coverage: `enumerated_value` used to return a bare `String`, so enumerated
+    // values had no source range and couldn't become addressable Spec42/Babel42 elements. It now
+    // returns a `Node<EnumeratedValue>` whose span covers just the name, regardless of whether a
+    // discarded inline body or `= expr` initializer follows.
+
+    #[test]
+    fn enumerated_value_bare_semicolon_form_has_name_span() {
+        let (rest, node) = enumerated_value(input("active;")).expect("enumerated value");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "active");
+        assert_eq!(node.span.offset, 0);
+        assert_eq!(node.span.len, "active".len());
+    }
+
+    #[test]
+    fn enumerated_value_inline_body_form_has_name_only_span() {
+        let (rest, node) =
+            enumerated_value(input("active { doc /* x */ }")).expect("enumerated value");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "active");
+        assert_eq!(node.span.offset, 0);
+        assert_eq!(node.span.len, "active".len());
+    }
+
+    #[test]
+    fn enumerated_value_initializer_form_has_name_only_span() {
+        let (rest, node) = enumerated_value(input("active = 1;")).expect("enumerated value");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "active");
+        assert_eq!(node.span.offset, 0);
+        assert_eq!(node.span.len, "active".len());
+    }
+
+    #[test]
+    fn enumerated_value_optional_enum_keyword_prefix_offsets_the_name_span() {
+        let (rest, node) = enumerated_value(input("enum active;")).expect("enumerated value");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "active");
+        assert_eq!(node.span.offset, "enum ".len());
+        assert_eq!(node.span.len, "active".len());
+    }
+
+    #[test]
+    fn enumeration_body_collects_spanned_values_in_order() {
+        let (rest, body) =
+            enumeration_body(input("{ active; inactive = 1; degraded { } }")).expect("body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let EnumerationBody::Brace { values } = body else {
+            panic!("expected brace body");
+        };
+        let names: Vec<_> = values.iter().map(|v| v.value.name.as_str()).collect();
+        assert_eq!(names, ["active", "inactive", "degraded"]);
     }
 }

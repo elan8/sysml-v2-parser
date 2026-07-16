@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-07-16
+
+- **Enumerated values are now spanned AST nodes** — `EnumerationBody::Brace { values }` changed
+  from `Vec<String>` to `Vec<Node<EnumeratedValue>>` (new `EnumeratedValue { name: String }`
+  struct). `enumerated_value()` (`src/parser/enumeration.rs`) now returns a `Node<EnumeratedValue>`
+  whose span covers the value's name, so each enumerated value inside `enum def { ... }` can
+  become an addressable Spec42/Babel42 element instead of a bare display string. The optional
+  inline `{ ... }` body and `= expr` initializer remain discarded — only name + span are
+  retained, matching the existing `enumerated_value` production's scope. Breaking AST change;
+  minor bump.
+
 ## [0.38.0] - 2026-07-16
 
 - **PAR-007: `connection`/`interface` usage misclassified when typed with an inline `connect`
