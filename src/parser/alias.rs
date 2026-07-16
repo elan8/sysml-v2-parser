@@ -81,8 +81,7 @@ mod membership_tests {
 
     #[test]
     fn alias_def_visibility_prefix_is_captured_on_membership() {
-        let (_, node) =
-            alias_def(input("private alias m for ISQ::mass;")).expect("alias def");
+        let (_, node) = alias_def(input("private alias m for ISQ::mass;")).expect("alias def");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Private)

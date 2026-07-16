@@ -7,8 +7,8 @@ use sysml_v2_parser::ast::{
     PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
     PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
     RefDecl, RelationshipTarget, RelationshipTargetSegment, RootElement, RootNamespace,
-    SegmentSeparator, Span, SubsettingKind, SubsettingRelationship, TypingKind,
-    TypingRelationship, Visibility,
+    SegmentSeparator, Span, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
+    Visibility,
 };
 use sysml_v2_parser::parse;
 
@@ -644,9 +644,9 @@ fn part_vehicle1_c1() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
-                    direction: None,
-                    is_derived: false,
-                    is_constant: false,
+        direction: None,
+        is_derived: false,
+        is_constant: false,
         name: "vehicle1_c1".to_string(),
         type_name: "VehicleA".to_string(),
         multiplicity: None,
@@ -819,9 +819,9 @@ fn part_rear_axle_assembly() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
-                    direction: None,
-                    is_derived: false,
-                    is_constant: false,
+        direction: None,
+        is_derived: false,
+        is_constant: false,
         name: "rearAxleAssembly".to_string(),
         type_name: "RearAxleAssembly".to_string(),
         multiplicity: None,
@@ -1002,9 +1002,9 @@ fn part_differential() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
-                    direction: None,
-                    is_derived: false,
-                    is_constant: false,
+        direction: None,
+        is_derived: false,
+        is_constant: false,
         name: "differential".to_string(),
         type_name: "Differential".to_string(),
         multiplicity: None,
@@ -1074,9 +1074,9 @@ fn part_rear_axle() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
-                    direction: None,
-                    is_derived: false,
-                    is_constant: false,
+        direction: None,
+        is_derived: false,
+        is_constant: false,
         name: "rearAxle".to_string(),
         type_name: "RearAxle".to_string(),
         multiplicity: None,

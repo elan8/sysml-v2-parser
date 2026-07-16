@@ -10,13 +10,13 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::expr::path_expression;
+use crate::parser::flow::flow_usage_member;
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     capture_opaque_member, name, recover_body_element, visibility_prefix, ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
-use crate::parser::flow::flow_usage_member;
 use crate::parser::part::part_usage;
 use crate::parser::requirement::{doc_comment, satisfy};
 use crate::parser::usage::{
@@ -56,8 +56,14 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
 
 // Note: "succession" is intentionally NOT in this list — `succession_usage()` in
 // `occurrence_body_element` now parses the standalone succession usage for real (see below).
-const DEFINITION_BODY_OPAQUE_STARTERS: &[&[u8]] =
-    &[b"end", b"ref", b"abstract", b"private", b"in", b"connection"];
+const DEFINITION_BODY_OPAQUE_STARTERS: &[&[u8]] = &[
+    b"end",
+    b"ref",
+    b"abstract",
+    b"private",
+    b"in",
+    b"connection",
+];
 
 /// `;` or brace body with occurrence-style members (`attribute`, `part`, `occurrence`, …).
 pub(crate) fn occurrence_definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
@@ -68,7 +74,9 @@ pub(crate) fn occurrence_definition_body(input: Input<'_>) -> IResult<Input<'_>,
     )
 }
 
-pub(crate) fn occurrence_def_definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
+pub(crate) fn occurrence_def_definition_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, DefinitionBody> {
     occurrence_definition_body_with_labels(
         input,
         "occurrence definition body",
@@ -98,13 +106,13 @@ fn occurrence_definition_body_with_labels<'a>(
                     |i| capture_opaque_member(i, DEFINITION_BODY_OPAQUE_STARTERS),
                     DefinitionBodyElement::Other,
                 ),
-                nom::combinator::map(occurrence_body_element, DefinitionBodyElement::OccurrenceMember),
+                nom::combinator::map(
+                    occurrence_body_element,
+                    DefinitionBodyElement::OccurrenceMember,
+                ),
             ))
             .parse(input)?;
-            Ok((
-                input,
-                node_from_to(start, input, element),
-            ))
+            Ok((input, node_from_to(start, input, element)))
         },
         |start, end| {
             let recovery = build_recovery_error_node_from_span(
@@ -125,7 +133,8 @@ fn occurrence_definition_body_with_labels<'a>(
 }
 
 pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) = preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    let (input, (visibility_span, visibility)) =
+        preceded(ws_and_comments, visibility_prefix).parse(input)?;
     occurrence_usage_with_modifiers(
         input,
         false,
@@ -136,14 +145,22 @@ pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Occu
 }
 
 pub(crate) fn individual_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) = preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    let (input, (visibility_span, visibility)) =
+        preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"individual"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    occurrence_usage_tail(input, true, false, None, Membership::feature(visibility, visibility_span))
+    occurrence_usage_tail(
+        input,
+        true,
+        false,
+        None,
+        Membership::feature(visibility, visibility_span),
+    )
 }
 
 pub(crate) fn snapshot_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) = preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    let (input, (visibility_span, visibility)) =
+        preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"snapshot"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     occurrence_usage_tail(
@@ -156,7 +173,8 @@ pub(crate) fn snapshot_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
 }
 
 pub(crate) fn timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) = preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    let (input, (visibility_span, visibility)) =
+        preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"timeslice"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     occurrence_usage_tail(
@@ -383,10 +401,12 @@ fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage
     let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
     let (input, _) =
         opt(preceded(ws_and_comments, preceded(tag(&b"first"[..]), ws1))).parse(input)?;
-    let (input, source_multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    let (input, source_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
     let (input, source) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
-    let (input, target_multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    let (input, target_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
     let (input, target) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
@@ -471,8 +491,7 @@ mod membership_tests {
 
     #[test]
     fn snapshot_usage_visibility_prefix_is_captured_on_membership() {
-        let (_, node) =
-            snapshot_usage(input("public snapshot o1 : O1;")).expect("snapshot usage");
+        let (_, node) = snapshot_usage(input("public snapshot o1 : O1;")).expect("snapshot usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Public)

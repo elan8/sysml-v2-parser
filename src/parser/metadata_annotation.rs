@@ -3,7 +3,9 @@
 use crate::ast::{Annotation, MetadataAnnotation, MetadataKeywordUsage, Node};
 use crate::parser::attribute::metadata_body;
 use crate::parser::interface::connect_body;
-use crate::parser::lex::{name, qualified_name, starts_with_keyword, take_until_terminator, ws1, ws_and_comments};
+use crate::parser::lex::{
+    name, qualified_name, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -23,10 +25,7 @@ pub(crate) fn parse_about_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<St
     let (input, _) = tag(&b"about"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     separated_list1(
-        preceded(
-            ws_and_comments,
-            preceded(tag(&b","[..]), ws_and_comments),
-        ),
+        preceded(ws_and_comments, preceded(tag(&b","[..]), ws_and_comments)),
         qualified_name,
     )
     .parse(input)

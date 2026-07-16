@@ -170,7 +170,13 @@ fn test_stdlib_requirement_usecase_enum_map_to_dedicated_nodes() {
     let PackageBodyElement::RequirementDef(req) = &elements[0].value else {
         panic!("expected requirement def");
     };
-    assert_eq!(req.value.specializes.as_ref().map(|n| n.value.target_display()), Some("BaseType".to_string()));
+    assert_eq!(
+        req.value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("BaseType".to_string())
+    );
     assert!(matches!(
         elements[1].value,
         PackageBodyElement::UseCaseDef(_)
@@ -178,7 +184,13 @@ fn test_stdlib_requirement_usecase_enum_map_to_dedicated_nodes() {
     let PackageBodyElement::UseCaseDef(uc) = &elements[1].value else {
         panic!("expected use case def");
     };
-    assert_eq!(uc.value.specializes.as_ref().map(|n| n.value.target_display()), Some("Case".to_string()));
+    assert_eq!(
+        uc.value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("Case".to_string())
+    );
     assert!(matches!(elements[2].value, PackageBodyElement::EnumDef(_)));
 }
 
@@ -202,12 +214,24 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
     let PackageBodyElement::PartDef(part) = &elements[0].value else {
         panic!("expected part def");
     };
-    assert_eq!(part.value.specializes.as_ref().map(|n| n.value.target_display()), Some("Item".to_string()));
+    assert_eq!(
+        part.value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("Item".to_string())
+    );
     assert!(matches!(elements[1].value, PackageBodyElement::PortDef(_)));
     let PackageBodyElement::PortDef(port) = &elements[1].value else {
         panic!("expected port def");
     };
-    assert_eq!(port.value.specializes.as_ref().map(|n| n.value.target_display()), Some("Object".to_string()));
+    assert_eq!(
+        port.value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("Object".to_string())
+    );
     assert!(matches!(
         elements[2].value,
         PackageBodyElement::ViewpointDef(_)
@@ -215,7 +239,13 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
     let PackageBodyElement::ViewpointDef(vp) = &elements[2].value else {
         panic!("expected viewpoint def");
     };
-    assert_eq!(vp.value.specializes.as_ref().map(|n| n.value.target_display()), Some("RequirementCheck".to_string()));
+    assert_eq!(
+        vp.value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("RequirementCheck".to_string())
+    );
     assert!(
         !elements
             .iter()

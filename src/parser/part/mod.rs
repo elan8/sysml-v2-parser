@@ -1,14 +1,19 @@
 //! Part definition and part usage parsing.
-#![allow(dead_code, unused_imports)]
 
 mod body;
 mod def;
 mod prelude;
 mod usage;
 
-pub(crate) use body::{connection_usage_member, part_def_body};
-pub(crate) use def::{part_def, part_def_or_usage};
+pub(crate) use body::connection_usage_member;
+pub(crate) use def::part_def_or_usage;
+// `part_def`/`part_def_body` are reached in production code through `part_def_or_usage` and
+// `body::part_def_body`'s own callers, not through this re-export -- it exists only so
+// `package.rs`'s `#[cfg(test)]` module can call `crate::parser::part::part_def_body`/`part_def`
+// directly, which is why a plain (non-test) `cargo build` sees the re-export itself as unused.
 pub(crate) use usage::{bind_, part_ref_usage, part_usage, perform_action_decl};
+#[allow(unused_imports)]
+pub(crate) use {body::part_def_body, def::part_def};
 
 use crate::ast::{Node, PartDef, PartUsage};
 

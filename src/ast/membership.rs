@@ -19,8 +19,8 @@
 //! see `CHANGELOG.md`'s "Item 4b" entry for the exact list of struct families that got a
 //! `membership` field in this increment vs. what's left as a documented, scoped-out follow-up.
 
-use crate::ast::core::Span;
 use crate::ast::common::Visibility;
+use crate::ast::core::Span;
 
 /// What kind of member a def/usage element is, independent of visibility.
 ///

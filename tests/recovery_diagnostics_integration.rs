@@ -701,7 +701,10 @@ fn state_ref_brace_body_recovers_without_aborting_siblings() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements: pkg_elements } = &pkg.body else {
+    let PackageBody::Brace {
+        elements: pkg_elements,
+    } = &pkg.body
+    else {
         panic!("expected brace body");
     };
     let state_def = pkg_elements
@@ -752,7 +755,9 @@ fn part_usage_bind_brace_body_recovers_without_aborting_siblings() {
         panic!("expected brace body");
     };
     assert!(
-        elements.iter().any(|e| matches!(e.value, PackageBodyElement::PartDef(_))),
+        elements
+            .iter()
+            .any(|e| matches!(e.value, PackageBodyElement::PartDef(_))),
         "part def should parse despite malformed bind connect body"
     );
     assert!(
@@ -817,10 +822,9 @@ fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
 
     // The body must contain an Error node for the bad token.
     assert!(
-        view_body.iter().any(|e| matches!(
-            e.value,
-            sysml_v2_parser::ast::ViewDefBodyElement::Error(_)
-        )),
+        view_body
+            .iter()
+            .any(|e| matches!(e.value, sysml_v2_parser::ast::ViewDefBodyElement::Error(_))),
         "view def body should contain a ParseErrorNode for the bad token"
     );
 
@@ -882,7 +886,9 @@ fn constraint_def_recovery_inserts_error_node_and_keeps_later_sibling() {
 
     // Sibling part def after the constraint must parse.
     assert!(
-        elements.iter().any(|e| matches!(e.value, PackageBodyElement::PartDef(_))),
+        elements
+            .iter()
+            .any(|e| matches!(e.value, PackageBodyElement::PartDef(_))),
         "sibling part def after malformed constraint should still parse"
     );
 

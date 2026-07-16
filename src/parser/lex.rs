@@ -102,8 +102,16 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"variation",
 ];
 
-pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] =
-    &[b"doc", b"attribute", b"port", b"in", b"out", b"inout", b"ref", b"abstract"];
+pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b"doc",
+    b"attribute",
+    b"port",
+    b"in",
+    b"out",
+    b"inout",
+    b"ref",
+    b"abstract",
+];
 
 pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[b"doc", b"port", b"in", b"out", b"inout"];
 
@@ -171,7 +179,8 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
 
 pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[b"doc", b"@", b"in", b"out", b"inout"];
 
-pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[b"@", b"doc", b"in", b"out", b"inout", b"return"];
+pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] =
+    &[b"@", b"doc", b"in", b"out", b"inout", b"return"];
 
 pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] =
     &[b"@", b"doc", b"filter", b"render", b"ref", b"abstract"];
@@ -558,10 +567,14 @@ pub(crate) fn qualified_name_segments(
             separator: None,
         });
     }
-    segments.extend(rest_segments.into_iter().map(|name| RelationshipTargetSegment {
-        name,
-        separator: Some(SegmentSeparator::ColonColon),
-    }));
+    segments.extend(
+        rest_segments
+            .into_iter()
+            .map(|name| RelationshipTargetSegment {
+                name,
+                separator: Some(SegmentSeparator::ColonColon),
+            }),
+    );
     Ok((input, segments))
 }
 

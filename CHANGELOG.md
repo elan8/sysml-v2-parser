@@ -5,6 +5,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Technical debt: rustfmt and clippy cleanup
+
+Housekeeping pass after the PAR-002..006 and post-PAR-006 "Parser work still required" backlogs
+(neither ran `cargo fmt`/full `cargo clippy` as part of their per-increment gate, only
+`cargo test`/`clippy -W clippy::all`'s error count, so warnings and formatting drift accumulated).
+
+- **`cargo fmt`**: 48 files had formatting drift (239 diff hunks); applied mechanically, no
+  behavior change.
+- **`clippy::large_enum_variant`** (`AttributeBodyElement`, `RequirementDefBodyElement`):
+  `AttributeUsage`'s size relative to `Doc`/`Error` is inherent (it carries a `Membership` plus
+  relationship nodes) and shared by ~10 other body-element enums crate-wide with the same variant
+  shape; boxing it in just these two flagged enums would be an inconsistent partial fix, so both
+  are `#[allow(clippy::large_enum_variant)]` with a documented reason instead.
+- **`clippy::type_complexity`** (`connection.rs`/`interface.rs`'s `connect_ends`,
+  `usage.rs`'s `optional_typings`): fixed properly with named type aliases (`ConnectEnds`,
+  `TypingsResult`) rather than suppressed — genuine readability win, no behavior change.
+- **`clippy::needless_lifetimes`** (3 test helper functions): auto-fixed via `cargo clippy --fix`.
+- **Removed 10 blanket `#![allow(dead_code, unused_imports)]` module attributes**
+  (`bnf_surface.rs`, `connection.rs`, `constraint.rs`, `interface.rs`, `part/mod.rs`, `port.rs`,
+  `requirement.rs`, `state.rs`, `usecase.rs`, `view.rs`) that were masking real warnings.
+  Underneath them: ~15 genuinely unused imports (auto-fixed via `cargo fix --lib`), and 3
+  genuinely dead functions removed entirely (`safe_constraint_def_body_element` in
+  `constraint.rs`, `constraint_body` in `requirement.rs`, `keyword_use_case_def` in
+  `usecase.rs`, and `parse_usage_header` in `definition_header.rs` -- all confirmed unreferenced
+  anywhere, including tests, before deleting). `bnf_surface.rs`'s five functions are a deliberate
+  exception: each names and exercises one BNF production for grammar-coverage traceability, and is
+  called only by that module's own `#[cfg(test)]` block -- restored `#![allow(dead_code)]` there
+  with a comment explaining why, rather than deleting genuinely-intentional documentation code.
+  `part/mod.rs`'s `part_def`/`part_def_body` re-exports got the same narrow, documented
+  `#[allow(unused_imports)]` treatment for the same reason (used only by a `#[cfg(test)]` block in
+  `package.rs`, so a plain non-test `cargo build` sees the re-export as unused).
+
+All three gates green throughout: `cargo build --all-targets` (zero warnings), `cargo test`
+(100% pass), `cargo clippy --all-targets -- -W clippy::all` (zero warnings, down from 5 lib + 3
+test-file warnings), and the full `SYSML_V2_RELEASE_DIR` validation gate (25/25).
+
 ### Item 4b closing sweep: scope-boundary list is now empty
 
 Per the task's closing instruction, re-swept the whole `src/ast` tree for every `*Def`/`*Usage`-

@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_imports)]
-
 use crate::ast::{
     DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefBody, RefDecl, StateDef,
     StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition, TransitionEffect,
@@ -9,17 +7,16 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, starts_with_keyword, take_until_terminator, visibility_prefix, ws1,
+    name, qualified_name, starts_with_keyword, take_until_terminator, visibility_prefix, ws1,
     ws_and_comments, STATE_BODY_STARTERS,
 };
 
 const UNTIL_BODY: &[u8] = b";{";
 use crate::parser::metadata_annotation::{annotation, metadata_annotation, metadata_keyword_usage};
-use crate::parser::payload::transition_accept;
 use crate::parser::node_from_to;
+use crate::parser::payload::transition_accept;
 use crate::parser::requirement::{doc_comment, requirement_usage};
-use crate::parser::usage::{feature_usage_header, multiplicity, usage_header};
+use crate::parser::usage::{feature_usage_header, multiplicity};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -243,7 +240,9 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         ws_and_comments,
         alt((
             map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(consume_state_structured_brace, |_| RefBody::Brace { elements: vec![] }),
+            map(consume_state_structured_brace, |_| RefBody::Brace {
+                elements: vec![],
+            }),
         )),
     )
     .parse(input)?;
@@ -544,11 +543,8 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, target) = expression(input)?;
-    let (input, body) = preceded(
-        ws_and_comments,
-        crate::parser::interface::connect_body,
-    )
-    .parse(input)?;
+    let (input, body) =
+        preceded(ws_and_comments, crate::parser::interface::connect_body).parse(input)?;
     Ok((
         input,
         node_from_to(

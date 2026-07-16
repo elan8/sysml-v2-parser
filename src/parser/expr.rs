@@ -890,9 +890,13 @@ mod tests {
                         match &base.value {
                             Expression::MemberAccess(inner_base, inner_member) => {
                                 assert_eq!(inner_member, "b");
-                                assert!(matches!(&inner_base.value, Expression::FeatureRef(s) if s == "a"));
+                                assert!(
+                                    matches!(&inner_base.value, Expression::FeatureRef(s) if s == "a")
+                                );
                             }
-                            other => panic!("expected MemberAccess base (bare arrow access), got {other:?}"),
+                            other => panic!(
+                                "expected MemberAccess base (bare arrow access), got {other:?}"
+                            ),
                         }
                     }
                     other => panic!("expected CollectionOp on lhs of subtraction, got {other:?}"),
@@ -959,7 +963,10 @@ mod tests {
             Expression::Invocation { args, .. } => {
                 assert_eq!(args.len(), 2);
                 assert_eq!(args[0].name.as_deref(), Some("q"));
-                assert!(matches!(&args[0].value.value, Expression::LiteralInteger(1)));
+                assert!(matches!(
+                    &args[0].value.value,
+                    Expression::LiteralInteger(1)
+                ));
                 assert_eq!(args[1].name.as_deref(), Some("p"));
                 assert!(matches!(&args[1].value.value, Expression::FeatureRef(s) if s == "a"));
             }

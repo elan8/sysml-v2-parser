@@ -40,9 +40,7 @@ fn part_def_body(input: &str) -> Vec<sysml_v2_parser::ast::Node<PartDefBodyEleme
 
 #[test]
 fn anonymous_flow_in_part_def() {
-    let elements = part_def_body(
-        "package P { part def V { part a; part b; flow a.x to b.y; } }",
-    );
+    let elements = part_def_body("package P { part def V { part a; part b; flow a.x to b.y; } }");
     assert!(elements.iter().any(|e| {
         matches!(
             e.value,
@@ -132,8 +130,8 @@ fn message_flow_in_part_def() {
 
 #[test]
 fn flow_in_use_case_def() {
-    let result = parse("package P { use case def UC { flow actor.msg to system.inbox; } }")
-        .expect("parse");
+    let result =
+        parse("package P { use case def UC { flow actor.msg to system.inbox; } }").expect("parse");
     let uc = match &result.elements[0].value {
         RootElement::Package(p) => match &p.value.body {
             PackageBody::Brace { elements } => match &elements[0].value {
@@ -146,10 +144,9 @@ fn flow_in_use_case_def() {
     };
     match &uc.value.body {
         sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => {
-            assert!(elements.iter().any(|e| matches!(
-                e.value,
-                UseCaseDefBodyElement::FlowUsage(_)
-            )));
+            assert!(elements
+                .iter()
+                .any(|e| matches!(e.value, UseCaseDefBodyElement::FlowUsage(_))));
         }
         _ => panic!("expected brace use case body"),
     }
@@ -170,10 +167,9 @@ fn flow_in_part_usage_body() {
     };
     match &part.value.body {
         sysml_v2_parser::ast::PartUsageBody::Brace { elements } => {
-            assert!(elements.iter().any(|e| matches!(
-                e.value,
-                PartUsageBodyElement::FlowUsage(_)
-            )));
+            assert!(elements
+                .iter()
+                .any(|e| matches!(e.value, PartUsageBodyElement::FlowUsage(_))));
         }
         _ => panic!("expected brace part usage body"),
     }

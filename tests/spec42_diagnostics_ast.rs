@@ -14,7 +14,7 @@ fn fixture(name: &str) -> String {
     fs::read_to_string(path).expect("read fixture")
 }
 
-fn first_package<'a>(root: &'a RootNamespace) -> &'a Package {
+fn first_package(root: &RootNamespace) -> &Package {
     match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
@@ -51,10 +51,7 @@ fn transition_accept_retained_with_spans() {
         !transitions[0].is_initial,
         "named transition to_running must not be classified as initial"
     );
-    let accept = transitions[0]
-        .accept
-        .as_ref()
-        .expect("shorthand accept");
+    let accept = transitions[0].accept.as_ref().expect("shorthand accept");
     match accept {
         TransitionAccept::Shorthand(expr, via) => {
             assert!(matches!(expr.value, Expression::FeatureRef(ref n) if n == "StartPressed"));
@@ -63,10 +60,7 @@ fn transition_accept_retained_with_spans() {
         }
         _ => panic!("expected shorthand accept"),
     }
-    let typed = transitions[1]
-        .accept
-        .as_ref()
-        .expect("typed accept");
+    let typed = transitions[1].accept.as_ref().expect("typed accept");
     match typed {
         TransitionAccept::Payload(p, via) => {
             assert_eq!(p.name, "evt");
@@ -141,14 +135,12 @@ fn viewpoint_stakeholder_and_purpose_members() {
         RequirementDefBody::Brace { elements } => elements,
         _ => panic!("expected brace viewpoint body"),
     };
-    assert!(body.iter().any(|e| matches!(
-        e.value,
-        RequirementDefBodyElement::Stakeholder(_)
-    )));
-    assert!(body.iter().any(|e| matches!(
-        e.value,
-        RequirementDefBodyElement::Purpose(_)
-    )));
+    assert!(body
+        .iter()
+        .any(|e| matches!(e.value, RequirementDefBodyElement::Stakeholder(_))));
+    assert!(body
+        .iter()
+        .any(|e| matches!(e.value, RequirementDefBodyElement::Purpose(_))));
 }
 
 #[test]
@@ -196,7 +188,10 @@ fn verification_local_attribute_has_name_span() {
     };
     assert_eq!(attr.name, "count");
     assert!(attr.name_span.is_some());
-    assert_eq!(attr.typing.as_ref().map(|n| n.value.target_display()), Some("Integer".to_string()));
+    assert_eq!(
+        attr.typing.as_ref().map(|n| n.value.target_display()),
+        Some("Integer".to_string())
+    );
 }
 
 #[test]
@@ -513,7 +508,9 @@ fn metadata_annotation_about_clause_parses_targets() {
     let part_def = package_body_elements(pkg)
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::PartDef(pd) if pd.value.identification.name.as_deref() == Some("Design") => {
+            PackageBodyElement::PartDef(pd)
+                if pd.value.identification.name.as_deref() == Some("Design") =>
+            {
                 Some(&pd.value)
             }
             _ => None,
@@ -643,8 +640,14 @@ fn metadata_def_shorthand_annotated_element() {
             _ => None,
         })
         .expect("annotatedElement shorthand binding");
-    assert_eq!(attr.subsets.as_ref().map(|n| n.value.target_display()), Some("annotatedElement".to_string()));
-    assert_eq!(attr.typing.as_ref().map(|n| n.value.target_display()), Some("SysML::RequirementUsage".to_string()));
+    assert_eq!(
+        attr.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("annotatedElement".to_string())
+    );
+    assert_eq!(
+        attr.typing.as_ref().map(|n| n.value.target_display()),
+        Some("SysML::RequirementUsage".to_string())
+    );
 }
 
 #[test]
@@ -669,7 +672,10 @@ fn metadata_def_shorthand_base_type_meta_cast() {
             _ => None,
         })
         .expect("baseType shorthand binding");
-    assert_eq!(attr.redefines.as_ref().map(|n| n.value.target_display()), Some("baseType".to_string()));
+    assert_eq!(
+        attr.redefines.as_ref().map(|n| n.value.target_display()),
+        Some("baseType".to_string())
+    );
     let Some(expr) = attr.value.as_ref() else {
         panic!("expected value expression");
     };
@@ -722,9 +728,14 @@ fn requirement_metadata_def_body_no_errors() {
     for metadata_def in metadata_defs {
         let errors = attribute_body_error_count(metadata_def_body_elements(metadata_def));
         assert_eq!(
-            errors, 0,
+            errors,
+            0,
             "metadata def body should have no parse errors: {:?}",
-            metadata_def.identification.name.as_deref().unwrap_or("<unnamed>")
+            metadata_def
+                .identification
+                .name
+                .as_deref()
+                .unwrap_or("<unnamed>")
         );
     }
 }

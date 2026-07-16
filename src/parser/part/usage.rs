@@ -1,4 +1,4 @@
-﻿use super::body::exhibit_state;
+use super::body::exhibit_state;
 use super::prelude::*;
 use crate::parser::feature_value_part as usage_value_part;
 
@@ -509,7 +509,9 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
             Some(ConnectBody::Semicolon)
         }),
-        map(consume_part_usage_structured_brace, |_| Some(ConnectBody::Brace)),
+        map(consume_part_usage_structured_brace, |_| {
+            Some(ConnectBody::Brace)
+        }),
     ));
     let (input, body) = body_parser.parse(input)?;
     Ok((
@@ -614,7 +616,9 @@ fn ref_body_parse(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| RefBody::Semicolon),
-        map(consume_part_usage_structured_brace, |_| RefBody::Brace { elements: vec![] }),
+        map(consume_part_usage_structured_brace, |_| RefBody::Brace {
+            elements: vec![],
+        }),
     ))
     .parse(input)
 }
@@ -754,7 +758,9 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
         ws_and_comments,
         alt((
             map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(consume_part_usage_structured_brace, |_| RefBody::Brace { elements: vec![] }),
+            map(consume_part_usage_structured_brace, |_| RefBody::Brace {
+                elements: vec![],
+            }),
         )),
     )
     .parse(input)?;
@@ -781,8 +787,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
 /// (`variant name;`).
 pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
     let start = input;
-    let (input, (visibility_span, visibility)) =
-        crate::parser::lex::visibility_prefix(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let membership = Membership::variant(visibility, visibility_span);
     let (input, _) = tag(&b"variant"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -940,10 +945,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             map(requirement_def, PartUsageBodyElement::RequirementDef),
             map(occurrence_def, PartUsageBodyElement::OccurrenceDef),
             map(calc_def_required, PartUsageBodyElement::CalcDef),
-            map(
-                connection_def_required,
-                PartUsageBodyElement::ConnectionDef,
-            ),
+            map(connection_def_required, PartUsageBodyElement::ConnectionDef),
             map(port_def_required, PartUsageBodyElement::PortDef),
         )),
         alt((
@@ -1018,8 +1020,7 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_usage_body_accepts_nested_flow_def_not_misparsed_as_usage() {
-        let (rest, node) =
-            part_usage_body_element(input("flow def DataFlow;")).expect("flow def");
+        let (rest, node) = part_usage_body_element(input("flow def DataFlow;")).expect("flow def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PartUsageBodyElement::FlowDef(_)));
     }
@@ -1052,8 +1053,7 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_usage_body_accepts_nested_port_usage() {
-        let (rest, node) =
-            part_usage_body_element(input("port p1: MyPort;")).expect("port usage");
+        let (rest, node) = part_usage_body_element(input("port p1: MyPort;")).expect("port usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PartUsageBodyElement::PortUsage(_)));
     }
@@ -1081,11 +1081,13 @@ mod par_002_nested_def_tests {
         let text = "state def Modes { state on; state off; }";
         let (_, usage_node) =
             part_usage_body_element(input(text)).expect("nested in part usage body");
-        assert!(matches!(usage_node.value, PartUsageBodyElement::StateDef(_)));
-        let (_, def_node) = crate::parser::part::part_def_or_usage(input(&format!(
-            "part def X {{ {text} }}"
-        )))
-        .expect("part def parses");
+        assert!(matches!(
+            usage_node.value,
+            PartUsageBodyElement::StateDef(_)
+        ));
+        let (_, def_node) =
+            crate::parser::part::part_def_or_usage(input(&format!("part def X {{ {text} }}")))
+                .expect("part def parses");
         let crate::parser::part::PartDefOrUsage::Def(def_node) = def_node else {
             panic!("expected a part def");
         };

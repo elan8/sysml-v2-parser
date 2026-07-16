@@ -205,7 +205,14 @@ fn test_enum_def_with_specialization_and_assigned_literals_maps_dedicated() {
     let PackageBodyElement::EnumDef(enum_def) = &elements[0].value else {
         panic!("expected enum def");
     };
-    assert_eq!(enum_def.value.specializes.as_ref().map(|n| n.value.target_display()), Some("Level".to_string()));
+    assert_eq!(
+        enum_def
+            .value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("Level".to_string())
+    );
     assert!(
         !elements
             .iter()
@@ -297,7 +304,11 @@ part def D {
 }
 }"#;
     let result = parse_with_diagnostics(input);
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let root = result.root;
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -314,9 +325,7 @@ part def D {
         let value_opt: &Option<Node<FeatureValue>> = elements
             .iter()
             .find_map(|e| match &e.value {
-                PackageBodyElement::AttributeDef(a) if a.value.name == name => {
-                    Some(&a.value.value)
-                }
+                PackageBodyElement::AttributeDef(a) if a.value.name == name => Some(&a.value.value),
                 _ => None,
             })
             .unwrap_or_else(|| panic!("expected AttributeDef {name}"));
@@ -349,13 +358,18 @@ part def D {
     let part_def = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::PartDef(p) if p.value.identification.name.as_deref() == Some("D") => {
+            PackageBodyElement::PartDef(p)
+                if p.value.identification.name.as_deref() == Some("D") =>
+            {
                 Some(&p.value)
             }
             _ => None,
         })
         .expect("expected part def D");
-    let PartDefBody::Brace { elements: part_elements } = &part_def.body else {
+    let PartDefBody::Brace {
+        elements: part_elements,
+    } = &part_def.body
+    else {
         panic!("expected part def brace body");
     };
 
@@ -586,7 +600,10 @@ part def Sensor {
         defs.len(),
         1,
         "exactly one member has the `def` keyword and should be an AttributeDef: {:?}",
-        elements.iter().map(|e| format!("{:?}", e.value)).collect::<Vec<_>>()
+        elements
+            .iter()
+            .map(|e| format!("{:?}", e.value))
+            .collect::<Vec<_>>()
     );
     assert_eq!(defs[0].name, "LocalValueType");
 
@@ -601,10 +618,16 @@ part def Sensor {
         usages.len(),
         3,
         "typed, untyped, and initialized forms without `def` should all be AttributeUsage: {:?}",
-        elements.iter().map(|e| format!("{:?}", e.value)).collect::<Vec<_>>()
+        elements
+            .iter()
+            .map(|e| format!("{:?}", e.value))
+            .collect::<Vec<_>>()
     );
-    assert!(usages.iter().any(|u| u.name == "typed" && u.typing.as_ref().map(|n| n.value.target_display()) == Some("Temperature".to_string())));
-    assert!(usages.iter().any(|u| u.name == "untyped" && u.typing.is_none()));
+    assert!(usages.iter().any(|u| u.name == "typed"
+        && u.typing.as_ref().map(|n| n.value.target_display()) == Some("Temperature".to_string())));
+    assert!(usages
+        .iter()
+        .any(|u| u.name == "untyped" && u.typing.is_none()));
     assert!(usages.iter().any(|u| u.name == "initialized"
         && u.typing.as_ref().map(|n| n.value.target_display()) == Some("Temperature".to_string())
         && u.value.is_some()));
@@ -641,7 +664,10 @@ fn test_part_def_body_never_misclassifies_non_connector_interface_as_definition(
             .iter()
             .any(|e| matches!(e.value, PartDefBodyElement::InterfaceDef(_))),
         "non-connector interface usage must never be misclassified as InterfaceDef: {:?}",
-        elements.iter().map(|e| format!("{:?}", e.value)).collect::<Vec<_>>()
+        elements
+            .iter()
+            .map(|e| format!("{:?}", e.value))
+            .collect::<Vec<_>>()
     );
 }
 
@@ -731,7 +757,13 @@ fn test_parse_part_attribute_prefix_redefines_shorthand() {
         })
         .expect("attribute usage should be present");
     assert_eq!(attribute.name, "name");
-    assert_eq!(attribute.redefines.as_ref().map(|n| n.value.target_display()), Some("name".to_string()));
+    assert_eq!(
+        attribute
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("name".to_string())
+    );
     assert!(
         attribute.value.is_some(),
         "attribute value should be parsed"
@@ -844,7 +876,13 @@ fn test_parse_part_attribute_prefix_redefines_with_subsets_clause() {
         })
         .expect("attribute usage should be present");
     assert_eq!(attribute.name, "outlet");
-    assert_eq!(attribute.redefines.as_ref().map(|n| n.value.target_display()), Some("outlet".to_string()));
+    assert_eq!(
+        attribute
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("outlet".to_string())
+    );
 }
 
 #[test]
@@ -968,7 +1006,14 @@ part def A specializes B;
         PackageBodyElement::PartDef(p) => p,
         other => panic!("expected part def, got {:?}", other),
     };
-    assert_eq!(part_def.value.specializes.as_ref().map(|n| n.value.target_display()), Some("B".to_string()));
+    assert_eq!(
+        part_def
+            .value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("B".to_string())
+    );
     assert!(
         part_def.value.specializes.is_some(),
         "specializes span should be present for keyword form"
@@ -993,7 +1038,14 @@ part def A :> B, C, D;
         PackageBodyElement::PartDef(part) => part,
         other => panic!("expected part definition, got {:?}", other),
     };
-    assert_eq!(part_def.value.specializes.as_ref().map(|n| n.value.target_display()), Some("B, C, D".to_string()));
+    assert_eq!(
+        part_def
+            .value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("B, C, D".to_string())
+    );
     assert!(
         part_def.value.specializes.is_some(),
         "specializes span should be present for multi-target form"
@@ -1018,7 +1070,14 @@ port def ControlPort specializes BasePort;
         PackageBodyElement::PortDef(p) => p,
         other => panic!("expected port def, got {:?}", other),
     };
-    assert_eq!(port_def.value.specializes.as_ref().map(|n| n.value.target_display()), Some("BasePort".to_string()));
+    assert_eq!(
+        port_def
+            .value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("BasePort".to_string())
+    );
 }
 
 #[test]
@@ -1040,7 +1099,11 @@ port def ControlPort :> BasePort, DiagnosticPort;
         other => panic!("expected port definition, got {:?}", other),
     };
     assert_eq!(
-        port_def.value.specializes.as_ref().map(|n| n.value.target_display()),
+        port_def
+            .value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
         Some("BasePort, DiagnosticPort".to_string())
     );
     assert!(port_def.value.specializes.is_some());
@@ -1065,7 +1128,11 @@ individual def Rover specializes MobileRobot;
         other => panic!("expected individual def, got {:?}", other),
     };
     assert_eq!(
-        individual_def.value.specializes.as_ref().map(|n| n.value.target_display()),
+        individual_def
+            .value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
         Some("MobileRobot".to_string())
     );
 }
@@ -1088,8 +1155,17 @@ occurrence rover subsets BaseOccurrence redefines LegacyOccurrence;
         PackageBodyElement::OccurrenceUsage(o) => o,
         other => panic!("expected occurrence usage, got {:?}", other),
     };
-    assert_eq!(occ.value.subsets.as_ref().map(|n| n.value.target_display()), Some("BaseOccurrence".to_string()));
-    assert_eq!(occ.value.redefines.as_ref().map(|n| n.value.target_display()), Some("LegacyOccurrence".to_string()));
+    assert_eq!(
+        occ.value.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("BaseOccurrence".to_string())
+    );
+    assert_eq!(
+        occ.value
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("LegacyOccurrence".to_string())
+    );
 }
 
 #[test]
@@ -1112,8 +1188,17 @@ occurrence event typed by Mission::Event subsets events redefines oldEvent;
     };
     assert_eq!(occ.value.name, "event");
     assert_eq!(occ.value.type_name.as_deref(), Some("Mission::Event"));
-    assert_eq!(occ.value.subsets.as_ref().map(|n| n.value.target_display()), Some("events".to_string()));
-    assert_eq!(occ.value.redefines.as_ref().map(|n| n.value.target_display()), Some("oldEvent".to_string()));
+    assert_eq!(
+        occ.value.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("events".to_string())
+    );
+    assert_eq!(
+        occ.value
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("oldEvent".to_string())
+    );
 }
 
 #[test]
@@ -1134,8 +1219,17 @@ occurrence rover; subsets BaseOccurrence redefines LegacyOccurrence;
         PackageBodyElement::OccurrenceUsage(o) => o,
         other => panic!("expected occurrence usage, got {:?}", other),
     };
-    assert_eq!(occ.value.subsets.as_ref().map(|n| n.value.target_display()), Some("BaseOccurrence".to_string()));
-    assert_eq!(occ.value.redefines.as_ref().map(|n| n.value.target_display()), Some("LegacyOccurrence".to_string()));
+    assert_eq!(
+        occ.value.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("BaseOccurrence".to_string())
+    );
+    assert_eq!(
+        occ.value
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("LegacyOccurrence".to_string())
+    );
 }
 
 #[test]
@@ -1464,7 +1558,14 @@ part def Carrier {
             .map(|(name, _)| name.value.target_display()),
         Some("basePort".to_string())
     );
-    assert_eq!(port_usage.value.redefines.as_ref().map(|n| n.value.target_display()), Some("wheelPort".to_string()));
+    assert_eq!(
+        port_usage
+            .value
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("wheelPort".to_string())
+    );
 }
 
 #[test]
@@ -1499,7 +1600,14 @@ part def Carrier {
         port_usage.value.type_name.as_deref(),
         Some("~Ports::FuelPort, Ports::CommandPort")
     );
-    assert_eq!(port_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
+    assert_eq!(
+        port_usage
+            .value
+            .multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[1]".to_string())
+    );
     assert_eq!(
         port_usage
             .value
@@ -1542,7 +1650,14 @@ part def Carrier {
         port_usage.value.type_name.as_deref(),
         Some("~Ports::FuelPort, Ports::CommandPort")
     );
-    assert_eq!(port_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
+    assert_eq!(
+        port_usage
+            .value
+            .multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[1]".to_string())
+    );
     assert_eq!(
         port_usage
             .value
@@ -1590,7 +1705,14 @@ part def Carrier {
             .map(|(name, _)| name.value.target_display()),
         Some("latestPort".to_string())
     );
-    assert_eq!(port_usage.value.redefines.as_ref().map(|n| n.value.target_display()), Some("newestPort".to_string()));
+    assert_eq!(
+        port_usage
+            .value
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("newestPort".to_string())
+    );
 }
 
 #[test]
@@ -1725,7 +1847,10 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
         })
         .expect("typed attribute usage in part usage body");
     assert_eq!(attribute.name, "totalMassKg");
-    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target_display()), Some("MassValue".to_string()));
+    assert_eq!(
+        attribute.typing.as_ref().map(|n| n.value.target_display()),
+        Some("MassValue".to_string())
+    );
     assert!(attribute.value.is_some(), "attribute value should parse");
 }
 
@@ -1767,7 +1892,10 @@ fn test_attribute_usage_accepts_defined_by_typing() {
         })
         .expect("attribute usage");
     assert_eq!(attribute.name, "mass");
-    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target_display()), Some("ISQ::MassValue".to_string()));
+    assert_eq!(
+        attribute.typing.as_ref().map(|n| n.value.target_display()),
+        Some("ISQ::MassValue".to_string())
+    );
 }
 
 #[test]
@@ -1808,7 +1936,10 @@ fn test_attribute_usage_accepts_typed_by_default_value() {
         })
         .expect("attribute usage");
     assert_eq!(attribute.name, "speed");
-    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target_display()), Some("ISQ::SpeedValue".to_string()));
+    assert_eq!(
+        attribute.typing.as_ref().map(|n| n.value.target_display()),
+        Some("ISQ::SpeedValue".to_string())
+    );
     assert!(attribute.value.is_some(), "default value should parse");
 }
 
@@ -1850,8 +1981,17 @@ fn test_attribute_usage_prefix_redefines_accepts_defined_by_typing() {
         })
         .expect("attribute usage");
     assert_eq!(attribute.name, "mass");
-    assert_eq!(attribute.redefines.as_ref().map(|n| n.value.target_display()), Some("Vehicle::mass".to_string()));
-    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target_display()), Some("ISQ::MassValue".to_string()));
+    assert_eq!(
+        attribute
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("Vehicle::mass".to_string())
+    );
+    assert_eq!(
+        attribute.typing.as_ref().map(|n| n.value.target_display()),
+        Some("ISQ::MassValue".to_string())
+    );
 }
 
 #[test]
@@ -1892,7 +2032,10 @@ fn test_attribute_usage_accepts_subsets_clause_without_ast_field() {
         })
         .expect("attribute usage");
     assert_eq!(attribute.name, "outlet");
-    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target_display()), Some("PowerPort".to_string()));
+    assert_eq!(
+        attribute.typing.as_ref().map(|n| n.value.target_display()),
+        Some("PowerPort".to_string())
+    );
 }
 
 #[test]
@@ -1921,7 +2064,10 @@ fn test_attribute_def_accepts_multiplicity_and_uniqueness_before_specialization(
         })
         .expect("attribute definition");
     assert_eq!(attribute.name, "length");
-    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target_display()), Some("LengthValue".to_string()));
+    assert_eq!(
+        attribute.typing.as_ref().map(|n| n.value.target_display()),
+        Some("LengthValue".to_string())
+    );
 }
 
 #[test]
@@ -1975,7 +2121,10 @@ fn test_attribute_def_accepts_default_value_without_equals_after_specialization(
             _ => None,
         })
         .expect("attribute definition");
-    assert_eq!(attribute.typing.as_ref().map(|n| n.value.target_display()), Some("LengthValue".to_string()));
+    assert_eq!(
+        attribute.typing.as_ref().map(|n| n.value.target_display()),
+        Some("LengthValue".to_string())
+    );
     assert!(attribute.value.is_some(), "default value should parse");
 }
 
@@ -2139,7 +2288,14 @@ part def Carrier {
         part_usage.value.type_name,
         "Vehicle::Engine, Vehicle::PoweredComponent"
     );
-    assert_eq!(part_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
+    assert_eq!(
+        part_usage
+            .value
+            .multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[1]".to_string())
+    );
     assert_eq!(
         part_usage
             .value
@@ -2183,7 +2339,14 @@ part def Carrier {
         part_usage.value.type_name,
         "Vehicle::Engine, Vehicle::PoweredComponent"
     );
-    assert_eq!(part_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
+    assert_eq!(
+        part_usage
+            .value
+            .multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[1]".to_string())
+    );
     assert_eq!(
         part_usage
             .value
@@ -2231,7 +2394,14 @@ part def Carrier {
             .map(|(name, _)| name.value.target_display()),
         Some("latestEngine".to_string())
     );
-    assert_eq!(part_usage.value.redefines.as_ref().map(|n| n.value.target_display()), Some("newestEngine".to_string()));
+    assert_eq!(
+        part_usage
+            .value
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("newestEngine".to_string())
+    );
 }
 
 #[test]
@@ -2264,7 +2434,14 @@ part def Carrier {
     };
     assert!(part_usage.value.name.is_empty());
     assert_eq!(part_usage.value.type_name, "Vehicle::Engine");
-    assert_eq!(part_usage.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[2]".to_string()));
+    assert_eq!(
+        part_usage
+            .value
+            .multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[2]".to_string())
+    );
 }
 
 #[test]
@@ -2277,8 +2454,20 @@ part def FourCylinderEngine :> Engine {
     let result = parse(input).expect("part redefines-only keyword should parse");
     let part_usage = part_def_body_part_usage(&result, 0, 0);
     assert!(part_usage.name.is_empty());
-    assert_eq!(part_usage.redefines.as_ref().map(|n| n.value.target_display()), Some("cylinders".to_string()));
-    assert_eq!(part_usage.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[4]".to_string()));
+    assert_eq!(
+        part_usage
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("cylinders".to_string())
+    );
+    assert_eq!(
+        part_usage
+            .multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[4]".to_string())
+    );
 }
 
 #[test]
@@ -2301,8 +2490,20 @@ part def logicalDriveUnit {
     );
     let part_usage = nested_part_usage_in_part_usage(&diag.root, 0, 0, 0);
     assert_eq!(part_usage.name, "tire1");
-    assert_eq!(part_usage.redefines.as_ref().map(|n| n.value.target_display()), Some("motorTire".to_string()));
-    assert_eq!(part_usage.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[1]".to_string()));
+    assert_eq!(
+        part_usage
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("motorTire".to_string())
+    );
+    assert_eq!(
+        part_usage
+            .multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[1]".to_string())
+    );
 }
 
 #[test]
@@ -2325,7 +2526,13 @@ part brushSystem : BrushSystem {
     );
     let port_usage = nested_port_usage_in_part_usage(&diag.root, 0, 0, 0);
     assert_eq!(port_usage.name, "rotationSpeedIn");
-    assert_eq!(port_usage.redefines.as_ref().map(|n| n.value.target_display()), Some("rotationSpeedIn".to_string()));
+    assert_eq!(
+        port_usage
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("rotationSpeedIn".to_string())
+    );
 }
 
 #[test]
@@ -2338,7 +2545,10 @@ part def DriveController {
     let result = parse(input).expect("attribute redefines prefix should parse");
     let attr = part_def_body_attribute_usage(&result, 0, 0);
     assert_eq!(attr.name, "architecture");
-    assert_eq!(attr.redefines.as_ref().map(|n| n.value.target_display()), Some("architecture".to_string()));
+    assert_eq!(
+        attr.redefines.as_ref().map(|n| n.value.target_display()),
+        Some("architecture".to_string())
+    );
     assert!(attr.value.is_some());
 }
 
@@ -2352,8 +2562,14 @@ port def SuctionLevelPort :> Base::PowerOutPort {
     let result = parse(input).expect("directed attribute redefines should parse");
     let attr = port_def_body_attribute_usage(&result, 0, 0);
     assert_eq!(attr.name, "suctionPower");
-    assert_eq!(attr.redefines.as_ref().map(|n| n.value.target_display()), Some("suctionPower".to_string()));
-    assert_eq!(attr.subsets.as_ref().map(|n| n.value.target_display()), Some("ISQ::power".to_string()));
+    assert_eq!(
+        attr.redefines.as_ref().map(|n| n.value.target_display()),
+        Some("suctionPower".to_string())
+    );
+    assert_eq!(
+        attr.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("ISQ::power".to_string())
+    );
     assert_eq!(attr.direction, Some(sysml_v2_parser::ast::InOut::Out));
 }
 
@@ -2375,7 +2591,10 @@ port def DebrisPort {
         sysml_v2_parser::ast::AttributeBody::Brace { elements } => {
             assert_eq!(elements.len(), 2);
         }
-        other => panic!("expected brace body with nested attributes, got {:?}", other),
+        other => panic!(
+            "expected brace body with nested attributes, got {:?}",
+            other
+        ),
     }
 }
 
@@ -3131,7 +3350,7 @@ part def Foo {
     assert_eq!(enum_usage.name, "status");
 }
 
-fn alias_def_target<'a>(pkg_elements: &'a [Node<PackageBodyElement>]) -> &'a AliasDef {
+fn alias_def_target(pkg_elements: &[Node<PackageBodyElement>]) -> &AliasDef {
     pkg_elements
         .iter()
         .find_map(|el| match &el.value {

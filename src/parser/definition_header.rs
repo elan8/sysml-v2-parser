@@ -4,7 +4,7 @@
 
 use crate::ast::{Node, TypingRelationship};
 use crate::parser::specialization::parse_optional_definition_header_after_identification;
-use crate::parser::usage::{feature_usage_header, usage_header, UsageHeader};
+use crate::parser::usage::{feature_usage_header, UsageHeader};
 use crate::parser::Input;
 use nom::IResult;
 
@@ -30,9 +30,4 @@ pub(crate) fn parse_feature_usage_header(
     input: Input<'_>,
 ) -> IResult<Input<'_>, FeatureHeaderParts> {
     feature_usage_header(input)
-}
-
-/// Usage header with specialization before or after typing.
-pub(crate) fn parse_usage_header(input: Input<'_>) -> IResult<Input<'_>, FeatureHeaderParts> {
-    usage_header(input)
 }

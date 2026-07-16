@@ -150,11 +150,7 @@ pub(crate) fn parse_definition_prefix(
     };
 
     let (input, visibility, visibility_span) = match options.visibility {
-        VisibilityPrefix::None => (
-            input,
-            None,
-            crate::parser::span_from_to(input, input),
-        ),
+        VisibilityPrefix::None => (input, None, crate::parser::span_from_to(input, input)),
         VisibilityPrefix::Captured => {
             let (input, (span, vis)) = crate::parser::lex::visibility_prefix(input)?;
             (input, vis, span)
@@ -221,7 +217,13 @@ mod tests {
             parse_definition_prefix(input, DefinitionPrefixOptions::new(b"item")).expect("prefix");
         assert!(prefix.is_abstract);
         assert_eq!(prefix.identification.name.as_deref(), Some("Foo"));
-        assert_eq!(prefix.specializes.as_ref().map(|n| targets_display_string(&n.value.target)), Some("Base".to_string()));
+        assert_eq!(
+            prefix
+                .specializes
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("Base".to_string())
+        );
         assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
     }
 
@@ -234,7 +236,13 @@ mod tests {
         )
         .expect("prefix");
         assert_eq!(prefix.identification.name.as_deref(), Some("connections"));
-        assert_eq!(prefix.specializes.as_ref().map(|n| targets_display_string(&n.value.target)), Some("linkObjects, parts".to_string()));
+        assert_eq!(
+            prefix
+                .specializes
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("linkObjects, parts".to_string())
+        );
         assert!(rest.fragment().starts_with(b"{"));
     }
 
@@ -248,7 +256,13 @@ mod tests {
         .expect("prefix");
         assert_eq!(prefix.annotation.as_deref(), Some("MyConn"));
         assert!(prefix.is_abstract);
-        assert_eq!(prefix.specializes.as_ref().map(|n| targets_display_string(&n.value.target)), Some("Base".to_string()));
+        assert_eq!(
+            prefix
+                .specializes
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("Base".to_string())
+        );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
@@ -278,6 +292,12 @@ mod tests {
         )
         .expect("prefix");
         assert!(!prefix.is_abstract);
-        assert_eq!(prefix.specializes.as_ref().map(|n| targets_display_string(&n.value.target)), Some("Y".to_string()));
+        assert_eq!(
+            prefix
+                .specializes
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("Y".to_string())
+        );
     }
 }

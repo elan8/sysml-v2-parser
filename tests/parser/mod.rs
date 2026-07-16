@@ -1,8 +1,8 @@
 mod behavior;
-mod flow_usage;
-mod occurrence_body;
 pub(crate) mod common;
+mod flow_usage;
 mod misc;
+mod occurrence_body;
 mod package;
 mod recovery;
 mod requirement;

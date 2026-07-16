@@ -1,5 +1,4 @@
 //! Connection definition parsing (BNF ConnectionDefinition).
-#![allow(dead_code, unused_imports)]
 
 use crate::ast::{
     ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, ConnectionEnd,
@@ -7,14 +6,13 @@ use crate::ast::{
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
+use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
-    identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
-    CONNECTION_DEF_BODY_STARTERS,
+    name, qualified_name, ws1, ws_and_comments, CONNECTION_DEF_BODY_STARTERS,
 };
-use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
@@ -22,8 +20,7 @@ use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_while1};
-use nom::combinator::{map, opt};
-use nom::multi::many0;
+use nom::combinator::map;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -160,11 +157,16 @@ fn connection_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
     )
 }
 
+/// `(from, to, extra_ends)` for a parsed connect statement.
+type ConnectEnds = (
+    Node<ConnectionEnd>,
+    Node<ConnectionEnd>,
+    Vec<Node<ConnectionEnd>>,
+);
+
 /// Connect ends: the n-ary `'(' end (',' end)+ ')'` form (`NaryConnectorPart`), or the ordinary
 /// binary `from ... to ...` form. Returns `(from, to, extra_ends)`.
-fn connect_ends(
-    input: Input<'_>,
-) -> IResult<Input<'_>, (Node<ConnectionEnd>, Node<ConnectionEnd>, Vec<Node<ConnectionEnd>>)> {
+fn connect_ends(input: Input<'_>) -> IResult<Input<'_>, ConnectEnds> {
     alt((
         map(
             (
@@ -375,8 +377,8 @@ mod par_002_widening_tests {
 
     #[test]
     fn connection_def_body_accepts_nested_attribute_usage() {
-        let (rest, node) = connection_def_body_element(input("attribute mass: Real;"))
-            .expect("attribute usage");
+        let (rest, node) =
+            connection_def_body_element(input("attribute mass: Real;")).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(
             node.value,
@@ -422,7 +424,10 @@ mod par_002_widening_tests {
             ConnectionDefBodyElement::AttributeUsage(_)
         ));
         let result = attribute_usage(input(text));
-        assert!(result.is_ok(), "attribute_usage should also accept {text:?}");
+        assert!(
+            result.is_ok(),
+            "attribute_usage should also accept {text:?}"
+        );
     }
 }
 
@@ -449,7 +454,8 @@ mod par_006b_audit_tests {
     #[test]
     fn connection_def_accepts_the_bare_abstract_multiplicity_nonunique_subsets_form_that_makes_def_required_unsafe(
     ) {
-        let text = "abstract connection connections: Connection[0..*] nonunique :> linkObjects, parts { }";
+        let text =
+            "abstract connection connections: Connection[0..*] nonunique :> linkObjects, parts { }";
         let result = connection_def(input(text));
         assert!(
             result.is_ok(),
@@ -474,9 +480,8 @@ mod membership_tests {
     /// at all (same genuine gap as `part_def`/`port_def`/`port_usage`/`item_def`/`item_usage`).
     #[test]
     fn connection_usage_member_visibility_prefix_is_captured_on_membership() {
-        let (_, node) =
-            connection_usage_member(input("private connection c1: MyConnection;"))
-                .expect("connection usage member");
+        let (_, node) = connection_usage_member(input("private connection c1: MyConnection;"))
+            .expect("connection usage member");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Private)
@@ -489,9 +494,8 @@ mod membership_tests {
 
     #[test]
     fn connection_usage_member_without_visibility_prefix_has_no_membership_visibility() {
-        let (_, node) =
-            connection_usage_member(input("connection c1: MyConnection;"))
-                .expect("connection usage member");
+        let (_, node) = connection_usage_member(input("connection c1: MyConnection;"))
+            .expect("connection usage member");
         assert_eq!(node.value.membership.visibility, None);
         assert_eq!(
             node.value.membership.kind,
@@ -503,8 +507,8 @@ mod membership_tests {
     /// either (same genuine gap as `part_def`/`port_def`/`item_def`).
     #[test]
     fn connection_def_visibility_prefix_is_captured_on_membership() {
-        let (rest, node) =
-            connection_def(input("protected connection def MyConnection;")).expect("connection def");
+        let (rest, node) = connection_def(input("protected connection def MyConnection;"))
+            .expect("connection def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,

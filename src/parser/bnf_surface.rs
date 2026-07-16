@@ -1,8 +1,11 @@
 //! BNF production surface parsers: lexical terminals, empty productions, and shared grammar hooks.
-#![allow(dead_code)]
 //!
 //! Each public entry point corresponds to a named production in the SysML/KerML textual BNF and is
-//! covered by unit tests in this module.
+//! covered by unit tests in this module. These functions exist for grammar-production traceability
+//! (each names and exercises one BNF production directly) rather than because production code
+//! calls them elsewhere -- production parsing composes the same underlying pieces directly. `dead_code`
+//! is expected here: the `#[cfg(test)]` module below is each function's only caller.
+#![allow(dead_code)]
 
 use crate::parser::expr::expression;
 use crate::parser::lex::name;

@@ -1,13 +1,13 @@
 use super::behavior::{ActionDefBodyElement, Allocate, InOut, InOutDecl, StateDefBody, StateUsage};
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
-use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
+use super::relationship_target::RelationshipTarget;
+use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::view::{CalcUsage, ConstraintDefBody};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
-use super::relationship_target::RelationshipTarget;
 
 /// Part definition: `part def` Identification (`:>` specializes)? Body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -223,6 +223,10 @@ pub enum AttributeBody {
     },
 }
 
+// See `RequirementDefBodyElement`'s `#[allow(clippy::large_enum_variant)]` doc comment --
+// `AttributeUsage`'s size relative to `Doc`/`Error` is an accepted, crate-wide tradeoff, not
+// specific to this enum.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AttributeBodyElement {

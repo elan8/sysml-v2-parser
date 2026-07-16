@@ -172,7 +172,14 @@ action def Run specializes BaseAction;
         PackageBodyElement::ActionDef(p) => p,
         other => panic!("expected action def, got {:?}", other),
     };
-    assert_eq!(action_def.value.specializes.as_ref().map(|n| n.value.target_display()), Some("BaseAction".to_string()));
+    assert_eq!(
+        action_def
+            .value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("BaseAction".to_string())
+    );
 }
 
 #[test]
@@ -194,7 +201,11 @@ action def Run :> BaseAction, LoggedAction;
         other => panic!("expected action definition, got {:?}", other),
     };
     assert_eq!(
-        action_def.value.specializes.as_ref().map(|n| n.value.target_display()),
+        action_def
+            .value
+            .specializes
+            .as_ref()
+            .map(|n| n.value.target_display()),
         Some("BaseAction, LoggedAction".to_string())
     );
     assert!(action_def.value.specializes.is_some());
@@ -244,7 +255,10 @@ action def Compute {
             assert!(args.is_empty());
             assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "collection"));
         }
-        other => panic!("expected rhs to be a structured CollectionOp expression, got {:?}", other),
+        other => panic!(
+            "expected rhs to be a structured CollectionOp expression, got {:?}",
+            other
+        ),
     }
 }
 
@@ -342,8 +356,16 @@ action def Run {
             _ => None,
         })
         .collect();
-    assert_eq!(terminates.len(), 2, "expected two TerminateStmt nodes, got {:?}", body_elements);
-    assert!(terminates[0].target.is_none(), "bare `terminate;` should have no target");
+    assert_eq!(
+        terminates.len(),
+        2,
+        "expected two TerminateStmt nodes, got {:?}",
+        body_elements
+    );
+    assert!(
+        terminates[0].target.is_none(),
+        "bare `terminate;` should have no target"
+    );
     assert!(
         matches!(&terminates[1].target, Some(t) if matches!(&t.value, Expression::FeatureRef(s) if s == "step")),
         "expected `terminate step;` to target `step`, got {:?}",
@@ -371,7 +393,10 @@ action def Run {
             _ => None,
         })
         .expect("expected a WhileStmt node");
-    assert!(matches!(&while_stmt.condition.value, Expression::BinaryOp { .. }));
+    assert!(matches!(
+        &while_stmt.condition.value,
+        Expression::BinaryOp { .. }
+    ));
     match &while_stmt.body {
         sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
             assert!(
@@ -412,7 +437,12 @@ action def Run {
             _ => None,
         })
         .collect();
-    assert_eq!(if_stmts.len(), 2, "expected two IfStmt nodes, got {:?}", body_elements);
+    assert_eq!(
+        if_stmts.len(),
+        2,
+        "expected two IfStmt nodes, got {:?}",
+        body_elements
+    );
 
     let with_else = &if_stmts[0];
     match &with_else.then_body {
@@ -428,7 +458,10 @@ action def Run {
         }
         other => panic!("expected structured then-body, got {:?}", other),
     }
-    assert!(with_else.else_body.is_some(), "expected an else-body to be present");
+    assert!(
+        with_else.else_body.is_some(),
+        "expected an else-body to be present"
+    );
     match with_else.else_body.as_ref().unwrap() {
         sysml_v2_parser::ast::ActionDefBody::Brace { elements } => {
             assert!(elements.iter().any(|el| matches!(
@@ -440,7 +473,10 @@ action def Run {
     }
 
     let without_else = &if_stmts[1];
-    assert!(without_else.else_body.is_none(), "expected no else-body for the second if");
+    assert!(
+        without_else.else_body.is_none(),
+        "expected no else-body for the second if"
+    );
 }
 
 #[test]
@@ -485,7 +521,9 @@ state def S {
     match shorthand_accept {
         sysml_v2_parser::ast::TransitionAccept::Shorthand(expr, via) => {
             assert!(matches!(&expr.value, Expression::FeatureRef(n) if n == "StartPressed"));
-            let via = via.as_ref().expect("expected via clause on shorthand accept");
+            let via = via
+                .as_ref()
+                .expect("expected via clause on shorthand accept");
             assert!(matches!(&via.value, Expression::FeatureRef(n) if n == "commPort"));
         }
         other => panic!("expected shorthand accept, got {:?}", other),

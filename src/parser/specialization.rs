@@ -38,7 +38,10 @@ fn subclassification_node(
 /// just that target (not the whole surrounding clause).
 fn qualified_name_target(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipTarget>> {
     let (input, (span, segments)) = with_span(qualified_name_segments).parse(input)?;
-    Ok((input, Node::new(span.clone(), RelationshipTarget { segments, span })))
+    Ok((
+        input,
+        Node::new(span.clone(), RelationshipTarget { segments, span }),
+    ))
 }
 
 /// Optional definition subclassification: `:> Base` or `specializes Base`, with optional `, Base2`.

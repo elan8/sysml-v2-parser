@@ -108,9 +108,7 @@ fn control_node_payload_stmt<'a>(
     ))
 }
 
-pub(crate) fn control_node_action_usage(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<ActionUsage>> {
+pub(crate) fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
     if starts_with_keyword(frag, b"accept") {

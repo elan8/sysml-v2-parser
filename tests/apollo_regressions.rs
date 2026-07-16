@@ -79,7 +79,10 @@ fn requirement_usage_supports_trailing_subsets_after_body() {
         _ => None,
     });
     let req = req.expect("requirement usage should parse in part body");
-    assert_eq!(req.subsets.as_ref().map(|n| n.value.target_display()), Some("goals".to_string()));
+    assert_eq!(
+        req.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("goals".to_string())
+    );
 }
 
 #[test]
@@ -254,7 +257,13 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         .collect();
     assert_eq!(occurrences.len(), 2);
     assert_eq!(occurrences[0].portion_kind.as_deref(), Some("timeslice"));
-    assert_eq!(occurrences[0].subsets.as_ref().map(|n| n.value.target_display()), None);
+    assert_eq!(
+        occurrences[0]
+            .subsets
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        None
+    );
     assert_eq!(occurrences[1].portion_kind.as_deref(), Some("timeslice"));
 
     let OccurrenceUsageBody::Brace {
@@ -303,7 +312,10 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
             _ => None,
         })
         .expect("snapshot should parse in then timeslice body");
-    assert_eq!(snapshot.subsets.as_ref().map(|n| n.value.target_display()), Some("system".to_string()));
+    assert_eq!(
+        snapshot.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("system".to_string())
+    );
     assert_eq!(snapshot.type_name.as_deref(), Some("MissionSystem"));
 }
 
@@ -341,7 +353,10 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         _ => panic!("expected nested part usage"),
     };
     assert_eq!(
-        apollo1.subsets.as_ref().map(|(name, _)| name.value.target_display()),
+        apollo1
+            .subsets
+            .as_ref()
+            .map(|(name, _)| name.value.target_display()),
         Some("missions".to_string())
     );
 
@@ -407,7 +422,10 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    assert_eq!(exhibit.redefines.as_ref().map(|n| n.value.target_display()), Some("missionPhases".to_string()));
+    assert_eq!(
+        exhibit.redefines.as_ref().map(|n| n.value.target_display()),
+        Some("missionPhases".to_string())
+    );
 }
 
 #[test]
@@ -488,10 +506,17 @@ fn part_usage_accepts_multiplicity_before_type() {
         _ => panic!("expected part usage"),
     };
     assert_eq!(suit.name, "spaceSuits");
-    assert_eq!(suit.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[2]".to_string()));
+    assert_eq!(
+        suit.multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[2]".to_string())
+    );
     assert_eq!(suit.type_name, "ExtravehicularMobilityUnit");
     assert_eq!(
-        suit.subsets.as_ref().map(|(name, _)| name.value.target_display()),
+        suit.subsets
+            .as_ref()
+            .map(|(name, _)| name.value.target_display()),
         Some("constituentSystems".to_string())
     );
 }
@@ -592,7 +617,13 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
         connection.type_name.as_deref(),
         Some("CapabilityToGoalDerivation")
     );
-    assert_eq!(connection.subsets.as_ref().map(|n| n.value.target_display()), Some("capabilityToGoals".to_string()));
+    assert_eq!(
+        connection
+            .subsets
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("capabilityToGoals".to_string())
+    );
     let ConnectionDefBody::Brace { elements } = &connection.body else {
         panic!("expected connection body");
     };
@@ -688,7 +719,10 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
     assert_eq!(csm.name, "csm");
     assert!(csm.is_individual);
     assert_eq!(csm.type_name, "CSM-107");
-    assert_eq!(csm.redefines.as_ref().map(|n| n.value.target_display()), Some("commandServiceModule".to_string()));
+    assert_eq!(
+        csm.redefines.as_ref().map(|n| n.value.target_display()),
+        Some("commandServiceModule".to_string())
+    );
     assert!(elements
         .iter()
         .any(|e| matches!(e.value, PartDefBodyElement::InterfaceUsage(_))));
@@ -742,13 +776,23 @@ fn part_redefinition_value_parses_parenthesized_tuple_of_engines() {
     let engines = elements
         .iter()
         .find_map(|e| match &e.value {
-            PartDefBodyElement::PartUsage(p) if p.value.redefines.as_ref().map(|n| n.value.target_display()) == Some("engines".to_string()) => {
+            PartDefBodyElement::PartUsage(p)
+                if p.value.redefines.as_ref().map(|n| n.value.target_display())
+                    == Some("engines".to_string()) =>
+            {
                 Some(&**p)
             }
             _ => None,
         })
         .expect("engines part usage");
-    assert_eq!(engines.value.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[5]".to_string()));
+    assert_eq!(
+        engines
+            .value
+            .multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[5]".to_string())
+    );
     let value = engines
         .value
         .value
@@ -816,13 +860,25 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
         "expected both attribute redefinitions as usages"
     );
     assert_eq!(attrs[0].name, "propellantMass");
-    assert_eq!(attrs[0].redefines.as_ref().map(|n| n.value.target_display()), Some("propellantMass".to_string()));
+    assert_eq!(
+        attrs[0]
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("propellantMass".to_string())
+    );
     assert!(
         attrs[0].value.is_some(),
         "propellantMass should keep assigned value"
     );
     assert_eq!(attrs[1].name, "dryMass");
-    assert_eq!(attrs[1].redefines.as_ref().map(|n| n.value.target_display()), Some("dryMass".to_string()));
+    assert_eq!(
+        attrs[1]
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("dryMass".to_string())
+    );
     assert!(
         attrs[1].value.is_some(),
         "dryMass should keep assigned value"
@@ -894,6 +950,11 @@ fn part_def_body_item_usage_parses() {
         })
         .expect("item usage in part def body");
     assert_eq!(item.name, "concerns");
-    assert_eq!(item.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[*]".to_string()));
+    assert_eq!(
+        item.multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[*]".to_string())
+    );
     assert_eq!(item.type_name.as_deref(), Some("Concern"));
 }

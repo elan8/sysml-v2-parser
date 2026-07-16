@@ -1,6 +1,7 @@
 use crate::ast::{Expression, FlowDef, FlowUsage, FlowUsageKind, Membership, Node};
 
-type FlowEndpoints<'a> = nom::IResult<Input<'a>, (Option<Node<Expression>>, Option<Node<Expression>>)>;
+type FlowEndpoints<'a> =
+    nom::IResult<Input<'a>, (Option<Node<Expression>>, Option<Node<Expression>>)>;
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
@@ -42,10 +43,7 @@ pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
 fn flow_usage_keyword(input: Input<'_>) -> IResult<Input<'_>, FlowUsageKind> {
     alt((
         map(
-            preceded(
-                tag(&b"succession"[..]),
-                preceded(ws1, tag(&b"flow"[..])),
-            ),
+            preceded(tag(&b"succession"[..]), preceded(ws1, tag(&b"flow"[..]))),
             |_| FlowUsageKind::SuccessionFlow,
         ),
         map(tag(&b"message"[..]), |_| FlowUsageKind::Message),
@@ -148,8 +146,8 @@ pub(crate) fn flow_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<Flo
             Ok((after_name, _name_str)) => {
                 let (after_name, _) = ws_and_comments(after_name)?;
                 let fragment = after_name.fragment();
-                let is_anonymous = fragment.starts_with(b".")
-                    || starts_with_keyword(fragment, b"to");
+                let is_anonymous =
+                    fragment.starts_with(b".") || starts_with_keyword(fragment, b"to");
                 if is_anonymous {
                     flow_usage_anonymous(peek)?
                 } else {

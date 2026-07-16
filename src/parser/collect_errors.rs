@@ -3,8 +3,8 @@
 use super::diagnostics::{bare_feature_declaration_in_part_def_diagnostic, trim_ascii_start};
 use super::recovery::parse_error_from_recovery_node;
 use crate::ast::{
-    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement,
-    AttributeBody, AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConstraintDefBody,
+    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AttributeBody,
+    AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConstraintDefBody,
     ConstraintDefBodyElement, DefinitionBody, DefinitionBodyElement, OccurrenceBodyElement,
     OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
     PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RefBody,
@@ -228,10 +228,7 @@ fn collect_rendering_def_body_errors(body: &RenderingDefBody, errors: &mut Vec<P
     }
 }
 
-fn collect_occurrence_usage_body_errors(
-    body: &OccurrenceUsageBody,
-    errors: &mut Vec<ParseError>,
-) {
+fn collect_occurrence_usage_body_errors(body: &OccurrenceUsageBody, errors: &mut Vec<ParseError>) {
     if let OccurrenceUsageBody::Brace { elements } = body {
         for element in elements {
             match &element.value {
@@ -422,24 +419,18 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
                 PackageBodyElement::ViewpointUsage(n) => {
                     collect_requirement_body_errors(&n.value.body, errors)
                 }
-                PackageBodyElement::StateDef(n) => {
-                    collect_state_body_errors(&n.value.body, errors)
-                }
+                PackageBodyElement::StateDef(n) => collect_state_body_errors(&n.value.body, errors),
                 PackageBodyElement::StateUsage(n) => {
                     collect_state_body_errors(&n.value.body, errors)
                 }
                 PackageBodyElement::ConstraintDef(n) => {
                     collect_constraint_body_errors(&n.value.body, errors)
                 }
-                PackageBodyElement::CalcDef(n) => {
-                    collect_calc_body_errors(&n.value.body, errors)
-                }
+                PackageBodyElement::CalcDef(n) => collect_calc_body_errors(&n.value.body, errors),
                 PackageBodyElement::ViewDef(n) => {
                     collect_view_def_body_errors(&n.value.body, errors)
                 }
-                PackageBodyElement::ViewUsage(n) => {
-                    collect_view_body_errors(&n.value.body, errors)
-                }
+                PackageBodyElement::ViewUsage(n) => collect_view_body_errors(&n.value.body, errors),
                 PackageBodyElement::RenderingDef(n) => {
                     collect_rendering_def_body_errors(&n.value.body, errors)
                 }

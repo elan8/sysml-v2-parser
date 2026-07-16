@@ -123,7 +123,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::LibraryPackage(n) => {
             PackageBodyElement::LibraryPackage(dummy_node(n, normalize_library_package(&n.value)))
         }
-        PackageBodyElement::Import(n) => PackageBodyElement::Import(dummy_node(n, normalize_import(&n.value))),
+        PackageBodyElement::Import(n) => {
+            PackageBodyElement::Import(dummy_node(n, normalize_import(&n.value)))
+        }
         PackageBodyElement::PartDef(n) => {
             PackageBodyElement::PartDef(dummy_node(n, normalize_part_def(&n.value)))
         }
@@ -830,9 +832,7 @@ fn normalize_port_body_element_node(el: &Node<PortBodyElement>) -> Node<PortBody
         PortBodyElement::AttributeUsage(n) => {
             PortBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
         }
-        PortBodyElement::ItemUsage(n) => {
-            PortBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
-        }
+        PortBodyElement::ItemUsage(n) => PortBodyElement::ItemUsage(dummy_node(n, n.value.clone())),
     };
     dummy_node(el, value)
 }
@@ -938,9 +938,9 @@ fn normalize_connection_def_body_element_node(
         ConnectionDefBodyElement::Error(n) => {
             ConnectionDefBodyElement::Error(dummy_node(n, n.value.clone()))
         }
-        ConnectionDefBodyElement::AttributeDef(n) => ConnectionDefBodyElement::AttributeDef(
-            dummy_node(n, normalize_attribute_def(&n.value)),
-        ),
+        ConnectionDefBodyElement::AttributeDef(n) => {
+            ConnectionDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
+        }
         ConnectionDefBodyElement::AttributeUsage(n) => ConnectionDefBodyElement::AttributeUsage(
             dummy_node(n, normalize_attribute_usage(&n.value)),
         ),
@@ -1017,9 +1017,9 @@ fn normalize_interface_def_body_element_node(
         InterfaceDefBodyElement::ConnectStmt(n) => {
             InterfaceDefBodyElement::ConnectStmt(dummy_node(n, n.value.clone()))
         }
-        InterfaceDefBodyElement::AttributeDef(n) => InterfaceDefBodyElement::AttributeDef(
-            dummy_node(n, normalize_attribute_def(&n.value)),
-        ),
+        InterfaceDefBodyElement::AttributeDef(n) => {
+            InterfaceDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
+        }
         InterfaceDefBodyElement::AttributeUsage(n) => InterfaceDefBodyElement::AttributeUsage(
             dummy_node(n, normalize_attribute_usage(&n.value)),
         ),

@@ -1,17 +1,15 @@
 //! Port definition and port usage parsing.
-#![allow(dead_code, unused_imports)]
 
 use crate::ast::{
     Node, PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage,
 };
 use crate::parser::action::in_out_decl;
 use crate::parser::attribute::{attribute_def, attribute_usage, directed_attribute_usage};
-use crate::parser::enumeration::enum_usage;
-use crate::parser::item::{directed_item_usage, item_def_required, item_usage};
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::expression;
+use crate::parser::enumeration::enum_usage;
+use crate::parser::item::{directed_item_usage, item_def_required, item_usage};
 use crate::parser::lex::{
     capture_opaque_member, name, ws1, ws_and_comments, PORT_BODY_STARTERS, PORT_DEF_BODY_STARTERS,
 };
@@ -120,7 +118,10 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 redefines,
             },
         ),
-        map(with_span(name), |(name_span, name)| PortUsageHead::Named { name_span, name }),
+        map(with_span(name), |(name_span, name)| PortUsageHead::Named {
+            name_span,
+            name,
+        }),
     ))
     .parse(input)?;
     let (input, name_str, name_span, prefix_redefines) = match usage_head {
@@ -146,7 +147,11 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
             let name = targets_display_string(&targets);
             (
                 Some(span),
-                Some(if is_conjugated { format!("~{name}") } else { name }),
+                Some(if is_conjugated {
+                    format!("~{name}")
+                } else {
+                    name
+                }),
             )
         })
         .unwrap_or((None, None));
@@ -317,8 +322,7 @@ mod par_002_widening_tests {
 
     #[test]
     fn port_def_body_accepts_nested_item_def_not_misparsed_as_usage() {
-        let (rest, node) =
-            port_def_body_element(input("item def MyItem;")).expect("item def");
+        let (rest, node) = port_def_body_element(input("item def MyItem;")).expect("item def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PortDefBodyElement::ItemDef(_)));
     }
@@ -344,7 +348,10 @@ mod par_002_widening_tests {
     fn port_def_body_accepts_nested_enum_usage() {
         let (rest, node) = port_def_body_element(input("enum e1: MyEnum;")).expect("enum usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(matches!(node.value, PortDefBodyElement::EnumerationUsage(_)));
+        assert!(matches!(
+            node.value,
+            PortDefBodyElement::EnumerationUsage(_)
+        ));
     }
 
     /// PAR-002 acceptance criterion: the same `item def` declaration yields the same AST variant
@@ -358,7 +365,10 @@ mod par_002_widening_tests {
         // Directly confirms `item_def_required` (the same parser reused across every body enum
         // wired in this backlog) accepts the identical snippet.
         let result = item_def_required(input(text));
-        assert!(result.is_ok(), "item_def_required should also accept {text:?}");
+        assert!(
+            result.is_ok(),
+            "item_def_required should also accept {text:?}"
+        );
     }
 
     // --- parser work item 4b (continuation): Membership on PortDef/PortUsage ---

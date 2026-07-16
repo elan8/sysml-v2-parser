@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_imports)]
-
 use crate::ast::{
     CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef, ConstraintDefBody,
     ConstraintDefBodyElement, Expression, Membership, Node, ParseErrorNode, ReturnDecl,
@@ -9,17 +7,15 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, starts_with_keyword, take_until_terminator, visibility_prefix, ws1,
-    ws_and_comments, CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
+    identification, name, qualified_name, skip_statement_or_block, starts_with_any_keyword,
+    starts_with_keyword, visibility_prefix, ws1, ws_and_comments, CALC_DEF_BODY_STARTERS,
+    CONSTRAINT_DEF_BODY_STARTERS,
 };
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
-use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::multi::many0;
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
 /// `def` is intentionally optional: the standard library uses bare, `def`-less `constraint`
@@ -139,21 +135,6 @@ pub(crate) fn constraint_def_body_element(
     };
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
-}
-
-fn safe_constraint_def_body_element(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
-    let start = input;
-    let mut parser = alt((
-        map(in_out_decl, |n| {
-            node_from_to(start, input, ConstraintDefBodyElement::InOutDecl(n))
-        }),
-        map(expression, |n| {
-            node_from_to(start, input, ConstraintDefBodyElement::Expression(n))
-        }),
-    ));
-    parser.parse(input)
 }
 
 /// Calculation usage: `calc` Identification (`:` type)? body (SysML §7.19.2).

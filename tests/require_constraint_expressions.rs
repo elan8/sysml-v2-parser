@@ -168,15 +168,27 @@ fn requirement_body_attribute_integer_default_and_quantity() {
     });
     let n = attrs.next().expect("attribute n");
     assert_eq!(n.name, "n");
-    assert_eq!(n.typing.as_ref().map(|n| n.value.target_display()), Some("Integer".to_string()));
+    assert_eq!(
+        n.typing.as_ref().map(|n| n.value.target_display()),
+        Some("Integer".to_string())
+    );
     let v0 = n.value.as_ref().expect("default 0");
-    assert!(matches!(v0.value.expression.value, Expression::LiteralInteger(0)));
+    assert!(matches!(
+        v0.value.expression.value,
+        Expression::LiteralInteger(0)
+    ));
 
     let v = attrs.next().expect("attribute v");
     assert_eq!(v.name, "v");
-    assert_eq!(v.subsets.as_ref().map(|n| n.value.target_display()), Some("ISQ::speed".to_string()));
+    assert_eq!(
+        v.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("ISQ::speed".to_string())
+    );
     let q = v.value.as_ref().expect("quantity default");
-    assert!(matches!(&q.value.expression.value, Expression::LiteralWithUnit { .. }));
+    assert!(matches!(
+        &q.value.expression.value,
+        Expression::LiteralWithUnit { .. }
+    ));
 }
 
 #[test]

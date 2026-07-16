@@ -1,24 +1,21 @@
-#![allow(dead_code, unused_imports)]
-
 use crate::ast::{
     ActorDecl, ActorRedefinitionAssignment, ActorUsage, CaseReturnDecl, FirstSuccession,
-    IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition,
-    RequirementUsage, ReturnRef, SubjectRef, ThenDone, ThenIncludeUseCase, ThenUseCaseUsage,
-    UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage, Visibility,
+    IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition, ReturnRef,
+    SubjectRef, ThenDone, ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody,
+    UseCaseDefBodyElement, UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::constraint::return_expression_stmt;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, take_until_terminator, visibility_prefix, ws1, ws_and_comments,
-    USE_CASE_BODY_STARTERS,
+    identification, name, qualified_name, skip_statement_or_block, take_until_terminator,
+    visibility_prefix, ws1, ws_and_comments, USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
-use crate::parser::with_span;
 use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
 use crate::parser::usage::{multiplicity_node, usage_header};
+use crate::parser::with_span;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
 use nom::branch::alt;
@@ -219,14 +216,15 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
     let (input, (name_span, n)) = with_span(name).parse(input)?;
     // Optional `: type`.
     let (input, _) = ws_and_comments(input)?;
-    let (input, type_name) = if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
-        let (input, _) = tag(&b":"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
-        let (input, tn) = crate::parser::lex::qualified_name(input)?;
-        (input, Some(tn))
-    } else {
-        (input, None)
-    };
+    let (input, type_name) =
+        if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
+            let (input, _) = tag(&b":"[..]).parse(input)?;
+            let (input, _) = ws_and_comments(input)?;
+            let (input, tn) = crate::parser::lex::qualified_name(input)?;
+            (input, Some(tn))
+        } else {
+            (input, None)
+        };
     // Consume the rest of the statement (= expr ;) opaquely.
     let (input, _) = skip_statement_or_block(input)?;
     Ok((
@@ -385,17 +383,6 @@ pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActorDecl>
             },
         ),
     ))
-}
-
-fn keyword_use_case_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"use"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"case"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    Ok((input, ()))
 }
 
 /// use case name ( : type )? CaseBody

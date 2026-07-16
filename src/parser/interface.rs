@@ -1,5 +1,4 @@
 //! Interface definition and usage parsing.
-#![allow(dead_code, unused_imports)]
 
 use crate::ast::{
     ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, InterfaceDef, InterfaceDefBody,
@@ -10,9 +9,7 @@ use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
 use crate::parser::item::{item_def_required, item_usage};
-use crate::parser::lex::{
-    identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
-};
+use crate::parser::lex::{name, qualified_name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
@@ -143,11 +140,16 @@ fn connect_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
     )
 }
 
+/// `(from, to, extra_ends)` for a parsed connect statement.
+type ConnectEnds = (
+    Node<ConnectionEnd>,
+    Node<ConnectionEnd>,
+    Vec<Node<ConnectionEnd>>,
+);
+
 /// Connect ends: the n-ary `'(' end (',' end)+ ')'` form (`NaryInterfacePart`), or the ordinary
 /// binary `from ... to ...` form. Returns `(from, to, extra_ends)`.
-fn connect_ends(
-    input: Input<'_>,
-) -> IResult<Input<'_>, (Node<ConnectionEnd>, Node<ConnectionEnd>, Vec<Node<ConnectionEnd>>)> {
+fn connect_ends(input: Input<'_>) -> IResult<Input<'_>, ConnectEnds> {
     alt((
         map(
             (
@@ -321,8 +323,7 @@ mod par_002_widening_tests {
 
     #[test]
     fn interface_def_body_accepts_nested_item_def_not_misparsed_as_usage() {
-        let (rest, node) =
-            interface_def_body_element(input("item def MyItem;")).expect("item def");
+        let (rest, node) = interface_def_body_element(input("item def MyItem;")).expect("item def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, InterfaceDefBodyElement::ItemDef(_)));
     }
@@ -337,8 +338,7 @@ mod par_002_widening_tests {
 
     #[test]
     fn interface_def_body_accepts_nested_port_def_not_misparsed_as_usage() {
-        let (rest, node) =
-            interface_def_body_element(input("port def MyPort;")).expect("port def");
+        let (rest, node) = interface_def_body_element(input("port def MyPort;")).expect("port def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, InterfaceDefBodyElement::PortDef(_)));
     }
@@ -365,7 +365,10 @@ mod par_002_widening_tests {
             InterfaceDefBodyElement::PortDef(_)
         ));
         let result = port_def_required(input(text));
-        assert!(result.is_ok(), "port_def_required should also accept {text:?}");
+        assert!(
+            result.is_ok(),
+            "port_def_required should also accept {text:?}"
+        );
     }
 }
 

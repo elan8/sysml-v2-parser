@@ -50,7 +50,9 @@ pub struct FeatureValue {
 /// hand-built expected ASTs in tests don't need real source spans.
 impl PartialEq for FeatureValue {
     fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind && self.is_default == other.is_default && self.expression == other.expression
+        self.kind == other.kind
+            && self.is_default == other.is_default
+            && self.expression == other.expression
     }
 }
 

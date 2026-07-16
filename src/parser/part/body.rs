@@ -241,7 +241,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             // siblings here: a bare (`def`-less) declaration always falls through to the usage
             // arm above/below instead.
             map(state_def, PartDefBodyElement::StateDef),
-            map(crate::parser::enumeration::enum_def, PartDefBodyElement::EnumDef),
+            map(
+                crate::parser::enumeration::enum_def,
+                PartDefBodyElement::EnumDef,
+            ),
             map(requirement_def, PartDefBodyElement::RequirementDef),
             map(occurrence_def, PartDefBodyElement::OccurrenceDef),
             map(metadata_usage, PartDefBodyElement::MetadataUsage),
@@ -548,8 +551,7 @@ mod par_002_nested_def_tests {
         use crate::parser::package::package_body_element;
 
         let text = "state def Modes { state on; state off; }";
-        let (_, package_node) =
-            package_body_element(input(text)).expect("package-level state def");
+        let (_, package_node) = package_body_element(input(text)).expect("package-level state def");
         let (_, part_node) = part_def_body_element(input(text)).expect("nested state def");
         assert!(matches!(
             package_node.value,
@@ -563,8 +565,7 @@ mod par_002_nested_def_tests {
         use crate::parser::package::package_body_element;
 
         let text = "enum def MyEnum;";
-        let (_, package_node) =
-            package_body_element(input(text)).expect("package-level enum def");
+        let (_, package_node) = package_body_element(input(text)).expect("package-level enum def");
         let (_, part_node) = part_def_body_element(input(text)).expect("nested enum def");
         assert!(matches!(
             package_node.value,
@@ -681,8 +682,8 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_accepts_nested_analysis_case_def() {
-        let (rest, node) = part_def_body_element(input("analysis def MyAnalysis;"))
-            .expect("analysis case def");
+        let (rest, node) =
+            part_def_body_element(input("analysis def MyAnalysis;")).expect("analysis case def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PartDefBodyElement::AnalysisCaseDef(_)));
     }

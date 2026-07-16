@@ -93,7 +93,9 @@ fn flow_def_body_parses_nested_part() {
 
 #[test]
 fn flow_usage_brace_body_parses_attribute() {
-    let pkg = parse_package("package P { item def Payload; flow cargo : Payload { attribute weight : Real; } }");
+    let pkg = parse_package(
+        "package P { item def Payload; flow cargo : Payload { attribute weight : Real; } }",
+    );
     let flow = brace_package_elements(&pkg)
         .iter()
         .find_map(|element| match &element.value {
@@ -141,9 +143,8 @@ fn flow_def_body_parses_standalone_succession_usage() {
     // Regression: bare `succession first A then B;` directly in a definition body was
     // swallowed as opaque text via `DEFINITION_BODY_OPAQUE_STARTERS` (which listed
     // "succession"). It's now a real `SuccessionUsage` node.
-    let pkg = parse_package(
-        "package P { flow def Sequence { succession first stepA then stepB; } }",
-    );
+    let pkg =
+        parse_package("package P { flow def Sequence { succession first stepA then stepB; } }");
     let flow = match &brace_package_elements(&pkg)[0].value {
         PackageBodyElement::FlowDef(flow) => flow,
         _ => panic!("expected FlowDef"),
@@ -220,7 +221,13 @@ fn flow_def_body_parses_succession_usage_with_multiplicities_like_systems_librar
             _ => None,
         })
         .expect("expected a SuccessionUsage node");
-    assert_eq!(succession.multiplicity.as_ref().map(|n| n.value.to_bracket_string()), Some("[seBeforeNum]".to_string()));
+    assert_eq!(
+        succession
+            .multiplicity
+            .as_ref()
+            .map(|n| n.value.to_bracket_string()),
+        Some("[seBeforeNum]".to_string())
+    );
     assert_eq!(
         succession
             .source_multiplicity

@@ -82,8 +82,7 @@ mod membership_tests {
 
     #[test]
     fn metadata_def_visibility_prefix_is_captured_on_membership() {
-        let (rest, node) =
-            metadata_def(input("private metadata def M1;")).expect("metadata def");
+        let (rest, node) = metadata_def(input("private metadata def M1;")).expect("metadata def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,

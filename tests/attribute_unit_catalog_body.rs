@@ -5,7 +5,9 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse;
 
-fn first_package_attribute_def<'a>(root: &'a sysml_v2_parser::RootNamespace) -> &'a sysml_v2_parser::ast::AttributeDef {
+fn first_package_attribute_def(
+    root: &sysml_v2_parser::RootNamespace,
+) -> &sysml_v2_parser::ast::AttributeDef {
     let package = root
         .elements
         .iter()
@@ -15,14 +17,12 @@ fn first_package_attribute_def<'a>(root: &'a sysml_v2_parser::RootNamespace) -> 
         })
         .expect("package");
     let attr = match &package.value.body {
-        sysml_v2_parser::ast::PackageBody::Brace { elements } => match &elements
-            .first()
-            .expect("member")
-            .value
-        {
-            PackageBodyElement::AttributeDef(def) => def,
-            other => panic!("expected attribute def, got {other:?}"),
-        },
+        sysml_v2_parser::ast::PackageBody::Brace { elements } => {
+            match &elements.first().expect("member").value {
+                PackageBodyElement::AttributeDef(def) => def,
+                other => panic!("expected attribute def, got {other:?}"),
+            }
+        }
         _ => panic!("expected brace package body"),
     };
     &attr.value
@@ -58,12 +58,25 @@ fn parses_conversion_by_prefix_in_attribute_body() {
     let usages = attribute_body_usages(&def.body);
     assert_eq!(usages.len(), 1, "expected one unitConversion binding");
     let conversion = usages[0];
-    assert_eq!(conversion.redefines.as_ref().map(|n| n.value.target_display()), Some("unitConversion".to_string()));
-    assert_eq!(conversion.typing.as_ref().map(|n| n.value.target_display()), Some("ConversionByPrefix".to_string()));
+    assert_eq!(
+        conversion
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("unitConversion".to_string())
+    );
+    assert_eq!(
+        conversion.typing.as_ref().map(|n| n.value.target_display()),
+        Some("ConversionByPrefix".to_string())
+    );
     let AttributeBody::Brace { elements } = &conversion.body else {
         panic!("expected nested brace body");
     };
-    assert_eq!(elements.len(), 2, "expected prefix and referenceUnit bindings");
+    assert_eq!(
+        elements.len(),
+        2,
+        "expected prefix and referenceUnit bindings"
+    );
     assert!(
         !elements
             .iter()
@@ -89,8 +102,17 @@ fn parses_conversion_by_convention_in_attribute_body() {
     let usages = attribute_body_usages(&def.body);
     assert_eq!(usages.len(), 1);
     let conversion = usages[0];
-    assert_eq!(conversion.redefines.as_ref().map(|n| n.value.target_display()), Some("unitConversion".to_string()));
-    assert_eq!(conversion.typing.as_ref().map(|n| n.value.target_display()), Some("ConversionByConvention".to_string()));
+    assert_eq!(
+        conversion
+            .redefines
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("unitConversion".to_string())
+    );
+    assert_eq!(
+        conversion.typing.as_ref().map(|n| n.value.target_display()),
+        Some("ConversionByConvention".to_string())
+    );
     let AttributeBody::Brace { elements } = &conversion.body else {
         panic!("expected nested brace body");
     };

@@ -1,11 +1,10 @@
-﻿fn brace_errors(input: &str) -> Vec<(Option<String>, String)> {
+fn brace_errors(input: &str) -> Vec<(Option<String>, String)> {
     let result = sysml_v2_parser::parse_for_editor(input);
     result
         .errors
         .iter()
         .filter(|d| {
-            d.code.as_deref().is_some_and(|c| c.contains("brace"))
-                || d.message.contains("brace")
+            d.code.as_deref().is_some_and(|c| c.contains("brace")) || d.message.contains("brace")
         })
         .map(|d| (d.code.clone(), d.message.clone()))
         .collect()
@@ -60,11 +59,7 @@ fn vacuuming_types_all_ports_without_block_comment() {
     port def FillStatePort :> NumericSignal;
   }
 }"#;
-    assert!(
-        brace_errors(input).is_empty(),
-        "{:?}",
-        brace_errors(input)
-    );
+    assert!(brace_errors(input).is_empty(), "{:?}", brace_errors(input));
 }
 
 #[test]
@@ -91,11 +86,7 @@ fn vacuuming_types_block_comment_with_nested_braces() {
     }
   }
 }"#;
-    assert!(
-        brace_errors(input).is_empty(),
-        "{:?}",
-        brace_errors(input)
-    );
+    assert!(brace_errors(input).is_empty(), "{:?}", brace_errors(input));
 }
 
 #[test]
@@ -117,9 +108,8 @@ fn vacuuming_types_line_comments_with_braces_do_not_break_parse() {
 
 fn vacuuming_types_sysml_path() -> Option<std::path::PathBuf> {
     let root = std::env::var_os("MBSE_VACUUM_EXAMPLE_DIR")?;
-    let path = std::path::PathBuf::from(root).join(
-        "Functions/legacy/VacuumingSystem/VacuumingTypes.sysml",
-    );
+    let path = std::path::PathBuf::from(root)
+        .join("Functions/legacy/VacuumingSystem/VacuumingTypes.sysml");
     path.exists().then_some(path)
 }
 
@@ -158,5 +148,8 @@ fn vacuuming_types_port_definitions_package() {
         &input[port_defs_start..port_defs_end]
     );
     let errors = brace_errors(&chunk);
-    assert!(errors.is_empty(), "port definitions brace errors: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "port definitions brace errors: {errors:?}"
+    );
 }

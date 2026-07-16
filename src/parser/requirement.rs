@@ -1,8 +1,6 @@
-#![allow(dead_code, unused_imports)]
-
 use crate::ast::{
-    CommentAnnotation, ConcernUsage, ConstraintBody, DocComment, FrameMember, Node, ParseErrorNode,
-    PurposeMember, RequireConstraint, RequireConstraintBody, RequirementActorDecl, RequirementDef,
+    CommentAnnotation, ConcernUsage, DocComment, FrameMember, Node, PurposeMember,
+    RequireConstraint, RequireConstraintBody, RequirementActorDecl, RequirementDef,
     RequirementDefBody, RequirementDefBodyElement, RequirementUsage, Satisfy, StakeholderMember,
     SubjectDecl, TextualRepresentation, VerifyRequirementMember,
 };
@@ -13,23 +11,23 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_statement_or_block, specialization_operator,
-    starts_with_any_keyword, subset_operator, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
+    identification, name, qualified_name, skip_statement_or_block, ws, ws1, ws_and_comments,
+    REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
-use crate::parser::with_span;
 use crate::parser::usage::{
     feature_usage_header, multiplicity, optional_typings, specialization_clauses,
-    targets_display_string, usage_header,
+    targets_display_string,
 };
+use crate::parser::with_span;
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, span_from_to};
+use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::multi::many0;
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
 fn other_requirement_body_element(
@@ -199,7 +197,10 @@ fn requirement_def_body_element(
             map(frame_member, RequirementDefBodyElement::Frame),
             map(stakeholder_member, RequirementDefBodyElement::Stakeholder),
             map(purpose_member, RequirementDefBodyElement::Purpose),
-            map(textual_representation, RequirementDefBodyElement::TextualRep),
+            map(
+                textual_representation,
+                RequirementDefBodyElement::TextualRep,
+            ),
             map(doc_comment, RequirementDefBodyElement::Doc),
         )),
         other_requirement_body_element,
@@ -454,17 +455,6 @@ pub(crate) fn require_constraint_body(
     Ok((input, body))
 }
 
-pub(crate) fn constraint_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintBody> {
-    let (input, body) = structured_constraint_body(input)?;
-    Ok((
-        input,
-        match body {
-            StructuredConstraintBody::Semicolon => ConstraintBody::Semicolon,
-            StructuredConstraintBody::Brace { .. } => ConstraintBody::Brace,
-        },
-    ))
-}
-
 /// KerML STRING_VALUE: double-quoted string, returns the inner string.
 fn string_value(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
@@ -640,41 +630,40 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
         .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = tag(&b"satisfy"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, (source, inline_requirement)) = if let Ok((after_kw, _)) =
-        preceded(tag(&b"requirement"[..]), ws1).parse(input)
-    {
-        // Fuller `satisfy requirement <name> : <Type>` form (SysML `SatisfyRequirementUsage`),
-        // reusing the shared typing fragment from usage.rs rather than hand-rolling it.
-        let inline_start = after_kw;
-        let (after_name, req_name) = name(after_kw)?;
-        let (after_type, type_suffix) = optional_typings(after_name)?;
-        let type_name = type_suffix.map(|(_, is_conjugated, targets)| {
-            let type_name = targets_display_string(&targets);
-            if is_conjugated {
-                format!("~{type_name}")
-            } else {
-                type_name
-            }
-        });
-        let source = node_from_to(
-            inline_start,
-            after_type,
-            crate::ast::Expression::FeatureRef(req_name.clone()),
-        );
-        (
-            after_type,
+    let (input, (source, inline_requirement)) =
+        if let Ok((after_kw, _)) = preceded(tag(&b"requirement"[..]), ws1).parse(input) {
+            // Fuller `satisfy requirement <name> : <Type>` form (SysML `SatisfyRequirementUsage`),
+            // reusing the shared typing fragment from usage.rs rather than hand-rolling it.
+            let inline_start = after_kw;
+            let (after_name, req_name) = name(after_kw)?;
+            let (after_type, type_suffix) = optional_typings(after_name)?;
+            let type_name = type_suffix.map(|(_, is_conjugated, targets)| {
+                let type_name = targets_display_string(&targets);
+                if is_conjugated {
+                    format!("~{type_name}")
+                } else {
+                    type_name
+                }
+            });
+            let source = node_from_to(
+                inline_start,
+                after_type,
+                crate::ast::Expression::FeatureRef(req_name.clone()),
+            );
             (
-                source,
-                Some(crate::ast::InlineSatisfyRequirement {
-                    name: req_name,
-                    type_name,
-                }),
-            ),
-        )
-    } else {
-        let (input, source) = expression(input)?;
-        (input, (source, None))
-    };
+                after_type,
+                (
+                    source,
+                    Some(crate::ast::InlineSatisfyRequirement {
+                        name: req_name,
+                        type_name,
+                    }),
+                ),
+            )
+        } else {
+            let (input, source) = expression(input)?;
+            (input, (source, None))
+        };
     let (input, target) = if let Ok((input, _)) = preceded(
         ws_and_comments,
         tag::<_, _, nom::error::Error<Input>>(&b"by"[..]),
@@ -792,8 +781,8 @@ mod membership_tests {
 
     #[test]
     fn requirement_usage_visibility_prefix_is_captured_on_membership() {
-        let (_, node) =
-            requirement_usage(input("protected requirement need1 : Need;")).expect("requirement usage");
+        let (_, node) = requirement_usage(input("protected requirement need1 : Need;"))
+            .expect("requirement usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Protected)
@@ -806,7 +795,8 @@ mod membership_tests {
 
     #[test]
     fn requirement_usage_without_visibility_prefix_has_no_membership_visibility() {
-        let (_, node) = requirement_usage(input("requirement need1 : Need;")).expect("requirement usage");
+        let (_, node) =
+            requirement_usage(input("requirement need1 : Need;")).expect("requirement usage");
         assert_eq!(node.value.membership.visibility, None);
         assert_eq!(
             node.value.membership.kind,

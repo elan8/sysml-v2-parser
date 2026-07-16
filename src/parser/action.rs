@@ -55,13 +55,7 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"#",
 ];
 
-const CONTROL_NODE_KEYWORDS: &[&[u8]] = &[
-    b"accept",
-    b"send",
-    b"terminate",
-    b"while",
-    b"if",
-];
+const CONTROL_NODE_KEYWORDS: &[&[u8]] = &[b"accept", b"send", b"terminate", b"while", b"if"];
 
 const UNTIL_SEMI_OR_BRACE: &[u8] = b";{";
 
@@ -396,7 +390,11 @@ pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
             let (next, raw) = take_until_terminator(input, b"{")?;
             (
                 next,
-                node_from_to(input, next, crate::ast::Expression::FeatureRef(raw.trim().to_string())),
+                node_from_to(
+                    input,
+                    next,
+                    crate::ast::Expression::FeatureRef(raw.trim().to_string()),
+                ),
             )
         }
     };
@@ -457,7 +455,10 @@ fn action_def_body_element(
         map(action_body_decl, ActionDefBodyElement::Decl),
         map(in_out_decl, ActionDefBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionDefBodyElement::Doc),
-        map(metadata_annotation, ActionDefBodyElement::MetadataAnnotation),
+        map(
+            metadata_annotation,
+            ActionDefBodyElement::MetadataAnnotation,
+        ),
         map(
             crate::parser::metadata_annotation::metadata_keyword_usage,
             ActionDefBodyElement::MetadataKeywordUsage,
@@ -726,7 +727,10 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         map(action_body_decl, ActionUsageBodyElement::Decl),
         map(in_out_decl, ActionUsageBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionUsageBodyElement::Doc),
-        map(metadata_annotation, ActionUsageBodyElement::MetadataAnnotation),
+        map(
+            metadata_annotation,
+            ActionUsageBodyElement::MetadataAnnotation,
+        ),
         map(
             crate::parser::metadata_annotation::metadata_keyword_usage,
             ActionUsageBodyElement::MetadataKeywordUsage,

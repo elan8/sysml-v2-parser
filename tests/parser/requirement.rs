@@ -284,16 +284,19 @@ fn test_analysis_ref_redefinition_is_structured_not_other() {
         _ => panic!("expected analysis brace body"),
     };
     assert!(
-        case_body.iter().any(|e| {
-            matches!(e.value, UseCaseDefBodyElement::RefRedefinition(_))
-        }),
+        case_body
+            .iter()
+            .any(|e| { matches!(e.value, UseCaseDefBodyElement::RefRedefinition(_)) }),
         "expected RefRedefinition, got {:?}",
-        case_body.iter().map(|e| format!("{:?}", e.value)).collect::<Vec<_>>()
+        case_body
+            .iter()
+            .map(|e| format!("{:?}", e.value))
+            .collect::<Vec<_>>()
     );
     assert!(
-        !case_body.iter().any(|e| {
-            matches!(e.value, UseCaseDefBodyElement::Other(_))
-        }),
+        !case_body
+            .iter()
+            .any(|e| { matches!(e.value, UseCaseDefBodyElement::Other(_)) }),
         "ref :>> should not land in Other"
     );
 }
@@ -559,7 +562,10 @@ requirement VehicleReq; subsets BaseReq;
         PackageBodyElement::RequirementUsage(r) => r,
         other => panic!("expected requirement usage, got {:?}", other),
     };
-    assert_eq!(req.value.subsets.as_ref().map(|n| n.value.target_display()), Some("BaseReq".to_string()));
+    assert_eq!(
+        req.value.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("BaseReq".to_string())
+    );
 }
 
 #[test]
@@ -580,7 +586,10 @@ requirement VehicleReq; subsets BaseReq :> LatestReq;
         PackageBodyElement::RequirementUsage(r) => r,
         other => panic!("expected requirement usage, got {:?}", other),
     };
-    assert_eq!(req.value.subsets.as_ref().map(|n| n.value.target_display()), Some("LatestReq".to_string()));
+    assert_eq!(
+        req.value.subsets.as_ref().map(|n| n.value.target_display()),
+        Some("LatestReq".to_string())
+    );
 }
 
 #[test]

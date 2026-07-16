@@ -1,13 +1,15 @@
 use super::behavior::{AssignStmt, ForLoop, InOut, ThenAction};
-use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
 use super::common::TextualRepresentation;
+use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
+use super::membership::Membership;
 use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
     MetadataKeywordUsage,
 };
-use super::membership::Membership;
 use super::view::ConstraintDefBodyElement;
-use crate::ast::core::{Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship};
+use crate::ast::core::{
+    Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
+};
 
 /// Requirement definition: `requirement def` Identification (`:>` specializes)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +39,12 @@ pub enum RequirementDefBody {
     },
 }
 
+// `AttributeUsage` carries a `Membership` plus several relationship nodes, making it inherently
+// larger than sibling variants like `Doc`/`Error`; boxing just this one variant in just this one
+// enum would be inconsistent with the ~10 other body-element enums sharing the same
+// `AttributeUsage(Node<AttributeUsage>)` shape crate-wide, so the size difference is accepted here
+// rather than partially addressed.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RequirementDefBodyElement {

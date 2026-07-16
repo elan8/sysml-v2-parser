@@ -557,7 +557,9 @@ pub struct SubsettingRelationship {
 /// Equality ignores `span`, matching [`TypingRelationship`]'s convention.
 impl PartialEq for SubsettingRelationship {
     fn eq(&self, other: &Self) -> bool {
-        self.target == other.target && self.kind == other.kind && self.is_implied == other.is_implied
+        self.target == other.target
+            && self.kind == other.kind
+            && self.is_implied == other.is_implied
     }
 }
 

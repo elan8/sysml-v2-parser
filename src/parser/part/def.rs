@@ -1,4 +1,4 @@
-﻿use super::body::part_def_body;
+use super::body::part_def_body;
 use super::prelude::*;
 use super::usage::{part_usage_named, part_usage_redefines_only};
 
@@ -65,8 +65,7 @@ pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefO
     if let Ok((input, _)) = tag::<_, _, nom::error::Error<Input>>(&b"def"[..]).parse(input) {
         let (input, _) = ws1(input)?;
         let (input, identification) = identification(input)?;
-        let (input, specializes) =
-            parse_optional_definition_specialization(input)?;
+        let (input, specializes) = parse_optional_definition_specialization(input)?;
         let (input, body) = part_def_body(input)?;
         return Ok((
             input,

@@ -59,7 +59,10 @@ fn subsetting_relationship_node(
     Node::new(
         span.clone(),
         SubsettingRelationship {
-            target: vec![Node::new(span.clone(), RelationshipTarget::single(target, span.clone()))],
+            target: vec![Node::new(
+                span.clone(),
+                RelationshipTarget::single(target, span.clone()),
+            )],
             kind,
             span,
             is_implied: false,
@@ -228,7 +231,10 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
             AttributeBodyElement::AttributeDef,
         ),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
-        map(attribute_feature_binding, AttributeBodyElement::AttributeUsage),
+        map(
+            attribute_feature_binding,
+            AttributeBodyElement::AttributeUsage,
+        ),
         map(
             |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
             AttributeBodyElement::Other,
@@ -246,14 +252,12 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, prefix) = nom::combinator::opt(alt((
-        map(
-            preceded(ws_and_comments, tag(&b":>>"[..])),
-            |_| MetadataBindingPrefix::Redefines,
-        ),
-        map(
-            preceded(ws_and_comments, subset_operator),
-            |_| MetadataBindingPrefix::Subsets,
-        ),
+        map(preceded(ws_and_comments, tag(&b":>>"[..])), |_| {
+            MetadataBindingPrefix::Redefines
+        }),
+        map(preceded(ws_and_comments, subset_operator), |_| {
+            MetadataBindingPrefix::Subsets
+        }),
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -555,7 +559,9 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             } => {
                 let (input, typing_result) = optional_typings(input)?;
                 let (typing_span, typing) = typing_result
-                    .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                    .map(|(span, is_conj, s)| {
+                        (Some(span.clone()), Some(typing_node(span, is_conj, s)))
+                    })
                     .unwrap_or((None, None));
                 let (input, mods0) = feature_modifiers(input)?;
                 (
@@ -577,7 +583,9 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             AttributeUsageHead::Named { name_span, name } => {
                 let (input, typing_result) = optional_typings(input)?;
                 let (typing_span, typing) = typing_result
-                    .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                    .map(|(span, is_conj, s)| {
+                        (Some(span.clone()), Some(typing_node(span, is_conj, s)))
+                    })
                     .unwrap_or((None, None));
                 let (input, mods0) = feature_modifiers(input)?;
                 (
@@ -614,7 +622,8 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         .map(|(target, _)| target);
     let references = trailing_clauses.references.or(leading_clauses.references);
     let crosses = trailing_clauses.crosses.or(leading_clauses.crosses);
-    let value = value.or(leading_subsets_value.map(crate::parser::feature_value::wrap_bind_expression));
+    let value =
+        value.or(leading_subsets_value.map(crate::parser::feature_value::wrap_bind_expression));
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -656,14 +665,12 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
         nom::combinator::opt(preceded(ws_and_comments, tag(&b"ref"[..]))).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, prefix) = nom::combinator::opt(alt((
-        map(
-            preceded(ws_and_comments, tag(&b":>>"[..])),
-            |_| MetadataBindingPrefix::Redefines,
-        ),
-        map(
-            preceded(ws_and_comments, subset_operator),
-            |_| MetadataBindingPrefix::Subsets,
-        ),
+        map(preceded(ws_and_comments, tag(&b":>>"[..])), |_| {
+            MetadataBindingPrefix::Redefines
+        }),
+        map(preceded(ws_and_comments, subset_operator), |_| {
+            MetadataBindingPrefix::Subsets
+        }),
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -858,7 +865,8 @@ mod attribute_body_tests {
 
     #[test]
     fn feature_binding_parses_unit_conversion_prefix_form() {
-        let text = ":>> unitConversion: ConversionByPrefix { :>> prefix = kilo; :>> referenceUnit = m; }";
+        let text =
+            ":>> unitConversion: ConversionByPrefix { :>> prefix = kilo; :>> referenceUnit = m; }";
         let (rest, node) = attribute_feature_binding(input(text)).expect("feature binding");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(

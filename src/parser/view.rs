@@ -1,17 +1,16 @@
 //! View, viewpoint, and rendering parsing (SysML v2 Clause 8.2.2.26).
-#![allow(dead_code, unused_imports)]
 
 use crate::ast::{
     ExposeMember, FilterMember, Membership, Node, ParseErrorNode, RenderingDef, RenderingDefBody,
     RenderingDefBodyElement, RenderingUsage, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef,
     ViewDefBody, ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
-use crate::parser::definition_header::{parse_feature_usage_header, parse_usage_header};
+use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    capture_opaque_member, identification, name, qualified_name, starts_with_any_keyword,
-    visibility_prefix, ws1, ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    capture_opaque_member, name, qualified_name, starts_with_any_keyword, visibility_prefix, ws1,
+    ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::Input;
@@ -19,8 +18,7 @@ use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, success};
-use nom::multi::many0;
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
 const VIEW_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
@@ -539,8 +537,7 @@ mod membership_tests {
 
     #[test]
     fn rendering_def_visibility_prefix_is_captured_on_membership() {
-        let (rest, node) =
-            rendering_def(input("public rendering def R1;")).expect("rendering def");
+        let (rest, node) = rendering_def(input("public rendering def R1;")).expect("rendering def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -593,8 +590,8 @@ mod membership_tests {
 
     #[test]
     fn view_rendering_usage_visibility_prefix_is_captured_on_membership() {
-        let (_, node) = view_rendering_usage(input("protected render r1 : R1;"))
-            .expect("view rendering usage");
+        let (_, node) =
+            view_rendering_usage(input("protected render r1 : R1;")).expect("view rendering usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Protected)
