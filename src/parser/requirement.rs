@@ -80,7 +80,9 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
-        DefinitionPrefixOptions::new(b"requirement").def_required(),
+        DefinitionPrefixOptions::new(b"requirement")
+            .def_required()
+            .with_captured_visibility(),
     )?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
@@ -93,6 +95,10 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
                 specializes: prefix.specializes,
                 is_abstract: prefix.is_abstract,
                 body,
+                membership: crate::ast::Membership::owning(
+                    prefix.visibility,
+                    prefix.visibility_span,
+                ),
             },
         ),
     ))
@@ -254,6 +260,10 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
                 .or(header.subsets),
             is_abstract,
             body,
+            // No visibility grammar at this shared payload's callers (`verify requirement ...`,
+            // `objective { requirement ... }`); the member-position `requirement_usage` parser
+            // overrides this after calling into the payload. See `RequirementUsage::membership`.
+            membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
         },
     ))
 }
@@ -711,6 +721,7 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
 pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ConcernUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -722,6 +733,7 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
         name: ident,
         type_name: header.type_name,
         body,
+        membership: crate::ast::Membership::feature(visibility, visibility_span),
     };
     Ok((input, node_from_to(start, input, val)))
 }
@@ -729,11 +741,114 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
 pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"requirement"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, val) =
+    let (input, mut val) =
         parse_requirement_usage_payload_with_abstract(input, None, abstract_kw.is_some())?;
+    val.membership = crate::ast::Membership::feature(visibility, visibility_span);
     Ok((input, node_from_to(start, input, val)))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (continuation): Membership on RequirementDef/RequirementUsage/ConcernUsage ---
+
+    #[test]
+    fn requirement_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            requirement_def(input("private requirement def Need;")).expect("requirement def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn requirement_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) =
+            requirement_def(input("requirement def Need;")).expect("requirement def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn requirement_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            requirement_usage(input("protected requirement need1 : Need;")).expect("requirement usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn requirement_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = requirement_usage(input("requirement need1 : Need;")).expect("requirement usage");
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn concern_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            concern_usage(input("public concern c1 : ConcernType;")).expect("concern usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn concern_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = concern_usage(input("concern c1 : ConcernType;")).expect("concern usage");
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    /// Payload sites with no visibility grammar of their own (`verify requirement ...`,
+    /// `objective { requirement ... }`) always build `visibility: None` -- see
+    /// `RequirementUsage::membership`'s doc comment.
+    #[test]
+    fn verify_requirement_inline_usage_has_no_membership_visibility() {
+        let (_, node) = verify_requirement(input("verify requirement r1 : ReqType;"))
+            .expect("verify requirement");
+        let inline = node
+            .value
+            .requirement
+            .expect("inline requirement usage present");
+        assert_eq!(inline.value.membership.visibility, None);
+    }
 }

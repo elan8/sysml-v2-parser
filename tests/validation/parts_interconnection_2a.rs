@@ -106,6 +106,15 @@ fn feature_membership() -> sysml_v2_parser::ast::Membership {
     sysml_v2_parser::ast::Membership::feature(None, Span::dummy())
 }
 
+/// Both `import`s in this fixture's source are written `public import ...`.
+fn public_import_membership() -> sysml_v2_parser::ast::Membership {
+    sysml_v2_parser::ast::Membership::new(
+        sysml_v2_parser::ast::MembershipKind::Import,
+        Some(Visibility::Public),
+        Span::dummy(),
+    )
+}
+
 /// Path expression from dot-separated path (e.g. "engine.fuelCmdPort"), for endpoints parsed via
 /// `path_expression` (`src/parser/expr.rs`: bind/connect/allocate/interface-connect lhs/rhs). A
 /// single segment stays `FeatureRef`; a genuine multi-segment dotted chain becomes
@@ -163,7 +172,7 @@ fn expected_ast() -> RootNamespace {
             body: PackageBody::Brace {
                 elements: vec![
                     n(PackageBodyElement::Import(n(Import {
-                        visibility: Some(Visibility::Public),
+                        membership: public_import_membership(),
                         is_import_all: true,
                         target: "Definitions::*".to_string(),
                         target_span: Span::dummy(),
@@ -171,7 +180,7 @@ fn expected_ast() -> RootNamespace {
                         filter_members: None,
                     }))),
                     n(PackageBodyElement::Import(n(Import {
-                        visibility: Some(Visibility::Public),
+                        membership: public_import_membership(),
                         is_import_all: true,
                         target: "Usages::*".to_string(),
                         target_span: Span::dummy(),
@@ -572,6 +581,7 @@ fn interface_def_engine_to_transmission() -> PackageBodyElement {
                 }))),
             ],
         },
+        membership: owning_membership(),
     }))
 }
 
@@ -617,6 +627,7 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                 }))),
             ],
         },
+        membership: owning_membership(),
     }))
 }
 

@@ -1,8 +1,9 @@
 //! Shared occurrence-style body parsing for occurrence defs and generic `DefinitionBody` users.
 
 use crate::ast::{
-    AssertConstraintMember, ConstraintDefBody, DefinitionBody, DefinitionBodyElement, Node,
-    OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode, SuccessionUsage,
+    AssertConstraintMember, ConstraintDefBody, DefinitionBody, DefinitionBodyElement, Membership,
+    Node, OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode,
+    SuccessionUsage,
 };
 use crate::parser::attribute::attribute_usage;
 use crate::parser::body::parse_structured_brace_members;
@@ -10,7 +11,9 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
-use crate::parser::lex::{capture_opaque_member, name, recover_body_element, ws1, ws_and_comments};
+use crate::parser::lex::{
+    capture_opaque_member, name, recover_body_element, visibility_prefix, ws1, ws_and_comments,
+};
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::flow::flow_usage_member;
@@ -122,33 +125,66 @@ fn occurrence_definition_body_with_labels<'a>(
 }
 
 pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    occurrence_usage_with_modifiers(input, false, false, None)
+    let (input, (visibility_span, visibility)) = preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    occurrence_usage_with_modifiers(
+        input,
+        false,
+        false,
+        None,
+        Membership::feature(visibility, visibility_span),
+    )
 }
 
 pub(crate) fn individual_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
+    let (input, (visibility_span, visibility)) = preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"individual"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    occurrence_usage_tail(input, true, false, None)
+    occurrence_usage_tail(input, true, false, None, Membership::feature(visibility, visibility_span))
 }
 
 pub(crate) fn snapshot_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
+    let (input, (visibility_span, visibility)) = preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"snapshot"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    occurrence_usage_tail(input, false, false, Some("snapshot".to_string()))
+    occurrence_usage_tail(
+        input,
+        false,
+        false,
+        Some("snapshot".to_string()),
+        Membership::feature(visibility, visibility_span),
+    )
 }
 
 pub(crate) fn timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
+    let (input, (visibility_span, visibility)) = preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"timeslice"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    occurrence_usage_tail(input, false, false, Some("timeslice".to_string()))
+    occurrence_usage_tail(
+        input,
+        false,
+        false,
+        Some("timeslice".to_string()),
+        Membership::feature(visibility, visibility_span),
+    )
 }
 
+/// `then timeslice ...`: a succession-continuation form, not a distinct BNF production with its
+/// own `BasicUsagePrefix`/visibility grammar (unlike `occurrence`/`individual`/`snapshot`/
+/// `timeslice`, each `OccurrenceUsagePrefix`-backed per the BNF and captured above) -- ad hoc
+/// site, `visibility: None`, matching this rollout's established convention for constructs with
+/// no visibility grammar of their own (see `AttributeUsage`'s ad hoc sites).
 pub(crate) fn then_timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"timeslice"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    occurrence_usage_tail(input, false, true, Some("timeslice".to_string()))
+    occurrence_usage_tail(
+        input,
+        false,
+        true,
+        Some("timeslice".to_string()),
+        Membership::feature(None, crate::ast::Span::dummy()),
+    )
 }
 
 fn occurrence_usage_with_modifiers(
@@ -156,10 +192,11 @@ fn occurrence_usage_with_modifiers(
     is_individual: bool,
     is_then: bool,
     portion_kind: Option<String>,
+    membership: Membership,
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let (input, _) = preceded(ws_and_comments, tag(&b"occurrence"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    occurrence_usage_tail(input, is_individual, is_then, portion_kind)
+    occurrence_usage_tail(input, is_individual, is_then, portion_kind, membership)
 }
 
 fn occurrence_usage_tail(
@@ -167,6 +204,7 @@ fn occurrence_usage_tail(
     is_individual: bool,
     is_then: bool,
     portion_kind: Option<String>,
+    membership: Membership,
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let start = input;
     let (input, name_str) = name(input)?;
@@ -222,6 +260,7 @@ fn occurrence_usage_tail(
                 references,
                 crosses,
                 body,
+                membership,
             },
         ),
     ))
@@ -338,6 +377,7 @@ pub(crate) fn occurrence_body_element(
 fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = tag(&b"succession"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
@@ -361,6 +401,7 @@ fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage
                 target,
                 target_multiplicity,
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -385,4 +426,96 @@ pub(crate) fn assert_constraint_member(
         input,
         node_from_to(start, input, AssertConstraintMember { body, is_negated }),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): Membership on OccurrenceUsage/SuccessionUsage ---
+
+    #[test]
+    fn occurrence_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            occurrence_usage(input("protected occurrence o1 : O1;")).expect("occurrence usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn occurrence_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = occurrence_usage(input("occurrence o1 : O1;")).expect("occurrence usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn individual_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            individual_usage(input("private individual o1 : O1;")).expect("individual usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+    }
+
+    #[test]
+    fn snapshot_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            snapshot_usage(input("public snapshot o1 : O1;")).expect("snapshot usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+    }
+
+    #[test]
+    fn timeslice_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            timeslice_usage(input("protected timeslice o1 : O1;")).expect("timeslice usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+    }
+
+    #[test]
+    fn then_timeslice_usage_always_has_no_membership_visibility() {
+        // Ad hoc site with no visibility grammar of its own -- see the doc comment on
+        // `then_timeslice_usage`.
+        let (_, node) =
+            then_timeslice_usage(input("then timeslice o1 : O1;")).expect("then timeslice usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn succession_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = succession_usage(input("protected succession first a then b;"))
+            .expect("succession usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn succession_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) =
+            succession_usage(input("succession first a then b;")).expect("succession usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
 }

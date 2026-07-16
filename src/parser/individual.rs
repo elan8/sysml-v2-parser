@@ -1,6 +1,6 @@
 //! Individual definition parsing.
 
-use crate::ast::{IndividualDef, Node};
+use crate::ast::{IndividualDef, Membership, Node};
 use crate::parser::attribute::attribute_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
@@ -14,7 +14,8 @@ pub(crate) fn individual_def(input: Input<'_>) -> IResult<Input<'_>, Node<Indivi
         input,
         DefinitionPrefixOptions::new(b"individual")
             .def_required()
-            .no_abstract(),
+            .no_abstract()
+            .with_captured_visibility(),
     )?;
     let (input, body) = attribute_body(input)?;
     Ok((
@@ -26,7 +27,42 @@ pub(crate) fn individual_def(input: Input<'_>) -> IResult<Input<'_>, Node<Indivi
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): Membership on IndividualDef ---
+
+    #[test]
+    fn individual_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            individual_def(input("private individual def I1;")).expect("individual def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn individual_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = individual_def(input("individual def I1;")).expect("individual def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
 }

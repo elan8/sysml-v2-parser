@@ -46,6 +46,17 @@ pub enum MembershipKind {
     Import,
     /// An aliased member (`alias ... for ...`).
     Alias,
+    /// A `variant` member inside a `variation part`/`variation` body (BNF `VariantUsageMember :
+    /// VariantMembership = MemberPrefix 'variant' ownedVariantUsage = VariantUsageElement`),
+    /// confirmed against `SysML-textual-bnf.kebnf` during the Item 4b final sweep -- named
+    /// `VariantMembership` in the grammar itself, and its `MemberPrefix` legally carries a
+    /// visibility prefix, so this is a distinct kind rather than reusing `FeatureMembership`.
+    VariantMembership,
+    /// An `actor` member inside a use-case-family body (BNF `ActorMember : ActorMembership =
+    /// MemberPrefix ownedRelatedElement += ActorUsage`), confirmed against
+    /// `SysML-textual-bnf.kebnf` during the Item 4b final sweep -- named `ActorMembership` in the
+    /// grammar itself, distinct from `RequirementActorDecl`/`ActorDecl`'s own membership form.
+    ActorMembership,
 }
 
 /// Ownership/visibility/kind wrapper for a def/usage member, kept alongside (not replacing) the
@@ -94,5 +105,15 @@ impl Membership {
     /// Convenience constructor for the common `*Usage` case (see [`MembershipKind::FeatureMembership`]).
     pub fn feature(visibility: Option<Visibility>, span: Span) -> Self {
         Self::new(MembershipKind::FeatureMembership, visibility, span)
+    }
+
+    /// Convenience constructor for `VariantUsage` (see [`MembershipKind::VariantMembership`]).
+    pub fn variant(visibility: Option<Visibility>, span: Span) -> Self {
+        Self::new(MembershipKind::VariantMembership, visibility, span)
+    }
+
+    /// Convenience constructor for `ActorUsage` (see [`MembershipKind::ActorMembership`]).
+    pub fn actor(visibility: Option<Visibility>, span: Span) -> Self {
+        Self::new(MembershipKind::ActorMembership, visibility, span)
     }
 }

@@ -1,8 +1,8 @@
-use crate::ast::{AllocationDef, AllocationUsage, Node};
+use crate::ast::{AllocationDef, AllocationUsage, Membership, Node};
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
-use crate::parser::lex::{name, ws1, ws_and_comments};
+use crate::parser::lex::{name, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::feature_usage_header;
 use crate::parser::Input;
@@ -18,7 +18,8 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
         input,
         DefinitionPrefixOptions::new(b"allocation")
             .def_required()
-            .no_abstract(),
+            .no_abstract()
+            .with_captured_visibility(),
     )?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
@@ -30,6 +31,7 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
@@ -37,6 +39,7 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
 
 pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AllocationUsage>> {
     let start = input;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"allocation"[..]).parse(input)?;
@@ -70,6 +73,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
                 source,
                 target,
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -77,6 +81,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
 
 pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AllocationUsage>> {
     let start = input;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"allocate"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, source) = expression(input)?;
@@ -94,7 +99,81 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
                 source: Some(source),
                 target: Some(target),
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): Membership on AllocationDef/AllocationUsage ---
+
+    #[test]
+    fn allocation_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            allocation_def(input("private allocation def A1;")).expect("allocation def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn allocation_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = allocation_def(input("allocation def A1;")).expect("allocation def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn allocation_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            allocation_usage(input("protected allocation a1;")).expect("allocation usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn allocation_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = allocation_usage(input("allocation a1;")).expect("allocation usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn allocate_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = allocate_usage(input("public allocate a to b;")).expect("allocate usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn allocate_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = allocate_usage(input("allocate a to b;")).expect("allocate usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
 }

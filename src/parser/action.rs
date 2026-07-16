@@ -499,7 +499,9 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
-        DefinitionPrefixOptions::new(b"action").def_required(),
+        DefinitionPrefixOptions::new(b"action")
+            .def_required()
+            .with_captured_visibility(),
     )?;
     let (input, body) = action_def_body(input)?;
     Ok((
@@ -511,6 +513,10 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: crate::ast::Membership::owning(
+                    prefix.visibility,
+                    prefix.visibility_span,
+                ),
             },
         ),
     ))
@@ -802,6 +808,7 @@ fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>
 pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -835,7 +842,60 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (continuation): Membership on ActionDef/ActionUsage ---
+
+    #[test]
+    fn action_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) = action_def(input("private action def A1;")).expect("action def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn action_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = action_def(input("action def A1;")).expect("action def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn action_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = action_usage(input("protected action a1 : A1;")).expect("action usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn action_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = action_usage(input("action a1 : A1;")).expect("action usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
 }

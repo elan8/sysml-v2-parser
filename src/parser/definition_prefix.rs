@@ -43,15 +43,13 @@ pub enum DefKeywordMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VisibilityPrefix {
     None,
-    /// Optional `private` before the keyword (`constraint def`, etc.). Matched and discarded --
-    /// does not populate `DefinitionPrefixResult::visibility`. Kept for the two pre-existing
-    /// `constraint`/`calc` call sites; new call sites that need to feed a
-    /// [`crate::ast::Membership`] should use [`Captured`](VisibilityPrefix::Captured) instead.
-    OptionalPrivate,
     /// Optional `private` / `protected` / `public` before the keyword, captured (not discarded)
     /// via [`crate::parser::lex::visibility_prefix`] into `DefinitionPrefixResult::visibility`/
     /// `visibility_span`, for callers building a [`crate::ast::Membership`] (parser work item 4b
-    /// continuation, `PortDef`/`ItemDef`/`ConnectionDef`).
+    /// continuation, `PortDef`/`ItemDef`/`ConnectionDef`, and -- as of the Item 4b final sweep --
+    /// every remaining `*Def` in this crate, including `constraint`/`calc`, which previously used
+    /// a since-removed `OptionalPrivate` mode that matched-and-discarded a bare `private` only;
+    /// `Captured` is a strict superset that also accepts `protected`/`public`).
     Captured,
 }
 
@@ -97,11 +95,6 @@ impl DefinitionPrefixOptions {
 
     pub const fn no_abstract(mut self) -> Self {
         self.abstract_allowed = false;
-        self
-    }
-
-    pub const fn with_private(mut self) -> Self {
-        self.visibility = VisibilityPrefix::OptionalPrivate;
         self
     }
 
@@ -162,11 +155,6 @@ pub(crate) fn parse_definition_prefix(
             None,
             crate::parser::span_from_to(input, input),
         ),
-        VisibilityPrefix::OptionalPrivate => {
-            let (input, _) = opt(preceded(tag(&b"private"[..]), ws1)).parse(input)?;
-            let (input, _) = opt(preceded(tag(&b"private"[..]), ws1)).parse(input)?;
-            (input, None, crate::parser::span_from_to(input, input))
-        }
         VisibilityPrefix::Captured => {
             let (input, (span, vis)) = crate::parser::lex::visibility_prefix(input)?;
             (input, vis, span)
@@ -270,12 +258,13 @@ mod tests {
         let (_, prefix) = parse_definition_prefix(
             input,
             DefinitionPrefixOptions::new(b"constraint")
-                .with_private()
+                .with_captured_visibility()
                 .def_required(),
         )
         .expect("prefix");
         assert!(prefix.is_abstract);
         assert_eq!(prefix.identification.name.as_deref(), Some("X"));
+        assert_eq!(prefix.visibility, Some(crate::ast::Visibility::Private));
     }
 
     #[test]

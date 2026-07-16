@@ -781,6 +781,9 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
 /// (`variant name;`).
 pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
     let start = input;
+    let (input, (visibility_span, visibility)) =
+        crate::parser::lex::visibility_prefix(input)?;
+    let membership = Membership::variant(visibility, visibility_span);
     let (input, _) = tag(&b"variant"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
 
@@ -794,6 +797,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
                 VariantUsage {
                     name,
                     typed: Some(VariantTypedUsage::Part(Box::new(usage))),
+                    membership,
                 },
             ),
         ));
@@ -808,6 +812,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
                 VariantUsage {
                     name,
                     typed: Some(VariantTypedUsage::Attribute(Box::new(usage))),
+                    membership,
                 },
             ),
         ));
@@ -822,6 +827,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
                 VariantUsage {
                     name,
                     typed: Some(VariantTypedUsage::Item(Box::new(usage))),
+                    membership,
                 },
             ),
         ));
@@ -836,6 +842,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
                 VariantUsage {
                     name,
                     typed: Some(VariantTypedUsage::Port(Box::new(usage))),
+                    membership,
                 },
             ),
         ));
@@ -845,7 +852,15 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
-        node_from_to(start, input, VariantUsage { name, typed: None }),
+        node_from_to(
+            start,
+            input,
+            VariantUsage {
+                name,
+                typed: None,
+                membership,
+            },
+        ),
     ))
 }
 
@@ -959,6 +974,11 @@ fn exhibit_state_as_state_usage(
         name: exhibit.value.name,
         type_name: exhibit.value.type_name,
         body: exhibit.value.body,
+        // `ExhibitState` (the struct this adapts from) has no `membership`/visibility field of
+        // its own -- out of this item's scope, see `CHANGELOG.md`'s Item 4b entries -- so there
+        // is nothing to thread through here; ad hoc site, `visibility: None` per this rollout's
+        // established convention (see `AttributeUsage`'s ad hoc sites).
+        membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
     };
     Ok((input, Node::new(exhibit.span, state)))
 }
@@ -1077,5 +1097,54 @@ mod par_002_nested_def_tests {
             elements[0].value,
             crate::ast::PartDefBodyElement::StateDef(_)
         ));
+    }
+}
+
+#[cfg(test)]
+mod variant_membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): VariantMembership on VariantUsage, confirmed
+    // against the BNF's `VariantUsageMember : VariantMembership = MemberPrefix 'variant'
+    // ownedVariantUsage = VariantUsageElement`.
+
+    #[test]
+    fn variant_usage_visibility_prefix_is_captured_on_membership_untyped_form() {
+        let (rest, node) = variant_usage(input("private variant v1;")).expect("variant usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::VariantMembership
+        );
+    }
+
+    #[test]
+    fn variant_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = variant_usage(input("variant v1;")).expect("variant usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn variant_usage_visibility_prefix_is_captured_on_membership_typed_form() {
+        let (_, node) =
+            variant_usage(input("protected variant part p1 : P1;")).expect("variant usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::VariantMembership
+        );
     }
 }

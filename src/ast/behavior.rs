@@ -1,4 +1,5 @@
 use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
+use super::membership::Membership;
 use super::requirement::RequirementUsage;
 use super::structure::{
     Annotation, Bind, DefinitionBody, MetadataAnnotation, MetadataKeywordUsage, Perform, RefDecl,
@@ -12,6 +13,11 @@ pub struct ActionDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ActionDefBody,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::OwningMembership`]. Genuine new grammar coverage: `action_def`
+    /// did not previously accept a `private`/`protected`/`public` prefix -- same gap class found
+    /// repeatedly in this rollout (see `crate::ast::PortDef::membership`).
+    pub membership: Membership,
 }
 
 /// Body of an action definition: `;` or `{` ActionDefBodyElement* `}`.
@@ -172,6 +178,12 @@ pub struct ActionUsage {
     pub name_span: Option<Span>,
     /// Span of the type reference after `:` (for semantic tokens).
     pub type_ref_span: Option<Span>,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::FeatureMembership`]. Captured with real visibility only for
+    /// the primary `action_usage` parser; the `accept`/`send` standalone control-node-statement
+    /// constructor (`control_node_payload_stmt`) has no visibility grammar of its own and always
+    /// sets `visibility: None`, matching this rollout's ad hoc-site convention.
+    pub membership: Membership,
 }
 
 /// Body of an action usage: `;` or `{` ActionUsageBodyElement* `}`.
@@ -228,6 +240,7 @@ pub struct FlowDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,
+    pub membership: Membership,
 }
 
 /// Kind of flow usage statement per SysML v2 §8.2.2.16.
@@ -250,6 +263,7 @@ pub struct FlowUsage {
     pub from: Option<Node<Expression>>,
     pub to: Option<Node<Expression>>,
     pub body: DefinitionBody,
+    pub membership: Membership,
 }
 
 /// First/then control flow: `first` expr `then` expr body.
@@ -346,6 +360,7 @@ pub struct AllocationDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,
+    pub membership: Membership,
 }
 
 /// Allocation usage: `allocation` name (`:` type)? [`allocate` source `to` target]? body.
@@ -357,6 +372,7 @@ pub struct AllocationUsage {
     pub source: Option<Node<Expression>>,
     pub target: Option<Node<Expression>>,
     pub body: DefinitionBody,
+    pub membership: Membership,
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +386,7 @@ pub struct StateDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: StateDefBody,
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -457,6 +474,7 @@ pub struct StateUsage {
     pub name: String,
     pub type_name: Option<String>,
     pub body: StateDefBody,
+    pub membership: Membership,
 }
 
 /// Transition: `transition` name [`first` source [`accept` trigger]] [`if` guard] [`do` effect] `then` target body.

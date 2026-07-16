@@ -2,7 +2,7 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    ExposeMember, FilterMember, Node, ParseErrorNode, RenderingDef, RenderingDefBody,
+    ExposeMember, FilterMember, Membership, Node, ParseErrorNode, RenderingDef, RenderingDefBody,
     RenderingDefBodyElement, RenderingUsage, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef,
     ViewDefBody, ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
@@ -10,8 +10,8 @@ use crate::parser::definition_header::{parse_feature_usage_header, parse_usage_h
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    capture_opaque_member, identification, name, qualified_name, starts_with_any_keyword, ws1,
-    ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    capture_opaque_member, identification, name, qualified_name, starts_with_any_keyword,
+    visibility_prefix, ws1, ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::Input;
@@ -51,6 +51,8 @@ fn view_filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterMember>
 
 fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderingUsage>> {
     let start = input;
+    let (input, (visibility_span, visibility)) =
+        preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"render"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
@@ -65,6 +67,7 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
                 name: name_str,
                 type_name: header.type_name,
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -107,8 +110,12 @@ fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
 
 pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
     let start = input;
-    let (input, prefix) =
-        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"view").def_required())?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"view")
+            .def_required()
+            .with_captured_visibility(),
+    )?;
     let (input, body) = view_def_body(input)?;
     Ok((
         input,
@@ -119,6 +126,7 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
@@ -128,7 +136,9 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
-        DefinitionPrefixOptions::new(b"viewpoint").def_required(),
+        DefinitionPrefixOptions::new(b"viewpoint")
+            .def_required()
+            .with_captured_visibility(),
     )?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
@@ -140,6 +150,7 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
@@ -201,7 +212,9 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
-        DefinitionPrefixOptions::new(b"rendering").def_required(),
+        DefinitionPrefixOptions::new(b"rendering")
+            .def_required()
+            .with_captured_visibility(),
     )?;
     let (input, body) = rendering_def_body(input)?;
     Ok((
@@ -213,6 +226,7 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
@@ -364,6 +378,7 @@ fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
 pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -379,6 +394,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
                 name: name_str,
                 type_name: header.type_name,
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -387,6 +403,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
 pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewpointUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -402,6 +419,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
                 name: name_str,
                 type_name: header.type_name.unwrap_or_default(),
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -410,6 +428,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
 pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RenderingUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"rendering"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -425,6 +444,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
                 name: name_str,
                 type_name: header.type_name,
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -467,5 +487,128 @@ mod expose_diagnostic_tests {
             expose.value.target, "SurveillanceDrone.SurveillanceQuadrotorDrone",
             "feature-chain segments should be preserved in expose target"
         );
+    }
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): Membership on the view family (7 structs) ---
+
+    #[test]
+    fn view_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) = view_def(input("private view def V1;")).expect("view def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn view_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = view_def(input("view def V1;")).expect("view def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn viewpoint_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            viewpoint_def(input("protected viewpoint def VP1;")).expect("viewpoint def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn rendering_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            rendering_def(input("public rendering def R1;")).expect("rendering def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn view_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = view_usage(input("private view v1 : V1;")).expect("view usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn view_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = view_usage(input("view v1 : V1;")).expect("view usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn viewpoint_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            viewpoint_usage(input("protected viewpoint vp1 : VP1;")).expect("viewpoint usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+    }
+
+    #[test]
+    fn rendering_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            rendering_usage(input("public rendering r1 : R1;")).expect("rendering usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+    }
+
+    #[test]
+    fn view_rendering_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = view_rendering_usage(input("protected render r1 : R1;"))
+            .expect("view rendering usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn view_rendering_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) =
+            view_rendering_usage(input("render r1 : R1;")).expect("view rendering usage");
+        assert_eq!(node.value.membership.visibility, None);
     }
 }

@@ -508,6 +508,7 @@ fn normalize_enumeration_usage(u: &EnumerationUsage) -> EnumerationUsage {
         multiplicity: u.multiplicity.clone(),
         body: u.body.clone(),
         is_end: u.is_end,
+        membership: u.membership.clone(),
     }
 }
 
@@ -892,6 +893,7 @@ fn normalize_interface_def(i: &InterfaceDef) -> InterfaceDef {
         identification: i.identification.clone(),
         specializes: i.specializes.clone(),
         body: normalize_interface_def_body(&i.body),
+        membership: i.membership.clone(),
     }
 }
 
@@ -964,6 +966,7 @@ fn normalize_metadata_def(m: &MetadataDef) -> MetadataDef {
         identification: m.identification.clone(),
         specializes: m.specializes.clone(),
         body: m.body.clone(),
+        membership: m.membership.clone(),
     }
 }
 
@@ -972,6 +975,7 @@ fn normalize_enum_def(e: &EnumDef) -> EnumDef {
         identification: e.identification.clone(),
         specializes: e.specializes.clone(),
         body: e.body.clone(),
+        membership: e.membership.clone(),
     }
 }
 
@@ -981,6 +985,7 @@ fn normalize_occurrence_def(o: &OccurrenceDef) -> OccurrenceDef {
         identification: o.identification.clone(),
         specializes: o.specializes.clone(),
         body: o.body.clone(),
+        membership: o.membership.clone(),
     }
 }
 
@@ -1060,6 +1065,7 @@ fn normalize_action_def(a: &ActionDef) -> ActionDef {
         identification: a.identification.clone(),
         specializes: a.specializes.clone(),
         body: normalize_action_def_body(&a.body),
+        membership: a.membership.clone(),
     }
 }
 
@@ -1158,6 +1164,7 @@ fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
         body: normalize_action_usage_body(&a.body),
         name_span: None,
         type_ref_span: None,
+        membership: a.membership.clone(),
     }
 }
 

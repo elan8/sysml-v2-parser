@@ -19,6 +19,12 @@ pub struct RequirementDef {
     /// True for `abstract requirement def ...`.
     pub is_abstract: bool,
     pub body: RequirementDefBody,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::OwningMembership`]. Genuine new grammar coverage (not just
+    /// discarded data): `requirement_def` did not previously accept a `private`/`protected`/
+    /// `public` prefix -- same gap class found repeatedly in this rollout (see
+    /// `crate::ast::PortDef::membership`).
+    pub membership: Membership,
 }
 
 /// Body of an requirement definition: `;` or `{` RequirementDefBodyElement* `}`.
@@ -155,6 +161,15 @@ pub struct RequirementUsage {
     /// True for `abstract requirement ...`.
     pub is_abstract: bool,
     pub body: RequirementDefBody,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
+    /// [`crate::ast::MembershipKind::FeatureMembership`]. Only captured with real visibility for
+    /// the top-level `requirement_usage` member-position parser; the shared
+    /// `parse_requirement_usage_payload*` helper used inside `verify requirement ...` and
+    /// `objective { requirement ... }` (neither has visibility syntax of its own) always sets
+    /// `visibility: None`, matching this rollout's convention for ad hoc, no-visibility-grammar
+    /// construction sites (see `AttributeUsage`'s three ad hoc sites in the first `Membership`
+    /// increment).
+    pub membership: Membership,
 }
 
 /// Item usage inside a part definition body: `item` name multiplicity? (`:` type)? body.
@@ -187,6 +202,7 @@ pub struct EnumerationUsage {
     /// the same `UsagePrefix` production `AttributeUsage.is_end` uses (`UsagePrefix 'enum'
     /// Usage`). See `structure::AttributeUsage::is_end` for the full BNF citation.
     pub is_end: bool,
+    pub membership: Membership,
 }
 
 /// Dependency: `dependency` (Identification `from`)? client(s) `to` supplier(s) RelationshipBody.
@@ -214,6 +230,12 @@ pub struct ConcernUsage {
     pub name: String,
     pub type_name: Option<String>,
     pub body: RequirementDefBody,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
+    /// [`crate::ast::MembershipKind::FeatureMembership`] -- no separate `ConcernDef` struct exists
+    /// in this AST (`concern_usage` already handles both the `concern` and `concern def` textual
+    /// forms itself; the BNF's own `ConcernDefinition` production is not modeled as a distinct
+    /// struct, a pre-existing design predating this item and out of scope to change here).
+    pub membership: Membership,
 }
 
 /// Case definition: `case def` Identification body.
@@ -225,6 +247,8 @@ pub struct CaseDef {
     /// True for `abstract case def ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
+    /// See [`RequirementDef::membership`]; same gap class found again for `case_def`.
+    pub membership: Membership,
 }
 
 /// Case usage: `case` name (`:` type)? body.
@@ -236,6 +260,9 @@ pub struct CaseUsage {
     /// True for `abstract case ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
+    /// See [`RequirementUsage::membership`]; `case_usage` captures real visibility, `kind` always
+    /// [`crate::ast::MembershipKind::FeatureMembership`].
+    pub membership: Membership,
 }
 
 /// Analysis case definition: `analysis def` Identification body.
@@ -247,6 +274,8 @@ pub struct AnalysisCaseDef {
     /// True for `abstract analysis def ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
+    /// See [`RequirementDef::membership`]; same gap class found again for `analysis_case_def`.
+    pub membership: Membership,
 }
 
 /// Analysis case usage: `analysis` name (`:` type)? body.
@@ -258,6 +287,9 @@ pub struct AnalysisCaseUsage {
     /// True for `abstract analysis ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
+    /// See [`RequirementUsage::membership`]; `analysis_case_usage` captures real visibility,
+    /// `kind` always [`crate::ast::MembershipKind::FeatureMembership`].
+    pub membership: Membership,
 }
 
 /// Verification case definition: `verification def` Identification body.
@@ -269,6 +301,8 @@ pub struct VerificationCaseDef {
     /// True for `abstract verification def ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
+    /// See [`RequirementDef::membership`]; same gap class found again for `verification_case_def`.
+    pub membership: Membership,
 }
 
 /// Verification case usage: `verification` name (`:` type)? body.
@@ -280,6 +314,9 @@ pub struct VerificationCaseUsage {
     /// True for `abstract verification ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
+    /// See [`RequirementUsage::membership`]; `verification_case_usage` captures real visibility,
+    /// `kind` always [`crate::ast::MembershipKind::FeatureMembership`].
+    pub membership: Membership,
 }
 
 /// Use case usage at package level: `use case` name (`:` type)? CaseBody.
@@ -291,6 +328,11 @@ pub struct UseCaseUsage {
     /// True for `abstract use case ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
+    /// See [`RequirementUsage::membership`]; captures real visibility at member position
+    /// (`use_case_usage`), `visibility: None` at the `then use case ...` control-flow position
+    /// (`use_case_usage_in_body`, no visibility grammar there). `kind` always
+    /// [`crate::ast::MembershipKind::FeatureMembership`].
+    pub membership: Membership,
 }
 
 // ---------------------------------------------------------------------------
@@ -313,6 +355,8 @@ pub struct UseCaseDef {
     /// True for `abstract use case def ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
+    /// See [`RequirementDef::membership`]; same gap class found again for `use_case_def`.
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -445,6 +489,12 @@ pub enum UseCaseDefBodyElement {
 pub struct ActorUsage {
     pub name: String,
     pub type_name: String,
+    /// Ownership/visibility/kind wrapper (parser work item 4b final sweep), `kind` always
+    /// [`crate::ast::MembershipKind::ActorMembership`] -- confirmed against
+    /// `SysML-textual-bnf.kebnf`'s `ActorMember : ActorMembership = MemberPrefix
+    /// ownedRelatedElement += ActorUsage`, which legally carries a visibility prefix before this
+    /// increment added support for parsing one.
+    pub membership: Membership,
 }
 
 /// Objective `objective { doc ... }`

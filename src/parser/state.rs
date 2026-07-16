@@ -1,8 +1,8 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    DoAction, EntryAction, ExitAction, FinalState, Node, RefBody, RefDecl, StateDef, StateDefBody,
-    StateDefBodyElement, StateUsage, ThenStmt, Transition, TransitionEffect,
+    DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefBody, RefDecl, StateDef,
+    StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition, TransitionEffect,
 };
 use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
 use crate::parser::build_recovery_error_node_from_span;
@@ -10,8 +10,8 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
-    STATE_BODY_STARTERS,
+    starts_with_any_keyword, starts_with_keyword, take_until_terminator, visibility_prefix, ws1,
+    ws_and_comments, STATE_BODY_STARTERS,
 };
 
 const UNTIL_BODY: &[u8] = b";{";
@@ -30,8 +30,12 @@ use nom::{IResult, Parser};
 
 pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> {
     let start = input;
-    let (input, prefix) =
-        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"state").def_required())?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"state")
+            .def_required()
+            .with_captured_visibility(),
+    )?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
@@ -42,6 +46,7 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
@@ -348,6 +353,7 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
 
 pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsage>> {
     let start = input;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"state"[..]).parse(input)?;
@@ -371,6 +377,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
                 name: n,
                 type_name: header.type_name,
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -559,4 +566,56 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): Membership on StateDef/StateUsage ---
+
+    #[test]
+    fn state_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) = state_def(input("private state def S1;")).expect("state def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn state_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = state_def(input("state def S1;")).expect("state def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn state_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = state_usage(input("protected state s1 : S1;")).expect("state usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn state_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = state_usage(input("state s1 : S1;")).expect("state usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
 }

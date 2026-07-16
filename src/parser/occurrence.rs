@@ -1,6 +1,6 @@
 //! Occurrence definition parsing.
 
-use crate::ast::{Node, OccurrenceDef};
+use crate::ast::{Membership, Node, OccurrenceDef};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
 use crate::parser::occurrence_body::occurrence_def_definition_body;
@@ -15,7 +15,9 @@ pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
-        DefinitionPrefixOptions::new(b"occurrence").def_required(),
+        DefinitionPrefixOptions::new(b"occurrence")
+            .def_required()
+            .with_captured_visibility(),
     )?;
     let (input, body) = occurrence_def_definition_body(input)?;
     Ok((
@@ -28,7 +30,42 @@ pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): Membership on OccurrenceDef ---
+
+    #[test]
+    fn occurrence_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            occurrence_def(input("private occurrence def O1;")).expect("occurrence def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn occurrence_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = occurrence_def(input("occurrence def O1;")).expect("occurrence def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
 }

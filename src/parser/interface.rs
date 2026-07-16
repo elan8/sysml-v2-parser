@@ -3,7 +3,7 @@
 
 use crate::ast::{
     ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, InterfaceDef, InterfaceDefBody,
-    InterfaceDefBodyElement, Node, RefBody, RefDecl,
+    InterfaceDefBodyElement, Membership, Node, RefBody, RefDecl,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::body::advance_to_closing_brace;
@@ -278,7 +278,7 @@ fn parse_interface_def(
     require_def: bool,
 ) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"interface");
+    let mut options = DefinitionPrefixOptions::new(b"interface").with_captured_visibility();
     if require_def {
         options = options.def_required();
     }
@@ -293,6 +293,7 @@ fn parse_interface_def(
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
@@ -365,5 +366,39 @@ mod par_002_widening_tests {
         ));
         let result = port_def_required(input(text));
         assert!(result.is_ok(), "port_def_required should also accept {text:?}");
+    }
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): Membership on InterfaceDef ---
+
+    #[test]
+    fn interface_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            interface_def(input("private interface def I1;")).expect("interface def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn interface_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = interface_def(input("interface def I1;")).expect("interface def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
     }
 }

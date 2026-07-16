@@ -5,7 +5,563 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+### Item 4b closing sweep: scope-boundary list is now empty
+
+Per the task's closing instruction, re-swept the whole `src/ast` tree for every `*Def`/`*Usage`-
+shaped struct after all six increments above (and the `VariantUsage`/`ActorUsage`/
+`MetadataKeywordUsage` BNF checks) landed. Every `pub struct *Def`/`pub struct *Usage` declaration
+lives in exactly four files (`src/ast/behavior.rs`, `src/ast/requirement.rs`,
+`src/ast/structure.rs`, `src/ast/view.rs`) -- confirmed by grepping the whole `src/ast` tree, no
+other file declares one. Mechanically checked all 53 matching struct declarations for a
+`membership:` field:
+
+- **51 of 53 have it**, closing every struct this rollout (across this session and every prior
+  session) has touched: `ActionDef`/`ActionUsage`, `FlowDef`/`FlowUsage`,
+  `AllocationDef`/`AllocationUsage`, `StateDef`/`StateUsage`, `RequirementDef`/`RequirementUsage`,
+  `ItemUsage`, `EnumerationUsage`, `ConcernUsage`, `CaseDef`/`CaseUsage`,
+  `AnalysisCaseDef`/`AnalysisCaseUsage`, `VerificationCaseDef`/`VerificationCaseUsage`,
+  `UseCaseDef`/`UseCaseUsage`, `ActorUsage`, `PartDef`/`PartUsage`, `AttributeDef`/`AttributeUsage`,
+  `ItemDef`, `IndividualDef`, `VariantUsage`, `PortDef`/`PortUsage`, `InterfaceDef`,
+  `ConnectionDef`, `MetadataDef`/`MetadataUsage`, `EnumDef`, `OccurrenceDef`/`OccurrenceUsage`,
+  `SuccessionUsage`, `AliasDef`, `ConstraintDef`, `CalcDef`/`CalcUsage`, and the full view family
+  (`ViewDef`/`ViewUsage`/`ViewpointDef`/`ViewpointUsage`/`RenderingDef`/`RenderingUsage`/
+  `ViewRenderingUsage`).
+- **2 of 53 deliberately do not**, both already documented with a confirmed (not guessed) grammar
+  reason: `ThenUseCaseUsage` (`src/ast/requirement.rs`, wraps an already-`membership`-bearing
+  `UseCaseUsage` -- it is the `then use case ...` clause, not a member) and
+  `MetadataKeywordUsage` (`src/ast/structure.rs`, the `#keyword` shorthand -- confirmed above its
+  BNF production `PrefixMetadataMember : OwningMembership = '#' ownedRelatedElement =
+  PrefixMetadataUsage` has no `MemberPrefix`, so no textual position exists for a visibility
+  keyword). `Objective` and `ExhibitState` (not `*Def`/`*Usage`-named, so outside this grep's
+  matching set, but already individually confirmed and documented as non-members or out-of-scope
+  in earlier entries in this file) round out the complete set of deliberate exclusions.
+
+No code changes in this entry -- it is a verification pass confirming the prior six increments'
+combined effect actually closed the scope, not a new increment. `cargo build --all-targets`,
+`cargo test` (246 lib tests + full integration suite), `cargo clippy -- -W clippy::all` (same 5
+pre-existing warnings), and the `SYSML_V2_RELEASE_DIR` validation gate (25/25) all remain green
+against the final combined state. `PARSE_AST_VERSION` stays at 34 (last bumped by the
+`VariantUsage`/`ActorUsage` entry above).
+
+**Item 4b (the first-class `Membership` node item from the "Parser work still required" gaps doc)
+is now complete.** The scope-boundary list every prior entry in this rollout carried forward is
+empty except for the small set of struct-level, BNF-confirmed exclusions listed above -- there is
+no remaining "not yet covered" struct family.
+
+### Changed: `VariantUsage`/`ActorUsage` join the `Membership` rollout with new grammar-backed kinds; `MetadataKeywordUsage` confirmed out of scope
+
+Resolves the three "unverified against BNF" structs the "Item 4b final sweep" entry flagged
+(`VariantUsage`, `MetadataKeywordUsage`, `ActorUsage`) by actually checking each production in
+`sysml-v2-release/bnf/SysML-textual-bnf.kebnf`, per the task's "don't invent fields with no grammar
+backing" discipline used throughout this whole backlog.
+
+**`VariantUsage`** (`src/ast/structure.rs`, the `variant ...;` member inside a `variation part def`
+body) -- confirmed **in scope**: BNF `VariantUsageMember : VariantMembership = MemberPrefix
+'variant' ownedVariantUsage = VariantUsageElement` carries its own `MemberPrefix` (visibility-
+legal) and is explicitly typed as a distinct `VariantMembership` kind in the grammar itself, not a
+plain `FeatureMembership`. Added `membership: Membership` with a **new**
+`MembershipKind::VariantMembership` variant (`src/ast/membership.rs`, plus a `Membership::variant`
+convenience constructor) rather than reusing `FeatureMembership`, since the BNF names it
+distinctly. `variant_usage` (`src/parser/part/usage.rs`) previously accepted no visibility prefix at
+all -- confirmed by probing `variation part def P { variant part v1: V1; }` vs. a `private`-prefixed
+variant -- now calls `lex::visibility_prefix` at its start, threading the resulting `Membership`
+through all five of its internal branches (typed `part`/`attribute`/`item`/`port` forms and the
+untyped bare-reference form).
+
+**`ActorUsage`** (`src/ast/requirement.rs`, distinct from the larger `RequirementActorDecl`/
+`ActorDecl`) -- confirmed **in scope**: BNF `ActorMember : ActorMembership = MemberPrefix
+ownedRelatedElement += ActorUsage` also carries its own `MemberPrefix` and its own distinctly-named
+`ActorMembership` kind. Added `membership: Membership` with a **new**
+`MembershipKind::ActorMembership` variant (plus `Membership::actor`). `actor_usage`
+(`src/parser/usecase.rs`) previously accepted no visibility prefix -- now calls
+`lex::visibility_prefix` at its start, ordered before the `actor` keyword.
+
+**`MetadataKeywordUsage`** (`src/ast/structure.rs`, the `#keyword` annotation shorthand) --
+confirmed **out of scope, for real grammar reasons**: its production is `PrefixMetadataMember :
+OwningMembership = '#' ownedRelatedElement = PrefixMetadataUsage` -- no `MemberPrefix` anywhere in
+this production, unlike every other struct touched by this rollout. The `#` sigil is the entire
+prefix; there is no legal position for `private`/`protected`/`public` before it anywhere in the
+grammar. Left with no `membership` field, matching the PAR-003b `unique`/`readonly`/`variable`
+precedent for confirmed (not guessed) grammar exclusions.
+
+No test-fixture struct-literal ripple and no `src/ast/mod.rs` normalize-match ripple -- neither
+`VariantUsage` nor `ActorUsage` has hand-built literal construction sites or a dedicated normalize
+helper.
+
+`PARSE_AST_VERSION` bumped 33 -> 34. Added five regression tests locking in visibility capture (and
+the new `VariantMembership`/`ActorMembership` kinds) across both the typed and untyped
+`variant_usage` forms and `actor_usage` (`src/parser/part/usage.rs`, `src/parser/usecase.rs`). Full
+`cargo test` (246 lib tests + full integration suite), `cargo clippy -- -W clippy::all` (same 5
+pre-existing warnings, zero new), and the full `SYSML_V2_RELEASE_DIR` validation gate (25/25) are
+green, with **zero validation snapshot regeneration required** this increment.
+
+This closes the "three unverified-against-BNF structs" item from the "Item 4b final sweep" entry:
+two were genuine gaps (now fixed, with new grammar-backed `MembershipKind` variants), one is a
+confirmed, documented exclusion.
+
+### Changed: `Membership` rollout extended to the view family (`ViewDef`/`ViewUsage`/`ViewpointDef`/`ViewpointUsage`/`RenderingDef`/`RenderingUsage`/`ViewRenderingUsage`)
+
+Sixth increment of the Item 4b final-sweep follow-up list, and the last of the "same mechanical
+shape" batch the sweep entry called out as cheap, high-confidence follow-up work. Landed as one
+increment (all seven structs, `src/ast/view.rs`/`src/parser/view.rs`) since they share one file and
+one mechanical shape, matching the `RequirementUsage`-family precedent from earlier in this rollout.
+Adds `membership: Membership` to `ViewDef`/`ViewpointDef`/`RenderingDef` (`kind:
+OwningMembership`) and `ViewUsage`/`ViewpointUsage`/`RenderingUsage`/`ViewRenderingUsage` (`kind:
+FeatureMembership`).
+
+Confirmed all seven productions legally carry a visibility prefix before writing any code:
+`ViewDefinition`/`ViewpointDefinition`/`RenderingDefinition` are all `OccurrenceDefinitionPrefix`-
+backed, `ViewUsage`/`ViewpointUsage`/`RenderingUsage` are all `OccurrenceUsagePrefix`-backed, and
+`ViewRenderingMember : ViewRenderingMembership = MemberPrefix 'render' ownedRelatedElement +=
+ViewRenderingUsage` explicitly carries its own `MemberPrefix` (the same `render r1 : R1;` member
+form nested inside a view/rendering definition body) -- all confirmed against
+`SysML-textual-bnf.kebnf`'s Clause 8.2.2.26.
+
+**Found the same genuine parsing gap an eleventh time, across all seven parsers.** None of
+`view_def`, `viewpoint_def`, `rendering_def` (`DefinitionPrefixOptions`-routed), or the hand-rolled
+`view_usage`, `viewpoint_usage`, `rendering_usage`, `view_rendering_usage` accepted a
+`private`/`protected`/`public` prefix before this increment -- confirmed by probing `package P {
+private view def V1; }` and `package P { view v: V1 { private render r1 : R1; } }` against the
+pre-change parser (both fell through to recovery). Fixed the three `*Def` parsers via
+`.with_captured_visibility()`, and the four hand-rolled `*Usage` parsers via a direct
+`lex::visibility_prefix` call at each one's start (ordered before the existing `abstract` prefix on
+`view_usage`/`viewpoint_usage`/`rendering_usage`; `view_rendering_usage` has no `abstract` prefix of
+its own).
+
+No test-fixture struct-literal ripple and no `src/ast/mod.rs` normalize-match ripple -- none of the
+seven structs have hand-built literal construction sites or dedicated normalize helpers in this
+crate.
+
+`PARSE_AST_VERSION` bumped 32 -> 33. Added eleven regression tests locking in visibility capture and
+the no-prefix default across the family (`src/parser/view.rs`). Full `cargo test` (241 lib tests +
+full integration suite), `cargo clippy -- -W clippy::all` (same 5 pre-existing warnings, zero new),
+and the full `SYSML_V2_RELEASE_DIR` validation gate (25/25) are green, with **zero validation
+snapshot regeneration required** this increment.
+
+Updates the Item 4b scope-boundary list: the entire view family is no longer in the "not yet
+covered" set. This closes the "same mechanical shape" batch the "Item 4b final sweep" entry called
+out; still not covered: `VariantUsage`/`MetadataKeywordUsage`/`ActorUsage` (the three
+unverified-against-BNF structs) -- see the next increment.
+
+### Changed: `Membership` rollout continues to `ConstraintDef`/`CalcDef`/`CalcUsage`
+
+Fifth increment of the Item 4b final-sweep follow-up list. Adds `membership: Membership` to
+`ConstraintDef` (`src/ast/view.rs`, `kind: OwningMembership`), `CalcDef` (`kind:
+OwningMembership`), and `CalcUsage` (`kind: FeatureMembership`).
+
+**Found the same genuine parsing gap a tenth time, but with a twist**: unlike every prior struct in
+this rollout, `constraint_def` and `parse_calc_def` (`src/parser/constraint.rs`) already had *some*
+visibility handling -- both used `DefinitionPrefixOptions::with_private()`
+(`VisibilityPrefix::OptionalPrivate`), which matched a bare `private` prefix but **discarded** it
+(never populated `DefinitionPrefixResult::visibility`) and, unlike `Captured`, did not accept
+`protected`/`public` at all. Both switched to `.with_captured_visibility()`, a strict superset (adds
+`protected`/`public` support and captures the result instead of discarding it) confirmed
+behavior-preserving for every previously-accepted input. `calc_usage` (hand-rolled, no
+`DefinitionPrefixOptions` involved) had no visibility handling of any kind and now calls
+`lex::visibility_prefix` directly at its start, same as every other hand-rolled `*_usage` parser in
+this rollout.
+
+**Removed the now-dead `VisibilityPrefix::OptionalPrivate` variant and
+`DefinitionPrefixOptions::with_private()`** (`src/parser/definition_prefix.rs`) -- `constraint`/
+`calc` were the only two call sites (per that enum variant's own doc comment), and both migrated to
+`Captured` above, so keeping the discard-only mode around would have been orphaned dead code (it
+was in fact flagging `cargo build`'s `dead_code` lint until removed). The one unit test exercising
+`OptionalPrivate`'s `private`-before-`abstract` ordering (`prefix_private_before_abstract_constraint`,
+`src/parser/definition_prefix.rs`) was updated to use `.with_captured_visibility()` instead, keeping
+the same ordering assertion and additionally asserting the now-captured `visibility` field.
+
+No test-fixture struct-literal ripple and no `src/ast/mod.rs` normalize-match ripple -- none of the
+three structs have hand-built literal construction sites or dedicated normalize helpers in this
+crate (`ConstraintDef`/`CalcDef`/`CalcUsage` all use the whole-value clone path where they appear in
+body enums).
+
+`PARSE_AST_VERSION` bumped 31 -> 32. Added six regression tests locking in visibility capture and
+the no-prefix default for `constraint_def`/`calc_def`/`calc_usage` (`src/parser/constraint.rs`).
+Full `cargo test` (231 lib tests + full integration suite), `cargo clippy -- -W clippy::all` (same 5
+pre-existing warnings, zero new -- the `OptionalPrivate`/`with_private` dead-code warnings introduced
+by this increment's own migration were fixed by removing the dead code rather than suppressed), and
+the full `SYSML_V2_RELEASE_DIR` validation gate (25/25) are green, with **zero validation snapshot
+regeneration required** this increment.
+
+Updates the Item 4b scope-boundary list: `ConstraintDef`/`CalcDef`/`CalcUsage` are no longer in the
+"not yet covered" set. Still not covered: the view family and the three unverified-against-BNF
+structs -- same reasoning as the "Item 4b final sweep" entry below.
+
+### Changed: `Membership` rollout continues to `OccurrenceDef`/`OccurrenceUsage`/`SuccessionUsage`
+
+Fourth increment of the Item 4b final-sweep follow-up list. Adds `membership: Membership` to
+`OccurrenceDef` (`src/ast/structure.rs`, `kind: OwningMembership`), `OccurrenceUsage` (`kind:
+FeatureMembership`), and `SuccessionUsage` (`kind: FeatureMembership`).
+
+**Found the same genuine parsing gap a ninth time.** `occurrence_def` (`src/parser/occurrence.rs`)
+never accepted a `private`/`protected`/`public` prefix -- confirmed by probing `package P { private
+occurrence def O1; }` against the pre-change parser (fell through to recovery). Fixed via
+`.with_captured_visibility()` on its `DefinitionPrefixOptions`.
+
+**`OccurrenceUsage`'s four real member-position entry points** (`src/parser/occurrence_body.rs`)
+-- `occurrence_usage`, `individual_usage`, `snapshot_usage`, `timeslice_usage` -- each independently
+verified against the BNF first: `OccurrenceUsage`/`IndividualUsage`/`PortionUsage` (the
+`snapshot`/`timeslice` production) are all `OccurrenceUsagePrefix`-backed (`BasicUsagePrefix` +
+optional `individual`/portion-kind), so all four legally carry a visibility prefix and each now
+calls `lex::visibility_prefix` at its own start (threaded through the shared `occurrence_usage_tail`
+helper via a new `membership: Membership` parameter, since each entry point captures its own
+distinct visibility before delegating).
+
+**`then_timeslice_usage`** (the `then timeslice ...` succession-continuation form) does **not** get
+real visibility capture -- confirmed against the BNF this is not a distinct production with its own
+`BasicUsagePrefix` the way the other four are (no `ThenTimeSliceUsage`/similar production exists
+anywhere in `SysML-textual-bnf.kebnf`; `timeslice`/`snapshot` only appear via the shared
+`PortionKind` alternative on `OccurrenceUsagePrefix`). Treated as an ad hoc site, `visibility: None`,
+same as this rollout's other no-grammar-backing sites, and documented inline on the function.
+
+**`succession_usage`** (the standalone `succession ... first ... then ...;` form,
+`src/parser/occurrence_body.rs`) also gets real visibility capture: BNF `SuccessionAsUsage =
+UsagePrefix ('succession' UsageDeclaration)? 'first' ... 'then' ...` is `UsagePrefix`-backed (which
+includes visibility), and this parser is invoked directly from `occurrence_body_element`'s real
+member-position dispatch, not a payload-sharing helper -- confirmed the same way `allocate_usage`
+was confirmed in this session's first increment.
+
+`src/ast/mod.rs`'s dedicated `normalize_occurrence_def` helper needed a one-line
+`membership: o.membership.clone()` addition; `OccurrenceUsage`/`SuccessionUsage` have no dedicated
+normalize functions and use the whole-value clone path, and neither has hand-built literal
+construction sites in the test suite.
+
+`PARSE_AST_VERSION` bumped 30 -> 31. Added nine regression tests locking in visibility capture (and
+`then_timeslice_usage`'s deliberate lack of it) across `occurrence_def`, `occurrence_usage`,
+`individual_usage`, `snapshot_usage`, `timeslice_usage`, `then_timeslice_usage`, and
+`succession_usage` (`src/parser/occurrence.rs`, `src/parser/occurrence_body.rs`). Full `cargo test`
+(225 lib tests + full integration suite), `cargo clippy -- -W clippy::all` (same 5 pre-existing
+warnings, zero new), and the full `SYSML_V2_RELEASE_DIR` validation gate (25/25) are green, with
+**zero validation snapshot regeneration required** this increment.
+
+Updates the Item 4b scope-boundary list: `OccurrenceDef`/`OccurrenceUsage`/`SuccessionUsage` are no
+longer in the "not yet covered" set. Still not covered: `ConstraintDef`, `CalcDef`/`CalcUsage`, the
+view family, and the three unverified-against-BNF structs -- same reasoning as the "Item 4b final
+sweep" entry below.
+
+### Changed: `Membership` rollout continues to `MetadataDef`/`MetadataUsage`/`EnumDef`/`EnumerationUsage`
+
+Third increment of the Item 4b final-sweep follow-up list. Adds `membership: Membership` to
+`MetadataDef` (`src/ast/structure.rs`, `kind: OwningMembership`), `MetadataUsage` (`kind:
+FeatureMembership`), `EnumDef` (`kind: OwningMembership`), and `EnumerationUsage`
+(`src/ast/requirement.rs`, `kind: FeatureMembership`) -- `EnumerationUsage` already had `is_end`
+from the earlier modifier-completeness audit item; this adds the still-missing `membership`
+alongside it.
+
+**Found the same genuine parsing gap an eighth time, across all four parsers.** None of
+`metadata_def` (`src/parser/metadata.rs`), `metadata_usage`, `enum_def` (`src/parser/enumeration.rs`),
+or `enum_usage` accepted a `private`/`protected`/`public` prefix before this increment -- confirmed
+by probing `package P { private metadata def M1; }` and `package P { private enum def E1; }`
+against the pre-change parser (both fell through to recovery). Fixed `metadata_def`/`enum_def` via
+`.with_captured_visibility()` on their `DefinitionPrefixOptions`, and `metadata_usage`/`enum_usage`
+via a direct `lex::visibility_prefix` call at each one's start. `enum_usage`'s visibility capture is
+ordered before its existing `is_end` prefix check (visibility, then `end`, then the `enum` keyword),
+matching `attribute_usage`'s established `visibility_prefix` -> `EndUsagePrefix`/`RefPrefix` ordering
+from the modifier-completeness audit.
+
+`src/ast/mod.rs`'s dedicated `normalize_metadata_def`/`normalize_enum_def`/
+`normalize_enumeration_usage` helpers each needed a one-line `membership: ...clone()` addition (they
+null out individual fields rather than whole-value-clone); `MetadataUsage` has no dedicated
+normalize function and uses the whole-value clone path. No test-fixture struct-literal ripple --
+none of the four structs have hand-built literal construction sites in the test suite.
+
+`PARSE_AST_VERSION` bumped 29 -> 30. Added twelve regression tests locking in visibility capture and
+the no-prefix default (`src/parser/metadata.rs`, `src/parser/enumeration.rs`). Full `cargo test`
+(215 lib tests + full integration suite), `cargo clippy -- -W clippy::all` (same 5 pre-existing
+warnings, zero new), and the full `SYSML_V2_RELEASE_DIR` validation gate (25/25) are green, with
+**zero validation snapshot regeneration required** this increment.
+
+Updates the Item 4b scope-boundary list: `MetadataDef`/`MetadataUsage`/`EnumDef`/`EnumerationUsage`
+are no longer in the "not yet covered" set. Still not covered:
+`OccurrenceDef`/`OccurrenceUsage`/`SuccessionUsage`, `ConstraintDef`, `CalcDef`/`CalcUsage`, the view
+family, and the three unverified-against-BNF structs -- same reasoning as the "Item 4b final sweep"
+entry below.
+
+### Changed: `Membership` rollout continues to `StateDef`/`StateUsage`/`IndividualDef`/`InterfaceDef`
+
+Second increment of the Item 4b final-sweep follow-up list. Adds `membership: Membership` to
+`StateDef` (`src/ast/behavior.rs`, `kind: OwningMembership`), `StateUsage` (`kind:
+FeatureMembership`), `IndividualDef` (`src/ast/structure.rs`, `kind: OwningMembership`), and
+`InterfaceDef` (`src/ast/structure.rs`, `kind: OwningMembership`) -- `Transition` (also in
+`state.rs`) is a distinct control-flow construct with no independent membership form of its own and
+was left untouched, matching this rollout's precedent of only wiring the field onto real
+member-bearing `*Def`/`*Usage` structs.
+
+**Found the same genuine parsing gap a seventh time, across all four parsers.** None of `state_def`
+(`src/parser/state.rs`), `state_usage`, `individual_def` (`src/parser/individual.rs`), or
+`parse_interface_def` (`src/parser/interface.rs`, backing both `interface_def` and
+`interface_def_required`) accepted a `private`/`protected`/`public` prefix before this increment --
+confirmed by probing `package P { private state def S1; }`, `package P { private individual def
+I1; }`, and `package P { private interface def I1; }` against the pre-change parser (all fell
+through to recovery). Fixed `state_def`/`individual_def`/`parse_interface_def` via
+`.with_captured_visibility()` on their `DefinitionPrefixOptions`, and `state_usage` via a direct
+`lex::visibility_prefix` call at its start, ordered before the optional `abstract` prefix.
+
+**`ExhibitState`** (`src/ast/structure.rs`, the `exhibit state name ...` shorthand parsed by
+`part/body.rs::exhibit_state`) has its own `OccurrenceUsagePrefix`-backed visibility grammar per the
+BNF's `ExhibitStateUsage` production, but `ExhibitState` itself has no `membership` field and is not
+in this item's scope (it is a distinct struct from `StateUsage`, not one of the eleven families this
+sweep covers). Its adapter site in `src/parser/part/usage.rs::exhibit_state_as_state_usage`, which
+repackages an already-parsed `ExhibitState` into a `StateUsage` (used where a state usage is
+expected but the source wrote the `exhibit state` shorthand instead), therefore has no visibility
+data available to thread through and sets `visibility: None`, documented inline as an ad hoc site
+per this rollout's established convention -- adding `membership` to `ExhibitState` itself, if ever
+needed, is a separate, explicitly out-of-scope follow-up.
+
+One test-fixture struct-literal ripple: `tests/validation/parts_interconnection_2a.rs`'s two
+hand-built `InterfaceDef` literals (`interface_def_engine_to_transmission`,
+`interface_def_driveshaft`) needed `membership: owning_membership()` added (both source
+declarations have no explicit visibility prefix). `src/ast/mod.rs`'s `normalize_interface_def`
+needed a one-line `membership: i.membership.clone()` addition; `StateDef`/`StateUsage`/
+`IndividualDef` have zero hand-built literal construction sites and their consumers all use the
+whole-value `n.value.clone()` path.
+
+`PARSE_AST_VERSION` bumped 28 -> 29. Added twelve regression tests locking in visibility capture
+and the no-prefix default (`src/parser/state.rs`, `src/parser/individual.rs`,
+`src/parser/interface.rs`). Full `cargo test` (207 lib tests + full integration suite), `cargo
+clippy -- -W clippy::all` (same 5 pre-existing warnings, zero new), and the full
+`SYSML_V2_RELEASE_DIR` validation gate (25/25) are green, with **zero validation snapshot
+regeneration required** this increment.
+
+Updates the Item 4b scope-boundary list: `StateDef`/`StateUsage`/`IndividualDef`/`InterfaceDef` are
+no longer in the "not yet covered" set. Still not covered: `MetadataDef`/`MetadataUsage`,
+`EnumDef`/`EnumerationUsage`, `OccurrenceDef`/`OccurrenceUsage`/`SuccessionUsage`, `ConstraintDef`,
+`CalcDef`/`CalcUsage`, the view family, and the three unverified-against-BNF structs -- same
+reasoning as the "Item 4b final sweep" entry below.
+
+### Changed: `Membership` rollout continues to `FlowDef`/`FlowUsage`/`AllocationDef`/`AllocationUsage`
+
+First increment of the Item 4b final-sweep follow-up list (see the "Item 4b final sweep" entry
+below for the full remaining scope this continues). Adds `membership: Membership` to `FlowDef`
+(`src/ast/behavior.rs`, `kind: OwningMembership`), `FlowUsage` (`kind: FeatureMembership`),
+`AllocationDef` (`kind: OwningMembership`), and `AllocationUsage` (`kind: FeatureMembership`).
+
+**Found the same genuine parsing gap a sixth time, across all four parsers.** None of `flow_def`
+(`src/parser/flow.rs`), `flow_usage_member`, `allocation_def` (`src/parser/allocation.rs`), or
+`allocation_usage` accepted a `private`/`protected`/`public` prefix before this increment --
+confirmed by probing `package P { private flow def F1; }` and `package P { private allocation def
+A1; }` against the pre-change parser (both fell through to recovery). Fixed `flow_def`/
+`allocation_def` via `.with_captured_visibility()` on their `DefinitionPrefixOptions`, and
+`flow_usage_member`/`allocation_usage` via a direct `lex::visibility_prefix` call at each one's
+start, ordered before the optional `abstract` prefix, matching this rollout's established ordering.
+
+**`allocate_usage`** (`src/parser/allocation.rs`, the bare `allocate a to b;` shorthand form) also
+got a `lex::visibility_prefix` call, unlike this rollout's usual "ad hoc site, `visibility: None`"
+treatment for shared/no-grammar sites -- confirmed against the BNF first: `AllocationUsage =
+OccurrenceUsagePrefix AllocationUsageDeclaration UsageBody` where `AllocationUsageDeclaration :
+AllocationUsage = 'allocation' UsageDeclaration ('allocate' ConnectorPart)? | 'allocate'
+ConnectorPart` -- both the `allocation ... allocate ...` and bare `allocate ... to ...` forms are
+alternatives of the *same* production reachable through the *same* `OccurrenceUsagePrefix`, so the
+bare-`allocate` shorthand legally carries a visibility prefix too, and `allocate_usage` is invoked
+directly from real member-position call sites (`package.rs`), not a payload-sharing helper with no
+visibility grammar of its own -- unlike `AllocationUsage`'s truly ad hoc analogues elsewhere in this
+rollout (e.g. `ActionUsage`'s `control_node_payload_stmt` site).
+
+No test-fixture struct-literal ripple (`FlowDef`/`FlowUsage`/`AllocationDef`/`AllocationUsage` have
+zero hand-built literal construction sites in the test suite; every consumer in `src/ast/mod.rs`'s
+normalize matches uses the whole-value `n.value.clone()` path). `PARSE_AST_VERSION` bumped 27 -> 28.
+Added ten regression tests locking in visibility capture and the no-prefix default
+(`src/parser/flow.rs`, `src/parser/allocation.rs`), including one covering `allocate_usage`'s
+visibility prefix specifically. Regenerated the `function_based_behavior_3a` validation snapshot
+(contains `flow`/`message` declarations) whose `Debug` output changed shape from the new field; full
+`cargo test` (199 lib tests + full integration suite), `cargo clippy -- -W clippy::all` (same 5
+pre-existing warnings, zero new), and the full `SYSML_V2_RELEASE_DIR` validation gate (25/25) are
+green.
+
+Updates the Item 4b scope-boundary list: `FlowDef`/`FlowUsage`/`AllocationDef`/`AllocationUsage` are
+no longer in the "not yet covered" set. Still not covered: `StateDef`/`StateUsage`, `IndividualDef`,
+`InterfaceDef`, `MetadataDef`/`MetadataUsage`, `EnumDef`/`EnumerationUsage`,
+`OccurrenceDef`/`OccurrenceUsage`/`SuccessionUsage`, `ConstraintDef`, `CalcDef`/`CalcUsage`, the view
+family, and the three unverified-against-BNF structs (`VariantUsage`/`MetadataKeywordUsage`/
+`ActorUsage`) -- same reasoning as the "Item 4b final sweep" entry below.
+
+### Changed: `AliasDef`/`Import` join the `Membership` rollout -- closes the two structs deferred since the very first increment
+
+Closes the two struct families every prior entry in this rollout explicitly deferred ("`AliasDef`/
+`Import` -- `MembershipKind::Alias`/`MembershipKind::Import` variants exist ... but nothing
+constructs them yet"). This is the third and last of this session's three increments (see the two
+entries below for `RequirementUsage`-family and `ActionDef`/`ActionUsage`); together they close the
+item's confirmed scope and this session runs the final sweep documented below.
+
+**`AliasDef`** gets a non-optional `membership: Membership` field, `kind:
+`[`MembershipKind::Alias`]` -- the variant reserved since the rollout's first increment, previously
+unconstructed. **Found the same genuine parsing gap a fifth time**: BNF `AliasMember : Membership =
+MemberPrefix 'alias' ( '<' memberShortName = NAME '>' )? ( memberName = NAME )? 'for' memberElement
+= [QualifiedName] RelationshipBody` (`SysML-textual-bnf.kebnf`) legally permits a
+`private`/`protected`/`public` prefix before `alias`, but `alias_def` (`src/parser/alias.rs`) never
+parsed one at all before this increment -- confirmed by probing `package P { private alias m for
+ISQ::mass; }` against the pre-change parser (fell through to recovery). Fixed by calling the shared
+`lex::visibility_prefix` at the very start of `alias_def`, same as every hand-rolled usage parser in
+this rollout.
+
+**`Import`** gets `membership: Membership`, `kind:` `[`MembershipKind::Import`]`. **Design
+decision, since this struct is different from every other one in this rollout**: `Import` already
+had its own `visibility: Option<Visibility>` field from before this item (`src/ast/common.rs`), so
+the two options left open by the very first increment's scope-boundary note were: (a) add
+`membership: Membership` alongside the old field, keeping both, or (b) replace the old field with
+`membership`. This lands **(b), a straight replacement** -- `Import.visibility` already captured
+exactly the same information `Membership.visibility` does (an optional
+`private`/`protected`/`public` prefix, no separate ownership/kind data worth preserving alongside
+it), and grepping the whole crate (`src/`, `tests/`) found no in-crate consumer reading
+`Import.visibility` other than its own constructor in `import.rs` -- a dual-field design would only
+have added a redundant, confusing field with no compatibility benefit for zero real consumers. The
+old field's hand-inlined `opt(alt((tag("public"), tag("private"), tag("protected"))))` visibility
+match in `import_` was also replaced by the shared `lex::visibility_prefix` call (for consistency
+and span capture), so this is a pure behavior-preserving refactor plus the new wrapper -- `Import`
+already had full visibility grammar coverage, so (unlike every other struct in this rollout) there
+was no parsing gap to fix here.
+
+Fixed the two downstream `Import` struct-literal construction sites in
+`tests/validation/parts_interconnection_2a.rs` (both `public import ...;`) via a new
+`public_import_membership()` test helper alongside the fixture's existing
+`owning_membership()`/`feature_membership()` helpers. `PARSE_AST_VERSION` bumped 26 -> 27 for the
+breaking AST-schema change. Added four regression tests (`alias_def`/`import_` visibility capture
+and no-prefix default, `src/parser/alias.rs`, `src/parser/import.rs`). Regenerated the
+`parts_tree_1a`, `function_based_behavior_3a`, and `functional_allocation_4a` validation snapshots
+(all contain `import` declarations) whose `Debug` output changed shape from the field rename; full
+`cargo test`, `cargo clippy -- -W clippy::all` (same 5 pre-existing warnings, zero new), and the
+full `SYSML_V2_RELEASE_DIR` validation gate (25/25, including `full_library_suite` which exercises
+every `import`/`alias` declaration in the Kernel and Systems libraries) are green.
+
+### Changed: first-class `Membership` node extended to `ActionDef`/`ActionUsage`
+
+Second of this session's three increments. Adds `membership: Membership` to `ActionDef`
+(`src/ast/behavior.rs`, `kind: OwningMembership`) and `ActionUsage` (`kind: FeatureMembership`).
+**Found the same genuine parsing gap again**: `action_def` (`src/parser/action.rs`) never accepted
+a `private`/`protected`/`public` prefix -- confirmed by probing `package P { private action def
+Foo; }` pre-change. Fixed via `.with_captured_visibility()` on `action_def`'s
+`DefinitionPrefixOptions`, and a direct `lex::visibility_prefix` call at the start of the primary
+`action_usage` parser (`src/parser/action.rs`), matching every hand-rolled usage parser in this
+rollout.
+
+`ActionUsage` has a second, ad hoc construction site with no visibility grammar of its own:
+`control_node_payload_stmt` (`src/parser/payload.rs`), the standalone `accept`/`send`
+control-node-statement shorthand (e.g. `accept msg : Type;` as its own statement, not part of an
+`action ...` declaration) -- this always sets `visibility: None`, matching this rollout's
+established convention for ad hoc, no-visibility-grammar sites (see `AttributeUsage`'s three ad hoc
+sites in the item's first increment).
+
+No test-fixture struct-literal ripple (`ActionDef`/`ActionUsage` have zero hand-built literal
+construction sites in the test suite); only `src/ast/mod.rs`'s dedicated `normalize_action_def`/
+`normalize_action_usage` helpers needed a one-line `membership: ...clone()` addition (they null out
+individual fields rather than whole-value-clone). `PARSE_AST_VERSION` bumped 25 -> 26. Added four
+regression tests locking in visibility capture and the no-prefix default for `action_def`/
+`action_usage` (`src/parser/action.rs`). All three gates green (see the combined gate run noted in
+the entry above for the full three-increment session).
+
+### Changed: first-class `Membership` node extended to the `RequirementUsage`-family (`RequirementDef`/`RequirementUsage`/`ConcernUsage`/`CaseDef`/`CaseUsage`/`AnalysisCaseDef`/`AnalysisCaseUsage`/`VerificationCaseDef`/`VerificationCaseUsage`/`UseCaseDef`/`UseCaseUsage`)
+
+First of this session's three increments closing the item's confirmed remaining scope (see the
+"still not covered" list at the bottom of the previous `ConnectionDef`/`ConnectionUsageMember`
+entry). Landed as one increment rather than several smaller ones because every struct in this list
+shares one of two parser helpers (`parse_definition_prefix` for every `*Def`, and either a shared
+payload builder or a small hand-rolled `case_like_usage_body`/`use_case_usage_tail` helper for every
+`*Usage`), so the mechanical shape is identical across all eleven structs -- splitting further would
+not have reduced risk, only increased the number of gate cycles for no benefit. Confirmed the
+family's exact membership by reading `src/ast/requirement.rs` in full first, per the task's own
+instruction not to guess: it covers `RequirementDef`/`RequirementUsage` (`src/parser/requirement.rs`),
+`ConcernUsage` (same file -- no separate `ConcernDef` struct exists in this AST; see below),
+`CaseDef`/`CaseUsage`/`AnalysisCaseDef`/`AnalysisCaseUsage`/`VerificationCaseDef`/
+`VerificationCaseUsage` (`src/parser/case.rs`), and `UseCaseDef`/`UseCaseUsage`
+(`src/parser/usecase.rs`). All eleven get a non-optional `membership: Membership` field, `kind:
+OwningMembership` on the five `*Def` structs and `kind: FeatureMembership` on the six `*Usage`
+structs.
+
+**Found the same genuine parsing gap a fourth time, across all five `*Def` parsers and four of the
+six `*Usage` parsers.** None of `requirement_def`, `case_def`, `analysis_case_def`,
+`verification_case_def`, or `use_case_def` accepted a visibility prefix before this increment
+(confirmed the same way as every prior entry: `package P { private requirement def Foo; }` and
+siblings all fell through to recovery pre-change) -- fixed via `.with_captured_visibility()` on each
+one's `DefinitionPrefixOptions`. The hand-rolled `case_usage`/`analysis_case_usage`/
+`verification_case_usage`/`use_case_usage`/`concern_usage` had the same gap -- fixed via a direct
+`lex::visibility_prefix` call at each one's start, ordered before the optional `abstract` keyword
+(matching this rollout's established prefix ordering: visibility, then abstract, then the type
+keyword).
+
+Two structural wrinkles specific to this family, both handled the same way this rollout has handled
+every ad hoc/shared-payload site so far (real visibility only at the true member-position parser,
+`visibility: None` everywhere else):
+- `RequirementUsage`'s payload is built by a single shared function
+  (`parse_requirement_usage_payload_with_abstract`) called from three places: the member-position
+  `requirement_usage` parser (captures real visibility, overrides the payload's `membership` field
+  after the call), `verify_requirement`'s `verify requirement ...` form, and `usecase.rs`'s
+  `objective { requirement ... }` form (neither of the latter two has visibility grammar of its
+  own, so the payload always builds `visibility: None` and those two callers don't override it).
+- `CaseUsage` is similarly shared by `AnalysisCaseUsage`/`VerificationCaseUsage`, which each parse
+  their own visibility prefix independently (all three keywords are mutually exclusive
+  alternatives, not a shared entry point) and pass the resulting `Membership` into
+  `case_like_usage_body` as a parameter rather than re-deriving it. `UseCaseUsage` similarly has two
+  construction call sites: the true member-position `use_case_usage` (captures real visibility) and
+  `use_case_usage_in_body` (only reachable via the `then use case ...` control-flow production in
+  `then_use_case_usage`, which has no visibility grammar of its own -- `visibility: None`).
+- `ConcernUsage` has no separate `ConcernDef` struct in this AST even though the BNF has a distinct
+  `ConcernDefinition` production -- `concern_usage` already parses both the `concern` and `concern
+  def` textual forms into the one `ConcernUsage` struct, a pre-existing design predating this item
+  and out of scope to change here; it gets `kind: FeatureMembership` regardless of which textual
+  form matched.
+
+No test-fixture struct-literal ripple (all eleven structs have zero hand-built literal construction
+sites in the test suite; every consumer in `src/ast/mod.rs`'s normalize matches uses the whole-value
+`n.value.clone()` path). `PARSE_AST_VERSION` bumped 24 -> 25. Added ten regression tests locking in
+visibility capture and the no-prefix default across the family (`src/parser/requirement.rs`,
+`src/parser/case.rs`, `src/parser/usecase.rs`), including one confirming the `verify requirement
+...` payload site stays `visibility: None`.
+
+**Combined gate run for all three of this session's increments** (`RequirementUsage`-family above,
+`ActionDef`/`ActionUsage`, and `AliasDef`/`Import` below): `cargo build --all-targets`, `cargo test`
+(189 lib tests + full integration suite, all green), `cargo clippy -- -W clippy::all` (same 5
+pre-existing `large_enum_variant`/`type_complexity` warnings as every prior entry, zero new), and
+the full `SYSML_V2_RELEASE_DIR` validation gate (25/25, including `full_library_suite`, which
+exercises every `requirement`/`case`/`action`/`import`/`alias` declaration in the real Kernel and
+Systems libraries) are green.
+
+### Item 4b final sweep: remaining member-bearing struct families not covered by this rollout
+
+Per the task's closing instruction, swept the whole `src/ast` tree for every `*Def`/`*Usage`-shaped
+struct and cross-checked which already have a `membership` field after this session's three
+increments land. **This rollout (Item 4b) is not fully complete** -- the sweep found substantially
+more member-bearing struct families than the task anticipated when framing this session as the
+"last increment." The following are explicitly *not* covered, left as a documented follow-up rather
+than guessed at or rushed through with reduced gate discipline:
+
+- **Same mechanical shape as every struct this rollout has already covered** (a `*Def` parser
+  routed through `parse_definition_prefix`, needing only `.with_captured_visibility()`, plus a
+  sibling `*Usage` parser needing a `lex::visibility_prefix` call at its start) -- expected to be
+  cheap, high-confidence follow-up increments of the identical shape as every entry in this
+  changelog, deferred purely because this session's scope was bounded to the three items the task
+  explicitly named plus this sweep, not because of any grammar or design obstacle:
+  `FlowDef`/`FlowUsage` (`src/parser/flow.rs`), `AllocationDef`/`AllocationUsage`
+  (`src/parser/allocation.rs`), `StateDef`/`StateUsage` (`src/parser/state.rs`), `IndividualDef`
+  (`src/parser/individual.rs`), `InterfaceDef` (`src/parser/interface.rs`), `MetadataDef`/
+  `MetadataUsage` (`src/parser/metadata.rs`), `EnumDef`/`EnumerationUsage`
+  (`src/parser/enumeration.rs` -- `EnumerationUsage` already has `is_end` from the modifier-audit
+  item but no `membership`), `OccurrenceDef`/`OccurrenceUsage`/`SuccessionUsage`
+  (`src/parser/occurrence.rs`/`occurrence_body.rs`), `ConstraintDef` (`src/parser/constraint.rs`),
+  `CalcDef`/`CalcUsage` (`src/parser/constraint.rs`), and the view family `ViewDef`/`ViewUsage`/
+  `ViewpointDef`/`ViewpointUsage`/`RenderingDef`/`RenderingUsage`/`ViewRenderingUsage`
+  (`src/parser/view.rs`).
+- **`VariantUsage`** (`src/ast/structure.rs`) -- a variant member inside a `variation part def`
+  body; not yet checked against the BNF for whether `VariantUsageElement` legally carries its own
+  `MemberPrefix` distinct from the nested usage it wraps. Left unverified rather than guessed at;
+  should be confirmed against the grammar before either wiring it in or excluding it for real
+  (grammar-backed) reasons.
+- **`MetadataKeywordUsage`** (`src/ast/structure.rs`) -- the `#keyword` annotation shorthand
+  attached to an element; likely closer to an annotation than a first-class member, but not
+  confirmed against the BNF's `MetadataUsage`/annotation productions in this session. Same
+  "unverified, not excluded for a confirmed reason" caveat as `VariantUsage`.
+- **`ActorUsage`** (`src/ast/requirement.rs`, `usecase.rs`'s `actor_usage`, distinct from the
+  larger `RequirementActorDecl`/`ActorDecl` already in this AST) -- a use-case-body actor
+  declaration; same "same mechanical shape, not yet verified against the BNF's `MemberPrefix`
+  applicability at this exact production" status as the two above.
+- **Confirmed *not* real memberships, no field needed**: `ThenUseCaseUsage` (`src/ast/
+  requirement.rs`) wraps an already-`membership`-bearing `UseCaseUsage` inside the `then use case
+  ...` control-flow clause -- it is the clause, not a member, and its wrapped `UseCaseUsage` already
+  carries `visibility: None` at that position (see the `RequirementUsage`-family entry above).
+  `Objective` (`src/ast/requirement.rs`) similarly wraps an already-`membership`-bearing
+  `RequirementUsage` and is not itself a member.
+
+This list should be treated as the new scope-boundary state for any future continuation of Item 4b,
+replacing the shorter "still not covered" lists in every entry below.
 
 ### Fixed: `PARSE_AST_VERSION` was left at 20 instead of 21 after the Part extension
 

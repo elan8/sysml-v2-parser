@@ -2,7 +2,7 @@
 
 use crate::ast::{
     CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef, ConstraintDefBody,
-    ConstraintDefBodyElement, Expression, Node, ParseErrorNode, ReturnDecl,
+    ConstraintDefBodyElement, Expression, Membership, Node, ParseErrorNode, ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
 use crate::parser::body::parse_structured_brace_members;
@@ -10,8 +10,8 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
-    CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
+    starts_with_any_keyword, starts_with_keyword, take_until_terminator, visibility_prefix, ws1,
+    ws_and_comments, CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
 };
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
@@ -32,7 +32,7 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
-        DefinitionPrefixOptions::new(b"constraint").with_private(),
+        DefinitionPrefixOptions::new(b"constraint").with_captured_visibility(),
     )?;
     let (input, body) = constraint_def_body(input)?;
     Ok((
@@ -44,6 +44,7 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
@@ -159,6 +160,7 @@ fn safe_constraint_def_body_element(
 pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
@@ -177,6 +179,7 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
                 identification,
                 type_name,
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -204,7 +207,7 @@ pub(crate) fn calc_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<Cal
 
 fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"calc").with_private();
+    let mut options = DefinitionPrefixOptions::new(b"calc").with_captured_visibility();
     if require_def {
         options = options.def_required();
     }
@@ -218,6 +221,7 @@ fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             CalcDef {
                 identification: prefix.identification,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
@@ -449,4 +453,80 @@ pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDec
         input,
         node_from_to(start, input, ReturnDecl { name: n, type_name }),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): Membership on ConstraintDef/CalcDef/CalcUsage ---
+
+    #[test]
+    fn constraint_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) =
+            constraint_def(input("private constraint def C1;")).expect("constraint def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn constraint_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = constraint_def(input("constraint def C1;")).expect("constraint def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn calc_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) = calc_def(input("protected calc def C1;")).expect("calc def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn calc_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = calc_def(input("calc def C1;")).expect("calc def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn calc_usage_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) = calc_usage(input("public calc c1;")).expect("calc usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn calc_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = calc_usage(input("calc c1;")).expect("calc usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
 }

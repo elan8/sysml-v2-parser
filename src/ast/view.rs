@@ -1,6 +1,7 @@
 use super::behavior::InOutDecl;
 use super::common::FilterMember;
 use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
+use super::membership::Membership;
 use super::requirement::RequirementDefBody;
 use super::structure::MetadataAnnotation;
 use crate::ast::core::{Expression, Node, TypingRelationship};
@@ -12,6 +13,7 @@ pub struct ConstraintDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConstraintDefBody,
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +51,7 @@ pub enum ConstraintBody {
 pub struct CalcDef {
     pub identification: Identification,
     pub body: CalcDefBody,
+    pub membership: Membership,
 }
 
 /// Calculation usage: `calc` Identification (`:` type)? body.
@@ -58,6 +61,7 @@ pub struct CalcUsage {
     pub identification: Identification,
     pub type_name: Option<String>,
     pub body: CalcDefBody,
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,6 +105,7 @@ pub struct ViewDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ViewDefBody,
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,6 +136,7 @@ pub struct ViewRenderingUsage {
     pub name: String,
     pub type_name: Option<String>,
     pub body: ConnectBody,
+    pub membership: Membership,
 }
 
 /// Viewpoint definition: `viewpoint def` Identification RequirementBody.
@@ -140,6 +146,7 @@ pub struct ViewpointDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RequirementDefBody,
+    pub membership: Membership,
 }
 
 /// Rendering definition: `rendering def` Definition.
@@ -149,6 +156,7 @@ pub struct RenderingDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RenderingDefBody,
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -177,6 +185,7 @@ pub struct ViewUsage {
     pub name: String,
     pub type_name: Option<String>,
     pub body: ViewBody,
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -225,6 +234,7 @@ pub struct ViewpointUsage {
     pub name: String,
     pub type_name: String,
     pub body: RequirementDefBody,
+    pub membership: Membership,
 }
 
 /// Rendering usage: `rendering` Usage.
@@ -234,4 +244,5 @@ pub struct RenderingUsage {
     pub name: String,
     pub type_name: Option<String>,
     pub body: ConnectBody,
+    pub membership: Membership,
 }

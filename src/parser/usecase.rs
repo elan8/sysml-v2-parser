@@ -2,9 +2,9 @@
 
 use crate::ast::{
     ActorDecl, ActorRedefinitionAssignment, ActorUsage, CaseReturnDecl, FirstSuccession,
-    IncludeUseCase, Node, Objective, ParseErrorNode, RefRedefinition, RequirementUsage, ReturnRef,
-    SubjectRef, ThenDone, ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody,
-    UseCaseDefBodyElement, UseCaseUsage, Visibility,
+    IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition,
+    RequirementUsage, ReturnRef, SubjectRef, ThenDone, ThenIncludeUseCase, ThenUseCaseUsage,
+    UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
 use crate::parser::body::parse_structured_brace_members;
@@ -12,7 +12,8 @@ use crate::parser::constraint::return_expression_stmt;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments, USE_CASE_BODY_STARTERS,
+    starts_with_any_keyword, take_until_terminator, visibility_prefix, ws1, ws_and_comments,
+    USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::with_span;
@@ -100,6 +101,7 @@ fn use_case_usage_tail(
     input: Input<'_>,
     ident: String,
     is_abstract: bool,
+    membership: crate::ast::Membership,
 ) -> IResult<Input<'_>, UseCaseUsage> {
     let (input, header) = usage_header(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
@@ -111,6 +113,7 @@ fn use_case_usage_tail(
             type_name: header.type_name,
             is_abstract,
             body,
+            membership,
         },
     ))
 }
@@ -122,7 +125,14 @@ fn use_case_usage_in_body(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUs
     let (input, _) = tag(&b"case"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
-    let (input, usage) = use_case_usage_tail(input, ident, false)?;
+    // No visibility grammar at this "then use case ..." control-flow position; only the
+    // member-position `use_case_usage` parser below captures real visibility.
+    let (input, usage) = use_case_usage_tail(
+        input,
+        ident,
+        false,
+        crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
+    )?;
     Ok((input, node_from_to(start, input, usage)))
 }
 
@@ -392,6 +402,7 @@ fn keyword_use_case_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
 pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"use"[..]).parse(input)?;
@@ -399,7 +410,12 @@ pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCas
     let (input, _) = tag(&b"case"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
-    let (input, usage) = use_case_usage_tail(input, ident, abstract_kw.is_some())?;
+    let (input, usage) = use_case_usage_tail(
+        input,
+        ident,
+        abstract_kw.is_some(),
+        crate::ast::Membership::feature(visibility, visibility_span),
+    )?;
     Ok((input, node_from_to(start, input, usage)))
 }
 
@@ -409,7 +425,8 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
         input,
         DefinitionPrefixOptions::new(b"use")
             .with_second_keyword(b"case")
-            .def_required(),
+            .def_required()
+            .with_captured_visibility(),
     )?;
     let (input, body) = use_case_def_body(input)?;
     Ok((
@@ -422,6 +439,10 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
                 specializes: prefix.specializes,
                 is_abstract: prefix.is_abstract,
                 body,
+                membership: crate::ast::Membership::owning(
+                    prefix.visibility,
+                    prefix.visibility_span,
+                ),
             },
         ),
     ))
@@ -519,6 +540,8 @@ pub(crate) fn use_case_def_body_element(
 
 pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
     let start = input;
+    let (input, (visibility_span, visibility)) =
+        preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"actor"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, n) = name(input)?;
@@ -527,7 +550,15 @@ pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsag
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
-        node_from_to(start, input, ActorUsage { name: n, type_name }),
+        node_from_to(
+            start,
+            input,
+            ActorUsage {
+                name: n,
+                type_name,
+                membership: Membership::actor(visibility, visibility_span),
+            },
+        ),
     ))
 }
 
@@ -556,4 +587,78 @@ pub(crate) fn objective(input: Input<'_>) -> IResult<Input<'_>, Node<Objective>>
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (continuation): Membership on UseCaseDef/UseCaseUsage ---
+
+    #[test]
+    fn use_case_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) = use_case_def(input("private use case def U1;")).expect("use case def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn use_case_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = use_case_def(input("use case def U1;")).expect("use case def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn use_case_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = use_case_usage(input("public use case u1 : U1;")).expect("use case usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn use_case_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = use_case_usage(input("use case u1 : U1;")).expect("use case usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    // --- parser work item 4b (final sweep): ActorMembership on ActorUsage, confirmed against
+    // the BNF's `ActorMember : ActorMembership = MemberPrefix ownedRelatedElement += ActorUsage`.
+
+    #[test]
+    fn actor_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = actor_usage(input("private actor a1 : A1;")).expect("actor usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::ActorMembership
+        );
+    }
+
+    #[test]
+    fn actor_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = actor_usage(input("actor a1 : A1;")).expect("actor usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
 }

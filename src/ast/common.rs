@@ -1,4 +1,5 @@
 use crate::ast::core::{Expression, Node, Span};
+use crate::ast::membership::Membership;
 
 /// KerML ElementFilterMember: MemberPrefix? 'filter' condition ';'
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,7 +51,21 @@ pub struct FilterPackageMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Import {
-    pub visibility: Option<Visibility>,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006 continuation), `kind`
+    /// always [`crate::ast::MembershipKind::Import`] -- the variant reserved for this struct since
+    /// `Membership`'s introduction, previously unconstructed.
+    ///
+    /// **Design decision**: this *replaces* the pre-existing `visibility: Option<Visibility>`
+    /// field (rather than adding `membership` alongside it, the other option the prior
+    /// `AttributeDef`/`AttributeUsage` increment's scope-boundary note left open) -- `Import`'s old
+    /// `visibility` field already captured exactly the same information
+    /// `Membership::visibility` does (an optional `private`/`protected`/`public` prefix, with no
+    /// separate ownership/kind data to preserve alongside it), and grepping the whole crate
+    /// (`src/`, `tests/`) found no in-crate consumer reading `Import.visibility` other than its own
+    /// constructor in `import.rs` -- so a dual-field design would only have added a redundant,
+    /// confusing field with no compatibility benefit. This is a breaking `PARSE_AST_VERSION` change
+    /// either way, matching every other struct this rollout has touched.
+    pub membership: Membership,
     /// Whether this is a namespace import (QualifiedName::* or FilterPackage) or membership import (single QualifiedName).
     pub is_import_all: bool,
     /// Import target, e.g. "SI::kg" or "Definitions::*".

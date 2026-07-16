@@ -33,6 +33,7 @@ fn alias_body(input: Input<'_>) -> IResult<Input<'_>, AliasBody> {
 pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"alias"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
@@ -54,7 +55,51 @@ pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> 
                 identification,
                 target,
                 body,
+                membership: crate::ast::Membership::new(
+                    crate::ast::MembershipKind::Alias,
+                    visibility,
+                    visibility_span,
+                ),
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (continuation): Membership on AliasDef ---
+    // BNF `AliasMember : Membership = MemberPrefix 'alias' ...` legally permits a visibility
+    // prefix, but `alias_def` never parsed one at all before this increment -- same gap class
+    // found repeatedly in this rollout.
+
+    #[test]
+    fn alias_def_visibility_prefix_is_captured_on_membership() {
+        let (_, node) =
+            alias_def(input("private alias m for ISQ::mass;")).expect("alias def");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::Alias
+        );
+    }
+
+    #[test]
+    fn alias_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = alias_def(input("alias m for ISQ::mass;")).expect("alias def");
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::Alias
+        );
+    }
 }

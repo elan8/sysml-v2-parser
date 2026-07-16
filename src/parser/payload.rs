@@ -100,6 +100,9 @@ fn control_node_payload_stmt<'a>(
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
+                // No visibility grammar at this standalone `accept`/`send` control-node-statement
+                // position. See `ActionUsage::membership`.
+                membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))

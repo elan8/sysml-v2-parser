@@ -1,10 +1,10 @@
 //! Enumeration definition parsing (BNF EnumerationDefinition).
 
-use crate::ast::{EnumDef, EnumerationBody, EnumerationUsage, Node};
+use crate::ast::{EnumDef, EnumerationBody, EnumerationUsage, Membership, Node};
 use crate::parser::attribute::attribute_body;
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, take_until_terminator, ws1, ws_and_comments};
+use crate::parser::lex::{name, take_until_terminator, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::requirement::{comment_annotation, doc_comment};
 use crate::parser::usage::{feature_usage_header, multiplicity_node};
@@ -84,7 +84,8 @@ pub(crate) fn enum_def(input: Input<'_>) -> IResult<Input<'_>, Node<EnumDef>> {
         input,
         DefinitionPrefixOptions::new(b"enum")
             .def_required()
-            .no_abstract(),
+            .no_abstract()
+            .with_captured_visibility(),
     )?;
     let (input, body) = enumeration_body(input)?;
     Ok((
@@ -96,6 +97,7 @@ pub(crate) fn enum_def(input: Input<'_>) -> IResult<Input<'_>, Node<EnumDef>> {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
+                membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },
         ),
     ))
@@ -108,6 +110,7 @@ pub(crate) fn enum_def(input: Input<'_>) -> IResult<Input<'_>, Node<EnumDef>> {
 pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<EnumerationUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, is_end) = opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
     let is_end = is_end.is_some();
     let (input, _) = tag(&b"enum"[..]).parse(input)?;
@@ -127,7 +130,60 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
                 multiplicity,
                 body,
                 is_end,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (final sweep): Membership on EnumDef/EnumerationUsage ---
+
+    #[test]
+    fn enum_def_visibility_prefix_is_captured_on_membership() {
+        let (rest, node) = enum_def(input("private enum def E1;")).expect("enum def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Private)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::OwningMembership
+        );
+    }
+
+    #[test]
+    fn enum_def_without_visibility_prefix_has_no_membership_visibility() {
+        let (rest, node) = enum_def(input("enum def E1;")).expect("enum def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn enum_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = enum_usage(input("protected enum e1 : E1;")).expect("enum usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Protected)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn enum_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = enum_usage(input("enum e1 : E1;")).expect("enum usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
 }

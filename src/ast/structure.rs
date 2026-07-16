@@ -254,6 +254,7 @@ pub struct IndividualDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
+    pub membership: Membership,
 }
 
 /// Part usage: `part` name `:` type multiplicity? `ordered`? (`redefines`|`:>>`)? value? body.
@@ -403,6 +404,12 @@ pub struct VariantUsage {
     /// Present when declared with a kind keyword (`variant part ...;`); `None` for the untyped
     /// reference form (`variant name;`).
     pub typed: Option<VariantTypedUsage>,
+    /// Ownership/visibility/kind wrapper (parser work item 4b final sweep), `kind` always
+    /// [`crate::ast::MembershipKind::VariantMembership`] -- confirmed against
+    /// `SysML-textual-bnf.kebnf`'s `VariantUsageMember : VariantMembership = MemberPrefix
+    /// 'variant' ownedVariantUsage = VariantUsageElement`, which legally carries a visibility
+    /// prefix before this increment added support for parsing one.
+    pub membership: Membership,
 }
 
 /// The nested usage of a typed `variant` member (BNF `VariantUsageElement`, restricted here to
@@ -638,6 +645,7 @@ pub struct InterfaceDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: InterfaceDefBody,
+    pub membership: Membership,
 }
 
 /// Body of an interface definition: `;` or `{` InterfaceDefBodyElement* `}`.
@@ -770,6 +778,7 @@ pub struct MetadataDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
+    pub membership: Membership,
 }
 
 /// Metadata usage: `metadata` name (`:` type)? (`about` targets)? body (BNF MetadataUsage).
@@ -780,6 +789,7 @@ pub struct MetadataUsage {
     pub type_name: Option<String>,
     pub about_targets: Vec<String>,
     pub body: AttributeBody,
+    pub membership: Membership,
 }
 
 // ---------------------------------------------------------------------------
@@ -793,6 +803,7 @@ pub struct EnumDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: EnumerationBody,
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -814,6 +825,7 @@ pub struct OccurrenceDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,
+    pub membership: Membership,
 }
 
 /// Occurrence usage: `occurrence` name (`:` type)? body, with optional individual/portion modifiers.
@@ -830,6 +842,7 @@ pub struct OccurrenceUsage {
     pub references: Option<Node<SubsettingRelationship>>,
     pub crosses: Option<Node<SubsettingRelationship>>,
     pub body: OccurrenceUsageBody,
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -886,6 +899,7 @@ pub struct SuccessionUsage {
     /// Multiplicity on the `then` end, e.g. `[0..1]`.
     pub target_multiplicity: Option<Node<Multiplicity>>,
     pub body: ConnectBody,
+    pub membership: Membership,
 }
 
 // ---------------------------------------------------------------------------
@@ -986,6 +1000,14 @@ pub struct AliasDef {
     /// qualified name, with no comma-separated multi-target concept (parser work item 4a).
     pub target: RelationshipTarget,
     pub body: AliasBody,
+    /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006 continuation), `kind`
+    /// always [`crate::ast::MembershipKind::Alias`] -- the variant reserved for this struct since
+    /// `Membership`'s introduction, previously unconstructed. Genuine new grammar coverage: BNF
+    /// `AliasMember : Membership = MemberPrefix 'alias' ...` (`SysML-textual-bnf.kebnf`) legally
+    /// permits a `private`/`protected`/`public` prefix before `alias`, but `alias_def` never parsed
+    /// one at all before this increment -- same gap class found repeatedly in this rollout (see
+    /// `crate::ast::PortDef::membership`).
+    pub membership: Membership,
 }
 
 /// Body of an alias definition: `;` or `{` ... `}`.

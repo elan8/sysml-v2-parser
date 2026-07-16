@@ -1,6 +1,6 @@
 //! Import and relationship body parsing.
 
-use crate::ast::{FilterPackageMember, Import, Node, Visibility};
+use crate::ast::{FilterPackageMember, Import, Membership, MembershipKind, Node};
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::expr::expression;
 use crate::parser::lex::{qualified_name, ws1, ws_and_comments};
@@ -36,14 +36,7 @@ pub(crate) fn relationship_body(input: Input<'_>) -> IResult<Input<'_>, ()> {
 pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, visibility) = opt(alt((
-        map(preceded(tag(&b"public"[..]), ws1), |_| Visibility::Public),
-        map(preceded(tag(&b"private"[..]), ws1), |_| Visibility::Private),
-        map(preceded(tag(&b"protected"[..]), ws1), |_| {
-            Visibility::Protected
-        }),
-    )))
-    .parse(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"import"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
@@ -119,7 +112,7 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
             start,
             input,
             Import {
-                visibility,
+                membership: Membership::new(MembershipKind::Import, visibility, visibility_span),
                 is_import_all,
                 target,
                 target_span: qname_span,
@@ -128,4 +121,39 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod membership_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // --- parser work item 4b (continuation): `Import.visibility` replaced by `Import.membership` ---
+
+    #[test]
+    fn import_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = import_(input("public import SI::kg;")).expect("import");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::Import
+        );
+    }
+
+    #[test]
+    fn import_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = import_(input("import SI::kg;")).expect("import");
+        assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::Import
+        );
+    }
 }
