@@ -196,6 +196,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::ConstraintDef(n) => {
             PackageBodyElement::ConstraintDef(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::ConstraintUsage(n) => {
+            PackageBodyElement::ConstraintUsage(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::CalcDef(n) => {
             PackageBodyElement::CalcDef(dummy_node(n, n.value.clone()))
         }

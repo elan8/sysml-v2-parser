@@ -20,8 +20,8 @@ use super::structure::{
     OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
-    CalcDef, ConstraintDef, RenderingDef, RenderingUsage, ViewDef, ViewUsage, ViewpointDef,
-    ViewpointUsage,
+    CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
+    ViewpointDef, ViewpointUsage,
 };
 use crate::ast::core::Node;
 
@@ -81,6 +81,7 @@ pub enum PackageBodyElement {
     ItemDef(Node<ItemDef>),
     IndividualDef(Node<IndividualDef>),
     ConstraintDef(Node<ConstraintDef>),
+    ConstraintUsage(Node<ConstraintUsage>),
     CalcDef(Node<CalcDef>),
     ViewDef(Node<ViewDef>),
     ViewpointDef(Node<ViewpointDef>),

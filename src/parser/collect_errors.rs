@@ -426,6 +426,9 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
                 PackageBodyElement::ConstraintDef(n) => {
                     collect_constraint_body_errors(&n.value.body, errors)
                 }
+                PackageBodyElement::ConstraintUsage(n) => {
+                    collect_constraint_body_errors(&n.value.body, errors)
+                }
                 PackageBodyElement::CalcDef(n) => collect_calc_body_errors(&n.value.body, errors),
                 PackageBodyElement::ViewDef(n) => {
                     collect_view_def_body_errors(&n.value.body, errors)

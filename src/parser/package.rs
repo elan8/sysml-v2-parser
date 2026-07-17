@@ -15,7 +15,7 @@ use crate::parser::case::{
     verification_case_usage,
 };
 use crate::parser::connection::connection_def;
-use crate::parser::constraint::{calc_def, constraint_def};
+use crate::parser::constraint::{calc_def, constraint_def, constraint_usage};
 use crate::parser::dependency::dependency;
 use crate::parser::enumeration::{enum_def, enum_usage};
 use crate::parser::expr::expression;
@@ -799,6 +799,12 @@ fn try_package_body_behavior<'a>(
         start,
         constraint_def,
         PackageBodyElement::ConstraintDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        constraint_usage,
+        PackageBodyElement::ConstraintUsage
     );
     try_package_body_dispatch!(input, start, calc_def, PackageBodyElement::CalcDef);
     Err(nom::Err::Error(nom::error::Error::new(

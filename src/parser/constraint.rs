@@ -1,6 +1,7 @@
 use crate::ast::{
     CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef, ConstraintDefBody,
-    ConstraintDefBodyElement, Expression, Membership, Node, ParseErrorNode, ReturnDecl,
+    ConstraintDefBodyElement, ConstraintUsage, Expression, Membership, Node, ParseErrorNode,
+    ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
 use crate::parser::body::parse_structured_brace_members;
@@ -11,6 +12,7 @@ use crate::parser::lex::{
     starts_with_keyword, visibility_prefix, ws1, ws_and_comments, CALC_DEF_BODY_STARTERS,
     CONSTRAINT_DEF_BODY_STARTERS,
 };
+use crate::parser::usage::feature_usage_header;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::bytes::complete::tag;
@@ -18,17 +20,29 @@ use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
-/// `def` is intentionally optional: the standard library uses bare, `def`-less `constraint`
-/// usages at namespace level (e.g. `abstract constraint constraintChecks: ConstraintCheck[0..*]
-/// nonunique :> booleanEvaluations { ... }` in `Systems Library/Constraints.sysml`), and there is
-/// no dedicated `constraint_usage` parser to catch them instead — this parser currently folds
-/// that legal form into `ConstraintDef`. Do not add `.def_required()` here without first adding
-/// real constraint-usage support.
+/// `def` is required: package level dispatches [`constraint_usage`] right after this parser in
+/// the same `alt(...)` (mirroring `case_def`/`case_usage`, `requirement_def`/`requirement_usage`,
+/// etc. -- see `definition_prefix.rs`'s module doc), so a `def`-less declaration is left for
+/// `constraint_usage` instead of being misclassified as a definition (the PAR-001 bug class).
+///
+/// **History:** this was `Optional` until parser 0.40.0 specifically because no
+/// `constraint_usage` parser existed yet to catch the standard library's bare, `def`-less
+/// `constraint` usages at namespace level (e.g. `abstract constraint constraintChecks:
+/// ConstraintCheck[0..*] nonunique :> booleanEvaluations { ... }` in
+/// `Systems Library/Constraints.sysml`) -- see CHANGELOG 0.33.0 for an earlier, unsafe attempt
+/// that made this `.def_required()` with no usage-parser fallback, which broke the full
+/// `SYSML_V2_RELEASE_DIR` validation gate. [`constraint_usage`] below (built on
+/// [`crate::parser::usage::feature_usage_header`], the same shared header parser
+/// `allocation_usage`/`flow_usage`/`requirement_usage`/etc. already use for the identical
+/// abstract/multiplicity/`nonunique`/subsetting shape) now covers that real-library form, so
+/// requiring `def` here is safe -- verified against the full validation suite.
 pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConstraintDef>> {
     let start = input;
     let (input, prefix) = parse_definition_prefix(
         input,
-        DefinitionPrefixOptions::new(b"constraint").with_captured_visibility(),
+        DefinitionPrefixOptions::new(b"constraint")
+            .with_captured_visibility()
+            .def_required(),
     )?;
     let (input, body) = constraint_def_body(input)?;
     Ok((
@@ -41,6 +55,43 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
+            },
+        ),
+    ))
+}
+
+/// Constraint usage: `constraint` name (feature usage header)? body (SysML/KerML: a bare
+/// `constraint` feature, package-level only). Mirrors `allocation_usage`'s shape (a baseline
+/// `PartUsage`-family usage, not the richer `attribute_usage`), reusing `constraint_def_body` for
+/// the body and `feature_usage_header` for typing/subsetting/multiplicity/`nonunique` so the
+/// Systems Library's real bare forms all still parse: `constraint mc : MassConstraint4 { ... }`
+/// (typing only), `abstract constraint constraintChecks: ConstraintCheck[0..*] nonunique :>
+/// booleanEvaluations { ... }` (typing + trailing multiplicity + modifier + subsetting),
+/// `abstract constraint assertedConstraintChecks :> constraintChecks, trueEvaluations { ... }`
+/// (subsetting only, no typing, multi-target), and `constraint assumptions :>>
+/// RequirementConstraintCheck::assumptions;` (redefinition with a qualified feature-chain
+/// target). `abstract` is accepted and discarded, matching `ConstraintDef` itself, which has no
+/// `is_abstract` field either.
+pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ConstraintUsage>> {
+    let start = input;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, _) = tag(&b"constraint"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, name_str) = name(input)?;
+    let (input, header) = feature_usage_header(input)?;
+    let (input, body) = constraint_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ConstraintUsage {
+                name: name_str,
+                type_name: header.type_name,
+                body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -509,5 +560,168 @@ mod membership_tests {
         let (rest, node) = calc_usage(input("calc c1;")).expect("calc usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.membership.visibility, None);
+    }
+}
+
+#[cfg(test)]
+mod constraint_usage_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // Package-level `def`/usage disambiguation (PAR-001 bug class, closed for `constraint` here).
+    // `def` is now required for `ConstraintDef`, with `constraint_usage` (built on
+    // `feature_usage_header`) catching every bare, `def`-less real-library form instead -- see
+    // `constraint_def`'s doc comment and CHANGELOG 0.33.0 for the earlier, unsafe attempt this
+    // supersedes.
+
+    #[test]
+    fn constraint_def_no_longer_accepts_a_bare_def_less_declaration() {
+        // Previously folded into `ConstraintDef`; must now be left for `constraint_usage`.
+        let result = constraint_def(input("constraint c : C;"));
+        assert!(
+            result.is_err(),
+            "constraint_def must require the `def` keyword"
+        );
+    }
+
+    #[test]
+    fn constraint_usage_accepts_simple_typed_semicolon_form() {
+        let (rest, node) = constraint_usage(input("constraint c : C;")).expect("constraint usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "c");
+        assert_eq!(node.value.type_name.as_deref(), Some("C"));
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn constraint_usage_accepts_typed_braced_form() {
+        let (rest, node) = constraint_usage(input(
+            "constraint mc : MassConstraint4 {\n    in totalMass : MassValue;\n}",
+        ))
+        .expect("constraint usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "mc");
+        assert_eq!(node.value.type_name.as_deref(), Some("MassConstraint4"));
+        assert!(matches!(node.value.body, ConstraintDefBody::Brace { .. }));
+    }
+
+    #[test]
+    fn constraint_usage_accepts_untyped_braced_form() {
+        let (_, node) =
+            constraint_usage(input("constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}"))
+                .expect("constraint usage");
+        assert_eq!(node.value.name, "hasLegalProfileDepth");
+        assert_eq!(node.value.type_name, None);
+    }
+
+    /// Regression: `Systems Library/Constraints.sysml`'s `constraintChecks` -- `abstract` +
+    /// typing + trailing multiplicity + `nonunique` modifier + subsetting, all `def`-less. This
+    /// exact shape is why `constraint_def` couldn't safely require `def` before this parser
+    /// existed (CHANGELOG 0.33.0).
+    #[test]
+    fn constraint_usage_accepts_the_real_library_constraint_checks_form() {
+        let (rest, node) = constraint_usage(input(
+            "abstract constraint constraintChecks: ConstraintCheck[0..*] nonunique :> booleanEvaluations {\n}",
+        ))
+        .expect("constraint usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "constraintChecks");
+        assert_eq!(node.value.type_name.as_deref(), Some("ConstraintCheck"));
+    }
+
+    /// Regression: `Systems Library/Constraints.sysml`'s `assertedConstraintChecks` -- `abstract`
+    /// + multi-target subsetting only, no typing at all.
+    #[test]
+    fn constraint_usage_accepts_subsetting_only_multi_target_form() {
+        let (rest, node) = constraint_usage(input(
+            "abstract constraint assertedConstraintChecks :> constraintChecks, trueEvaluations {\n}",
+        ))
+        .expect("constraint usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "assertedConstraintChecks");
+        assert_eq!(node.value.type_name, None);
+    }
+
+    /// Regression: `Systems Library/Requirements.sysml`'s `constraint assumptions[0..*] :>
+    /// constraintChecks, subperformances` -- multiplicity directly after the name with no typing,
+    /// then multi-target subsetting.
+    #[test]
+    fn constraint_usage_accepts_leading_multiplicity_then_subsetting() {
+        let (rest, node) = constraint_usage(input(
+            "constraint assumptions[0..*] :> constraintChecks, subperformances {\n}",
+        ))
+        .expect("constraint usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "assumptions");
+        assert_eq!(node.value.type_name, None);
+    }
+
+    /// Regression: `Systems Library/Requirements.sysml`'s `constraint assumptions :>>
+    /// RequirementConstraintCheck::assumptions;` -- redefinition with a qualified target,
+    /// semicolon body.
+    #[test]
+    fn constraint_usage_accepts_redefinition_with_qualified_target() {
+        let (rest, node) = constraint_usage(input(
+            "constraint assumptions :>> RequirementConstraintCheck::assumptions;",
+        ))
+        .expect("constraint usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "assumptions");
+        assert_eq!(node.value.type_name, None);
+        assert!(matches!(node.value.body, ConstraintDefBody::Semicolon));
+    }
+
+    #[test]
+    fn constraint_usage_visibility_prefix_is_captured_on_membership() {
+        let (_, node) = constraint_usage(input("public constraint c1;")).expect("constraint usage");
+        assert_eq!(
+            node.value.membership.visibility,
+            Some(crate::ast::Visibility::Public)
+        );
+        assert_eq!(
+            node.value.membership.kind,
+            crate::ast::MembershipKind::FeatureMembership
+        );
+    }
+
+    #[test]
+    fn constraint_usage_without_visibility_prefix_has_no_membership_visibility() {
+        let (_, node) = constraint_usage(input("constraint c1;")).expect("constraint usage");
+        assert_eq!(node.value.membership.visibility, None);
+    }
+
+    /// Package-level dispatch order (`package.rs`): `constraint def X;` must still classify as
+    /// `ConstraintDef`, not fall through to `constraint_usage`.
+    #[test]
+    fn package_body_dispatch_still_classifies_constraint_def_correctly() {
+        use crate::parser::package::package_body_element;
+
+        let (_, node) = package_body_element(input("constraint def X;"))
+            .expect("constraint def package member");
+        assert!(matches!(
+            node.value,
+            crate::ast::PackageBodyElement::ConstraintDef(_)
+        ));
+    }
+
+    /// Package-level dispatch order (`package.rs`): a bare, `def`-less `constraint c : X;` must
+    /// now classify as `ConstraintUsage`, not be misclassified as `ConstraintDef`.
+    #[test]
+    fn package_body_dispatch_classifies_bare_constraint_as_usage() {
+        use crate::parser::package::package_body_element;
+
+        let (_, node) =
+            package_body_element(input("constraint c : X;")).expect("constraint usage package member");
+        assert!(matches!(
+            node.value,
+            crate::ast::PackageBodyElement::ConstraintUsage(_)
+        ));
     }
 }

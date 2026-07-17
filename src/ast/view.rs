@@ -16,6 +16,21 @@ pub struct ConstraintDef {
     pub membership: Membership,
 }
 
+/// Constraint usage: `constraint` name (feature usage header: typing/subsetting/multiplicity/
+/// `ordered`/`nonunique`)? body. Package-level only -- mirrors [`ConstraintDef`]'s existing
+/// `abstract`/`def`-less real-library forms (`Systems Library/Constraints.sysml`'s
+/// `constraintChecks`/`assertedConstraintChecks`/`negatedConstraintChecks`), which previously had
+/// no distinct usage-side AST node and folded into `ConstraintDef` (see
+/// `parser::constraint::constraint_def`'s doc comment history).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ConstraintUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: ConstraintDefBody,
+    pub membership: Membership,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConstraintDefBody {

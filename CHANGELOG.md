@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-07-17
+
+Closes the `constraint`/`ConstraintUsage` gap flagged in Babel42's Systems Modeling API gaps
+document: `constraint c : C;` had no distinct usage-side AST node and folded into `ConstraintDef`
+at parse time.
+
+### Added
+
+- **`ast::ConstraintUsage`** (`src/ast/view.rs`) and its parser, `constraint_usage`
+  (`src/parser/constraint.rs`), built on `parser::usage::feature_usage_header` — the same shared
+  header parser `allocation_usage`/`flow_usage`/`requirement_usage`/etc. already use for
+  typing/subsetting/multiplicity/`nonunique`. New `PackageBodyElement::ConstraintUsage` variant,
+  dispatched right after `constraint_def` in `package.rs`'s package-level `alt(...)` (mirroring
+  `case_def`/`case_usage`).
+- Regression tests in `src/parser/constraint.rs`'s new `constraint_usage_tests` module locking in
+  every real `Systems Library`/example-corpus bare-`constraint` shape: simple typed
+  (`constraint c : C;`), typed-and-braced, untyped-and-braced, the `constraintChecks` shape
+  (`abstract` + typing + trailing multiplicity + `nonunique` + subsetting, from
+  `Systems Library/Constraints.sysml`), subsetting-only with multiple targets
+  (`assertedConstraintChecks`), leading-multiplicity-then-subsetting with no typing
+  (`Requirements.sysml`'s `assumptions[0..*] :> constraintChecks, subperformances`), and
+  redefinition with a qualified feature-chain target (`assumptions :>>
+  RequirementConstraintCheck::assumptions`).
+
+### Changed
+
+- **`constraint_def` now requires the `def` keyword** (`.def_required()`), the PAR-001
+  disambiguation pattern, now that `constraint_usage` exists to catch the bare form instead of
+  silently misclassifying it as a definition.
+- **`PARSE_AST_VERSION`** bumped `36` → `37`: `constraint`/`ConstraintUsage` classification
+  changed, so cached parses built against 0.39.x schema must be invalidated.
+
+### Notes
+
+- **This is not the same change CHANGELOG 0.33.0 reverted.** That earlier attempt made
+  `constraint_def` (and `calc_def`/`port_def`) require `def` with **no usage-parser fallback at
+  all**, so the standard library's bare, `def`-less namespace-level forms became unparseable —
+  breaking the full `SYSML_V2_RELEASE_DIR` validation gate. This change adds the missing
+  `constraint_usage` parser first, verified to cover every real bare-`constraint` shape in the
+  release corpus (see the regression tests above), before requiring `def` on the definition side.
+  `calc_def`/`port_def` remain deliberately `Optional` — this change does not touch them.
+- Verified against the full SysML v2 release validation suite (`cargo test --test validation --
+  --include-ignored` with `SYSML_V2_RELEASE_DIR` pointing at the fetched
+  `Systems-Modeling/SysML-v2-Release` checkout): all 25 tests pass, including
+  `full_library_suite::test_full_library_suite`,
+  `full_library_suite::test_full_library_strict_no_diagnostics`,
+  `full_library_suite::test_systems_library_strict_no_diagnostics`, and
+  `full_validation_suite::test_full_validation_suite` — the exact gates the 0.33.0 attempt broke.
+
 ## [0.39.0] - 2026-07-16
 
 - **Enumerated values are now spanned AST nodes** — `EnumerationBody::Brace { values }` changed
