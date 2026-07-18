@@ -714,7 +714,7 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
+    let (input, def_kw) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, ident) = name(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
@@ -722,6 +722,7 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
         name: ident,
         type_name: header.type_name,
         body,
+        is_definition: def_kw.is_some(),
         membership: crate::ast::Membership::feature(visibility, visibility_span),
     };
     Ok((input, node_from_to(start, input, val)))
@@ -826,6 +827,33 @@ mod membership_tests {
             node.value.membership.kind,
             crate::ast::MembershipKind::FeatureMembership
         );
+    }
+
+    #[test]
+    fn concern_usage_bare_form_is_not_a_definition() {
+        let (rest, node) =
+            concern_usage(input("concern c1 : ConcernType;")).expect("concern usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(!node.value.is_definition);
+    }
+
+    #[test]
+    fn concern_usage_def_form_is_a_definition() {
+        let (rest, node) = concern_usage(input("concern def ConcernType;")).expect("concern def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_definition);
+        assert_eq!(node.value.name, "ConcernType");
+    }
+
+    #[test]
+    fn concern_usage_def_form_with_type_and_body_is_a_definition() {
+        let (rest, node) = concern_usage(input(
+            "concern def SafetyConcern : BaseConcern { doc /* d */ }",
+        ))
+        .expect("concern def with type and body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_definition);
+        assert_eq!(node.value.type_name.as_deref(), Some("BaseConcern"));
     }
 
     /// Payload sites with no visibility grammar of their own (`verify requirement ...`,

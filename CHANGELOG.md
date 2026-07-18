@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-07-18
+
+Closes the `ConcernDefinition`/`ConcernUsage` gap flagged in Babel42's Systems Modeling API gaps
+document: `concern_usage` already parses both the `concern` and `concern def` textual forms, but
+discarded which one was used, so downstream consumers could not distinguish a concern definition
+from a concern usage the way they already can for `case`/`case def`.
+
+### Added
+
+- **`ast::ConcernUsage::is_definition`** (`src/ast/requirement.rs`): true when the optional `def`
+  keyword was present. `parser::requirement::concern_usage` now records the match instead of
+  discarding it via `nom::combinator::opt(...)`.
+- Parser tests in `src/parser/requirement.rs`'s `membership_tests` module covering the bare
+  `concern c1 : ConcernType;` form (`is_definition: false`) and the `concern def ...` form,
+  including with a typing target and a body (`is_definition: true`).
+
+### Changed
+
+- **`PARSE_AST_VERSION`** bumped `37` → `38`: `ConcernUsage` gained a new field, so cached parses
+  built against 0.40.x schema must be invalidated.
+
 ## [0.40.0] - 2026-07-17
 
 Closes the `constraint`/`ConstraintUsage` gap flagged in Babel42's Systems Modeling API gaps

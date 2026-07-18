@@ -238,11 +238,14 @@ pub struct ConcernUsage {
     pub name: String,
     pub type_name: Option<String>,
     pub body: RequirementDefBody,
+    /// True for `concern def ...`, false for a bare `concern ...` usage. `concern_usage` handles
+    /// both the `concern` and `concern def` textual forms itself rather than through a separate
+    /// `ConcernDef` struct (the BNF's own `ConcernDefinition` production is not modeled as a
+    /// distinct struct); this flag is the sole discriminator between the two, restored so
+    /// consumers can classify them distinctly instead of folding both into one semantic kind.
+    pub is_definition: bool,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
-    /// [`crate::ast::MembershipKind::FeatureMembership`] -- no separate `ConcernDef` struct exists
-    /// in this AST (`concern_usage` already handles both the `concern` and `concern def` textual
-    /// forms itself; the BNF's own `ConcernDefinition` production is not modeled as a distinct
-    /// struct, a pre-existing design predating this item and out of scope to change here).
+    /// [`crate::ast::MembershipKind::FeatureMembership`].
     pub membership: Membership,
 }
 
