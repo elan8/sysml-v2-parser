@@ -231,6 +231,15 @@ pub enum ViewBodyElement {
 pub struct ExposeMember {
     /// Full target path (e.g. vehicle, vehicle::*, vehicle::*::**, SystemModel::vehicle::**).
     pub target: String,
+    /// Whether this is a namespace import (`X::*`) rather than a membership import (`X`) --
+    /// mirrors [`crate::ast::Import::is_import_all`]. `expose` is normatively an Import per this
+    /// struct's own BNF doc comment; the parser already distinguished the four suffix forms
+    /// (`::*::**` / `::**` / `::*` / plain) to build `target`, but previously discarded which one
+    /// matched into the concatenated string instead of retaining it structurally.
+    pub is_import_all: bool,
+    /// Whether the import is recursive (`::**` suffix) -- mirrors
+    /// [`crate::ast::Import::is_recursive`].
+    pub is_recursive: bool,
     pub body: ConnectBody,
 }
 

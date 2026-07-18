@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-07-18
+
+Closes the `expose` classification gap flagged in Babel42's Systems Modeling API gaps document:
+`expose_member` already distinguished the four suffix forms (`::*::**` / `::**` / `::*` / plain)
+to build the concatenated `target` string, but discarded which one matched instead of retaining
+it structurally — `expose` is normatively an Import per its own BNF doc comment
+(`MembershipImport = QualifiedName (::**)?`, `NamespaceImport = QualifiedName :: * (::**)?`), the
+same distinction `ast::Import` already makes for ordinary `import` statements.
+
+### Added
+
+- **`ast::ExposeMember::is_import_all`/`::is_recursive`** (`src/ast/view.rs`), mirroring
+  `Import`'s fields of the same name. `parser::view::expose_member` now records which of the four
+  suffix branches matched instead of only concatenating `target`.
+- Parser tests in `src/parser/view.rs`'s `expose_diagnostic_tests` module covering all four forms:
+  plain (`expose vehicle;`), `::*`, `::**`, and `::*::**`.
+
+### Changed
+
+- **`PARSE_AST_VERSION`** bumped `38` → `39`: `ExposeMember` gained two new fields, so cached
+  parses built against 0.41.x schema must be invalidated.
+
 ## [0.41.0] - 2026-07-18
 
 Closes the `ConcernDefinition`/`ConcernUsage` gap flagged in Babel42's Systems Modeling API gaps

@@ -271,7 +271,7 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
     let (input, _) = preceded(ws_and_comments, tag(&b"expose"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, first) = qualified_name.parse(input)?;
-    let (input, target) = alt((
+    let (input, (target, is_import_all, is_recursive)) = alt((
         // ::*::** (try before ::* since * would consume first char of **)
         map(
             (
@@ -280,7 +280,7 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
                 preceded(ws_and_comments, tag(&b"::"[..])),
                 preceded(ws_and_comments, tag(&b"**"[..])),
             ),
-            |_| format!("{}::*::**", first),
+            |_| (format!("{}::*::**", first), true, true),
         ),
         // ::** (try before ::*)
         map(
@@ -288,7 +288,7 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
                 preceded(ws_and_comments, tag(&b"::"[..])),
                 preceded(ws_and_comments, tag(&b"**"[..])),
             ),
-            |_| format!("{}::**", first),
+            |_| (format!("{}::**", first), false, true),
         ),
         // ::*
         map(
@@ -296,10 +296,10 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
                 preceded(ws_and_comments, tag(&b"::"[..])),
                 preceded(ws_and_comments, tag(&b"*"[..])),
             ),
-            |_| format!("{}::*", first),
+            |_| (format!("{}::*", first), true, false),
         ),
         // plain
-        map(success(()), |_| first.clone()),
+        map(success(()), |_| (first.clone(), false, false)),
     ))
     .parse(input)?;
     let (input, target) = parse_expose_feature_chain_suffix(input, target)?;
@@ -313,7 +313,16 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
     let (input, body) = connect_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, ExposeMember { target, body }),
+        node_from_to(
+            start,
+            input,
+            ExposeMember {
+                target,
+                is_import_all,
+                is_recursive,
+                body,
+            },
+        ),
     ))
 }
 
@@ -450,7 +459,9 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
 
 #[cfg(test)]
 mod expose_diagnostic_tests {
-    use crate::ast::{PackageBody, PackageBodyElement, RootElement, ViewBody, ViewBodyElement};
+    use crate::ast::{
+        ExposeMember, PackageBody, PackageBodyElement, RootElement, ViewBody, ViewBodyElement,
+    };
     use crate::parse_with_diagnostics;
 
     #[test]
@@ -485,6 +496,64 @@ mod expose_diagnostic_tests {
             expose.value.target, "SurveillanceDrone.SurveillanceQuadrotorDrone",
             "feature-chain segments should be preserved in expose target"
         );
+        assert!(!expose.value.is_import_all, "no wildcard suffix present");
+        assert!(!expose.value.is_recursive, "no `::**` suffix present");
+    }
+
+    fn expose_of(input: &str) -> ExposeMember {
+        let result = parse_with_diagnostics(input);
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        let root = result.root;
+        let pkg = match &root.elements[0].value {
+            RootElement::Package(p) => p,
+            other => panic!("expected package, got {other:?}"),
+        };
+        let view_usage = match &pkg.value.body {
+            PackageBody::Brace { elements } => match &elements[0].value {
+                PackageBodyElement::ViewUsage(v) => v,
+                other => panic!("expected view usage, got {other:?}"),
+            },
+            other => panic!("expected brace body, got {other:?}"),
+        };
+        match &view_usage.value.body {
+            ViewBody::Brace { elements } => match &elements[0].value {
+                ViewBodyElement::Expose(e) => e.value.clone(),
+                other => panic!("expected expose member, got {other:?}"),
+            },
+            other => panic!("expected view body, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn expose_plain_target_is_a_membership_import() {
+        let expose = expose_of("package Views { view v : GeneralView { expose vehicle; } }");
+        assert_eq!(expose.target, "vehicle");
+        assert!(!expose.is_import_all);
+        assert!(!expose.is_recursive);
+    }
+
+    #[test]
+    fn expose_wildcard_target_is_a_namespace_import() {
+        let expose = expose_of("package Views { view v : GeneralView { expose vehicle::*; } }");
+        assert_eq!(expose.target, "vehicle::*");
+        assert!(expose.is_import_all);
+        assert!(!expose.is_recursive);
+    }
+
+    #[test]
+    fn expose_recursive_membership_import() {
+        let expose = expose_of("package Views { view v : GeneralView { expose vehicle::**; } }");
+        assert_eq!(expose.target, "vehicle::**");
+        assert!(!expose.is_import_all);
+        assert!(expose.is_recursive);
+    }
+
+    #[test]
+    fn expose_recursive_namespace_import() {
+        let expose = expose_of("package Views { view v : GeneralView { expose vehicle::*::**; } }");
+        assert_eq!(expose.target, "vehicle::*::**");
+        assert!(expose.is_import_all);
+        assert!(expose.is_recursive);
     }
 }
 
