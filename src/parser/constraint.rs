@@ -614,9 +614,10 @@ mod constraint_usage_tests {
 
     #[test]
     fn constraint_usage_accepts_untyped_braced_form() {
-        let (_, node) =
-            constraint_usage(input("constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}"))
-                .expect("constraint usage");
+        let (_, node) = constraint_usage(input(
+            "constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}",
+        ))
+        .expect("constraint usage");
         assert_eq!(node.value.name, "hasLegalProfileDepth");
         assert_eq!(node.value.type_name, None);
     }
@@ -717,8 +718,8 @@ mod constraint_usage_tests {
     fn package_body_dispatch_classifies_bare_constraint_as_usage() {
         use crate::parser::package::package_body_element;
 
-        let (_, node) =
-            package_body_element(input("constraint c : X;")).expect("constraint usage package member");
+        let (_, node) = package_body_element(input("constraint c : X;"))
+            .expect("constraint usage package member");
         assert!(matches!(
             node.value,
             crate::ast::PackageBodyElement::ConstraintUsage(_)
