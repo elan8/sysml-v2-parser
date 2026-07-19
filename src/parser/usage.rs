@@ -212,7 +212,7 @@ fn relationship_target_node(
 
 /// Parses an optional leading `~` and a qualified name; returns `(was_conjugated, target)` with
 /// the `~` stripped from the target's segments rather than folded into them.
-fn conjugated_qualified_name(
+pub(crate) fn conjugated_qualified_name(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (bool, Node<RelationshipTarget>)> {
     let before = input;

@@ -4,7 +4,7 @@ use super::requirement::RequirementUsage;
 use super::structure::{
     Annotation, Bind, DefinitionBody, MetadataAnnotation, MetadataKeywordUsage, Perform, RefDecl,
 };
-use crate::ast::core::{Expression, Node, Span, TypingRelationship};
+use crate::ast::core::{Expression, Multiplicity, Node, Span, TypingRelationship};
 
 /// Action definition: `action def` Identification body (in/out params).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -252,6 +252,18 @@ pub enum FlowUsageKind {
     SuccessionFlow,
 }
 
+/// `of` clause payload feature on a flow usage: SysML v2 §8.2.2.16 `PayloadFeature` — an
+/// optionally-named `Feature` typed by (and/or given a multiplicity by) the `of` clause, e.g.
+/// `of Payload`, `of qty : Payload`, `of qty : Payload[1..3]`. Distinct from a plain expression:
+/// the flow owns this as a real `FeatureMembership`, not a value reference.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct PayloadFeature {
+    pub name: Option<String>,
+    pub type_name: Option<String>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+}
+
 /// Flow usage: `flow` | `message` | `succession flow` with optional name, payload, and endpoints.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -259,7 +271,7 @@ pub struct FlowUsage {
     pub kind: FlowUsageKind,
     pub name: Option<String>,
     pub type_name: Option<String>,
-    pub payload: Option<Node<Expression>>,
+    pub payload: Option<Node<PayloadFeature>>,
     pub from: Option<Node<Expression>>,
     pub to: Option<Node<Expression>>,
     pub body: DefinitionBody,

@@ -1,4 +1,4 @@
-use crate::ast::{Expression, FlowDef, FlowUsage, FlowUsageKind, Membership, Node};
+use crate::ast::{Expression, FlowDef, FlowUsage, FlowUsageKind, Membership, Node, PayloadFeature};
 
 type FlowEndpoints<'a> =
     nom::IResult<Input<'a>, (Option<Node<Expression>>, Option<Node<Expression>>)>;
@@ -7,7 +7,10 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::expression;
 use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::usage::feature_usage_header;
+use crate::parser::usage::{
+    conjugated_qualified_name, feature_usage_header, multiplicity_node, optional_typings,
+    targets_display_string,
+};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -52,15 +55,78 @@ fn flow_usage_keyword(input: Input<'_>) -> IResult<Input<'_>, FlowUsageKind> {
     .parse(input)
 }
 
-fn optional_payload(input: Input<'_>) -> IResult<Input<'_>, Option<Node<crate::ast::Expression>>> {
+fn optional_payload(input: Input<'_>) -> IResult<Input<'_>, Option<Node<PayloadFeature>>> {
     let (peek, _) = ws_and_comments(input)?;
     if starts_with_keyword(peek.fragment(), b"of") {
         let (input, _) = preceded(ws_and_comments, tag(&b"of"[..])).parse(input)?;
-        let (input, payload) = preceded(ws1, expression).parse(input)?;
+        let (input, payload) = preceded(ws1, payload_feature).parse(input)?;
         Ok((input, Some(payload)))
     } else {
         Ok((input, None))
     }
+}
+
+/// SysML v2 §8.2.2.16 `PayloadFeature`: an optionally-named feature typed by (and/or given a
+/// multiplicity by) the `of` clause -- `of Payload`, `of qty : Payload`, `of qty : Payload[1..3]`.
+///
+/// Disambiguates "name : Type" from a bare type reference by trying the named form first: an
+/// identifier is only treated as the feature's own name if a typing clause (`:`/`typed`/
+/// `defined by`) genuinely follows it; otherwise that identifier (or qualified name) is the type
+/// reference itself, matching the grammar's second/third `PayloadFeature` alternative (a bare
+/// `OwnedFeatureTyping`, no `Identification`). Multiplicity is accepted after either form.
+///
+/// Scope limit (documented, not silently dropped): does not accept a *leading* multiplicity
+/// before the name/type (the grammar's third alternative, `OwnedMultiplicity
+/// OwnedFeatureTyping`) -- an extreme edge case with no observed real-world usage, unlike
+/// trailing `[mult]` which is common. `feature_usage_header` (used elsewhere) accepts a leading
+/// multiplicity too, but discards its value; this function is not built on that combinator.
+fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>> {
+    let start = input;
+    if let Ok((after_name, feature_name)) = preceded(ws_and_comments, name).parse(input) {
+        if let Ok((after_typing, Some((_, is_conjugated, targets)))) = optional_typings(after_name)
+        {
+            let base = targets_display_string(&targets);
+            let type_name = Some(if is_conjugated {
+                format!("~{base}")
+            } else {
+                base
+            });
+            let (rest, multiplicity) =
+                nom::combinator::opt(preceded(ws_and_comments, multiplicity_node))
+                    .parse(after_typing)?;
+            return Ok((
+                rest,
+                node_from_to(
+                    start,
+                    rest,
+                    PayloadFeature {
+                        name: Some(feature_name),
+                        type_name,
+                        multiplicity,
+                    },
+                ),
+            ));
+        }
+    }
+    // Bare type reference: no explicit feature name.
+    let (input, (conjugated, target)) =
+        preceded(ws_and_comments, conjugated_qualified_name).parse(input)?;
+    let base = targets_display_string(std::slice::from_ref(&target));
+    let type_name = Some(if conjugated { format!("~{base}") } else { base });
+    let (input, multiplicity) =
+        nom::combinator::opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            PayloadFeature {
+                name: None,
+                type_name,
+                multiplicity,
+            },
+        ),
+    ))
 }
 
 fn flow_endpoints(input: Input<'_>) -> FlowEndpoints<'_> {

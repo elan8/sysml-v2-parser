@@ -65,6 +65,84 @@ fn named_flow_in_package() {
     }
 }
 
+fn find_flow(
+    elements: &[sysml_v2_parser::ast::Node<PackageBodyElement>],
+) -> &sysml_v2_parser::ast::Node<sysml_v2_parser::ast::FlowUsage> {
+    elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::FlowUsage(flow) => Some(flow),
+            _ => None,
+        })
+        .expect("expected a FlowUsage among the package's elements")
+}
+
+#[test]
+fn flow_payload_bare_type_reference() {
+    let elements = package_body(
+        "package P { attribute def Payload; flow transfer of Payload from src to dst; }",
+    );
+    let flow = find_flow(&elements);
+    let payload = flow.value.payload.as_ref().expect("payload feature");
+    assert_eq!(payload.value.name, None);
+    assert_eq!(payload.value.type_name.as_deref(), Some("Payload"));
+    assert!(payload.value.multiplicity.is_none());
+}
+
+#[test]
+fn flow_payload_named_feature() {
+    let elements = package_body(
+        "package P { attribute def Payload; flow transfer of qty : Payload from src to dst; }",
+    );
+    let flow = find_flow(&elements);
+    let payload = flow.value.payload.as_ref().expect("payload feature");
+    assert_eq!(payload.value.name.as_deref(), Some("qty"));
+    assert_eq!(payload.value.type_name.as_deref(), Some("Payload"));
+    assert!(payload.value.multiplicity.is_none());
+}
+
+#[test]
+fn flow_payload_named_feature_with_multiplicity() {
+    let elements = package_body(
+        "package P { attribute def Payload; flow transfer of qty : Payload[1..3] from src to dst; }",
+    );
+    let flow = find_flow(&elements);
+    let payload = flow.value.payload.as_ref().expect("payload feature");
+    assert_eq!(payload.value.name.as_deref(), Some("qty"));
+    assert_eq!(payload.value.type_name.as_deref(), Some("Payload"));
+    let mult = payload
+        .value
+        .multiplicity
+        .as_ref()
+        .expect("multiplicity present");
+    assert!(matches!(
+        mult.value.lower.as_deref().map(|n| &n.value),
+        Some(sysml_v2_parser::ast::Expression::LiteralInteger(1))
+    ));
+    assert!(matches!(
+        mult.value.upper.as_deref().map(|n| &n.value),
+        Some(sysml_v2_parser::ast::Expression::LiteralInteger(3))
+    ));
+}
+
+#[test]
+fn flow_payload_bare_qualified_type_reference() {
+    let elements = package_body(
+        "package P { package Types { attribute def Payload; } flow transfer of Types::Payload from src to dst; }",
+    );
+    let flow = find_flow(&elements);
+    let payload = flow.value.payload.as_ref().expect("payload feature");
+    assert_eq!(payload.value.name, None);
+    assert_eq!(payload.value.type_name.as_deref(), Some("Types::Payload"));
+}
+
+#[test]
+fn flow_without_of_clause_has_no_payload() {
+    let elements = package_body("package P { flow transfer : Fuel from src to dst; }");
+    let flow = find_flow(&elements);
+    assert!(flow.value.payload.is_none());
+}
+
 #[test]
 fn flow_in_occurrence_def_body() {
     let result = parse("package P { occurrence def O { flow a to b; } }").expect("parse");

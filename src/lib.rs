@@ -21,18 +21,18 @@ pub use ast::{
     InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement,
     ItemUsage, MergeStmt, NamespaceDecl, Node, OccurrenceBodyElement, OccurrenceUsage,
     OccurrenceUsageBody, Package, PackageBody, PackageBodyElement, ParseErrorNode, PartDef,
-    PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, Perform,
-    PerformBody, PerformBodyElement, PerformInOutBinding, PortBody, PortBodyElement, PortDef,
-    PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, RequireConstraint,
-    RequireConstraintBody, RequirementDef, RequirementDefBody, RequirementDefBodyElement,
-    RequirementUsage, RootElement, RootNamespace, Span, TextualRepresentation, TypeCheckKind,
-    VerificationCaseDef, VerificationCaseUsage, Visibility,
+    PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
+    PayloadFeature, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, PortBody,
+    PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl,
+    RequireConstraint, RequireConstraintBody, RequirementDef, RequirementDefBody,
+    RequirementDefBodyElement, RequirementUsage, RootElement, RootNamespace, Span,
+    TextualRepresentation, TypeCheckKind, VerificationCaseDef, VerificationCaseUsage, Visibility,
 };
 pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 39;
+pub const PARSE_AST_VERSION: u32 = 40;
 pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
 
 /// Parse a SysML v2 textual input into a root namespace AST.

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-07-19
+
+Closes a flow-payload parsing gap found while auditing Babel42's flow-payload-resolution work
+(Spec42 0.44.11) against the OMG SysML v2.0 spec text: `succession flow dataFlow of Payload from
+a to b;`'s `of X` clause was parsed by the generic `expression` combinator, which only handles a
+bare type reference. Per §8.2.2.16, `of X` denotes a `PayloadFeature` — an optionally-named
+`Feature`, typed and/or given a multiplicity — not a plain expression. Confirmed by direct
+testing: `of qty : Payload` (a named payload feature, no multiplicity) and `of qty :
+Payload[1..3]` (named + multiplicity) both previously failed to parse entirely, dropping the
+whole flow statement into an `Error` recovery node.
+
+### Added
+
+- **`ast::PayloadFeature`** (`src/ast/behavior.rs`): `{ name: Option<String>, type_name:
+  Option<String>, multiplicity: Option<Node<Multiplicity>> }`, mirroring `ItemUsage`'s shape with
+  the name relaxed to optional (a payload feature's `Identification` is itself optional per
+  spec). `parser::flow::payload_feature` disambiguates the named form (`name : Type`) from a bare
+  type reference by trying the named form first and only committing to it if a typing clause
+  genuinely follows the identifier; multiplicity is accepted after either form (leading
+  multiplicity, the grammar's third alternative, is out of scope — no observed real-world usage).
+  `FlowUsage::payload` changes from `Option<Node<Expression>>` to `Option<Node<PayloadFeature>>`.
+- Parser tests in `tests/parser/flow_usage.rs` covering all four payload forms: bare type
+  reference, named (no multiplicity), named with multiplicity, and bare qualified type reference,
+  plus a regression test confirming a flow with no `of` clause still has `payload: None`.
+
+### Changed
+
+- **`PARSE_AST_VERSION`** bumped `39` → `40`: `FlowUsage::payload`'s type changed.
+
 ## [0.42.0] - 2026-07-18
 
 Closes the `expose` classification gap flagged in Babel42's Systems Modeling API gaps document:
