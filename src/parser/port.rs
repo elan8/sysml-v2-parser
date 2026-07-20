@@ -175,6 +175,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 redefines,
                 references: clauses.references,
                 crosses: clauses.crosses,
+                intersects: clauses.intersects,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
@@ -303,6 +304,19 @@ mod par_002_widening_tests {
 
     fn input(text: &str) -> Input<'_> {
         LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn port_usage_captures_intersects() {
+        let (rest, node) = port_usage(input("port p : PortType intersects a;")).expect("port usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value
+                .intersects
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("a".to_string())
+        );
     }
 
     #[test]

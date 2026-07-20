@@ -530,6 +530,8 @@ pub enum SubsettingKind {
     Redefines,
     /// `=>` / `crosses` (cross subsetting).
     Crosses,
+    /// `intersects` (KerML `Intersecting`).
+    Intersects,
 }
 
 /// A subsetting-family relationship target: subsetting, reference subsetting, redefinition, or

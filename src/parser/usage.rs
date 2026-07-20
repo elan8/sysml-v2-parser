@@ -23,6 +23,7 @@ pub(crate) struct SpecializationClauses {
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub references: Option<Node<SubsettingRelationship>>,
     pub crosses: Option<Node<SubsettingRelationship>>,
+    pub intersects: Option<Node<SubsettingRelationship>>,
     pub had_any: bool,
 }
 
@@ -33,6 +34,7 @@ pub(crate) struct UsageHeader {
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub references: Option<Node<SubsettingRelationship>>,
     pub crosses: Option<Node<SubsettingRelationship>>,
+    pub intersects: Option<Node<SubsettingRelationship>>,
     pub had_specialization: bool,
 }
 
@@ -359,11 +361,29 @@ pub(crate) fn cross_subsetting(
     ))
 }
 
+/// Intersecting: `intersects` target(s), e.g. `intersects a, b`. Previously tokenized and
+/// discarded entirely (`skip_intersects_clause`); now kept structured like the other three
+/// subsetting-family clauses.
+pub(crate) fn intersecting(input: Input<'_>) -> IResult<Input<'_>, Node<SubsettingRelationship>> {
+    let before = input;
+    let (input, target) = preceded(
+        preceded(ws_and_comments, tag(&b"intersects"[..])),
+        preceded(ws_and_comments, specialization_targets),
+    )
+    .parse(input)?;
+    let span = span_from_to(before, input);
+    Ok((
+        input,
+        subsetting_relationship_node(target, SubsettingKind::Intersects, span),
+    ))
+}
+
 enum SpecializationClause {
     Subsets((Node<SubsettingRelationship>, Option<Node<Expression>>)),
     Redefines(Node<SubsettingRelationship>),
     References(Node<SubsettingRelationship>),
     Crosses(Node<SubsettingRelationship>),
+    Intersects(Node<SubsettingRelationship>),
 }
 
 /// Parse zero or more subsetting/redefinition clauses in any order.
@@ -379,6 +399,7 @@ pub(crate) fn specialization_clauses(
             nom::combinator::map(redefinition, SpecializationClause::Redefines),
             nom::combinator::map(reference_subsetting, SpecializationClause::References),
             nom::combinator::map(cross_subsetting, SpecializationClause::Crosses),
+            nom::combinator::map(intersecting, SpecializationClause::Intersects),
         )),
     ))
     .parse(input)?;
@@ -390,6 +411,7 @@ pub(crate) fn specialization_clauses(
             SpecializationClause::Redefines(value) => out.redefines = Some(value),
             SpecializationClause::References(value) => out.references = Some(value),
             SpecializationClause::Crosses(value) => out.crosses = Some(value),
+            SpecializationClause::Intersects(value) => out.intersects = Some(value),
         }
     }
     out.had_any = had_any;
@@ -408,15 +430,6 @@ fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, ()> {
     Ok((input, ()))
 }
 
-fn skip_intersects_clause(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"intersects"[..])),
-        preceded(ws_and_comments, specialization_targets),
-    ))
-    .parse(input)?;
-    Ok((input, ()))
-}
-
 fn merge_usage_header(
     leading: SpecializationClauses,
     trailing: SpecializationClauses,
@@ -429,6 +442,7 @@ fn merge_usage_header(
     let redefines = trailing.redefines.or(leading.redefines);
     let references = trailing.references.or(leading.references);
     let crosses = trailing.crosses.or(leading.crosses);
+    let intersects = trailing.intersects.or(leading.intersects);
     UsageHeader {
         type_name: type_result.map(|(_, is_conjugated, targets)| {
             let name = targets_display_string(&targets);
@@ -442,13 +456,15 @@ fn merge_usage_header(
         redefines,
         references,
         crosses,
+        intersects,
         had_specialization: leading.had_any || trailing.had_any,
     }
 }
 
 /// Usage header for library-style feature usages: optional leading multiplicity,
 /// typing, trailing multiplicity, `ordered` / `nonunique`, subsetting/redefinition,
-/// and optional `intersects` before the body.
+/// and `intersects` (folded into `specialization_clauses`, called for both the leading and
+/// trailing position) before the body.
 pub(crate) fn feature_usage_header(input: Input<'_>) -> IResult<Input<'_>, UsageHeader> {
     let (input, _) = opt(multiplicity).parse(input)?;
     let (input, leading) = specialization_clauses(input)?;
@@ -456,7 +472,6 @@ pub(crate) fn feature_usage_header(input: Input<'_>) -> IResult<Input<'_>, Usage
     let (input, _) = opt(multiplicity).parse(input)?;
     let (input, _) = skip_usage_feature_modifiers(input)?;
     let (input, trailing) = specialization_clauses(input)?;
-    let (input, _) = skip_intersects_clause(input)?;
     Ok((input, merge_usage_header(leading, trailing, type_result)))
 }
 
@@ -718,6 +733,59 @@ mod tests {
         assert_eq!(
             clauses.crosses.as_ref().map(rel_target_kind),
             Some(("c, d".to_string(), SubsettingKind::Crosses))
+        );
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn intersecting_accepts_keyword() {
+        let input = span_input("intersects other ;");
+        let (rest, target) = intersecting(input).expect("intersects");
+        assert_eq!(
+            rel_target_kind(&target),
+            ("other".to_string(), SubsettingKind::Intersects)
+        );
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn intersecting_accepts_multi_target() {
+        let input = span_input("intersects a, b ;");
+        let (rest, target) = intersecting(input).expect("intersects");
+        assert_eq!(
+            rel_target_kind(&target),
+            ("a, b".to_string(), SubsettingKind::Intersects)
+        );
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn specialization_clauses_accepts_mixed_subsets_crosses_intersects() {
+        let input = span_input("subsets a crosses b intersects c, d ;");
+        let (rest, clauses) = specialization_clauses(input).expect("clauses");
+        assert_eq!(
+            clauses.subsets.as_ref().map(|(t, _)| rel_target_kind(t)),
+            Some(("a".to_string(), SubsettingKind::Subsets))
+        );
+        assert_eq!(
+            clauses.crosses.as_ref().map(rel_target_kind),
+            Some(("b".to_string(), SubsettingKind::Crosses))
+        );
+        assert_eq!(
+            clauses.intersects.as_ref().map(rel_target_kind),
+            Some(("c, d".to_string(), SubsettingKind::Intersects))
+        );
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn usage_header_preserves_intersects() {
+        let input = span_input(": T intersects a ;");
+        let (rest, header) = usage_header(input).expect("usage header");
+        assert_eq!(header.type_name.as_deref(), Some("T"));
+        assert_eq!(
+            header.intersects.as_ref().map(rel_target_kind),
+            Some(("a".to_string(), SubsettingKind::Intersects))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }

@@ -491,6 +491,8 @@ pub struct AttributeUsage {
     pub references: Option<Node<SubsettingRelationship>>,
     /// Crosses target after `=>` / `crosses`.
     pub crosses: Option<Node<SubsettingRelationship>>,
+    /// Intersects target(s) after `intersects`.
+    pub intersects: Option<Node<SubsettingRelationship>>,
     /// Value expression.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
@@ -599,6 +601,8 @@ pub struct PortUsage {
     pub references: Option<Node<SubsettingRelationship>>,
     /// Crosses target after `=>` / `crosses`.
     pub crosses: Option<Node<SubsettingRelationship>>,
+    /// Intersects target(s) after `intersects`.
+    pub intersects: Option<Node<SubsettingRelationship>>,
     pub body: PortBody,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -866,6 +870,7 @@ pub struct OccurrenceUsage {
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub references: Option<Node<SubsettingRelationship>>,
     pub crosses: Option<Node<SubsettingRelationship>>,
+    pub intersects: Option<Node<SubsettingRelationship>>,
     pub body: OccurrenceUsageBody,
     pub membership: Membership,
 }

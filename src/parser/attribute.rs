@@ -321,6 +321,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
                 redefines,
                 references: None,
                 crosses: None,
+                intersects: None,
                 value,
                 body,
                 name_span: Some(name_span),
@@ -630,6 +631,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         .map(|(target, _)| target);
     let references = trailing_clauses.references.or(leading_clauses.references);
     let crosses = trailing_clauses.crosses.or(leading_clauses.crosses);
+    let intersects = trailing_clauses.intersects.or(leading_clauses.intersects);
     let value =
         value.or(leading_subsets_value.map(crate::parser::feature_value::wrap_bind_expression));
     let (input, body) = attribute_body(input)?;
@@ -645,6 +647,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 redefines,
                 references,
                 crosses,
+                intersects,
                 value,
                 body,
                 name_span,
@@ -733,6 +736,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 redefines,
                 references: None,
                 crosses: None,
+                intersects: None,
                 value,
                 body: AttributeBody::Semicolon,
                 name_span: Some(name_span),
@@ -844,6 +848,7 @@ pub(crate) fn attribute_usage_shorthand(
                 redefines: None,
                 references: None,
                 crosses: None,
+                intersects: None,
                 value,
                 body: AttributeBody::Semicolon,
                 name_span: Some(name_span),
@@ -872,6 +877,20 @@ mod attribute_body_tests {
 
     fn input(text: &str) -> Input<'_> {
         LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn attribute_usage_captures_intersects() {
+        let (rest, node) =
+            attribute_usage(input("attribute reading : Weight intersects a, b;")).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value
+                .intersects
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("a, b".to_string())
+        );
     }
 
     #[test]

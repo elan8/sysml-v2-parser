@@ -256,6 +256,10 @@ fn occurrence_usage_tail(
         .crosses
         .or(trailing_clauses.crosses)
         .or(leading_clauses.crosses);
+    let intersects = post_body_clauses
+        .intersects
+        .or(trailing_clauses.intersects)
+        .or(leading_clauses.intersects);
     let input = if post_body_clauses.had_any {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
@@ -277,6 +281,7 @@ fn occurrence_usage_tail(
                 redefines,
                 references,
                 crosses,
+                intersects,
                 body,
                 membership,
             },
@@ -451,10 +456,25 @@ pub(crate) fn assert_constraint_member(
 #[cfg(test)]
 mod membership_tests {
     use super::*;
+    use crate::parser::usage::targets_display_string;
     use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
         LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn occurrence_usage_captures_intersects() {
+        let (rest, node) =
+            occurrence_usage(input("occurrence o1 : O1 intersects a;")).expect("occurrence usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value
+                .intersects
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("a".to_string())
+        );
     }
 
     // --- parser work item 4b (final sweep): Membership on OccurrenceUsage/SuccessionUsage ---

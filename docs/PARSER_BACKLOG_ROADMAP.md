@@ -2,7 +2,9 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-03 (§5 — all 7 open follow-ups from the 2026-07 audit closed: if/while/terminate, standalone succession, transition trigger `via`, satisfy inline requirement form, assert/satisfy scope wiring, arrow-invocation operator, AssignStmt.rhs. §2.3 — `doc` support added for port usage, connection def, and interface usage connect bodies; `connection def` body recovery migrated to the shared structured-body loop)
+**Last updated:** 2026-07-20 (0.44.0 — `Intersecting` closed: `intersects` clauses were tokenized and discarded (`skip_intersects_clause`); now kept structured as `AttributeUsage`/`PortUsage`/`OccurrenceUsage::intersects`, same shape as `references`/`crosses`. Investigated and ruled out as parser gaps in the same pass: `TypeFeaturing`/`FeatureInverting`/`Unioning`/`Disjoining`/`Differencing`/`FeatureChaining`-as-metaclass have zero real usage in the systems library or examples (backlog, not urgent); general non-port Conjugation needs no parser change at all — `~` conjugated typing already parses generically for every usage kind, the remaining gap is Spec42-side only. See CHANGELOG.md 0.44.0 and `babel42-v2/docs/spec42-systems-modeling-api-gaps.md` S42-002/S42-008.)
+
+**Previously:** 2026-07-03 (§5 — all 7 open follow-ups from the 2026-07 audit closed: if/while/terminate, standalone succession, transition trigger `via`, satisfy inline requirement form, assert/satisfy scope wiring, arrow-invocation operator, AssignStmt.rhs. §2.3 — `doc` support added for port usage, connection def, and interface usage connect bodies; `connection def` body recovery migrated to the shared structured-body loop)
 
 ## Spec42 v1.0 checklist
 

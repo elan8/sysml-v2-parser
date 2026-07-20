@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-07-20
+
+Closes the `Intersecting` gap flagged in Babel42's Systems Modeling API gaps document
+(S42-002/S42-008, 2026-07-19 audit) as a "confirmed genuine parser gap": `intersects
+<target>` (KerML `Intersecting`, e.g. `attribute reading : Weight intersects a, b;`) was
+grammatically recognized (`usage::skip_intersects_clause`) but the parsed targets were
+discarded entirely via `opt(...)` with no captured value — the same bug class already fixed
+for `references`/`crosses` (`ReferenceSubsetting`/`CrossSubsetting`). The same audit's other
+flagged items were investigated and found out of scope for this repo: `TypeFeaturing`,
+`FeatureInverting`, `Unioning`, `Disjoining`, `Differencing`, and `FeatureChaining`-as-a-
+relationship-metaclass have zero real usage in the SysML systems library or examples
+(`sysml-v2-release/`) and remain backlog, not a release blocker. General (non-port)
+Conjugation, also flagged, turned out not to be a parser gap at all: the `~` conjugated-typing
+prefix is already parsed generically for every usage kind via `usage::conjugated_qualified_name`
+— nothing about it is port-specific in this parser — so that item requires only a Spec42-side
+fix (its graph builder only materializes the implicit conjugate/`PortConjugation` edge for
+`PortDefinition` today), not a `sysml-v2-parser` change.
+
+### Added
+
+- **`SubsettingKind::Intersects`** (`src/ast/core.rs`) and `parser::usage::intersecting()`,
+  mirroring `cross_subsetting`. `intersects` is now a normal `SpecializationClause` alternative
+  parsed by `specialization_clauses()` instead of being tokenized and dropped by a separate
+  `skip_intersects_clause` (removed).
+- **`AttributeUsage::intersects`, `PortUsage::intersects`, `OccurrenceUsage::intersects`**
+  (`src/ast/structure.rs`): `Option<Node<SubsettingRelationship>>`, matching the existing
+  `subsets`/`redefines`/`references`/`crosses` field set on these three usage kinds — the only
+  ones that already carried the full subsetting-family field set before this change.
+- Parser tests covering `intersects` in `specialization_clauses()` (single target, multi-target
+  comma-separated, and mixed with `subsets`/`crosses` in one clause) and end-to-end coverage on
+  `AttributeUsage`, `PortUsage`, and `OccurrenceUsage`.
+
+### Changed
+
+- **`PARSE_AST_VERSION`** bumped `40` → `41`: `AttributeUsage`, `PortUsage`, and `OccurrenceUsage`
+  each gained a new field.
+
 ## [0.43.0] - 2026-07-19
 
 Closes a flow-payload parsing gap found while auditing Babel42's flow-payload-resolution work
