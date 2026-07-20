@@ -2,7 +2,7 @@
 
 use crate::ast::{
     Expression, Multiplicity, Node, RelationshipTarget, RelationshipTargetSegment,
-    SegmentSeparator, Span, SubsettingKind, SubsettingRelationship,
+    SegmentSeparator, Span, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
 };
 use crate::parser::expr::expression;
 use crate::parser::lex::{
@@ -204,6 +204,25 @@ pub(crate) fn targets_display_string(targets: &[Node<RelationshipTarget>]) -> St
         .join(", ")
 }
 
+/// Turn a `typings`/`optional_typings` result into the `(type_ref_span, type_name, typing)`
+/// triple several usage structs carry: a display-string span/name (joined, `~`-conjugated when
+/// applicable) alongside the structured, multi-target-capable `typing` node. Factors out the
+/// pattern `part_usage_named`/`anonymous_part_usage`/`action_ref_decl` each need.
+pub(crate) fn typing_fields_from_result(
+    result: Option<TypingsResult>,
+) -> (Option<Span>, String, Option<Node<TypingRelationship>>) {
+    let typing = result
+        .clone()
+        .map(|(span, is_conjugated, targets)| typing_node(span, is_conjugated, targets));
+    let (type_ref_span, type_name) = result
+        .map(|(span, is_conjugated, targets)| {
+            let t = targets_display_string(&targets);
+            (Some(span), if is_conjugated { format!("~{t}") } else { t })
+        })
+        .unwrap_or((None, String::new()));
+    (type_ref_span, type_name, typing)
+}
+
 /// Build a `Node<RelationshipTarget>` from segments and the span they cover.
 fn relationship_target_node(
     segments: Vec<RelationshipTargetSegment>,
@@ -261,6 +280,57 @@ fn specialization_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<Node<Relat
     let mut targets = vec![first];
     targets.extend(rest);
     Ok((input, targets))
+}
+
+/// Build a `TypingRelationship` node from a `typings`/`optional_typings` result, mirroring
+/// `subsetting_relationship_node` below. Shared by every usage-kind parser that wraps a `:`/
+/// `defined by`/`typed by` clause -- moved here (from `attribute.rs`, its original single caller)
+/// so `PartUsage`/`RefDecl` parsers can reuse the exact same multi-target-capable construction
+/// instead of each hand-rolling a `targets_display_string`-only collapse (S42-004).
+pub(crate) fn typing_relationship_node(
+    span: Span,
+    kind: TypingKind,
+    is_conjugated: bool,
+    target: Vec<Node<RelationshipTarget>>,
+) -> Node<TypingRelationship> {
+    Node::new(
+        span.clone(),
+        TypingRelationship {
+            target,
+            kind,
+            span,
+            is_conjugated,
+            is_implied: false,
+        },
+    )
+}
+
+/// Shorthand for the common `:` / `typed by` case (`TypingKind::Typing`).
+pub(crate) fn typing_node(
+    span: Span,
+    is_conjugated: bool,
+    target: Vec<Node<RelationshipTarget>>,
+) -> Node<TypingRelationship> {
+    typing_relationship_node(span, TypingKind::Typing, is_conjugated, target)
+}
+
+/// Build a single-target `TypingRelationship` from an already-parsed plain qualified-name
+/// string and its span, for the ad hoc `ref`-declaration call sites (`connection.rs`,
+/// `interface.rs`, `part_ref_usage`, `state.rs`) that only ever parse one `:` target via
+/// `qualified_name` rather than the comma-aware `typings`/`optional_typings`. Keeps their
+/// `RefDecl.typing` field populated consistently with the multi-target-capable call sites,
+/// without changing their existing single-target parsing behavior.
+pub(crate) fn single_target_typing(span: Span, name: String) -> Node<TypingRelationship> {
+    let target = Node::new(span.clone(), RelationshipTarget::single(name, span.clone()));
+    typing_node(span, false, vec![target])
+}
+
+/// Build a single-target `redefines`/`:>>` `SubsettingRelationship` from an already-parsed
+/// plain qualified-name string and its span, mirroring [`single_target_typing`] for the same
+/// ad hoc `ref`-declaration call sites.
+pub(crate) fn single_target_redefines(span: Span, name: String) -> Node<SubsettingRelationship> {
+    let target = Node::new(span.clone(), RelationshipTarget::single(name, span.clone()));
+    subsetting_relationship_node(vec![target], SubsettingKind::Redefines, span)
 }
 
 /// Build a `SubsettingRelationship` node from target(s) and the span of the whole clause

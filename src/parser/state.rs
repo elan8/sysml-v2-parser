@@ -219,6 +219,14 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     } else {
         preceded(ws_and_comments, with_span(qualified_name)).parse(input)?
     };
+    let typing = if type_name.is_empty() {
+        None
+    } else {
+        Some(crate::parser::usage::single_target_typing(
+            type_ref_span.clone(),
+            type_name.clone(),
+        ))
+    };
 
     let (input, _) = ws_and_comments(input)?;
     let (mut input, value) = opt(preceded(
@@ -254,6 +262,8 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             RefDecl {
                 name: name_str,
                 type_name,
+                typing,
+                redefines: None,
                 value,
                 body,
                 name_span: Some(name_span),

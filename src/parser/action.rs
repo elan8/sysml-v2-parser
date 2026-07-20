@@ -80,11 +80,19 @@ fn optional_multiplicity_brackets(input: Input<'_>) -> IResult<Input<'_>, ()> {
 
 /// Ref declaration inside an action body.
 ///
-/// The Systems Library often uses `ref action name: Type :>> ...;` in action definitions.
-/// We parse the structured `ref ... name: Type` prefix and accept `= expr` bindings; any
-/// remaining tokens up to the statement terminator are skipped.
+/// The Systems Library uses `ref name :>> redefinesTarget: Type1, Type2 { ... }` in action
+/// definitions (e.g. `Actions.sysml`'s `SendAction`/`AcceptMessageAction`: `ref sentMessage :>>
+/// sentTransfer: MessageTransfer, MessageAction { ... }`) -- an optional `:>>` redefines clause
+/// optionally followed by a `:` typing clause, which may itself name more than one
+/// comma-separated target. Previously, seeing `:>>` swallowed everything up to the body/
+/// terminator as unparsed text, silently discarding both the redefines target and the entire
+/// typing clause (S42-004). We also accept `= expr` bindings; anything still unrecognized before
+/// the terminator is skipped as before.
 fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
     use crate::parser::expr::expression;
+    use crate::parser::usage::{
+        optional_typings, single_target_redefines, single_target_typing, typing_fields_from_result,
+    };
 
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -102,20 +110,36 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
     let (input, _) = optional_multiplicity_brackets(input)?;
     let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
-    // Standard library uses either `:` typing, `:>` specialization-like typing, or `:>>` feature redefinition.
-    let (input, uses_shift) = preceded(
-        ws_and_comments,
-        alt((
-            map(tag(&b":>>"[..]), |_| true),
-            map(tag(&b":>"[..]), |_| false),
-            map(tag(&b":"[..]), |_| false),
-        )),
-    )
+    // Optional `:>>` redefines clause: `ref NAME :>> TARGET`.
+    let (input, redefines_target) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":>>"[..])),
+        preceded(ws_and_comments, with_span(qualified_name)),
+    ))
     .parse(input)?;
-    let (input, (type_ref_span, type_name)) = if uses_shift {
-        (input, (crate::ast::Span::dummy(), String::new()))
+    let redefines =
+        redefines_target.map(|(span, target)| single_target_redefines(span, target));
+
+    let (input, type_ref_span, type_name, typing) = if redefines.is_some() {
+        // After `:>> target`, an optional `:` typing clause (possibly multi-target) may follow.
+        let (input, typing_result) = optional_typings(input)?;
+        let (type_ref_span, type_name, typing) = typing_fields_from_result(typing_result);
+        (input, type_ref_span, type_name, typing)
     } else {
-        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?
+        // No `:>>` redefines clause seen: bare `:` (multi-target aware) or legacy `:>`
+        // (single-target only; kept for backward compatibility -- no confirmed real usage of
+        // this spelling in action-def bodies, unlike `:>>`/`:` above).
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":>") && !peek.fragment().starts_with(b":>>") {
+            let (input, _) = preceded(ws_and_comments, tag(&b":>"[..])).parse(input)?;
+            let (input, (span, target)) =
+                preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
+            let typing = Some(single_target_typing(span.clone(), target.clone()));
+            (input, Some(span), target, typing)
+        } else {
+            let (input, typing_result) = optional_typings(input)?;
+            let (type_ref_span, type_name, typing) = typing_fields_from_result(typing_result);
+            (input, type_ref_span, type_name, typing)
+        }
     };
 
     let (input, _) = ws_and_comments(input)?;
@@ -126,8 +150,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
     .parse(input)?;
     let value = value.map(crate::parser::feature_value::wrap_bind_expression);
 
-    // Accept and skip shorthand redeclaration forms like `:>> Performance::self;`
-    // (we don't model this binding yet, but we must consume it to avoid cascading errors).
+    // Accept and skip any remaining unmodeled shorthand before the body/terminator.
     if !input.fragment().is_empty()
         && !input.fragment().starts_with(b";")
         && !input.fragment().starts_with(b"{")
@@ -170,10 +193,12 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
             crate::ast::RefDecl {
                 name: name_str,
                 type_name,
+                typing,
+                redefines,
                 value,
                 body,
                 name_span: Some(name_span),
-                type_ref_span: Some(type_ref_span),
+                type_ref_span,
             },
         ),
     ))

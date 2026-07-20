@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-07-20
+
+Closes the S42-004 "multi-target typing" gap flagged in Babel42's Systems Modeling API gaps
+document, plus a more severe bug found while verifying it against real usage: a `ref` declaration
+combining `:>>` redefinition with a `:` typing clause (e.g. Systems Library `Actions.sysml`'s `ref
+sentMessage :>> sentTransfer: MessageTransfer, MessageAction { ... }`, used in both `SendAction`
+and `AcceptMessageAction`) previously silently discarded the redefines target *and* the entire
+typing clause as unparsed text once `:>>` was seen — worse than the "only the first type survives"
+framing in the gaps doc, since neither type nor the redefines target survived at all. Confirmed via
+direct parse probes, not just static reading: `PartUsage`/`ref` declarations already parsed a
+comma-separated multi-target clause structurally in most call sites (`typings`/`optional_typings`
+already returned every target), but every consumer collapsed it to a single joined `type_name:
+String` before it ever reached the AST — the fix reuses the same `TypingRelationship`/
+`typing_node` machinery `AttributeUsage`/`AttributeDef` already ship, rather than inventing a new
+mechanism.
+
+Two related gaps found during the real-usage audit are deliberately left open, out of scope for
+this release: `ref` inside a `part def`/`port def` body has no visibility/direction-prefix support
+at all, and `ref <kind> name : Type[mult] :> subsets` forms (`ref action`, `ref state`, `ref port`,
+etc., real usage confirmed in the Systems Library, e.g. `Parts.sysml`'s `abstract ref action
+performedActions: Action[0..*] :> actions, enactedPerformances`) fall through to an opaque,
+inert `Other(...)` catch-all rather than a real AST node. Both are real, but distinct bug classes
+from multi-target typing, and the second is comparable in size to the P5+ "unified definition/
+usage/specialization grammar layer" item this repo's own backlog already flags as "do not
+big-bang rewrite."
+
+### Added
+
+- **`PartUsage::typing`, `RefDecl::typing`** (`Option<Node<TypingRelationship>>`): structured,
+  multi-target-capable typing clause alongside the existing joined-display-string `type_name`,
+  mirroring `AttributeUsage.typing`/`AttributeDef.typing`. Populated in every `PartUsage`
+  constructor (`part_usage_named`, `anonymous_part_usage`) from the same `typings`/
+  `optional_typings` result already computed for `type_name` — no new grammar. `RefDecl`'s ad hoc
+  single-target call sites (`connection.rs`, `interface.rs`, `part_ref_usage`, `state.rs`) wrap
+  their existing single `qualified_name` result into the same field via a new
+  `usage::single_target_typing` helper, for API consistency, with no parsing-behavior change.
+- **`RefDecl::redefines`** (`Option<Node<SubsettingRelationship>>`): the `:>>` target, via a new
+  `usage::single_target_redefines` helper. Only `action_ref_decl` (action/action-usage bodies)
+  actually parses this clause today — the other `ref`-declaration sites have no confirmed real
+  `:>>` usage and are left as `None`, unchanged from before.
+- `usage::typing_fields_from_result`: shared helper turning a `typings`/`optional_typings` result
+  into the `(type_ref_span, type_name, typing)` triple, factoring out the pattern
+  `part_usage_named`/`anonymous_part_usage`/`action_ref_decl` each need.
+
+### Fixed
+
+- **`action_ref_decl`** (`ref` inside action def/usage bodies): now parses an optional `:>>`
+  redefines clause followed by an optional `:` typing clause (multi-target aware) as two separate,
+  sequential clauses, instead of one `:>>`/`:>`/`:` token deciding a single all-or-nothing branch.
+  Previously, `:>>` matched but never consumed a target, and everything up to the body/terminator
+  — including a following `: Type1, Type2` clause — was silently skipped as opaque text via
+  `take_until_terminator`. This is live in the gated Systems Library today (`Actions.sysml`'s
+  `SendAction.sentMessage`/`AcceptMessageAction.acceptedMessage`), confirmed via
+  `cargo test --test validation -- --include-ignored` (`full_library_suite::
+  test_full_library_strict_no_diagnostics` and the rest of the 25-test gate still pass — the bug
+  produced no diagnostic before or after, only silent data loss, so the strict gate alone would
+  not have caught either the bug or the fix).
+
+### Changed
+
+- **`PARSE_AST_VERSION`** bumped `41` → `42`: `PartUsage` and `RefDecl` each gained new fields.
+- Regenerated AST snapshot fixtures (`UPDATE_VALIDATION_AST=1 cargo test --test validation --
+  --include-ignored`) and updated the hand-authored `parts_interconnection_2a.rs` expected-AST
+  fixture for the new `PartUsage`/`RefDecl` fields.
+
 ## [0.44.0] - 2026-07-20
 
 Closes the `Intersecting` gap flagged in Babel42's Systems Modeling API gaps document

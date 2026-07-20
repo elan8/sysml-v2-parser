@@ -109,6 +109,10 @@ fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, (type_ref_span, type_name)) =
         preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
+    let typing = Some(crate::parser::usage::single_target_typing(
+        type_ref_span.clone(),
+        type_name.clone(),
+    ));
     let (input, body) = ref_body(input)?;
     Ok((
         input,
@@ -118,6 +122,8 @@ fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             RefDecl {
                 name: name_str,
                 type_name,
+                typing,
+                redefines: None,
                 value: None,
                 body,
                 name_span: Some(name_span),

@@ -554,6 +554,7 @@ fn normalize_part_usage(p: &PartUsage) -> PartUsage {
         is_constant: p.is_constant,
         name: p.name.clone(),
         type_name: p.type_name.clone(),
+        typing: p.typing.clone(),
         multiplicity: p.multiplicity.clone(),
         ordered: p.ordered,
         subsets: p.subsets.clone(),
@@ -1062,6 +1063,8 @@ fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
     RefDecl {
         name: r.name.clone(),
         type_name: r.type_name.clone(),
+        typing: r.typing.clone(),
+        redefines: r.redefines.clone(),
         value: r.value.clone(),
         body: r.body.clone(),
         name_span: None,

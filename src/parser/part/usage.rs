@@ -31,6 +31,7 @@ pub(crate) fn part_usage_redefines_only<'a>(
                 is_constant: false,
                 name: String::new(),
                 type_name: String::new(),
+                typing: None,
                 multiplicity: multiplicity_opt,
                 ordered,
                 subsets: None,
@@ -56,6 +57,9 @@ pub(crate) fn part_usage_named<'a>(
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let (input, ordered_before_type) = usage_ordered_modifier(input)?;
     let (input, type_result) = optional_typings(input)?;
+    let typing = type_result
+        .clone()
+        .map(|(s, is_conjugated, targets)| typing_node(s, is_conjugated, targets));
     let (type_ref_span, type_name) = type_result
         .map(|(s, is_conjugated, targets)| {
             let t = targets_display_string(&targets);
@@ -101,6 +105,7 @@ pub(crate) fn part_usage_named<'a>(
                 is_constant: false,
                 name: name_str,
                 type_name,
+                typing,
                 multiplicity: multiplicity_opt,
                 ordered,
                 subsets,
@@ -194,6 +199,7 @@ fn anonymous_part_usage<'a>(
     } else {
         type_name
     };
+    let typing = Some(typing_node(type_ref_span.clone(), is_conjugated, targets));
     let (input, multiplicity_after) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_before.or(multiplicity_after);
     let (input, ordered_after_type) = usage_ordered_modifier(input)?;
@@ -218,6 +224,7 @@ fn anonymous_part_usage<'a>(
                 is_constant: false,
                 name: String::new(),
                 type_name,
+                typing,
                 multiplicity: multiplicity_opt,
                 ordered,
                 subsets: clauses.subsets,
@@ -754,6 +761,14 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     .parse(input)?;
     let value = value.map(crate::parser::feature_value::wrap_bind_expression);
     let type_name = type_name.unwrap_or_default();
+    let typing = if type_name.is_empty() {
+        None
+    } else {
+        Some(crate::parser::usage::single_target_typing(
+            crate::ast::Span::dummy(),
+            type_name.clone(),
+        ))
+    };
     let (input, body) = preceded(
         ws_and_comments,
         alt((
@@ -772,6 +787,8 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             RefDecl {
                 name: name_str,
                 type_name,
+                typing,
+                redefines: None,
                 value,
                 body,
                 name_span: None,

@@ -288,8 +288,14 @@ pub struct PartUsage {
     /// `constant` keyword from `RefPrefix` -- see `AttributeUsage::is_constant`.
     pub is_constant: bool,
     pub name: String,
-    /// Type after `:`, e.g. "Vehicle", "AxleAssembly".
+    /// Type after `:`, e.g. "Vehicle", "AxleAssembly". A comma-separated multi-target clause
+    /// (`part vehicle : Vehicle, SpatialItem;`) joins into one display string here; see `typing`
+    /// for the structured, multi-target-capable form (S42-004).
     pub type_name: String,
+    /// Structured typing clause mirroring `AttributeUsage.typing`: every comma-separated target
+    /// from `:`/`defined by`/`typed by`, not just the first (S42-004). `None` when no typing
+    /// clause was written (`type_name` is then empty).
+    pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity, e.g. `[2]` parsed into structured lower/upper bounds.
     pub multiplicity: Option<Node<Multiplicity>>,
     pub ordered: bool,
@@ -715,7 +721,18 @@ pub struct EndDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RefDecl {
     pub name: String,
+    /// Type after `:`, e.g. "Vehicle". A comma-separated multi-target clause joins into one
+    /// display string here; see `typing` for the structured, multi-target-capable form.
     pub type_name: String,
+    /// Structured typing clause mirroring `PartUsage.typing`/`AttributeUsage.typing`: every
+    /// comma-separated target from a `:` clause, not just the first (S42-004). `None` when no
+    /// typing clause was written (`type_name` is then empty).
+    pub typing: Option<Node<TypingRelationship>>,
+    /// Redefines target from an optional leading `:>>` clause, e.g. `ref sentMessage :>>
+    /// sentTransfer: MessageTransfer, MessageAction { ... }` (Systems Library `Actions.sysml`).
+    /// Previously this whole `:>> target : type` combination silently discarded the redefines
+    /// target and the entire typing clause as unparsed text once `:>>` was seen.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// Optional binding value: `= expr` (SysML shorthand binding for references).
     pub value: Option<Node<FeatureValue>>,
     pub body: RefBody,

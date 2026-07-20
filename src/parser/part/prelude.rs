@@ -46,7 +46,7 @@ pub(crate) use crate::parser::specialization::parse_optional_definition_speciali
 pub(crate) use crate::parser::state::state_def;
 pub(crate) use crate::parser::usage::{
     multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
-    targets_display_string, typings,
+    targets_display_string, typing_node, typings,
 };
 pub(crate) use crate::parser::usecase::{use_case_def, use_case_usage};
 pub(crate) use crate::parser::view::{

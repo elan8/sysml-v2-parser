@@ -64,6 +64,17 @@ fn spec(target: &str) -> Node<TypingRelationship> {
     })
 }
 
+/// `: target` typing relationship for `PartUsage.typing`, e.g. `typed("Engine")` for `: Engine`.
+fn typed(target: &str) -> Node<TypingRelationship> {
+    n(TypingRelationship {
+        target: vec![relationship_target(target)],
+        kind: TypingKind::Typing,
+        span: Span::dummy(),
+        is_conjugated: false,
+        is_implied: false,
+    })
+}
+
 /// `:>>` / `redefines` target, e.g. `redef("cylinders")` for `redefines cylinders`.
 fn redef(target: &str) -> Node<SubsettingRelationship> {
     n(SubsettingRelationship {
@@ -620,6 +631,8 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                 n(InterfaceDefBodyElement::RefDecl(n(RefDecl {
                     name: "driveshaft".to_string(),
                     type_name: "Driveshaft".to_string(),
+                    typing: Some(typed("Driveshaft")),
+                    redefines: None,
                     value: None,
                     body: RefBody::Brace { elements: vec![] },
                     name_span: None,
@@ -661,6 +674,7 @@ fn part_vehicle1_c1() -> PartUsage {
         is_constant: false,
         name: "vehicle1_c1".to_string(),
         type_name: "VehicleA".to_string(),
+        typing: Some(typed("VehicleA")),
         multiplicity: None,
         ordered: false,
         subsets: None,
@@ -683,6 +697,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     is_constant: false,
                     name: "engine".to_string(),
                     type_name: "Engine".to_string(),
+                    typing: Some(typed("Engine")),
                     multiplicity: None,
                     ordered: false,
                     subsets: None,
@@ -710,6 +725,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     is_constant: false,
                     name: "transmission".to_string(),
                     type_name: "Transmission".to_string(),
+                    typing: Some(typed("Transmission")),
                     multiplicity: None,
                     ordered: false,
                     subsets: None,
@@ -728,6 +744,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     is_constant: false,
                     name: "driveshaft".to_string(),
                     type_name: "Driveshaft".to_string(),
+                    typing: Some(typed("Driveshaft")),
                     multiplicity: None,
                     ordered: false,
                     subsets: None,
@@ -839,6 +856,7 @@ fn part_rear_axle_assembly() -> PartUsage {
         is_constant: false,
         name: "rearAxleAssembly".to_string(),
         type_name: "RearAxleAssembly".to_string(),
+        typing: Some(typed("RearAxleAssembly")),
         multiplicity: None,
         ordered: false,
         subsets: None,
@@ -891,6 +909,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     is_constant: false,
                     name: "rearWheel".to_string(),
                     type_name: "Wheel".to_string(),
+                    typing: Some(typed("Wheel")),
                     multiplicity: Some(mult(2)),
                     ordered: true,
                     subsets: None,
@@ -909,6 +928,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     is_constant: false,
                     name: "leftWheel".to_string(),
                     type_name: "".to_string(),
+                    typing: None,
                     multiplicity: None,
                     ordered: false,
                     subsets: Some((subs("rearWheel"), Some(expr_index("rearWheel", 1)))),
@@ -964,6 +984,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     is_constant: false,
                     name: "rightWheel".to_string(),
                     type_name: "".to_string(),
+                    typing: None,
                     multiplicity: None,
                     ordered: false,
                     subsets: Some((subs("rearWheel"), Some(expr_index("rearWheel", 2)))),
@@ -1026,6 +1047,7 @@ fn part_differential() -> PartUsage {
         is_constant: false,
         name: "differential".to_string(),
         type_name: "Differential".to_string(),
+        typing: Some(typed("Differential")),
         multiplicity: None,
         ordered: false,
         subsets: None,
@@ -1101,6 +1123,7 @@ fn part_rear_axle() -> PartUsage {
         is_constant: false,
         name: "rearAxle".to_string(),
         type_name: "RearAxle".to_string(),
+        typing: Some(typed("RearAxle")),
         multiplicity: None,
         ordered: false,
         subsets: None,
@@ -1118,6 +1141,7 @@ fn part_rear_axle() -> PartUsage {
                     is_constant: false,
                     name: "leftHalfAxle".to_string(),
                     type_name: "HalfAxle".to_string(),
+                    typing: Some(typed("HalfAxle")),
                     multiplicity: None,
                     ordered: false,
                     subsets: None,
@@ -1136,6 +1160,7 @@ fn part_rear_axle() -> PartUsage {
                     is_constant: false,
                     name: "rightHalfAxle".to_string(),
                     type_name: "HalfAxle".to_string(),
+                    typing: Some(typed("HalfAxle")),
                     multiplicity: None,
                     ordered: false,
                     subsets: None,

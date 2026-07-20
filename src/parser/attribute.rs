@@ -3,7 +3,6 @@
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Membership,
     Multiplicity, Node, RelationshipTarget, SubsettingKind, SubsettingRelationship, TypingKind,
-    TypingRelationship,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -14,39 +13,10 @@ use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
     multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
-    typings,
+    typing_node, typing_relationship_node, typings,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
-
-/// Wrap a typing/subclassification target (with its parsed conjugation flag) in a
-/// `TypingRelationship` node, mirroring `specialization::subclassification_node`.
-fn typing_relationship_node(
-    span: crate::ast::Span,
-    kind: TypingKind,
-    is_conjugated: bool,
-    target: Vec<Node<RelationshipTarget>>,
-) -> Node<TypingRelationship> {
-    Node::new(
-        span.clone(),
-        TypingRelationship {
-            target,
-            kind,
-            span,
-            is_conjugated,
-            is_implied: false,
-        },
-    )
-}
-
-/// Shorthand for the common `:` / `typed by` case (`TypingKind::Typing`).
-fn typing_node(
-    span: crate::ast::Span,
-    is_conjugated: bool,
-    target: Vec<Node<RelationshipTarget>>,
-) -> Node<TypingRelationship> {
-    typing_relationship_node(span, TypingKind::Typing, is_conjugated, target)
-}
 
 /// Wrap a subsetting-family target in a `SubsettingRelationship` node, mirroring
 /// `usage::subsetting_relationship_node` for the ad hoc `:>`/`:>>` prefix shapes parsed directly
