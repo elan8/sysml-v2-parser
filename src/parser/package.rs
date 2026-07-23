@@ -445,7 +445,7 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
                         nom::error::ErrorKind::Many0,
                     )));
                 }
-                elements.push(element);
+                elements.push(*element);
                 input = next;
             }
             Err(_)
@@ -587,7 +587,7 @@ pub(crate) fn filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterM
 macro_rules! try_package_body_dispatch {
     ($input:expr, $start:expr, $parser:expr, $wrap:expr) => {
         if let Ok((input, elem)) = map($parser, $wrap).parse($input) {
-            return Ok((input, node_from_to($start, input, elem)));
+            return Ok((input, Box::new(node_from_to($start, input, elem))));
         }
     };
 }
@@ -595,7 +595,7 @@ macro_rules! try_package_body_dispatch {
 fn try_package_body_annotations<'a>(
     input: Input<'a>,
     start: Input<'a>,
-) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
     try_package_body_dispatch!(input, start, doc_comment, PackageBodyElement::Doc);
     try_package_body_dispatch!(
         input,
@@ -636,7 +636,7 @@ fn try_package_body_annotations<'a>(
 fn try_package_body_packages<'a>(
     input: Input<'a>,
     start: Input<'a>,
-) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
     try_package_body_dispatch!(
         input,
         start,
@@ -654,7 +654,7 @@ fn try_package_body_packages<'a>(
 fn try_package_body_structure<'a>(
     input: Input<'a>,
     start: Input<'a>,
-) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
     try_package_body_dispatch!(input, start, part_def_or_usage, |p| match p {
         PartDefOrUsage::Def(n) => PackageBodyElement::PartDef(n),
         PartDefOrUsage::Usage(n) => PackageBodyElement::PartUsage(n),
@@ -778,7 +778,7 @@ fn try_package_body_structure<'a>(
 fn try_package_body_behavior<'a>(
     input: Input<'a>,
     start: Input<'a>,
-) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
     try_package_body_dispatch!(input, start, alias_def, PackageBodyElement::AliasDef);
     try_package_body_dispatch!(input, start, action_def, PackageBodyElement::ActionDef);
     try_package_body_dispatch!(input, start, action_usage, PackageBodyElement::ActionUsage);
@@ -816,7 +816,7 @@ fn try_package_body_behavior<'a>(
 fn try_package_body_requirement<'a>(
     input: Input<'a>,
     start: Input<'a>,
-) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
     try_package_body_dispatch!(
         input,
         start,
@@ -879,7 +879,7 @@ fn try_package_body_requirement<'a>(
 fn try_package_body_view<'a>(
     input: Input<'a>,
     start: Input<'a>,
-) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
     try_package_body_dispatch!(input, start, view_def, PackageBodyElement::ViewDef);
     try_package_body_dispatch!(
         input,
@@ -928,7 +928,7 @@ fn try_package_body_view<'a>(
 /// PackageBodyElement: Package | Import | PartDef | PartUsage | PortDef | InterfaceDef | AliasDef | ActionDef | ActionUsage
 pub(crate) fn package_body_element(
     input: Input<'_>,
-) -> IResult<Input<'_>, Node<PackageBodyElement>> {
+) -> IResult<Input<'_>, Box<Node<PackageBodyElement>>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     if let Ok(r) = try_package_body_annotations(input, start) {
@@ -974,7 +974,7 @@ pub(crate) fn package_body_element(
     if let Ok((input, elem)) =
         map(kerml_feature_decl, PackageBodyElement::KermlFeatureDecl).parse(input)
     {
-        return Ok((input, node_from_to(start, input, elem)));
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
     }
     if let Ok((next, _)) = recover_body_element(input, PACKAGE_BODY_STARTERS) {
         if next.location_offset() != input.location_offset() {
@@ -1005,7 +1005,7 @@ pub(crate) fn package_body_element(
         PackageBodyElement::ExtendedLibraryDecl,
     )
     .parse(input)?;
-    Ok((input, node_from_to(start, input, elem)))
+    Ok((input, Box::new(node_from_to(start, input, elem))))
 }
 
 /// Root: (package | namespace)*

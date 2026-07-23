@@ -16,6 +16,102 @@ use super::package;
 use crate::ast::RootNamespace;
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 use nom_locate::LocatedSpan;
+
+/// Maximum structural brace nesting accepted by the recursive-descent parser.
+///
+/// Flat model size does not consume recursive stack, but each nested package/body does. Rejecting
+/// pathological nesting before descent keeps parser stack usage bounded on every host.
+pub const MAX_SYNTAX_NESTING: usize = 32;
+
+fn nesting_limit_error(input: &[u8]) -> Option<ParseError> {
+    let mut brace_depth = 0usize;
+    let mut block_comment_depth = 0usize;
+    let mut in_line_comment = false;
+    let mut quote = None;
+    let mut escaped = false;
+    let mut index = 0usize;
+
+    while index < input.len() {
+        let byte = input[index];
+        let next = input.get(index + 1).copied();
+
+        if in_line_comment {
+            if byte == b'\n' {
+                in_line_comment = false;
+            }
+            index += 1;
+            continue;
+        }
+        if block_comment_depth > 0 {
+            if byte == b'/' && next == Some(b'*') {
+                block_comment_depth += 1;
+                index += 2;
+            } else if byte == b'*' && next == Some(b'/') {
+                block_comment_depth -= 1;
+                index += 2;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+        if let Some(delimiter) = quote {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == delimiter {
+                quote = None;
+            }
+            index += 1;
+            continue;
+        }
+
+        match (byte, next) {
+            (b'/', Some(b'/')) => {
+                in_line_comment = true;
+                index += 2;
+            }
+            (b'/', Some(b'*')) => {
+                block_comment_depth = 1;
+                index += 2;
+            }
+            (b'"' | b'\'', _) => {
+                quote = Some(byte);
+                index += 1;
+            }
+            (b'{', _) => {
+                brace_depth += 1;
+                if brace_depth > MAX_SYNTAX_NESTING {
+                    let prefix = &input[..index];
+                    let line = 1 + prefix.iter().filter(|&&b| b == b'\n').count();
+                    let column = prefix
+                        .iter()
+                        .rposition(|&b| b == b'\n')
+                        .map_or(index + 1, |newline| index - newline);
+                    return Some(
+                        ParseError::new(format!(
+                            "model nesting exceeds the supported limit of {MAX_SYNTAX_NESTING}"
+                        ))
+                        .with_location(index, line as u32, column)
+                        .with_length(1)
+                        .with_code("nesting_too_deep")
+                        .with_category(DiagnosticCategory::ParseError)
+                        .with_suggestion(
+                            "Split deeply nested declarations into packages or definitions referenced by name.",
+                        ),
+                    );
+                }
+                index += 1;
+            }
+            (b'}', _) => {
+                brace_depth = brace_depth.saturating_sub(1);
+                index += 1;
+            }
+            _ => index += 1,
+        }
+    }
+    None
+}
 /// Result of parsing with error recovery: a (possibly partial) AST and zero or more diagnostics.
 #[derive(Debug, Clone)]
 pub struct ParseResult {
@@ -39,6 +135,9 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
         .map(str::as_bytes)
         .unwrap_or_else(|| input.as_bytes());
     let located = LocatedSpan::new(bytes);
+    if let Some(error) = nesting_limit_error(bytes) {
+        return Err(error);
+    }
     match package::root_namespace(located) {
         Ok((rest, root)) => {
             if !rest.fragment().is_empty() && has_unclosed_brace(bytes) {
@@ -117,6 +216,12 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
         .map(str::as_bytes)
         .unwrap_or_else(|| input.as_bytes());
     let located = LocatedSpan::new(bytes);
+    if let Some(error) = nesting_limit_error(bytes) {
+        return ParseResult {
+            root: RootNamespace { elements: vec![] },
+            errors: vec![error],
+        };
+    }
 
     let mut elements = Vec::new();
     let mut errors = Vec::new();
@@ -263,5 +368,61 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
     ParseResult {
         root: RootNamespace { elements },
         errors,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn nested_packages(depth: usize) -> String {
+        let mut source = String::new();
+        for index in 0..depth {
+            source.push_str(&format!("package P{index} {{\n"));
+        }
+        source.push_str("attribute value : Real;\n");
+        for _ in 0..depth {
+            source.push_str("}\n");
+        }
+        source
+    }
+
+    #[test]
+    fn accepts_nesting_at_the_limit() {
+        assert!(parse_root(&nested_packages(MAX_SYNTAX_NESTING)).is_ok());
+    }
+
+    #[test]
+    fn flat_model_size_does_not_consume_nesting_budget() {
+        let mut source = String::from("package Stress {\n");
+        for index in 0..10_000 {
+            source.push_str(&format!("attribute value{index} : Real;\n"));
+        }
+        source.push_str("}\n");
+
+        let parsed = parse_root(&source).expect("large flat model");
+        assert_eq!(parsed.elements.len(), 1);
+    }
+
+    #[test]
+    fn rejects_nesting_beyond_the_limit_before_descent() {
+        let error = parse_root(&nested_packages(MAX_SYNTAX_NESTING + 1))
+            .expect_err("excessive nesting should be rejected");
+        assert_eq!(error.code.as_deref(), Some("nesting_too_deep"));
+
+        let editor = parse_with_diagnostics(&nested_packages(MAX_SYNTAX_NESTING + 1));
+        assert_eq!(editor.errors.len(), 1);
+        assert_eq!(editor.errors[0].code.as_deref(), Some("nesting_too_deep"));
+    }
+
+    #[test]
+    fn braces_in_comments_and_quoted_text_do_not_count_as_nesting() {
+        let source = format!(
+            "package P {{ doc /* {} */ attribute text = \"{}\"; }}",
+            "{".repeat(MAX_SYNTAX_NESTING + 1),
+            "{".repeat(MAX_SYNTAX_NESTING + 1)
+        );
+        let error = nesting_limit_error(source.as_bytes());
+        assert!(error.is_none(), "comments and strings are not model scopes");
     }
 }

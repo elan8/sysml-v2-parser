@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.1] - 2026-07-23
+
+### Fixed
+
+- Bounded parser stack consumption for adversarially deep models. Package-body dispatch now
+  heap-allocates its large transient `Node<PackageBodyElement>` result without changing the public
+  AST or serialized shape, and inputs deeper than 32 structural brace scopes are rejected with
+  `nesting_too_deep` before recursive descent. Flat models remain unrestricted by this guard; a
+  10,000-member flat package is covered by regression testing.
+
 ## [0.45.0] - 2026-07-20
 
 Closes the S42-004 "multi-target typing" gap flagged in Babel42's Systems Modeling API gaps
