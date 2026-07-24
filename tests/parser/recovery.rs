@@ -213,9 +213,52 @@ fn test_package_body_recovery_skips_malformed_abstract_part_and_keeps_next_membe
 }
 
 #[test]
-fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
+fn test_part_def_nested_state_and_attribute_siblings() {
+    // Previously `state …` in a part body was only preserved as Other/OpaqueMember.
+    // 0.46.0 parses it as a real StateUsage; the later attribute sibling must still parse.
     let input =
         "package P {\npart def Vehicle {\nstate monitor: Mode;\nattribute mass: MassValue;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let part_def = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("part def should be present");
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part_def.body else {
+        panic!("expected part def body");
+    };
+    assert!(
+        elements.iter().any(|e| matches!(
+            &e.value,
+            sysml_v2_parser::ast::PartDefBodyElement::StateUsage(s)
+                if s.value.name == "monitor"
+        )),
+        "nested state usage in part body should be a real StateUsage, not opaque"
+    );
+    assert!(
+        elements.iter().any(|e| matches!(
+            &e.value,
+            sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a)
+                if a.value.typing.is_some()
+        )),
+        "later modeled members should still parse"
+    );
+}
+
+#[test]
+fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
+    // Truly unmodeled keyword still lands in Other/Error recovery; later siblings stay intact.
+    let input =
+        "package P {\npart def Vehicle {\nwidget monitor: Mode;\nattribute mass: MassValue;\n}\n}";
     let result = parse_with_diagnostics(input);
     let pkg = match &result.root.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -239,6 +282,7 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
             e.value,
             sysml_v2_parser::ast::PartDefBodyElement::Other(_)
                 | sysml_v2_parser::ast::PartDefBodyElement::OpaqueMember(_)
+                | sysml_v2_parser::ast::PartDefBodyElement::Error(_)
         )),
         "library-tolerant unmodeled part members should be preserved explicitly"
     );
