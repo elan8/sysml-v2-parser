@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-07-23
+
+### Added
+
+- **`PartDefBodyElement::ActionUsage` / `StateUsage`** and matching
+  `PartUsageBodyElement::ActionUsage` — Systems Library forms such as
+  `abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances`
+  and `ref state …` now parse as real usage AST instead of
+  `OpaqueMember` / recovery.
+- **`ActionUsage` / `StateUsage` reference and specialization fields:**
+  `is_abstract`, `is_reference`, structured `typing`, `multiplicity`,
+  `subsets`, and `redefines`. Feature-style headers preserve `[0..*]` and
+  multi-target `:>` clauses.
+- **`PortUsage::is_abstract`** and acceptance of a leading `abstract`
+  keyword (e.g. `abstract port ownedPorts: Port[0..*] :> …`).
+- **`RefDecl::membership`** with visibility capture on
+  `part_ref_usage` (`private ref …`). Kinded refs (`ref action` /
+  `ref state` / …) are rejected by `part_ref_usage` so dedicated parsers
+  own them.
+- **Implicit empty `ActionUsage` bodies** when the next token starts a
+  sibling statement/succession (Systems Library `LoopAction` style
+  without braces).
+
+### Changed
+
+- **`PARSE_AST_VERSION`** bumped `42` → `43`.
+- Opaque part-def catch-all no longer claims `action` / `state` / bare
+  `port`; those go through dedicated parsers.
+
 ## [0.45.1] - 2026-07-23
 
 ### Fixed

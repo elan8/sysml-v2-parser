@@ -4,7 +4,9 @@ use super::requirement::RequirementUsage;
 use super::structure::{
     Annotation, Bind, DefinitionBody, MetadataAnnotation, MetadataKeywordUsage, Perform, RefDecl,
 };
-use crate::ast::core::{Expression, Multiplicity, Node, Span, TypingRelationship};
+use crate::ast::core::{
+    Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
+};
 
 /// Action definition: `action def` Identification body (in/out params).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -163,12 +165,25 @@ pub enum TransitionEffect {
     Expression(Node<Expression>),
 }
 
-/// Action usage: `action` name `:` type_name (`accept` param_name `:` param_type)? body.
+/// Action usage: `(abstract)? (ref)? action` name (`:` type)? (`[mult]`)? (`:>`/` :>>` …)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionUsage {
+    /// Leading `abstract` keyword (Systems Library e.g. `abstract ref action performedActions`).
+    pub is_abstract: bool,
+    /// Leading `ref` keyword — reference feature usage rather than composite
+    /// (`ref action …` inside a part body).
+    pub is_reference: bool,
     pub name: String,
     pub type_name: String,
+    /// Structured typing clause (multi-target capable), mirroring `PartUsage.typing`.
+    pub typing: Option<Node<TypingRelationship>>,
+    /// Multiplicity after the type, e.g. `[0..*]`.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// Optional `subsets` / `:>` clause.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Optional `redefines` / `:>>` clause.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// For `action ... accept param : Type` form.
     pub accept: Option<PayloadClause>,
     /// For standalone `send param : Type` control-node statements.
@@ -479,12 +494,24 @@ pub struct FinalState {
     pub name_span: Span,
 }
 
-/// State usage: `state` name (`:` type)? body.
+/// State usage: `(abstract)? (ref)? state` name (`:` type)? (`:>`/` :>>` …)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StateUsage {
+    /// Leading `abstract` keyword.
+    pub is_abstract: bool,
+    /// Leading `ref` keyword — reference feature usage (`ref state …`).
+    pub is_reference: bool,
     pub name: String,
     pub type_name: Option<String>,
+    /// Structured typing clause when a `:` target was written.
+    pub typing: Option<Node<TypingRelationship>>,
+    /// Multiplicity after the type, when present.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// Optional `subsets` / `:>` clause.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Optional `redefines` / `:>>` clause.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: StateDefBody,
     pub membership: Membership,
 }

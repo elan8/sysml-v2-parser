@@ -3,12 +3,12 @@
 use sysml_v2_parser::ast::{
     Bind, Connect, ConnectBody, ConnectStmt, EndDecl, Expression, Identification, Import,
     InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
-    InterfaceUsageBodyElement, Multiplicity, Node, Package, PackageBody, PackageBodyElement,
-    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
-    PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
-    RefDecl, RelationshipTarget, RelationshipTargetSegment, RootElement, RootNamespace,
-    SegmentSeparator, Span, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
-    Visibility,
+    InterfaceUsageBodyElement, Membership, Multiplicity, Node, Package, PackageBody,
+    PackageBodyElement, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
+    PartUsageBodyElement, PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement,
+    PortUsage, RefBody, RefDecl, RelationshipTarget, RelationshipTargetSegment, RootElement,
+    RootNamespace, SegmentSeparator, Span, SubsettingKind, SubsettingRelationship, TypingKind,
+    TypingRelationship, Visibility,
 };
 use sysml_v2_parser::parse;
 
@@ -292,6 +292,7 @@ fn port_def_vehicle_to_road() -> PackageBodyElement {
         specializes: None,
         body: PortDefBody::Brace {
             elements: vec![n(PortDefBodyElement::PortUsage(n(PortUsage {
+                is_abstract: false,
                 direction: None,
                 is_derived: false,
                 is_constant: false,
@@ -322,6 +323,7 @@ fn part_def_vehicle_a() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -339,6 +341,7 @@ fn part_def_vehicle_a() -> PackageBodyElement {
                     membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -369,6 +372,7 @@ fn part_def_rear_axle_assembly() -> PackageBodyElement {
         specializes: Some(spec("AxleAssembly")),
         body: PartDefBody::Brace {
             elements: vec![n(PartDefBodyElement::PortUsage(n(PortUsage {
+                is_abstract: false,
                 direction: None,
                 is_derived: false,
                 is_constant: false,
@@ -399,6 +403,7 @@ fn part_def_half_axle() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -416,6 +421,7 @@ fn part_def_half_axle() -> PackageBodyElement {
                     membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -447,6 +453,7 @@ fn part_def_engine() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -464,6 +471,7 @@ fn part_def_engine() -> PackageBodyElement {
                     membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -495,6 +503,7 @@ fn part_def_transmission() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -512,6 +521,7 @@ fn part_def_transmission() -> PackageBodyElement {
                     membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -543,6 +553,7 @@ fn part_def_driveshaft() -> PackageBodyElement {
         body: PartDefBody::Brace {
             elements: vec![
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -560,6 +571,7 @@ fn part_def_driveshaft() -> PackageBodyElement {
                     membership: feature_membership(),
                 }))),
                 n(PartDefBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -637,6 +649,7 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                     body: RefBody::Brace { elements: vec![] },
                     name_span: None,
                     type_ref_span: None,
+                    membership: Membership::feature(None, Span::dummy()),
                 }))),
                 n(InterfaceDefBodyElement::ConnectStmt(n(ConnectStmt {
                     from: end(n(Expression::FeatureRef("shaftPort_a".to_string()))),
@@ -782,6 +795,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     body: Some(ConnectBody::Semicolon),
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -796,6 +810,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     body: PortBody::Brace {
                         elements: vec![
                             n(PortBodyElement::PortUsage(n(PortUsage {
+                                is_abstract: false,
                                 direction: None,
                                 is_derived: false,
                                 is_constant: false,
@@ -816,6 +831,7 @@ fn part_vehicle1_c1() -> PartUsage {
                                 membership: feature_membership(),
                             }))),
                             n(PortBodyElement::PortUsage(n(PortUsage {
+                                is_abstract: false,
                                 direction: None,
                                 is_derived: false,
                                 is_constant: false,
@@ -937,6 +953,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     body: PartUsageBody::Brace {
                         elements: vec![
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                                is_abstract: false,
                                 direction: None,
                                 is_derived: false,
                                 is_constant: false,
@@ -954,6 +971,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 membership: feature_membership(),
                             }))),
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                                is_abstract: false,
                                 direction: None,
                                 is_derived: false,
                                 is_constant: false,
@@ -993,6 +1011,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     body: PartUsageBody::Brace {
                         elements: vec![
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                                is_abstract: false,
                                 direction: None,
                                 is_derived: false,
                                 is_constant: false,
@@ -1010,6 +1029,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                                 membership: feature_membership(),
                             }))),
                             n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                                is_abstract: false,
                                 direction: None,
                                 is_derived: false,
                                 is_constant: false,
@@ -1058,6 +1078,7 @@ fn part_differential() -> PartUsage {
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -1075,6 +1096,7 @@ fn part_differential() -> PartUsage {
                     membership: feature_membership(),
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -1092,6 +1114,7 @@ fn part_differential() -> PartUsage {
                     membership: feature_membership(),
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
+                    is_abstract: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,

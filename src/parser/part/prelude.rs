@@ -7,6 +7,7 @@ pub(crate) use crate::ast::{
     PartUsageBodyElement, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
     RefDecl, VariantTypedUsage, VariantUsage,
 };
+pub(crate) use crate::parser::action::action_usage;
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};
 pub(crate) use crate::parser::attribute::{
     attribute_def, attribute_usage, attribute_usage_shorthand,
@@ -43,7 +44,7 @@ pub(crate) use crate::parser::requirement::{
     comment_annotation, doc_comment, requirement_def, requirement_usage, satisfy,
 };
 pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
-pub(crate) use crate::parser::state::state_def;
+pub(crate) use crate::parser::state::{state_def, state_usage};
 pub(crate) use crate::parser::usage::{
     multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
     targets_display_string, typing_node, typings,

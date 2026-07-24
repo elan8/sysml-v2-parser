@@ -1,4 +1,6 @@
-use super::behavior::{ActionDefBodyElement, Allocate, InOut, InOutDecl, StateDefBody, StateUsage};
+use super::behavior::{
+    ActionDefBodyElement, ActionUsage, Allocate, InOut, InOutDecl, StateDefBody, StateUsage,
+};
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
@@ -83,6 +85,12 @@ pub enum PartDefBodyElement {
     ExhibitState(Node<ExhibitState>),
     /// Calculation usage (`calc` keyword) inside a part definition body.
     CalcUsage(Node<CalcUsage>),
+    /// `action` / `ref action` usage inside a part definition body (Systems Library
+    /// `Parts::performedActions` and similar). Previously fell through to [`OpaqueMember`].
+    ActionUsage(Box<Node<ActionUsage>>),
+    /// `state` / `ref state` usage inside a part definition body. Previously fell through to
+    /// [`OpaqueMember`].
+    StateUsage(Node<StateUsage>),
     /// Enumeration usage (`enum` keyword) inside a part definition body.
     EnumerationUsage(Node<EnumerationUsage>),
     /// `assert (not)? constraint { ... }` inside a part definition body (previously only
@@ -385,6 +393,8 @@ pub enum PartUsageBodyElement {
     Allocate(Node<Allocate>),
     Satisfy(Node<Satisfy>),
     StateUsage(Node<StateUsage>),
+    /// `action` / `ref action` usage inside a part usage body.
+    ActionUsage(Box<Node<ActionUsage>>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// `variant` name `;` inside a variation part usage body.
@@ -593,6 +603,8 @@ pub struct PortUsage {
     /// Direction prefix when parsed as `in`/`out`/`inout port ...` (BNF `RefPrefix`, reachable
     /// through `OccurrenceUsagePrefix` -> `BasicUsagePrefix` -> `RefPrefix`).
     pub direction: Option<InOut>,
+    /// Leading `abstract` keyword (Systems Library e.g. `abstract port ownedPorts`).
+    pub is_abstract: bool,
     /// `derived` keyword from `RefPrefix`. See `AttributeUsage::is_derived`.
     pub is_derived: bool,
     /// `constant` keyword from `RefPrefix`. See `AttributeUsage::is_constant`.
@@ -740,6 +752,9 @@ pub struct RefDecl {
     pub name_span: Option<Span>,
     /// Span of the type after `:` (for semantic tokens).
     pub type_ref_span: Option<Span>,
+    /// Ownership/visibility wrapper (`FeatureMembership`). Populated when a visibility prefix
+    /// precedes `ref` (e.g. `private ref mass : MassValue;`).
+    pub membership: Membership,
 }
 
 /// Body of a ref declaration: `;` or `{` members `}`.

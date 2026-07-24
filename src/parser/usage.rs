@@ -488,7 +488,7 @@ pub(crate) fn specialization_clauses(
     Ok((input, out))
 }
 
-fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, ()> {
+pub(crate) fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) = many0(preceded(
         ws_and_comments,
         nom::branch::alt((

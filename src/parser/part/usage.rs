@@ -737,11 +737,33 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     }
 }
 
-/// Ref in part usage body: `ref` (`part`)? name (`:` type)? (`=` value)? body.
+/// Ref in part usage/def body: `(visibility)? ref` (`part`)? name (`:` type)? (`=` value)? body.
 pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // Reject kinded refs (`ref action` / `ref state` / `ref port` / …) so those forms can be
+    // parsed as real ActionUsage/StateUsage/PortUsage instead of a mis-named RefDecl.
+    if crate::parser::lex::starts_with_any_keyword(
+        input.fragment(),
+        &[
+            b"action",
+            b"state",
+            b"port",
+            b"connection",
+            b"item",
+            b"attribute",
+            b"calc",
+            b"flow",
+            b"occurrence",
+        ],
+    ) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let (input, _) = opt(preceded(tag(&b"part"[..]), ws1)).parse(input)?;
     let (input, _) = opt(preceded(
         ws_and_comments,
@@ -749,26 +771,15 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     ))
     .parse(input)?;
     let (input, name_str) = name(input)?;
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (type_ref_span, type_name, typing) =
+        crate::parser::usage::typing_fields_from_result(type_result);
     let (input, value) = opt(preceded(
         preceded(ws_and_comments, tag(&b"="[..])),
         preceded(ws_and_comments, expression),
     ))
     .parse(input)?;
     let value = value.map(crate::parser::feature_value::wrap_bind_expression);
-    let type_name = type_name.unwrap_or_default();
-    let typing = if type_name.is_empty() {
-        None
-    } else {
-        Some(crate::parser::usage::single_target_typing(
-            crate::ast::Span::dummy(),
-            type_name.clone(),
-        ))
-    };
     let (input, body) = preceded(
         ws_and_comments,
         alt((
@@ -792,7 +803,8 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
                 value,
                 body,
                 name_span: None,
-                type_ref_span: None,
+                type_ref_span,
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -914,6 +926,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 exhibit_state_as_state_usage,
                 PartUsageBodyElement::StateUsage,
             ),
+            map(action_usage, |a| {
+                PartUsageBodyElement::ActionUsage(Box::new(a))
+            }),
+            map(state_usage, PartUsageBodyElement::StateUsage),
             map(perform_action_decl, PartUsageBodyElement::Perform),
             map(perform_usage, PartUsageBodyElement::Perform),
             map(allocate_, PartUsageBodyElement::Allocate),
@@ -990,8 +1006,14 @@ fn exhibit_state_as_state_usage(
 ) -> IResult<Input<'_>, Node<crate::ast::StateUsage>> {
     let (input, exhibit) = exhibit_state(input)?;
     let state = crate::ast::StateUsage {
+        is_abstract: false,
+        is_reference: false,
         name: exhibit.value.name,
         type_name: exhibit.value.type_name,
+        typing: None,
+        multiplicity: None,
+        subsets: None,
+        redefines: None,
         body: exhibit.value.body,
         // `ExhibitState` (the struct this adapts from) has no `membership`/visibility field of
         // its own -- out of this item's scope, see `CHANGELOG.md`'s Item 4b entries -- so there

@@ -16,7 +16,7 @@ use crate::parser::metadata_annotation::{annotation, metadata_annotation, metada
 use crate::parser::node_from_to;
 use crate::parser::payload::transition_accept;
 use crate::parser::requirement::{doc_comment, requirement_usage};
-use crate::parser::usage::{feature_usage_header, multiplicity};
+use crate::parser::usage::multiplicity;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -268,6 +268,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 body,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))
@@ -364,11 +365,27 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let start = input;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, is_abstract) =
+        nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, is_reference) =
+        nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"state"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, n) = name(input)?;
-    let (input, header) = feature_usage_header(input)?;
+    let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (input, multiplicity) =
+        nom::combinator::opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
+    let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
+    let (_type_ref_span, type_name, typing) =
+        crate::parser::usage::typing_fields_from_result(type_result);
+    let subsets = trailing
+        .subsets
+        .clone()
+        .or(leading.subsets.clone())
+        .map(|(target, _)| target);
+    let redefines = trailing.redefines.clone().or(leading.redefines.clone());
     // Optional modifier before body: `parallel` or `initial` (SysML state usage)
     let (input, _) = opt(alt((
         preceded(preceded(ws_and_comments, tag(&b"parallel"[..])), ws1),
@@ -383,8 +400,18 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
             start,
             input,
             StateUsage {
+                is_abstract: is_abstract.is_some(),
+                is_reference: is_reference.is_some(),
                 name: n,
-                type_name: header.type_name,
+                type_name: if type_name.is_empty() {
+                    None
+                } else {
+                    Some(type_name)
+                },
+                typing,
+                multiplicity,
+                subsets,
+                redefines,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },

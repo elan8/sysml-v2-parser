@@ -101,6 +101,9 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
     let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
     let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1))
         .parse(input)
@@ -166,6 +169,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
             input,
             PortUsage {
                 direction,
+                is_abstract,
                 is_derived,
                 is_constant,
                 name: name_str,

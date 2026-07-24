@@ -185,7 +185,7 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
             PackageBodyElement::StateDef(dummy_node(n, n.value.clone()))
         }
         PackageBodyElement::StateUsage(n) => {
-            PackageBodyElement::StateUsage(dummy_node(n, n.value.clone()))
+            PackageBodyElement::StateUsage(dummy_node(n, normalize_state_usage(&n.value)))
         }
         PackageBodyElement::ItemDef(n) => {
             PackageBodyElement::ItemDef(dummy_node(n, n.value.clone()))
@@ -414,6 +414,12 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         }
         PartDefBodyElement::CalcUsage(n) => {
             PartDefBodyElement::CalcUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::ActionUsage(n) => PartDefBodyElement::ActionUsage(Box::new(
+            dummy_node(n, normalize_action_usage(&n.value)),
+        )),
+        PartDefBodyElement::StateUsage(n) => {
+            PartDefBodyElement::StateUsage(dummy_node(n, normalize_state_usage(&n.value)))
         }
         PartDefBodyElement::EnumerationUsage(n) => PartDefBodyElement::EnumerationUsage(
             dummy_node(n, normalize_enumeration_usage(&n.value)),
@@ -757,8 +763,11 @@ fn normalize_part_usage_body_element_node(
             PartUsageBodyElement::Satisfy(dummy_node(n, n.value.clone()))
         }
         PartUsageBodyElement::StateUsage(n) => {
-            PartUsageBodyElement::StateUsage(dummy_node(n, n.value.clone()))
+            PartUsageBodyElement::StateUsage(dummy_node(n, normalize_state_usage(&n.value)))
         }
+        PartUsageBodyElement::ActionUsage(n) => PartUsageBodyElement::ActionUsage(Box::new(
+            dummy_node(n, normalize_action_usage(&n.value)),
+        )),
         PartUsageBodyElement::MetadataAnnotation(n) => {
             PartUsageBodyElement::MetadataAnnotation(dummy_node(n, n.value.clone()))
         }
@@ -802,6 +811,7 @@ fn normalize_part_usage_body_element_node(
 fn normalize_port_usage(p: &PortUsage) -> PortUsage {
     PortUsage {
         direction: p.direction,
+        is_abstract: p.is_abstract,
         is_derived: p.is_derived,
         is_constant: p.is_constant,
         name: p.name.clone(),
@@ -1069,6 +1079,7 @@ fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
         body: r.body.clone(),
         name_span: None,
         type_ref_span: None,
+        membership: r.membership.clone(),
     }
 }
 
@@ -1148,7 +1159,7 @@ fn normalize_action_def_body_element_node(
             ActionDefBodyElement::IfStmt(dummy_node(n, n.value.clone()))
         }
         ActionDefBodyElement::StateUsage(n) => {
-            ActionDefBodyElement::StateUsage(dummy_node(n, n.value.clone()))
+            ActionDefBodyElement::StateUsage(dummy_node(n, normalize_state_usage(&n.value)))
         }
         ActionDefBodyElement::ActionUsage(n) => ActionDefBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),
@@ -1169,14 +1180,35 @@ fn normalize_action_def_body_element_node(
 
 fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
     ActionUsage {
+        is_abstract: a.is_abstract,
+        is_reference: a.is_reference,
         name: a.name.clone(),
         type_name: a.type_name.clone(),
+        typing: a.typing.clone(),
+        multiplicity: a.multiplicity.clone(),
+        subsets: a.subsets.clone(),
+        redefines: a.redefines.clone(),
         accept: a.accept.clone(),
         send: a.send.clone(),
         body: normalize_action_usage_body(&a.body),
         name_span: None,
         type_ref_span: None,
         membership: a.membership.clone(),
+    }
+}
+
+fn normalize_state_usage(s: &StateUsage) -> StateUsage {
+    StateUsage {
+        is_abstract: s.is_abstract,
+        is_reference: s.is_reference,
+        name: s.name.clone(),
+        type_name: s.type_name.clone(),
+        typing: s.typing.clone(),
+        multiplicity: s.multiplicity.clone(),
+        subsets: s.subsets.clone(),
+        redefines: s.redefines.clone(),
+        body: s.body.clone(),
+        membership: s.membership.clone(),
     }
 }
 
@@ -1248,7 +1280,7 @@ fn normalize_action_usage_body_element_node(
             ActionUsageBodyElement::IfStmt(dummy_node(n, n.value.clone()))
         }
         ActionUsageBodyElement::StateUsage(n) => {
-            ActionUsageBodyElement::StateUsage(dummy_node(n, n.value.clone()))
+            ActionUsageBodyElement::StateUsage(dummy_node(n, normalize_state_usage(&n.value)))
         }
         ActionUsageBodyElement::ActionUsage(n) => ActionUsageBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),

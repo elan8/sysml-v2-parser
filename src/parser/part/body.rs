@@ -223,6 +223,13 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             // so `port def Foo {}` would otherwise misparse as `PortUsage { name: "def" }`.
             map(port_def_required, PartDefBodyElement::PortDef),
             map(port_usage, PartDefBodyElement::PortUsage),
+            // Kinded usages before plain `ref` / opaque catch-all so Systems Library forms like
+            // `abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances`
+            // become real ActionUsage/StateUsage nodes.
+            map(action_usage, |a| {
+                PartDefBodyElement::ActionUsage(Box::new(a))
+            }),
+            map(state_usage, PartDefBodyElement::StateUsage),
             map(part_ref_usage, PartDefBodyElement::Ref),
             map(|i| attribute_def(i, true), PartDefBodyElement::AttributeDef),
             map(attribute_usage, PartDefBodyElement::AttributeUsage),
@@ -387,34 +394,47 @@ pub(crate) fn connection_usage_member(
 }
 
 /// Permissive parser for library-style part members not yet modeled with dedicated AST nodes.
-/// Examples: `abstract ref action ... { ... }`, `state monitor: StateKind { ... }`.
+/// Kinded `ref action` / `ref state` / bare `action` / `state` are handled by dedicated parsers
+/// above; this catch-all remains for residual forms such as unmodeled `ref connection` headers.
 fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMemberDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     if !starts_with_any_keyword(
         input.fragment(),
-        &[b"ref", b"action", b"state", b"port", b"connection"],
+        &[b"ref", b"connection"],
     ) {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, header_text) =
-        crate::parser::lex::take_until_terminator(input, MEMBER_HEADER_UNTIL_BODY)?;
-    let keyword = if starts_with_any_keyword(input.fragment(), &[b"ref"]) {
+    // Do not opaque-capture kinded refs that have dedicated parsers.
+    if starts_with_keyword(input.fragment(), b"ref") {
+        let after_ref = {
+            let (peek, _) = ws_and_comments(input)?;
+            let (peek, _) = tag(&b"ref"[..]).parse(peek)?;
+            let (peek, _) = ws1(peek)?;
+            peek
+        };
+        if starts_with_any_keyword(
+            after_ref.fragment(),
+            &[b"action", b"state", b"port", b"part"],
+        ) {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
+    let keyword = if starts_with_keyword(input.fragment(), b"ref") {
         "ref"
-    } else if starts_with_any_keyword(input.fragment(), &[b"action"]) {
-        "action"
-    } else if starts_with_any_keyword(input.fragment(), &[b"state"]) {
-        "state"
-    } else if starts_with_any_keyword(input.fragment(), &[b"connection"]) {
-        "connection"
     } else {
-        "port"
+        "connection"
     }
     .to_string();
+    let (input, header_text) =
+        crate::parser::lex::take_until_terminator(input, MEMBER_HEADER_UNTIL_BODY)?;
     let name_str = header_text
         .split(|c: char| {
             c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == '(' || c == ')'
@@ -433,6 +453,7 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
                     | "private"
                     | "protected"
                     | "public"
+                    | "abstract"
             )
         })
         .unwrap_or("member")
@@ -757,5 +778,38 @@ mod par_002_nested_def_tests {
             crate::ast::PackageBodyElement::CaseDef(_)
         ));
         assert!(matches!(part_node.value, PartDefBodyElement::CaseDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_parses_abstract_ref_action_as_action_usage() {
+        let src =
+            "abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances;";
+        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            PartDefBodyElement::ActionUsage(action) => {
+                assert!(action.value.is_abstract);
+                assert!(action.value.is_reference);
+                assert_eq!(action.value.name, "performedActions");
+                assert_eq!(action.value.type_name, "Action");
+                assert!(action.value.subsets.is_some());
+            }
+            other => panic!("expected ActionUsage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn part_def_body_parses_ref_state_as_state_usage() {
+        let src = "ref state monitor: StateKind;";
+        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            PartDefBodyElement::StateUsage(state) => {
+                assert!(state.value.is_reference);
+                assert_eq!(state.value.name, "monitor");
+                assert_eq!(state.value.type_name.as_deref(), Some("StateKind"));
+            }
+            other => panic!("expected StateUsage, got {other:?}"),
+        }
     }
 }

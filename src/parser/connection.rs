@@ -128,6 +128,7 @@ fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 body,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
+                membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))

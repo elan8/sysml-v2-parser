@@ -16,7 +16,6 @@ use crate::parser::lex::{
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
-use crate::parser::usage::usage_header;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -199,6 +198,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
+                membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))
@@ -435,12 +435,7 @@ pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenActio
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"then"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = opt(alt((
-        preceded(tag(&b"public"[..]), ws1),
-        preceded(tag(&b"private"[..]), ws1),
-        preceded(tag(&b"protected"[..]), ws1),
-    )))
-    .parse(input)?;
+    // `action_usage` already accepts visibility / abstract / ref prefixes.
     let (input, action) = action_usage(input)?;
     Ok((input, node_from_to(start, input, ThenAction { action })))
 }
@@ -707,14 +702,63 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
     ))
 }
 
-/// Action usage body: `;` or `{` ActionUsageBodyElement* `}`
+/// Action usage body: `;`, `{` … `}`, or an implicit empty body when the next token starts
+/// another statement/succession (Systems Library `LoopAction` style without braces).
 pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| ActionUsageBody::Semicolon),
         action_usage_body_brace,
+        map(peek_implicit_action_usage_body_end, |_| ActionUsageBody::Semicolon),
     ))
     .parse(input)
+}
+
+/// Succeeds without consuming input when the next token cannot continue this usage header/body
+/// and instead begins a sibling action-body statement or closes the enclosing brace.
+fn peek_implicit_action_usage_body_end(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (peek, _) = ws_and_comments(input)?;
+    let frag = peek.fragment();
+    if frag.starts_with(b"}")
+        || starts_with_any_keyword(
+            frag,
+            &[
+                b"assign",
+                b"then",
+                b"while",
+                b"if",
+                b"for",
+                b"accept",
+                b"send",
+                b"merge",
+                b"first",
+                b"decide",
+                b"join",
+                b"fork",
+                b"terminate",
+                b"private",
+                b"public",
+                b"protected",
+                b"action",
+                b"perform",
+                b"bind",
+                b"flow",
+                b"message",
+                b"succession",
+                b"state",
+                b"doc",
+                b"@",
+                b"#",
+            ],
+        )
+    {
+        Ok((input, ()))
+    } else {
+        Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Alt,
+        )))
+    }
 }
 
 fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
@@ -792,13 +836,7 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
 }
 
 fn visibility_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(alt((
-        preceded(tag(&b"public"[..]), ws1),
-        preceded(tag(&b"private"[..]), ws1),
-        preceded(tag(&b"protected"[..]), ws1),
-    )))
-    .parse(input)?;
+    // `action_usage` already captures visibility / abstract / ref.
     action_usage(input)
 }
 
@@ -833,25 +871,44 @@ fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>
     ))
 }
 
-/// Action usage: `action` name ( `:` type_name ( `accept` param `:` param_type )? | `accept` param_name `:` param_type )? body
+/// Action usage: `(visibility)? (abstract)? (ref)? action` name header (`accept` …)? body
 pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, is_abstract) =
+        nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, is_reference) =
+        nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, header) = usage_header(input)?;
+    // Feature-style header: typing, multiplicity, ordered/nonunique, subsets/redefines.
+    // Plain `usage_header` drops `[0..*]` (Systems Library `performedActions`).
+    let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let (input, multiplicity) =
+        nom::combinator::opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
+    let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
+    let (type_ref_span, type_name, typing) =
+        crate::parser::usage::typing_fields_from_result(type_result);
+    let subsets = trailing
+        .subsets
+        .clone()
+        .or(leading.subsets.clone())
+        .map(|(target, _)| target);
+    let redefines = trailing.redefines.clone().or(leading.redefines.clone());
     let (input, accept) = nom::combinator::opt(preceded(
         preceded(ws_and_comments, tag(&b"accept"[..])),
         preceded(ws1, crate::parser::payload::typed_payload_clause),
     ))
     .parse(input)?;
+    let type_ref_span = accept
+        .as_ref()
+        .and_then(|p| p.type_span.clone())
+        .or(type_ref_span);
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
-    let type_name = header.type_name.unwrap_or_default();
-    let type_ref_span = accept.as_ref().and_then(|p| p.type_span.clone());
     let (input, body) = action_usage_body(input)?;
     // Spec-wise, a braced body does not require a trailing semicolon. However, in practice some
     // sources write `... { ... };` as a statement terminator. We accept an optional `;` here to
@@ -864,8 +921,14 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
             start,
             input,
             ActionUsage {
+                is_abstract: is_abstract.is_some(),
+                is_reference: is_reference.is_some(),
                 name: name_str,
                 type_name,
+                typing,
+                multiplicity,
+                subsets,
+                redefines,
                 accept,
                 send: None,
                 body,
@@ -926,5 +989,36 @@ mod membership_tests {
     fn action_usage_without_visibility_prefix_has_no_membership_visibility() {
         let (_, node) = action_usage(input("action a1 : A1;")).expect("action usage");
         assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn abstract_ref_action_with_multiplicity_and_subsets_is_structured() {
+        let src = "abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances;";
+        let (rest, node) = action_usage(input(src)).expect("ref action usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_abstract);
+        assert!(node.value.is_reference);
+        assert_eq!(node.value.name, "performedActions");
+        assert_eq!(node.value.type_name, "Action");
+        assert!(node.value.typing.is_some());
+        assert_eq!(
+            node.value
+                .multiplicity
+                .as_ref()
+                .map(|m| m.value.to_bracket_string()),
+            Some("[0..*]".to_string())
+        );
+        let subsets = node
+            .value
+            .subsets
+            .as_ref()
+            .expect("subsets clause")
+            .value
+            .target
+            .iter()
+            .map(|t| t.value.to_display_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        assert_eq!(subsets, "actions, enactedPerformances");
     }
 }

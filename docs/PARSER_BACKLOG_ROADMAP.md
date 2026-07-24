@@ -2,7 +2,9 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-20 (0.44.0 — `Intersecting` closed: `intersects` clauses were tokenized and discarded (`skip_intersects_clause`); now kept structured as `AttributeUsage`/`PortUsage`/`OccurrenceUsage::intersects`, same shape as `references`/`crosses`. Investigated and ruled out as parser gaps in the same pass: `TypeFeaturing`/`FeatureInverting`/`Unioning`/`Disjoining`/`Differencing`/`FeatureChaining`-as-metaclass have zero real usage in the systems library or examples (backlog, not urgent); general non-port Conjugation needs no parser change at all — `~` conjugated typing already parses generically for every usage kind, the remaining gap is Spec42-side only. See CHANGELOG.md 0.44.0 and `babel42-v2/docs/spec42-systems-modeling-api-gaps.md` S42-002/S42-008.)
+**Last updated:** 2026-07-23 (0.46.0 — Systems Library `ref action` / `ref state` / nested action·state in part bodies parse as real `ActionUsage`/`StateUsage` AST with `is_reference`, structured typing/multiplicity/`:>`/` :>>`, instead of `OpaqueMember`. Visibility on plain `part_ref_usage`. Full P5+ unified definition/usage/specialization layer remains deferred to 1.x.)
+
+**Previously:** 2026-07-20 (0.44.0 — `Intersecting` closed: `intersects` clauses were tokenized and discarded (`skip_intersects_clause`); now kept structured as `AttributeUsage`/`PortUsage`/`OccurrenceUsage::intersects`, same shape as `references`/`crosses`. Investigated and ruled out as parser gaps in the same pass: `TypeFeaturing`/`FeatureInverting`/`Unioning`/`Disjoining`/`Differencing`/`FeatureChaining`-as-metaclass have zero real usage in the systems library or examples (backlog, not urgent); general non-port Conjugation needs no parser change at all — `~` conjugated typing already parses generically for every usage kind, the remaining gap is Spec42-side only. See CHANGELOG.md 0.44.0 and `babel42-v2/docs/spec42-systems-modeling-api-gaps.md` S42-002/S42-008.)
 
 **Previously:** 2026-07-03 (§5 — all 7 open follow-ups from the 2026-07 audit closed: if/while/terminate, standalone succession, transition trigger `via`, satisfy inline requirement form, assert/satisfy scope wiring, arrow-invocation operator, AssignStmt.rhs. §2.3 — `doc` support added for port usage, connection def, and interface usage connect bodies; `connection def` body recovery migrated to the shared structured-body loop)
 
@@ -83,7 +85,8 @@ See [`tests/validation/README.md`](../tests/validation/README.md) for layout and
 | Spec42 **semantic** diagnostics (§1 wave) | **Done** in Spec42 0.29.0 — partial §2 items remain parser-side |
 | Deep body fidelity | **Open** — many `advance_to_closing_brace` call sites remain |
 | Full `OwnedExpression` | **Open** — operator enums added; full KerML expression family not modeled |
-| Unified definition/usage grammar layer | **Open** — P5+ architectural work |
+| Systems Library `ref <kind>` in part bodies | **Done** (0.46.0) — `ActionUsage`/`StateUsage` (+ Spec42 graph wire); not full P5+ |
+| Unified definition/usage grammar layer | **Open** — P5+ architectural work (still deferred; do not big-bang rewrite) |
 
 ```mermaid
 flowchart TB
@@ -216,7 +219,8 @@ Consolidated from [SYSML_V2_COMPLIANCE_GAP.md](./SYSML_V2_COMPLIANCE_GAP.md) and
 
 | Theme | Priority | Notes |
 | ----- | -------- | ----- |
-| Unified definition / usage / specialization grammar layer | **P5+** | Largest architectural gap; do not big-bang rewrite |
+| Unified definition / usage / specialization grammar layer | **P5+** | Largest architectural gap; do not big-bang rewrite. The 0.46.0 `ref action`/`ref state` part-body slice is **not** this rewrite — only the Systems Library forms that were opaque catch-alls. |
+| Part-body `ref action` / `ref state` (Systems Library) | **Done** (0.46.0) | Real `ActionUsage`/`StateUsage` with `is_reference`, `:>`/` :>>`, visibility on plain `ref` |
 | `take_until_terminator` header scraping → structured headers | Medium | Per-family as library fixtures expose gaps |
 | `part_def` prelude unify with `definition_prefix` | Low | Intentionally local for disambiguation |
 | `package_body_element` sub-dispatchers | **Done** (P2) | Maintain when adding keywords |
