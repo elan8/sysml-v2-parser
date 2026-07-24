@@ -371,6 +371,13 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
         nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"state"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // `state def …` is a definition, not a usage named `def`.
+    if starts_with_keyword(input.fragment(), b"def") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let (input, n) = name(input)?;
     let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;

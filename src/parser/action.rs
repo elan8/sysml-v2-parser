@@ -11,7 +11,8 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::lex::{
-    name, qualified_name, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
+    name, qualified_name, starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
+    ws_and_comments,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
@@ -503,6 +504,9 @@ fn action_def_body_element(
             map(terminate_stmt, ActionDefBodyElement::TerminateStmt),
             map(while_stmt, ActionDefBodyElement::WhileStmt),
             map(if_stmt, ActionDefBodyElement::IfStmt),
+            // Nested `action def` must win over `action_usage` (which would otherwise treat
+            // `def` as a usage name).
+            map(nested_action_def_decl, ActionDefBodyElement::Decl),
             map(control_node_action_usage, |a| {
                 ActionDefBodyElement::ActionUsage(Box::new(a))
             }),
@@ -823,6 +827,7 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
             map(terminate_stmt, ActionUsageBodyElement::TerminateStmt),
             map(while_stmt, ActionUsageBodyElement::WhileStmt),
             map(if_stmt, ActionUsageBodyElement::IfStmt),
+            map(nested_action_def_decl, ActionUsageBodyElement::Decl),
             map(control_node_action_usage, |a| {
                 ActionUsageBodyElement::ActionUsage(Box::new(a))
             }),
@@ -838,6 +843,30 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
 fn visibility_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     // `action_usage` already captures visibility / abstract / ref.
     action_usage(input)
+}
+
+/// Nested `action def …` inside an action body. Kept as a lightweight Decl so we do not bump
+/// AST shape for this recovery/parity fix; Spec42 already ignores `Decl`.
+fn nested_action_def_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>> {
+    let start = input;
+    let (input, def) = action_def(input)?;
+    let name = def
+        .value
+        .identification
+        .name
+        .clone()
+        .unwrap_or_else(|| "action".to_string());
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ActionBodyDecl {
+                keyword: "action".to_string(),
+                text: format!("def {name}"),
+            },
+        ),
+    ))
 }
 
 fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>> {
@@ -882,6 +911,13 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
         nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // `action def …` is a definition, not a usage named `def`.
+    if starts_with_keyword(input.fragment(), b"def") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
     // Feature-style header: typing, multiplicity, ordered/nonunique, subsets/redefines.
     // Plain `usage_header` drops `[0..*]` (Systems Library `performedActions`).

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Nested `action def …` inside action bodies no longer cascades a
+  `missing_body_or_semicolon` diagnostic after an incomplete sibling
+  (e.g. `bind status = ;`). `action_usage` rejects `action def`, and nested
+  definitions are accepted as body members. Same `def` guard on
+  `state_usage`.
+
 ## [0.46.0] - 2026-07-23
 
 ### Added
