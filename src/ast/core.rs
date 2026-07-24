@@ -321,6 +321,84 @@ pub enum Expression {
     MetadataAccess(Box<Node<Expression>>),
 }
 
+/// Move every direct `Node<Expression>` child out of `expr`, replacing each with a cheap
+/// non-recursive placeholder, and push it onto `out`. Used by [`Drop for Expression`](Expression)
+/// to unwind arbitrarily deep trees (e.g. `((((...))))` or `f(g(h(i(...))))`, which the iterative
+/// expression parser now happily accepts instead of stack-overflowing) with an explicit heap `Vec`
+/// instead of the native call stack, which Rust's default derived drop glue would otherwise use one
+/// frame of per nesting level.
+fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression>>) {
+    fn take_box(slot: &mut Box<Node<Expression>>) -> Node<Expression> {
+        *std::mem::replace(slot, Box::new(Node::new(Span::dummy(), Expression::Null)))
+    }
+
+    match expr {
+        Expression::MemberAccess(base, _)
+        | Expression::Bracket(base)
+        | Expression::Parenthesized(base)
+        | Expression::MetadataAccess(base)
+        | Expression::MetaCast { base, .. }
+        | Expression::Select { base, .. }
+        | Expression::Collect { base, .. } => {
+            out.push(take_box(base));
+        }
+        Expression::Index { base, index } => {
+            out.push(take_box(base));
+            out.push(take_box(index));
+        }
+        Expression::LiteralWithUnit { value, unit } => {
+            out.push(take_box(value));
+            out.push(take_box(unit));
+        }
+        Expression::BinaryOp { left, right, .. } => {
+            out.push(take_box(left));
+            out.push(take_box(right));
+        }
+        Expression::UnaryOp { operand, .. } => {
+            out.push(take_box(operand));
+        }
+        Expression::Invocation { callee, args } => {
+            out.push(take_box(callee));
+            out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
+        }
+        Expression::CollectionOp { base, args, .. } => {
+            out.push(take_box(base));
+            out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
+        }
+        Expression::Constructor { args, .. } => {
+            out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
+        }
+        Expression::Tuple(items) => {
+            out.extend(std::mem::take(items));
+        }
+        Expression::TypeCheck { operand, .. } => {
+            if let Some(boxed) = operand.take() {
+                out.push(*boxed);
+            }
+        }
+        Expression::LiteralInteger(_)
+        | Expression::LiteralReal(_)
+        | Expression::LiteralString(_)
+        | Expression::LiteralBoolean(_)
+        | Expression::FeatureRef(_)
+        | Expression::Classification { .. }
+        | Expression::Null
+        | Expression::FeatureChainRef(_) => {}
+    }
+}
+
+impl Drop for Expression {
+    fn drop(&mut self) {
+        let mut pending: Vec<Node<Expression>> = Vec::new();
+        take_expression_children(self, &mut pending);
+        while let Some(mut node) = pending.pop() {
+            take_expression_children(&mut node.value, &mut pending);
+            // `node` drops here: its children were already moved out above, so this is a shallow,
+            // non-recursive drop no matter how deep the original tree was.
+        }
+    }
+}
+
 /// A single invocation/constructor argument: positional or named (KerML `ArgumentList`,
 /// BNF 8.2.5.8.3: `PositionalArgumentList | NamedArgumentList`), e.g. `F(a, b)` (positional) vs.
 /// `F(x = a, y = b)` (named, via `NamedArgument: ParameterRedefinition '=' ArgumentValue`).

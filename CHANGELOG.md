@@ -7,8 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.1] - 2026-07-24
+
 ### Fixed
 
+- **Stack overflow on deeply/pathologically nested expressions.** Expression parsing
+  (`parenthesized`/`tuple` groups, function/constructor argument lists, `#(index)`) was
+  recursive-descent: each nesting level consumed a native call-stack frame with no limit, so input
+  like `((((...))))`, `f(g(h(i(...))))`, or a long `.member` / arrow-invocation chain could crash
+  the whole process with `STATUS_STACK_OVERFLOW` — not a recoverable parse error, a hard process
+  abort. The 0.45.1 `MAX_SYNTAX_NESTING` guard only counted `{`/`}` structural brace nesting and
+  never covered this. `src/parser/expr.rs` is now an iterative precedence-climbing (Pratt) parser:
+  every construct that used to re-enter the grammar through a real recursive call instead pushes an
+  explicit frame onto a heap `Vec` and resumes it later, so nesting depth costs heap growth, not
+  call-stack depth. Unlike the brace-nesting guard, there is no arbitrary depth limit here — deeply
+  nested expressions now simply parse successfully instead of being rejected or crashing. Covered by
+  new regression tests parsing 200,000-deep nested parens, 200,000-deep postfix chains, and
+  50,000-deep nested invocations.
+- **Stack overflow when dropping a deeply nested `Expression` tree**, a second instance of the same
+  class of bug found while writing the regression tests above: even after the parser fix, Rust's
+  default recursive `Drop` glue for the `Box<Node<Expression>>` chain built by a deeply nested
+  expression could itself overflow the stack when the tree went out of scope, independent of how it
+  was parsed. `Expression` now has an explicit iterative `Drop` impl that unwinds arbitrarily deep
+  trees via the same heap-`Vec`-instead-of-call-stack technique.
+- No public AST or behavior changes: every existing test (including span-exact expectations)
+  passes unchanged, and both fixes are internal to how the existing grammar is parsed and torn
+  down.
 - Nested `action def …` inside action bodies no longer cascades a
   `missing_body_or_semicolon` diagnostic after an incomplete sibling
   (e.g. `bind status = ;`). `action_usage` rejects `action def`, and nested

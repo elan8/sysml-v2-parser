@@ -1,8 +1,8 @@
 //! Expression and path parsing for values and bind/connect.
 
 use crate::ast::{
-    Argument, BinaryOperator, CollectionOperator, Expression, FeatureChain, Node, TypeCheckKind,
-    UnaryOperator,
+    Argument, BinaryOperator, CollectionOperator, Expression, FeatureChain, Node, Span,
+    TypeCheckKind, UnaryOperator,
 };
 use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws_and_comments};
 use crate::parser::node_from_to;
@@ -10,7 +10,7 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
@@ -166,73 +166,6 @@ fn metadata_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>
     ))
 }
 
-/// A single `ArgumentList` entry: positional (`ArgumentValue`) or named
-/// (`NAME '=' ArgumentValue`, KerML `NamedArgument`). Only treats `NAME '='` as named when the
-/// `=` is a lone assignment token, not the start of `==`/`===`, so equality expressions like
-/// `a == b` are never misread as a named argument.
-fn argument(input: Input<'_>) -> IResult<Input<'_>, Argument> {
-    let (input, _) = ws_and_comments(input)?;
-    if let Ok((after_name, arg_name)) = name(input) {
-        let (after_ws, _) = ws_and_comments(after_name)?;
-        let frag = after_ws.fragment();
-        if frag.first() == Some(&b'=') && frag.get(1) != Some(&b'=') {
-            let (after_eq, _) = tag(&b"="[..]).parse(after_ws)?;
-            let (after_eq, _) = ws_and_comments(after_eq)?;
-            let (rest, value) = expression(after_eq)?;
-            return Ok((
-                rest,
-                Argument {
-                    name: Some(arg_name),
-                    value,
-                },
-            ));
-        }
-    }
-    let (rest, value) = expression(input)?;
-    Ok((rest, Argument { name: None, value }))
-}
-
-/// Parses the interior of an `ArgumentList` (`PositionalArgumentList | NamedArgumentList`) after
-/// the opening `(` has already been consumed, through and including the closing `)`.
-fn argument_list_tail(input: Input<'_>) -> IResult<Input<'_>, Vec<Argument>> {
-    let (next, _) = ws_and_comments(input)?;
-    if next.fragment().starts_with(b")") {
-        let (next, _) = tag(&b")"[..]).parse(next)?;
-        return Ok((next, Vec::new()));
-    }
-    let mut args = Vec::new();
-    let mut input = next;
-    loop {
-        let (next, arg) = argument(input)?;
-        args.push(arg);
-        let (next, _) = ws_and_comments(next)?;
-        if next.fragment().starts_with(b")") {
-            let (next, _) = tag(&b")"[..]).parse(next)?;
-            return Ok((next, args));
-        }
-        let (next, _) = tag(&b","[..]).parse(next)?;
-        let (next, _) = ws_and_comments(next)?;
-        input = next;
-    }
-}
-
-fn constructor_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"new"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, type_name) = qualified_name(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, args) = if input.fragment().starts_with(b"(") {
-        let (input, _) = tag(&b"("[..]).parse(input)?;
-        argument_list_tail(input)?
-    } else {
-        (input, Vec::new())
-    };
-    let current = node_from_to(start, input, Expression::Constructor { type_name, args });
-    postfix(input, start, current)
-}
-
 /// Literal only (no unit): integer, real, string, boolean.
 fn literal_only(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
@@ -342,71 +275,14 @@ fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     Ok((input, node_from_to(start, input, expr)))
 }
 
-/// Parenthesized expression: `( expression )` for grouping, or `( e1, e2, ... )` as [`Expression::Tuple`].
-fn parenthesized(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"("[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, first) = expression(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b")") {
-        let (input, _) = tag(&b")"[..]).parse(input)?;
-        // Include `(` … `)` in the span so consumers (e.g. Spec42 `text_from_span`) round-trip
-        // the full parenthesized source, not only the inner expression. Wrap in `Parenthesized`
-        // (PAR-005 item 6) so the fact source had explicit grouping parens survives parsing
-        // instead of being lost when only the inner expression's span was recomputed.
-        return Ok((
-            input,
-            node_from_to(start, input, Expression::Parenthesized(Box::new(first))),
-        ));
-    }
-    let (input, _) = tag(&b","[..]).parse(input)?;
-    let mut elements = vec![first];
-    let mut input = input;
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        if next.fragment().starts_with(b")") {
-            let (input, _) = tag(&b")"[..]).parse(next)?;
-            return Ok((
-                input,
-                node_from_to(start, input, Expression::Tuple(elements)),
-            ));
-        }
-        let (next, expr) = expression(next)?;
-        elements.push(expr);
-        let (next, _) = ws_and_comments(next)?;
-        if next.fragment().starts_with(b")") {
-            let (input, _) = tag(&b")"[..]).parse(next)?;
-            return Ok((
-                input,
-                node_from_to(start, input, Expression::Tuple(elements)),
-            ));
-        }
-        if next.fragment().starts_with(b",") {
-            let (next, _) = tag(&b","[..]).parse(next)?;
-            input = next;
-            continue;
-        }
-        return Err(nom::Err::Error(nom::error::Error::new(
-            next,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-}
-
-/// KerML null or empty sequence ().
+/// KerML null value: the `null` keyword. Empty parens `()` are a *separate* production
+/// (`Expression::Null` too, but spelled `(` `)`) handled directly by the iterative expression
+/// engine below, alongside every other `(`-led construct, since -- like any parenthesized group --
+/// it must not recurse through this function.
 fn null_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = alt((
-        map(tag(&b"null"[..]), |_| ()),
-        map(
-            delimited(tag(&b"("[..]), ws_and_comments, tag(&b")"[..])),
-            |_| (),
-        ),
-    ))
-    .parse(input)?;
+    let (input, _) = tag(&b"null"[..]).parse(input)?;
     Ok((input, node_from_to(start, input, Expression::Null)))
 }
 
@@ -448,36 +324,6 @@ fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> 
     ))
 }
 
-/// SequenceExpression: `(` expr (`,` expr)* `)`
-fn sequence_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, _) = tag(&b"("[..]).parse(input)?;
-    let (input, first) = preceded(ws_and_comments, expression).parse(input)?;
-    let (input, rest) = nom::multi::many0(preceded(
-        preceded(ws_and_comments, tag(&b","[..])),
-        preceded(ws_and_comments, expression),
-    ))
-    .parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b")"[..])).parse(input)?;
-    let mut exprs = vec![first];
-    exprs.extend(rest);
-    let args = exprs
-        .into_iter()
-        .map(|value| Argument { name: None, value })
-        .collect();
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            Expression::Invocation {
-                callee: Box::new(node_from_to(start, start, Expression::Null)),
-                args,
-            },
-        ),
-    ))
-}
-
 /// KerML type test suffix: `istype Type`, `hastype Type`, or `as Type`.
 fn type_check_kind_token(input: Input<'_>) -> IResult<Input<'_>, TypeCheckKind> {
     let (input, _) = ws_and_comments(input)?;
@@ -508,8 +354,10 @@ fn type_check_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> 
     ))
 }
 
-/// Primary expression: literal with unit, literal only, metadata ref, feature ref, null, or parenthesized.
-fn primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+/// Primary alternatives that never recurse into [`expression`]. `(`-led groups/tuples/empty-parens
+/// and `new`-led constructors are handled directly by the iterative engine below instead, because
+/// (unlike every alternative here) they can nest arbitrarily deep.
+fn primary_atom(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         literal_with_unit,
@@ -517,111 +365,11 @@ fn primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         null_expression,
         metadata_ref_primary,
         type_check_primary,
-        constructor_expression,
         collect_expression,
         select_expression,
         feature_ref_primary,
-        parenthesized,
-        sequence_expression,
     ))
     .parse(input)
-}
-
-/// Apply postfix #( expr ), . name, or :: name (qualified member access) to an expression.
-fn postfix<'a>(
-    input: Input<'a>,
-    start: Input<'a>,
-    current: Node<Expression>,
-) -> IResult<Input<'a>, Node<Expression>> {
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b"(") {
-        let (input, _) = tag(&b"("[..]).parse(input)?;
-        let (input, args) = argument_list_tail(input)?;
-        let expr = Expression::Invocation {
-            callee: Box::new(current),
-            args,
-        };
-        return postfix(input, start, node_from_to(start, input, expr));
-    }
-    if input.fragment().starts_with(b"#") {
-        let (input, _) = tag(&b"#"[..]).parse(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b"("[..])).parse(input)?;
-        let (input, index_node) = preceded(ws_and_comments, expression).parse(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b")"[..])).parse(input)?;
-        let expr = Expression::Index {
-            base: Box::new(current),
-            index: Box::new(index_node),
-        };
-        return postfix(input, start, node_from_to(start, input, expr));
-    }
-    if input.fragment().starts_with(b"::") {
-        let (input, _) = tag(&b"::"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
-        let (input, member) = name(input)?;
-        let expr = Expression::MemberAccess(Box::new(current), member);
-        return postfix(input, start, node_from_to(start, input, expr));
-    }
-    if input.fragment().starts_with(b".") {
-        let (input, _) = tag(&b"."[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
-        let (input, member) = name(input)?;
-        // `expr.metadata` is a dedicated KerML production (MetadataAccessExpression, BNF
-        // 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`), distinct from ordinary member
-        // access -- PAR-005 item 4.
-        let expr = if member == "metadata" {
-            Expression::MetadataAccess(Box::new(current))
-        } else {
-            Expression::MemberAccess(Box::new(current), member)
-        };
-        return postfix(input, start, node_from_to(start, input, expr));
-    }
-    if input.fragment().starts_with(b"->") {
-        let (input, _) = tag(&b"->"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
-        let (input, member) = name(input)?;
-        let (after_name, _) = ws_and_comments(input)?;
-        // KerML arrow-invocation, e.g. `collection->size()`, `xs->select(p)`, `xs->collect(f)`.
-        // When followed by a call, capture it as a dedicated `CollectionOp` (PAR-005 item 2) so
-        // the specific operator survives without string-matching a generic Invocation's callee.
-        if after_name.fragment().starts_with(b"(") {
-            let (after_paren, _) = tag(&b"("[..]).parse(after_name)?;
-            let (after_args, args) = argument_list_tail(after_paren)?;
-            let expr = Expression::CollectionOp {
-                op: CollectionOperator::from_name(&member),
-                base: Box::new(current),
-                args,
-            };
-            return postfix(after_args, start, node_from_to(start, after_args, expr));
-        }
-        // Bare arrow access with no call (rare) -- fall back to plain member access.
-        let expr = Expression::MemberAccess(Box::new(current), member);
-        return postfix(input, start, node_from_to(start, input, expr));
-    }
-    if let Ok((after_kind, kind)) = type_check_kind_token(input) {
-        if let Ok((after_type, type_name)) = qualified_name(after_kind) {
-            let expr = node_from_to(
-                start,
-                after_type,
-                Expression::TypeCheck {
-                    kind,
-                    operand: Some(Box::new(current)),
-                    type_name,
-                },
-            );
-            return postfix(after_type, start, expr);
-        }
-    }
-    if starts_with_keyword(input.fragment(), b"meta") {
-        let (input, _) = tag(&b"meta"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
-        let (input, metaclass) = qualified_name(input)?;
-        let expr = Expression::MetaCast {
-            base: Box::new(current),
-            metaclass,
-        };
-        return postfix(input, start, node_from_to(start, input, expr));
-    }
-    Ok((input, current))
 }
 
 fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
@@ -689,35 +437,6 @@ fn multiplicative_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
     .parse(input)
 }
 
-fn binary_chain_with<'a, P, N>(
-    mut input: Input<'a>,
-    start: Input<'a>,
-    mut left: Node<Expression>,
-    mut op_parser: P,
-    mut next_parser: N,
-) -> IResult<Input<'a>, Node<Expression>>
-where
-    P: Parser<Input<'a>, Output = String, Error = nom::error::Error<Input<'a>>>,
-    N: Parser<Input<'a>, Output = Node<Expression>, Error = nom::error::Error<Input<'a>>>,
-{
-    loop {
-        let Ok((next_input, op)) = op_parser.parse(input) else {
-            return Ok((input, left));
-        };
-        let (next_input, right) = next_parser.parse(next_input)?;
-        left = node_from_to(
-            start,
-            next_input,
-            Expression::BinaryOp {
-                op: BinaryOperator::from_token(&op),
-                left: Box::new(left),
-                right: Box::new(right),
-            },
-        );
-        input = next_input;
-    }
-}
-
 /// Unary operator token: + - ~ not (KerML UnaryOperator).
 fn unary_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
@@ -730,74 +449,609 @@ fn unary_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
     .parse(input)
 }
 
-/// Parse unary prefixes then primary; build nested UnaryOp from the right.
-fn unary_and_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, prefixes) = nom::multi::many0(unary_op_token).parse(input)?;
-    let primary_start = input;
-    let (input, primary_node) = primary(input)?;
-    let (input, after_postfix) = postfix(input, primary_start, primary_node)?;
-    let mut expr = after_postfix;
-    for op in prefixes.into_iter().rev() {
-        expr = node_from_to(
-            start,
-            input,
-            Expression::UnaryOp {
-                op: UnaryOperator::from_token(&op),
-                operand: Box::new(expr),
-            },
-        );
+// ---------------------------------------------------------------------------------------------
+// Iterative (Pratt / precedence-climbing) expression engine.
+//
+// Recursive descent naturally encodes "how deeply is this expression nested" as native call-stack
+// depth. Every `(`-group, function/constructor argument list, and `#( )` index used to re-enter the
+// grammar through a real recursive call -- one native stack frame per nesting level, with no limit,
+// so pathological input like `((((...))))` or `f(g(h(i(...))))` could overflow the stack. Binary
+// operator *chains* were already safe (a `loop`, not recursion) but mixing that with recursive
+// grouping still left the two genuinely unbounded vectors above.
+//
+// This module instead keeps one explicit, heap-allocated stack of suspended parse contexts
+// (`Frame` + `ItemState` pairs in `expression`'s `stack: Vec<_>`): entering `(` pushes a frame
+// instead of recursing, and the matching `)` pops it and resumes. Nesting depth becomes `Vec`
+// growth, not call-stack growth -- the native call stack used by `expression` itself stays O(1)
+// regardless of how deeply the input nests.
+// ---------------------------------------------------------------------------------------------
+
+const PREC_IMPLIES: u8 = 0;
+const PREC_LOGICAL: u8 = 1;
+const PREC_EQUALITY: u8 = 2;
+const PREC_COMPARISON: u8 = 3;
+const PREC_ADDITIVE: u8 = 4;
+const PREC_MULTIPLICATIVE: u8 = 5;
+
+/// Try each precedence tier's operator token, tightest-binding first -- the same order in which the
+/// original recursive ladder effectively tried them (each level only got a chance once every
+/// tighter-binding level nested inside it had already failed to match). Preserving that order
+/// preserves any token-overlap edge cases (e.g. `&` vs `&&`) exactly as they behaved before.
+fn any_binary_op_token(input: Input<'_>) -> IResult<Input<'_>, (BinaryOperator, u8)> {
+    alt((
+        map(multiplicative_op_token, |t| {
+            (BinaryOperator::from_token(&t), PREC_MULTIPLICATIVE)
+        }),
+        map(additive_op_token, |t| {
+            (BinaryOperator::from_token(&t), PREC_ADDITIVE)
+        }),
+        map(comparison_op_token, |t| {
+            (BinaryOperator::from_token(&t), PREC_COMPARISON)
+        }),
+        map(equality_op_token, |t| {
+            (BinaryOperator::from_token(&t), PREC_EQUALITY)
+        }),
+        map(logical_op_token, |t| {
+            (BinaryOperator::from_token(&t), PREC_LOGICAL)
+        }),
+        map(implies_op_token, |t| {
+            (BinaryOperator::from_token(&t), PREC_IMPLIES)
+        }),
+    ))
+    .parse(input)
+}
+
+struct PendingOp {
+    op: BinaryOperator,
+    prec: u8,
+}
+
+/// Precedence-climbing state for ONE expression (an argument value, a parenthesized group's item,
+/// or a full top-level expression): a `Vec`-backed operand stack and operator stack implementing
+/// the classic iterative operator-precedence algorithm. All operators here are left-associative --
+/// the original recursive ladder never treated any operator, including `**`, as right-associative,
+/// so this preserves that exactly (e.g. `a ** b ** c` still parses as `(a ** b) ** c`).
+#[derive(Default)]
+struct Climb {
+    operands: Vec<Node<Expression>>,
+    ops: Vec<PendingOp>,
+}
+
+impl Climb {
+    /// Push a new operator, first reducing any already-pending operator whose precedence is at
+    /// least as tight (this is what gives left-associativity for same-precedence chains).
+    fn push_op(&mut self, op: BinaryOperator, prec: u8) {
+        while let Some(top) = self.ops.last() {
+            if top.prec < prec {
+                break;
+            }
+            self.reduce_one();
+        }
+        self.ops.push(PendingOp { op, prec });
     }
-    Ok((input, expr))
+
+    /// Pop one operator and its two operands, combine them into a `BinaryOp`, and push the result
+    /// back. A no-op if the stacks are shorter than expected -- this is only ever called with both
+    /// present by construction (`push_op`/`finish` never call it otherwise), and this crate never
+    /// panics on any input, so an unreachable state degrades silently rather than crashing.
+    fn reduce_one(&mut self) {
+        let Some(pending) = self.ops.pop() else {
+            return;
+        };
+        let Some(right) = self.operands.pop() else {
+            return;
+        };
+        let Some(left) = self.operands.pop() else {
+            self.operands.push(right);
+            return;
+        };
+        let span = Span {
+            offset: left.span.offset,
+            line: left.span.line,
+            column: left.span.column,
+            len: (right.span.offset + right.span.len).saturating_sub(left.span.offset),
+        };
+        self.operands.push(Node::new(
+            span,
+            Expression::BinaryOp {
+                op: pending.op,
+                left: Box::new(left),
+                right: Box::new(right),
+            },
+        ));
+    }
+
+    /// Fold everything down to the single resulting value. Only called once at least one atom has
+    /// been pushed (`expression` always feeds an atom in before checking whether the item is
+    /// done), so `operands` is never actually empty here; the fallback exists only so this can
+    /// never panic even if that invariant were somehow violated.
+    fn finish(mut self) -> Node<Expression> {
+        while !self.ops.is_empty() {
+            self.reduce_one();
+        }
+        self.operands
+            .pop()
+            .unwrap_or_else(|| Node::new(Span::dummy(), Expression::Null))
+    }
 }
 
-fn multiplicative_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, left) = unary_and_primary(input)?;
-    binary_chain_with(
-        input,
-        start,
-        left,
-        multiplicative_op_token,
-        unary_and_primary,
-    )
+/// Per-item parse state, suspended on `expression`'s explicit stack whenever a `(` is entered and
+/// resumed when its matching `)` is found: the climb in progress, any unary prefixes already
+/// consumed and awaiting their operand (and where they started, for the `UnaryOp` span), and --
+/// inside a call-style argument list -- the `name =` prefix already consumed for the item
+/// currently being parsed, if any.
+struct ItemState<'a> {
+    climb: Climb,
+    pending_unary: Vec<UnaryOperator>,
+    prefix_start: Input<'a>,
+    arg_name: Option<String>,
 }
 
-fn additive_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, left) = multiplicative_expression(input)?;
-    binary_chain_with(
-        input,
-        start,
-        left,
-        additive_op_token,
-        multiplicative_expression,
-    )
+impl<'a> ItemState<'a> {
+    fn fresh(at: Input<'a>) -> Self {
+        ItemState {
+            climb: Climb::default(),
+            pending_unary: Vec::new(),
+            prefix_start: at,
+            arg_name: None,
+        }
+    }
 }
 
-fn comparison_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, left) = additive_expression(input)?;
-    binary_chain_with(input, start, left, comparison_op_token, additive_expression)
+/// What a suspended `(`-delimited item list will build once its closing `)` is reached.
+enum FrameKind {
+    /// `(` expr (`,` expr)* `)` in primary position: one item -> `Parenthesized`, 2+ -> `Tuple`.
+    Group,
+    /// Invocation argument list: postfix `(` args `)` applied to `base`.
+    Invocation { base: Node<Expression> },
+    /// Index argument: postfix `#(` expr `)` applied to `base` -- exactly one item, no comma.
+    Index { base: Node<Expression> },
+    /// Arrow-invocation argument list: postfix `->` name `(` args `)` applied to `base`.
+    ArrowInvocation {
+        base: Node<Expression>,
+        member: String,
+    },
+    /// Constructor argument list: `new` type_name `(` args `)`.
+    Constructor { type_name: String },
 }
 
-fn equality_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, left) = comparison_expression(input)?;
-    binary_chain_with(input, start, left, equality_op_token, comparison_expression)
+/// A suspended `(`-delimited list, collecting comma-separated items until its closing `)`.
+struct Frame<'a> {
+    kind: FrameKind,
+    /// Span anchor for the eventual built node: the start of `base`/`new`/the opening `(` itself
+    /// for a bare group -- exactly where the original recursive parser captured its `start`.
+    open_at: Input<'a>,
+    items: Vec<Argument>,
 }
 
-fn logical_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, left) = equality_expression(input)?;
-    binary_chain_with(input, start, left, logical_op_token, equality_expression)
+impl<'a> Frame<'a> {
+    /// Call-style frames (as opposed to `Group`/`Index`) support `NAME '=' value` items and allow
+    /// zero items (`f()`).
+    fn is_call_style(&self) -> bool {
+        matches!(
+            self.kind,
+            FrameKind::Invocation { .. } | FrameKind::ArrowInvocation { .. } | FrameKind::Constructor { .. }
+        )
+    }
+
+    /// `Index` never allows a comma -- its argument list is exactly one bare expression.
+    fn allows_comma(&self) -> bool {
+        !matches!(self.kind, FrameKind::Index { .. })
+    }
 }
 
-/// Full expression with precedence-aware binary parsing.
+/// Look ahead for a KerML named-argument prefix (`NAME '=' ...`), used only when starting a fresh
+/// item inside a call-style argument list. Only a lone `=` counts -- `==`/`===` must stay ordinary
+/// equality expressions, so e.g. `f(a == b)` is one positional boolean argument, not `a`-named-`=
+/// b`. On no match, returns the input completely unchanged so normal atom parsing proceeds (`a ==
+/// b` as a positional value, or `a` as a positional value followed by `,`/`)`).
+fn named_arg_prefix(input: Input<'_>) -> (Input<'_>, Option<String>) {
+    let Ok((ws_input, _)) = ws_and_comments(input) else {
+        return (input, None);
+    };
+    let Ok((after_name, arg_name)) = name(ws_input) else {
+        return (input, None);
+    };
+    let Ok((after_ws, _)) = ws_and_comments(after_name) else {
+        return (input, None);
+    };
+    let frag = after_ws.fragment();
+    if frag.first() == Some(&b'=') && frag.get(1) != Some(&b'=') {
+        let eq_result: IResult<Input<'_>, Input<'_>> = tag(&b"="[..]).parse(after_ws);
+        let Ok((after_eq, _)) = eq_result else {
+            return (input, None);
+        };
+        let Ok((after_eq, _)) = ws_and_comments(after_eq) else {
+            return (input, None);
+        };
+        (after_eq, Some(arg_name))
+    } else {
+        (input, None)
+    }
+}
+
+/// Look ahead for a `new` constructor's type name (`new` QualifiedName). Consumes nothing and
+/// returns `None` if `new` isn't followed by a valid qualified name -- letting the caller fall back
+/// to parsing `new` itself as a plain identifier via [`primary_atom`] (`new` is not a reserved word
+/// in [`crate::parser::lex::basic_name`]), matching the original recursive parser's `alt`
+/// fallthrough from `constructor_expression` to `feature_ref_primary`.
+fn try_constructor_prefix(after_ws: Input<'_>) -> Option<(Input<'_>, String)> {
+    let kw_result: IResult<Input<'_>, Input<'_>> = tag(&b"new"[..]).parse(after_ws);
+    let (after_kw, _) = kw_result.ok()?;
+    let (after_kw, _) = ws_and_comments(after_kw).ok()?;
+    qualified_name(after_kw).ok()
+}
+
+/// Build the final node for a frame once its closing `)` has been consumed.
+fn build_frame_node<'a>(frame: Frame<'a>, end: Input<'a>) -> Node<Expression> {
+    let Frame {
+        kind,
+        open_at,
+        items,
+    } = frame;
+    match kind {
+        FrameKind::Group => {
+            let mut values: Vec<Node<Expression>> = items.into_iter().map(|arg| arg.value).collect();
+            if values.len() == 1 {
+                let value = values
+                    .pop()
+                    .unwrap_or_else(|| Node::new(Span::dummy(), Expression::Null));
+                node_from_to(open_at, end, Expression::Parenthesized(Box::new(value)))
+            } else {
+                node_from_to(open_at, end, Expression::Tuple(values))
+            }
+        }
+        FrameKind::Invocation { base } => node_from_to(
+            open_at,
+            end,
+            Expression::Invocation {
+                callee: Box::new(base),
+                args: items,
+            },
+        ),
+        FrameKind::Index { base } => {
+            let index = items
+                .into_iter()
+                .next()
+                .map(|arg| arg.value)
+                .unwrap_or_else(|| Node::new(Span::dummy(), Expression::Null));
+            node_from_to(
+                open_at,
+                end,
+                Expression::Index {
+                    base: Box::new(base),
+                    index: Box::new(index),
+                },
+            )
+        }
+        FrameKind::ArrowInvocation { base, member } => node_from_to(
+            open_at,
+            end,
+            Expression::CollectionOp {
+                op: CollectionOperator::from_name(&member),
+                base: Box::new(base),
+                args: items,
+            },
+        ),
+        FrameKind::Constructor { type_name } => node_from_to(
+            open_at,
+            end,
+            Expression::Constructor {
+                type_name,
+                args: items,
+            },
+        ),
+    }
+}
+
+/// Full expression with precedence-aware binary parsing. See the module-level comment above for
+/// why this is an explicit-stack loop rather than recursive descent.
 pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let start = input;
-    let (input, left) = logical_expression(input)?;
-    binary_chain_with(input, start, left, implies_op_token, logical_expression)
+    let mut stack: Vec<(Frame<'_>, ItemState<'_>)> = Vec::new();
+    let mut state = ItemState::fresh(input);
+    let mut input = input;
+    // Set when a frame has just been popped: the built node (still needs postfix applied) and the
+    // `primary_start` anchor to resume postfix-span-building with, skipping the atom-fetch step.
+    let mut pending_atom: Option<(Node<Expression>, Input<'_>)> = None;
+
+    'outer: loop {
+        // === Step 1: obtain one atom, with unary prefixes not yet applied ===
+        let (mut atom, primary_start) = match pending_atom.take() {
+            Some(pair) => pair,
+            None => {
+                state.prefix_start = input;
+                while let Ok((next, tok)) = unary_op_token(input) {
+                    state.pending_unary.push(UnaryOperator::from_token(&tok));
+                    input = next;
+                }
+                let (after_ws, _) = ws_and_comments(input)?;
+                if after_ws.fragment().starts_with(b"(") {
+                    let (after_paren, _) = tag(&b"("[..]).parse(after_ws)?;
+                    let (peek, _) = ws_and_comments(after_paren)?;
+                    if peek.fragment().starts_with(b")") {
+                        let (after_close, _) = tag(&b")"[..]).parse(peek)?;
+                        input = after_close;
+                        (node_from_to(after_ws, after_close, Expression::Null), after_ws)
+                    } else {
+                        stack.push((
+                            Frame {
+                                kind: FrameKind::Group,
+                                open_at: after_ws,
+                                items: Vec::new(),
+                            },
+                            std::mem::replace(&mut state, ItemState::fresh(after_paren)),
+                        ));
+                        input = after_paren;
+                        continue 'outer;
+                    }
+                } else if let Some((after_type, type_name)) = try_constructor_prefix(after_ws) {
+                    let (peek, _) = ws_and_comments(after_type)?;
+                    if peek.fragment().starts_with(b"(") {
+                        let (after_paren, _) = tag(&b"("[..]).parse(peek)?;
+                        let (empty_peek, _) = ws_and_comments(after_paren)?;
+                        if empty_peek.fragment().starts_with(b")") {
+                            let (after_close, _) = tag(&b")"[..]).parse(empty_peek)?;
+                            input = after_close;
+                            (
+                                node_from_to(
+                                    after_ws,
+                                    after_close,
+                                    Expression::Constructor {
+                                        type_name,
+                                        args: Vec::new(),
+                                    },
+                                ),
+                                after_ws,
+                            )
+                        } else {
+                            stack.push((
+                                Frame {
+                                    kind: FrameKind::Constructor { type_name },
+                                    open_at: after_ws,
+                                    items: Vec::new(),
+                                },
+                                std::mem::replace(&mut state, ItemState::fresh(after_paren)),
+                            ));
+                            input = after_paren;
+                            let (after_lookahead, maybe_name) = named_arg_prefix(input);
+                            if let Some(arg_name) = maybe_name {
+                                state.arg_name = Some(arg_name);
+                                input = after_lookahead;
+                            }
+                            continue 'outer;
+                        }
+                    } else {
+                        input = after_type;
+                        (
+                            node_from_to(
+                                after_ws,
+                                after_type,
+                                Expression::Constructor {
+                                    type_name,
+                                    args: Vec::new(),
+                                },
+                            ),
+                            after_ws,
+                        )
+                    }
+                } else {
+                    let (next, node) = primary_atom(after_ws)?;
+                    input = next;
+                    (node, after_ws)
+                }
+            }
+        };
+
+        // === Step 2: apply postfix operators, which may themselves open a new `(`-delimited list ===
+        loop {
+            let (next, _) = ws_and_comments(input)?;
+            if next.fragment().starts_with(b"(") {
+                let (after_paren, _) = tag(&b"("[..]).parse(next)?;
+                let (empty_peek, _) = ws_and_comments(after_paren)?;
+                if empty_peek.fragment().starts_with(b")") {
+                    let (after_close, _) = tag(&b")"[..]).parse(empty_peek)?;
+                    let expr = Expression::Invocation {
+                        callee: Box::new(atom),
+                        args: Vec::new(),
+                    };
+                    atom = node_from_to(primary_start, after_close, expr);
+                    input = after_close;
+                    continue;
+                }
+                stack.push((
+                    Frame {
+                        kind: FrameKind::Invocation { base: atom },
+                        open_at: primary_start,
+                        items: Vec::new(),
+                    },
+                    std::mem::replace(&mut state, ItemState::fresh(after_paren)),
+                ));
+                input = after_paren;
+                let (after_lookahead, maybe_name) = named_arg_prefix(input);
+                if let Some(arg_name) = maybe_name {
+                    state.arg_name = Some(arg_name);
+                    input = after_lookahead;
+                }
+                continue 'outer;
+            }
+            if next.fragment().starts_with(b"#") {
+                let (after_hash, _) = tag(&b"#"[..]).parse(next)?;
+                let (after_paren, _) = preceded(ws_and_comments, tag(&b"("[..])).parse(after_hash)?;
+                stack.push((
+                    Frame {
+                        kind: FrameKind::Index { base: atom },
+                        open_at: primary_start,
+                        items: Vec::new(),
+                    },
+                    std::mem::replace(&mut state, ItemState::fresh(after_paren)),
+                ));
+                input = after_paren;
+                continue 'outer;
+            }
+            if next.fragment().starts_with(b"::") {
+                let (next, _) = tag(&b"::"[..]).parse(next)?;
+                let (next, _) = ws_and_comments(next)?;
+                let (next, member) = name(next)?;
+                let expr = Expression::MemberAccess(Box::new(atom), member);
+                atom = node_from_to(primary_start, next, expr);
+                input = next;
+                continue;
+            }
+            if next.fragment().starts_with(b".") {
+                let (next, _) = tag(&b"."[..]).parse(next)?;
+                let (next, _) = ws_and_comments(next)?;
+                let (next, member) = name(next)?;
+                // `expr.metadata` is a dedicated KerML production (MetadataAccessExpression, BNF
+                // 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`), distinct from ordinary
+                // member access.
+                let expr = if member == "metadata" {
+                    Expression::MetadataAccess(Box::new(atom))
+                } else {
+                    Expression::MemberAccess(Box::new(atom), member)
+                };
+                atom = node_from_to(primary_start, next, expr);
+                input = next;
+                continue;
+            }
+            if next.fragment().starts_with(b"->") {
+                let (next, _) = tag(&b"->"[..]).parse(next)?;
+                let (next, _) = ws_and_comments(next)?;
+                let (next, member) = name(next)?;
+                let (after_name, _) = ws_and_comments(next)?;
+                // KerML arrow-invocation, e.g. `collection->size()`, `xs->select(p)`.
+                if after_name.fragment().starts_with(b"(") {
+                    let (after_paren, _) = tag(&b"("[..]).parse(after_name)?;
+                    let (empty_peek, _) = ws_and_comments(after_paren)?;
+                    if empty_peek.fragment().starts_with(b")") {
+                        let (after_close, _) = tag(&b")"[..]).parse(empty_peek)?;
+                        let expr = Expression::CollectionOp {
+                            op: CollectionOperator::from_name(&member),
+                            base: Box::new(atom),
+                            args: Vec::new(),
+                        };
+                        atom = node_from_to(primary_start, after_close, expr);
+                        input = after_close;
+                        continue;
+                    }
+                    stack.push((
+                        Frame {
+                            kind: FrameKind::ArrowInvocation { base: atom, member },
+                            open_at: primary_start,
+                            items: Vec::new(),
+                        },
+                        std::mem::replace(&mut state, ItemState::fresh(after_paren)),
+                    ));
+                    input = after_paren;
+                    let (after_lookahead, maybe_name) = named_arg_prefix(input);
+                    if let Some(arg_name) = maybe_name {
+                        state.arg_name = Some(arg_name);
+                        input = after_lookahead;
+                    }
+                    continue 'outer;
+                }
+                // Bare arrow access with no call (rare) -- fall back to plain member access.
+                let expr = Expression::MemberAccess(Box::new(atom), member);
+                atom = node_from_to(primary_start, next, expr);
+                input = next;
+                continue;
+            }
+            if let Ok((after_kind, kind)) = type_check_kind_token(next) {
+                if let Ok((after_type, type_name)) = qualified_name(after_kind) {
+                    let expr = Expression::TypeCheck {
+                        kind,
+                        operand: Some(Box::new(atom)),
+                        type_name,
+                    };
+                    atom = node_from_to(primary_start, after_type, expr);
+                    input = after_type;
+                    continue;
+                }
+            }
+            if starts_with_keyword(next.fragment(), b"meta") {
+                let (next, _) = tag(&b"meta"[..]).parse(next)?;
+                let (next, _) = ws_and_comments(next)?;
+                let (next, metaclass) = qualified_name(next)?;
+                let expr = Expression::MetaCast {
+                    base: Box::new(atom),
+                    metaclass,
+                };
+                atom = node_from_to(primary_start, next, expr);
+                input = next;
+                continue;
+            }
+            break;
+        }
+
+        // === Step 3: apply any pending unary prefixes now that postfix is fully resolved ===
+        for op in state.pending_unary.drain(..).rev() {
+            atom = node_from_to(
+                state.prefix_start,
+                input,
+                Expression::UnaryOp {
+                    op,
+                    operand: Box::new(atom),
+                },
+            );
+        }
+
+        // === Step 4: feed the atom into the climb, then look for a following binary operator ===
+        state.climb.operands.push(atom);
+        if let Ok((next, (op, prec))) = any_binary_op_token(input) {
+            state.climb.push_op(op, prec);
+            input = next;
+            continue 'outer;
+        }
+
+        // No operator continues this item -- it's complete.
+        let value = std::mem::take(&mut state.climb).finish();
+        let Some((frame, _)) = stack.last_mut() else {
+            return Ok((input, value));
+        };
+        let arg_name = state.arg_name.take();
+        frame.items.push(Argument {
+            name: arg_name,
+            value,
+        });
+        let allows_comma = frame.allows_comma();
+        let is_call_style = frame.is_call_style();
+        let (peek, _) = ws_and_comments(input)?;
+        if allows_comma && peek.fragment().starts_with(b",") {
+            let (next, _) = tag(&b","[..]).parse(peek)?;
+            input = next;
+            state = ItemState::fresh(next);
+            if is_call_style {
+                let (after_lookahead, maybe_name) = named_arg_prefix(input);
+                if let Some(arg_name) = maybe_name {
+                    state.arg_name = Some(arg_name);
+                    input = after_lookahead;
+                }
+            }
+            continue 'outer;
+        }
+        if peek.fragment().starts_with(b")") {
+            let (next, _) = tag(&b")"[..]).parse(peek)?;
+            // `stack` is known non-empty here (the `let-else` above already confirmed it, and
+            // nothing between there and here can pop it) -- but rather than assert that with a
+            // panicking `expect`, treat the (unreachable) alternative as an ordinary parse error,
+            // since this crate never panics on any input.
+            let Some((frame, outer_state)) = stack.pop() else {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    next,
+                    nom::error::ErrorKind::Fail,
+                )));
+            };
+            let open_at = frame.open_at;
+            let built = build_frame_node(frame, next);
+            state = outer_state;
+            input = next;
+            pending_atom = Some((built, open_at));
+            continue 'outer;
+        }
+        return Err(nom::Err::Error(nom::error::Error::new(
+            peek,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
 }
 
 /// Path expression: qualified name and/or member access (for bind/connect).
@@ -805,9 +1059,9 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
 ///
 /// A single segment (no `.` chain) stays [`Expression::FeatureRef`]. A genuine multi-segment
 /// dotted chain (`A.B.C`, or `A::B.C`) is captured as [`Expression::FeatureChainRef`] using the
-/// standalone [`FeatureChain`] type built for exactly this by PAR-004 item 6 (PAR-005 item 3) --
-/// the first segment carries the full leading qualified name (which may itself contain `::`),
-/// and each subsequent `.`-separated segment is a plain feature name.
+/// standalone [`FeatureChain`] type built for exactly this -- the first segment carries the full
+/// leading qualified name (which may itself contain `::`), and each subsequent `.`-separated
+/// segment is a plain feature name.
 pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -1079,5 +1333,123 @@ mod tests {
         let input = span_input("a + b");
         let (_, node) = expression(input).expect("expression");
         assert!(matches!(&node.value, Expression::BinaryOp { .. }));
+    }
+
+    #[test]
+    fn tuple_expression_parses_multiple_elements() {
+        let input = span_input("(a, b, c)");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::Tuple(elements) => {
+                assert_eq!(elements.len(), 3);
+            }
+            other => panic!("expected Tuple, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn empty_parens_parse_as_null() {
+        let input = span_input("()");
+        let (_, node) = expression(input).expect("expression");
+        assert!(matches!(&node.value, Expression::Null));
+    }
+
+    #[test]
+    fn index_expression_parses_single_bracketed_expression() {
+        let input = span_input("items#(0)");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::Index { base, index } => {
+                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "items"));
+                assert!(matches!(&index.value, Expression::LiteralInteger(0)));
+            }
+            other => panic!("expected Index, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn deeply_nested_parentheses_do_not_overflow_the_stack() {
+        const DEPTH: usize = 200_000;
+        let mut text = String::with_capacity(DEPTH * 2 + 1);
+        for _ in 0..DEPTH {
+            text.push('(');
+        }
+        text.push('1');
+        for _ in 0..DEPTH {
+            text.push(')');
+        }
+        let input = span_input(&text);
+        let (rest, node) = expression(input).expect("expression");
+        assert!(rest.fragment().is_empty());
+        let mut depth = 0usize;
+        let mut current = &node;
+        loop {
+            match &current.value {
+                Expression::Parenthesized(inner) => {
+                    depth += 1;
+                    current = inner;
+                }
+                Expression::LiteralInteger(1) => break,
+                other => panic!("unexpected node at depth {depth}: {other:?}"),
+            }
+        }
+        assert_eq!(depth, DEPTH);
+    }
+
+    #[test]
+    fn long_postfix_chain_does_not_overflow_the_stack() {
+        const DEPTH: usize = 200_000;
+        let mut text = String::from("a");
+        for _ in 0..DEPTH {
+            text.push_str(".b");
+        }
+        let input = span_input(&text);
+        let (rest, node) = expression(input).expect("expression");
+        assert!(rest.fragment().is_empty());
+        let mut depth = 0usize;
+        let mut current = &node;
+        loop {
+            match &current.value {
+                Expression::MemberAccess(inner, member) => {
+                    assert_eq!(member, "b");
+                    depth += 1;
+                    current = inner;
+                }
+                Expression::FeatureRef(s) if s == "a" => break,
+                other => panic!("unexpected node at depth {depth}: {other:?}"),
+            }
+        }
+        assert_eq!(depth, DEPTH);
+    }
+
+    #[test]
+    fn long_nested_invocation_chain_does_not_overflow_the_stack() {
+        const DEPTH: usize = 50_000;
+        let mut text = String::new();
+        for _ in 0..DEPTH {
+            text.push_str("f(");
+        }
+        text.push('1');
+        for _ in 0..DEPTH {
+            text.push(')');
+        }
+        let input = span_input(&text);
+        let (rest, node) = expression(input).expect("expression");
+        assert!(rest.fragment().is_empty());
+        let mut depth = 0usize;
+        let mut current = &node;
+        loop {
+            match &current.value {
+                Expression::Invocation { callee, args } => {
+                    assert!(matches!(&callee.value, Expression::FeatureRef(s) if s == "f"));
+                    assert_eq!(args.len(), 1);
+                    depth += 1;
+                    current = &args[0].value;
+                }
+                Expression::LiteralInteger(1) => break,
+                other => panic!("unexpected node at depth {depth}: {other:?}"),
+            }
+        }
+        assert_eq!(depth, DEPTH);
     }
 }
