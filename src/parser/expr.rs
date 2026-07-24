@@ -324,13 +324,34 @@ fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> 
     ))
 }
 
+/// Match a bare alphabetic keyword, requiring a word boundary immediately after it (matching
+/// [`starts_with_keyword`]'s existing use for the `meta` postfix operator below). Without this, a
+/// plain `tag()` on e.g. `not`/`and`/`or`/`istype`/`as`/`new` would also match as a prefix of any
+/// unrelated identifier that merely starts with the same letters -- and does, on real, in-use
+/// identifiers in the official SysML v2 Systems Library: `notEmpty` (Kernel Semantic Library,
+/// silently misparsed as `not Empty`), `newSeq` (Kernel Function Library, silently misparsed as
+/// `new Seq`), and more generally any `order*`/`as*` identifier if it ever appears where a `or`/`as`
+/// token check runs. These were previously silent -- no parse error, just a wrong AST -- which is
+/// why none of the existing diagnostic-count-based tests caught them.
+fn keyword_token<'a>(input: Input<'a>, keyword: &'static [u8]) -> IResult<Input<'a>, Input<'a>> {
+    if !starts_with_keyword(input.fragment(), keyword) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    tag(keyword).parse(input)
+}
+
 /// KerML type test suffix: `istype Type`, `hastype Type`, or `as Type`.
 fn type_check_kind_token(input: Input<'_>) -> IResult<Input<'_>, TypeCheckKind> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b"istype"[..]), |_| TypeCheckKind::Istype),
-        map(tag(&b"hastype"[..]), |_| TypeCheckKind::Hastype),
-        map(tag(&b"as"[..]), |_| TypeCheckKind::As),
+        map(|i| keyword_token(i, b"istype"), |_| TypeCheckKind::Istype),
+        map(|i| keyword_token(i, b"hastype"), |_| {
+            TypeCheckKind::Hastype
+        }),
+        map(|i| keyword_token(i, b"as"), |_| TypeCheckKind::As),
     ))
     .parse(input)
 }
@@ -375,18 +396,21 @@ fn primary_atom(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b"and"[..]), |_| "&&".to_string()),
-        map(tag(&b"or"[..]), |_| "||".to_string()),
-        map(tag(&b"xor"[..]), |_| "xor".to_string()),
+        // Symbolic forms first: `&&`/`||` must win over `additive_op_token`'s bare `&`/`|`, which
+        // would otherwise greedily match just the first character and misparse `a && b` as `a`
+        // followed by a stray, unparseable `& b`.
         map(tag(&b"&&"[..]), |_| "&&".to_string()),
         map(tag(&b"||"[..]), |_| "||".to_string()),
+        map(|i| keyword_token(i, b"and"), |_| "&&".to_string()),
+        map(|i| keyword_token(i, b"or"), |_| "||".to_string()),
+        map(|i| keyword_token(i, b"xor"), |_| "xor".to_string()),
     ))
     .parse(input)
 }
 
 /// Implication: lower precedence than `or` / `and` (constraint and filter bodies).
 fn implies_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
-    preceded(ws_and_comments, tag(&b"implies"[..]))
+    preceded(ws_and_comments, |i| keyword_token(i, b"implies"))
         .map(|_| "implies".to_string())
         .parse(input)
 }
@@ -441,7 +465,7 @@ fn multiplicative_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
 fn unary_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b"not"[..]), |_| "not".to_string()),
+        map(|i| keyword_token(i, b"not"), |_| "not".to_string()),
         map(tag(&b"~"[..]), |_| "~".to_string()),
         map(tag(&b"+"[..]), |_| "+".to_string()),
         map(tag(&b"-"[..]), |_| "-".to_string()),
@@ -482,6 +506,11 @@ fn any_binary_op_token(input: Input<'_>) -> IResult<Input<'_>, (BinaryOperator, 
         map(multiplicative_op_token, |t| {
             (BinaryOperator::from_token(&t), PREC_MULTIPLICATIVE)
         }),
+        // `logical_op_token` before `additive_op_token`: its symbolic `&&`/`||` forms must win over
+        // `additive_op_token`'s bare `&`/`|` (see the comment in `logical_op_token`).
+        map(logical_op_token, |t| {
+            (BinaryOperator::from_token(&t), PREC_LOGICAL)
+        }),
         map(additive_op_token, |t| {
             (BinaryOperator::from_token(&t), PREC_ADDITIVE)
         }),
@@ -490,9 +519,6 @@ fn any_binary_op_token(input: Input<'_>) -> IResult<Input<'_>, (BinaryOperator, 
         }),
         map(equality_op_token, |t| {
             (BinaryOperator::from_token(&t), PREC_EQUALITY)
-        }),
-        map(logical_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_LOGICAL)
         }),
         map(implies_op_token, |t| {
             (BinaryOperator::from_token(&t), PREC_IMPLIES)
@@ -670,13 +696,15 @@ fn named_arg_prefix(input: Input<'_>) -> (Input<'_>, Option<String>) {
     }
 }
 
-/// Look ahead for a `new` constructor's type name (`new` QualifiedName). Consumes nothing and
-/// returns `None` if `new` isn't followed by a valid qualified name -- letting the caller fall back
-/// to parsing `new` itself as a plain identifier via [`primary_atom`] (`new` is not a reserved word
-/// in [`crate::parser::lex::basic_name`]), matching the original recursive parser's `alt`
-/// fallthrough from `constructor_expression` to `feature_ref_primary`.
+/// Look ahead for a `new` constructor's type name (`new` QualifiedName). `keyword_token` already
+/// rejects identifiers that merely start with `new` (e.g. `newSeq`, real usage in the Kernel
+/// Function Library). This also consumes nothing and returns `None` if a genuine `new` keyword
+/// isn't followed by a valid qualified name, letting the caller fall back to parsing it as a plain
+/// identifier via [`primary_atom`] (`new` is not a reserved word in
+/// [`crate::parser::lex::basic_name`]) -- matching the original recursive parser's `alt` fallthrough
+/// from `constructor_expression` to `feature_ref_primary`.
 fn try_constructor_prefix(after_ws: Input<'_>) -> Option<(Input<'_>, String)> {
-    let kw_result: IResult<Input<'_>, Input<'_>> = tag(&b"new"[..]).parse(after_ws);
+    let kw_result: IResult<Input<'_>, Input<'_>> = keyword_token(after_ws, b"new");
     let (after_kw, _) = kw_result.ok()?;
     let (after_kw, _) = ws_and_comments(after_kw).ok()?;
     qualified_name(after_kw).ok()
@@ -979,13 +1007,14 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                 input = next;
                 continue;
             }
-            // No postfix operator matched -- but the original recursive `postfix()` unconditionally
-            // stripped leading whitespace/comments as its first statement on every entry (including
-            // this final, non-matching one) before returning, so its result position always included
-            // one trailing run of whitespace/comments beyond the last real token. Commit `next` here
-            // too so every atom's span still extends exactly that far, matching pre-existing spans
-            // that downstream consumers (e.g. Spec42's hover/highlight ranges) already depend on.
-            input = next;
+            // No postfix operator matched: leave `input` where it was before this iteration's
+            // whitespace peek (`next` is intentionally discarded). The original recursive
+            // `postfix()` unconditionally committed that peek even on a non-match, so every atom's
+            // span used to bleed into one trailing run of whitespace/comments past its last real
+            // token -- e.g. `1750 [kg]` before ` {` used to span through the trailing space. That
+            // was never a deliberate design choice, just an artifact of `postfix()`'s
+            // strip-then-check structure, and PARSE_AST_VERSION is bumped alongside this change
+            // (see CHANGELOG) precisely so spans now end exactly at each expression's own text.
             break;
         }
 
@@ -1103,6 +1132,56 @@ mod tests {
 
     fn span_input(text: &str) -> Input<'_> {
         LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn keyword_prefixed_identifiers_stay_plain_identifiers() {
+        for text in [
+            "newSeq", "newValue", "notEmpty", "order", "ordered", "assert", "assoc", "originalReq",
+            "asOf", "istypeOf", "hastypeName",
+        ] {
+            let input = span_input(text);
+            let (rest, node) = expression(input).unwrap_or_else(|e| {
+                panic!("expected {text:?} to parse as a plain identifier, got error: {e:?}")
+            });
+            assert!(rest.fragment().is_empty(), "did not fully consume {text:?}");
+            assert!(
+                matches!(&node.value, Expression::FeatureRef(s) if s == text),
+                "expected FeatureRef({text:?}), got {:?}",
+                node.value
+            );
+        }
+    }
+
+    #[test]
+    fn keyword_operators_still_work_with_a_trailing_word_boundary() {
+        let input = span_input("notEmpty(x)");
+        let (_, node) = expression(input).expect("expression");
+        assert!(matches!(&node.value, Expression::Invocation { .. }));
+
+        let input = span_input("not x");
+        let (_, node) = expression(input).expect("expression");
+        assert!(matches!(&node.value, Expression::UnaryOp { op: UnaryOperator::Not, .. }));
+
+        let input = span_input("a and b");
+        let (_, node) = expression(input).expect("expression");
+        assert!(matches!(&node.value, Expression::BinaryOp { op: BinaryOperator::And, .. }));
+
+        let input = span_input("a && b");
+        let (_, node) = expression(input).expect("expression");
+        assert!(matches!(&node.value, Expression::BinaryOp { op: BinaryOperator::And, .. }));
+
+        let input = span_input("a || b");
+        let (_, node) = expression(input).expect("expression");
+        assert!(matches!(&node.value, Expression::BinaryOp { op: BinaryOperator::Or, .. }));
+
+        let input = span_input("new A(x)");
+        let (_, node) = expression(input).expect("expression");
+        assert!(matches!(&node.value, Expression::Constructor { .. }));
+
+        let input = span_input("x istype T");
+        let (_, node) = expression(input).expect("expression");
+        assert!(matches!(&node.value, Expression::TypeCheck { operand: Some(_), .. }));
     }
 
     #[test]

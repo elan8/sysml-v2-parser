@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-07-24
+
+**`PARSE_AST_VERSION` bumped `43` → `44`** — this release changes AST-observable expression
+parsing behavior (not just internals), found while writing regression tests for 0.46.1's
+stack-safety rewrite.
+
+### Fixed
+
+- **Keyword tokens in expression position silently misparsed identifiers that merely started with
+  the same letters.** `not`, `and`, `or`, `xor`, `implies`, `istype`, `hastype`, `as`, and `new`
+  were all matched via a bare `tag()` with no word-boundary check (unlike the `meta` postfix
+  operator a few lines away, which already used `starts_with_keyword` correctly). Confirmed via
+  direct parse probes against the real SysML v2 release library, not just synthetic examples:
+  - `notEmpty(x)` (Kernel Semantic Library, `Occurrences.kerml`/`Objects.kerml`, ~16 real call
+    sites) parsed as `UnaryOp(Not, Invocation(FeatureRef("Empty"), [x]))` instead of
+    `Invocation(FeatureRef("notEmpty"), [x])`.
+  - `newSeq` (Kernel Function Library, `SequenceFunctions.kerml`, used as a bound value in
+    `binding seq = newSeq;` four times) parsed as `Constructor { type_name: "Seq", args: [] }`
+    instead of `FeatureRef("newSeq")`.
+  - The same class of bug was latent (not confirmed triggering on real content, but reachable) for
+    any expression-position identifier starting with `order`/`as`/`hastype`/etc.
+  - None of this produced a parse error or diagnostic — it silently built a wrong-but-valid-looking
+    AST, which is why the existing diagnostic-count and node-type-mapping tests never caught it.
+    All nine keyword tokens now go through the same `keyword_token` helper (built on the existing
+    `starts_with_keyword`), requiring a real word boundary after the keyword.
+  - Same root cause also meant `a && b` / `a || b` (the symbolic spellings of `and`/`or`, never
+    observed in the release corpus but valid per the grammar) failed to parse at all: an unguarded
+    bare `&`/`|` in `additive_op_token` was tried before the two-character symbolic forms and
+    greedily consumed the first character. Fixed by trying the symbolic forms first.
+- **Expression spans no longer include trailing whitespace/comments past the expression's own
+  text.** The previous recursive `postfix()` unconditionally stripped leading whitespace as its
+  first statement on every call, including its final, non-matching return — so every expression's
+  span silently extended through any run of whitespace/comments up to (but not including) the next
+  real token, e.g. `1750 [kg]` immediately followed by ` {` used to span through the trailing
+  space. 0.46.1's rewrite initially reproduced this for byte-for-byte compatibility; this release
+  intentionally drops it since it was never a deliberate design choice, just an artifact of how the
+  old recursive parser happened to be structured.
+
 ## [0.46.1] - 2026-07-24
 
 ### Fixed
