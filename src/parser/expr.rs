@@ -979,6 +979,13 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                 input = next;
                 continue;
             }
+            // No postfix operator matched -- but the original recursive `postfix()` unconditionally
+            // stripped leading whitespace/comments as its first statement on every entry (including
+            // this final, non-matching one) before returning, so its result position always included
+            // one trailing run of whitespace/comments beyond the last real token. Commit `next` here
+            // too so every atom's span still extends exactly that far, matching pre-existing spans
+            // that downstream consumers (e.g. Spec42's hover/highlight ranges) already depend on.
+            input = next;
             break;
         }
 
