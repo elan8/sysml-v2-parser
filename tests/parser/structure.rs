@@ -3143,6 +3143,49 @@ satisfy MyReq;
 }
 
 #[test]
+fn test_part_definition_owns_dependency_definition_member() {
+    let input = r#"package Selection {
+part def CatalogSensor;
+part def RequiredSensor {
+  dependency selectedImplementation
+    from RequiredSensor to CatalogSensor;
+}
+}"#;
+    let result = parse(input).expect("dependency definition member should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected package body, got {:?}", other),
+    };
+    let required_sensor = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            PackageBodyElement::PartDef(part)
+                if part.value.identification.name.as_deref() == Some("RequiredSensor") =>
+            {
+                Some(part)
+            }
+            _ => None,
+        })
+        .expect("RequiredSensor part definition");
+    let body = match &required_sensor.value.body {
+        PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part definition body, got {:?}", other),
+    };
+
+    assert!(body.iter().any(|element| matches!(
+        &element.value,
+        PartDefBodyElement::Dependency(dependency)
+            if dependency.value.identification.as_ref()
+                .and_then(|identification| identification.name.as_deref())
+                == Some("selectedImplementation")
+    )));
+}
+
+#[test]
 fn test_satisfy_accepts_inline_requirement_name_and_type() {
     // Regression: only the bare `satisfy <ref> (by <expr>)?;` shorthand was implemented.
     // The fuller `satisfy requirement <name> : <Type> by <expr>;` form now also parses,

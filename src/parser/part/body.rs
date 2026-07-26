@@ -256,6 +256,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(occurrence_def, PartDefBodyElement::OccurrenceDef),
             map(metadata_usage, PartDefBodyElement::MetadataUsage),
             map(metadata_def, PartDefBodyElement::MetadataDef),
+            map(dependency, PartDefBodyElement::Dependency),
             map(item_def_required, PartDefBodyElement::ItemDef),
             map(item_usage, PartDefBodyElement::ItemUsage),
             map(

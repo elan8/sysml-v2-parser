@@ -5,7 +5,7 @@ use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, 
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::relationship_target::RelationshipTarget;
-use super::requirement::{EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
+use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::view::{CalcUsage, ConstraintDefBody};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
@@ -61,6 +61,8 @@ pub enum PartDefBodyElement {
     Annotation(Node<Annotation>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// A dependency owned by this definition (BNF `DefinitionMember`).
+    Dependency(Node<Dependency>),
     Other(String),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),

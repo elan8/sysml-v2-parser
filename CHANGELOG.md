@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.47.1] - 2026-07-26
+
+### Fixed
+
+- Parse `dependency` declarations as definition members inside `part def` bodies, as required by
+  the SysML v2 `DefinitionBodyItem -> DefinitionMember -> DefinitionElement` grammar.
+- Bump `PARSE_AST_VERSION` from `44` to `45` for the new `PartDefBodyElement::Dependency` variant.
+- Restore a clean `cargo clippy --all-targets -- -D warnings` gate on current Rust toolchains
+  without changing the established direct-node AST representation.
+
 ## [0.47.0] - 2026-07-24
 
 **`PARSE_AST_VERSION` bumped `43` → `44`** — this release changes AST-observable expression

@@ -33,6 +33,10 @@ pub enum ActionDefBody {
 }
 
 /// Element inside an action definition body.
+// Body-element variants intentionally preserve their direct `Node<T>` AST shape. Boxing only
+// `ThenAction` would make equivalent action constructs differ by containing context and introduce
+// indirection throughout parser consumers solely to satisfy a size heuristic.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionDefBodyElement {
@@ -212,6 +216,8 @@ pub enum ActionUsageBody {
 }
 
 /// Element inside an action usage body.
+// Keep the same direct-node representation as `ActionDefBodyElement`; see its size rationale.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionUsageBodyElement {

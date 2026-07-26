@@ -501,13 +501,7 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
     let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
     let (input, _) = tag(&b"*/"[..]).parse(input)?;
     let text = String::from_utf8_lossy(text_bytes.fragment()).to_string();
-    let ident = ident_parsed.and_then(|i| {
-        if i.short_name.is_some() || i.name.is_some() {
-            Some(i)
-        } else {
-            None
-        }
-    });
+    let ident = ident_parsed.filter(|i| i.short_name.is_some() || i.name.is_some());
     Ok((
         input,
         node_from_to(
@@ -540,13 +534,7 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
     let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
     let (input, _) = tag(&b"*/"[..]).parse(input)?;
     let text = String::from_utf8_lossy(text_bytes.fragment()).to_string();
-    let ident = ident_parsed.and_then(|i| {
-        if i.short_name.is_some() || i.name.is_some() {
-            Some(i)
-        } else {
-            None
-        }
-    });
+    let ident = ident_parsed.filter(|i| i.short_name.is_some() || i.name.is_some());
     Ok((
         input,
         node_from_to(

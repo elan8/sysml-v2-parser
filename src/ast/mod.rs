@@ -354,6 +354,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::MetadataKeywordUsage(n) => {
             PartDefBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::Dependency(n) => {
+            PartDefBodyElement::Dependency(dummy_node(n, n.value.clone()))
+        }
         PartDefBodyElement::Other(text) => PartDefBodyElement::Other(text.clone()),
         PartDefBodyElement::AttributeDef(n) => {
             PartDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))

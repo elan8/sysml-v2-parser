@@ -465,6 +465,9 @@ pub struct ReturnRef {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// `ThenAction` deliberately has the same direct-node representation here as in action bodies.
+// Boxing it only in use cases would make the public AST depend on the containing body kind.
+#[allow(clippy::large_enum_variant)]
 pub enum UseCaseDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// Unmodeled use-case / analysis-case body element captured as raw text (used for library parsing).
