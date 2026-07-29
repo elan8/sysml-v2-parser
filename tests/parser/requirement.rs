@@ -640,6 +640,7 @@ requirement def VehicleMassRequirement {
     actualMass >= targetMass;
   }
 }
+
 }"#;
     let result = sysml_v2_parser::parse_with_diagnostics(input);
     assert!(
@@ -673,5 +674,59 @@ requirement def VehicleMassRequirement {
     assert!(elements.iter().any(|e| matches!(
         &e.value,
         sysml_v2_parser::ast::RequirementDefBodyElement::RequireConstraint(_)
+    )));
+}
+
+#[test]
+fn test_composite_subrequirements_are_structured_and_recursive() {
+    let input = r#"package P {
+requirement systemSpecification {
+  subject system : Vehicle;
+  requirement braking {
+    require constraint { system.mass > 0 }
+    requirement emergencyStop;
+  }
+}
+}"#;
+    let result = sysml_v2_parser::parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "composite subrequirements should parse cleanly: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let specification = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            PackageBodyElement::RequirementUsage(requirement) => Some(&requirement.value),
+            _ => None,
+        })
+        .expect("expected requirement usage");
+    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements } = &specification.body else {
+        panic!("expected specification body");
+    };
+    let braking = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            sysml_v2_parser::ast::RequirementDefBodyElement::RequirementUsage(requirement) => {
+                Some(&requirement.value)
+            }
+            _ => None,
+        })
+        .expect("expected structured braking subrequirement");
+    let sysml_v2_parser::ast::RequirementDefBody::Brace { elements } = &braking.body else {
+        panic!("expected braking body");
+    };
+    assert!(elements.iter().any(|element| matches!(
+        &element.value,
+        sysml_v2_parser::ast::RequirementDefBodyElement::RequirementUsage(requirement)
+            if requirement.value.name == "emergencyStop"
     )));
 }

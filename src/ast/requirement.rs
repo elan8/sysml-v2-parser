@@ -57,6 +57,11 @@ pub enum RequirementDefBodyElement {
     Import(Node<Import>),
     SubjectDecl(Node<SubjectDecl>),
     RequirementActorDecl(Node<RequirementActorDecl>),
+    /// Composite requirement usage nested in a requirement definition or usage.
+    ///
+    /// Boxed because a `RequirementUsage` owns a `RequirementDefBody`, which may contain
+    /// further requirement usages.
+    RequirementUsage(Box<Node<RequirementUsage>>),
     Stakeholder(Node<StakeholderMember>),
     Purpose(Node<PurposeMember>),
     AttributeDef(Node<AttributeDef>),

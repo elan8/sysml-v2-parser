@@ -53,6 +53,9 @@ fn collect_requirement_body_errors(body: &RequirementDefBody, errors: &mut Vec<P
                 RequirementDefBodyElement::Frame(n) => {
                     collect_requirement_body_errors(&n.value.body, errors)
                 }
+                RequirementDefBodyElement::RequirementUsage(n) => {
+                    collect_requirement_body_errors(&n.value.body, errors)
+                }
                 RequirementDefBodyElement::TextualRep(n) => {
                     if let Some(diag) = textual_rep_language_diagnostic(&element.span, &n.value) {
                         errors.push(diag);

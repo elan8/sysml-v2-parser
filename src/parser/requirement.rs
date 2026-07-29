@@ -181,6 +181,9 @@ fn requirement_def_body_element(
             map(import_, RequirementDefBodyElement::Import),
             map(subject_decl, RequirementDefBodyElement::SubjectDecl),
             map(actor_decl, RequirementDefBodyElement::RequirementActorDecl),
+            map(requirement_usage, |usage| {
+                RequirementDefBodyElement::RequirementUsage(Box::new(usage))
+            }),
             map(
                 |i| attribute_def(i, true),
                 RequirementDefBodyElement::AttributeDef,
