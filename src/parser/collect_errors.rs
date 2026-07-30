@@ -486,14 +486,64 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
     }
 }
 
+/// Mask block and line comments on one line so heuristic scanners ignore comment bodies.
+///
+/// Matches the lexer: `/* ... */` and `//* ... */` are block comments (may span lines);
+/// `//` starts a line comment. Comment characters are replaced with spaces so offsets stay aligned.
+fn mask_comments_in_line(line: &str, in_block_comment: &mut bool) -> String {
+    let bytes = line.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if *in_block_comment {
+            if i + 1 < bytes.len() && bytes[i] == b'*' && bytes[i + 1] == b'/' {
+                out.extend_from_slice(b"  ");
+                *in_block_comment = false;
+                i += 2;
+            } else {
+                out.push(b' ');
+                i += 1;
+            }
+            continue;
+        }
+        if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'/' {
+            // Lexer tries `//*` block comments before `//` line comments.
+            if i + 2 < bytes.len() && bytes[i + 2] == b'*' {
+                out.extend_from_slice(b"   ");
+                *in_block_comment = true;
+                i += 3;
+                continue;
+            }
+            while i < bytes.len() {
+                out.push(b' ');
+                i += 1;
+            }
+            break;
+        }
+        if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'*' {
+            out.extend_from_slice(b"  ");
+            *in_block_comment = true;
+            i += 2;
+            continue;
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 pub(crate) fn collect_implicit_attribute_in_part_def_warnings(bytes: &[u8]) -> Vec<ParseError> {
     let text = String::from_utf8_lossy(bytes);
     let mut errors = Vec::new();
     let mut in_part_def_body = false;
     let mut brace_depth = 0i32;
     let mut offset = 0usize;
+    let mut in_block_comment = false;
     for (line_idx, line) in text.lines().enumerate() {
-        let trimmed = line.trim();
+        // Ignore comment bodies (including continuation lines of `/** ... */`) so prose like
+        // `Optional: ...` is not reported as a bare feature declaration.
+        let code_line = mask_comments_in_line(line, &mut in_block_comment);
+        let trimmed = code_line.trim();
         if trimmed.starts_with("part def") {
             in_part_def_body = false;
             brace_depth = 0;
@@ -519,16 +569,14 @@ pub(crate) fn collect_implicit_attribute_in_part_def_warnings(bytes: &[u8]) -> V
                 || trimmed.contains(":>")
                 || trimmed.contains("::>")
                 || trimmed.is_empty()
-                || trimmed.starts_with("//")
-                || trimmed.starts_with("/*")
                 || trimmed.starts_with("doc ");
             if !skip {
                 if let Some((code, message, expected, suggestion)) =
                     bare_feature_declaration_in_part_def_diagnostic(trimmed.as_bytes())
                 {
                     let line_no = (line_idx + 1) as u32;
-                    let column = line.find(trimmed).unwrap_or(0) + 1;
-                    let line_offset = offset + line.find(trimmed).unwrap_or(0);
+                    let column = code_line.find(trimmed).unwrap_or(0) + 1;
+                    let line_offset = offset + code_line.find(trimmed).unwrap_or(0);
                     errors.push(
                         ParseError::new(message)
                             .with_location(line_offset, line_no, column)

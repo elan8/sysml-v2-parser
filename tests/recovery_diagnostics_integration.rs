@@ -663,6 +663,38 @@ fn fixture_bare_feature_in_part_def_reports_attribute_hint() {
     );
 }
 
+/// Regression for https://github.com/elan8/sysml-v2-parser/issues/1
+///
+/// Multi-line `/** ... */` inside a part def body must not treat a continuation line that
+/// looks like `Ident: prose` as a bare feature declaration.
+#[test]
+fn multiline_block_comment_colon_line_not_bare_feature_in_part_def() {
+    let input = r#"package P {
+    part def C {
+        /** first line
+            Optional: a profile may state the rate */
+        attribute x : String;
+    }
+}
+"#;
+    let result = parse_with_diagnostics(input);
+    let bare = result
+        .errors
+        .iter()
+        .filter(|e| e.code.as_deref() == Some("bare_feature_declaration_in_part_def"))
+        .collect::<Vec<_>>();
+    assert!(
+        bare.is_empty(),
+        "comment body must not be reported as bare feature: {:?}",
+        bare
+    );
+    assert!(
+        result.errors.is_empty(),
+        "probe should parse cleanly with diagnostics: {:?}",
+        result.errors
+    );
+}
+
 #[test]
 fn fixture_glued_package_member_parses_without_separator_diagnostic() {
     let input = fixture("glued-package-member.sysml");
