@@ -13,10 +13,12 @@ use crate::parser::expr::path_expression;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    capture_opaque_member, name, recover_body_element, visibility_prefix, ws1, ws_and_comments,
+    capture_opaque_member, name, qualified_name, recover_body_element, visibility_prefix, ws1,
+    ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
+use crate::parser::part::exhibit_state_as_state_usage;
 use crate::parser::part::part_usage;
 use crate::parser::requirement::{doc_comment, satisfy};
 use crate::parser::usage::{
@@ -32,7 +34,9 @@ use nom::IResult;
 use nom::Parser;
 
 pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
+    b"allocate",
     b"doc",
+    b"event",
     b"assert",
     b"satisfy",
     b"attribute",
@@ -132,57 +136,100 @@ fn occurrence_definition_body_with_labels<'a>(
     Ok((input, DefinitionBody::Brace { elements }))
 }
 
+/// Everything an occurrence usage's leading keywords contribute to the node it builds. Grouped
+/// into one struct so [`occurrence_usage_tail`] keeps a readable signature as the BNF
+/// `OccurrenceUsagePrefix` slots accumulate.
+struct OccurrencePrefix {
+    is_individual: bool,
+    is_then: bool,
+    is_event: bool,
+    is_reference: bool,
+    portion_kind: Option<String>,
+    membership: Membership,
+}
+
+impl Default for OccurrencePrefix {
+    fn default() -> Self {
+        Self {
+            is_individual: false,
+            is_then: false,
+            is_event: false,
+            is_reference: false,
+            portion_kind: None,
+            membership: Membership::feature(None, crate::ast::Span::dummy()),
+        }
+    }
+}
+
+/// Optional `ref` keyword (BNF `RefPrefix`, §6 G29) before an occurrence usage's kind keyword.
+fn occurrence_ref_prefix(input: Input<'_>) -> IResult<Input<'_>, bool> {
+    let (input, kw) =
+        opt(preceded(preceded(ws_and_comments, tag(&b"ref"[..])), ws1)).parse(input)?;
+    Ok((input, kw.is_some()))
+}
+
 pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    let (input, is_reference) = occurrence_ref_prefix(input)?;
     occurrence_usage_with_modifiers(
         input,
-        false,
-        false,
-        None,
-        Membership::feature(visibility, visibility_span),
+        OccurrencePrefix {
+            is_reference,
+            membership: Membership::feature(visibility, visibility_span),
+            ..Default::default()
+        },
     )
 }
 
 pub(crate) fn individual_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    let (input, is_reference) = occurrence_ref_prefix(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"individual"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     occurrence_usage_tail(
         input,
-        true,
-        false,
-        None,
-        Membership::feature(visibility, visibility_span),
+        OccurrencePrefix {
+            is_individual: true,
+            is_reference,
+            membership: Membership::feature(visibility, visibility_span),
+            ..Default::default()
+        },
     )
 }
 
 pub(crate) fn snapshot_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    let (input, is_reference) = occurrence_ref_prefix(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"snapshot"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     occurrence_usage_tail(
         input,
-        false,
-        false,
-        Some("snapshot".to_string()),
-        Membership::feature(visibility, visibility_span),
+        OccurrencePrefix {
+            is_reference,
+            portion_kind: Some("snapshot".to_string()),
+            membership: Membership::feature(visibility, visibility_span),
+            ..Default::default()
+        },
     )
 }
 
 pub(crate) fn timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    let (input, is_reference) = occurrence_ref_prefix(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"timeslice"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     occurrence_usage_tail(
         input,
-        false,
-        false,
-        Some("timeslice".to_string()),
-        Membership::feature(visibility, visibility_span),
+        OccurrencePrefix {
+            is_reference,
+            portion_kind: Some("timeslice".to_string()),
+            membership: Membership::feature(visibility, visibility_span),
+            ..Default::default()
+        },
     )
 }
 
@@ -194,38 +241,70 @@ pub(crate) fn timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Occur
 pub(crate) fn then_timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, is_reference) = occurrence_ref_prefix(input)?;
     let (input, _) = tag(&b"timeslice"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     occurrence_usage_tail(
         input,
-        false,
-        true,
-        Some("timeslice".to_string()),
-        Membership::feature(None, crate::ast::Span::dummy()),
+        OccurrencePrefix {
+            is_then: true,
+            is_reference,
+            portion_kind: Some("timeslice".to_string()),
+            membership: Membership::feature(None, crate::ast::Span::dummy()),
+            ..Default::default()
+        },
     )
 }
 
 fn occurrence_usage_with_modifiers(
     input: Input<'_>,
-    is_individual: bool,
-    is_then: bool,
-    portion_kind: Option<String>,
-    membership: Membership,
+    prefix: OccurrencePrefix,
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, _) = preceded(ws_and_comments, tag(&b"occurrence"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    occurrence_usage_tail(input, is_individual, is_then, portion_kind, membership)
+    // §6 G7: `event occurrence <name>;` (BNF `EventOccurrenceUsage`) and its succession form
+    // `then event occurrence <name>;`. Real usage: OMG spec Annex `17a-Sequence-Modeling.sysml`.
+    // Handled here rather than as a separate parser so every dispatcher that already reaches
+    // `occurrence_usage` picks both forms up.
+    let (input, then_kw) =
+        opt(preceded(preceded(ws_and_comments, tag(&b"then"[..])), ws1)).parse(input)?;
+    let (input, event_kw) =
+        opt(preceded(preceded(ws_and_comments, tag(&b"event"[..])), ws1)).parse(input)?;
+    // `occurrence` is only optional after `event`: the reference form `event <path>;` names an
+    // existing occurrence rather than declaring one (OMG spec Annex `17b-Sequence-Modeling.sysml`).
+    let (input, occurrence_kw) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"occurrence"[..])),
+        ws1,
+    ))
+    .parse(input)?;
+    if occurrence_kw.is_none() && event_kw.is_none() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    occurrence_usage_tail(
+        input,
+        OccurrencePrefix {
+            is_then: prefix.is_then || then_kw.is_some(),
+            is_event: event_kw.is_some(),
+            ..prefix
+        },
+    )
 }
 
 fn occurrence_usage_tail(
     input: Input<'_>,
-    is_individual: bool,
-    is_then: bool,
-    portion_kind: Option<String>,
-    membership: Membership,
+    prefix: OccurrencePrefix,
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let start = input;
-    let (input, name_str) = name(input)?;
+    // §6 G22: `occurrence :>> causes;` redefines an inherited occurrence without renaming it, so
+    // the name is optional here (OMG spec Annex `14c-Language Extensions.sysml`). The dotted form
+    // (`event publish_message.sourceEvent;`) names a nested feature, so a `.`-joined path is read
+    // as the name, matching how `perform` handles `perform providePower.generateTorque`.
+    let (input, name_str) = if starts_specialization_or_body(input) {
+        (input, String::new())
+    } else {
+        occurrence_name_path(input)?
+    };
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, type_name) = optional_typings(input)?;
     let type_name = type_name.map(|(_, is_conjugated, targets)| {
@@ -272,9 +351,11 @@ fn occurrence_usage_tail(
             start,
             input,
             OccurrenceUsage {
-                is_individual,
-                is_then,
-                portion_kind,
+                is_individual: prefix.is_individual,
+                is_then: prefix.is_then,
+                is_event: prefix.is_event,
+                is_reference: prefix.is_reference,
+                portion_kind: prefix.portion_kind,
                 name: name_str,
                 type_name,
                 subsets,
@@ -283,9 +364,37 @@ fn occurrence_usage_tail(
                 crosses,
                 intersects,
                 body,
-                membership,
+                membership: prefix.membership,
             },
         ),
+    ))
+}
+
+/// True when the next token starts a specialization clause, a typing clause, or the body -- i.e.
+/// the usage has no name of its own.
+fn starts_specialization_or_body(input: Input<'_>) -> bool {
+    let Ok((peek, _)) = ws_and_comments(input) else {
+        return false;
+    };
+    let frag = peek.fragment();
+    frag.starts_with(b":") || frag.starts_with(b"{") || frag.starts_with(b";")
+}
+
+/// `name` or `name.nested.feature` -- the occurrence's own name, or a path to the nested feature
+/// being referenced.
+fn occurrence_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, first) = name(input)?;
+    let (input, rest) = nom::multi::many0(preceded(
+        preceded(ws_and_comments, tag(&b"."[..])),
+        preceded(ws_and_comments, name),
+    ))
+    .parse(input)?;
+    Ok((
+        input,
+        std::iter::once(first)
+            .chain(rest)
+            .collect::<Vec<_>>()
+            .join("."),
     ))
 }
 
@@ -365,9 +474,19 @@ pub(crate) fn occurrence_body_element(
             OccurrenceBodyElement::AssertConstraint,
         ),
         map(attribute_usage, OccurrenceBodyElement::AttributeUsage),
+        // §6 G15: keyword-less `:>> name (= value)? (;|{ ... })` redefinition binding.
+        map(
+            crate::parser::attribute::redefinition_feature_binding,
+            OccurrenceBodyElement::AttributeUsage,
+        ),
         map(flow_usage_member, OccurrenceBodyElement::FlowUsage),
         map(succession_usage, OccurrenceBodyElement::SuccessionUsage),
         map(satisfy, OccurrenceBodyElement::Satisfy),
+        // §6 G17: a nested `allocate` decomposing the enclosing allocation usage.
+        map(
+            crate::parser::part::allocate_,
+            OccurrenceBodyElement::Allocate,
+        ),
         map(part_usage, |p| {
             OccurrenceBodyElement::PartUsage(Box::new(p))
         }),
@@ -386,6 +505,13 @@ pub(crate) fn occurrence_body_element(
         map(occurrence_usage, |n| {
             OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
         }),
+        // §6 G30: `exhibit (state)? <name> ...` inside occurrence/snapshot bodies (found while
+        // closing G15/G18 — real usage: `exhibit vehicleStates.on { ... }` in OMG spec Annex
+        // `6-Individual and Snapshots.sysml`).
+        map(
+            exhibit_state_as_state_usage,
+            OccurrenceBodyElement::StateUsage,
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -450,6 +576,11 @@ pub(crate) fn assert_constraint_member(
         let (input, parsed_name) = name(input)?;
         (input, Some(parsed_name))
     };
+    let (input, type_name) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
     let (input, body) = structured_constraint_body(input)?;
     let body = match body {
         StructuredConstraintBody::Semicolon => ConstraintDefBody::Semicolon,
@@ -462,6 +593,7 @@ pub(crate) fn assert_constraint_member(
             input,
             AssertConstraintMember {
                 name,
+                type_name,
                 body,
                 is_negated,
             },
@@ -490,6 +622,47 @@ mod assert_constraint_name_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name.as_deref(), Some("engineSelectionRational"));
         assert!(!node.value.is_negated);
+    }
+
+    /// §6 G22 (found while fixing G4): the *typed* named form still fell through to opaque
+    /// recovery after G3 added plain names. Real usage: OMG spec Annex `15_05-Unification of
+    /// Expression and Constraint Definition.sysml`.
+    #[test]
+    fn assert_constraint_accepts_a_name_and_a_type() {
+        let (rest, node) = assert_constraint_member(input(
+            "assert constraint discBrakeFitConstraint_Alt: DiscBrakeFitConstraint_Alt { in wheel = WheelAssy::wheel; }",
+        ))
+        .expect("typed assert constraint");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.name.as_deref(),
+            Some("discBrakeFitConstraint_Alt")
+        );
+        assert_eq!(
+            node.value.type_name.as_deref(),
+            Some("DiscBrakeFitConstraint_Alt")
+        );
+    }
+
+    /// §6 G17: an allocation usage body may decompose the outer allocation with nested
+    /// `allocate` members. Real usage: OMG spec Annex `12b-Allocation.sysml`.
+    #[test]
+    fn occurrence_body_accepts_a_nested_allocate() {
+        let (rest, node) = occurrence_body_element(input(
+            "allocate torqueGenerator.generateTorque to powerTrain.engine.generateTorque;",
+        ))
+        .expect("nested allocate");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, OccurrenceBodyElement::Allocate(_)));
+    }
+
+    /// §6 G30: exhibit usages inside occurrence/snapshot bodies.
+    #[test]
+    fn occurrence_body_accepts_exhibit_state_usage() {
+        let (rest, node) =
+            occurrence_body_element(input("exhibit vehicleStates.on;")).expect("exhibit state");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, OccurrenceBodyElement::StateUsage(_)));
     }
 
     #[test]

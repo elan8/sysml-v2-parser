@@ -19,20 +19,21 @@ pub use ast::{
     Expression, FeatureChain, FilterMember, FilterPackageMember, FirstMergeBody, FirstStmt,
     FlowDef, FlowUsage, FlowUsageKind, Identification, Import, InOut, InOutDecl, InterfaceDef,
     InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement,
-    ItemUsage, MergeStmt, NamespaceDecl, Node, OccurrenceBodyElement, OccurrenceUsage,
+    ItemUsage, LoopStmt, MergeStmt, NamespaceDecl, Node, OccurrenceBodyElement, OccurrenceUsage,
     OccurrenceUsageBody, Package, PackageBody, PackageBodyElement, ParseErrorNode, PartDef,
     PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
     PayloadFeature, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, PortBody,
     PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl,
     RequireConstraint, RequireConstraintBody, RequirementDef, RequirementDefBody,
     RequirementDefBodyElement, RequirementUsage, RootElement, RootNamespace, Span,
-    TextualRepresentation, TypeCheckKind, VerificationCaseDef, VerificationCaseUsage, Visibility,
+    TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind, VerificationCaseDef,
+    VerificationCaseUsage, Visibility,
 };
 pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 50;
+pub const PARSE_AST_VERSION: u32 = 52;
 pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
 
 /// Parse a SysML v2 textual input into a root namespace AST.

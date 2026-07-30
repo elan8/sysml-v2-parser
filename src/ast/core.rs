@@ -674,13 +674,17 @@ impl Eq for SubsettingRelationship {}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionEnd {
     pub expression: Node<Expression>,
+    /// Endpoint multiplicity (§6 G24), as in `connect [0..1] a.p1 to [1] b.p2;` from the OMG spec
+    /// Annex `7a1-Variant Configuration - General Concept-a.sysml`. `None` for the (far more
+    /// common) unadorned endpoint.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub span: Span,
 }
 
 /// Equality ignores `span`, matching [`TypingRelationship`]'s convention.
 impl PartialEq for ConnectionEnd {
     fn eq(&self, other: &Self) -> bool {
-        self.expression == other.expression
+        self.expression == other.expression && self.multiplicity == other.multiplicity
     }
 }
 

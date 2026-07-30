@@ -57,6 +57,8 @@ pub enum ActionDefBodyElement {
     ForkStmt(Node<ForkStmt>),
     TerminateStmt(Node<TerminateStmt>),
     WhileStmt(Node<WhileStmt>),
+    /// `loop { ... }` (§6 G14).
+    LoopStmt(Node<LoopStmt>),
     IfStmt(Node<IfStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
@@ -64,6 +66,9 @@ pub enum ActionDefBodyElement {
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),
     Decl(Node<ActionBodyDecl>),
+    /// Keyword-less `name = expr;` feature binding (§6 G26), e.g. `measurement =
+    /// testVehicle.mass;` in the OMG spec Annex `9-Verification-simplified.sysml`.
+    DefaultReferenceUsage(Node<crate::ast::DefaultReferenceUsage>),
 }
 
 /// Assignment statement (SysML v2 AssignmentNode/AssignmentActionUsage).
@@ -88,11 +93,25 @@ pub struct ForLoop {
     pub body: ActionDefBody,
 }
 
-/// Succession to an action usage: `then action ...`.
+/// Succession to a following node: `then action ...`, `then merge <name>;`, or `then <name>;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThenAction {
-    pub action: Node<ActionUsage>,
+    pub target: ThenTarget,
+}
+
+/// What a `then` succession connects to. Only [`ThenTarget::Action`] existed before §6 G23; the
+/// other two forms are the succession shorthand used after `first <name>;` in the OMG spec Annex
+/// (`3a-Function-based Behavior-2.sysml`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ThenTarget {
+    /// `then action <name> accept ...;` — an inline action usage declaration.
+    Action(Box<Node<ActionUsage>>),
+    /// `then merge continue;` — an inline merge node.
+    Merge(Node<MergeStmt>),
+    /// `then continue;` — a reference to an already-declared node.
+    Feature(Node<Expression>),
 }
 
 /// In/out parameter in action def: `in` name `:` type `;` or `out` name `:` type `;`.
@@ -132,6 +151,23 @@ pub enum TransitionAccept {
     Payload(PayloadClause, Option<Node<Expression>>),
     /// `(expr, via)` — `via` is the optional `via <port>` clause after the trigger.
     Shorthand(Node<Expression>, Option<Node<Expression>>),
+    /// A time trigger: `accept at <expr>`, `accept when <expr>`, or `accept after <expr>`
+    /// (BNF `TriggerKind`, §6 G8). Real usage: `accept at vehicle1_c1.maintenanceTime` in the
+    /// OMG spec Annex `5-State-based Behavior-1.sysml`. Without this the trigger keyword was
+    /// swallowed as the payload expression itself.
+    TimeTrigger(TriggerKind, Node<Expression>),
+}
+
+/// The three time-trigger keywords of BNF `TriggerKind`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TriggerKind {
+    /// `accept at <time-expr>` — fires at an absolute instant.
+    At,
+    /// `accept when <bool-expr>` — fires on a change to the condition.
+    When,
+    /// `accept after <duration-expr>` — fires a duration after the source became active.
+    After,
 }
 
 /// Transition `do` effect: a structured action-usage form (SysML v2 `EffectBehaviorUsage`)
@@ -237,6 +273,8 @@ pub enum ActionUsageBodyElement {
     ForkStmt(Node<ForkStmt>),
     TerminateStmt(Node<TerminateStmt>),
     WhileStmt(Node<WhileStmt>),
+    /// `loop { ... }` (§6 G14).
+    LoopStmt(Node<LoopStmt>),
     IfStmt(Node<IfStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
@@ -244,6 +282,9 @@ pub enum ActionUsageBodyElement {
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),
     Decl(Node<ActionBodyDecl>),
+    /// Keyword-less `name = expr;` feature binding (§6 G26), e.g. `measurement =
+    /// testVehicle.mass;` in the OMG spec Annex `9-Verification-simplified.sysml`.
+    DefaultReferenceUsage(Node<crate::ast::DefaultReferenceUsage>),
 }
 
 /// A minimally-modeled declaration inside an action/behavior body (e.g. `attribute ...;`, `calc ...;`).
@@ -304,7 +345,9 @@ pub struct FlowUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FirstStmt {
     pub first: Node<Expression>,
-    pub then: Node<Expression>,
+    /// `None` for the standalone initial-node marker `first start;` (§6 G13), which names a
+    /// starting node without declaring a succession to a target.
+    pub then: Option<Node<Expression>>,
     pub body: FirstMergeBody,
 }
 
@@ -361,6 +404,14 @@ pub struct TerminateStmt {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WhileStmt {
     pub condition: Node<Expression>,
+    pub body: ActionDefBody,
+}
+
+/// Loop control node: `loop` `{` body `}` (§6 G14) — a `while` with no condition. Closed alongside
+/// `decide`/`join`/`fork`/`if`/`while` in the §5 audit's family, which missed `loop`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct LoopStmt {
     pub body: ActionDefBody,
 }
 

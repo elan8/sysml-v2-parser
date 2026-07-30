@@ -174,6 +174,9 @@ pub struct RequirementUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// True for `abstract requirement ...`.
     pub is_abstract: bool,
+    /// True for `variation requirement ...` (§6 G5) — a variation point whose body holds
+    /// `variant` members.
+    pub is_variation: bool,
     pub body: RequirementDefBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
     /// [`crate::ast::MembershipKind::FeatureMembership`]. Only captured with real visibility for

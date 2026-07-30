@@ -246,8 +246,7 @@ mod redefines_tests {
 
     #[test]
     fn item_usage_captures_short_name() {
-        let (rest, node) =
-            item_usage(input("item <ws> wheelShape : Circle;")).expect("item usage");
+        let (rest, node) = item_usage(input("item <ws> wheelShape : Circle;")).expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.short_name.as_deref(), Some("ws"));
         assert_eq!(node.value.name, "wheelShape");

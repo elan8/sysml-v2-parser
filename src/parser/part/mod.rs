@@ -11,7 +11,10 @@ pub(crate) use def::part_def_or_usage;
 // `body::part_def_body`'s own callers, not through this re-export -- it exists only so
 // `package.rs`'s `#[cfg(test)]` module can call `crate::parser::part::part_def_body`/`part_def`
 // directly, which is why a plain (non-test) `cargo build` sees the re-export itself as unused.
-pub(crate) use usage::{bind_, interface_usage, part_ref_usage, part_usage, perform_action_decl};
+pub(crate) use usage::{
+    allocate_, bind_, exhibit_state_as_state_usage, interface_usage, part_ref_usage, part_usage,
+    perform_action_decl,
+};
 #[allow(unused_imports)]
 pub(crate) use {body::part_def_body, def::part_def};
 

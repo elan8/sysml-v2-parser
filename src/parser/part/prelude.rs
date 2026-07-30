@@ -23,6 +23,7 @@ pub(crate) use crate::parser::connection::connection_def_required;
 pub(crate) use crate::parser::connection::connection_member_body;
 pub(crate) use crate::parser::constraint::calc_def_required;
 pub(crate) use crate::parser::constraint::calc_usage;
+pub(crate) use crate::parser::constraint::{constraint_def, constraint_usage};
 pub(crate) use crate::parser::dependency::dependency;
 pub(crate) use crate::parser::enumeration::enum_usage;
 pub(crate) use crate::parser::expr::{expression, path_expression};

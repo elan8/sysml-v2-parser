@@ -142,6 +142,7 @@ fn connect_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
         span.clone(),
         ConnectionEnd {
             expression: expr,
+            multiplicity: None,
             span,
         },
     )

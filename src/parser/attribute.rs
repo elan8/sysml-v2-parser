@@ -69,6 +69,8 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"part",
     b"binding",
     b"connection",
+    b"value",
+    b"occurrence",
 ];
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
@@ -209,10 +211,17 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
             AttributeBodyElement::AttributeDef,
         ),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
+        map(value_keyword_binding, AttributeBodyElement::AttributeUsage),
         map(
             attribute_feature_binding,
             AttributeBodyElement::AttributeUsage,
         ),
+        // §6 G27: this body is shared with `item def` / `item` usage bodies, which legally own
+        // occurrence members. Placed after the bindings so a member merely *named* `occurrence`
+        // still reaches them first.
+        map(crate::parser::occurrence_body::occurrence_usage, |n| {
+            AttributeBodyElement::OccurrenceUsage(Box::new(n))
+        }),
         map(
             |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
             AttributeBodyElement::Other,
@@ -220,6 +229,20 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+/// §6 G9: `value :>> elements: Integer;` spells an attribute member with the `value` keyword.
+/// Deliberately scoped to attribute-definition bodies (not the shared usage dispatch): the whole
+/// OMG release contains exactly one occurrence, in `15_11-Variable Length Collection Types.sysml`,
+/// so widening `attribute_usage` itself would make `value` a usage keyword everywhere for no gain.
+/// The keyword carries no information the AST doesn't already hold, so it is consumed and dropped.
+fn value_keyword_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"value"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, binding) = attribute_feature_binding(input)?;
+    Ok((input, node_from_to(start, input, binding.value)))
 }
 
 /// Attribute body feature binding: (`:>>` | `:>`)? name (`:` type)? (`=` value)? (`;` | `{` body `}`).
@@ -313,6 +336,65 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
             },
         ),
     ))
+}
+
+/// §6 G26: keyword-less `name = expr;` feature binding, i.e. a [`crate::ast::DefaultReferenceUsage`]
+/// that carries a value but no typing clause. Distinct from [`attribute_usage_shorthand`], which
+/// requires the `: Type` half; that stricter form stays the one dispatched from part bodies so
+/// their existing AST shape is untouched.
+///
+/// Real usage: `measurement = testVehicle.mass;` inside the perform body of the OMG spec Annex
+/// `9-Verification-simplified.sysml`.
+pub(crate) fn feature_value_binding(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    if is_reserved_shorthand_starter(&name_str) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, value) =
+        preceded(ws_and_comments, crate::parser::feature_value_part).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::DefaultReferenceUsage {
+                name: name_str,
+                typing: None,
+                value: Some(value),
+                name_span: Some(name_span),
+                typing_span: None,
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
+            },
+        ),
+    ))
+}
+
+/// §6 G15: the same feature binding as [`attribute_feature_binding`], but with the `:>>` / `:>`
+/// prefix *required*, so it can be offered in body dispatchers whose members are otherwise
+/// keyword-led. Without the mandatory prefix the underlying parser would also swallow bare
+/// `name : Type;` members and shadow the kind-keyword arms around it.
+///
+/// Real usage: `:>> mass = m;` and `:>> t = t0 { ... }` inside the snapshot bodies of the OMG
+/// spec Annex `6-Individual and Snapshots.sysml`.
+pub(crate) fn redefinition_feature_binding(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<AttributeUsage>> {
+    let (peek, _) = ws_and_comments(input)?;
+    if !peek.fragment().starts_with(b":>") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    attribute_feature_binding(input)
 }
 
 fn attribute_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBodyElement> {
@@ -574,6 +656,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 redefines_span,
                 redefines,
             } => {
+                let (input, pre_typing_mods) = feature_modifiers(input)?;
                 let (input, typing_result) = optional_typings(input)?;
                 let (typing_span, typing) = typing_result
                     .map(|(span, is_conj, s)| {
@@ -581,6 +664,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     })
                     .unwrap_or((None, None));
                 let (input, mods0) = feature_modifiers(input)?;
+                let mods0 = pre_typing_mods.merge(mods0);
                 (
                     input,
                     None,
@@ -598,6 +682,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 )
             }
             AttributeUsageHead::Named { name_span, name } => {
+                // §6 G10: the multiplicity may precede the typing clause -- `attribute
+                // occurs[0..1]: Real;` (OMG spec Annex `14c-Language Extensions.sysml`). Only the
+                // trailing position (`attribute a : Real[0..1];`) was accepted before, so the
+                // leading one left `: Real` unconsumed and the member fell through to recovery.
+                // `FeatureModifiers::merge` is first-wins, so reading both positions is safe.
+                let (input, pre_typing_mods) = feature_modifiers(input)?;
                 let (input, typing_result) = optional_typings(input)?;
                 let (typing_span, typing) = typing_result
                     .map(|(span, is_conj, s)| {
@@ -605,6 +695,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                     })
                     .unwrap_or((None, None));
                 let (input, mods0) = feature_modifiers(input)?;
+                let mods0 = pre_typing_mods.merge(mods0);
                 (
                     input,
                     Some(name_span),

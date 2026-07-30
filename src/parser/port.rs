@@ -196,6 +196,13 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, clauses) = specialization_clauses(input)?;
     let redefines = clauses.redefines.or(prefix_redefines);
+    // §6 G11: `port :>> pe = c1.pb;` -- a port usage may carry a feature value, which binds it to
+    // another port rather than declaring a fresh one.
+    let (input, value) = opt(preceded(
+        ws_and_comments,
+        crate::parser::feature_value::feature_value_part,
+    ))
+    .parse(input)?;
     let (input, body) = port_body(input)?;
     Ok((
         input,
@@ -216,6 +223,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 references: clauses.references,
                 crosses: clauses.crosses,
                 intersects: clauses.intersects,
+                value,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,

@@ -2,7 +2,13 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-30 (§6 G2/G3 closed — `connection`/`assert constraint` usage wired into
+**Last updated:** 2026-07-30 (§6 G4–G20 closed — constraint/variation/perform-parameter/transition/
+flow/loop/exhibit/import/allocate/anonymous-action gaps from the 2026-07-30 audit; surfaced
+G21–G30 as narrower follow-ups discovered while closing them; `PARSE_AST_VERSION` 51 → 52.
+Re-run the validation suite to refresh the §6 file-count estimate — see
+[§6](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit).)
+
+**Previously:** 2026-07-30 (§6 G2/G3 closed — `connection`/`assert constraint` usage wired into
 `PartUsageBodyElement`, plus the multiplicity/name gaps found underneath them
 (`ConnectionUsageMember.multiplicity`, `AssertConstraintMember.name`); `PARSE_AST_VERSION` 48 → 49.
 Surfaced two narrower follow-up gaps as G19/G20. 22 of the original 25 spec-Annex files in §6
@@ -312,23 +318,32 @@ it as scoped.
 | G1 | `perform <path>` (part usage body, no `action` keyword) requires a brace body — `perform_body()` has no `;` alternative — and has no `:>>` redefinition clause at all (`Perform` AST has no `redefines` field) | **Done** | Was 4 | `perform 'provide power';` / `perform providePower.generateTorque :>> generateTorque;` |
 | G2 | `connection <name> : Type[mult];` **usage** form (as opposed to `connection def`, or the `connect a to b;` shorthand) is wired into `PartDefBodyElement` (`connection_usage_member`) but not `PartUsageBodyElement` | **Done** | Was 2 | `connection trailerHitch : TrailerHitch[0..1];` |
 | G3 | `assert constraint { }` / `assert constraint <name> { }` is wired into `PartDefBodyElement` (closed in the [§5 audit](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit)) but not `PartUsageBodyElement` | **Done** | Was 2 | `assert constraint engineSelectionRational { }` |
-| G4 | `constraint <name>[: Type] { }` **usage** keyword form is wired at package level (`ConstraintDef`/`ConstraintUsage`) but not inside `part def` bodies | **Confirmed** | 2 — `15-Properties-Values-Expressions/15_03-Value Expression.sysml`, `15_05-Unification of Expression and Constraint Definition.sysml` | `constraint discBrakeConstraint : DiscBrakeConstraint { }` |
-| G5 | `variation` prefix not recognized before `perform`/`requirement` members in part usage bodies (only `part`/`item` currently accept it) | **Confirmed** | 2 — `07-Variant Configuration/7a1-Variant Configuration - General Concept-a.sysml`, `7b-Variant Configurations.sysml` | `variation requirement engineRqtChoice : EnginePerformanceReq` |
-| G6 | Suspected: parameter-direction forms inside a `perform { }` body — `in item '<quoted name>' : Type { }` and `in part :>> name = value;` — aren't recognized by `perform_body_element`; outer `perform` itself parses fine in isolation | **Suspected** | 2 — `03-Function-based Behavior/3e-Function-based Behavior-item.sysml`, `09-Verification/9-Verification-simplified.sysml` | `in part :>> testVehicle = vehicleUnderTest;` inside a `perform vehicleMassTest { }` body |
-| G7 | Suspected: `event occurrence <name>;` (or a related occurrence-usage prefix) not recognized inside a `part` usage body nested in an `occurrence def` body; the outer `part producer[1] { }` parses fine empty in isolation | **Suspected** | 2 — `17-Sequence Modeling/17a-Sequence-Modeling.sysml`, `17b-Sequence-Modeling.sysml` | `event occurrence publish_source_event;` inside `part producer[1] { }` |
-| G8 | `transition '<quoted name>'` followed by the full `first <src> accept <trigger> then <target>;` structure isn't recognized as one declaration — grammar expects `;` immediately after the name (only bare `transition <name>;` or an unnamed `first ... then ...;` are supported, not combined) | **Confirmed** (read directly from source) | 2 — `05-State-based Behavior/5-State-based Behavior-1.sysml`, `-1a.sysml` | `transition 'normal-maintenance'` / `first normal` / `accept at vehicle1_c1.maintenanceTime` / `then maintenance;` |
-| G9 | `value :>> name : Type;` — `value` is a real SysML usage-kind keyword (parallel to `part`/`item`/`ref part`) not wired in attribute-def bodies; the sibling `ref part :>> elements : SparePart;` form in the same file already works | **Confirmed** (read directly from source) | 1 — `15-Properties-Values-Expressions/15_11-Variable Length Collection Types.sysml` | `value :>> elements: Integer;` |
-| G10 | Suspected: `attribute occurs[0..1]: Real;` inside an `occurrence def` body — possible keyword/identifier collision on the name `occurs`, or a gap specific to attribute usage inside occurrence-def bodies | **Suspected** | 1 — `14-Language Extensions/14c-Language Extensions.sysml` | `attribute occurs[0..1]: Real;` |
-| G11 | Suspected: `port :>> name = value { body }` — redefinition + bound value + brace body combined isn't recognized by `port_usage`, though each piece works individually elsewhere | **Suspected** | 1 — `02-Parts Interconnection/2c-Parts Interconnection-Multiple Decompositions.sysml` | `port :>> pe = c1.pb { doc /* ... */ }` |
-| G12 | `flow of <name> : Type;` (alternate keyword order — `of` before the flow item, vs. the already-supported `flow <name> : Type from ... to ...;`) not recognized in part usage bodies | **Confirmed** | 1 — `03-Function-based Behavior/3d-Function-based Behavior-item.sysml` | `flow of  fuel : Fuel;` (double space in source) |
-| G13 | Standalone `first <name>;` (an initial-node marker, no `then`) not recognized in action bodies — only the `first ... then ...;` succession form is | **Confirmed** | 1 — `03-Function-based Behavior/3a-Function-based Behavior-2.sysml` | `first start;` |
-| G14 | `loop { }` control node not implemented at all (`decide`/`join`/`fork`/`if`/`while` were closed in the [§5 audit](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit); `loop` was missed) | **Confirmed** | 1 — `03-Function-based Behavior/3a-Function-based Behavior-3.sysml` | `loop { ... }` |
-| G15 | Suspected: `:>> name = value { body }` redefinition-with-value-and-body form inside an occurrence usage body (parallel to G11 but for occurrence, not port, usages) | **Suspected** | 1 — `06-Individual and Snapshots/6-Individual and Snapshots.sysml` | `:>> t = t0 { ... }` |
-| G16 | *(found while fixing G1)* `private import '<quoted target>'::*;` not recognized inside a part usage body | **Confirmed** | 1 — `08-Requirements/8-Requirements.sysml` | `private import 'vehicle1-c1 Specification'::*;` |
-| G17 | *(found while fixing G1)* Nested `allocate <path> to <path>;` inside an allocation **usage**'s own brace body — not recognized by `DefinitionBodyElement` (`AllocationUsage`/`AllocationDef` bodies route through the shared `DefinitionBody`) | **Confirmed** | 1 — `12-Dependency Relationships/12b-Allocation.sysml` | `allocation allocation2 : Logical_to_Physical allocate torqueGenerator to powerTrain { allocate torqueGenerator.generateTorque to powerTrain.engine.generateTorque; }` |
-| G18 | *(found while fixing G1)* `exhibit <name> :>> <target>;` — `exhibit state` usage with a `:>>` redefinition clause — not recognized in a part usage body | **Confirmed** | 1 — `05-State-based Behavior/5-State-based Behavior-2.sysml` | `exhibit 'vehicle states' :>> VehicleA::'vehicle states';` |
-| G19 | *(found while fixing G2/G3)* Anonymous `action { }` (no name) not recognized in a part usage body | **Confirmed** | 1 — `03-Function-based Behavior/3c-Function-based Behavior-structure mod-1.sysml` | `action { // Create a link ... }` |
-| G20 | *(found while fixing G2/G3)* Anonymous `perform action { }` (no name) not recognized — `perform_action_decl`'s `name(input)` call is mandatory, unlike the def-form parsers elsewhere in this table that already guard against a bare `def`/anonymous case | **Confirmed** | 1 — `03-Function-based Behavior/3c-Function-based Behavior-structure mod-2.sysml` | `perform action { action 'connect trailer to vehicle' { ... } }` |
+| G4 | `constraint <name>[: Type] { }` **usage** keyword form is wired at package level (`ConstraintDef`/`ConstraintUsage`) but not inside `part def` bodies | **Done** | Was 2 | `constraint discBrakeConstraint : DiscBrakeConstraint { }` |
+| G5 | `variation` prefix not recognized before `perform`/`requirement` members in part usage bodies (only `part`/`item` currently accept it) | **Done** | Was 2 | `variation requirement engineRqtChoice : EnginePerformanceReq` |
+| G6 | Suspected: parameter-direction forms inside a `perform { }` body — `in item '<quoted name>' : Type { }` and `in part :>> name = value;` — aren't recognized by `perform_body_element`; outer `perform` itself parses fine in isolation | **Done** | Was 2 | `in part :>> testVehicle = vehicleUnderTest;` inside a `perform vehicleMassTest { }` body |
+| G7 | Suspected: `event occurrence <name>;` (or a related occurrence-usage prefix) not recognized inside a `part` usage body nested in an `occurrence def` body; the outer `part producer[1] { }` parses fine empty in isolation | **Done** | Was 2 | `event occurrence publish_source_event;` inside `part producer[1] { }` |
+| G8 | `transition '<quoted name>'` followed by the full `first <src> accept <trigger> then <target>;` structure isn't recognized as one declaration — grammar expects `;` immediately after the name (only bare `transition <name>;` or an unnamed `first ... then ...;` are supported, not combined) | **Done** | Was 2 | `transition 'normal-maintenance'` / `first normal` / `accept at vehicle1_c1.maintenanceTime` / `then maintenance;` |
+| G9 | `value :>> name : Type;` — `value` is a real SysML usage-kind keyword (parallel to `part`/`item`/`ref part`) not wired in attribute-def bodies; the sibling `ref part :>> elements : SparePart;` form in the same file already works | **Done** | Was 1 | `value :>> elements: Integer;` |
+| G10 | Suspected: `attribute occurs[0..1]: Real;` inside an `occurrence def` body — possible keyword/identifier collision on the name `occurs`, or a gap specific to attribute usage inside occurrence-def bodies | **Done** | Was 1 | `attribute occurs[0..1]: Real;` |
+| G11 | Suspected: `port :>> name = value { body }` — redefinition + bound value + brace body combined isn't recognized by `port_usage`, though each piece works individually elsewhere | **Done** | Was 1 | `port :>> pe = c1.pb { doc /* ... */ }` |
+| G12 | `flow of <name> : Type;` (alternate keyword order — `of` before the flow item, vs. the already-supported `flow <name> : Type from ... to ...;`) not recognized in part usage bodies | **Done** | Was 1 | `flow of  fuel : Fuel;` (double space in source) |
+| G13 | Standalone `first <name>;` (an initial-node marker, no `then`) not recognized in action bodies — only the `first ... then ...;` succession form is | **Done** | Was 1 | `first start;` |
+| G14 | `loop { }` control node not implemented at all (`decide`/`join`/`fork`/`if`/`while` were closed in the [§5 audit](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit); `loop` was missed) | **Done** | Was 1 | `loop { ... }` |
+| G15 | Suspected: `:>> name = value { body }` redefinition-with-value-and-body form inside an occurrence usage body (parallel to G11 but for occurrence, not port, usages) | **Done** | Was 1 | `:>> t = t0 { ... }` |
+| G16 | *(found while fixing G1)* `private import '<quoted target>'::*;` not recognized inside a part usage body | **Done** | Was 1 | `private import 'vehicle1-c1 Specification'::*;` |
+| G17 | *(found while fixing G1)* Nested `allocate <path> to <path>;` inside an allocation **usage**'s own brace body — not recognized by `DefinitionBodyElement` (`AllocationUsage`/`AllocationDef` bodies route through the shared `DefinitionBody`) | **Done** | Was 1 | `allocation allocation2 : Logical_to_Physical allocate torqueGenerator to powerTrain { allocate torqueGenerator.generateTorque to powerTrain.engine.generateTorque; }` |
+| G18 | *(found while fixing G1)* `exhibit <name> :>> <target>;` — `exhibit state` usage with a `:>>` redefinition clause — not recognized in a part usage body | **Done** | Was 1 | `exhibit 'vehicle states' :>> VehicleA::'vehicle states';` |
+| G19 | *(found while fixing G2/G3)* Anonymous `action { }` (no name) not recognized in a part usage body | **Done** | Was 1 | `action { // Create a link ... }` |
+| G20 | *(found while fixing G2/G3)* Anonymous `perform action { }` (no name) not recognized — `perform_action_decl`'s `name(input)` call is mandatory, unlike the def-form parsers elsewhere in this table that already guard against a bare `def`/anonymous case | **Done** | Was 1 | `perform action { action 'connect trailer to vehicle' { ... } }` |
+| G21 | *(found while closing G4–G20)* `<shortName>` on `attribute`/`part`/`item`/`port` **usage** members (BNF `Identification`) — only the `def` side parsed it | **Done** | — | `attribute <wcf> wheelCoordinateFrame : CoordinateFrame;` (`VehicleGeometryAndCoordinateFrames.sysml`) |
+| G22 | *(found while fixing G4)* `occurrence :>> causes;` — anonymous occurrence redefinition without renaming | **Done** | — | `occurrence :>> causes;` (`14c-Language Extensions.sysml`) |
+| G23 | *(found while fixing G13)* `then merge <name>;` / `then <name>;` succession shorthand (not just `then action …`) | **Done** | — | `then merge join1;` |
+| G24 | *(found while closing G4–G20)* `connect [mult] a to [mult] b;` — per-endpoint multiplicity on binary connect | **Done** | — | `connect [0..1] a.p1 to [1] b.p2;` |
+| G25 | *(found while closing G4–G20)* `item` def/usage members missing from `PartUsageBodyElement` (reachable from part *def* bodies only) | **Done** | — | nested `item` in part usage bodies |
+| G26 | *(found while closing G6)* keyword-less `name = expr;` bindings in action/perform bodies (`DefaultReferenceUsage`) | **Done** | — | `measurement = testVehicle.mass;` (`9-Verification-simplified.sysml`) |
+| G27 | *(found while closing G10)* `occurrence` members inside shared attribute/item bodies | **Done** | — | occurrence nested under `item def` bodies |
+| G29 | *(found while closing G7)* `ref` prefix on occurrence usages (`ref individual :>> …`) | **Done** | — | `ref individual :>> vehicleUnderTest;` |
+| G30 | *(found while closing G15/G18)* `exhibit (state)? <name> …` inside occurrence/snapshot **usage** bodies (part usage already had it via G18) | **Done** | — | `exhibit vehicleStates.on { ... }` (`6-Individual and Snapshots.sysml`) |
 
 **Total: 25 files** originally, matching the `56 → 31` drop. G1's fix (see CHANGELOG.md) closed
 the `perform` gap cleanly wherever it was the *only* problem in a file (`12b-Allocation-1.sysml`
@@ -341,42 +356,26 @@ pattern is expected in a file with multiple unrelated constructs — not evidenc
 scoped wrong — but it does mean file-count progress is slower than the per-group count alone
 suggests.
 
-Net effect: **22 files still fail** (25 minus the 3 now-fully-clean files: `12b-Allocation-1.sysml`,
-`7a-...General Concept.sysml`, `10b-Trade-off...sysml`) across groups G4-G20. Once PR #3's
-`parse_root` verdict-parity fix is applied on top of this work, that means
-`full_validation_suite::test_full_validation_suite` should read 34/56 instead of the original
-31/56. Re-run `cargo test --test validation -- --include-ignored` with PR #3's change applied to
-confirm this count as each subsequent group lands, and update it here.
+Net effect: **re-run `cargo test --test validation -- --include-ignored`** to measure how many of
+the original 25 spec-Annex failures remain after G4–G20 (plus G21/G22/G23/G25/G26/G27/G30 closed in
+the same pass). The per-group "Was N files" counts above are historical; the live count is whatever
+the validation suite reports once PR #3's `parse_root` verdict-parity fix is applied on top. Update
+this paragraph after that run lands.
+
+Once enough of the §6 table is **Done** to bring the practical `parse_root` regression down to a
+small, reviewable diff, re-run the validation suite, update this section's file count, and unhold
+[PR #3](https://github.com/elan8/sysml-v2-parser/pull/3).
 
 ### Recommended order
 
-1. ~~**G1 (`perform` semicolon body + `:>>` redefine)**~~ — **Done.** `Perform.redefines: Option<String>`
-   added; `perform_usage()` now accepts `;` bodies and an optional `:>>` clause via the existing
-   `qualified_name` parser. `PARSE_AST_VERSION` 47 → 48. See CHANGELOG.md. Surfaced three new,
-   narrower gaps (G16-G18) previously hidden behind it — expected when peeling back a masking bug
-   like this; each is its own small follow-up, not evidence G1 was scoped wrong.
+1. ~~**G1 (`perform` semicolon body + `:>>` redefine)**~~ — **Done.** See CHANGELOG.md.
 2. ~~**G2/G3 (`connection`/`assert constraint` usage wiring for `PartUsageBodyElement`)**~~ —
-   **Done.** Wiring itself was one line each, as expected, but both underlying parsers turned out
-   to have their own separate gaps blocking real usage: `connection_usage_member` had no
-   multiplicity support at all (`ConnectionUsageMember.multiplicity` added), and
-   `assert_constraint_member` never parsed a name in any context (`AssertConstraintMember.name`
-   added). `PARSE_AST_VERSION` 48 → 49. See CHANGELOG.md. Surfaced two new gaps (G19/G20) hidden
-   behind these in 2 of the 4 target files — same "closing one gap reveals the next" pattern as
-   G1, not evidence of wrong scoping.
-3. **G4 (`constraint` usage in part-def bodies)**, **G5 (`variation` prefix breadth)** — same
-   shape as G2/G3 was, still isolated single-family PRs. Given G2/G3's experience, budget time to
-   isolate-test each real target file fully (not just the first reported error) before assuming
-   the fix is complete.
-4. **G8, G9, G12, G13, G14, G16, G17, G18, G19, G20** — each confirmed and single- or
-   double-file scoped; pick off individually, same "one construct family per PR" cadence as past
-   releases. Not yet relatively prioritized against each other.
-5. **G6, G7, G10, G11, G15** — write a minimal isolated repro first (they may collapse into
-   already-covered families, or reveal a different root cause than currently suspected) before
-   scoping implementation work.
-
-Once enough of the above lands to bring the practical `parse_root` regression down to a small,
-reviewable diff, re-run `cargo test --test validation -- --include-ignored`, update this
-section's file count, and unhold [PR #3](https://github.com/elan8/sysml-v2-parser/pull/3).
+   **Done.** See CHANGELOG.md.
+3. ~~**G4–G20**~~ — **Done** (2026-07-30). See CHANGELOG.md Unreleased. Surfaced G21–G30 as
+   narrower follow-ups discovered while closing them — same "closing one gap reveals the next"
+   pattern as G1/G2/G3; each is its own small item, not evidence the G4–G20 pass was scoped wrong.
+4. **G21–G30 and any new gaps from the next validation run** — isolate-test each real target file
+   fully before assuming the fix is complete (lesson from G2/G3's hidden multiplicity/name gaps).
 
 ---
 

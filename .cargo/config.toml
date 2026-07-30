@@ -1,0 +1,5 @@
+# Windows default thread stacks (1 MiB) are too small for the parser's recursive-descent
+# depth at MAX_SYNTAX_NESTING (32 nested packages). Linux/macOS defaults are larger and did
+# not hit this; bump the test/build stack uniformly so `accepts_nesting_at_the_limit` is stable.
+[env]
+RUST_MIN_STACK = "8388608"

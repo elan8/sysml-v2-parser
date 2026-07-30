@@ -16,11 +16,12 @@ use crate::parser::lex::{
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
+use crate::parser::usage::multiplicity_node;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_while1};
-use nom::combinator::map;
+use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -154,11 +155,22 @@ fn connect_body(input: Input<'_>) -> IResult<Input<'_>, crate::ast::ConnectBody>
 /// span (`path_expression` already tracks a real span, so the endpoint's span and the inner
 /// expression's span are identical today -- see `ast::core::ConnectionEnd`'s doc comment).
 fn connection_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
+    connection_end_with_multiplicity(None, expr)
+}
+
+/// [`connection_end`] for the §6 G24 `connect [0..1] a to [1] b;` form. The endpoint's span still
+/// comes from the expression alone, so a multiplicity-bearing endpoint reports the same range as
+/// the bare one.
+fn connection_end_with_multiplicity(
+    multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    expr: Node<crate::ast::Expression>,
+) -> Node<ConnectionEnd> {
     let span = expr.span.clone();
     Node::new(
         span.clone(),
         ConnectionEnd {
             expression: expr,
+            multiplicity,
             span,
         },
     )
@@ -201,11 +213,20 @@ pub(crate) fn connect_ends(input: Input<'_>) -> IResult<Input<'_>, ConnectEnds> 
         ),
         map(
             (
+                // §6 G24: each binary endpoint may carry its own multiplicity.
+                opt(preceded(ws_and_comments, multiplicity_node)),
                 path_expression,
                 preceded(ws_and_comments, tag(&b"to"[..])),
+                opt(preceded(ws_and_comments, multiplicity_node)),
                 preceded(ws_and_comments, path_expression),
             ),
-            |(from, _, to)| (connection_end(from), connection_end(to), Vec::new()),
+            |(from_mult, from, _, to_mult, to)| {
+                (
+                    connection_end_with_multiplicity(from_mult, from),
+                    connection_end_with_multiplicity(to_mult, to),
+                    Vec::new(),
+                )
+            },
         ),
     ))
     .parse(input)

@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **PARSER_BACKLOG_ROADMAP.md §6 G4–G20 grammar gaps** — closed the remaining confirmed
+  spec-Annex construct families from the 2026-07-30 strict-vs-recovery audit (on top of the
+  already-committed G1–G3 and short-name work at `PARSE_AST_VERSION` 50–51):
+  - **G4** — `constraint` usage/def wired into `PartDefBodyElement` and `PartUsageBodyElement`.
+  - **G5** — `variation`/`abstract` prefix on `perform`/`requirement` members in part usage
+    bodies; `RequirementUsage.is_variation`.
+  - **G6** — directed `part`/`item`/`attribute` usages inside `perform { }` bodies via new
+    `PerformBodyElement::{PartUsage,ItemUsage,AttributeUsage}` variants.
+  - **G7** — `event occurrence <name>;` / `then event occurrence …` in `occurrence_usage`.
+  - **G8** — named `transition '<name>' first … accept at/when/after … then …;` with time
+    triggers on `TransitionAccept`.
+  - **G9** — `value :>> name : Type;` in attribute-definition bodies.
+  - **G10** — leading multiplicity on `attribute occurs[0..1]: Real;`.
+  - **G11** — `port :>> name = value { body }` via `PortUsage.value`.
+  - **G12** — payload-first `flow of <name> : Type …` in part usage bodies.
+  - **G13** — standalone `first <name>;` initial-node marker in action bodies.
+  - **G14** — `loop { }` control node (`LoopStmt`).
+  - **G15** — keyword-less `:>> name (= value)? (;|{ … })` in occurrence usage bodies.
+  - **G16** — `import` in part usage bodies.
+  - **G17** — nested `allocate … to …;` in allocation/occurrence usage bodies.
+  - **G18** — `exhibit (state)? <name> :>> <target>;` with optional `state`, pre-body `:>>`,
+    and `redefines` preserved on `StateUsage`.
+  - **G19** — anonymous `action { }` in part usage bodies.
+  - **G20** — anonymous `perform action { }` (optional name on `perform_action_decl`).
+  - Surfaced narrower follow-up gaps while closing the above — now tracked as **G21–G30** in
+    `PARSER_BACKLOG_ROADMAP.md` §6 (short-name on usages, anonymous occurrence redefines, extra
+    `then` succession targets, item members in part usage bodies, keyword-less value bindings,
+    occurrence members in attribute bodies, exhibit in occurrence bodies, …).
+- Bump `PARSE_AST_VERSION` from `51` to `52` for the `PerformBodyElement` additions and the
+  cumulative AST field additions in this pass (`Perform.usage_prefix`/`value`, `PortUsage.value`,
+  `LoopStmt`, `RequirementUsage.is_variation`, `OccurrenceBodyElement::StateUsage`, …).
+  Regenerated AST snapshot fixtures where needed (`UPDATE_VALIDATION_AST=1 cargo test --test
+  validation -- --include-ignored`).
+- Added `.cargo/config.toml` with `RUST_MIN_STACK=8388608` so the nesting-limit regression test
+  is stable on Windows (deeper parser recursion after this pass exceeded the default 1 MiB stack).
+
 - **`attribute_usage` had no `<shortName>` handling at all**, unlike `attribute_def` --
   `AttributeUsage`/`AttributeDef` share the same BNF `UsageDeclaration`/`DefinitionDeclaration` ->
   `Identification` production (§8.2.2.2, `( '<' ShortName '>' )? ( Name )?`), but only the `def`
