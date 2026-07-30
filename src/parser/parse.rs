@@ -1,8 +1,7 @@
 //! Public parse entry points.
 
 use super::collect_errors::{
-    collect_implicit_attribute_in_part_def_warnings, collect_recovery_errors,
-    collect_requirement_id_dialect_diagnostics,
+    collect_recovery_errors, collect_requirement_id_dialect_diagnostics,
 };
 use super::diagnostics::{
     dedup_errors, extra_closing_brace_at_eof, fragment_to_found_snippet, has_unclosed_brace,
@@ -359,7 +358,6 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
     errors.extend(collect_recovery_errors(&RootNamespace {
         elements: elements.clone(),
     }));
-    errors.extend(collect_implicit_attribute_in_part_def_warnings(bytes));
     errors.extend(collect_requirement_id_dialect_diagnostics(bytes));
     errors = suppress_redundant_closing_brace_errors(errors);
     errors = dedup_errors(errors);

@@ -58,7 +58,6 @@ fn part_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PartDefBodyE
             | "unexpected_keyword_in_scope"
             | "missing_semicolon"
             | "missing_body_or_semicolon"
-            | "bare_feature_declaration_in_part_def"
             | "invalid_requirement_short_name_syntax"
     ) {
         return node_from_to(

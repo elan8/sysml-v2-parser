@@ -525,74 +525,6 @@ fn invalid_requirement_short_name_syntax_diagnostic(
     None
 }
 
-pub(crate) fn bare_feature_declaration_in_part_def_diagnostic(
-    fragment: &[u8],
-) -> Option<(&'static str, String, String, String)> {
-    let fragment = trim_ascii_start(fragment);
-    let feature_keywords: &[&[u8]] = &[
-        b"attribute",
-        b"part",
-        b"port",
-        b"item",
-        b"ref",
-        b"bind",
-        b"connection",
-        b"interface",
-        b"action",
-        b"state",
-        b"import",
-        b"doc",
-        b"comment",
-        b"constraint",
-        b"calc",
-        b"perform",
-        b"enum",
-    ];
-    if lex::starts_with_any_keyword(fragment, feature_keywords) {
-        return None;
-    }
-    let ident_end = fragment
-        .iter()
-        .position(|b| !b.is_ascii_alphanumeric() && *b != b'_')
-        .unwrap_or(fragment.len());
-    if ident_end == 0 || !fragment[0].is_ascii_alphabetic() {
-        return None;
-    }
-    let ident = String::from_utf8_lossy(&fragment[..ident_end]);
-    let rest = trim_ascii_start(&fragment[ident_end..]);
-    if !rest.starts_with(b":") {
-        return None;
-    }
-    if fragment
-        .windows(3)
-        .any(|w| w == b":>>" || w == b":> " || w == b"::>")
-        || fragment.windows(8).any(|w| w == b" connect")
-        || fragment.windows(4).any(|w| w == b" to ")
-    {
-        return None;
-    }
-    let rest = trim_ascii_start(&rest[1..]);
-    let type_end = rest
-        .iter()
-        .position(|b| matches!(*b, b';' | b'{' | b'}' | b'\n' | b'\r' | b'['))
-        .unwrap_or(rest.len());
-    if type_end == 0 {
-        return None;
-    }
-    let type_name = String::from_utf8_lossy(&rest[..type_end])
-        .trim()
-        .to_string();
-    let sample_ident = ident.to_lowercase();
-    Some((
-        "bare_feature_declaration_in_part_def",
-        format!("bare feature `{ident} : {type_name}` is not valid in a part definition body"),
-        "feature kind keyword such as `attribute`, `part`, or `port`".to_string(),
-        format!(
-            "Use `attribute {sample_ident} : {type_name};` (or `item` / `port` as appropriate)."
-        ),
-    ))
-}
-
 fn starts_declaration_header(fragment: &[u8], prefix: &[u8]) -> bool {
     if !fragment.starts_with(prefix) {
         return false;
@@ -1053,7 +985,6 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("invalid_unit_reference")
         | Some("missing_body_or_semicolon")
         | Some("invalid_requirement_short_name_syntax")
-        | Some("bare_feature_declaration_in_part_def")
         | Some("missing_semicolon")
         | Some("unexpected_closing_brace")
         | Some("missing_closing_brace")
