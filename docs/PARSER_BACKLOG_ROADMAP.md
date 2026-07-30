@@ -2,7 +2,13 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-30 (§6 G1 closed — `perform <path>` now accepts a `;` body and an
+**Last updated:** 2026-07-30 (§6 G2/G3 closed — `connection`/`assert constraint` usage wired into
+`PartUsageBodyElement`, plus the multiplicity/name gaps found underneath them
+(`ConnectionUsageMember.multiplicity`, `AssertConstraintMember.name`); `PARSE_AST_VERSION` 48 → 49.
+Surfaced two narrower follow-up gaps as G19/G20. 22 of the original 25 spec-Annex files in §6
+still fail; **Spec42 v1.0 remains blocked** — see [§6](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit).)
+
+**Previously:** 2026-07-30 (§6 G1 closed — `perform <path>` now accepts a `;` body and an
 optional `:>>` redefinition clause; `PARSE_AST_VERSION` 47 → 48. Surfaced three narrower follow-up
 gaps as G16-G18. 24 of the original 25 spec-Annex files in §6 still fail; **Spec42 v1.0 remains
 blocked** — see [§6](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit).)
@@ -304,8 +310,8 @@ it as scoped.
 | # | Root cause (construct family) | Confidence | Files (of the 25) | Example (from the real file) |
 | - | ------------------------------ | ---------- | ------------------ | ----------------------------- |
 | G1 | `perform <path>` (part usage body, no `action` keyword) requires a brace body — `perform_body()` has no `;` alternative — and has no `:>>` redefinition clause at all (`Perform` AST has no `redefines` field) | **Done** | Was 4 | `perform 'provide power';` / `perform providePower.generateTorque :>> generateTorque;` |
-| G2 | `connection <name> : Type[mult];` **usage** form (as opposed to `connection def`, or the `connect a to b;` shorthand) is wired into `PartDefBodyElement` (`connection_usage_member`) but not `PartUsageBodyElement` | **Confirmed** | 2 — `03-Function-based Behavior/3c-Function-based Behavior-structure mod-1.sysml`, `-2.sysml` | `connection trailerHitch : TrailerHitch[0..1];` |
-| G3 | `assert constraint { }` / `assert constraint <name> { }` is wired into `PartDefBodyElement` (closed in the [§5 audit](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit)) but not `PartUsageBodyElement` | **Confirmed** | 2 — `07-Variant Configuration/7a-Variant Configuration - General Concept.sysml`, `10-Analysis and Trades/10b-Trade-off Among Alternative Configurations.sysml` | `assert constraint engineSelectionRational { }` |
+| G2 | `connection <name> : Type[mult];` **usage** form (as opposed to `connection def`, or the `connect a to b;` shorthand) is wired into `PartDefBodyElement` (`connection_usage_member`) but not `PartUsageBodyElement` | **Done** | Was 2 | `connection trailerHitch : TrailerHitch[0..1];` |
+| G3 | `assert constraint { }` / `assert constraint <name> { }` is wired into `PartDefBodyElement` (closed in the [§5 audit](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit)) but not `PartUsageBodyElement` | **Done** | Was 2 | `assert constraint engineSelectionRational { }` |
 | G4 | `constraint <name>[: Type] { }` **usage** keyword form is wired at package level (`ConstraintDef`/`ConstraintUsage`) but not inside `part def` bodies | **Confirmed** | 2 — `15-Properties-Values-Expressions/15_03-Value Expression.sysml`, `15_05-Unification of Expression and Constraint Definition.sysml` | `constraint discBrakeConstraint : DiscBrakeConstraint { }` |
 | G5 | `variation` prefix not recognized before `perform`/`requirement` members in part usage bodies (only `part`/`item` currently accept it) | **Confirmed** | 2 — `07-Variant Configuration/7a1-Variant Configuration - General Concept-a.sysml`, `7b-Variant Configurations.sysml` | `variation requirement engineRqtChoice : EnginePerformanceReq` |
 | G6 | Suspected: parameter-direction forms inside a `perform { }` body — `in item '<quoted name>' : Type { }` and `in part :>> name = value;` — aren't recognized by `perform_body_element`; outer `perform` itself parses fine in isolation | **Suspected** | 2 — `03-Function-based Behavior/3e-Function-based Behavior-item.sysml`, `09-Verification/9-Verification-simplified.sysml` | `in part :>> testVehicle = vehicleUnderTest;` inside a `perform vehicleMassTest { }` body |
@@ -321,15 +327,24 @@ it as scoped.
 | G16 | *(found while fixing G1)* `private import '<quoted target>'::*;` not recognized inside a part usage body | **Confirmed** | 1 — `08-Requirements/8-Requirements.sysml` | `private import 'vehicle1-c1 Specification'::*;` |
 | G17 | *(found while fixing G1)* Nested `allocate <path> to <path>;` inside an allocation **usage**'s own brace body — not recognized by `DefinitionBodyElement` (`AllocationUsage`/`AllocationDef` bodies route through the shared `DefinitionBody`) | **Confirmed** | 1 — `12-Dependency Relationships/12b-Allocation.sysml` | `allocation allocation2 : Logical_to_Physical allocate torqueGenerator to powerTrain { allocate torqueGenerator.generateTorque to powerTrain.engine.generateTorque; }` |
 | G18 | *(found while fixing G1)* `exhibit <name> :>> <target>;` — `exhibit state` usage with a `:>>` redefinition clause — not recognized in a part usage body | **Confirmed** | 1 — `05-State-based Behavior/5-State-based Behavior-2.sysml` | `exhibit 'vehicle states' :>> VehicleA::'vehicle states';` |
+| G19 | *(found while fixing G2/G3)* Anonymous `action { }` (no name) not recognized in a part usage body | **Confirmed** | 1 — `03-Function-based Behavior/3c-Function-based Behavior-structure mod-1.sysml` | `action { // Create a link ... }` |
+| G20 | *(found while fixing G2/G3)* Anonymous `perform action { }` (no name) not recognized — `perform_action_decl`'s `name(input)` call is mandatory, unlike the def-form parsers elsewhere in this table that already guard against a bare `def`/anonymous case | **Confirmed** | 1 — `03-Function-based Behavior/3c-Function-based Behavior-structure mod-2.sysml` | `perform action { action 'connect trailer to vehicle' { ... } }` |
 
 **Total: 25 files** originally, matching the `56 → 31` drop. G1's fix (see CHANGELOG.md) closed
 the `perform` gap cleanly wherever it was the *only* problem in a file (`12b-Allocation-1.sysml`
 → fully clean now), but 3 of G1's 4 files had a second, distinct gap sitting directly behind it
-that recovery's sync-point-skip had been masking — those are now G16-G18, same 3 files.
+that recovery's sync-point-skip had been masking — those are now G16-G18, same 3 files. G2/G3's
+fix closed 2 of their 4 target files fully clean (`7a-...General Concept.sysml`,
+`10b-Trade-off...sysml`); the other 2 (`3c-...structure mod-1.sysml`/`-2.sysml`) each had a
+second gap behind them too — now G19/G20, same 2 files. This "closing one gap reveals the next"
+pattern is expected in a file with multiple unrelated constructs — not evidence either fix was
+scoped wrong — but it does mean file-count progress is slower than the per-group count alone
+suggests.
 
-Net effect: **24 files still fail** (25 minus the 1 now-fully-clean file) across groups G2-G18.
-Once PR #3's `parse_root` verdict-parity fix is applied on top of this work, that means
-`full_validation_suite::test_full_validation_suite` should read 32/56 instead of the original
+Net effect: **22 files still fail** (25 minus the 3 now-fully-clean files: `12b-Allocation-1.sysml`,
+`7a-...General Concept.sysml`, `10b-Trade-off...sysml`) across groups G4-G20. Once PR #3's
+`parse_root` verdict-parity fix is applied on top of this work, that means
+`full_validation_suite::test_full_validation_suite` should read 34/56 instead of the original
 31/56. Re-run `cargo test --test validation -- --include-ignored` with PR #3's change applied to
 confirm this count as each subsequent group lands, and update it here.
 
@@ -340,14 +355,21 @@ confirm this count as each subsequent group lands, and update it here.
    `qualified_name` parser. `PARSE_AST_VERSION` 47 → 48. See CHANGELOG.md. Surfaced three new,
    narrower gaps (G16-G18) previously hidden behind it — expected when peeling back a masking bug
    like this; each is its own small follow-up, not evidence G1 was scoped wrong.
-2. **G2/G3 (`connection`/`assert constraint` usage wiring for `PartUsageBodyElement`)** — each is
-   likely a one-line addition to the existing `alt()` dispatch, mirroring what `PartDefBodyElement`
-   already does for the same constructs. Good next PR, low risk.
+2. ~~**G2/G3 (`connection`/`assert constraint` usage wiring for `PartUsageBodyElement`)**~~ —
+   **Done.** Wiring itself was one line each, as expected, but both underlying parsers turned out
+   to have their own separate gaps blocking real usage: `connection_usage_member` had no
+   multiplicity support at all (`ConnectionUsageMember.multiplicity` added), and
+   `assert_constraint_member` never parsed a name in any context (`AssertConstraintMember.name`
+   added). `PARSE_AST_VERSION` 48 → 49. See CHANGELOG.md. Surfaced two new gaps (G19/G20) hidden
+   behind these in 2 of the 4 target files — same "closing one gap reveals the next" pattern as
+   G1, not evidence of wrong scoping.
 3. **G4 (`constraint` usage in part-def bodies)**, **G5 (`variation` prefix breadth)** — same
-   shape as G2/G3, still isolated single-family PRs.
-4. **G8, G9, G12, G13, G14, G16, G17, G18** — each confirmed and single- or double-file scoped;
-   pick off individually, same "one construct family per PR" cadence as past releases. G16-G18
-   are fresh (found while implementing G1) and haven't been prioritized relative to G8-G14 yet.
+   shape as G2/G3 was, still isolated single-family PRs. Given G2/G3's experience, budget time to
+   isolate-test each real target file fully (not just the first reported error) before assuming
+   the fix is complete.
+4. **G8, G9, G12, G13, G14, G16, G17, G18, G19, G20** — each confirmed and single- or
+   double-file scoped; pick off individually, same "one construct family per PR" cadence as past
+   releases. Not yet relatively prioritized against each other.
 5. **G6, G7, G10, G11, G15** — write a minimal isolated repro first (they may collapse into
    already-covered families, or reveal a different root cause than currently suspected) before
    scoping implementation work.

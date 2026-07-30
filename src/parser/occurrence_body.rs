@@ -442,6 +442,14 @@ pub(crate) fn assert_constraint_member(
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, name) = if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";")
+    {
+        (input, None)
+    } else {
+        let (input, parsed_name) = name(input)?;
+        (input, Some(parsed_name))
+    };
     let (input, body) = structured_constraint_body(input)?;
     let body = match body {
         StructuredConstraintBody::Semicolon => ConstraintDefBody::Semicolon,
@@ -449,8 +457,57 @@ pub(crate) fn assert_constraint_member(
     };
     Ok((
         input,
-        node_from_to(start, input, AssertConstraintMember { body, is_negated }),
+        node_from_to(
+            start,
+            input,
+            AssertConstraintMember {
+                name,
+                body,
+                is_negated,
+            },
+        ),
     ))
+}
+
+/// PARSER_BACKLOG_ROADMAP.md §6, G3: `assert_constraint_member` never parsed a name at all, so
+/// real usage like `assert constraint engineSelectionRational { }` (OMG spec Annex
+/// `10b-Trade-off Among Alternative Configurations.sysml`) fell through to opaque recovery --
+/// not just missing from `PartUsageBodyElement`, but unmodeled in the grammar entirely.
+#[cfg(test)]
+mod assert_constraint_name_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn assert_constraint_accepts_a_name() {
+        let (rest, node) =
+            assert_constraint_member(input("assert constraint engineSelectionRational { }"))
+                .expect("named assert constraint");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name.as_deref(), Some("engineSelectionRational"));
+        assert!(!node.value.is_negated);
+    }
+
+    #[test]
+    fn assert_constraint_anonymous_form_still_works() {
+        let (rest, node) =
+            assert_constraint_member(input("assert constraint { }")).expect("anonymous form");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, None);
+    }
+
+    #[test]
+    fn assert_constraint_negated_named_form() {
+        let (rest, node) = assert_constraint_member(input("assert not constraint c { }"))
+            .expect("negated named form");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name.as_deref(), Some("c"));
+        assert!(node.value.is_negated);
+    }
 }
 
 #[cfg(test)]

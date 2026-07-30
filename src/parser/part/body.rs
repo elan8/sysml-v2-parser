@@ -330,6 +330,7 @@ pub(crate) fn connection_usage_member(
             (input, None)
         }
     };
+    let (input, multiplicity) = opt(crate::parser::usage::multiplicity_node).parse(input)?;
     // PAR-007 widening: an inline `connect from to to (, extra)*` clause between the type and the
     // body, e.g. `connection link : Link connect sensorA.cmd to sensorB.cmd;`. Optional -- a
     // plain `connection link : Link;` declaration with no explicit binding must keep parsing.
@@ -380,6 +381,7 @@ pub(crate) fn connection_usage_member(
             ConnectionUsageMember {
                 name,
                 type_name,
+                multiplicity,
                 connect_from,
                 connect_to,
                 connect_extra_ends,

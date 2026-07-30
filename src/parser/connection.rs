@@ -526,6 +526,30 @@ mod membership_tests {
         );
     }
 
+    /// PARSER_BACKLOG_ROADMAP.md §6, G2: `connection_usage_member` had no multiplicity support
+    /// at all, so real usage like `connection trailerHitch : TrailerHitch[0..1];` (OMG spec
+    /// Annex `3c-Function-based Behavior-structure mod.sysml`) fell through to opaque recovery.
+    #[test]
+    fn connection_usage_member_accepts_multiplicity() {
+        let (rest, node) =
+            connection_usage_member(input("connection trailerHitch : TrailerHitch[0..1];"))
+                .expect("connection usage member with multiplicity");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name.as_deref(), Some("trailerHitch"));
+        assert_eq!(node.value.type_name.as_deref(), Some("TrailerHitch"));
+        let multiplicity = node.value.multiplicity.expect("multiplicity present");
+        assert!(multiplicity.value.lower.is_some());
+        assert!(multiplicity.value.upper.is_some());
+    }
+
+    #[test]
+    fn connection_usage_member_without_multiplicity_still_works() {
+        let (rest, node) = connection_usage_member(input("connection c1: MyConnection;"))
+            .expect("connection usage member without multiplicity");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.multiplicity, None);
+    }
+
     /// `connection_def`/`connection_def_required` previously never parsed a visibility prefix
     /// either (same genuine gap as `part_def`/`port_def`/`item_def`).
     #[test]

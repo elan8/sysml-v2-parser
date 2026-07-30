@@ -37,6 +37,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added regression tests in `src/parser/part/usage.rs::perform_semicolon_and_redefine_tests`
   covering plain/dotted/quoted-name semicolon bodies, the `:>>` redefine clause with both body
   forms, and confirming the `perform action <name>` declaration form is unaffected.
+- **`connection <name> : Type[mult];` usage form and `assert constraint` were wired into
+  `PartDefBodyElement` but not `PartUsageBodyElement`**, so real OMG spec Annex usage inside a
+  `part` usage body — as opposed to a `part def` body — fell through to opaque recovery.
+  PARSER_BACKLOG_ROADMAP.md §6, groups G2/G3.
+- `connection_usage_member` additionally had **no multiplicity support at all** (in either body
+  kind) — `connection trailerHitch : TrailerHitch[0..1];` (`3c-Function-based Behavior-structure
+  mod.sysml`) failed on the `[0..1]` regardless of which body it was in. Added
+  `ConnectionUsageMember.multiplicity: Option<Node<Multiplicity>>`, parsed via the existing
+  `multiplicity_node` parser right after the type.
+- `assert_constraint_member` additionally **never parsed a name at all** (in either body kind) —
+  `assert constraint engineSelectionRational { }` (`10b-Trade-off Among Alternative
+  Configurations.sysml`) isn't just missing from `PartUsageBodyElement`, it was unmodeled in the
+  grammar entirely; only the anonymous `assert constraint { }` form worked. Added
+  `AssertConstraintMember.name: Option<String>`.
+- Added `PartUsageBodyElement::Connection(Node<ConnectionUsageMember>)` and
+  `PartUsageBodyElement::AssertConstraint(Node<AssertConstraintMember>)` variants and wired
+  `connection_usage_member`/`assert_constraint_member` into `part_usage_body_element`'s dispatch,
+  mirroring the existing `PartDefBodyElement` wiring (`connection_def_required` before
+  `connection_usage_member`, same "def must be tried before usage" ordering rationale already
+  documented for `port`/`flow`/`calc`).
+- Bump `PARSE_AST_VERSION` from `48` to `49` (stacks on G1's `47` → `48` bump above). No
+  checked-in AST snapshot fixture exercises `connection`/`assert constraint` usage syntax, so no
+  snapshot regeneration was needed this time (verified: `cargo test --test validation --
+  --include-ignored` passes unchanged).
+- Added regression tests: `src/parser/connection.rs` (multiplicity), `src/parser/occurrence_body.rs`
+  (`assert_constraint_name_tests`), `src/parser/part/usage.rs::par_002_nested_def_tests` (the new
+  `PartUsageBodyElement` variants, plus confirming `connection def` isn't shadowed by the new
+  `connection_usage_member` wiring).
+  <br>Confirmed against real usage in the OMG spec Annex validation corpus: of the 4 files
+  originally attributed to G2/G3, `7a-Variant Configuration - General Concept.sysml` and
+  `10b-Trade-off Among Alternative Configurations.sysml` are now fully clean.
+  `3c-Function-based Behavior-structure mod-1.sysml`/`-2.sysml` each have a second, distinct gap
+  sitting directly behind the one fixed here (anonymous `action { }` and anonymous
+  `perform action { }` — the latter's `name` is currently mandatory) — not fixed here, added to
+  PARSER_BACKLOG_ROADMAP.md §6 as G19/G20.
 
 - **`ItemUsage` never accepted the anonymous redefinition form** (`item :>> name[multiplicity]?
   (: type)? (= value)? body`) that `PartUsage`/`AttributeUsage` already support, and had no
