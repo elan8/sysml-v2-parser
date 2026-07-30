@@ -49,16 +49,28 @@ fn parse_item_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
     ))
 }
 
-/// Item usage in a part definition body: `item` name multiplicity? (`:` type)? body.
+/// Item usage in a part definition body: `item` (name | `:>>` redefines)? multiplicity? (`:`
+/// type)? (`=` value)? body.
 pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"item"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name) = name(input)?;
+    // Name is optional: `ItemUsage`'s BNF `Identification` legally omits the name in favor of a
+    // leading `:>>` redefinition (`item :>> shape : Cylinder { ... }`), the same shape
+    // `PartUsage`/`AttributeUsage` already support. `name` simply fails to match `:>>` (not a
+    // valid identifier start), so `opt` naturally falls through to `feature_usage_header` below,
+    // which already recognizes a leading redefines/typing clause on its own via
+    // `specialization_clauses` -- no separate `prefix_redefinition_target` branch needed, unlike
+    // `part_usage`/`view_usage`'s hand-rolled dispatch. Confirmed real usage (not speculative) in
+    // the OMG Geometry domain library's `VehicleGeometryAndCoordinateFrames.sysml` example.
+    let (input, name) = opt(name).parse(input)?;
+    let name = name.unwrap_or_default();
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
+    let (input, value) =
+        opt(nom::sequence::preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -68,7 +80,9 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
             ItemUsage {
                 name,
                 type_name: header.type_name,
+                redefines: header.redefines,
                 multiplicity,
+                value,
                 body,
                 direction: None,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
@@ -156,5 +170,61 @@ mod membership_tests {
             node.value.membership.kind,
             crate::ast::MembershipKind::OwningMembership
         );
+    }
+}
+
+#[cfg(test)]
+mod redefines_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // Real usage confirmed in the OMG Geometry domain library's
+    // `sysml-v2-release/sysml/src/examples/Geometry Examples/VehicleGeometryAndCoordinateFrames.sysml`.
+
+    #[test]
+    fn item_usage_accepts_anonymous_redefinition_with_value() {
+        let (rest, node) =
+            item_usage(input("item :>> shape = new Box(4800 [mm], 1840 [mm], 1350 [mm]);"))
+                .expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "");
+        assert!(node.value.redefines.is_some());
+        assert!(node.value.value.is_some());
+        assert!(node.value.type_name.is_none());
+    }
+
+    #[test]
+    fn item_usage_accepts_anonymous_redefinition_with_type_and_body() {
+        let (rest, node) = item_usage(input(
+            "item :>> shape : Cylinder { :>> radius = 14 [mm]; :>> height = 40 [mm]; }",
+        ))
+        .expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "");
+        assert!(node.value.redefines.is_some());
+        assert_eq!(node.value.type_name.as_deref(), Some("Cylinder"));
+        assert!(node.value.value.is_none());
+    }
+
+    #[test]
+    fn item_usage_named_form_still_parses() {
+        let (rest, node) = item_usage(input("item wheelShape : Circle;")).expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "wheelShape");
+        assert_eq!(node.value.type_name.as_deref(), Some("Circle"));
+        assert!(node.value.redefines.is_none());
+    }
+
+    #[test]
+    fn item_usage_named_form_accepts_a_value() {
+        let (rest, node) = item_usage(input("item shape = new Box(1 [mm], 2 [mm], 3 [mm]);"))
+            .expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "shape");
+        assert!(node.value.value.is_some());
     }
 }

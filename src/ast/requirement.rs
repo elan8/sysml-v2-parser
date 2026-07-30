@@ -6,6 +6,7 @@ use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
     MetadataKeywordUsage,
 };
+use super::feature_value::FeatureValue;
 use super::view::ConstraintDefBodyElement;
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
@@ -185,13 +186,24 @@ pub struct RequirementUsage {
     pub membership: Membership,
 }
 
-/// Item usage inside a part definition body: `item` name multiplicity? (`:` type)? body.
+/// Item usage inside a part definition body: `item` (name | `:>>` redefines)? multiplicity? (`:`
+/// type)? (`=` value)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemUsage {
+    /// Empty for the anonymous redefinition form (`item :>> shape : Cylinder { ... }`), matching
+    /// `PartUsage::name`'s existing convention.
     pub name: String,
     pub type_name: Option<String>,
+    /// Redefines target, e.g. `shape` in `item :>> shape : Cylinder { ... }`. `None` for the
+    /// ordinary named form. Confirmed real usage in the OMG Geometry domain library's
+    /// `VehicleGeometryAndCoordinateFrames.sysml` example (`item :>> shape = new Box(...);` and
+    /// `item :>> shape : Cylinder { ... }`) -- previously unparseable, falling through to opaque
+    /// body-element recovery.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// Value expression (`= expr`, `default = expr`, `:= expr`), e.g. `new Box(...)`.
+    pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
     /// Set when parsed as `in`/`out`/`inout item` in port def bodies.
     pub direction: Option<InOut>,

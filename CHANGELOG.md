@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ItemUsage` never accepted the anonymous redefinition form** (`item :>> name[multiplicity]?
+  (: type)? (= value)? body`) that `PartUsage`/`AttributeUsage` already support, and had no
+  `value`/`redefines` fields at all. `item_usage`'s mandatory `name(input)?` call meant any
+  `item :>> shape ...` member fell straight through to opaque body-element recovery. Confirmed
+  real usage (not speculative) in the OMG Geometry domain library's
+  `VehicleGeometryAndCoordinateFrames.sysml` example (`item :>> shape = new Box(4800 [mm], 1840
+  [mm], 1350 [mm]);` and `item :>> shape : Cylinder { :>> radius = ...; :>> height = ...; }`),
+  discovered while validating that library end-to-end.
+- Made `item_usage`'s name `opt(name)` (mirroring `part_usage`/`view_usage`'s pattern) and added
+  `redefines: Option<Node<SubsettingRelationship>>` / `value: Option<Node<FeatureValue>>` fields to
+  `ItemUsage`. Unlike `part_usage_redefines_only`/`view_usage_redefines_only`'s separate
+  `prefix_redefinition_target` branch, no extra dispatch was needed here: the existing
+  `feature_usage_header` call already recognizes a leading `:>>` redefines clause together with a
+  `: Type` clause via its own `specialization_clauses`, so making the name optional was sufficient.
+- Bump `PARSE_AST_VERSION` from `46` to `47` for the `ItemUsage` field changes above.
+- Added regression tests in `src/parser/item.rs::redefines_tests` covering both real-usage forms
+  (redefines+value, redefines+type+body) plus regression coverage for the pre-existing named form.
+
 ## [0.49.0] - 2026-07-30
 
 ### Fixed
