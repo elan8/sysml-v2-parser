@@ -4,12 +4,13 @@ use crate::ast::{ItemDef, ItemUsage, Node};
 use crate::parser::attribute::{attribute_body, direction_prefix};
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, ws1, ws_and_comments};
+use crate::parser::lex::{name, short_name_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::multiplicity_node;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
+use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
@@ -57,6 +58,11 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"item"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2) -- see
+    // `attribute::attribute_usage`'s identical short-name handling for the confirmed real-usage
+    // citation (the same `VehicleGeometryAndCoordinateFrames.sysml` example this function's
+    // existing comment below already cites for the name-optional shape).
+    let (input, short_name) = short_name_prefix(input)?;
     // Name is optional: `ItemUsage`'s BNF `Identification` legally omits the name in favor of a
     // leading `:>>` redefinition (`item :>> shape : Cylinder { ... }`), the same shape
     // `PartUsage`/`AttributeUsage` already support. `name` simply fails to match `:>>` (not a
@@ -65,7 +71,7 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
     // `specialization_clauses` -- no separate `prefix_redefinition_target` branch needed, unlike
     // `part_usage`/`view_usage`'s hand-rolled dispatch. Confirmed real usage (not speculative) in
     // the OMG Geometry domain library's `VehicleGeometryAndCoordinateFrames.sysml` example.
-    let (input, name) = opt(name).parse(input)?;
+    let (input, name) = opt(preceded(ws_and_comments, name)).parse(input)?;
     let name = name.unwrap_or_default();
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
@@ -82,6 +88,7 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
             input,
             ItemUsage {
                 name,
+                short_name,
                 type_name: header.type_name,
                 redefines: header.redefines,
                 multiplicity,
@@ -230,5 +237,25 @@ mod redefines_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "shape");
         assert!(node.value.value.is_some());
+    }
+
+    // --- short-name (`<shortName>`) support, mirroring `attribute_usage`'s identical gap (shared
+    // `Identification` BNF production, §8.2.2.2) -- see `attribute.rs::attribute_body_tests`'s
+    // citation of the confirmed real-usage gap in the OMG Geometry domain library's
+    // `VehicleGeometryAndCoordinateFrames.sysml`.
+
+    #[test]
+    fn item_usage_captures_short_name() {
+        let (rest, node) =
+            item_usage(input("item <ws> wheelShape : Circle;")).expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.short_name.as_deref(), Some("ws"));
+        assert_eq!(node.value.name, "wheelShape");
+    }
+
+    #[test]
+    fn item_usage_without_short_name_has_none() {
+        let (_, node) = item_usage(input("item wheelShape : Circle;")).expect("item usage");
+        assert_eq!(node.value.short_name, None);
     }
 }

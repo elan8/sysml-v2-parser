@@ -7,8 +7,8 @@ use crate::ast::{
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::lex::{
-    capture_opaque_member, identification, name, starts_with_keyword, subset_operator, ws1,
-    ws_and_comments,
+    capture_opaque_member, identification, name, short_name_prefix, starts_with_keyword,
+    subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -287,6 +287,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
             input,
             AttributeUsage {
                 name: name_str,
+                short_name: None,
                 typing,
                 subsets,
                 redefines,
@@ -529,7 +530,17 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         let (input, _) = ws1(input)?;
         input
     };
-    let (peek, _) = ws_and_comments(input)?;
+    // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2), shared with `attribute_def`
+    // via `identification` -- confirmed real usage in the OMG Geometry domain library's
+    // `VehicleGeometryAndCoordinateFrames.sysml` (`attribute <wcf> wheelCoordinateFrame : ...`,
+    // `attribute <lbpr> lugBoltPlacementRadius :>> radius ...`), previously unparseable here.
+    let (input, short_name) = short_name_prefix(input)?;
+    // Consume (not just peek) any whitespace/comments between the short name's closing `>` and
+    // whatever follows -- `short_name_prefix` only skips ws *inside* the `< ... >` brackets, so a
+    // short name leaves fresh un-consumed whitespace here that wasn't present in the no-short-name
+    // path (where `ws1` above already fully consumed it).
+    let (input, _) = ws_and_comments(input)?;
+    let peek = input;
     let (input, usage_head) = if (peek.fragment().starts_with(b":")
         && !peek.fragment().starts_with(b":>")
         && !peek.fragment().starts_with(b":>>"))
@@ -639,6 +650,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             input,
             AttributeUsage {
                 name: name_str,
+                short_name,
                 typing,
                 subsets,
                 redefines,
@@ -728,6 +740,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
             input,
             AttributeUsage {
                 name: name_str,
+                short_name: None,
                 typing,
                 subsets,
                 redefines,
@@ -1086,5 +1099,53 @@ mod attribute_body_tests {
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(!node.value.is_end);
+    }
+
+    // --- short-name (`<shortName>`) support on `attribute_usage`, confirmed real-usage gap: the
+    // OMG Geometry domain library's `VehicleGeometryAndCoordinateFrames.sysml` example contains
+    // `attribute <wcf> wheelCoordinateFrame : CoordinateFrame;` and
+    // `attribute <lbpr> lugBoltPlacementRadius :>> radius default 60 [mm];`, both of which
+    // previously failed with `recovered_part_def_body_element` -- `attribute_usage` had no
+    // `<shortName>` handling at all, unlike `attribute_def` (shared `Identification` BNF
+    // production, §8.2.2.2).
+
+    #[test]
+    fn attribute_usage_captures_short_name() {
+        let text = "attribute <wcf> wheelCoordinateFrame : CoordinateFrame;";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.short_name.as_deref(), Some("wcf"));
+        assert_eq!(node.value.name, "wheelCoordinateFrame");
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("CoordinateFrame".to_string())
+        );
+    }
+
+    #[test]
+    fn attribute_usage_captures_short_name_with_redefines_and_value() {
+        let text = "attribute <lbpr> lugBoltPlacementRadius :>> radius default 60 [mm];";
+        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.short_name.as_deref(), Some("lbpr"));
+        assert_eq!(node.value.name, "lugBoltPlacementRadius");
+        assert_eq!(
+            node.value
+                .redefines
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("radius".to_string())
+        );
+        assert!(node.value.value.is_some());
+    }
+
+    #[test]
+    fn attribute_usage_without_short_name_has_none() {
+        let text = "attribute mass: Real;";
+        let (_, node) = attribute_usage(input(text)).expect("attribute usage");
+        assert_eq!(node.value.short_name, None);
     }
 }

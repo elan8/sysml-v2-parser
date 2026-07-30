@@ -303,6 +303,8 @@ pub struct PartUsage {
     /// `constant` keyword from `RefPrefix` -- see `AttributeUsage::is_constant`.
     pub is_constant: bool,
     pub name: String,
+    /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
+    pub short_name: Option<String>,
     /// Type after `:`, e.g. "Vehicle", "AxleAssembly". A comma-separated multi-target clause
     /// (`part vehicle : Vehicle, SpatialItem;`) joins into one display string here; see `typing`
     /// for the structured, multi-target-capable form (S42-004).
@@ -515,6 +517,10 @@ pub struct PerformInOutBinding {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeUsage {
     pub name: String,
+    /// Short name from `< ... >` when present, e.g. `attribute <wcf> wheelCoordinateFrame : ...`
+    /// (confirmed real usage in the OMG Geometry domain library's
+    /// `VehicleGeometryAndCoordinateFrames.sysml`). See `AttributeDef::short_name`.
+    pub short_name: Option<String>,
     /// Type after `:` or `:>`, e.g. `Some(TypingRelationship { target: "MassValue", .. })`
     /// (PAR-004 item 1). `typing_span` duplicates the node's own `span`.
     pub typing: Option<Node<TypingRelationship>>,
@@ -645,6 +651,8 @@ pub struct PortUsage {
     /// `constant` keyword from `RefPrefix`. See `AttributeUsage::is_constant`.
     pub is_constant: bool,
     pub name: String,
+    /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
+    pub short_name: Option<String>,
     pub type_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// Subsets feature and optional value expression.

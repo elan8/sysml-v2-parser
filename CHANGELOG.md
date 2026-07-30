@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`attribute_usage` had no `<shortName>` handling at all**, unlike `attribute_def` --
+  `AttributeUsage`/`AttributeDef` share the same BNF `UsageDeclaration`/`DefinitionDeclaration` ->
+  `Identification` production (§8.2.2.2, `( '<' ShortName '>' )? ( Name )?`), but only the `def`
+  side ever parsed it; `attribute_usage`'s head-dispatch only tried
+  `alt((prefix_redefinition_target, name))` for the name/redefines part. Confirmed real usage
+  (not speculative) in the OMG Geometry domain library's
+  `VehicleGeometryAndCoordinateFrames.sysml`: `attribute <wcf> wheelCoordinateFrame :
+  CoordinateFrame;` and `attribute <lbpr> lugBoltPlacementRadius :>> radius default 60 [mm];`
+  both failed with `recovered_part_def_body_element` before this fix.
+  <br>Since `AttributeUsage`/`PartUsage`/`ItemUsage`/`PortUsage` all reach `Identification` through
+  the same shared `UsageDeclaration` production, checked the other three usage kinds and found
+  they had the identical gap -- fixed all four together rather than leaving three known-bad.
+- Added `short_name: Option<String>` to `AttributeUsage`, `PartUsage`, `ItemUsage`, and
+  `PortUsage`, and a shared `short_name_prefix` lexer helper (`src/parser/lex.rs`) factored out of
+  `identification`'s existing `( '<' ShortName '>' )?` half, reused by all four usage parsers'
+  head-dispatch logic (`attribute::attribute_usage`, `part::usage::part_usage`, `item::item_usage`,
+  `port::port_usage`). Each dispatch now re-consumes whitespace/comments after the short name's
+  closing `>` before proceeding (a short name leaves fresh un-consumed whitespace there that the
+  no-short-name path previously got for free from the mandatory keyword-`ws1`) -- caught by the
+  new regression tests below, which initially failed with a `TakeWhile1` parse error until this
+  whitespace handling was added.
+- Bump `PARSE_AST_VERSION` from `49` to `50` for the four struct field additions. Regenerated AST
+  snapshot fixtures (`UPDATE_VALIDATION_AST=1 cargo test --test validation -- --include-ignored`)
+  — reviewed the diff: only the new `short_name: None` field appears, in
+  `functional_allocation_4a.txt` and `parts_tree_1a.txt` (neither fixture's source uses
+  `<shortName>` syntax).
+- Added regression tests: `attribute_body_tests` (attribute.rs), `short_name_tests`
+  (part/usage.rs), `redefines_tests` (item.rs), and `par_002_widening_tests` (port.rs) --
+  covering the plain named form, the form combined with a leading redefines/subsets clause, and
+  confirming the no-short-name path is unaffected (`short_name: None`).
+  <br>Confirmed against real usage: `VehicleGeometryAndCoordinateFrames.sysml` no longer produces
+  any `recovered_part_def_body_element` diagnostics.
+
 - **`perform <path>` (part usage body, no `action` keyword) only accepted a brace body and had
   no `:>>` redefinition clause**, so real Systems Library / OMG spec Annex usage like
   `perform 'provide power';`, `perform providePower.generateTorque;`, and

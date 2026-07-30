@@ -538,6 +538,7 @@ fn normalize_enumeration_usage(u: &EnumerationUsage) -> EnumerationUsage {
 fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
     AttributeUsage {
         name: a.name.clone(),
+        short_name: a.short_name.clone(),
         typing: a.typing.clone(),
         subsets: a.subsets.clone(),
         redefines: a.redefines.clone(),
@@ -579,6 +580,7 @@ fn normalize_part_usage(p: &PartUsage) -> PartUsage {
         is_derived: p.is_derived,
         is_constant: p.is_constant,
         name: p.name.clone(),
+        short_name: p.short_name.clone(),
         type_name: p.type_name.clone(),
         typing: p.typing.clone(),
         multiplicity: p.multiplicity.clone(),
@@ -848,6 +850,7 @@ fn normalize_port_usage(p: &PortUsage) -> PortUsage {
         is_derived: p.is_derived,
         is_constant: p.is_constant,
         name: p.name.clone(),
+        short_name: p.short_name.clone(),
         type_name: p.type_name.clone(),
         multiplicity: p.multiplicity.clone(),
         subsets: p.subsets.clone(),

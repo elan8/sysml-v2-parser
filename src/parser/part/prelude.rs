@@ -30,8 +30,8 @@ pub(crate) use crate::parser::flow::flow_def;
 pub(crate) use crate::parser::interface::{connect_body, interface_def_required};
 pub(crate) use crate::parser::item::{item_def_required, item_usage};
 pub(crate) use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, starts_with_any_keyword,
-    starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
+    identification, name, qualified_name, recover_body_element, short_name_prefix,
+    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
 };
 pub(crate) use crate::parser::metadata::{metadata_def, metadata_usage};
 pub(crate) use crate::parser::metadata_annotation::{annotation, metadata_annotation};

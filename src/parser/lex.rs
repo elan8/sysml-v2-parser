@@ -703,12 +703,7 @@ fn starts_new_declaration_after_newline(fragment: &[u8], newline_end: usize) -> 
 
 /// Identification: ( '<' ShortName '>' )? ( Name )?
 pub(crate) fn identification(input: Input<'_>) -> IResult<Input<'_>, Identification> {
-    let (input, short_name) = opt(delimited(
-        preceded(ws_and_comments, tag(&b"<"[..])),
-        preceded(ws_and_comments, name),
-        preceded(ws_and_comments, tag(&b">"[..])),
-    ))
-    .parse(input)?;
+    let (input, short_name) = short_name_prefix(input)?;
     let (input, decl_name) = opt(preceded(ws_and_comments, name)).parse(input)?;
     Ok((
         input,
@@ -717,6 +712,19 @@ pub(crate) fn identification(input: Input<'_>) -> IResult<Input<'_>, Identificat
             name: decl_name,
         },
     ))
+}
+
+/// The `( '<' ShortName '>' )?` half of `Identification` (BNF §8.2.2.2) in isolation, for usage
+/// parsers (`attribute_usage`, `part_usage`, `item_usage`, `port_usage`, ...) whose own
+/// name-dispatch logic (anonymous colon form vs. named vs. prefix-redefines) can't reuse
+/// `identification` wholesale since the name half isn't a plain `opt(name)` for them.
+pub(crate) fn short_name_prefix(input: Input<'_>) -> IResult<Input<'_>, Option<String>> {
+    opt(delimited(
+        preceded(ws_and_comments, tag(&b"<"[..])),
+        preceded(ws_and_comments, name),
+        preceded(ws_and_comments, tag(&b">"[..])),
+    ))
+    .parse(input)
 }
 
 /// Optional `private` / `protected` / `public` visibility prefix, shared by every `*Def`/`*Usage`

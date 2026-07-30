@@ -30,6 +30,7 @@ pub(crate) fn part_usage_redefines_only<'a>(
                 is_derived: false,
                 is_constant: false,
                 name: String::new(),
+                short_name: None,
                 type_name: String::new(),
                 typing: None,
                 multiplicity: multiplicity_opt,
@@ -104,6 +105,7 @@ pub(crate) fn part_usage_named<'a>(
                 is_derived: false,
                 is_constant: false,
                 name: name_str,
+                short_name: None,
                 type_name,
                 typing,
                 multiplicity: multiplicity_opt,
@@ -162,7 +164,17 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         let (input, _) = ws1(input)?;
         input
     };
-    let (peek, _) = ws_and_comments(input)?;
+    // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2) -- see
+    // `attribute::attribute_usage`'s identical short-name handling for the confirmed real-usage
+    // citation. Parsed once here at the dispatch level (rather than inside each of the three
+    // branches below) and threaded through post-hoc, mirroring how `usage_prefix`/`is_individual`/
+    // etc. are already applied to whichever branch matches.
+    let (input, short_name) = short_name_prefix(input)?;
+    // Consume (not just peek) whitespace/comments after the short name's closing `>` -- see
+    // `attribute::attribute_usage`'s identical fix for why this can't reuse `ws1`'s earlier
+    // consumption (a short name leaves fresh un-consumed whitespace after it).
+    let (input, _) = ws_and_comments(input)?;
+    let peek = input;
     if (peek.fragment().starts_with(b":")
         && !peek.fragment().starts_with(b":>")
         && !peek.fragment().starts_with(b":>>"))
@@ -174,6 +186,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         usage.value.direction = direction;
         usage.value.is_derived = is_derived;
         usage.value.is_constant = is_constant;
+        usage.value.short_name = short_name;
         usage.value.membership = Membership::feature(visibility, visibility_span);
         return Ok((input, usage));
     }
@@ -184,6 +197,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         usage.value.direction = direction;
         usage.value.is_derived = is_derived;
         usage.value.is_constant = is_constant;
+        usage.value.short_name = short_name;
         usage.value.membership = Membership::feature(visibility, visibility_span);
         return Ok((input, usage));
     }
@@ -193,6 +207,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
     usage.value.direction = direction;
     usage.value.is_derived = is_derived;
     usage.value.is_constant = is_constant;
+    usage.value.short_name = short_name;
     usage.value.membership = Membership::feature(visibility, visibility_span);
     Ok((input, usage))
 }
@@ -234,6 +249,7 @@ fn anonymous_part_usage<'a>(
                 is_derived: false,
                 is_constant: false,
                 name: String::new(),
+                short_name: None,
                 type_name,
                 typing,
                 multiplicity: multiplicity_opt,
@@ -1334,5 +1350,54 @@ mod variant_membership_tests {
             node.value.membership.kind,
             crate::ast::MembershipKind::VariantMembership
         );
+    }
+}
+
+// --- short-name (`<shortName>`) support on `part_usage`, mirroring `attribute_usage`'s identical
+// gap (shared `Identification` BNF production, §8.2.2.2) -- see
+// `attribute.rs::attribute_body_tests`'s citation of the confirmed real-usage gap in the OMG
+// Geometry domain library's `VehicleGeometryAndCoordinateFrames.sysml`.
+#[cfg(test)]
+mod short_name_tests {
+    use super::*;
+    use crate::parser::usage::targets_display_string;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn part_usage_captures_short_name() {
+        let (rest, node) =
+            part_usage(input("part <eng> engine : Engine;")).expect("part usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.short_name.as_deref(), Some("eng"));
+        assert_eq!(node.value.name, "engine");
+        assert_eq!(node.value.type_name, "Engine");
+    }
+
+    // Mirrors the anonymous-redefinition shape confirmed in `tests/apollo_regressions.rs`
+    // (`part :>> engines[5] = (...);`) -- no own type, so this goes through
+    // `part_usage_redefines_only` rather than `part_usage_named`'s permissive (and unrelated)
+    // leading-`:>>`-discard shape.
+    #[test]
+    fn part_usage_captures_short_name_with_redefines() {
+        let (rest, node) = part_usage(input("part <e> :>> engines[5];")).expect("part usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.short_name.as_deref(), Some("e"));
+        assert_eq!(
+            node.value
+                .redefines
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("engines".to_string())
+        );
+    }
+
+    #[test]
+    fn part_usage_without_short_name_has_none() {
+        let (_, node) = part_usage(input("part engine : Engine;")).expect("part usage");
+        assert_eq!(node.value.short_name, None);
     }
 }

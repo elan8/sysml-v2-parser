@@ -201,6 +201,8 @@ pub struct ItemUsage {
     /// `item :>> shape : Cylinder { ... }`) -- previously unparseable, falling through to opaque
     /// body-element recovery.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Short name from `< ... >` when present. See `crate::ast::AttributeUsage::short_name`.
+    pub short_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// Value expression (`= expr`, `default = expr`, `:= expr`), e.g. `new Box(...)`.
     pub value: Option<Node<FeatureValue>>,
