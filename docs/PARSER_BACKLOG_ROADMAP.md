@@ -358,6 +358,13 @@ it as scoped.
 | G27 | *(found while closing G10)* `occurrence` members inside shared attribute/item bodies | **Done** | — | occurrence nested under `item def` bodies |
 | G29 | *(found while closing G7)* `ref` prefix on occurrence usages (`ref individual :>> …`) | **Done** | — | `ref individual :>> vehicleUnderTest;` |
 | G30 | *(found while closing G15/G18)* `exhibit (state)? <name> …` inside occurrence/snapshot **usage** bodies (part usage already had it via G18) | **Done** | — | `exhibit vehicleStates.on { ... }` (`6-Individual and Snapshots.sysml`) |
+| G31 | *(found while adapting Spec42 to 0.50.0)* Explicit `succession <a> to <b> [of <guard-expr>];` statement not wired into `ActionDefBodyElement`/`ActionUsageBodyElement` — `SuccessionUsage` already exists and works inside `OccurrenceBodyElement` (state/occurrence bodies), just not action bodies | **Open** | — | `succession validate to checkRoute of status == "ok";` |
+| G32 | *(found while adapting Spec42 to 0.50.0)* `PartDefBodyElement` has no `ActionDef` variant at all — nested `action def <name>;` / `{ }` inside a `part def` body fails to parse ("expected ';' or '{' after action definition header"), unlike its already-supported siblings `StateDef`/`MetadataDef`/`FlowDef`/`RequirementDef` (PAR-002) | **Open** | — | `part def Navigation { action def DoNavigate; action def FindHome; }` |
+
+G31/G32 are unrelated to the original 25-file spec-Annex audit below — they surfaced from Spec42's
+own test suite while adapting it to consume 0.50.0, not from that audit. Repro: `spec42/crates/sysml_model/tests/activity_graph_semantics.rs::ast_extract_includes_decision_merge_assign_and_conditional_succession`
+(G31) and `spec42/crates/sysml_model/tests/p1_diagnostics.rs::action_defs_in_part_body_do_not_emit_duplicate_namespace_member`
+(G32), both currently failing on spec42's `main` pending these two gaps.
 
 **Total: 25 files** originally, matching the `56 → 31` drop. G1's fix (see CHANGELOG.md) closed
 the `perform` gap cleanly wherever it was the *only* problem in a file (`12b-Allocation-1.sysml`
@@ -392,8 +399,13 @@ is closed.
    more-specific dispatcher so `connection_def`'s own hash-annotation prefix still wins where it
    applies. See CHANGELOG.md.
 
-§6 is now fully closed. [PR #3](https://github.com/elan8/sysml-v2-parser/pull/3) is ready to
-merge.
+6. **G31/G32 (guarded `succession` in action bodies; `action def` nested in `part def` bodies)**
+   — **Open**, found 2026-07-30 while adapting Spec42 to 0.50.0. Not yet scheduled.
+
+§6 was fully closed as of the G1–G30 pass; G31/G32 reopened it slightly (found afterward, via a
+downstream consumer's test suite rather than the original spec-Annex audit).
+[PR #3](https://github.com/elan8/sysml-v2-parser/pull/3) is ready to merge — G31/G32 don't block
+it.
 
 ---
 
