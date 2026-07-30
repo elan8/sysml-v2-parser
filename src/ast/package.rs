@@ -15,9 +15,9 @@ use super::requirement::{
     UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
 };
 use super::structure::{
-    AliasDef, AttributeDef, AttributeUsage, ConnectionDef, ConnectionUsageMember, EnumDef,
-    IndividualDef, InterfaceDef, InterfaceUsage, ItemDef, MetadataDef, MetadataUsage,
-    OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
+    AliasDef, AttributeDef, AttributeUsage, Connect, ConnectionDef, ConnectionUsageMember, EnumDef,
+    IndividualDef, InterfaceDef, InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage,
+    MetadataUsage, OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
     CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
@@ -133,4 +133,14 @@ pub enum PackageBodyElement {
     Ref(Node<RefDecl>),
     /// Standalone enumeration usage at package level. See `AttributeUsage`.
     EnumerationUsage(Node<EnumerationUsage>),
+    /// `#keyword` metadata tag at package level, either the bare `#keyword (: Type)? (about
+    /// ...)? (;|{...})` form or the `PrefixMetadataMember`-style form prefixing the next package
+    /// member (e.g. `#fmeaspec requirement req1 { ... }`, OMG spec Annex `14c-Language
+    /// Extensions.sysml`, FMEA library example) -- previously package bodies had no `#`/`@`
+    /// annotation support at all, unlike part/item/action/etc. bodies.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// Standalone `connect a to b;` connector usage at package level (e.g. the FMEA library's
+    /// `#violation connect 'Glucose Meter in Use' to req2;` in `14c-Language Extensions.sysml`).
+    /// See `AttributeUsage` for the general PAR-002 rationale.
+    Connect(Node<Connect>),
 }

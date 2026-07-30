@@ -561,7 +561,11 @@ fn diagnostics_include_taxonomy_categories() {
         Some(DiagnosticCategory::ParseError)
     );
 
-    let unsupported = parse_with_diagnostics("package P { #fmeaspec requirement req1 { } }");
+    // `#fmeaspec requirement req1 { }` is now fully supported at package level as a
+    // PrefixMetadataMember-style tag on the following `requirement` member
+    // (PARSER_BACKLOG_ROADMAP.md §6); use a form still unsupported (a typed short-name tag
+    // followed by anything other than `;`/`{`/`about`) to exercise this diagnostic.
+    let unsupported = parse_with_diagnostics("package P { #tag : Foo::Bar::Baz weirdstuff; }");
     let unsupported_entry = unsupported
         .errors
         .iter()

@@ -274,6 +274,14 @@ pub enum AttributeBodyElement {
     /// bodies, and an item *is* an occurrence, so `occurrence :>> causes;` is a legal member --
     /// see the OMG spec Annex `14c-Language Extensions.sysml`.
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
+    /// `connect a to b;` connector usage. `AttributeBody` is shared with `item def`/`item` usage
+    /// bodies, which legally own connector members (e.g. the FMEA library's `#prevention connect
+    /// 'battery depleted' to req1;` in `14c-Language Extensions.sysml`).
+    Connect(Node<Connect>),
+    /// `#keyword` metadata tag, bare or `PrefixMetadataMember`-style prefixing the next member
+    /// (see `PackageBodyElement::MetadataKeywordUsage`). `14c-Language Extensions.sysml`'s FMEA
+    /// library example prefixes almost every member in these shared bodies with one.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Other(String),
 }
 

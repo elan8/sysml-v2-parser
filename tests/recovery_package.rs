@@ -3,8 +3,17 @@ use sysml_v2_parser::{parse, parse_with_diagnostics};
 
 #[test]
 fn package_recovery_inserts_error_node_and_keeps_later_sibling() {
-    let input = "package P {\n#fmeaspec requirement req1 { }\npart def Good;\n}";
-    let root = parse(input).expect("package should parse with local recovery");
+    // parse_root now rejects any document with an embedded recovery placeholder (GH-2), so the
+    // local-recovery guarantee this test checks belongs to parse_with_diagnostics, not parse.
+    // `#tag : Type trailing-garbage;` rather than `#fmeaspec requirement req1 { }`: package
+    // bodies now fully support the latter as a PrefixMetadataMember-style tag on the following
+    // `requirement` member (PARSER_BACKLOG_ROADMAP.md §6).
+    let input = "package P {\n#tag : Foo::Bar::Baz weirdstuff;\npart def Good;\n}";
+    assert!(
+        parse(input).is_err(),
+        "strict should reject the unsupported annotation"
+    );
+    let root = parse_with_diagnostics(input).root;
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
@@ -28,7 +37,7 @@ fn package_recovery_inserts_error_node_and_keeps_later_sibling() {
 
 #[test]
 fn package_recovery_diagnostic_is_specific() {
-    let input = "package P {\n#fmeaspec requirement req1 { }\npart def Good;\n}";
+    let input = "package P {\n#tag : Foo::Bar::Baz weirdstuff;\npart def Good;\n}";
     let result = parse_with_diagnostics(input);
     let err = result
         .errors
@@ -40,9 +49,7 @@ fn package_recovery_diagnostic_is_specific() {
         "annotation recovery should explain the failure"
     );
     assert!(
-        err.found
-            .as_deref()
-            .is_some_and(|f| f.contains("#fmeaspec")),
+        err.found.as_deref().is_some_and(|f| f.contains("#tag")),
         "diagnostic should preserve recovered snippet"
     );
 }

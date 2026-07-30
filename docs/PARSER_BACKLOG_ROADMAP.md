@@ -2,11 +2,19 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-30 (§6 G4–G20 closed — constraint/variation/perform-parameter/transition/
-flow/loop/exhibit/import/allocate/anonymous-action gaps from the 2026-07-30 audit; surfaced
-G21–G30 as narrower follow-ups discovered while closing them; `PARSE_AST_VERSION` 51 → 52.
-Re-run the validation suite to refresh the §6 file-count estimate — see
+**Last updated:** 2026-07-30 (§6 fully closed — rebased [PR #3](https://github.com/elan8/sysml-v2-parser/pull/3)
+(GH-2's `parse_root` verdict-parity fix) onto the completed G1–G30 work and found one last gap:
+package/item-def bodies had no `#`/`@` annotation or `connect a to b;` support at all, needed by
+`14c-Language Extensions.sysml`'s FMEA library example. Closed with a new `metadata_keyword_prefix`
+function (kept separate from `metadata_keyword_usage` to avoid regressing `hash_annotation`'s
+opaque-capture fallback used elsewhere) plus `PackageBodyElement`/`AttributeBodyElement::{Connect,
+MetadataKeywordUsage}`. `cargo test --test validation -- --include-ignored` is now a genuine
+56/56 with #3 applied — **§6 is closed, #3 is ready to merge.** See
 [§6](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit).)
+
+**Previously:** 2026-07-30 (§6 G4–G20 closed — constraint/variation/perform-parameter/transition/
+flow/loop/exhibit/import/allocate/anonymous-action gaps from the 2026-07-30 audit; surfaced
+G21–G30 as narrower follow-ups discovered while closing them; `PARSE_AST_VERSION` 51 → 52.)
 
 **Previously:** 2026-07-30 (§6 G2/G3 closed — `connection`/`assert constraint` usage wired into
 `PartUsageBodyElement`, plus the multiplicity/name gaps found underneath them
@@ -243,7 +251,7 @@ Consolidated from [SYSML_V2_COMPLIANCE_GAP.md](./SYSML_V2_COMPLIANCE_GAP.md) and
 | ----- | -------- | ----- |
 | Unified definition / usage / specialization grammar layer | **P5+** | Largest architectural gap; do not big-bang rewrite. The 0.46.0 `ref action`/`ref state` part-body slice is **not** this rewrite — only the Systems Library forms that were opaque catch-alls. |
 | `DefaultReferenceUsage` AST (bare `name : Type;`) | **Done** (diagnostics-spec-audit) | Part def/usage bodies; was mis-modeled as `AttributeUsage` via shorthand |
-| Metadata `#` / `@` / user-defined keyword surface | Medium | Partial parse; remaining legal forms still hit `unsupported_annotation_syntax` (coverage Warning, not a language ban) |
+| Metadata `#` / `@` / user-defined keyword surface | Medium | Partial parse; remaining legal forms still hit `unsupported_annotation_syntax` (coverage Warning, not a language ban). §6's audit closed the `PrefixMetadataMember`-style `#<tag>` prefix syntactically (`metadata_keyword_prefix`, package/attribute bodies) — still doesn't resolve whether `<tag>` is an actually-declared `metadata def <tag>` short name (that semantic check + a package-local short-name index is the remaining 1.5b item, §2.1) |
 | Part-body `ref action` / `ref state` (Systems Library) | **Done** (0.46.0) | Real `ActionUsage`/`StateUsage` with `is_reference`, `:>`/` :>>`, visibility on plain `ref` |
 | `take_until_terminator` header scraping → structured headers | Medium | Per-family as library fixtures expose gaps |
 | `part_def` prelude unify with `definition_prefix` | Low | Intentionally local for disambiguation |
@@ -289,22 +297,28 @@ No Spec42 diagnostic currently depends on any of these; cross-check against § 1
 
 ## 6. Strict vs. recovery verdict parity (2026-07-30 audit)
 
-**Blocking Spec42 v1.0.** [GH-2](https://github.com/elan8/sysml-v2-parser/issues/2) reported that
-`parse`/`parse_root` (strict) and `parse_for_editor`/`parse_with_diagnostics` (recovery) disagree
-on whether a document is valid: strict silently accepted documents where the grammar had
-internally given up on a body member and embedded a recovery placeholder in the AST, because
-`parse_root` never walked the AST for those placeholders the way `parse_with_diagnostics` already
-did via `collect_recovery_errors`. A fix (`parse_root` now runs that same walk and rejects if any
-placeholder is present) is ready on
-[`fix/gh-2-strict-recovery-verdict-parity`](https://github.com/elan8/sysml-v2-parser/pull/3), but
-is **held, not merged**: running it against the full (normally `#[ignore]`d) validation suite
-(`cargo test --test validation -- --include-ignored`) drops
+**Was blocking Spec42 v1.0; now closed.** [GH-2](https://github.com/elan8/sysml-v2-parser/issues/2)
+reported that `parse`/`parse_root` (strict) and `parse_for_editor`/`parse_with_diagnostics`
+(recovery) disagree on whether a document is valid: strict silently accepted documents where the
+grammar had internally given up on a body member and embedded a recovery placeholder in the AST,
+because `parse_root` never walked the AST for those placeholders the way `parse_with_diagnostics`
+already did via `collect_recovery_errors`. A fix (`parse_root` now runs that same walk and rejects
+if any placeholder is present) is on
+[`fix/gh-2-strict-recovery-verdict-parity`](https://github.com/elan8/sysml-v2-parser/pull/3).
+
+It was **held, not merged** for a while: running it against the full (normally `#[ignore]`d)
+validation suite (`cargo test --test validation -- --include-ignored`) originally dropped
 `full_validation_suite::test_full_validation_suite` from 56/56 to **31/56**. The 25 failing files
-are official OMG SysML v2 spec Annex examples that use real, valid constructs the grammar doesn't
+were official OMG SysML v2 spec Annex examples using real, valid constructs the grammar didn't
 support yet in specific nested contexts — `parse_with_diagnostics` was already flagging all 25 as
 invalid before that fix; `parse_root` was just the one silently disagreeing. Merging the verdict
-fix without first closing (most of) these gaps would make `parse()` reject ~45% of realistic
-spec-conformant models, which is why it's blocked rather than shipped as-is.
+fix without first closing (most of) these gaps would have made `parse()` reject ~45% of realistic
+spec-conformant models.
+
+**Now unblocked: the table below closed all 25, plus the last remaining gap it surfaced
+(`14c-Language Extensions.sysml`'s `#`-prefix and `connect a to b;` support in package/item-def
+bodies, found while rebasing #3 onto the G1–G30 work — see CHANGELOG.md). The full validation
+suite is a genuine 56/56 with #3's `parse_root` fix applied; #3 is ready to merge.**
 
 **This section is the file-by-file audit of those 25 failures**, grouped by root-cause construct
 family. Each group lists its confidence: **Confirmed** means isolated outside the real file with a
@@ -356,15 +370,10 @@ pattern is expected in a file with multiple unrelated constructs — not evidenc
 scoped wrong — but it does mean file-count progress is slower than the per-group count alone
 suggests.
 
-Net effect: **re-run `cargo test --test validation -- --include-ignored`** to measure how many of
-the original 25 spec-Annex failures remain after G4–G20 (plus G21/G22/G23/G25/G26/G27/G30 closed in
-the same pass). The per-group "Was N files" counts above are historical; the live count is whatever
-the validation suite reports once PR #3's `parse_root` verdict-parity fix is applied on top. Update
-this paragraph after that run lands.
-
-Once enough of the §6 table is **Done** to bring the practical `parse_root` regression down to a
-small, reviewable diff, re-run the validation suite, update this section's file count, and unhold
-[PR #3](https://github.com/elan8/sysml-v2-parser/pull/3).
+Net effect: **`cargo test --test validation -- --include-ignored` is a genuine 56/56** with #3's
+`parse_root` fix rebased onto the G1–G30 work, confirmed 2026-07-30. `test_full_validation_suite`
+needed no exception list or expectation change — every one of the original 25 spec-Annex failures
+is closed.
 
 ### Recommended order
 
@@ -374,8 +383,17 @@ small, reviewable diff, re-run the validation suite, update this section's file 
 3. ~~**G4–G20**~~ — **Done** (2026-07-30). See CHANGELOG.md Unreleased. Surfaced G21–G30 as
    narrower follow-ups discovered while closing them — same "closing one gap reveals the next"
    pattern as G1/G2/G3; each is its own small item, not evidence the G4–G20 pass was scoped wrong.
-4. **G21–G30 and any new gaps from the next validation run** — isolate-test each real target file
-   fully before assuming the fix is complete (lesson from G2/G3's hidden multiplicity/name gaps).
+4. ~~**G21–G30**~~ — **Done.** See CHANGELOG.md Unreleased.
+5. ~~**Last remaining gap: `#`-prefix / `connect` support in package & item-def bodies**~~ —
+   **Done** (found and closed while rebasing #3 onto the G1–G30 work). `metadata_keyword_prefix`
+   (a new function, kept separate from `metadata_keyword_usage` so its stricter guard still
+   protects `hash_annotation`'s opaque-capture fallback elsewhere) plus
+   `PackageBodyElement`/`AttributeBodyElement::{Connect, MetadataKeywordUsage}`, wired after every
+   more-specific dispatcher so `connection_def`'s own hash-annotation prefix still wins where it
+   applies. See CHANGELOG.md.
+
+§6 is now fully closed. [PR #3](https://github.com/elan8/sysml-v2-parser/pull/3) is ready to
+merge.
 
 ---
 

@@ -142,6 +142,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `perform action { }` — the latter's `name` is currently mandatory) — not fixed here, added to
   PARSER_BACKLOG_ROADMAP.md §6 as G19/G20.
 
+- **`parse`/`parse_root` silently accepted invalid SysML v2 input** (misspelled keywords,
+  unknown keywords, and other body members the grammar could not match) by returning `Ok` for
+  any document that structurally parsed (balanced braces, full input consumed), even when the
+  recursive-descent grammar had internally given up on a body member and embedded it as a
+  recovery placeholder (`PartDefBodyElement::Error`, `PackageBodyElement::Error`, etc.) instead
+  of failing. `parse_with_diagnostics`/`parse_for_editor` already walked the AST for these
+  placeholders via `collect_recovery_errors` and correctly reported them; `parse_root` never did
+  the same walk, so the two public entry points disagreed on whether a document was valid.
+  Reported in [elan8/sysml-v2-parser#2](https://github.com/elan8/sysml-v2-parser/issues/2).
+- `parse_root` now calls `collect_recovery_errors` on the successfully-structured AST before
+  returning `Ok`, and returns the first embedded diagnostic as an `Err` if any are present. This
+  closes the "strict silently accepts invalid SysML" half of the reported divergence.
+- Added regression tests in `src/parser/parse.rs::tests` covering the misspelled-keyword,
+  unknown-keyword, and typo'd-declaration cases from the issue, confirming `parse_root` and
+  `parse_with_diagnostics` now agree on the verdict.
+- Updated four existing tests (`tests/parser/recovery.rs`,
+  `tests/parser/structure.rs::test_flow_and_allocation_brace_bodies_parse`/
+  `test_metadata_def_brace_body_parse`, `tests/recovery_package.rs`) that had asserted `parse()`
+  succeeds on inputs containing an embedded recovery placeholder -- i.e. they encoded the bug
+  as intended behavior. They now assert `parse()` rejects that input and moved the
+  recovers-and-keeps-later-siblings assertions to `parse_with_diagnostics`, which is where that
+  guarantee actually belongs.
+
+**Was held pending follow-up; now unblocked and merge-ready.** Running this fix against the full
+(normally `#[ignore]`d) validation suite originally showed
+`full_validation_suite::test_full_validation_suite` drop from 56/56 to 31/56 (25 of the official
+SysML v2 spec Annex example files hit constructs the grammar didn't support yet in specific
+nested contexts -- `parse_with_diagnostics` already flagged all 25 as invalid; `parse_root` was
+just silently agreeing to disagree). PARSER_BACKLOG_ROADMAP.md §6's follow-up work (G1-G20, see
+below and #7/#8/#9) closed all but one of those, and rebasing this branch onto that work closed
+the last one directly: `14c-Language Extensions.sysml`'s FMEA library example uses `#<tag>` as a
+`PrefixMetadataMember`-style prefix on the following declaration (`#fmeaspec requirement req1 {
+... }`, `#prevention connect a to b;`) inside package and item-def bodies, neither of which had
+any `#`/`@` annotation or `connect a to b;` support at all before this. Added
+`metadata_keyword_prefix` (a new function, not a widening of `metadata_keyword_usage`'s existing
+guard -- that guard is relied on elsewhere to correctly fail and fall through to
+`hash_annotation`'s opaque-capture form, e.g. `#refinement dependency X to Y;` in action/
+requirement bodies) plus `PackageBodyElement`/`AttributeBodyElement::{Connect,
+MetadataKeywordUsage}`, wired carefully *after* every more-specific dispatcher (in particular
+`connection_def`'s own `DefinitionPrefixOptions::with_hash_annotation()`, so `#derivation
+connection { ... }` still becomes one annotated `ConnectionDef`, not a stray tag). Result: a
+genuine **56/56** -- no test exception needed. Four existing tests/fixtures that used
+`#fmeaspec requirement req1 { }` specifically as a stand-in for "an unsupported annotation" were
+updated to a still-genuinely-unsupported example (`#tag : Foo::Bar::Baz weirdstuff;`) now that
+the original is valid, fully-supported syntax. All gates green: `cargo test` (361 lib tests),
+`cargo test --test validation -- --include-ignored` (25/25, 56/56 files), `cargo fmt`,
+`cargo clippy`.
+
+Investigated the issue's other reported direction ("recovery rejects valid SysML") before
+deciding not to add speculative grammar branches for it, per this project's practice of verifying
+against real usage before scoping a fix:
+- The comment-continuation false positive (a `/* ... */` continuation line resembling `Word:
+  text` misflagged as a bare declaration) was already fixed independently in
+  [#4](https://github.com/elan8/sysml-v2-parser/pull/4) (issue #1), which removed the whole
+  non-spec heuristic that caused it.
+- `allocate` in a part-definition body already works correctly on both entry points when given
+  real (dotted-qualified-name) syntax, confirmed against `AllocationTest.sysml` in the vendored
+  library -- the issue's own example (`allocate action step to image;`, space-separated instead
+  of dotted) isn't valid `path_expression` syntax, so this isn't a parser gap.
+- `foreach ... in ... { }` isn't SysML v2 syntax; the real loop keyword is `for`, which already
+  parses correctly in an action-definition body on both entry points.
+- `part`/`snapshot` inside an action body have zero confirmed real usage in the vendored SysML v2
+  library (`snapshot` is real and well-supported inside `occurrence`/individual-occurrence bodies,
+  just not inside `action` bodies) -- backlog candidates, not scoped here without real-usage
+  evidence.
+
 - **`ItemUsage` never accepted the anonymous redefinition form** (`item :>> name[multiplicity]?
   (: type)? (= value)? body`) that `PartUsage`/`AttributeUsage` already support, and had no
   `value`/`redefines` fields at all. `item_usage`'s mandatory `name(input)?` call meant any
