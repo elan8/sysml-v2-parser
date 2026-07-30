@@ -708,6 +708,15 @@ fn try_package_body_structure<'a>(
         crate::parser::part::connection_usage_member,
         PackageBodyElement::ConnectionUsage
     );
+    // Standalone `connect a to b;` connector usage at package level (distinct from the
+    // `connection <name> : Type` usage form above) -- see the OMG spec Annex `14c-Language
+    // Extensions.sysml` FMEA library example.
+    try_package_body_dispatch!(
+        input,
+        start,
+        crate::parser::part::connect_,
+        PackageBodyElement::Connect
+    );
     try_package_body_dispatch!(input, start, dependency, PackageBodyElement::Dependency);
     try_package_body_dispatch!(
         input,
@@ -963,6 +972,31 @@ pub(crate) fn package_body_element(
     }
     if let Ok(r) = try_package_body_view(input, start) {
         return Ok(r);
+    }
+    // `#keyword` metadata tag -- package bodies previously had no `#`/`@` annotation support at
+    // all. Tried only after every other dispatcher above: some definitions (e.g. `connection_def`
+    // via `DefinitionPrefixOptions::with_hash_annotation()`) already capture a leading `#<name>`
+    // as their *own* annotation field, and must get first refusal so `#derivation connection {
+    // ... }` still becomes one `ConnectionDef` node, not a stray metadata tag followed by a
+    // separate (and here invalid, since it'd be missing its own annotation-aware header)
+    // `connection` parse. Bare/typed/`about`/body form tried first, then the
+    // `PrefixMetadataMember`-style form that prefixes the next member (e.g. `#fmeaspec
+    // requirement req1 { ... }`, OMG spec Annex `14c-Language Extensions.sysml`).
+    if let Ok((input, elem)) = map(
+        crate::parser::metadata_annotation::metadata_keyword_usage,
+        PackageBodyElement::MetadataKeywordUsage,
+    )
+    .parse(input)
+    {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
+    if let Ok((input, elem)) = map(
+        crate::parser::metadata_annotation::metadata_keyword_prefix,
+        PackageBodyElement::MetadataKeywordUsage,
+    )
+    .parse(input)
+    {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
     }
     if starts_with_keyword(input.fragment(), b"occurrence") {
         if let Ok((next, _)) = recover_body_element(input, PACKAGE_BODY_STARTERS) {
@@ -1265,5 +1299,64 @@ mod tests {
             elements[0].value,
             crate::ast::PartDefBodyElement::AttributeUsage(_)
         ));
+    }
+}
+
+/// `#`/connector support in package bodies -- previously package bodies had no `#`/`@`
+/// annotation or `connect a to b;` support at all. Closes the last remaining gap in
+/// PARSER_BACKLOG_ROADMAP.md §6's full-validation-suite audit (`14c-Language Extensions.sysml`'s
+/// FMEA library example, which prefixes nearly every member with a `#<tag>`).
+#[cfg(test)]
+mod package_metadata_and_connect_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn package_body_accepts_bare_metadata_tag() {
+        let (rest, node) = package_body_element(input("#Tag;")).expect("bare metadata tag");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            PackageBodyElement::MetadataKeywordUsage(_)
+        ));
+    }
+
+    #[test]
+    fn package_body_accepts_metadata_tag_prefixing_a_requirement() {
+        let (rest, node) = package_body_element(input("#fmeaspec requirement req1 { }"))
+            .expect("prefix-form metadata tag");
+        // Only the tag is consumed; the prefixed requirement is left for the next element.
+        assert_eq!(rest.fragment(), b"requirement req1 { }");
+        assert!(matches!(
+            node.value,
+            PackageBodyElement::MetadataKeywordUsage(_)
+        ));
+    }
+
+    #[test]
+    fn package_body_accepts_standalone_connect() {
+        let (rest, node) =
+            package_body_element(input("connect a to b;")).expect("standalone connect");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PackageBodyElement::Connect(_)));
+    }
+
+    /// Regression guard: `connection_def`'s own generic hash-annotation prefix
+    /// (`DefinitionPrefixOptions::with_hash_annotation()`) must still win over the new bare
+    /// metadata-tag dispatch, or `#derivation connection { ... }` misparses into a stray tag
+    /// followed by an unannotated (and here invalid) `connection` declaration.
+    #[test]
+    fn package_body_still_prefers_connection_defs_own_hash_annotation() {
+        let (rest, node) = package_body_element(input("#derivation connection { end a; end b; }"))
+            .expect("connection def with hash annotation");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PackageBodyElement::ConnectionDef(conn) = node.value else {
+            panic!("expected ConnectionDef, got {:?}", node.value);
+        };
+        assert_eq!(conn.value.annotation.as_deref(), Some("derivation"));
     }
 }

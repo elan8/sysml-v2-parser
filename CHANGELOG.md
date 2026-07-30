@@ -165,18 +165,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recovers-and-keeps-later-siblings assertions to `parse_with_diagnostics`, which is where that
   guarantee actually belongs.
 
-**Not merge-ready -- held pending follow-up.** Running the repo's full (normally `#[ignore]`d)
-validation suite (`cargo test --test validation -- --include-ignored`) shows this change drops
-`full_validation_suite::test_full_validation_suite` from 56/56 to 31/56: 25 of the official
-SysML v2 spec Annex example files use constructs the grammar doesn't yet support in specific
-nested contexts (`perform`/`connection`/`flow`/`constraint`/`part` inside part-usage bodies,
-`assert constraint` inside part bodies, etc.). `parse_with_diagnostics` already flagged all 25 as
-invalid before this change -- `parse_root` was just silently agreeing to disagree -- so this is
-expected given the fix, not a new defect, but it means merging today would make `parse()` reject
-~45% of realistic spec-conformant models until those grammar gaps are closed. Holding this branch
-until enough of that follow-up work lands to make the practical regression small; do not merge as
-is. `test_full_validation_suite`'s 56/56 expectation should also be revisited once this lands (it
-currently masks these same gaps for anyone who runs it).
+**Was held pending follow-up; now unblocked and merge-ready.** Running this fix against the full
+(normally `#[ignore]`d) validation suite originally showed
+`full_validation_suite::test_full_validation_suite` drop from 56/56 to 31/56 (25 of the official
+SysML v2 spec Annex example files hit constructs the grammar didn't support yet in specific
+nested contexts -- `parse_with_diagnostics` already flagged all 25 as invalid; `parse_root` was
+just silently agreeing to disagree). PARSER_BACKLOG_ROADMAP.md §6's follow-up work (G1-G20, see
+below and #7/#8/#9) closed all but one of those, and rebasing this branch onto that work closed
+the last one directly: `14c-Language Extensions.sysml`'s FMEA library example uses `#<tag>` as a
+`PrefixMetadataMember`-style prefix on the following declaration (`#fmeaspec requirement req1 {
+... }`, `#prevention connect a to b;`) inside package and item-def bodies, neither of which had
+any `#`/`@` annotation or `connect a to b;` support at all before this. Added
+`metadata_keyword_prefix` (a new function, not a widening of `metadata_keyword_usage`'s existing
+guard -- that guard is relied on elsewhere to correctly fail and fall through to
+`hash_annotation`'s opaque-capture form, e.g. `#refinement dependency X to Y;` in action/
+requirement bodies) plus `PackageBodyElement`/`AttributeBodyElement::{Connect,
+MetadataKeywordUsage}`, wired carefully *after* every more-specific dispatcher (in particular
+`connection_def`'s own `DefinitionPrefixOptions::with_hash_annotation()`, so `#derivation
+connection { ... }` still becomes one annotated `ConnectionDef`, not a stray tag). Result: a
+genuine **56/56** -- no test exception needed. Four existing tests/fixtures that used
+`#fmeaspec requirement req1 { }` specifically as a stand-in for "an unsupported annotation" were
+updated to a still-genuinely-unsupported example (`#tag : Foo::Bar::Baz weirdstuff;`) now that
+the original is valid, fully-supported syntax. All gates green: `cargo test` (361 lib tests),
+`cargo test --test validation -- --include-ignored` (25/25, 56/56 files), `cargo fmt`,
+`cargo clippy`.
 
 Investigated the issue's other reported direction ("recovery rejects valid SysML") before
 deciding not to add speculative grammar branches for it, per this project's practice of verifying

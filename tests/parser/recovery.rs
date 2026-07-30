@@ -171,7 +171,12 @@ fn test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling() {
     // parse_root now rejects any document containing an embedded recovery placeholder (GH-2):
     // an unsupported annotation is exactly such a placeholder, so strict must reject it even
     // though the annotation itself is legal SysML the parser doesn't fully support yet.
-    let input = "package P {\n#fmeaspec requirement req1 { }\npart def Good;\n}";
+    //
+    // `#tag : Type trailing-garbage;` (not `#fmeaspec requirement req1 { }`, which package
+    // bodies now fully support as a PrefixMetadataMember-style tag on the following
+    // `requirement` member -- PARSER_BACKLOG_ROADMAP.md §6) -- the typed short-name form still
+    // has no support for anything after the type besides `;`/`{`/`about`.
+    let input = "package P {\n#tag : Foo::Bar::Baz weirdstuff;\npart def Good;\n}";
     let strict_err = parse(input).expect_err("strict should reject the unsupported annotation");
     assert_eq!(
         strict_err.code.as_deref(),
@@ -535,7 +540,9 @@ fn test_parse_with_diagnostics_accepts_anonymous_part_in_part_body() {
 
 #[test]
 fn test_parse_with_diagnostics_reports_local_package_recovery() {
-    let input = "package P {\n#fmeaspec requirement req1 { }\npart def Good;\n}";
+    // See test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling for why this
+    // uses `#tag : Type trailing-garbage;` rather than `#fmeaspec requirement req1 { }`.
+    let input = "package P {\n#tag : Foo::Bar::Baz weirdstuff;\npart def Good;\n}";
     let result = parse_with_diagnostics(input);
     assert!(
         !result.is_ok(),
@@ -548,9 +555,7 @@ fn test_parse_with_diagnostics_reports_local_package_recovery() {
         .expect("expected local package recovery diagnostic");
     assert_eq!(err.line, Some(2));
     assert!(
-        err.found
-            .as_deref()
-            .is_some_and(|f| f.contains("#fmeaspec")),
+        err.found.as_deref().is_some_and(|f| f.contains("#tag")),
         "diagnostic should preserve recovered snippet"
     );
     assert!(

@@ -1,5 +1,5 @@
 package P {
-  #broken requirement req1 { }
+  #broken : Foo::Bar::Baz weirdstuff;
   part def Good;
   action def Next;
   requirement def R;

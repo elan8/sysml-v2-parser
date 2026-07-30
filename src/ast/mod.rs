@@ -150,6 +150,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::MetadataUsage(n) => {
             PackageBodyElement::MetadataUsage(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::MetadataKeywordUsage(n) => {
+            PackageBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::EnumDef(n) => {
             PackageBodyElement::EnumDef(dummy_node(n, normalize_enum_def(&n.value)))
         }
@@ -288,6 +291,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         }
         PackageBodyElement::ConnectionUsage(n) => {
             PackageBodyElement::ConnectionUsage(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::Connect(n) => {
+            PackageBodyElement::Connect(dummy_node(n, n.value.clone()))
         }
         PackageBodyElement::InterfaceUsage(n) => {
             PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))

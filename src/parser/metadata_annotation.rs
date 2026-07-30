@@ -1,6 +1,6 @@
 //! Metadata/annotation parsing helpers.
 
-use crate::ast::{Annotation, MetadataAnnotation, MetadataKeywordUsage, Node};
+use crate::ast::{Annotation, AttributeBody, MetadataAnnotation, MetadataKeywordUsage, Node};
 use crate::parser::attribute::metadata_body;
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
@@ -108,6 +108,61 @@ pub(crate) fn metadata_keyword_usage(
                 body,
                 keyword_span,
                 type_span,
+            },
+        ),
+    ))
+}
+
+/// Bare `#keyword` used as a `PrefixMetadataMember`-style tag on the *following* declaration,
+/// rather than owning its own body (SysML §8.2.3.2): `#fmeaspec requirement req1 { ... }`,
+/// `#prevention connect a to b;` (OMG spec Annex `14c-Language Extensions.sysml`, FMEA library
+/// example). Stops right after the keyword -- the prefixed declaration is left unconsumed for
+/// the caller's next body-element iteration to parse as its own element, so `#fmeaspec
+/// requirement req1 { ... }` becomes two sibling body elements (a bare `MetadataKeywordUsage`
+/// tag, then the real `RequirementUsage`) rather than one combined node.
+///
+/// Deliberately a separate function from [`metadata_keyword_usage`], not a widening of its
+/// guard: `metadata_keyword_usage` is also relied on to correctly *fail* on this same shape in
+/// bodies where `annotation`/`hash_annotation` is dispatched afterward as an opaque-capture
+/// fallback (e.g. `#refinement dependency X to Y;` in action/requirement bodies, where
+/// `dependency ...` is not an independently valid body element and must be captured whole).
+/// Only wire this into bodies that don't already dispatch `hash_annotation`.
+///
+/// This intentionally doesn't attempt to resolve whether the keyword is actually a declared
+/// `metadata def <keyword> ...` short name (that semantic check, plus a package-local short-name
+/// index, is the larger deferred 1.5b item in PARSER_BACKLOG_ROADMAP.md §2.1) -- syntactically,
+/// any bare `#<name>` immediately followed by what looks like the start of another declaration
+/// (an identifier) is accepted.
+pub(crate) fn metadata_keyword_prefix(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"#"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (keyword_span, keyword)) = with_span(name).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let peek = input.fragment();
+    if !peek
+        .first()
+        .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_')
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            MetadataKeywordUsage {
+                keyword,
+                type_name: None,
+                about_targets: Vec::new(),
+                body: AttributeBody::Semicolon,
+                keyword_span,
+                type_span: None,
             },
         ),
     ))

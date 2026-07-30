@@ -222,6 +222,19 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(crate::parser::occurrence_body::occurrence_usage, |n| {
             AttributeBodyElement::OccurrenceUsage(Box::new(n))
         }),
+        // This body is also shared with `item def`/`item` usage bodies, which legally own
+        // connector members (`connect a to b;`) and metadata tags (`#keyword`, bare or
+        // prefixing the next member) -- see the OMG spec Annex `14c-Language Extensions.sysml`
+        // FMEA library example, which uses both extensively.
+        map(crate::parser::part::connect_, AttributeBodyElement::Connect),
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_usage,
+            AttributeBodyElement::MetadataKeywordUsage,
+        ),
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_prefix,
+            AttributeBodyElement::MetadataKeywordUsage,
+        ),
         map(
             |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
             AttributeBodyElement::Other,
@@ -1238,5 +1251,39 @@ mod attribute_body_tests {
         let text = "attribute mass: Real;";
         let (_, node) = attribute_usage(input(text)).expect("attribute usage");
         assert_eq!(node.value.short_name, None);
+    }
+
+    /// `AttributeBody` is shared with `item def`/`item` usage bodies (OMG spec Annex
+    /// `14c-Language Extensions.sysml`'s FMEA library example uses both `connect a to b;` and
+    /// `#tag`-prefixed members extensively inside `item def` bodies) -- previously neither was
+    /// recognized here at all.
+    #[test]
+    fn attribute_body_accepts_standalone_connect() {
+        let (rest, node) =
+            attribute_body_element(input("connect a to b;")).expect("standalone connect");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, AttributeBodyElement::Connect(_)));
+    }
+
+    #[test]
+    fn attribute_body_accepts_bare_metadata_tag() {
+        let (rest, node) = attribute_body_element(input("#Tag;")).expect("bare metadata tag");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            AttributeBodyElement::MetadataKeywordUsage(_)
+        ));
+    }
+
+    #[test]
+    fn attribute_body_accepts_metadata_tag_prefixing_a_connect() {
+        let (rest, node) = attribute_body_element(input("#prevention connect a to b;"))
+            .expect("prefix-form metadata tag");
+        // Only the tag is consumed; the prefixed connect is left for the next element.
+        assert_eq!(rest.fragment(), b"connect a to b;");
+        assert!(matches!(
+            node.value,
+            AttributeBodyElement::MetadataKeywordUsage(_)
+        ));
     }
 }
