@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-07-30
+
 ### Fixed
 
 - **PARSER_BACKLOG_ROADMAP.md §6 G4–G20 grammar gaps** — closed the remaining confirmed
