@@ -125,6 +125,10 @@ impl ParseResult {
     }
 }
 /// Parse full input; must consume entire input. Strips UTF-8 BOM if present.
+///
+/// Rejects input that structurally parses but contains a body member the grammar could not
+/// match (surfaced as an embedded recovery diagnostic, the same ones [`parse_with_diagnostics`]
+/// reports) so both entry points agree on whether a document is valid.
 #[allow(clippy::result_large_err)]
 pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
     let bytes = input
@@ -141,6 +145,13 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
                 return Err(missing_closing_brace_error_at_eof(bytes));
             }
             if rest.fragment().is_empty() {
+                if let Some(error) = collect_recovery_errors(&root).into_iter().next() {
+                    log::debug!(
+                        "parse_root: rejecting document with embedded recovery diagnostic: {:?}",
+                        error.code
+                    );
+                    return Err(error);
+                }
                 log::debug!("parse_root: success, {} top-level elements", root.elements.len());
                 Ok(root)
             } else if trim_ascii_start(rest.fragment()).starts_with(b"}") {
@@ -415,5 +426,47 @@ mod tests {
         );
         let error = nesting_limit_error(source.as_bytes());
         assert!(error.is_none(), "comments and strings are not model scopes");
+    }
+
+    /// GH-2: `parse_root` previously returned `Ok` for input the grammar could not fully match,
+    /// because it never inspected the AST for the same embedded recovery diagnostics
+    /// `parse_with_diagnostics` surfaces. These cases all structurally parse (balanced braces,
+    /// full input consumed) while still containing a body member the grammar dropped.
+    #[test]
+    fn rejects_misspelled_keyword_that_recovery_would_flag() {
+        let source = "package P { attribut def X { } }";
+        let error = parse_root(source).expect_err("misspelled keyword should be rejected");
+        assert!(error.code.is_some());
+
+        let editor = parse_with_diagnostics(source);
+        assert!(!editor.errors.is_empty());
+        assert_eq!(error.code, editor.errors[0].code);
+    }
+
+    #[test]
+    fn rejects_unknown_keyword_that_recovery_would_flag() {
+        let source = "package P { frobnicate def Q { } }";
+        let error = parse_root(source).expect_err("unknown keyword should be rejected");
+        assert!(error.code.is_some());
+
+        let editor = parse_with_diagnostics(source);
+        assert!(!editor.errors.is_empty());
+        assert_eq!(error.code, editor.errors[0].code);
+    }
+
+    #[test]
+    fn rejects_typo_that_recovery_would_flag_and_does_not_silently_drop_it() {
+        let source = "package P { parts def A { } }";
+        let error = parse_root(source).expect_err("typo'd declaration should be rejected");
+        assert!(error.code.is_some());
+    }
+
+    #[test]
+    fn still_accepts_clean_input() {
+        let source = "package P { part def A { attribute x : Real; } }";
+        let root = parse_root(source).expect("well-formed input should still parse");
+        assert_eq!(root.elements.len(), 1);
+        let editor = parse_with_diagnostics(source);
+        assert!(editor.is_ok());
     }
 }

@@ -142,6 +142,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `perform action { }` — the latter's `name` is currently mandatory) — not fixed here, added to
   PARSER_BACKLOG_ROADMAP.md §6 as G19/G20.
 
+- **`parse`/`parse_root` silently accepted invalid SysML v2 input** (misspelled keywords,
+  unknown keywords, and other body members the grammar could not match) by returning `Ok` for
+  any document that structurally parsed (balanced braces, full input consumed), even when the
+  recursive-descent grammar had internally given up on a body member and embedded it as a
+  recovery placeholder (`PartDefBodyElement::Error`, `PackageBodyElement::Error`, etc.) instead
+  of failing. `parse_with_diagnostics`/`parse_for_editor` already walked the AST for these
+  placeholders via `collect_recovery_errors` and correctly reported them; `parse_root` never did
+  the same walk, so the two public entry points disagreed on whether a document was valid.
+  Reported in [elan8/sysml-v2-parser#2](https://github.com/elan8/sysml-v2-parser/issues/2).
+- `parse_root` now calls `collect_recovery_errors` on the successfully-structured AST before
+  returning `Ok`, and returns the first embedded diagnostic as an `Err` if any are present. This
+  closes the "strict silently accepts invalid SysML" half of the reported divergence; the
+  "recovery rejects valid SysML" half (real grammar gaps for `allocate`/`part`/`foreach`/
+  `snapshot` in specific nested body contexts) is a separate, follow-up scoping effort.
+- Added regression tests in `src/parser/parse.rs::tests` covering the misspelled-keyword,
+  unknown-keyword, and typo'd-declaration cases from the issue, confirming `parse_root` and
+  `parse_with_diagnostics` now agree on the verdict.
+
 - **`ItemUsage` never accepted the anonymous redefinition form** (`item :>> name[multiplicity]?
   (: type)? (= value)? body`) that `PartUsage`/`AttributeUsage` already support, and had no
   `value`/`redefines` fields at all. `item_usage`'s mandatory `name(input)?` call meant any
