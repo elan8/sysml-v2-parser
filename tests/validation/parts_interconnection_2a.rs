@@ -707,6 +707,7 @@ fn part_vehicle1_c1() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
+        is_reference: false,
         direction: None,
         is_derived: false,
         is_constant: false,
@@ -731,6 +732,7 @@ fn part_vehicle1_c1() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    is_reference: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -760,6 +762,7 @@ fn part_vehicle1_c1() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    is_reference: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -780,6 +783,7 @@ fn part_vehicle1_c1() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    is_reference: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -902,6 +906,7 @@ fn part_rear_axle_assembly() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
+        is_reference: false,
         direction: None,
         is_derived: false,
         is_constant: false,
@@ -956,6 +961,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    is_reference: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -976,6 +982,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    is_reference: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -1039,6 +1046,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    is_reference: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -1109,6 +1117,7 @@ fn part_differential() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
+        is_reference: false,
         direction: None,
         is_derived: false,
         is_constant: false,
@@ -1195,6 +1204,7 @@ fn part_rear_axle() -> PartUsage {
     PartUsage {
         usage_prefix: None,
         is_individual: false,
+        is_reference: false,
         direction: None,
         is_derived: false,
         is_constant: false,
@@ -1214,6 +1224,7 @@ fn part_rear_axle() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    is_reference: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,
@@ -1234,6 +1245,7 @@ fn part_rear_axle() -> PartUsage {
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
                     is_individual: false,
+                    is_reference: false,
                     direction: None,
                     is_derived: false,
                     is_constant: false,

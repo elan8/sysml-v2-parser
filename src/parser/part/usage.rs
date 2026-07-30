@@ -28,6 +28,7 @@ pub(crate) fn part_usage_redefines_only<'a>(
             PartUsage {
                 usage_prefix: None,
                 is_individual: false,
+                is_reference: false,
                 direction: None,
                 is_derived: false,
                 is_constant: false,
@@ -103,6 +104,7 @@ pub(crate) fn part_usage_named<'a>(
             PartUsage {
                 usage_prefix: None,
                 is_individual: false,
+                is_reference: false,
                 direction: None,
                 is_derived: false,
                 is_constant: false,
@@ -124,12 +126,12 @@ pub(crate) fn part_usage_named<'a>(
     ))
 }
 
-/// Part usage: 'part' ( ':>>' qualified_name | (':>>')? name ':' type_name? ... ) multiplicity? ... body
+/// Part usage: (`ref`)? 'part' ( ':>>' qualified_name | (':>>')? name ':' type_name? ... ) multiplicity? ... body
 ///
 /// Prefix keywords follow BNF `RefPrefix`/`OccurrenceUsagePrefix` order (§8.2.2.6.2, §8.2.2.9.2,
 /// reached via `PartUsage = OccurrenceUsagePrefix 'part' Usage` -> `OccurrenceUsagePrefix :
 /// BasicUsagePrefix ...` -> `BasicUsagePrefix : RefPrefix ...`): direction, `derived`,
-/// (`abstract`|`variation`), `constant`, then `individual`.
+/// (`abstract`|`variation`), `constant`, `ref` (`BasicUsagePrefix.isReference`), then `individual`.
 pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -150,12 +152,25 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
     let (input, is_constant) = opt(preceded(tag(&b"constant"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
+    // `BasicUsagePrefix.isReference` — must come before `individual` / `'part'`.
+    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
     let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = tag(&b"part"[..]).parse(input)?;
     // Allow `part: Type` with no whitespace (anonymous UsageDeclaration).
     let (after_kw, _) = ws_and_comments(input)?;
+    // `part def …` is a definition. Especially important for `ref part def …`, which would
+    // otherwise not be claimed by `part_def` (no leading `ref`) and misparse as a usage named
+    // `def`.
+    if starts_with_keyword(after_kw.fragment(), b"def") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            after_kw,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let input = if (after_kw.fragment().starts_with(b":")
         && !after_kw.fragment().starts_with(b":>")
         && !after_kw.fragment().starts_with(b":>>"))
@@ -185,6 +200,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         let (input, mut usage) = anonymous_part_usage(start, input)?;
         usage.value.usage_prefix = usage_prefix;
         usage.value.is_individual = is_individual;
+        usage.value.is_reference = is_reference;
         usage.value.direction = direction;
         usage.value.is_derived = is_derived;
         usage.value.is_constant = is_constant;
@@ -196,6 +212,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         let mut usage = usage;
         usage.value.usage_prefix = usage_prefix;
         usage.value.is_individual = is_individual;
+        usage.value.is_reference = is_reference;
         usage.value.direction = direction;
         usage.value.is_derived = is_derived;
         usage.value.is_constant = is_constant;
@@ -206,6 +223,7 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
     let (input, mut usage) = part_usage_named(start, input)?;
     usage.value.usage_prefix = usage_prefix;
     usage.value.is_individual = is_individual;
+    usage.value.is_reference = is_reference;
     usage.value.direction = direction;
     usage.value.is_derived = is_derived;
     usage.value.is_constant = is_constant;
@@ -247,6 +265,7 @@ fn anonymous_part_usage<'a>(
             PartUsage {
                 usage_prefix: None,
                 is_individual: false,
+                is_reference: false,
                 direction: None,
                 is_derived: false,
                 is_constant: false,
@@ -869,17 +888,23 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     }
 }
 
-/// Ref in part usage/def body: `(visibility)? ref` (`part`)? name (`:` type)? (`=` value)? body.
+/// Bare reference usage: `(visibility)? ref` name (`:` type)? (`=` value)? body.
+///
+/// Kinded forms (`ref part` / `ref action` / …) are rejected so dedicated usage parsers own them
+/// (`part_usage` with `is_reference`, `action_usage`, …). This path is BNF `ReferenceUsage`
+/// (`'ref' Usage`), not `PartUsage`.
 pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    // Reject kinded refs (`ref action` / `ref state` / `ref port` / …) so those forms can be
-    // parsed as real ActionUsage/StateUsage/PortUsage instead of a mis-named RefDecl.
+    // Reject kinded refs so those forms parse as real PartUsage/ActionUsage/StateUsage/…
+    // instead of a mis-named RefDecl. Includes `part` (GH-10): `ref part … :> …` belongs on
+    // `part_usage` with `is_reference`, which already accepts `FeatureSpecializationPart`.
     if crate::parser::lex::starts_with_any_keyword(
         input.fragment(),
         &[
+            b"part",
             b"action",
             b"state",
             b"port",
@@ -896,7 +921,6 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, _) = opt(preceded(tag(&b"part"[..]), ws1)).parse(input)?;
     let (input, _) = opt(preceded(
         ws_and_comments,
         preceded(tag(&b":>>"[..]), ws_and_comments),
@@ -1558,5 +1582,50 @@ mod short_name_tests {
     fn part_usage_without_short_name_has_none() {
         let (_, node) = part_usage(input("part engine : Engine;")).expect("part usage");
         assert_eq!(node.value.short_name, None);
+    }
+
+    /// GH-10: `ref part` is `PartUsage` with `is_reference` and full specialization.
+    #[test]
+    fn part_usage_accepts_ref_prefix_with_typing_and_subsetting() {
+        let (rest, node) =
+            part_usage(input("ref part origin : Remote :> remotes;")).expect("ref part usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_reference);
+        assert_eq!(node.value.name, "origin");
+        assert_eq!(node.value.type_name, "Remote");
+        assert_eq!(
+            node.value
+                .subsets
+                .as_ref()
+                .map(|(n, _)| targets_display_string(&n.value.target)),
+            Some("remotes".to_string())
+        );
+    }
+
+    #[test]
+    fn part_usage_accepts_ref_prefix_with_subsetting_only() {
+        let (rest, node) = part_usage(input("ref part origin :> mesolab;")).expect("ref part");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_reference);
+        assert!(node.value.subsets.is_some());
+    }
+
+    #[test]
+    fn part_usage_without_ref_prefix_is_not_reference() {
+        let (_, node) = part_usage(input("part origin : Remote :> remotes;")).expect("part");
+        assert!(!node.value.is_reference);
+        assert!(node.value.subsets.is_some());
+    }
+
+    #[test]
+    fn part_usage_accepts_ref_prefix_leading_redefines_typed_form() {
+        // Release validation `15_11-Variable Length Collection Types.sysml`.
+        // Previously accepted by `part_ref_usage`; now owned by `part_usage` with `is_reference`.
+        let (rest, node) =
+            part_usage(input("ref part :>> elements: SparePart;")).expect("ref part :>>");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_reference);
+        assert_eq!(node.value.name, "elements");
+        assert_eq!(node.value.type_name, "SparePart");
     }
 }

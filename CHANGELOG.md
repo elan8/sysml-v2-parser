@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ref part … :> …` rejected as unexpected token** ([#10](https://github.com/elan8/sysml-v2-parser/issues/10)) —
+  `part_ref_usage` only accepted `(visibility)? ref (part)? (:>>)? name (: type)? (= value)? body`,
+  so a post-name `:>` / `subsets` clause failed in both part definition and usage bodies. Per BNF
+  §8.2.2.6.2 / §8.2.2.11, `ref part` is `PartUsage` with `BasicUsagePrefix.isReference`, which
+  includes the full `FeatureSpecializationPart` (same as plain `part x : T :> y;`).
+  <br>`part_usage` / `part_def_or_usage` now parse the leading `ref` and set new
+  `PartUsage.is_reference`. `part_ref_usage` rejects `part` (like other kinded refs) so bare
+  `ref name …` remains `ReferenceUsage` / `RefDecl`. Bump `PARSE_AST_VERSION` 52 → 53.
+
 ## [0.50.0] - 2026-07-30
 
 ### Fixed

@@ -896,4 +896,30 @@ mod par_002_nested_def_tests {
             other => panic!("expected StateUsage, got {other:?}"),
         }
     }
+
+    /// GH-10: `ref part` is BNF `PartUsage` with `isReference`, so `:>` specialization must
+    /// parse (same path as plain `part … :> …`), not the narrow `part_ref_usage` / `RefDecl`.
+    #[test]
+    fn part_def_body_parses_ref_part_with_subsetting_as_part_usage() {
+        let src = "ref part origin : Remote :> remotes;";
+        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            PartDefBodyElement::PartUsage(part) => {
+                assert!(part.value.is_reference);
+                assert_eq!(part.value.name, "origin");
+                assert_eq!(part.value.type_name, "Remote");
+                assert!(part.value.subsets.is_some());
+            }
+            other => panic!("expected PartUsage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn part_def_body_keeps_bare_ref_as_ref_decl() {
+        let src = "ref sensor: Sensor;";
+        let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::Ref(_)));
+    }
 }

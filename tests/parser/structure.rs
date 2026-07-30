@@ -2256,7 +2256,7 @@ fn test_part_usage_body_ref_part_assignments_parse() {
     let refs: Vec<_> = elements
         .iter()
         .filter_map(|element| match &element.value {
-            PartUsageBodyElement::Ref(reference) => Some(&reference.value),
+            PartUsageBodyElement::PartUsage(part) if part.value.is_reference => Some(&part.value),
             _ => None,
         })
         .collect();
@@ -2267,6 +2267,68 @@ fn test_part_usage_body_ref_part_assignments_parse() {
     assert_eq!(refs[1].name, "orbitingBody");
     assert_eq!(refs[1].type_name, "Body");
     assert!(refs[1].value.is_some());
+}
+
+#[test]
+fn test_ref_part_accepts_subsetting_in_def_and_usage_body() {
+    // https://github.com/elan8/sysml-v2-parser/issues/10
+    let def_body = r#"package M {
+    part def Remote { attribute name : String; }
+    part def Workspace {
+        part remotes : Remote[0..*];
+        ref part origin : Remote :> remotes;
+    }
+}"#;
+    let def_result = sysml_v2_parser::parse_with_diagnostics(def_body);
+    assert!(
+        def_result.errors.is_empty(),
+        "ref part : T :> x in part def body: {:?}",
+        def_result.errors
+    );
+
+    let usage_body = r#"package p {
+    part def Remote;
+    part def Workspace {
+        part remotes : Remote[0..*];
+    }
+    part w : Workspace {
+        part mesolab : Remote;
+        ref part origin :> mesolab;
+    }
+}"#;
+    let usage_result = sysml_v2_parser::parse_with_diagnostics(usage_body);
+    assert!(
+        usage_result.errors.is_empty(),
+        "ref part :> x in part usage body: {:?}",
+        usage_result.errors
+    );
+
+    let package = match &usage_result.root.elements[0].value {
+        RootElement::Package(package) => &package.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &package.body else {
+        panic!("expected package body");
+    };
+    let w = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartUsage(p) if p.value.name == "w" => Some(&p.value),
+            _ => None,
+        })
+        .expect("part w");
+    let PartUsageBody::Brace { elements } = &w.body else {
+        panic!("expected w body");
+    };
+    let origin = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartUsageBodyElement::PartUsage(p) if p.value.name == "origin" => Some(&p.value),
+            _ => None,
+        })
+        .expect("ref part origin as PartUsage");
+    assert!(origin.is_reference);
+    assert!(origin.subsets.is_some(), "expected :> mesolab subsets");
 }
 
 #[test]
