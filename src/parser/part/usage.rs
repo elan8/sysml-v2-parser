@@ -1,4 +1,4 @@
-use super::body::exhibit_state;
+use super::body::{connection_usage_member, exhibit_state};
 use super::prelude::*;
 use crate::parser::feature_value_part as usage_value_part;
 
@@ -986,11 +986,11 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         )),
         // PAR-002: nested `def` kinds -- usage bodies legally contain nested definitions per BNF
         // `UsageBody = DefinitionBody`. `port_def_required`/`calc_def_required`/
-        // `connection_def_required` must be tried before `port_usage`/(no calc or connection
-        // usage exists in this body yet, so no ordering risk for those two) -- `port_usage` has
-        // no guard against a bare `def` keyword (same bug class fixed for `PartDefBodyElement`
-        // in a prior increment), so `port def Foo;` would otherwise misparse as a port usage
-        // named "def". `state_def`/`metadata_def`/`requirement_def`/`occurrence_def` are all
+        // `connection_def_required` must be tried before `port_usage`/`connection_usage_member`
+        // -- both usage-form parsers have no guard against a bare `def` keyword (same bug class
+        // fixed for `PartDefBodyElement` in a prior increment), so `port def Foo;`/
+        // `connection def Foo;` would otherwise misparse as a usage named "def".
+        // `state_def`/`metadata_def`/`requirement_def`/`occurrence_def` are all
         // `def_required()`-guarded internally and have no usage sibling dispatched in this body
         // today, so no ordering risk for them either.
         alt((
@@ -1004,6 +1004,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             map(occurrence_def, PartUsageBodyElement::OccurrenceDef),
             map(calc_def_required, PartUsageBodyElement::CalcDef),
             map(connection_def_required, PartUsageBodyElement::ConnectionDef),
+            map(connection_usage_member, PartUsageBodyElement::Connection),
             map(port_def_required, PartUsageBodyElement::PortDef),
         )),
         alt((
@@ -1011,6 +1012,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             map(part_ref_usage, PartUsageBodyElement::Ref),
             map(bind_, PartUsageBodyElement::Bind),
             map(satisfy, PartUsageBodyElement::Satisfy),
+            map(
+                crate::parser::occurrence_body::assert_constraint_member,
+                PartUsageBodyElement::AssertConstraint,
+            ),
             map(interface_usage, PartUsageBodyElement::InterfaceUsage),
             map(connect_, PartUsageBodyElement::Connect),
             // `flow_def` must be tried before `flow_usage_member`: the latter has no guard
@@ -1135,6 +1140,40 @@ mod par_002_nested_def_tests {
             part_usage_body_element(input("connection def MyConn;")).expect("connection def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PartUsageBodyElement::ConnectionDef(_)));
+    }
+
+    /// PARSER_BACKLOG_ROADMAP.md §6, G2: `connection <name> : Type[mult];` usage was wired for
+    /// `PartDefBodyElement` but not `PartUsageBodyElement`.
+    #[test]
+    fn part_usage_body_accepts_connection_usage_member() {
+        let (rest, node) =
+            part_usage_body_element(input("connection trailerHitch : TrailerHitch[0..1];"))
+                .expect("connection usage member");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::Connection(_)));
+    }
+
+    /// `connection def` must still win when both are dispatched in the same body -- same
+    /// ordering risk already documented for `port`/`flow`/`calc`.
+    #[test]
+    fn part_usage_body_connection_def_is_not_shadowed_by_connection_usage_member() {
+        let (rest, node) =
+            part_usage_body_element(input("connection def MyConn;")).expect("connection def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::ConnectionDef(_)));
+    }
+
+    /// PARSER_BACKLOG_ROADMAP.md §6, G3: `assert constraint { }` was wired for
+    /// `PartDefBodyElement` but not `PartUsageBodyElement`.
+    #[test]
+    fn part_usage_body_accepts_assert_constraint() {
+        let (rest, node) =
+            part_usage_body_element(input("assert constraint c { }")).expect("assert constraint");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            PartUsageBodyElement::AssertConstraint(_)
+        ));
     }
 
     /// PAR-002 acceptance criterion, increment 4: the same `state def` declaration yields the

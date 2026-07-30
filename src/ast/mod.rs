@@ -831,6 +831,12 @@ fn normalize_part_usage_body_element_node(
         PartUsageBodyElement::EnumDef(n) => {
             PartUsageBodyElement::EnumDef(dummy_node(n, normalize_enum_def(&n.value)))
         }
+        PartUsageBodyElement::Connection(n) => {
+            PartUsageBodyElement::Connection(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::AssertConstraint(n) => {
+            PartUsageBodyElement::AssertConstraint(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }

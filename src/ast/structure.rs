@@ -169,6 +169,9 @@ pub struct OpaqueMemberDecl {
 pub struct ConnectionUsageMember {
     pub name: Option<String>,
     pub type_name: Option<String>,
+    /// Multiplicity after the type, e.g. `[0..1]` in `connection trailerHitch :
+    /// TrailerHitch[0..1];` (OMG spec Annex `3c-Function-based Behavior-structure mod.sysml`).
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Optional inline `connect from to to (, extra)* ` clause (PAR-007 widening): a package- or
     /// part-body-level `connection name : Type connect a to b;` usage. `None` for a plain
     /// `connection name : Type;` declaration with no explicit binding. See `connect_to`/
@@ -426,6 +429,13 @@ pub enum PartUsageBodyElement {
     ConnectionDef(Node<ConnectionDef>),
     /// `enum def` nested inside a part usage body. See `StateDef`.
     EnumDef(Node<EnumDef>),
+    /// `connection` usage member inside a part usage body (previously only reachable from part
+    /// definition bodies; see `PartDefBodyElement::Connection`).
+    Connection(Node<ConnectionUsageMember>),
+    /// `assert (not)? constraint { ... }` inside a part usage body (previously only reachable
+    /// from part definition and occurrence definition bodies; see
+    /// `PartDefBodyElement::AssertConstraint`).
+    AssertConstraint(Node<AssertConstraintMember>),
 }
 
 /// Variant member inside a variation part usage/def body: either an untyped reference to a
@@ -945,6 +955,10 @@ pub enum OccurrenceUsageBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssertConstraintMember {
+    /// Optional name after `constraint`, e.g. `engineSelectionRational` in
+    /// `assert constraint engineSelectionRational { ... }`. `None` for the anonymous form
+    /// (`assert constraint { ... }`).
+    pub name: Option<String>,
     pub body: ConstraintDefBody,
     /// `true` for a negated assert: `assert not constraint ...`.
     pub is_negated: bool,
