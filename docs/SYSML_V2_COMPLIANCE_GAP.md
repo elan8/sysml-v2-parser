@@ -12,6 +12,9 @@ Reference grammar:
 
 This is a parser-status document, not a semantic conformance claim.
 
+The **pinned textual-notation target** and layered CI scorecard live in
+[`docs/conformance-target`](./conformance-target) and [`docs/CONFORMANCE.md`](./CONFORMANCE.md).
+
 It describes:
 
 - which major textual grammar families currently have dedicated parser coverage
