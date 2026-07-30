@@ -609,6 +609,7 @@ fn normalize_perform(p: &Perform) -> Perform {
     Perform {
         action_name: p.action_name.clone(),
         type_name: p.type_name.clone(),
+        redefines: p.redefines.clone(),
         body: normalize_perform_body(&p.body),
     }
 }

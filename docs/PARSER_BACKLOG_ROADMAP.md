@@ -2,7 +2,12 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-30 (§6 opened — full-validation-suite audit found 25 real OMG spec Annex example files (of 56) hit grammar gaps that were previously masked by `parse_root` silently accepting them; see [§6](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit) for the file-by-file breakdown. **Blocking Spec42 v1.0** — see that section for why and the release-gate note.)
+**Last updated:** 2026-07-30 (§6 G1 closed — `perform <path>` now accepts a `;` body and an
+optional `:>>` redefinition clause; `PARSE_AST_VERSION` 47 → 48. Surfaced three narrower follow-up
+gaps as G16-G18. 24 of the original 25 spec-Annex files in §6 still fail; **Spec42 v1.0 remains
+blocked** — see [§6](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit).)
+
+**Previously:** 2026-07-30 (§6 opened — full-validation-suite audit found 25 real OMG spec Annex example files (of 56) hit grammar gaps that were previously masked by `parse_root` silently accepting them; see [§6](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit) for the file-by-file breakdown. **Blocking Spec42 v1.0** — see that section for why and the release-gate note.)
 
 **Previously:** 2026-07-30 (diagnostics-spec-audit — root `PackageBodyElement*` accepted; `missing_member_name` / `illegal_top_level_definition` removed as non-spec; bare `name : Type;` is `DefaultReferenceUsage` AST. Shared specialization layer + full `#`/`@` metadata surface remain open.)
 
@@ -298,7 +303,7 @@ it as scoped.
 
 | # | Root cause (construct family) | Confidence | Files (of the 25) | Example (from the real file) |
 | - | ------------------------------ | ---------- | ------------------ | ----------------------------- |
-| G1 | `perform <path>` (part usage body, no `action` keyword) requires a brace body — `perform_body()` has no `;` alternative — and has no `:>>` redefinition clause at all (`Perform` AST has no `redefines` field) | **Confirmed** | 4 — `08-Requirements/8-Requirements.sysml`, `12-Dependency Relationships/12b-Allocation.sysml`, `12b-Allocation-1.sysml`, `05-State-based Behavior/5-State-based Behavior-2.sysml` | `perform 'provide power';` / `perform providePower.generateTorque :>> generateTorque;` |
+| G1 | `perform <path>` (part usage body, no `action` keyword) requires a brace body — `perform_body()` has no `;` alternative — and has no `:>>` redefinition clause at all (`Perform` AST has no `redefines` field) | **Done** | Was 4 | `perform 'provide power';` / `perform providePower.generateTorque :>> generateTorque;` |
 | G2 | `connection <name> : Type[mult];` **usage** form (as opposed to `connection def`, or the `connect a to b;` shorthand) is wired into `PartDefBodyElement` (`connection_usage_member`) but not `PartUsageBodyElement` | **Confirmed** | 2 — `03-Function-based Behavior/3c-Function-based Behavior-structure mod-1.sysml`, `-2.sysml` | `connection trailerHitch : TrailerHitch[0..1];` |
 | G3 | `assert constraint { }` / `assert constraint <name> { }` is wired into `PartDefBodyElement` (closed in the [§5 audit](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit)) but not `PartUsageBodyElement` | **Confirmed** | 2 — `07-Variant Configuration/7a-Variant Configuration - General Concept.sysml`, `10-Analysis and Trades/10b-Trade-off Among Alternative Configurations.sysml` | `assert constraint engineSelectionRational { }` |
 | G4 | `constraint <name>[: Type] { }` **usage** keyword form is wired at package level (`ConstraintDef`/`ConstraintUsage`) but not inside `part def` bodies | **Confirmed** | 2 — `15-Properties-Values-Expressions/15_03-Value Expression.sysml`, `15_05-Unification of Expression and Constraint Definition.sysml` | `constraint discBrakeConstraint : DiscBrakeConstraint { }` |
@@ -313,23 +318,36 @@ it as scoped.
 | G13 | Standalone `first <name>;` (an initial-node marker, no `then`) not recognized in action bodies — only the `first ... then ...;` succession form is | **Confirmed** | 1 — `03-Function-based Behavior/3a-Function-based Behavior-2.sysml` | `first start;` |
 | G14 | `loop { }` control node not implemented at all (`decide`/`join`/`fork`/`if`/`while` were closed in the [§5 audit](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit); `loop` was missed) | **Confirmed** | 1 — `03-Function-based Behavior/3a-Function-based Behavior-3.sysml` | `loop { ... }` |
 | G15 | Suspected: `:>> name = value { body }` redefinition-with-value-and-body form inside an occurrence usage body (parallel to G11 but for occurrence, not port, usages) | **Suspected** | 1 — `06-Individual and Snapshots/6-Individual and Snapshots.sysml` | `:>> t = t0 { ... }` |
+| G16 | *(found while fixing G1)* `private import '<quoted target>'::*;` not recognized inside a part usage body | **Confirmed** | 1 — `08-Requirements/8-Requirements.sysml` | `private import 'vehicle1-c1 Specification'::*;` |
+| G17 | *(found while fixing G1)* Nested `allocate <path> to <path>;` inside an allocation **usage**'s own brace body — not recognized by `DefinitionBodyElement` (`AllocationUsage`/`AllocationDef` bodies route through the shared `DefinitionBody`) | **Confirmed** | 1 — `12-Dependency Relationships/12b-Allocation.sysml` | `allocation allocation2 : Logical_to_Physical allocate torqueGenerator to powerTrain { allocate torqueGenerator.generateTorque to powerTrain.engine.generateTorque; }` |
+| G18 | *(found while fixing G1)* `exhibit <name> :>> <target>;` — `exhibit state` usage with a `:>>` redefinition clause — not recognized in a part usage body | **Confirmed** | 1 — `05-State-based Behavior/5-State-based Behavior-2.sysml` | `exhibit 'vehicle states' :>> VehicleA::'vehicle states';` |
 
-**Total: 25 files**, matching the `56 → 31` drop.
+**Total: 25 files** originally, matching the `56 → 31` drop. G1's fix (see CHANGELOG.md) closed
+the `perform` gap cleanly wherever it was the *only* problem in a file (`12b-Allocation-1.sysml`
+→ fully clean now), but 3 of G1's 4 files had a second, distinct gap sitting directly behind it
+that recovery's sync-point-skip had been masking — those are now G16-G18, same 3 files.
+
+Net effect: **24 files still fail** (25 minus the 1 now-fully-clean file) across groups G2-G18.
+Once PR #3's `parse_root` verdict-parity fix is applied on top of this work, that means
+`full_validation_suite::test_full_validation_suite` should read 32/56 instead of the original
+31/56. Re-run `cargo test --test validation -- --include-ignored` with PR #3's change applied to
+confirm this count as each subsequent group lands, and update it here.
 
 ### Recommended order
 
-1. **G1 (`perform` semicolon body + `:>>` redefine)** — highest confirmed-impact single fix (4
-   files), small and well-contained: `PerformBody` already has a `Semicolon` variant unused by
-   `perform_usage`; add an optional `:>>` clause using the existing `qualified_name` parser (same
-   one `perform_action_decl`'s `type_name` already uses). **Picked for immediate implementation —
-   see CHANGELOG.md.**
+1. ~~**G1 (`perform` semicolon body + `:>>` redefine)**~~ — **Done.** `Perform.redefines: Option<String>`
+   added; `perform_usage()` now accepts `;` bodies and an optional `:>>` clause via the existing
+   `qualified_name` parser. `PARSE_AST_VERSION` 47 → 48. See CHANGELOG.md. Surfaced three new,
+   narrower gaps (G16-G18) previously hidden behind it — expected when peeling back a masking bug
+   like this; each is its own small follow-up, not evidence G1 was scoped wrong.
 2. **G2/G3 (`connection`/`assert constraint` usage wiring for `PartUsageBodyElement`)** — each is
    likely a one-line addition to the existing `alt()` dispatch, mirroring what `PartDefBodyElement`
    already does for the same constructs. Good next PR, low risk.
 3. **G4 (`constraint` usage in part-def bodies)**, **G5 (`variation` prefix breadth)** — same
    shape as G2/G3, still isolated single-family PRs.
-4. **G8, G9, G12, G13, G14** — each confirmed and single- or double-file scoped; pick off
-   individually once G1-G5 land, same "one construct family per PR" cadence as past releases.
+4. **G8, G9, G12, G13, G14, G16, G17, G18** — each confirmed and single- or double-file scoped;
+   pick off individually, same "one construct family per PR" cadence as past releases. G16-G18
+   are fresh (found while implementing G1) and haven't been prioritized relative to G8-G14 yet.
 5. **G6, G7, G10, G11, G15** — write a minimal isolated repro first (they may collapse into
    already-covered families, or reveal a different root cause than currently suspected) before
    scoping implementation work.

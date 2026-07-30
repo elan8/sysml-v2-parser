@@ -432,14 +432,26 @@ fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     Ok((input, PerformBody::Brace { elements }))
 }
 
-/// Perform usage: `perform` action_path body (with optional `{ }` body).
+/// Perform usage: `perform` action_path (`:>>` redefinition_target)? (`;` or `{ }` body).
 pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, action_name) = perform_action_path(input)?;
-    let (input, body) = perform_body(input)?;
+    let (input, redefines) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":>>"[..])),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
+    let (input, body) = preceded(
+        ws_and_comments,
+        alt((
+            map(tag(&b";"[..]), |_| PerformBody::Semicolon),
+            perform_body,
+        )),
+    )
+    .parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -448,6 +460,7 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
             Perform {
                 action_name,
                 type_name: None,
+                redefines,
                 body,
             },
         ),
@@ -484,6 +497,7 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
             Perform {
                 action_name,
                 type_name,
+                redefines: None,
                 body,
             },
         ),
@@ -1149,6 +1163,89 @@ mod par_002_nested_def_tests {
             elements[0].value,
             crate::ast::PartDefBodyElement::StateDef(_)
         ));
+    }
+}
+
+/// PARSER_BACKLOG_ROADMAP.md §6, G1: `perform <path>` (no `action` keyword) only accepted a
+/// brace body and had no `:>>` redefinition clause, so real Systems Library usage like
+/// `perform 'provide power';` or `perform a.b :>> c.d { }` fell through to opaque recovery.
+/// Confirmed against real usage in the OMG spec Annex examples (`08-Requirements.sysml`,
+/// `12b-Allocation.sysml`, `12b-Allocation-1.sysml`, `05-State-based Behavior-2.sysml`).
+#[cfg(test)]
+mod perform_semicolon_and_redefine_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    fn perform(text: &str) -> Node<Perform> {
+        let (rest, node) = part_usage_body_element(input(text)).expect("perform parses");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PartUsageBodyElement::Perform(perform) = node.value else {
+            panic!("expected Perform, got {:?}", node.value);
+        };
+        perform
+    }
+
+    #[test]
+    fn perform_plain_name_accepts_semicolon_body() {
+        let node = perform("perform vehicleMassTest;");
+        assert_eq!(node.value.action_name, "vehicleMassTest");
+        assert_eq!(node.value.redefines, None);
+        assert!(matches!(node.value.body, PerformBody::Semicolon));
+    }
+
+    #[test]
+    fn perform_dotted_name_accepts_semicolon_body() {
+        let node = perform("perform providePower.generateTorque;");
+        assert_eq!(node.value.action_name, "providePower.generateTorque");
+        assert!(matches!(node.value.body, PerformBody::Semicolon));
+    }
+
+    #[test]
+    fn perform_quoted_name_accepts_semicolon_body() {
+        let node = perform("perform 'provide power';");
+        assert_eq!(node.value.action_name, "provide power");
+        assert!(matches!(node.value.body, PerformBody::Semicolon));
+    }
+
+    #[test]
+    fn perform_accepts_redefine_clause_with_semicolon_body() {
+        let node = perform("perform providePower.generateTorque :>> generateTorque;");
+        assert_eq!(node.value.action_name, "providePower.generateTorque");
+        assert_eq!(node.value.redefines.as_deref(), Some("generateTorque"));
+        assert!(matches!(node.value.body, PerformBody::Semicolon));
+    }
+
+    #[test]
+    fn perform_accepts_redefine_clause_with_brace_body() {
+        let node = perform("perform 'provide power' :>> VehicleA::'provide power' { }");
+        assert_eq!(node.value.action_name, "provide power");
+        assert_eq!(
+            node.value.redefines.as_deref(),
+            Some("VehicleA::provide power")
+        );
+        assert!(matches!(node.value.body, PerformBody::Brace { .. }));
+    }
+
+    #[test]
+    fn perform_plain_brace_body_still_works() {
+        let node = perform("perform vehicleMassTest { }");
+        assert!(matches!(node.value.body, PerformBody::Brace { .. }));
+    }
+
+    #[test]
+    fn perform_action_declaration_form_is_unaffected() {
+        let (rest, node) = part_usage_body_element(input("perform action 'assemble vehicle' { }"))
+            .expect("perform action parses");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PartUsageBodyElement::Perform(perform) = node.value else {
+            panic!("expected Perform, got {:?}", node.value);
+        };
+        assert_eq!(perform.value.action_name, "assemble vehicle");
+        assert_eq!(perform.value.redefines, None);
     }
 }
 

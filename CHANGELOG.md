@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`perform <path>` (part usage body, no `action` keyword) only accepted a brace body and had
+  no `:>>` redefinition clause**, so real Systems Library / OMG spec Annex usage like
+  `perform 'provide power';`, `perform providePower.generateTorque;`, and
+  `perform providePower.generateTorque :>> generateTorque;` fell through to opaque recovery
+  (`recovered_part_usage_body_element`). `perform_body()` already had a way to model a semicolon
+  body (`PerformBody::Semicolon`) but `perform_usage()` never offered it as an alternative —
+  only `perform_action_decl()` (the `perform action <name>` declaration form) did. `Perform` had
+  no `redefines` field at all.
+  PARSER_BACKLOG_ROADMAP.md §6, group G1 — part of the audit blocking Spec42 v1.0 (see that
+  section for the full 25-file breakdown this PR chips away at).
+- Added `redefines: Option<String>` to `Perform` (parsed via the existing `qualified_name`
+  parser, same one `perform_action_decl`'s `type_name` already uses); `perform_usage()` now
+  accepts an optional `:>>` clause and a `;`-only body, mirroring `perform_action_decl`'s
+  existing `alt((tag(";"), perform_body))` pattern.
+- Bump `PARSE_AST_VERSION` from `47` to `48` for the `Perform` field addition. Regenerated AST
+  snapshot fixtures (`UPDATE_VALIDATION_AST=1 cargo test --test validation -- --include-ignored`)
+  — reviewed the diff: only the new `redefines: None`/`Some(..)` field appears, in exactly the
+  5 `Perform` nodes `functional_allocation_4a.txt` contains, all `None` (that fixture doesn't use
+  the redefine form).
+  <br>Confirmed against real usage in the OMG spec Annex validation corpus: of the 4 files
+  originally attributed to this gap, `12b-Allocation-1.sysml` is now fully clean;
+  `8-Requirements.sysml`, `12b-Allocation.sysml`, and `5-State-based Behavior-2.sysml` each have
+  a second, distinct gap that was previously hidden behind this one (`private import` inside a
+  part usage body; nested `allocate` inside an allocation usage's own body; `exhibit <name> :>>
+  <target>;` redefinition) — not fixed here, tracked as new roadmap items.
+- Added regression tests in `src/parser/part/usage.rs::perform_semicolon_and_redefine_tests`
+  covering plain/dotted/quoted-name semicolon bodies, the `:>>` redefine clause with both body
+  forms, and confirming the `perform action <name>` declaration form is unaffected.
+
 - **`ItemUsage` never accepted the anonymous redefinition form** (`item :>> name[multiplicity]?
   (: type)? (= value)? body`) that `PartUsage`/`AttributeUsage` already support, and had no
   `value`/`redefines` fields at all. `item_usage`'s mandatory `name(input)?` call meant any
