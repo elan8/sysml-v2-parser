@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-07-30
+
+### Fixed
+
+- **`ViewRenderingUsage`/`RenderingUsage` bodies were opaque -- `render`/`rendering` usages could
+  never carry a real nested member, silently discarding everything inside their `{ ... }` block.**
+  Both parsers called the shared `interface::connect_body`, which only distinguishes `;` from
+  `{...}` and captures zero structure inside the braces. This blocked the Systems Library's
+  `asElementTable`/`columnView` mechanism (`Views.sysml`'s `view columnView[0..*] ordered { ... }`
+  feature): a model redefining a table column via `view :>> columnView[1] { render
+  asTextualNotation; }` inside a `render`/`rendering` binding parsed the redefinition as
+  unrecoverable opaque text. Confirmed real usage (not speculative KerML completeness) in
+  `sysml-v2-release/sysml/src/training/42. Views/Views Example.sysml` and
+  `.../validation/11-View and Viewpoint/11a-View-Viewpoint.sysml`, both using exactly this form.
+- New `RenderingUsageBody`/`RenderingUsageBodyElement` AST types give `ViewRenderingUsage.body`/
+  `RenderingUsage.body` real structure (`Semicolon | Brace { elements: Vec<...> }`, mirroring
+  `RenderingDefBody`'s existing shape) with `Doc` and nested `ViewUsage` variants; unrecognized
+  content still falls through to the existing brace-member recovery path as an `Error` node,
+  scoped to what's confirmed needed rather than a wider `UsageBody` grammar with no concrete
+  real-usage backing. `ConnectBody` itself is untouched -- it's shared by `connect`/`dependency`/
+  `requirement`-body call sites that don't need this.
+- **`ViewUsage` never accepted the anonymous redefinition form** (`view :>> name[multiplicity]?
+  { ... }`) that every other usage kind (`part`, `attribute`, ...) already supports -- confirmed
+  against the BNF (`ViewUsage = OccurrenceUsagePrefix 'view' UsageDeclaration? ValuePart?
+  ViewBody`, where `UsageDeclaration` legally omits the name). `view_usage`'s existing header
+  parsing already extracted `header.redefines` via the shared `parse_feature_usage_header`, but
+  silently discarded it -- the same "genuine parsing gap, value parsed then dropped" pattern found
+  repeatedly elsewhere in this rollout. Added `redefines`/`multiplicity` fields to `ViewUsage` and
+  a `view_usage_redefines_only` parser mirroring `part_usage_redefines_only`'s exact shape
+  (`prefix_redefinition_target` + optional `multiplicity_node`, straight to the body -- no `:
+  Type` header, matching how `part :>> wheels[4];` works).
+- Bump `PARSE_AST_VERSION` from `45` to `46` for the `ViewUsage`/`ViewRenderingUsage`/
+  `RenderingUsage` field changes above.
+- Added regression tests locking in both real-usage forms (`view :>> columnView[1] { ... }`
+  standalone, and nested inside `render`/`rendering` usage bodies) in
+  `src/parser/view.rs::column_view_tests`.
+
 ## [0.47.1] - 2026-07-26
 
 ### Fixed

@@ -2,8 +2,9 @@
 
 use crate::ast::{
     ExposeMember, FilterMember, Membership, Node, ParseErrorNode, RenderingDef, RenderingDefBody,
-    RenderingDefBodyElement, RenderingUsage, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef,
-    ViewDefBody, ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
+    RenderingDefBodyElement, RenderingUsage, RenderingUsageBody, RenderingUsageBodyElement,
+    SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody, ViewDefBodyElement,
+    ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -13,11 +14,12 @@ use crate::parser::lex::{
     ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
+use crate::parser::usage::{multiplicity_node, prefix_redefinition_target};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, success};
+use nom::combinator::{map, opt, success};
 use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
@@ -47,6 +49,62 @@ fn view_filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterMember>
     crate::parser::package::filter_member(input)
 }
 
+/// Body of a `render`/`rendering` usage (BNF `UsageBody`, Clause 8.2.2.26.1): a nested `view`
+/// usage member -- most notably a `columnView` redefinition of `asElementTable` (`view :>>
+/// columnView[N] { render ...; }`, confirmed real usage in `sysml-v2-release/sysml/src/training/
+/// 42. Views/Views Example.sysml` and `.../validation/11-View and Viewpoint/11a-View-Viewpoint.
+/// sysml`) -- or a doc comment. Any other content falls through to the shared brace-member
+/// recovery path (`parse_structured_brace_members`) as an `Error` node, same as every other
+/// structured body in this module; scoped to what's confirmed needed rather than guessing at a
+/// wider `UsageBody` grammar with no concrete real-usage backing.
+fn rendering_usage_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<RenderingUsageBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, elem) = alt((
+        map(doc_comment, RenderingUsageBodyElement::Doc),
+        map(view_usage, RenderingUsageBodyElement::ViewUsage),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, elem)))
+}
+
+fn rendering_usage_body_recovery(
+    start: Input<'_>,
+    end: Input<'_>,
+) -> Node<RenderingUsageBodyElement> {
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        VIEW_DEF_BODY_STARTERS,
+        "rendering usage body",
+        "recovered_rendering_usage_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        RenderingUsageBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
+fn rendering_usage_body(input: Input<'_>) -> IResult<Input<'_>, RenderingUsageBody> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, RenderingUsageBody::Semicolon));
+    }
+    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+        input,
+        VIEW_DEF_BODY_STARTERS,
+        "rendering usage body",
+        "recovered_rendering_usage_body_element",
+        rendering_usage_body_element,
+        rendering_usage_body_recovery,
+    )?;
+    Ok((input, RenderingUsageBody::Brace { elements }))
+}
+
 fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderingUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) =
@@ -55,7 +113,7 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = rendering_usage_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -389,6 +447,18 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // Anonymous redefinition form (BNF `ViewUsage`'s `UsageDeclaration?` legally omits the name
+    // in favor of a leading `:>>` target, same shape `PartUsage`'s `part_usage_redefines_only`
+    // already handles) -- e.g. `view :>> columnView[1] { render asTextualNotation; }`, confirmed
+    // real usage in `sysml-v2-release/sysml/src/training/42. Views/Views Example.sysml` and
+    // `.../validation/11-View and Viewpoint/11a-View-Viewpoint.sysml`. Peek before committing to
+    // the named path, mirroring `part_usage`'s own dispatch.
+    let (peek, _) = ws_and_comments(input)?;
+    if peek.fragment().starts_with(b":>>") {
+        let (input, mut usage) = view_usage_redefines_only(start, input)?;
+        usage.value.membership = Membership::feature(visibility, visibility_span);
+        return Ok((input, usage));
+    }
     let (input, name_str) = name(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
     let (input, body) = view_body(input)?;
@@ -400,8 +470,38 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
             ViewUsage {
                 name: name_str,
                 type_name: header.type_name,
+                redefines: header.redefines,
+                multiplicity: None,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
+            },
+        ),
+    ))
+}
+
+/// Anonymous `view :>> name[multiplicity]? ViewBody` redefinition form -- see [`view_usage`]'s
+/// doc comment. Mirrors `part_usage_redefines_only`'s shape exactly: redefinition target,
+/// optional multiplicity, then straight to the body (no `: Type` header -- the type comes from
+/// the redefined feature, not a fresh typing clause).
+fn view_usage_redefines_only<'a>(
+    start: Input<'a>,
+    input: Input<'a>,
+) -> IResult<Input<'a>, Node<ViewUsage>> {
+    let (input, (_, redefines_target)) = prefix_redefinition_target(input)?;
+    let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
+    let (input, body) = view_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ViewUsage {
+                name: String::new(),
+                type_name: None,
+                redefines: Some(redefines_target),
+                multiplicity: multiplicity_opt,
+                body,
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
     ))
@@ -441,7 +541,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = rendering_usage_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -676,5 +776,81 @@ mod membership_tests {
         let (_, node) =
             view_rendering_usage(input("render r1 : R1;")).expect("view rendering usage");
         assert_eq!(node.value.membership.visibility, None);
+    }
+}
+
+#[cfg(test)]
+mod column_view_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    // Real usage confirmed in sysml-v2-release/sysml/src/training/42. Views/Views Example.sysml
+    // and .../validation/11-View and Viewpoint/11a-View-Viewpoint.sysml:
+    //   rendering asTextualNotationTable :> asElementTable {
+    //       view :>> columnView[1] {
+    //           render asTextualNotation;
+    //       }
+    //   }
+
+    #[test]
+    fn view_usage_accepts_anonymous_redefinition_form() {
+        let (rest, node) =
+            view_usage(input("view :>> columnView[1] { render asTextualNotation; }"))
+                .expect("view usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "");
+        assert!(node.value.redefines.is_some());
+        assert!(node.value.multiplicity.is_some());
+    }
+
+    #[test]
+    fn rendering_usage_captures_nested_column_view_redefinition() {
+        let (rest, node) = rendering_usage(input(
+            "rendering asTextualNotationTable :> asElementTable { view :>> columnView[1] { render asTextualNotation; } }",
+        ))
+        .expect("rendering usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let RenderingUsageBody::Brace { elements } = &node.value.body else {
+            panic!("expected brace body, got {:?}", node.value.body);
+        };
+        assert_eq!(elements.len(), 1);
+        let RenderingUsageBodyElement::ViewUsage(column_view) = &elements[0].value else {
+            panic!("expected a nested view usage, got {:?}", elements[0].value);
+        };
+        assert_eq!(column_view.value.name, "");
+        assert!(column_view.value.redefines.is_some());
+        let ViewBody::Brace {
+            elements: nested_elements,
+        } = &column_view.value.body
+        else {
+            panic!("expected brace body on nested columnView");
+        };
+        let has_nested_render = nested_elements
+            .iter()
+            .any(|e| matches!(e.value, ViewBodyElement::ViewRendering(_)));
+        assert!(has_nested_render, "expected a nested render binding");
+    }
+
+    #[test]
+    fn view_rendering_usage_body_accepts_column_view_redefinition() {
+        // Inline `render asElementTable { view :>> columnView[1] { render asTextualNotation; } }`
+        // form (the other real fixture, used directly on a view usage's `render` binding).
+        let (rest, node) = view_rendering_usage(input(
+            "render asElementTable { view :>> columnView[1] { render asTextualNotation; } }",
+        ))
+        .expect("view rendering usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let RenderingUsageBody::Brace { elements } = &node.value.body else {
+            panic!("expected brace body, got {:?}", node.value.body);
+        };
+        assert_eq!(elements.len(), 1);
+        assert!(matches!(
+            elements[0].value,
+            RenderingUsageBodyElement::ViewUsage(_)
+        ));
     }
 }

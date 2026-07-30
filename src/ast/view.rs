@@ -4,7 +4,7 @@ use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::membership::Membership;
 use super::requirement::RequirementDefBody;
 use super::structure::MetadataAnnotation;
-use crate::ast::core::{Expression, Node, TypingRelationship};
+use crate::ast::core::{Expression, Multiplicity, Node, SubsettingRelationship, TypingRelationship};
 
 /// Constraint definition: `constraint def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -150,8 +150,35 @@ pub enum ViewDefBodyElement {
 pub struct ViewRenderingUsage {
     pub name: String,
     pub type_name: Option<String>,
-    pub body: ConnectBody,
+    pub body: RenderingUsageBody,
     pub membership: Membership,
+}
+
+/// Body of a `render`/`rendering` usage: `;` or `{` RenderingUsageBodyElement* `}`. Per BNF
+/// Clause 8.2.2.26.1 (`ViewRenderingUsage : RenderingUsage = ownedRelationship +=
+/// OwnedReferenceSubsetting FeatureSpecializationPart? UsageBody | ...`), the body is a generic
+/// `UsageBody` -- most notably it can own a redefined `columnView` feature of `asElementTable`
+/// (`view :>> columnView[N] { render ...; }`, confirmed against real usage in
+/// `sysml-v2-release/sysml/src/training/42. Views/Views Example.sysml` and
+/// `.../validation/11-View and Viewpoint/11a-View-Viewpoint.sysml`) -- not just a `;`/opaque
+/// `{...}` the way the previous `ConnectBody` field type treated it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RenderingUsageBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<RenderingUsageBodyElement>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RenderingUsageBodyElement {
+    Error(Node<ParseErrorNode>),
+    Doc(Node<DocComment>),
+    /// Nested `view` usage member, e.g. a `columnView` redefinition (`view :>> columnView[1] {
+    /// render asTextualNotation; }`).
+    ViewUsage(Node<ViewUsage>),
 }
 
 /// Viewpoint definition: `viewpoint def` Identification RequirementBody.
@@ -193,12 +220,22 @@ pub enum RenderingDefBodyElement {
     Other(String),
 }
 
-/// View usage: `view` name `:` type? ViewBody.
+/// View usage: `view` name `:` type? ViewBody, or the anonymous redefinition form `view :>>
+/// name[multiplicity]? ViewBody` (BNF `ViewUsage = OccurrenceUsagePrefix 'view' UsageDeclaration?
+/// ValuePart? ViewBody`, where `UsageDeclaration` legally omits the name in favor of a leading
+/// `:>>` redefinition target -- the same shape `PartUsage`'s `redefines`/`multiplicity` fields
+/// already cover). `name` is empty for the anonymous-redefinition form, matching
+/// `PartUsage::name`'s existing convention.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewUsage {
     pub name: String,
     pub type_name: Option<String>,
+    /// Redefines target, e.g. `columnView` in `view :>> columnView[1] { ... }`. `None` for the
+    /// ordinary named form.
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Multiplicity, e.g. `[1]` in `view :>> columnView[1] { ... }`.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub body: ViewBody,
     pub membership: Membership,
 }
@@ -267,6 +304,6 @@ pub struct ViewpointUsage {
 pub struct RenderingUsage {
     pub name: String,
     pub type_name: Option<String>,
-    pub body: ConnectBody,
+    pub body: RenderingUsageBody,
     pub membership: Membership,
 }
