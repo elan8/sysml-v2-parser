@@ -798,9 +798,10 @@ mod column_view_tests {
 
     #[test]
     fn view_usage_accepts_anonymous_redefinition_form() {
-        let (rest, node) =
-            view_usage(input("view :>> columnView[1] { render asTextualNotation; }"))
-                .expect("view usage");
+        let (rest, node) = view_usage(input(
+            "view :>> columnView[1] { render asTextualNotation; }",
+        ))
+        .expect("view usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "");
         assert!(node.value.redefines.is_some());

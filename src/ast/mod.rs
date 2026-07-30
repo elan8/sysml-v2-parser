@@ -68,6 +68,9 @@ fn normalize_root_element_node(el: &Node<RootElement>) -> Node<RootElement> {
             RootElement::Namespace(dummy_node(n, normalize_namespace_decl(&n.value)))
         }
         RootElement::Import(n) => RootElement::Import(dummy_node(n, normalize_import(&n.value))),
+        RootElement::Member(n) => {
+            RootElement::Member(Box::new(normalize_package_body_element_node(n)))
+        }
     };
     dummy_node(el, value)
 }
@@ -364,6 +367,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::AttributeUsage(n) => {
             PartDefBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
         }
+        PartDefBodyElement::DefaultReferenceUsage(n) => PartDefBodyElement::DefaultReferenceUsage(
+            dummy_node(n, normalize_default_reference_usage(&n.value)),
+        ),
         PartDefBodyElement::RequirementUsage(n) => {
             PartDefBodyElement::RequirementUsage(dummy_node(n, n.value.clone()))
         }
@@ -554,6 +560,17 @@ fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
     }
 }
 
+fn normalize_default_reference_usage(u: &DefaultReferenceUsage) -> DefaultReferenceUsage {
+    DefaultReferenceUsage {
+        name: u.name.clone(),
+        typing: u.typing.clone(),
+        value: u.value.clone(),
+        name_span: None,
+        typing_span: None,
+        membership: u.membership.clone(),
+    }
+}
+
 fn normalize_part_usage(p: &PartUsage) -> PartUsage {
     PartUsage {
         usage_prefix: p.usage_prefix.clone(),
@@ -730,6 +747,12 @@ fn normalize_part_usage_body_element_node(
         }
         PartUsageBodyElement::AttributeUsage(n) => {
             PartUsageBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
+        }
+        PartUsageBodyElement::DefaultReferenceUsage(n) => {
+            PartUsageBodyElement::DefaultReferenceUsage(dummy_node(
+                n,
+                normalize_default_reference_usage(&n.value),
+            ))
         }
         PartUsageBodyElement::EnumerationUsage(n) => PartUsageBodyElement::EnumerationUsage(
             dummy_node(n, normalize_enumeration_usage(&n.value)),

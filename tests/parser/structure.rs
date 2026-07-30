@@ -1791,13 +1791,17 @@ part def Vehicle {
     let usage = elements
         .iter()
         .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a) => Some(&a.value),
+            sysml_v2_parser::ast::PartDefBodyElement::DefaultReferenceUsage(a) => Some(&a.value),
             _ => None,
         })
-        .expect("expected shorthand attribute usage");
+        .expect("expected default reference usage");
     assert!(
         usage.value.is_some(),
         "value expression should be preserved"
+    );
+    assert!(
+        usage.typing.is_some(),
+        "typing from `: Real` should be preserved on DefaultReferenceUsage"
     );
 }
 

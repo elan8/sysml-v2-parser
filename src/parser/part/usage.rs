@@ -150,7 +150,18 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = tag(&b"part"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // Allow `part: Type` with no whitespace (anonymous UsageDeclaration).
+    let (after_kw, _) = ws_and_comments(input)?;
+    let input = if (after_kw.fragment().starts_with(b":")
+        && !after_kw.fragment().starts_with(b":>")
+        && !after_kw.fragment().starts_with(b":>>"))
+        || starts_with_keyword(after_kw.fragment(), b"defined")
+    {
+        after_kw
+    } else {
+        let (input, _) = ws1(input)?;
+        input
+    };
     let (peek, _) = ws_and_comments(input)?;
     if (peek.fragment().starts_with(b":")
         && !peek.fragment().starts_with(b":>")
@@ -937,7 +948,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             map(attribute_usage, PartUsageBodyElement::AttributeUsage),
             map(
                 attribute_usage_shorthand,
-                PartUsageBodyElement::AttributeUsage,
+                PartUsageBodyElement::DefaultReferenceUsage,
             ),
             alt((
                 map(enum_usage, PartUsageBodyElement::EnumerationUsage),

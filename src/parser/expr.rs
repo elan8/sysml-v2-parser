@@ -348,9 +348,7 @@ fn type_check_kind_token(input: Input<'_>) -> IResult<Input<'_>, TypeCheckKind> 
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(|i| keyword_token(i, b"istype"), |_| TypeCheckKind::Istype),
-        map(|i| keyword_token(i, b"hastype"), |_| {
-            TypeCheckKind::Hastype
-        }),
+        map(|i| keyword_token(i, b"hastype"), |_| TypeCheckKind::Hastype),
         map(|i| keyword_token(i, b"as"), |_| TypeCheckKind::As),
     ))
     .parse(input)
@@ -656,7 +654,9 @@ impl<'a> Frame<'a> {
     fn is_call_style(&self) -> bool {
         matches!(
             self.kind,
-            FrameKind::Invocation { .. } | FrameKind::ArrowInvocation { .. } | FrameKind::Constructor { .. }
+            FrameKind::Invocation { .. }
+                | FrameKind::ArrowInvocation { .. }
+                | FrameKind::Constructor { .. }
         )
     }
 
@@ -719,7 +719,8 @@ fn build_frame_node<'a>(frame: Frame<'a>, end: Input<'a>) -> Node<Expression> {
     } = frame;
     match kind {
         FrameKind::Group => {
-            let mut values: Vec<Node<Expression>> = items.into_iter().map(|arg| arg.value).collect();
+            let mut values: Vec<Node<Expression>> =
+                items.into_iter().map(|arg| arg.value).collect();
             if values.len() == 1 {
                 let value = values
                     .pop()
@@ -799,7 +800,10 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                     if peek.fragment().starts_with(b")") {
                         let (after_close, _) = tag(&b")"[..]).parse(peek)?;
                         input = after_close;
-                        (node_from_to(after_ws, after_close, Expression::Null), after_ws)
+                        (
+                            node_from_to(after_ws, after_close, Expression::Null),
+                            after_ws,
+                        )
                     } else {
                         stack.push((
                             Frame {
@@ -904,7 +908,8 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             }
             if next.fragment().starts_with(b"#") {
                 let (after_hash, _) = tag(&b"#"[..]).parse(next)?;
-                let (after_paren, _) = preceded(ws_and_comments, tag(&b"("[..])).parse(after_hash)?;
+                let (after_paren, _) =
+                    preceded(ws_and_comments, tag(&b"("[..])).parse(after_hash)?;
                 stack.push((
                     Frame {
                         kind: FrameKind::Index { base: atom },
@@ -1137,8 +1142,17 @@ mod tests {
     #[test]
     fn keyword_prefixed_identifiers_stay_plain_identifiers() {
         for text in [
-            "newSeq", "newValue", "notEmpty", "order", "ordered", "assert", "assoc", "originalReq",
-            "asOf", "istypeOf", "hastypeName",
+            "newSeq",
+            "newValue",
+            "notEmpty",
+            "order",
+            "ordered",
+            "assert",
+            "assoc",
+            "originalReq",
+            "asOf",
+            "istypeOf",
+            "hastypeName",
         ] {
             let input = span_input(text);
             let (rest, node) = expression(input).unwrap_or_else(|e| {
@@ -1161,19 +1175,43 @@ mod tests {
 
         let input = span_input("not x");
         let (_, node) = expression(input).expect("expression");
-        assert!(matches!(&node.value, Expression::UnaryOp { op: UnaryOperator::Not, .. }));
+        assert!(matches!(
+            &node.value,
+            Expression::UnaryOp {
+                op: UnaryOperator::Not,
+                ..
+            }
+        ));
 
         let input = span_input("a and b");
         let (_, node) = expression(input).expect("expression");
-        assert!(matches!(&node.value, Expression::BinaryOp { op: BinaryOperator::And, .. }));
+        assert!(matches!(
+            &node.value,
+            Expression::BinaryOp {
+                op: BinaryOperator::And,
+                ..
+            }
+        ));
 
         let input = span_input("a && b");
         let (_, node) = expression(input).expect("expression");
-        assert!(matches!(&node.value, Expression::BinaryOp { op: BinaryOperator::And, .. }));
+        assert!(matches!(
+            &node.value,
+            Expression::BinaryOp {
+                op: BinaryOperator::And,
+                ..
+            }
+        ));
 
         let input = span_input("a || b");
         let (_, node) = expression(input).expect("expression");
-        assert!(matches!(&node.value, Expression::BinaryOp { op: BinaryOperator::Or, .. }));
+        assert!(matches!(
+            &node.value,
+            Expression::BinaryOp {
+                op: BinaryOperator::Or,
+                ..
+            }
+        ));
 
         let input = span_input("new A(x)");
         let (_, node) = expression(input).expect("expression");
@@ -1181,7 +1219,13 @@ mod tests {
 
         let input = span_input("x istype T");
         let (_, node) = expression(input).expect("expression");
-        assert!(matches!(&node.value, Expression::TypeCheck { operand: Some(_), .. }));
+        assert!(matches!(
+            &node.value,
+            Expression::TypeCheck {
+                operand: Some(_),
+                ..
+            }
+        ));
     }
 
     #[test]

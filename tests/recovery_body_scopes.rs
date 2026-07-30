@@ -77,7 +77,8 @@ fn use_case_recovery_keeps_later_members() {
 
 #[test]
 fn state_recovery_keeps_later_members() {
-    let input = "package P {\nstate def Machine {\nstate: Mode;\ntransition t then Ready;\n}\n}";
+    // Named usage with typing started but type missing (anonymous `state: Mode;` is legal).
+    let input = "package P {\nstate def Machine {\nstate ready: ;\ntransition t then Ready;\n}\n}";
     let result = parse_with_diagnostics(input);
     let pkg = match &result.root.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -100,7 +101,11 @@ fn state_recovery_keeps_later_members() {
         elements
             .iter()
             .any(|e| matches!(e.value, StateDefBodyElement::Error(_))),
-        "malformed state member should be preserved as an error node"
+        "malformed state member should be preserved as an error node; got {:?}",
+        elements
+            .iter()
+            .map(|e| format!("{:?}", e.value))
+            .collect::<Vec<_>>()
     );
     assert!(
         elements

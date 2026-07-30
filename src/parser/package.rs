@@ -163,17 +163,32 @@ fn namespace_decl(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDecl>> {
     ))
 }
 
-/// One root-level element: import, package, or namespace (BNF PackageBodyElement* at root).
+/// One root-level element (BNF `RootNamespace = PackageBodyElement*`).
+///
+/// Dedicated variants for package / namespace / import keep existing consumers stable; all other
+/// legal package-body members (e.g. `part def` at file root) become [`RootElement::Member`].
 pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
-    let (input, elem) = alt((
-        map(import_, RootElement::Import),
-        map(namespace_decl, RootElement::Namespace),
-        map(library_package_, RootElement::LibraryPackage),
-        map(package_, RootElement::Package),
-    ))
-    .parse(input)?;
+    if let Ok((next, elem)) = map(import_, RootElement::Import).parse(input) {
+        return Ok((next, node_from_to(start, next, elem)));
+    }
+    if let Ok((next, elem)) = map(namespace_decl, RootElement::Namespace).parse(input) {
+        return Ok((next, node_from_to(start, next, elem)));
+    }
+    if let Ok((next, elem)) = map(library_package_, RootElement::LibraryPackage).parse(input) {
+        return Ok((next, node_from_to(start, next, elem)));
+    }
+    if let Ok((next, elem)) = map(package_, RootElement::Package).parse(input) {
+        return Ok((next, node_from_to(start, next, elem)));
+    }
+    let (input, boxed) = package_body_element(input)?;
+    let elem = match &boxed.value {
+        PackageBodyElement::Package(n) => RootElement::Package(n.clone()),
+        PackageBodyElement::LibraryPackage(n) => RootElement::LibraryPackage(n.clone()),
+        PackageBodyElement::Import(n) => RootElement::Import(n.clone()),
+        _ => RootElement::Member(boxed),
+    };
     Ok((input, node_from_to(start, input, elem)))
 }
 

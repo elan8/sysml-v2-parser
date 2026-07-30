@@ -1,14 +1,12 @@
 //! Public parse entry points.
 
-use super::collect_errors::{
-    collect_recovery_errors, collect_requirement_id_dialect_diagnostics,
-};
+use super::collect_errors::{collect_recovery_errors, collect_requirement_id_dialect_diagnostics};
 use super::diagnostics::{
     dedup_errors, extra_closing_brace_at_eof, fragment_to_found_snippet, has_unclosed_brace,
-    is_illegal_top_level_definition, missing_closing_brace_error,
-    missing_closing_brace_error_at_eof, nom_err_to_parse_error, root_body_recovery_error,
-    root_body_scope, suppress_diagnostic_cascades, suppress_redundant_closing_brace_errors,
-    trim_ascii_start, unexpected_closing_brace_parse_error,
+    missing_closing_brace_error, missing_closing_brace_error_at_eof, nom_err_to_parse_error,
+    root_body_recovery_error, root_body_scope, suppress_diagnostic_cascades,
+    suppress_redundant_closing_brace_errors, trim_ascii_start,
+    unexpected_closing_brace_parse_error,
 };
 use super::lex;
 use super::package;
@@ -171,15 +169,6 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
                 if !found_snippet.is_empty() {
                     pe = pe.with_found(found_snippet);
                 }
-                if root.elements.is_empty() && is_illegal_top_level_definition(rest.fragment()) {
-                    pe = pe
-                        .with_code("illegal_top_level_definition")
-                        .with_expected("'package', 'namespace', or 'import'")
-                        .with_suggestion(
-                            "Wrap this declaration in `package ... { ... }` or `namespace ... { ... }`.",
-                        );
-                    pe.message = "illegal top-level definition".to_string();
-                }
                 Err(pe)
             }
         }
@@ -187,14 +176,14 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
             nom_err_to_parse_error(
                 &e,
                 None,
-                Some("'package', 'namespace', or 'import' at top level; or valid element in package body"),
+                Some("package-body element at root (package, namespace, import, definition, or usage)"),
             )
         })),
         Err(nom::Err::Failure(e)) => Err(missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
             nom_err_to_parse_error(
                 &e,
                 None,
-                Some("'package', 'namespace', or 'import' at top level; or valid element in package body"),
+                Some("package-body element at root (package, namespace, import, definition, or usage)"),
             )
         })),
         Err(nom::Err::Incomplete(_)) => Err(
@@ -286,7 +275,11 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
                     }
                 }
                 let pe = missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
-                    nom_err_to_parse_error(&e, None, Some("'package', 'namespace', or 'import'"))
+                    nom_err_to_parse_error(
+                        &e,
+                        None,
+                        Some("package-body element at root (package, namespace, import, definition, or usage)"),
+                    )
                 });
                 errors.push(pe);
                 let skip_result = lex::skip_to_next_sync_point(e.input);

@@ -7,7 +7,8 @@ use crate::ast::{
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::lex::{
-    capture_opaque_member, identification, name, subset_operator, ws1, ws_and_comments,
+    capture_opaque_member, identification, name, starts_with_keyword, subset_operator, ws1,
+    ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -516,20 +517,46 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         (input, is_derived, is_constant)
     };
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, usage_head) = alt((
-        map(
-            preceded(ws_and_comments, prefix_redefinition_target),
-            |(redefines_span, redefines)| AttributeUsageHead::PrefixRedefines {
-                redefines_span,
-                redefines,
+    // SysML allows anonymous attribute usages: `attribute: Real;` (Identification may be empty).
+    let (after_kw, _) = ws_and_comments(input)?;
+    let input = if (after_kw.fragment().starts_with(b":")
+        && !after_kw.fragment().starts_with(b":>")
+        && !after_kw.fragment().starts_with(b":>>"))
+        || starts_with_keyword(after_kw.fragment(), b"defined")
+    {
+        after_kw
+    } else {
+        let (input, _) = ws1(input)?;
+        input
+    };
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, usage_head) = if (peek.fragment().starts_with(b":")
+        && !peek.fragment().starts_with(b":>")
+        && !peek.fragment().starts_with(b":>>"))
+        || starts_with_keyword(peek.fragment(), b"defined")
+    {
+        (
+            input,
+            AttributeUsageHead::Named {
+                name_span: crate::ast::Span::dummy(),
+                name: String::new(),
             },
-        ),
-        map(with_span(name), |(name_span, name)| {
-            AttributeUsageHead::Named { name_span, name }
-        }),
-    ))
-    .parse(input)?;
+        )
+    } else {
+        alt((
+            map(
+                preceded(ws_and_comments, prefix_redefinition_target),
+                |(redefines_span, redefines)| AttributeUsageHead::PrefixRedefines {
+                    redefines_span,
+                    redefines,
+                },
+            ),
+            map(with_span(name), |(name_span, name)| {
+                AttributeUsageHead::Named { name_span, name }
+            }),
+        ))
+        .parse(input)?
+    };
     let (input, name_span, name_str, typing_span, typing, redefines_span, redefines, mods0) =
         match usage_head {
             AttributeUsageHead::PrefixRedefines {
@@ -780,7 +807,8 @@ pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBod
     Ok((input, AttributeBody::Brace { elements }))
 }
 
-/// Shorthand attribute usage (no `attribute` keyword) commonly used inside part bodies.
+/// SysML `DefaultReferenceUsage` shorthand: bare `name : Type (= value)?;` without the
+/// `attribute` keyword (commonly used inside part bodies).
 ///
 /// Supports:
 /// - `name : Type ;`
@@ -788,7 +816,7 @@ pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBod
 /// - `:>> name : Type = expr ;` (leading `:>>` ignored; treated as a usage)
 pub(crate) fn attribute_usage_shorthand(
     input: Input<'_>,
-) -> IResult<Input<'_>, Node<AttributeUsage>> {
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) =
@@ -800,7 +828,8 @@ pub(crate) fn attribute_usage_shorthand(
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, _) = typings(input)?;
+    let (input, (typing_span, is_conjugated, targets)) = typings(input)?;
+    let typing = Some(typing_node(typing_span.clone(), is_conjugated, targets));
     // Keep shorthand values on the shared expression path so precedence/parentheses are preserved.
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
@@ -811,27 +840,13 @@ pub(crate) fn attribute_usage_shorthand(
         node_from_to(
             start,
             input,
-            AttributeUsage {
+            crate::ast::DefaultReferenceUsage {
                 name: name_str,
-                typing: None,
-                subsets: None,
-                redefines: None,
-                references: None,
-                crosses: None,
-                intersects: None,
+                typing,
                 value,
-                body: AttributeBody::Semicolon,
                 name_span: Some(name_span),
-                typing_span: None,
-                redefines_span: None,
-                direction: None,
-                multiplicity: None,
-                ordered: false,
-                nonunique: false,
-                is_derived: false,
-                is_constant: false,
-                is_end: false,
-                // No visibility prefix on the no-`attribute`-keyword shorthand form.
+                typing_span: Some(typing_span),
+                // No visibility prefix on the no-keyword shorthand form.
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
@@ -851,8 +866,8 @@ mod attribute_body_tests {
 
     #[test]
     fn attribute_usage_captures_intersects() {
-        let (rest, node) =
-            attribute_usage(input("attribute reading : Weight intersects a, b;")).expect("attribute usage");
+        let (rest, node) = attribute_usage(input("attribute reading : Weight intersects a, b;"))
+            .expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value

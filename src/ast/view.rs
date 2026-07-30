@@ -4,7 +4,9 @@ use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::membership::Membership;
 use super::requirement::RequirementDefBody;
 use super::structure::MetadataAnnotation;
-use crate::ast::core::{Expression, Multiplicity, Node, SubsettingRelationship, TypingRelationship};
+use crate::ast::core::{
+    Expression, Multiplicity, Node, SubsettingRelationship, TypingRelationship,
+};
 
 /// Constraint definition: `constraint def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]

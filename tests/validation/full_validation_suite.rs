@@ -65,6 +65,7 @@ fn count_packages_and_elements(root: &RootNamespace) -> (usize, usize) {
                 }
             }
             RootElement::Import(_) => {}
+            RootElement::Member(_) => {}
         }
     }
     (n_pkgs, n_elements)

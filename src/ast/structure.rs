@@ -66,6 +66,8 @@ pub enum PartDefBodyElement {
     Other(String),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
+    /// Bare `name : Type;` / `name = expr;` without a kind keyword (SysML DefaultReferenceUsage).
+    DefaultReferenceUsage(Node<DefaultReferenceUsage>),
     RequirementUsage(Node<RequirementUsage>),
     ItemDef(Node<ItemDef>),
     ItemUsage(Node<ItemUsage>),
@@ -381,6 +383,8 @@ pub enum PartUsageBodyElement {
     Doc(Node<DocComment>),
     Annotation(Node<Annotation>),
     AttributeUsage(Node<AttributeUsage>),
+    /// Bare `name : Type;` without a kind keyword (SysML DefaultReferenceUsage).
+    DefaultReferenceUsage(Node<DefaultReferenceUsage>),
     EnumerationUsage(Node<EnumerationUsage>),
     PartUsage(Box<Node<PartUsage>>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
@@ -545,6 +549,22 @@ pub struct AttributeUsage {
     /// [`MembershipKind::OwningMembership`]. See [`AttributeDef::membership`] for the
     /// `visibility` capture rationale; the same "matched and previously discarded" prefix applies
     /// here.
+    pub membership: Membership,
+}
+
+/// SysML `DefaultReferenceUsage` (BNF §8.2.2.6 / Spec §7.6.4): a usage without a kind keyword,
+/// e.g. `Capacity : Real;`. Distinct from [`AttributeUsage`], which requires the `attribute`
+/// keyword. Historically parsed via `attribute_usage_shorthand` into `AttributeUsage`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DefaultReferenceUsage {
+    pub name: String,
+    /// Type after `:` / `defined by` / `typed by`.
+    pub typing: Option<Node<TypingRelationship>>,
+    /// Optional feature value after `=` / `default`.
+    pub value: Option<Node<FeatureValue>>,
+    pub name_span: Option<Span>,
+    pub typing_span: Option<Span>,
     pub membership: Membership,
 }
 
