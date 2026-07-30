@@ -3,8 +3,14 @@ use sysml_v2_parser::{parse, parse_with_diagnostics};
 
 #[test]
 fn package_recovery_inserts_error_node_and_keeps_later_sibling() {
+    // parse_root now rejects any document with an embedded recovery placeholder (GH-2), so the
+    // local-recovery guarantee this test checks belongs to parse_with_diagnostics, not parse.
     let input = "package P {\n#fmeaspec requirement req1 { }\npart def Good;\n}";
-    let root = parse(input).expect("package should parse with local recovery");
+    assert!(
+        parse(input).is_err(),
+        "strict should reject the unsupported annotation"
+    );
+    let root = parse_with_diagnostics(input).root;
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),

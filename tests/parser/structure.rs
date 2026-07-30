@@ -88,8 +88,13 @@ fn test_flow_and_allocation_parse() {
 
 #[test]
 fn test_flow_and_allocation_brace_bodies_parse() {
+    // `x = y;`/`nested { .. }`/`one = two;` aren't real flow/allocation body members, so
+    // parse_root now rejects this (GH-2: it no longer silently drops unmatched body content).
+    // The container-structure guarantee this test checks for is exercised via
+    // parse_with_diagnostics's partial AST instead.
     let input = "package P { flow transfer : Fuel from src to dst { x = y; nested { z = q; } } allocation map allocate source to target { one = two; } }";
-    let result = parse(input).expect("parse should succeed");
+    assert!(parse(input).is_err());
+    let result = parse_with_diagnostics(input).root;
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
@@ -122,8 +127,13 @@ fn test_flow_and_allocation_brace_bodies_parse() {
 
 #[test]
 fn test_metadata_def_brace_body_parse() {
+    // `level = high;`/`nested { .. }` aren't real metadata body members, so parse_root now
+    // rejects this (GH-2: it no longer silently drops unmatched body content). The
+    // container-structure guarantee this test checks for is exercised via
+    // parse_with_diagnostics's partial AST instead.
     let input = "package P { metadata def SecurityTag { doc /* classification */ level = high; nested { key = value; } } }";
-    let result = parse(input).expect("parse should succeed");
+    assert!(parse(input).is_err());
+    let result = parse_with_diagnostics(input).root;
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),

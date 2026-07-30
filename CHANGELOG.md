@@ -153,12 +153,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Reported in [elan8/sysml-v2-parser#2](https://github.com/elan8/sysml-v2-parser/issues/2).
 - `parse_root` now calls `collect_recovery_errors` on the successfully-structured AST before
   returning `Ok`, and returns the first embedded diagnostic as an `Err` if any are present. This
-  closes the "strict silently accepts invalid SysML" half of the reported divergence; the
-  "recovery rejects valid SysML" half (real grammar gaps for `allocate`/`part`/`foreach`/
-  `snapshot` in specific nested body contexts) is a separate, follow-up scoping effort.
+  closes the "strict silently accepts invalid SysML" half of the reported divergence.
 - Added regression tests in `src/parser/parse.rs::tests` covering the misspelled-keyword,
   unknown-keyword, and typo'd-declaration cases from the issue, confirming `parse_root` and
   `parse_with_diagnostics` now agree on the verdict.
+- Updated four existing tests (`tests/parser/recovery.rs`,
+  `tests/parser/structure.rs::test_flow_and_allocation_brace_bodies_parse`/
+  `test_metadata_def_brace_body_parse`, `tests/recovery_package.rs`) that had asserted `parse()`
+  succeeds on inputs containing an embedded recovery placeholder -- i.e. they encoded the bug
+  as intended behavior. They now assert `parse()` rejects that input and moved the
+  recovers-and-keeps-later-siblings assertions to `parse_with_diagnostics`, which is where that
+  guarantee actually belongs.
+
+**Not merge-ready -- held pending follow-up.** Running the repo's full (normally `#[ignore]`d)
+validation suite (`cargo test --test validation -- --include-ignored`) shows this change drops
+`full_validation_suite::test_full_validation_suite` from 56/56 to 31/56: 25 of the official
+SysML v2 spec Annex example files use constructs the grammar doesn't yet support in specific
+nested contexts (`perform`/`connection`/`flow`/`constraint`/`part` inside part-usage bodies,
+`assert constraint` inside part bodies, etc.). `parse_with_diagnostics` already flagged all 25 as
+invalid before this change -- `parse_root` was just silently agreeing to disagree -- so this is
+expected given the fix, not a new defect, but it means merging today would make `parse()` reject
+~45% of realistic spec-conformant models until those grammar gaps are closed. Holding this branch
+until enough of that follow-up work lands to make the practical regression small; do not merge as
+is. `test_full_validation_suite`'s 56/56 expectation should also be revisited once this lands (it
+currently masks these same gaps for anyone who runs it).
+
+Investigated the issue's other reported direction ("recovery rejects valid SysML") before
+deciding not to add speculative grammar branches for it, per this project's practice of verifying
+against real usage before scoping a fix:
+- The comment-continuation false positive (a `/* ... */` continuation line resembling `Word:
+  text` misflagged as a bare declaration) was already fixed independently in
+  [#4](https://github.com/elan8/sysml-v2-parser/pull/4) (issue #1), which removed the whole
+  non-spec heuristic that caused it.
+- `allocate` in a part-definition body already works correctly on both entry points when given
+  real (dotted-qualified-name) syntax, confirmed against `AllocationTest.sysml` in the vendored
+  library -- the issue's own example (`allocate action step to image;`, space-separated instead
+  of dotted) isn't valid `path_expression` syntax, so this isn't a parser gap.
+- `foreach ... in ... { }` isn't SysML v2 syntax; the real loop keyword is `for`, which already
+  parses correctly in an action-definition body on both entry points.
+- `part`/`snapshot` inside an action body have zero confirmed real usage in the vendored SysML v2
+  library (`snapshot` is real and well-supported inside `occurrence`/individual-occurrence bodies,
+  just not inside `action` bodies) -- backlog candidates, not scoped here without real-usage
+  evidence.
 
 - **`ItemUsage` never accepted the anonymous redefinition form** (`item :>> name[multiplicity]?
   (: type)? (= value)? body`) that `PartUsage`/`AttributeUsage` already support, and had no

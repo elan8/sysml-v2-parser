@@ -168,9 +168,20 @@ action def B { }
 
 #[test]
 fn test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling() {
+    // parse_root now rejects any document containing an embedded recovery placeholder (GH-2):
+    // an unsupported annotation is exactly such a placeholder, so strict must reject it even
+    // though the annotation itself is legal SysML the parser doesn't fully support yet.
     let input = "package P {\n#fmeaspec requirement req1 { }\npart def Good;\n}";
-    let result = parse(input).expect("parse should succeed with recovery");
-    let pkg = match &result.elements[0].value {
+    let strict_err = parse(input).expect_err("strict should reject the unsupported annotation");
+    assert_eq!(
+        strict_err.code.as_deref(),
+        Some("unsupported_annotation_syntax")
+    );
+
+    // parse_with_diagnostics is the entry point meant to tolerate this: it should still recover
+    // and keep the later valid sibling, with the annotation surfaced as a diagnostic.
+    let result = parse_with_diagnostics(input);
+    let pkg = match &result.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -188,13 +199,29 @@ fn test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling() {
             .any(|e| matches!(e.value, PackageBodyElement::Error(_))),
         "recovered package region should be represented explicitly in the AST"
     );
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("unsupported_annotation_syntax")),
+        "the same diagnostic parse_root rejected on should be reported here too"
+    );
 }
 
 #[test]
 fn test_package_body_recovery_skips_malformed_abstract_part_and_keeps_next_member() {
+    // parse_root now rejects documents containing a genuinely malformed member (GH-2): `invalid`
+    // is not a valid part-definition body element, so strict must reject the whole document.
     let input = "package P {\nabstract part def Broken { invalid }\npart def Good;\n}";
-    let result = parse(input).expect("parse should succeed");
-    let pkg = match &result.elements[0].value {
+    let strict_err = parse(input).expect_err("strict should reject the malformed member");
+    assert_eq!(
+        strict_err.code.as_deref(),
+        Some("unexpected_keyword_in_scope")
+    );
+
+    // parse_with_diagnostics still recovers and preserves both part declarations.
+    let result = parse_with_diagnostics(input);
+    let pkg = match &result.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
