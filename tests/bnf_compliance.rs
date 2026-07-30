@@ -1,229 +1,17 @@
-use std::collections::BTreeMap;
+#[path = "common/mod.rs"]
+mod common;
+
 use std::fs;
-use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum CoverageStatus {
-    Implemented,
-    Partial,
-    Opaque,
-    Fallback,
-    Untested,
-    NotSupported,
-}
-
-impl CoverageStatus {
-    fn parse(value: &str) -> Option<Self> {
-        match value {
-            "implemented" => Some(Self::Implemented),
-            "partial" => Some(Self::Partial),
-            "opaque" => Some(Self::Opaque),
-            "fallback" => Some(Self::Fallback),
-            "untested" => Some(Self::Untested),
-            "not_supported" => Some(Self::NotSupported),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Grammar {
-    SysML,
-    KerML,
-    Any,
-}
-
-impl Grammar {
-    fn parse(value: &str) -> Option<Self> {
-        match value {
-            "SysML" => Some(Self::SysML),
-            "KerML" => Some(Self::KerML),
-            "*" => Some(Self::Any),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct CoverageRule {
-    grammar: Grammar,
-    pattern: String,
-    status: CoverageStatus,
-    line: usize,
-}
-
-impl CoverageRule {
-    fn matches(&self, grammar: Grammar, production: &str) -> bool {
-        if self.grammar != Grammar::Any && self.grammar != grammar {
-            return false;
-        }
-        pattern_matches(&self.pattern, production)
-    }
-
-    fn specificity(&self) -> usize {
-        let non_wildcard = self.pattern.chars().filter(|ch| *ch != '*').count();
-        let grammar_bonus = usize::from(self.grammar != Grammar::Any) * 1_000;
-        let exact_bonus = usize::from(!self.pattern.contains('*')) * 10_000;
-        exact_bonus + grammar_bonus + non_wildcard
-    }
-}
-
-fn manifest_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn release_root() -> PathBuf {
-    if let Some(path) = std::env::var_os("SYSML_V2_RELEASE_DIR") {
-        return PathBuf::from(path);
-    }
-
-    manifest_dir().join("sysml-v2-release")
-}
-
-fn extract_productions(path: &Path) -> Vec<String> {
-    let text = fs::read_to_string(path)
-        .unwrap_or_else(|err| panic!("failed to read BNF file {}: {err}", path.display()));
-    let mut productions = Vec::new();
-    for line in text.lines() {
-        let Some(first) = line.as_bytes().first().copied() else {
-            continue;
-        };
-        if !first.is_ascii_alphabetic() {
-            continue;
-        }
-        let name_len = line
-            .bytes()
-            .take_while(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
-            .count();
-        if name_len == 0 {
-            continue;
-        }
-        let rest = line[name_len..].trim_start();
-        if rest.starts_with('=') || rest.contains(" =") {
-            productions.push(line[..name_len].to_string());
-        }
-    }
-    productions.sort();
-    productions.dedup();
-    productions
-}
-
-fn parse_coverage_rules(path: &Path) -> Vec<CoverageRule> {
-    let text = fs::read_to_string(path)
-        .unwrap_or_else(|err| panic!("failed to read coverage map {}: {err}", path.display()));
-    let mut rules = Vec::new();
-    for (idx, line) in text.lines().enumerate() {
-        let line_no = idx + 1;
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        let fields = trimmed.split_whitespace().collect::<Vec<_>>();
-        assert_eq!(
-            fields.len(),
-            3,
-            "invalid coverage rule at {}:{line_no}: expected 3 fields",
-            path.display()
-        );
-        let grammar = Grammar::parse(fields[0]).unwrap_or_else(|| {
-            panic!(
-                "invalid grammar '{}' at {}:{line_no}",
-                fields[0],
-                path.display()
-            )
-        });
-        let status = CoverageStatus::parse(fields[2]).unwrap_or_else(|| {
-            panic!(
-                "invalid coverage status '{}' at {}:{line_no}",
-                fields[2],
-                path.display()
-            )
-        });
-        rules.push(CoverageRule {
-            grammar,
-            pattern: fields[1].to_string(),
-            status,
-            line: line_no,
-        });
-    }
-    rules
-}
-
-fn pattern_matches(pattern: &str, value: &str) -> bool {
-    match (pattern.starts_with('*'), pattern.ends_with('*')) {
-        (false, false) => pattern == value,
-        (false, true) => value.starts_with(&pattern[..pattern.len() - 1]),
-        (true, false) => value.ends_with(&pattern[1..]),
-        (true, true) => {
-            let needle = &pattern[1..pattern.len() - 1];
-            !needle.is_empty() && value.contains(needle)
-        }
-    }
-}
-
-fn classify<'a>(
-    rules: &'a [CoverageRule],
-    grammar: Grammar,
-    production: &str,
-) -> Result<&'a CoverageRule, String> {
-    let matches = rules
-        .iter()
-        .filter(|rule| rule.matches(grammar, production))
-        .collect::<Vec<_>>();
-    let Some(best_specificity) = matches.iter().map(|rule| rule.specificity()).max() else {
-        return Err(format!("no coverage rule for {grammar:?}.{production}"));
-    };
-    let best = matches
-        .into_iter()
-        .filter(|rule| rule.specificity() == best_specificity)
-        .collect::<Vec<_>>();
-    let first = best[0];
-    if best.iter().any(|rule| rule.status != first.status) {
-        let lines = best
-            .iter()
-            .map(|rule| rule.line.to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        return Err(format!(
-            "conflicting equally-specific coverage rules for {grammar:?}.{production} at lines {lines}"
-        ));
-    }
-    Ok(first)
-}
-
-type ClassifyAllResult = (
-    BTreeMap<CoverageStatus, usize>,
-    BTreeMap<CoverageStatus, Vec<String>>,
-    Vec<String>,
-);
-
-fn classify_all(
-    grammar: Grammar,
-    productions: &[String],
-    rules: &[CoverageRule],
-) -> ClassifyAllResult {
-    let mut counts = BTreeMap::<CoverageStatus, usize>::new();
-    let mut productions_by_status = BTreeMap::<CoverageStatus, Vec<String>>::new();
-    let mut errors = Vec::new();
-    for production in productions {
-        match classify(rules, grammar, production) {
-            Ok(rule) => {
-                *counts.entry(rule.status).or_insert(0) += 1;
-                productions_by_status
-                    .entry(rule.status)
-                    .or_default()
-                    .push(production.clone());
-            }
-            Err(err) => errors.push(err),
-        }
-    }
-    (counts, productions_by_status, errors)
-}
+use common::{
+    classify, classify_all, extract_productions, load_bnf_productions, load_conformance_target,
+    manifest_dir, parse_coverage_rules, pattern_matches, release_root, CoverageStatus, Grammar,
+};
 
 fn assert_all_productions_are_classified(
     grammar: Grammar,
     productions: &[String],
-    rules: &[CoverageRule],
+    rules: &[common::CoverageRule],
 ) {
     let (counts, productions_by_status, errors) = classify_all(grammar, productions, rules);
 
@@ -242,20 +30,9 @@ fn assert_all_productions_are_classified(
     );
 }
 
-fn load_bnf_productions() -> (Vec<String>, Vec<String>, Vec<CoverageRule>) {
-    let root = release_root();
-    let sysml_bnf = root.join("bnf").join("SysML-textual-bnf.kebnf");
-    let kerml_bnf = root.join("bnf").join("KerML-textual-bnf.kebnf");
-    let rules = parse_coverage_rules(&manifest_dir().join("docs").join("bnf_coverage.map"));
-    (
-        extract_productions(&sysml_bnf),
-        extract_productions(&kerml_bnf),
-        rules,
-    )
-}
-
 #[test]
 fn textual_bnf_productions_are_covered_by_status_map() {
+    let target = load_conformance_target();
     let root = release_root();
     let sysml_bnf = root.join("bnf").join("SysML-textual-bnf.kebnf");
     let kerml_bnf = root.join("bnf").join("KerML-textual-bnf.kebnf");
@@ -277,13 +54,15 @@ fn textual_bnf_productions_are_covered_by_status_map() {
     let kerml = extract_productions(&kerml_bnf);
     assert_eq!(
         sysml.len(),
-        350,
-        "unexpected SysML textual BNF production count"
+        target.sysml_bnf_productions,
+        "unexpected SysML textual BNF production count for pin {}",
+        target.release_tag
     );
     assert_eq!(
         kerml.len(),
-        290,
-        "unexpected KerML textual BNF production count"
+        target.kerml_bnf_productions,
+        "unexpected KerML textual BNF production count for pin {}",
+        target.release_tag
     );
 
     assert_all_productions_are_classified(Grammar::SysML, &sysml, &rules);
@@ -330,9 +109,10 @@ fn coverage_map_rules_use_no_partial_status() {
 
 #[test]
 fn all_textual_bnf_productions_are_implemented() {
+    let target = load_conformance_target();
     let (sysml, kerml, rules) = load_bnf_productions();
-    assert_eq!(sysml.len(), 350);
-    assert_eq!(kerml.len(), 290);
+    assert_eq!(sysml.len(), target.sysml_bnf_productions);
+    assert_eq!(kerml.len(), target.kerml_bnf_productions);
 
     for grammar in [Grammar::SysML, Grammar::KerML] {
         let productions = if grammar == Grammar::SysML {

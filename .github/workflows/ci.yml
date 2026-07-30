@@ -22,13 +22,14 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Fetch SysML v2 Release
+      - name: Fetch SysML v2 Release (pinned)
         run: bash ./scripts/fetch-sysml-v2-release.sh
 
       - name: cargo test
         run: cargo test
         env:
           SYSML_V2_RELEASE_DIR: ${{ github.workspace }}/sysml-v2-release
+          CI: true
 
       - name: cargo clippy
         run: cargo clippy -- -W clippy::all
@@ -42,11 +43,30 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Fetch SysML v2 Release
-        run: |
-          bash ./scripts/fetch-sysml-v2-release.sh
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Fetch SysML v2 Release (pinned)
+        run: bash ./scripts/fetch-sysml-v2-release.sh
 
       - name: cargo test (full validation suite)
         run: cargo test -- --include-ignored
         env:
           SYSML_V2_RELEASE_DIR: ${{ github.workspace }}/sysml-v2-release
+          CI: true
+
+      - name: Conformance scorecard (L1 + L2)
+        run: cargo test --test conformance_scorecard -- --nocapture
+        env:
+          SYSML_V2_RELEASE_DIR: ${{ github.workspace }}/sysml-v2-release
+          CONFORMANCE_SCORECARD_DIR: ${{ github.workspace }}/conformance-out
+          CONFORMANCE_SCORECARD_L2: "1"
+          CI: true
+
+      - name: Upload conformance scorecard
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-scorecard
+          path: |
+            conformance-out/conformance-scorecard.json
+            conformance-out/conformance-scorecard.md

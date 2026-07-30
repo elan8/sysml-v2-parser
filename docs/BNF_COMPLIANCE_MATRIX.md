@@ -2,7 +2,7 @@
 
 This is the primary compact coverage snapshot for the parser.
 
-Reference grammar:
+Reference grammar (pinned release — see [`docs/conformance-target`](./conformance-target)):
 
 - `sysml-v2-release/bnf/SysML-textual-bnf.kebnf`
 

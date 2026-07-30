@@ -1,0 +1,11 @@
+# SysML v2 textual-notation conformance target (single source of truth).
+# Consumed by fetch scripts, CI, bnf_compliance, and the conformance scorecard.
+#
+# Bump release_tag only together with a deliberate map/fixture refresh against
+# that OMG SysML-v2-Release tag. Production counts must match the BNF files in
+# that release (see tests/bnf_compliance.rs).
+
+release_tag=2026-04
+release_repo=https://github.com/Systems-Modeling/SysML-v2-Release
+sysml_bnf_productions=350
+kerml_bnf_productions=290

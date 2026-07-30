@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "2026-04",
+    [string]$Version = "",
     [string]$Destination = "sysml-v2-release"
 )
 
@@ -11,6 +11,16 @@ function Resolve-ProjectPath([string]$PathValue) {
     }
 
     return [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\$PathValue"))
+}
+
+function Read-ConformanceTargetValue([string]$TargetFile, [string]$Key) {
+    $line = Get-Content -LiteralPath $TargetFile |
+        Where-Object { $_ -match "^$Key=" } |
+        Select-Object -First 1
+    if (-not $line) {
+        throw "Missing $Key in $TargetFile"
+    }
+    return ($line -split "=", 2)[1].Trim()
 }
 
 function Assert-ReleaseLayout([string]$Root) {
@@ -25,6 +35,15 @@ function Assert-ReleaseLayout([string]$Root) {
             throw "Downloaded archive is missing expected path: $path"
         }
     }
+}
+
+$targetFile = Resolve-ProjectPath "docs\conformance-target"
+if (-not (Test-Path -LiteralPath $targetFile)) {
+    throw "Conformance target file not found: $targetFile"
+}
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = Read-ConformanceTargetValue $targetFile "release_tag"
 }
 
 $destinationPath = Resolve-ProjectPath $Destination
@@ -45,6 +64,7 @@ try {
     New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
 
     Write-Host "Downloading $repoName $Version from $archiveUrl"
+    Write-Host "(pinned by docs/conformance-target unless overridden)"
     Invoke-WebRequest -Uri $archiveUrl -OutFile $archivePath
 
     Write-Host "Extracting archive to temporary directory"
@@ -61,6 +81,12 @@ try {
     }
 
     Move-Item -LiteralPath $expandedRoot -Destination $stagingPath
+
+    # Stamp so CI/tests can prove the tree matches the conformance pin.
+    @(
+        "# Written by scripts/fetch-sysml-v2-release.ps1 — do not edit by hand."
+        "release_tag=$Version"
+    ) | Set-Content -LiteralPath (Join-Path $stagingPath ".elan8-conformance-target") -Encoding utf8
 
     if (Test-Path -LiteralPath $destinationPath) {
         Write-Host "Removing existing destination $destinationPath"

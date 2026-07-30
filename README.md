@@ -11,6 +11,7 @@ Release notes: [`CHANGELOG.md`](CHANGELOG.md).
 - Strict `parse()` and resilient `parse_for_editor()` entry points
 - Broad SysML v2 subset including port-def directed features (`in`/`out`/`inout` attribute and item usages)
 - BNF coverage gate: 640 textual productions classified as `implemented` ([`docs/BNF_COVERAGE.md`](docs/BNF_COVERAGE.md))
+- Pinned textual-notation conformance target + CI scorecard ([`docs/CONFORMANCE.md`](docs/CONFORMANCE.md))
 - Green default test suite; full validation and std-library gates with SysML v2 release fixtures
 
 ## API
@@ -37,11 +38,12 @@ cargo clippy -- -W clippy::all
 **Full validation suite** (CI validation job — includes ignored slow/corpus tests):
 
 ```bash
-./scripts/fetch-sysml-v2-release.sh   # or scripts/fetch-sysml-v2-release.ps1
+./scripts/fetch-sysml-v2-release.sh   # or scripts/fetch-sysml-v2-release.ps1 (reads docs/conformance-target)
 cargo test -- --include-ignored
 ```
 
 Set `SYSML_V2_RELEASE_DIR` if fixtures are not in `./sysml-v2-release`.
+The pin lives in [`docs/conformance-target`](docs/conformance-target); see [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
 
 **Optional MBSE vacuum corpus** (ignored integration tests; skips when unset):
 
@@ -60,5 +62,6 @@ When changing AST fields or body-element shapes, refresh checked-in snapshots in
 | Spec42 diagnostics | [`docs/SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md`](docs/SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md) |
 | Error recovery | [`docs/ERROR_RECOVERY.md`](docs/ERROR_RECOVERY.md) |
 | BNF coverage | [`docs/BNF_COVERAGE.md`](docs/BNF_COVERAGE.md) |
+| Conformance target & scorecard | [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) |
 | Compliance gap | [`docs/SYSML_V2_COMPLIANCE_GAP.md`](docs/SYSML_V2_COMPLIANCE_GAP.md) |
 | Technical debt | [`docs/PARSER_TECHNICAL_DEBT.md`](docs/PARSER_TECHNICAL_DEBT.md) |

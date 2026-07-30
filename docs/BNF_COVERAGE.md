@@ -5,6 +5,7 @@ This repo now keeps a machine-readable coverage map for the SysML/KerML textual 
 - coverage map: `docs/bnf_coverage.map`
 - gate: `tests/bnf_compliance.rs`
 - normative BNF source: `SYSML_V2_RELEASE_DIR/bnf/*.kebnf`, defaulting to `./sysml-v2-release` in the repo root
+- pinned release tag + production counts: [`docs/conformance-target`](./conformance-target) (see [`CONFORMANCE.md`](./CONFORMANCE.md))
 
 The coverage status labels are:
 
