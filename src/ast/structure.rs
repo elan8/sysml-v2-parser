@@ -467,6 +467,9 @@ pub struct Perform {
     pub action_name: String,
     /// Type after `:` in "perform action name : Type" form.
     pub type_name: Option<String>,
+    /// Redefinition target after `:>>` in "perform path :>> target" form (`perform` path usage
+    /// only; not available on the `perform action name` declaration form).
+    pub redefines: Option<String>,
     pub body: PerformBody,
 }
 

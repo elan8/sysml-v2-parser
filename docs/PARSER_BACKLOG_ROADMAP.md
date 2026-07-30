@@ -2,7 +2,14 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-30 (diagnostics-spec-audit — root `PackageBodyElement*` accepted; `missing_member_name` / `illegal_top_level_definition` removed as non-spec; bare `name : Type;` is `DefaultReferenceUsage` AST. Shared specialization layer + full `#`/`@` metadata surface remain open.)
+**Last updated:** 2026-07-30 (§6 G1 closed — `perform <path>` now accepts a `;` body and an
+optional `:>>` redefinition clause; `PARSE_AST_VERSION` 47 → 48. Surfaced three narrower follow-up
+gaps as G16-G18. 24 of the original 25 spec-Annex files in §6 still fail; **Spec42 v1.0 remains
+blocked** — see [§6](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit).)
+
+**Previously:** 2026-07-30 (§6 opened — full-validation-suite audit found 25 real OMG spec Annex example files (of 56) hit grammar gaps that were previously masked by `parse_root` silently accepting them; see [§6](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit) for the file-by-file breakdown. **Blocking Spec42 v1.0** — see that section for why and the release-gate note.)
+
+**Previously:** 2026-07-30 (diagnostics-spec-audit — root `PackageBodyElement*` accepted; `missing_member_name` / `illegal_top_level_definition` removed as non-spec; bare `name : Type;` is `DefaultReferenceUsage` AST. Shared specialization layer + full `#`/`@` metadata surface remain open.)
 
 **Previously:** 2026-07-23 (0.46.0 — Systems Library `ref action` / `ref state` / nested action·state in part bodies parse as real `ActionUsage`/`StateUsage` AST with `is_reference`, structured typing/multiplicity/`:>`/` :>>`, instead of `OpaqueMember`. Visibility on plain `part_ref_usage`. Full P5+ unified definition/usage/specialization layer remains deferred to 1.x.)
 
@@ -48,6 +55,7 @@ Items that must close before Spec42 can release v1.0. Everything else is 1.x.
 | Improve **editor / LSP** behavior | [§ 3 — Language server](#3-language-server--recovery) |
 | Go deeper on **grammar fidelity** | [§ 4 — Grammar & compliance](#4-grammar-depth--compliance) |
 | See the **state/action/connector fidelity pass** (2026-07) and its open follow-ups | [§ 5 — State machine, action & connector grammar fidelity](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit) |
+| See the **Spec42 v1.0-blocking grammar gap audit** (2026-07-30) and what's confirmed vs. still needs isolation | [§ 6 — Strict-vs-recovery verdict parity audit](#6-strict-vs-recovery-verdict-parity-2026-07-30-audit) |
 | Read the **original Spec42 parser spec** | [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md) |
 
 ### Regression gates (every parser PR)
@@ -264,6 +272,89 @@ audit trail from the original pass isn't lost.
 - ~~**`AssignStmt.rhs` still a raw `String`**~~ — **Done**, unblocked by the arrow-invocation operator above — [action.rs](../src/parser/action.rs), [behavior.rs](../src/ast/behavior.rs).
 
 No Spec42 diagnostic currently depends on any of these; cross-check against § 1 before wiring Spec42-side consumers.
+
+---
+
+## 6. Strict vs. recovery verdict parity (2026-07-30 audit)
+
+**Blocking Spec42 v1.0.** [GH-2](https://github.com/elan8/sysml-v2-parser/issues/2) reported that
+`parse`/`parse_root` (strict) and `parse_for_editor`/`parse_with_diagnostics` (recovery) disagree
+on whether a document is valid: strict silently accepted documents where the grammar had
+internally given up on a body member and embedded a recovery placeholder in the AST, because
+`parse_root` never walked the AST for those placeholders the way `parse_with_diagnostics` already
+did via `collect_recovery_errors`. A fix (`parse_root` now runs that same walk and rejects if any
+placeholder is present) is ready on
+[`fix/gh-2-strict-recovery-verdict-parity`](https://github.com/elan8/sysml-v2-parser/pull/3), but
+is **held, not merged**: running it against the full (normally `#[ignore]`d) validation suite
+(`cargo test --test validation -- --include-ignored`) drops
+`full_validation_suite::test_full_validation_suite` from 56/56 to **31/56**. The 25 failing files
+are official OMG SysML v2 spec Annex examples that use real, valid constructs the grammar doesn't
+support yet in specific nested contexts — `parse_with_diagnostics` was already flagging all 25 as
+invalid before that fix; `parse_root` was just the one silently disagreeing. Merging the verdict
+fix without first closing (most of) these gaps would make `parse()` reject ~45% of realistic
+spec-conformant models, which is why it's blocked rather than shipped as-is.
+
+**This section is the file-by-file audit of those 25 failures**, grouped by root-cause construct
+family. Each group lists its confidence: **Confirmed** means isolated outside the real file with a
+minimal repro that reproduces the exact failure; **Suspected** means the failing file's reported
+error position is consistent with the listed cause but recovery's sync-point-skip can attribute a
+diagnostic to a line *after* the true failure, so a minimal repro is still needed before treating
+it as scoped.
+
+| # | Root cause (construct family) | Confidence | Files (of the 25) | Example (from the real file) |
+| - | ------------------------------ | ---------- | ------------------ | ----------------------------- |
+| G1 | `perform <path>` (part usage body, no `action` keyword) requires a brace body — `perform_body()` has no `;` alternative — and has no `:>>` redefinition clause at all (`Perform` AST has no `redefines` field) | **Done** | Was 4 | `perform 'provide power';` / `perform providePower.generateTorque :>> generateTorque;` |
+| G2 | `connection <name> : Type[mult];` **usage** form (as opposed to `connection def`, or the `connect a to b;` shorthand) is wired into `PartDefBodyElement` (`connection_usage_member`) but not `PartUsageBodyElement` | **Confirmed** | 2 — `03-Function-based Behavior/3c-Function-based Behavior-structure mod-1.sysml`, `-2.sysml` | `connection trailerHitch : TrailerHitch[0..1];` |
+| G3 | `assert constraint { }` / `assert constraint <name> { }` is wired into `PartDefBodyElement` (closed in the [§5 audit](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit)) but not `PartUsageBodyElement` | **Confirmed** | 2 — `07-Variant Configuration/7a-Variant Configuration - General Concept.sysml`, `10-Analysis and Trades/10b-Trade-off Among Alternative Configurations.sysml` | `assert constraint engineSelectionRational { }` |
+| G4 | `constraint <name>[: Type] { }` **usage** keyword form is wired at package level (`ConstraintDef`/`ConstraintUsage`) but not inside `part def` bodies | **Confirmed** | 2 — `15-Properties-Values-Expressions/15_03-Value Expression.sysml`, `15_05-Unification of Expression and Constraint Definition.sysml` | `constraint discBrakeConstraint : DiscBrakeConstraint { }` |
+| G5 | `variation` prefix not recognized before `perform`/`requirement` members in part usage bodies (only `part`/`item` currently accept it) | **Confirmed** | 2 — `07-Variant Configuration/7a1-Variant Configuration - General Concept-a.sysml`, `7b-Variant Configurations.sysml` | `variation requirement engineRqtChoice : EnginePerformanceReq` |
+| G6 | Suspected: parameter-direction forms inside a `perform { }` body — `in item '<quoted name>' : Type { }` and `in part :>> name = value;` — aren't recognized by `perform_body_element`; outer `perform` itself parses fine in isolation | **Suspected** | 2 — `03-Function-based Behavior/3e-Function-based Behavior-item.sysml`, `09-Verification/9-Verification-simplified.sysml` | `in part :>> testVehicle = vehicleUnderTest;` inside a `perform vehicleMassTest { }` body |
+| G7 | Suspected: `event occurrence <name>;` (or a related occurrence-usage prefix) not recognized inside a `part` usage body nested in an `occurrence def` body; the outer `part producer[1] { }` parses fine empty in isolation | **Suspected** | 2 — `17-Sequence Modeling/17a-Sequence-Modeling.sysml`, `17b-Sequence-Modeling.sysml` | `event occurrence publish_source_event;` inside `part producer[1] { }` |
+| G8 | `transition '<quoted name>'` followed by the full `first <src> accept <trigger> then <target>;` structure isn't recognized as one declaration — grammar expects `;` immediately after the name (only bare `transition <name>;` or an unnamed `first ... then ...;` are supported, not combined) | **Confirmed** (read directly from source) | 2 — `05-State-based Behavior/5-State-based Behavior-1.sysml`, `-1a.sysml` | `transition 'normal-maintenance'` / `first normal` / `accept at vehicle1_c1.maintenanceTime` / `then maintenance;` |
+| G9 | `value :>> name : Type;` — `value` is a real SysML usage-kind keyword (parallel to `part`/`item`/`ref part`) not wired in attribute-def bodies; the sibling `ref part :>> elements : SparePart;` form in the same file already works | **Confirmed** (read directly from source) | 1 — `15-Properties-Values-Expressions/15_11-Variable Length Collection Types.sysml` | `value :>> elements: Integer;` |
+| G10 | Suspected: `attribute occurs[0..1]: Real;` inside an `occurrence def` body — possible keyword/identifier collision on the name `occurs`, or a gap specific to attribute usage inside occurrence-def bodies | **Suspected** | 1 — `14-Language Extensions/14c-Language Extensions.sysml` | `attribute occurs[0..1]: Real;` |
+| G11 | Suspected: `port :>> name = value { body }` — redefinition + bound value + brace body combined isn't recognized by `port_usage`, though each piece works individually elsewhere | **Suspected** | 1 — `02-Parts Interconnection/2c-Parts Interconnection-Multiple Decompositions.sysml` | `port :>> pe = c1.pb { doc /* ... */ }` |
+| G12 | `flow of <name> : Type;` (alternate keyword order — `of` before the flow item, vs. the already-supported `flow <name> : Type from ... to ...;`) not recognized in part usage bodies | **Confirmed** | 1 — `03-Function-based Behavior/3d-Function-based Behavior-item.sysml` | `flow of  fuel : Fuel;` (double space in source) |
+| G13 | Standalone `first <name>;` (an initial-node marker, no `then`) not recognized in action bodies — only the `first ... then ...;` succession form is | **Confirmed** | 1 — `03-Function-based Behavior/3a-Function-based Behavior-2.sysml` | `first start;` |
+| G14 | `loop { }` control node not implemented at all (`decide`/`join`/`fork`/`if`/`while` were closed in the [§5 audit](#5-state-machine-action--connector-grammar-fidelity-2026-07-audit); `loop` was missed) | **Confirmed** | 1 — `03-Function-based Behavior/3a-Function-based Behavior-3.sysml` | `loop { ... }` |
+| G15 | Suspected: `:>> name = value { body }` redefinition-with-value-and-body form inside an occurrence usage body (parallel to G11 but for occurrence, not port, usages) | **Suspected** | 1 — `06-Individual and Snapshots/6-Individual and Snapshots.sysml` | `:>> t = t0 { ... }` |
+| G16 | *(found while fixing G1)* `private import '<quoted target>'::*;` not recognized inside a part usage body | **Confirmed** | 1 — `08-Requirements/8-Requirements.sysml` | `private import 'vehicle1-c1 Specification'::*;` |
+| G17 | *(found while fixing G1)* Nested `allocate <path> to <path>;` inside an allocation **usage**'s own brace body — not recognized by `DefinitionBodyElement` (`AllocationUsage`/`AllocationDef` bodies route through the shared `DefinitionBody`) | **Confirmed** | 1 — `12-Dependency Relationships/12b-Allocation.sysml` | `allocation allocation2 : Logical_to_Physical allocate torqueGenerator to powerTrain { allocate torqueGenerator.generateTorque to powerTrain.engine.generateTorque; }` |
+| G18 | *(found while fixing G1)* `exhibit <name> :>> <target>;` — `exhibit state` usage with a `:>>` redefinition clause — not recognized in a part usage body | **Confirmed** | 1 — `05-State-based Behavior/5-State-based Behavior-2.sysml` | `exhibit 'vehicle states' :>> VehicleA::'vehicle states';` |
+
+**Total: 25 files** originally, matching the `56 → 31` drop. G1's fix (see CHANGELOG.md) closed
+the `perform` gap cleanly wherever it was the *only* problem in a file (`12b-Allocation-1.sysml`
+→ fully clean now), but 3 of G1's 4 files had a second, distinct gap sitting directly behind it
+that recovery's sync-point-skip had been masking — those are now G16-G18, same 3 files.
+
+Net effect: **24 files still fail** (25 minus the 1 now-fully-clean file) across groups G2-G18.
+Once PR #3's `parse_root` verdict-parity fix is applied on top of this work, that means
+`full_validation_suite::test_full_validation_suite` should read 32/56 instead of the original
+31/56. Re-run `cargo test --test validation -- --include-ignored` with PR #3's change applied to
+confirm this count as each subsequent group lands, and update it here.
+
+### Recommended order
+
+1. ~~**G1 (`perform` semicolon body + `:>>` redefine)**~~ — **Done.** `Perform.redefines: Option<String>`
+   added; `perform_usage()` now accepts `;` bodies and an optional `:>>` clause via the existing
+   `qualified_name` parser. `PARSE_AST_VERSION` 47 → 48. See CHANGELOG.md. Surfaced three new,
+   narrower gaps (G16-G18) previously hidden behind it — expected when peeling back a masking bug
+   like this; each is its own small follow-up, not evidence G1 was scoped wrong.
+2. **G2/G3 (`connection`/`assert constraint` usage wiring for `PartUsageBodyElement`)** — each is
+   likely a one-line addition to the existing `alt()` dispatch, mirroring what `PartDefBodyElement`
+   already does for the same constructs. Good next PR, low risk.
+3. **G4 (`constraint` usage in part-def bodies)**, **G5 (`variation` prefix breadth)** — same
+   shape as G2/G3, still isolated single-family PRs.
+4. **G8, G9, G12, G13, G14, G16, G17, G18** — each confirmed and single- or double-file scoped;
+   pick off individually, same "one construct family per PR" cadence as past releases. G16-G18
+   are fresh (found while implementing G1) and haven't been prioritized relative to G8-G14 yet.
+5. **G6, G7, G10, G11, G15** — write a minimal isolated repro first (they may collapse into
+   already-covered families, or reveal a different root cause than currently suspected) before
+   scoping implementation work.
+
+Once enough of the above lands to bring the practical `parse_root` regression down to a small,
+reviewable diff, re-run `cargo test --test validation -- --include-ignored`, update this
+section's file count, and unhold [PR #3](https://github.com/elan8/sysml-v2-parser/pull/3).
 
 ---
 
