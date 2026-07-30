@@ -1,12 +1,13 @@
 use super::behavior::{
-    ActionDefBodyElement, ActionUsage, Allocate, InOut, InOutDecl, StateDefBody, StateUsage,
+    ActionDefBodyElement, ActionUsage, ActionUsageBodyElement, Allocate, InOut, InOutDecl,
+    StateDefBody, StateUsage,
 };
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::relationship_target::RelationshipTarget;
 use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
-use super::view::{CalcUsage, ConstraintDefBody};
+use super::view::{CalcUsage, ConstraintDef, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
@@ -89,6 +90,16 @@ pub enum PartDefBodyElement {
     ExhibitState(Node<ExhibitState>),
     /// Calculation usage (`calc` keyword) inside a part definition body.
     CalcUsage(Node<CalcUsage>),
+    /// `constraint def` nested inside a part definition body (§6 G4: `constraint` was wired at
+    /// package level only, so both the definition and the usage form fell through to opaque
+    /// recovery here).
+    ConstraintDef(Node<ConstraintDef>),
+    /// `constraint <name>[: Type] { ... }` usage inside a part definition body. See
+    /// [`PartDefBodyElement::ConstraintDef`].
+    ConstraintUsage(Node<ConstraintUsage>),
+    /// `(private|public|protected)? import <qualified-name>;` inside a part definition body
+    /// (§6 G16). See [`PartUsageBodyElement::Import`].
+    Import(Node<crate::ast::Import>),
     /// `action` / `ref action` usage inside a part definition body (Systems Library
     /// `Parts::performedActions` and similar). Previously fell through to [`OpaqueMember`].
     ActionUsage(Box<Node<ActionUsage>>),
@@ -259,6 +270,10 @@ pub enum AttributeBodyElement {
     Doc(Node<DocComment>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
+    /// `occurrence ...` usage (§6 G27). `AttributeBody` is shared with `item def` / `item` usage
+    /// bodies, and an item *is* an occurrence, so `occurrence :>> causes;` is a legal member --
+    /// see the OMG spec Annex `14c-Language Extensions.sysml`.
+    OccurrenceUsage(Box<Node<OccurrenceUsage>>),
     Other(String),
 }
 
@@ -303,6 +318,8 @@ pub struct PartUsage {
     /// `constant` keyword from `RefPrefix` -- see `AttributeUsage::is_constant`.
     pub is_constant: bool,
     pub name: String,
+    /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
+    pub short_name: Option<String>,
     /// Type after `:`, e.g. "Vehicle", "AxleAssembly". A comma-separated multi-target clause
     /// (`part vehicle : Vehicle, SpatialItem;`) joins into one display string here; see `typing`
     /// for the structured, multi-target-capable form (S42-004).
@@ -436,6 +453,26 @@ pub enum PartUsageBodyElement {
     /// from part definition and occurrence definition bodies; see
     /// `PartDefBodyElement::AssertConstraint`).
     AssertConstraint(Node<AssertConstraintMember>),
+    /// `constraint def` nested inside a part usage body (§6 G4). See
+    /// `PartDefBodyElement::ConstraintDef`.
+    ConstraintDef(Node<ConstraintDef>),
+    /// `constraint <name>[: Type] { ... }` usage inside a part usage body (§6 G4). See
+    /// `PartDefBodyElement::ConstraintUsage`.
+    ConstraintUsage(Node<ConstraintUsage>),
+    /// `(private|public|protected)? import <qualified-name>;` inside a part usage body (§6 G16).
+    /// Imports are namespace members, and a part usage body is a namespace; real usage is
+    /// OMG spec Annex `8-Requirements.sysml`.
+    Import(Node<crate::ast::Import>),
+    /// `requirement <name> : Type { ... }` usage inside a part usage body (§6 G5: previously
+    /// reachable from part *definition* bodies only).
+    RequirementUsage(Node<RequirementUsage>),
+    /// `item def` nested inside a part usage body (§6 G25). See `StateDef`.
+    ItemDef(Node<ItemDef>),
+    /// `item <name> : Type (;|{ ... })` usage inside a part usage body (§6 G25: previously
+    /// reachable from part *definition* bodies only, so every `item` member of a nested part
+    /// usage -- e.g. `part fuelTank : FuelTank { item fuel : Fuel; }` in the OMG spec Annex
+    /// `3d-Function-based Behavior-item.sysml` -- fell into error recovery).
+    ItemUsage(Node<ItemUsage>),
 }
 
 /// Variant member inside a variation part usage/def body: either an untyped reference to a
@@ -467,19 +504,27 @@ pub enum VariantTypedUsage {
     Attribute(Box<Node<AttributeUsage>>),
     Item(Box<Node<ItemUsage>>),
     Port(Box<Node<PortUsage>>),
+    /// `variant perform doX;` inside a `variation perform action ... { ... }` body (§6 G5).
+    Perform(Box<Node<Perform>>),
 }
 
 /// Enacted performance: `perform` action_path `{` body `}` inside a part usage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Perform {
-    /// Qualified action name (e.g. "provide power" or "provide power.generate torque").
+    /// Optional `abstract` / `variation` prefix (§6 G5). `variation perform action doXorY { ... }`
+    /// is real usage in the OMG spec Annex `7a1-Variant Configuration - General Concept-a.sysml`.
+    pub usage_prefix: Option<DefinitionPrefix>,
+    /// Qualified action name (e.g. "provide power" or "provide power.generate torque"). Empty for
+    /// the anonymous forms (`perform action { ... }`, `perform action :>> target = value;`),
+    /// matching [`PartUsage::name`]'s convention.
     pub action_name: String,
     /// Type after `:` in "perform action name : Type" form.
     pub type_name: Option<String>,
-    /// Redefinition target after `:>>` in "perform path :>> target" form (`perform` path usage
-    /// only; not available on the `perform action name` declaration form).
+    /// Redefinition target after `:>>`, e.g. `doXorY` in `perform action :>> doXorY = doX;`.
     pub redefines: Option<String>,
+    /// Bound value after `=`, e.g. `doX` in `perform action :>> doXorY = doX;`.
+    pub value: Option<Node<FeatureValue>>,
     pub body: PerformBody,
 }
 
@@ -493,12 +538,25 @@ pub enum PerformBody {
     },
 }
 
-/// Element inside a perform body: doc comment or in/out binding.
+/// Element inside a perform body: doc comment, in/out binding, or variant member.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PerformBodyElement {
     Doc(Node<DocComment>),
     InOut(Node<PerformInOutBinding>),
+    /// `variant perform doX;` inside a `variation perform action ... { ... }` body (§6 G5).
+    Variant(Node<VariantUsage>),
+    /// Any action-body member inside an anonymous `perform action { ... }` (§6 G20), which owns a
+    /// real action body rather than just parameter bindings. Delegates to the same dispatcher
+    /// `ActionUsageBody` uses instead of duplicating the control-node grammar here.
+    Action(Box<Node<ActionUsageBodyElement>>),
+    /// Directed or undirected `part` usage inside a perform body (§6 G6), e.g.
+    /// `in part :>> testVehicle = vehicleUnderTest;`.
+    PartUsage(Box<Node<PartUsage>>),
+    /// `in`/`out`/`inout item` usage inside a perform body (§6 G6).
+    ItemUsage(Box<Node<ItemUsage>>),
+    /// `in`/`out`/`inout attribute` usage inside a perform body (§6 G6).
+    AttributeUsage(Box<Node<AttributeUsage>>),
 }
 
 /// In/out binding inside a perform body: `in` name `=` expr `;` or `out` name `=` expr `;`.
@@ -515,6 +573,10 @@ pub struct PerformInOutBinding {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeUsage {
     pub name: String,
+    /// Short name from `< ... >` when present, e.g. `attribute <wcf> wheelCoordinateFrame : ...`
+    /// (confirmed real usage in the OMG Geometry domain library's
+    /// `VehicleGeometryAndCoordinateFrames.sysml`). See `AttributeDef::short_name`.
+    pub short_name: Option<String>,
     /// Type after `:` or `:>`, e.g. `Some(TypingRelationship { target: "MassValue", .. })`
     /// (PAR-004 item 1). `typing_span` duplicates the node's own `span`.
     pub typing: Option<Node<TypingRelationship>>,
@@ -645,6 +707,8 @@ pub struct PortUsage {
     /// `constant` keyword from `RefPrefix`. See `AttributeUsage::is_constant`.
     pub is_constant: bool,
     pub name: String,
+    /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
+    pub short_name: Option<String>,
     pub type_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// Subsets feature and optional value expression.
@@ -656,6 +720,11 @@ pub struct PortUsage {
     pub crosses: Option<Node<SubsettingRelationship>>,
     /// Intersects target(s) after `intersects`.
     pub intersects: Option<Node<SubsettingRelationship>>,
+    /// `= expr` / `:= expr` feature value (§6 G11). A port usage carrying a value is the
+    /// binding-connector shorthand -- `port :>> pe = c1.pb;` in the OMG spec Annex
+    /// `2c-Parts Interconnection-Multiple Decompositions.sysml` binds the redefined port to
+    /// another port instead of declaring a fresh one.
+    pub value: Option<Node<crate::ast::FeatureValue>>,
     pub body: PortBody,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -930,6 +999,12 @@ pub struct OccurrenceDef {
 pub struct OccurrenceUsage {
     pub is_individual: bool,
     pub is_then: bool,
+    /// True for `event occurrence <name>;` (BNF `EventOccurrenceUsage`, §6 G7) — an occurrence
+    /// that marks a point in time rather than owning a lifetime.
+    pub is_event: bool,
+    /// Leading `ref` keyword (BNF `RefPrefix`, §6 G29), as in `ref individual :>> vehicleUnderTest
+    /// : TestVehicle1 { ... }` from the OMG spec Annex `9-Verification-simplified.sysml`.
+    pub is_reference: bool,
     pub portion_kind: Option<String>,
     pub name: String,
     pub type_name: Option<String>,
@@ -959,6 +1034,10 @@ pub struct AssertConstraintMember {
     /// `assert constraint engineSelectionRational { ... }`. `None` for the anonymous form
     /// (`assert constraint { ... }`).
     pub name: Option<String>,
+    /// Optional type after `:`, e.g. `DiscBrakeFitConstraint_Alt` in `assert constraint
+    /// discBrakeFitConstraint_Alt : DiscBrakeFitConstraint_Alt { ... }` (§6 G22 — the named form
+    /// was closed in G3 but the typed one still fell through to opaque recovery).
+    pub type_name: Option<String>,
     pub body: ConstraintDefBody,
     /// `true` for a negated assert: `assert not constraint ...`.
     pub is_negated: bool,
@@ -981,6 +1060,13 @@ pub enum OccurrenceBodyElement {
     /// `satisfy <ref> (by <expr>)?;` inside an occurrence definition body (previously only
     /// reachable at package level).
     Satisfy(Node<Satisfy>),
+    /// `allocate <source> to <target>;` nested inside an allocation usage body (§6 G17), which
+    /// decomposes the outer allocation. Real usage: OMG spec Annex `12b-Allocation.sysml`.
+    Allocate(Node<Allocate>),
+    /// `exhibit (state)? <name> ...` inside an occurrence body (§6 G30). An individual/snapshot
+    /// exhibits states just as a part usage does -- real usage: `exhibit vehicleStates.on { ... }`
+    /// in the OMG spec Annex `6-Individual and Snapshots.sysml`.
+    StateUsage(Node<StateUsage>),
 }
 
 /// Standalone succession usage directly in a definition/occurrence body (distinct from the

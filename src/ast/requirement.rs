@@ -174,6 +174,9 @@ pub struct RequirementUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// True for `abstract requirement ...`.
     pub is_abstract: bool,
+    /// True for `variation requirement ...` (§6 G5) — a variation point whose body holds
+    /// `variant` members.
+    pub is_variation: bool,
     pub body: RequirementDefBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
     /// [`crate::ast::MembershipKind::FeatureMembership`]. Only captured with real visibility for
@@ -201,6 +204,8 @@ pub struct ItemUsage {
     /// `item :>> shape : Cylinder { ... }`) -- previously unparseable, falling through to opaque
     /// body-element recovery.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Short name from `< ... >` when present. See `crate::ast::AttributeUsage::short_name`.
+    pub short_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// Value expression (`= expr`, `default = expr`, `:= expr`), e.g. `new Box(...)`.
     pub value: Option<Node<FeatureValue>>,

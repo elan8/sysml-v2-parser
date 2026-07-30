@@ -3,8 +3,8 @@
 use crate::ast::{
     ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
     ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstStmt, ForLoop, ForkStmt,
-    IfStmt, InOut, InOutDecl, JoinStmt, MergeStmt, Node, ParseErrorNode, TerminateStmt, ThenAction,
-    WhileStmt,
+    IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt, Node, ParseErrorNode, TerminateStmt,
+    ThenAction, ThenTarget, WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -50,6 +50,7 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"send",
     b"terminate",
     b"while",
+    b"loop",
     b"if",
     b"@",
     b"#",
@@ -102,6 +103,10 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
         preceded(tag(&b"protected"[..]), ws1),
     )))
     .parse(input)?;
+    // `abstract ref :>> trailerHitch[1];` (OMG spec Annex `3c-Function-based Behavior-structure
+    // mod-2.sysml`) -- the modifier is accepted and discarded, matching `RefDecl`, which has no
+    // `is_abstract` field.
+    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
@@ -435,9 +440,20 @@ pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenActio
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"then"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    // `action_usage` already accepts visibility / abstract / ref prefixes.
-    let (input, action) = action_usage(input)?;
-    Ok((input, node_from_to(start, input, ThenAction { action })))
+    // §6 G23: `then merge <name>;` and `then <name>;` are the succession shorthand that follows
+    // `first <name>;`; only the inline-declaration form (`then action ...`) was accepted before.
+    // `merge_stmt` must precede `action_usage`, which would otherwise take `merge` as a name.
+    let (input, target) = alt((
+        map(merge_stmt, ThenTarget::Merge),
+        // `action_usage` already accepts visibility / abstract / ref prefixes.
+        map(action_usage, |a| ThenTarget::Action(Box::new(a))),
+        map(
+            nom::sequence::terminated(path_expression, preceded(ws_and_comments, tag(&b";"[..]))),
+            ThenTarget::Feature,
+        ),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, ThenAction { target })))
 }
 
 /// Element inside an action definition body.
@@ -502,6 +518,7 @@ fn action_def_body_element(
         nom::branch::alt((
             map(terminate_stmt, ActionDefBodyElement::TerminateStmt),
             map(while_stmt, ActionDefBodyElement::WhileStmt),
+            map(loop_stmt, ActionDefBodyElement::LoopStmt),
             map(if_stmt, ActionDefBodyElement::IfStmt),
             // Nested `action def` must win over `action_usage` (which would otherwise treat
             // `def` as a usage name).
@@ -512,6 +529,12 @@ fn action_def_body_element(
             map(visibility_action_usage, |a| {
                 ActionDefBodyElement::ActionUsage(Box::new(a))
             }),
+            // §6 G26: last, so every keyword-led member above keeps priority over the
+            // keyword-less `name = expr;` binding.
+            map(
+                crate::parser::attribute::feature_value_binding,
+                ActionDefBodyElement::DefaultReferenceUsage,
+            ),
         )),
     ))
     .parse(input)?;
@@ -553,8 +576,14 @@ fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
     let (input, _) = tag(&b"first"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, first_expr) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
-    let (input, then_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
+    // §6 G13: `then` is optional -- `first start;` on its own marks an initial node without
+    // declaring a succession (OMG spec Annex `3a-Function-based Behavior-2.sysml`, where the
+    // following `then merge continue;` / `then action ...;` lines supply the targets).
+    let (input, then_expr) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"then"[..])),
+        preceded(ws_and_comments, path_expression),
+    ))
+    .parse(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
@@ -678,6 +707,15 @@ fn while_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<WhileStmt>> {
     ))
 }
 
+/// Loop control node: `loop` `{` body `}` (§6 G14) — `while_stmt` without a condition.
+fn loop_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"loop"[..]).parse(input)?;
+    let (input, body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
+    Ok((input, node_from_to(start, input, LoopStmt { body })))
+}
+
 /// If control node: `if` condition `{` thenBody `}` (`else` `{` elseBody `}`)?
 fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
     let start = input;
@@ -789,7 +827,9 @@ fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBo
 }
 
 /// Action usage body element: InOutDecl | Bind | Flow | FirstStmt | MergeStmt | ActionUsage
-fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsageBodyElement>> {
+pub(crate) fn action_usage_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ActionUsageBodyElement>> {
     use crate::parser::state::state_usage;
 
     let (input, _) = ws_and_comments(input)?;
@@ -827,6 +867,7 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         nom::branch::alt((
             map(terminate_stmt, ActionUsageBodyElement::TerminateStmt),
             map(while_stmt, ActionUsageBodyElement::WhileStmt),
+            map(loop_stmt, ActionUsageBodyElement::LoopStmt),
             map(if_stmt, ActionUsageBodyElement::IfStmt),
             map(nested_action_def_decl, ActionUsageBodyElement::Decl),
             map(control_node_action_usage, |a| {
@@ -835,6 +876,12 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
             map(visibility_action_usage, |a| {
                 ActionUsageBodyElement::ActionUsage(Box::new(a))
             }),
+            // §6 G26: last, so every keyword-led member above keeps priority over the
+            // keyword-less `name = expr;` binding.
+            map(
+                crate::parser::attribute::feature_value_binding,
+                ActionUsageBodyElement::DefaultReferenceUsage,
+            ),
         )),
     ))
     .parse(input)?;
@@ -920,9 +967,15 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
             nom::error::ErrorKind::Tag,
         )));
     }
+    // §6 G19: a fully anonymous usage (`action { ... }` / `action;`) is legal too -- the OMG spec
+    // Annex `3c-Function-based Behavior-structure mod-1.sysml` declares one directly in a part
+    // usage body. Previously only the typed anonymous form (`action: Runner;`) was accepted, so
+    // the bodied one fell through to opaque recovery.
     let (input, (name_span, name_str)) = if (after_gap.fragment().starts_with(b":")
         && !after_gap.fragment().starts_with(b":>")
         && !after_gap.fragment().starts_with(b":>>"))
+        || after_gap.fragment().starts_with(b"{")
+        || after_gap.fragment().starts_with(b";")
         || starts_with_keyword(after_gap.fragment(), b"defined")
     {
         (after_gap, (crate::ast::Span::dummy(), String::new()))
@@ -985,6 +1038,84 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod control_node_gap_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    /// PARSER_BACKLOG_ROADMAP.md §6, G13: `first <name>;` with no `then` clause marks an initial
+    /// node. Real usage: OMG spec Annex `3a-Function-based Behavior-2.sysml`, where the following
+    /// `then merge continue;` lines supply the succession targets.
+    #[test]
+    fn action_body_accepts_first_without_a_then_clause() {
+        let (rest, node) = action_def_body_element(input("first start;")).expect("first stmt");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::FirstStmt(f) => assert!(f.value.then.is_none()),
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn action_body_still_accepts_first_then_succession() {
+        let (rest, node) =
+            action_def_body_element(input("first engineStarted then 'generate torque';"))
+                .expect("first/then stmt");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::FirstStmt(f) => assert!(f.value.then.is_some()),
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    /// §6 G14: `loop { ... }` is a `while` with no condition. The §5 audit wired
+    /// `decide`/`join`/`fork`/`if`/`while` but missed `loop`, so it fell through to opaque
+    /// recovery. Real usage: OMG spec Annex `3a-Function-based Behavior-3.sysml`.
+    #[test]
+    fn action_body_accepts_loop_control_node() {
+        let (rest, node) = action_def_body_element(input("loop { action x; }")).expect("loop stmt");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, ActionDefBodyElement::LoopStmt(_)));
+    }
+
+    #[test]
+    fn action_usage_body_accepts_loop_control_node() {
+        let (rest, node) =
+            action_usage_body_element(input("loop { action x; }")).expect("loop stmt");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, ActionUsageBodyElement::LoopStmt(_)));
+    }
+
+    /// §6 G23 (found while fixing G13): only `then action ...` was accepted, so the two other
+    /// succession-shorthand targets that follow `first start;` in
+    /// `3a-Function-based Behavior-2.sysml` fell through to opaque recovery.
+    #[test]
+    fn then_succession_accepts_a_merge_node_target() {
+        let (rest, node) = then_action(input("then merge continue;")).expect("then merge");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value.target, ThenTarget::Merge(_)));
+    }
+
+    #[test]
+    fn then_succession_accepts_a_bare_feature_target() {
+        let (rest, node) = then_action(input("then continue;")).expect("then feature");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value.target, ThenTarget::Feature(_)));
+    }
+
+    #[test]
+    fn then_succession_still_accepts_an_inline_action_declaration() {
+        let (rest, node) = then_action(input("then action engineStarted accept e: EngineStart;"))
+            .expect("then action");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value.target, ThenTarget::Action(_)));
+    }
 }
 
 #[cfg(test)]

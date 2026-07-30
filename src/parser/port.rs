@@ -11,8 +11,8 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::enumeration::enum_usage;
 use crate::parser::item::{directed_item_usage, item_def_required, item_usage};
 use crate::parser::lex::{
-    capture_opaque_member, name, starts_with_keyword, ws1, ws_and_comments, PORT_BODY_STARTERS,
-    PORT_DEF_BODY_STARTERS,
+    capture_opaque_member, name, short_name_prefix, starts_with_keyword, ws1, ws_and_comments,
+    PORT_BODY_STARTERS, PORT_DEF_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -125,7 +125,15 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
         let (input, _) = ws1(input)?;
         input
     };
-    let (peek, _) = ws_and_comments(input)?;
+    // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2) -- see
+    // `attribute::attribute_usage`'s identical short-name handling for the confirmed real-usage
+    // citation.
+    let (input, short_name) = short_name_prefix(input)?;
+    // Consume (not just peek) whitespace/comments after the short name's closing `>` -- see
+    // `attribute::attribute_usage`'s identical fix for why this can't reuse `ws1`'s earlier
+    // consumption (a short name leaves fresh un-consumed whitespace after it).
+    let (input, _) = ws_and_comments(input)?;
+    let peek = input;
     let (input, usage_head) = if (peek.fragment().starts_with(b":")
         && !peek.fragment().starts_with(b":>")
         && !peek.fragment().starts_with(b":>>"))
@@ -188,6 +196,13 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, clauses) = specialization_clauses(input)?;
     let redefines = clauses.redefines.or(prefix_redefines);
+    // §6 G11: `port :>> pe = c1.pb;` -- a port usage may carry a feature value, which binds it to
+    // another port rather than declaring a fresh one.
+    let (input, value) = opt(preceded(
+        ws_and_comments,
+        crate::parser::feature_value::feature_value_part,
+    ))
+    .parse(input)?;
     let (input, body) = port_body(input)?;
     Ok((
         input,
@@ -200,6 +215,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 is_derived,
                 is_constant,
                 name: name_str,
+                short_name,
                 type_name,
                 multiplicity,
                 subsets: clauses.subsets,
@@ -207,6 +223,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 references: clauses.references,
                 crosses: clauses.crosses,
                 intersects: clauses.intersects,
+                value,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
@@ -478,5 +495,40 @@ mod par_002_widening_tests {
             node.value.membership.kind,
             crate::ast::MembershipKind::OwningMembership
         );
+    }
+
+    // --- short-name (`<shortName>`) support on `port_usage`, mirroring `attribute_usage`'s
+    // identical gap (shared `Identification` BNF production, §8.2.2.2) -- see
+    // `attribute.rs::attribute_body_tests`'s citation of the confirmed real-usage gap in the OMG
+    // Geometry domain library's `VehicleGeometryAndCoordinateFrames.sysml`.
+
+    #[test]
+    fn port_usage_captures_short_name() {
+        let (rest, node) =
+            port_usage(input("port <pp> powerPort: PowerPort;")).expect("port usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.short_name.as_deref(), Some("pp"));
+        assert_eq!(node.value.name, "powerPort");
+    }
+
+    #[test]
+    fn port_usage_captures_short_name_with_redefines() {
+        let (rest, node) =
+            port_usage(input("port <pp> :>> powerPort: PowerPort;")).expect("port usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.short_name.as_deref(), Some("pp"));
+        assert_eq!(
+            node.value
+                .redefines
+                .as_ref()
+                .map(|n| targets_display_string(&n.value.target)),
+            Some("powerPort".to_string())
+        );
+    }
+
+    #[test]
+    fn port_usage_without_short_name_has_none() {
+        let (_, node) = port_usage(input("port p1: MyPort;")).expect("port usage");
+        assert_eq!(node.value.short_name, None);
     }
 }

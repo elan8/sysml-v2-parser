@@ -108,20 +108,51 @@ fn subsetting_relationship_node(
     )
 }
 
+/// Dotted feature path for exhibit/perform-style names: `name ( '.' name )*`.
+fn feature_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, first) = name(input)?;
+    let (input, rest) = many0(preceded(
+        preceded(ws_and_comments, tag(&b"."[..])),
+        preceded(ws_and_comments, name),
+    ))
+    .parse(input)?;
+    Ok((
+        input,
+        std::iter::once(first)
+            .chain(rest)
+            .collect::<Vec<_>>()
+            .join("."),
+    ))
+}
+
 /// Exhibit state usage: `exhibit state` name (`:` type)? (`;` or body)
 pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"exhibit"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"state"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
+    // §6 G18: the `state` keyword is optional -- `exhibit 'vehicle states' :>> VehicleA::'vehicle
+    // states';` (OMG spec Annex `5-State-based Behavior-2.sysml`) exhibits an already-declared
+    // state usage by redefinition, without redeclaring its kind.
+    let (input, _) = opt(preceded(tag(&b"state"[..]), ws1)).parse(input)?;
+    let (input, name_str) = feature_name_path(input)?;
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    // §6 G18: `:>>` may also come *before* the body, which is where the redefinition form above
+    // puts it. The post-body position below predates it and stays supported.
+    let before_pre_body_redefines = input;
+    let (input, pre_body_redefines) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":>>"[..])),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
+    let pre_body_redefines = pre_body_redefines.map(|target| {
+        let span = crate::parser::span_from_to(before_pre_body_redefines, input);
+        subsetting_relationship_node(span, crate::ast::SubsettingKind::Redefines, target)
+    });
     let (input, body) = crate::parser::state::state_def_body(input)?;
     let before_redefines = input;
     let (input, redefines) = opt(preceded(
@@ -139,6 +170,7 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     } else {
         input
     };
+    let redefines = redefines.or(pre_body_redefines);
     Ok((
         input,
         node_from_to(
@@ -171,11 +203,19 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             ),
             map(annotation, PartDefBodyElement::Annotation),
             map(exhibit_state, PartDefBodyElement::ExhibitState),
-            // `calc_def_required` must be tried before `calc_usage`: `calc_usage` has no guard
-            // against a bare `def` keyword (same bug class as `flow_usage_member`/`port_usage`
-            // above), so `calc def Foo {}` would otherwise misparse as `CalcUsage` named "def".
-            map(calc_def_required, PartDefBodyElement::CalcDef),
-            map(calc_usage, PartDefBodyElement::CalcUsage),
+            // Each `_def` parser must be tried before its `_usage` sibling: neither `calc_usage`
+            // nor `constraint_usage` guards against a bare `def` keyword (same bug class as
+            // `flow_usage_member`/`port_usage` below), so `calc def Foo {}` would otherwise
+            // misparse as `CalcUsage` named "def". Grouped into a sub-`alt()` to stay under
+            // nom's 21-branch limit on the outer one.
+            alt((
+                map(calc_def_required, PartDefBodyElement::CalcDef),
+                map(calc_usage, PartDefBodyElement::CalcUsage),
+                map(constraint_def, PartDefBodyElement::ConstraintDef),
+                map(constraint_usage, PartDefBodyElement::ConstraintUsage),
+                // §6 G16: a part body is a namespace, so it owns imports too.
+                map(crate::parser::import::import_, PartDefBodyElement::Import),
+            )),
             map(perform_action_decl, PartDefBodyElement::Perform),
             map(perform_usage, PartDefBodyElement::Perform),
             map(allocate_, PartDefBodyElement::Allocate),
@@ -794,6 +834,52 @@ mod par_002_nested_def_tests {
             }
             other => panic!("expected ActionUsage, got {other:?}"),
         }
+    }
+
+    /// PARSER_BACKLOG_ROADMAP.md §6, G4: the `constraint` keyword was wired at package level
+    /// only, so both the definition and the usage form fell through to opaque recovery inside a
+    /// part definition body. Real usage: OMG spec Annex `15_03-Value Expression.sysml` and
+    /// `15_05-Unification of Expression and Constraint Definition.sysml`.
+    #[test]
+    fn part_def_body_accepts_untyped_constraint_usage_with_expression_body() {
+        let (rest, node) = part_def_body_element(input(
+            "constraint hasLegalProfileDepth {profileDepth >= 3.5 [mm]}",
+        ))
+        .expect("constraint usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            PartDefBodyElement::ConstraintUsage(c) => {
+                assert_eq!(c.value.name, "hasLegalProfileDepth");
+                assert_eq!(c.value.type_name, None);
+            }
+            other => panic!("expected ConstraintUsage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn part_def_body_accepts_typed_constraint_usage_with_in_binding_body() {
+        let (rest, node) = part_def_body_element(input(
+            "constraint discBrakeConstraint : DiscBrakeConstraint { in wheelAssy = Vehicle_2::wheelAssy; }",
+        ))
+        .expect("constraint usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            PartDefBodyElement::ConstraintUsage(c) => {
+                assert_eq!(c.value.name, "discBrakeConstraint");
+                assert_eq!(c.value.type_name.as_deref(), Some("DiscBrakeConstraint"));
+            }
+            other => panic!("expected ConstraintUsage, got {other:?}"),
+        }
+    }
+
+    /// `constraint def` must win over `constraint_usage` in the same `alt()` -- the usage parser
+    /// calls a bare `name(input)` right after the keyword and would take `def` as the name.
+    #[test]
+    fn part_def_body_accepts_nested_constraint_def_not_misparsed_as_usage() {
+        let (rest, node) =
+            part_def_body_element(input("constraint def MyConstraint;")).expect("constraint def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::ConstraintDef(_)));
     }
 
     #[test]

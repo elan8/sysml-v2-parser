@@ -176,6 +176,27 @@ fn flow_usage_named(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
     ))
 }
 
+/// Payload-first flow usage (§6 G12): `flow of <payload> (from <a> to <b>)? (`;` | `{ }`)`.
+fn flow_usage_payload_first(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
+    let (input, payload) = optional_payload(input)?;
+    let (input, (from, to)) = flow_endpoints(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, body) = semicolon_or_structured_definition_body(input)?;
+    Ok((
+        input,
+        FlowUsage {
+            kind: FlowUsageKind::Flow, // overwritten by caller
+            name: None,
+            type_name: None,
+            payload,
+            from,
+            to,
+            body,
+            membership: Membership::feature(None, crate::ast::Span::dummy()), // overwritten by caller
+        },
+    ))
+}
+
 fn flow_usage_anonymous(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
     let (input, from) = expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
@@ -208,19 +229,26 @@ pub(crate) fn flow_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<Flo
 
     let (input, mut usage) = {
         let peek = input;
-        match name(peek) {
-            Ok((after_name, _name_str)) => {
-                let (after_name, _) = ws_and_comments(after_name)?;
-                let fragment = after_name.fragment();
-                let is_anonymous =
-                    fragment.starts_with(b".") || starts_with_keyword(fragment, b"to");
-                if is_anonymous {
-                    flow_usage_anonymous(peek)?
-                } else {
-                    flow_usage_named(peek)?
+        // §6 G12: `flow of fuel : Fuel from a to b;` puts the payload clause before the endpoints
+        // and has no name of its own (OMG spec Annex `3d-Function-based Behavior-item.sysml`).
+        // Checked before the name dispatch below, which would otherwise take `of` as the name.
+        if starts_with_keyword(peek.fragment(), b"of") {
+            flow_usage_payload_first(peek)?
+        } else {
+            match name(peek) {
+                Ok((after_name, _name_str)) => {
+                    let (after_name, _) = ws_and_comments(after_name)?;
+                    let fragment = after_name.fragment();
+                    let is_anonymous =
+                        fragment.starts_with(b".") || starts_with_keyword(fragment, b"to");
+                    if is_anonymous {
+                        flow_usage_anonymous(peek)?
+                    } else {
+                        flow_usage_named(peek)?
+                    }
                 }
+                Err(_) => flow_usage_anonymous(input)?,
             }
-            Err(_) => flow_usage_anonymous(input)?,
         }
     };
     usage.kind = kind;
@@ -231,6 +259,51 @@ pub(crate) fn flow_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<Flo
 /// Package-level flow usage (alias for `flow_usage_member`).
 pub(crate) fn flow_usage(input: Input<'_>) -> IResult<Input<'_>, Node<FlowUsage>> {
     flow_usage_member(input)
+}
+
+#[cfg(test)]
+mod payload_first_gap_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    /// PARSER_BACKLOG_ROADMAP.md §6, G12: the payload clause may precede the endpoints, with no
+    /// name on the flow itself. `of` was previously consumed as the flow's name. Real usage: OMG
+    /// spec Annex `3d-Function-based Behavior-item.sysml`.
+    #[test]
+    fn flow_usage_accepts_a_payload_before_the_endpoints() {
+        let (rest, node) = flow_usage_member(input(
+            "flow of fuel : Fuel from storageTank.fuelOutPort.fuel to pump.fuelInPort.fuel;",
+        ))
+        .expect("payload-first flow");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, None);
+        let payload = node.value.payload.expect("payload");
+        assert_eq!(payload.value.name.as_deref(), Some("fuel"));
+        assert_eq!(payload.value.type_name.as_deref(), Some("Fuel"));
+        assert!(node.value.from.is_some() && node.value.to.is_some());
+    }
+
+    #[test]
+    fn flow_usage_accepts_a_payload_before_a_brace_body() {
+        let (rest, node) =
+            flow_usage_member(input("flow of fuel : Fuel from a.b to c.d { /* note */ }"))
+                .expect("payload-first flow");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.payload.is_some());
+    }
+
+    /// A flow whose name genuinely is `of`-prefixed (e.g. `offset`) must not take the G12 path.
+    #[test]
+    fn flow_usage_still_names_identifiers_that_merely_start_with_of() {
+        let (rest, node) =
+            flow_usage_member(input("flow offset from a to b;")).expect("named flow");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name.as_deref(), Some("offset"));
+    }
 }
 
 #[cfg(test)]

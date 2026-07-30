@@ -244,6 +244,9 @@ fn collect_occurrence_usage_body_errors(body: &OccurrenceUsageBody, errors: &mut
                 OccurrenceBodyElement::OccurrenceUsage(n) => {
                     collect_occurrence_usage_body_errors(&n.value.body, errors)
                 }
+                OccurrenceBodyElement::StateUsage(n) => {
+                    collect_state_body_errors(&n.value.body, errors)
+                }
                 _ => {}
             }
         }
@@ -266,6 +269,9 @@ fn collect_definition_body_errors(body: &DefinitionBody, errors: &mut Vec<ParseE
                     }
                     OccurrenceBodyElement::OccurrenceUsage(o) => {
                         collect_occurrence_usage_body_errors(&o.value.body, errors)
+                    }
+                    OccurrenceBodyElement::StateUsage(s) => {
+                        collect_state_body_errors(&s.value.body, errors)
                     }
                     _ => {}
                 },
@@ -312,10 +318,24 @@ fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>
     }
 }
 
-fn collect_perform_body_errors(body: &crate::ast::PerformBody, _errors: &mut Vec<ParseError>) {
-    match body {
-        crate::ast::PerformBody::Semicolon => {}
-        crate::ast::PerformBody::Brace { .. } => {}
+fn collect_perform_body_errors(body: &crate::ast::PerformBody, errors: &mut Vec<ParseError>) {
+    if let crate::ast::PerformBody::Brace { elements } = body {
+        for element in elements {
+            match &element.value {
+                crate::ast::PerformBodyElement::PartUsage(n) => {
+                    collect_part_usage_body_errors(&n.value.body, errors)
+                }
+                crate::ast::PerformBodyElement::AttributeUsage(n) => {
+                    collect_attribute_body_errors(&n.value.body, errors)
+                }
+                crate::ast::PerformBodyElement::Action(n) => {
+                    if let crate::ast::ActionUsageBodyElement::ActionUsage(a) = &n.value {
+                        collect_action_usage_body_errors(&a.value.body, errors)
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 }
 

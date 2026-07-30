@@ -1,6 +1,6 @@
 //! Shared parsers for accept/send payload clauses and transition accept triggers.
 
-use crate::ast::{ActionUsage, Expression, Node, PayloadClause, TransitionAccept};
+use crate::ast::{ActionUsage, Expression, Node, PayloadClause, TransitionAccept, TriggerKind};
 use crate::parser::action::action_usage_body;
 use crate::parser::expr::expression;
 use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws1, ws_and_comments};
@@ -30,11 +30,29 @@ pub(crate) fn typed_payload_clause(input: Input<'_>) -> IResult<Input<'_>, Paylo
     ))
 }
 
+/// BNF `TriggerKind` (§6 G8): `at` | `when` | `after`. The trailing `ws1` keeps identifiers that
+/// merely start with one of these keywords (`atomicMass`, `afterburner`) out.
+fn trigger_kind(input: Input<'_>) -> IResult<Input<'_>, TriggerKind> {
+    nom::branch::alt((
+        nom::combinator::map(preceded(tag(&b"at"[..]), ws1), |_| TriggerKind::At),
+        nom::combinator::map(preceded(tag(&b"when"[..]), ws1), |_| TriggerKind::When),
+        nom::combinator::map(preceded(tag(&b"after"[..]), ws1), |_| TriggerKind::After),
+    ))
+    .parse(input)
+}
+
 /// After `accept` keyword: `name : Type` or shorthand expression, with an optional trailing
 /// `via <port>` clause (e.g. `accept TurnOn via commPort`).
 pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
     let (input, _) = preceded(ws_and_comments, tag(&b"accept"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
+    // §6 G8: a `TriggerKind` keyword replaces the payload entirely. Checked before `expression`,
+    // which would otherwise take the keyword itself as a feature reference and leave the real
+    // trigger expression to be misread as the transition's effect.
+    if let Ok((input, kind)) = trigger_kind(input) {
+        let (input, expr_node) = expression(input)?;
+        return Ok((input, TransitionAccept::TimeTrigger(kind, expr_node)));
+    }
     let (input, expr_node) = expression(input)?;
     let (input, type_suffix) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),

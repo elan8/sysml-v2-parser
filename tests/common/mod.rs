@@ -38,8 +38,12 @@ pub fn load_conformance_target() -> ConformanceTarget {
 }
 
 pub fn load_conformance_target_from(path: &Path) -> ConformanceTarget {
-    let text = fs::read_to_string(path)
-        .unwrap_or_else(|err| panic!("failed to read conformance target {}: {err}", path.display()));
+    let text = fs::read_to_string(path).unwrap_or_else(|err| {
+        panic!(
+            "failed to read conformance target {}: {err}",
+            path.display()
+        )
+    });
     let mut release_tag = None;
     let mut release_repo = None;
     let mut sysml_bnf_productions = None;
@@ -84,7 +88,10 @@ pub fn load_conformance_target_from(path: &Path) -> ConformanceTarget {
             panic!("conformance-target missing release_tag: {}", path.display())
         }),
         release_repo: release_repo.unwrap_or_else(|| {
-            panic!("conformance-target missing release_repo: {}", path.display())
+            panic!(
+                "conformance-target missing release_repo: {}",
+                path.display()
+            )
         }),
         sysml_bnf_productions: sysml_bnf_productions.unwrap_or_else(|| {
             panic!(

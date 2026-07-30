@@ -259,6 +259,11 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
                 .map(|(target, _)| target)
                 .or(header.subsets),
             is_abstract,
+            // `variation` is only spelled at the member-position `requirement_usage` parser, which
+            // sets this after the fact (this shared payload is also reached from
+            // `verify requirement ...` and `objective { requirement ... }`, neither of which has a
+            // usage-prefix slot).
+            is_variation: false,
             body,
             // No visibility grammar at this shared payload's callers (`verify requirement ...`,
             // `objective { requirement ... }`); the member-position `requirement_usage` parser
@@ -721,10 +726,16 @@ pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Req
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // §6 G5: `variation requirement engineRqtChoice : EnginePerformanceRequirement { ... }` is
+    // real usage in the OMG spec Annex `7b-Variant Configurations.sysml`; the BNF
+    // `BasicUsagePrefix` slot allows `variation` wherever it allows `abstract`.
+    let (input, variation_kw) =
+        nom::combinator::opt(preceded(tag(&b"variation"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"requirement"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, mut val) =
         parse_requirement_usage_payload_with_abstract(input, None, abstract_kw.is_some())?;
+    val.is_variation = variation_kw.is_some();
     val.membership = crate::ast::Membership::feature(visibility, visibility_span);
     Ok((input, node_from_to(start, input, val)))
 }
