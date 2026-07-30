@@ -1,6 +1,6 @@
 //! Collect ParseError diagnostics from recovery nodes embedded in the AST.
 
-use super::diagnostics::{bare_feature_declaration_in_part_def_diagnostic, trim_ascii_start};
+use super::diagnostics::trim_ascii_start;
 use super::recovery::parse_error_from_recovery_node;
 use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AttributeBody,
@@ -484,67 +484,6 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
             }
         }
     }
-}
-
-pub(crate) fn collect_implicit_attribute_in_part_def_warnings(bytes: &[u8]) -> Vec<ParseError> {
-    let text = String::from_utf8_lossy(bytes);
-    let mut errors = Vec::new();
-    let mut in_part_def_body = false;
-    let mut brace_depth = 0i32;
-    let mut offset = 0usize;
-    for (line_idx, line) in text.lines().enumerate() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("part def") {
-            in_part_def_body = false;
-            brace_depth = 0;
-        }
-        if trimmed.contains('{') {
-            if in_part_def_body || trimmed.starts_with("part def") {
-                in_part_def_body = true;
-            }
-            brace_depth += trimmed.chars().filter(|&c| c == '{').count() as i32;
-        }
-        if trimmed.contains('}') {
-            brace_depth -= trimmed.chars().filter(|&c| c == '}').count() as i32;
-            if brace_depth <= 0 {
-                in_part_def_body = false;
-            }
-        }
-        if in_part_def_body && brace_depth > 0 {
-            let skip = trimmed.starts_with("attribute")
-                || trimmed.starts_with("part ")
-                || trimmed.starts_with("port ")
-                || trimmed.starts_with("interface")
-                || trimmed.starts_with("connect")
-                || trimmed.contains(":>")
-                || trimmed.contains("::>")
-                || trimmed.is_empty()
-                || trimmed.starts_with("//")
-                || trimmed.starts_with("/*")
-                || trimmed.starts_with("doc ");
-            if !skip {
-                if let Some((code, message, expected, suggestion)) =
-                    bare_feature_declaration_in_part_def_diagnostic(trimmed.as_bytes())
-                {
-                    let line_no = (line_idx + 1) as u32;
-                    let column = line.find(trimmed).unwrap_or(0) + 1;
-                    let line_offset = offset + line.find(trimmed).unwrap_or(0);
-                    errors.push(
-                        ParseError::new(message)
-                            .with_location(line_offset, line_no, column)
-                            .with_length(trimmed.len().max(1))
-                            .with_code(code)
-                            .with_expected(expected)
-                            .with_suggestion(suggestion)
-                            .with_severity(DiagnosticSeverity::Warning)
-                            .with_category(DiagnosticCategory::ParseError),
-                    );
-                }
-            }
-        }
-        offset += line.len() + 1;
-    }
-    errors
 }
 
 pub(crate) fn collect_requirement_id_dialect_diagnostics(bytes: &[u8]) -> Vec<ParseError> {

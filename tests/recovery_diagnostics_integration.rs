@@ -644,22 +644,36 @@ fn fixture_requirement_def_id_keyword_reports_short_name_hint() {
 }
 
 #[test]
-fn fixture_bare_feature_in_part_def_reports_attribute_hint() {
+fn fixture_reference_usage_in_part_def_parses_without_bare_feature_diagnostic() {
+    // SysML §7.6.4: a usage without a kind keyword is a (default) reference usage.
     let input = fixture("bare-feature-in-part-def.sysml");
     let result = parse_with_diagnostics(&input);
-    let err = result
-        .errors
-        .iter()
-        .find(|e| e.code.as_deref() == Some("bare_feature_declaration_in_part_def"))
-        .expect("expected part-def feature diagnostic");
     assert!(
-        err.message.contains("Capacity")
-            || err
-                .suggestion
-                .as_deref()
-                .is_some_and(|s| s.contains("attribute") || s.contains("Capacity")),
-        "expected Capacity-related guidance: {:?}",
-        err
+        result.errors.is_empty(),
+        "DefaultReferenceUsage `Capacity : Real;` is valid; unexpected errors: {:?}",
+        result.errors
+    );
+}
+
+/// Regression for https://github.com/elan8/sysml-v2-parser/issues/1
+///
+/// Multi-line `/** ... */` inside a part def body must not treat a continuation line that
+/// looks like `Ident: prose` as a diagnostic.
+#[test]
+fn multiline_block_comment_colon_line_parses_cleanly_in_part_def() {
+    let input = r#"package P {
+    part def C {
+        /** first line
+            Optional: a profile may state the rate */
+        attribute x : String;
+    }
+}
+"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "probe should parse cleanly with diagnostics: {:?}",
+        result.errors
     );
 }
 

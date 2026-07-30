@@ -1,12 +1,11 @@
 //! Recovery error nodes and classification for structured body parsing.
 
 use super::diagnostics::{
-    bare_feature_declaration_in_part_def_diagnostic, category_from_code,
-    invalid_bare_identifier_in_body_diagnostic, invalid_expose_separator_diagnostic,
-    invalid_typing_operator_diagnostic, invalid_unit_reference_diagnostic,
-    missing_expression_after_operator_diagnostic, missing_name_diagnostic,
-    missing_semicolon_or_body_diagnostic, missing_type_diagnostic, trim_ascii_end,
-    trim_ascii_start, unexpected_keyword_in_scope_diagnostic,
+    category_from_code, invalid_bare_identifier_in_body_diagnostic,
+    invalid_expose_separator_diagnostic, invalid_typing_operator_diagnostic,
+    invalid_unit_reference_diagnostic, missing_expression_after_operator_diagnostic,
+    missing_name_diagnostic, missing_semicolon_or_body_diagnostic, missing_type_diagnostic,
+    trim_ascii_end, trim_ascii_start, unexpected_keyword_in_scope_diagnostic,
 };
 use super::lex;
 use super::Input;
@@ -80,12 +79,6 @@ enum RecoveryClassification {
         suggestion: String,
     },
     MissingBodyOrSemicolon {
-        code: String,
-        message: String,
-        expected: String,
-        suggestion: String,
-    },
-    BareFeatureDeclarationInPartDef {
         code: String,
         message: String,
         expected: String,
@@ -196,19 +189,6 @@ fn classify_recovery(
         };
     }
 
-    if scope_label.contains("part definition body") {
-        if let Some((code, message, expected, suggestion)) =
-            bare_feature_declaration_in_part_def_diagnostic(trimmed)
-        {
-            return RecoveryClassification::BareFeatureDeclarationInPartDef {
-                code: code.to_string(),
-                message,
-                expected,
-                suggestion,
-            };
-        }
-    }
-
     if let Some((code, message, expected, suggestion)) =
         missing_semicolon_or_body_diagnostic(trimmed)
     {
@@ -316,12 +296,6 @@ pub(crate) fn build_recovery_error_node_from_span(
             suggestion,
         }
         | RecoveryClassification::MissingBodyOrSemicolon {
-            code,
-            message,
-            expected,
-            suggestion,
-        }
-        | RecoveryClassification::BareFeatureDeclarationInPartDef {
             code,
             message,
             expected,
