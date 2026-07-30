@@ -316,6 +316,11 @@ pub struct PartUsage {
     /// Optional `abstract` or `variation` prefix on a part usage.
     pub usage_prefix: Option<DefinitionPrefix>,
     pub is_individual: bool,
+    /// Leading `ref` from BNF `BasicUsagePrefix` (`isReference ?= 'ref'`), reached via
+    /// `PartUsage = OccurrenceUsagePrefix 'part' Usage` → `OccurrenceUsagePrefix :
+    /// BasicUsagePrefix ...`. Distinguishes `ref part origin : T :> x;` from composite
+    /// `part origin : T :> x;`. Parallel to `ActionUsage::is_reference` / `StateUsage::is_reference`.
+    pub is_reference: bool,
     /// Direction prefix when parsed as `in`/`out`/`inout part ...` (BNF `RefPrefix`, reachable
     /// through `OccurrenceUsagePrefix` -> `BasicUsagePrefix` -> `RefPrefix`, same production
     /// chain `AttributeUsage.direction` uses).

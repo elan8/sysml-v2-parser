@@ -734,9 +734,9 @@ fn try_package_body_structure<'a>(
         enum_usage,
         PackageBodyElement::EnumerationUsage
     );
-    // PAR-002: standalone `ref` declaration at package level (BNF `PackageMember` allows a bare
-    // `UsageElement`, and `ref` features are a legal usage shape). Reuses `part_ref_usage`, which
-    // despite its name has no part-specific grammar (`ref` (part)? name (: type)? (= value)?).
+    // PAR-002 / GH-10: standalone `ref` / `ref part` at package level.
+    // `part_def_or_usage` (earlier in this dispatch) now accepts `ref part …` as PartUsage with
+    // `is_reference`. Bare `ref name …` (BNF `ReferenceUsage`) still uses `part_ref_usage`.
     try_package_body_dispatch!(
         input,
         start,

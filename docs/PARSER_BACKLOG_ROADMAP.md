@@ -2,7 +2,10 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-30 (§6 fully closed — rebased [PR #3](https://github.com/elan8/sysml-v2-parser/pull/3)
+**Last updated:** 2026-07-30 (GH-10 — `ref part` parsed as `PartUsage` with `is_reference` and full
+`FeatureSpecializationPart`; `PARSE_AST_VERSION` 52 → 53.)
+
+**Previously:** 2026-07-30 (§6 fully closed — rebased [PR #3](https://github.com/elan8/sysml-v2-parser/pull/3)
 (GH-2's `parse_root` verdict-parity fix) onto the completed G1–G30 work and found one last gap:
 package/item-def bodies had no `#`/`@` annotation or `connect a to b;` support at all, needed by
 `14c-Language Extensions.sysml`'s FMEA library example. Closed with a new `metadata_keyword_prefix`

@@ -591,6 +591,7 @@ fn normalize_part_usage(p: &PartUsage) -> PartUsage {
     PartUsage {
         usage_prefix: p.usage_prefix.clone(),
         is_individual: p.is_individual,
+        is_reference: p.is_reference,
         direction: p.direction,
         is_derived: p.is_derived,
         is_constant: p.is_constant,
