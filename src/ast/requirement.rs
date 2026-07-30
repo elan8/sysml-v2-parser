@@ -1,12 +1,12 @@
 use super::behavior::{AssignStmt, ForLoop, InOut, ThenAction};
 use super::common::TextualRepresentation;
 use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
+use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
     MetadataKeywordUsage,
 };
-use super::feature_value::FeatureValue;
 use super::view::ConstraintDefBodyElement;
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,

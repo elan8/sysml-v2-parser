@@ -2,7 +2,9 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-07-23 (0.46.0 — Systems Library `ref action` / `ref state` / nested action·state in part bodies parse as real `ActionUsage`/`StateUsage` AST with `is_reference`, structured typing/multiplicity/`:>`/` :>>`, instead of `OpaqueMember`. Visibility on plain `part_ref_usage`. Full P5+ unified definition/usage/specialization layer remains deferred to 1.x.)
+**Last updated:** 2026-07-30 (diagnostics-spec-audit — root `PackageBodyElement*` accepted; `missing_member_name` / `illegal_top_level_definition` removed as non-spec; bare `name : Type;` is `DefaultReferenceUsage` AST. Shared specialization layer + full `#`/`@` metadata surface remain open.)
+
+**Previously:** 2026-07-23 (0.46.0 — Systems Library `ref action` / `ref state` / nested action·state in part bodies parse as real `ActionUsage`/`StateUsage` AST with `is_reference`, structured typing/multiplicity/`:>`/` :>>`, instead of `OpaqueMember`. Visibility on plain `part_ref_usage`. Full P5+ unified definition/usage/specialization layer remains deferred to 1.x.)
 
 **Previously:** 2026-07-20 (0.44.0 — `Intersecting` closed: `intersects` clauses were tokenized and discarded (`skip_intersects_clause`); now kept structured as `AttributeUsage`/`PortUsage`/`OccurrenceUsage::intersects`, same shape as `references`/`crosses`. Investigated and ruled out as parser gaps in the same pass: `TypeFeaturing`/`FeatureInverting`/`Unioning`/`Disjoining`/`Differencing`/`FeatureChaining`-as-metaclass have zero real usage in the systems library or examples (backlog, not urgent); general non-port Conjugation needs no parser change at all — `~` conjugated typing already parses generically for every usage kind, the remaining gap is Spec42-side only. See CHANGELOG.md 0.44.0 and `babel42-v2/docs/spec42-systems-modeling-api-gaps.md` S42-002/S42-008.)
 
@@ -220,6 +222,8 @@ Consolidated from [SYSML_V2_COMPLIANCE_GAP.md](./SYSML_V2_COMPLIANCE_GAP.md) and
 | Theme | Priority | Notes |
 | ----- | -------- | ----- |
 | Unified definition / usage / specialization grammar layer | **P5+** | Largest architectural gap; do not big-bang rewrite. The 0.46.0 `ref action`/`ref state` part-body slice is **not** this rewrite — only the Systems Library forms that were opaque catch-alls. |
+| `DefaultReferenceUsage` AST (bare `name : Type;`) | **Done** (diagnostics-spec-audit) | Part def/usage bodies; was mis-modeled as `AttributeUsage` via shorthand |
+| Metadata `#` / `@` / user-defined keyword surface | Medium | Partial parse; remaining legal forms still hit `unsupported_annotation_syntax` (coverage Warning, not a language ban) |
 | Part-body `ref action` / `ref state` (Systems Library) | **Done** (0.46.0) | Real `ActionUsage`/`StateUsage` with `is_reference`, `:>`/` :>>`, visibility on plain `ref` |
 | `take_until_terminator` header scraping → structured headers | Medium | Per-family as library fixtures expose gaps |
 | `part_def` prelude unify with `definition_prefix` | Low | Intentionally local for disambiguation |

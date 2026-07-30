@@ -219,8 +219,13 @@ fn requirement_body_rep_language_parsed() {
 #[test]
 fn diagnostic_catalog_documents_stable_codes() {
     use sysml_v2_parser::parser::diagnostic_catalog::DOCUMENTED_CODES;
-    assert!(DOCUMENTED_CODES.contains(&"missing_member_name"));
+    assert!(DOCUMENTED_CODES.contains(&"missing_type_reference"));
     assert!(DOCUMENTED_CODES.contains(&"missing_closing_brace"));
+    assert!(DOCUMENTED_CODES.contains(&"unsupported_annotation_syntax"));
+    assert!(DOCUMENTED_CODES.contains(&"nesting_too_deep"));
+    assert!(!DOCUMENTED_CODES.contains(&"missing_member_name"));
+    assert!(!DOCUMENTED_CODES.contains(&"illegal_top_level_definition"));
+    assert!(!DOCUMENTED_CODES.contains(&"unresolved_symbol"));
 }
 
 #[test]

@@ -116,8 +116,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
         preceded(ws_and_comments, with_span(qualified_name)),
     ))
     .parse(input)?;
-    let redefines =
-        redefines_target.map(|(span, target)| single_target_redefines(span, target));
+    let redefines = redefines_target.map(|(span, target)| single_target_redefines(span, target));
 
     let (input, type_ref_span, type_name, typing) = if redefines.is_some() {
         // After `:>> target`, an optional `:` typing clause (possibly multi-target) may follow.
@@ -713,7 +712,9 @@ pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUs
     alt((
         map(tag(&b";"[..]), |_| ActionUsageBody::Semicolon),
         action_usage_body_brace,
-        map(peek_implicit_action_usage_body_end, |_| ActionUsageBody::Semicolon),
+        map(peek_implicit_action_usage_body_end, |_| {
+            ActionUsageBody::Semicolon
+        }),
     ))
     .parse(input)
 }
@@ -910,15 +911,25 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let (input, is_reference) =
         nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // SysML allows anonymous action usages: `action: Runner;` (Identification may be empty).
+    let (after_gap, _) = ws_and_comments(input)?;
     // `action def …` is a definition, not a usage named `def`.
-    if starts_with_keyword(input.fragment(), b"def") {
+    if starts_with_keyword(after_gap.fragment(), b"def") {
         return Err(nom::Err::Error(nom::error::Error::new(
-            input,
+            after_gap,
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, (name_span, name_str)) = if (after_gap.fragment().starts_with(b":")
+        && !after_gap.fragment().starts_with(b":>")
+        && !after_gap.fragment().starts_with(b":>>"))
+        || starts_with_keyword(after_gap.fragment(), b"defined")
+    {
+        (after_gap, (crate::ast::Span::dummy(), String::new()))
+    } else {
+        let (input, _) = ws1(input)?;
+        with_span(name).parse(input)?
+    };
     // Feature-style header: typing, multiplicity, ordered/nonunique, subsets/redefines.
     // Plain `usage_header` drops `[0..*]` (Systems Library `performedActions`).
     let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
@@ -1029,7 +1040,8 @@ mod membership_tests {
 
     #[test]
     fn abstract_ref_action_with_multiplicity_and_subsets_is_structured() {
-        let src = "abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances;";
+        let src =
+            "abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances;";
         let (rest, node) = action_usage(input(src)).expect("ref action usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_abstract);

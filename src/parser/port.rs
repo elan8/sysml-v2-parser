@@ -11,7 +11,8 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::enumeration::enum_usage;
 use crate::parser::item::{directed_item_usage, item_def_required, item_usage};
 use crate::parser::lex::{
-    capture_opaque_member, name, ws1, ws_and_comments, PORT_BODY_STARTERS, PORT_DEF_BODY_STARTERS,
+    capture_opaque_member, name, starts_with_keyword, ws1, ws_and_comments, PORT_BODY_STARTERS,
+    PORT_DEF_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -112,21 +113,47 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = tag(&b"port"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, usage_head) = alt((
-        map(
-            preceded(ws_and_comments, prefix_redefinition_target),
-            |(name_span, redefines)| PortUsageHead::PrefixRedefines {
-                name_span,
-                redefines,
+    // SysML allows anonymous port usages: `port: PowerPort;` (Identification may be empty).
+    let (after_kw, _) = ws_and_comments(input)?;
+    let input = if (after_kw.fragment().starts_with(b":")
+        && !after_kw.fragment().starts_with(b":>")
+        && !after_kw.fragment().starts_with(b":>>"))
+        || starts_with_keyword(after_kw.fragment(), b"defined")
+    {
+        after_kw
+    } else {
+        let (input, _) = ws1(input)?;
+        input
+    };
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, usage_head) = if (peek.fragment().starts_with(b":")
+        && !peek.fragment().starts_with(b":>")
+        && !peek.fragment().starts_with(b":>>"))
+        || starts_with_keyword(peek.fragment(), b"defined")
+    {
+        (
+            input,
+            PortUsageHead::Named {
+                name_span: crate::ast::Span::dummy(),
+                name: String::new(),
             },
-        ),
-        map(with_span(name), |(name_span, name)| PortUsageHead::Named {
-            name_span,
-            name,
-        }),
-    ))
-    .parse(input)?;
+        )
+    } else {
+        alt((
+            map(
+                preceded(ws_and_comments, prefix_redefinition_target),
+                |(name_span, redefines)| PortUsageHead::PrefixRedefines {
+                    name_span,
+                    redefines,
+                },
+            ),
+            map(with_span(name), |(name_span, name)| PortUsageHead::Named {
+                name_span,
+                name,
+            }),
+        ))
+        .parse(input)?
+    };
     let (input, name_str, name_span, prefix_redefines) = match usage_head {
         PortUsageHead::PrefixRedefines {
             name_span,
@@ -312,7 +339,8 @@ mod par_002_widening_tests {
 
     #[test]
     fn port_usage_captures_intersects() {
-        let (rest, node) = port_usage(input("port p : PortType intersects a;")).expect("port usage");
+        let (rest, node) =
+            port_usage(input("port p : PortType intersects a;")).expect("port usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value

@@ -80,20 +80,15 @@ fn fixture_missing_semicolon_reports_specific_diagnostic_and_keeps_siblings() {
 }
 
 #[test]
-fn fixture_missing_name_does_not_fall_back_to_missing_semicolon() {
+fn fixture_anonymous_actor_in_use_case_parses_without_missing_member_name() {
     let input = fixture("missing-semicolon-false-positive-name.sysml");
     let (result, elements) = package_elements(&input);
 
-    assert_eq!(
-        result.errors.len(),
-        1,
-        "unexpected diagnostics: {:?}",
+    assert!(
+        result.errors.is_empty(),
+        "anonymous `actor : User` is valid SysML; unexpected errors: {:?}",
         result.errors
     );
-    let err = &result.errors[0];
-    assert_eq!(err.line, Some(3));
-    assert_eq!(err.code.as_deref(), Some("missing_member_name"));
-    assert_ne!(err.code.as_deref(), Some("missing_semicolon"));
     let use_case = elements
         .iter()
         .find_map(|element| match &element.value {
@@ -106,7 +101,7 @@ fn fixture_missing_name_does_not_fall_back_to_missing_semicolon() {
     };
     assert!(elements
         .iter()
-        .any(|e| matches!(e.value, UseCaseDefBodyElement::Error(_))));
+        .any(|e| matches!(e.value, UseCaseDefBodyElement::ActorUsage(_))));
     assert!(elements
         .iter()
         .any(|e| matches!(e.value, UseCaseDefBodyElement::Objective(_))));
@@ -454,12 +449,10 @@ package Later {
         result.errors
     );
     assert!(
-        !result.errors.iter().any(|e| {
-            matches!(
-                e.code.as_deref(),
-                Some("illegal_top_level_definition") | Some("expected_keyword")
-            )
-        }),
+        !result
+            .errors
+            .iter()
+            .any(|e| { matches!(e.code.as_deref(), Some("expected_keyword")) }),
         "malformed package body should not cascade as top-level errors: {:?}",
         result.errors
     );
@@ -557,12 +550,12 @@ fn fixture_unexpected_keyword_in_requirement_body_reports_scope_specific_error()
 
 #[test]
 fn diagnostics_include_taxonomy_categories() {
-    let parse_err = parse_with_diagnostics("package P { part def A { part: Wheel; } }");
+    let parse_err = parse_with_diagnostics("package P { part def A { part wheel: ; } }");
     let parse_err_entry = parse_err
         .errors
         .iter()
-        .find(|e| e.code.as_deref() == Some("missing_member_name"))
-        .expect("missing member name diagnostic expected");
+        .find(|e| e.code.as_deref() == Some("missing_type_reference"))
+        .expect("missing type reference diagnostic expected");
     assert_eq!(
         parse_err_entry.category,
         Some(DiagnosticCategory::ParseError)
@@ -652,6 +645,34 @@ fn fixture_reference_usage_in_part_def_parses_without_bare_feature_diagnostic() 
         result.errors.is_empty(),
         "DefaultReferenceUsage `Capacity : Real;` is valid; unexpected errors: {:?}",
         result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("part def");
+    let PartDefBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    assert!(
+        elements.iter().any(|e| matches!(
+            &e.value,
+            PartDefBodyElement::DefaultReferenceUsage(u) if u.value.name == "Capacity"
+        )),
+        "bare `Capacity : Real;` should be DefaultReferenceUsage, got {:?}",
+        elements
+            .iter()
+            .map(|e| format!("{:?}", e.value))
+            .collect::<Vec<_>>()
     );
 }
 
@@ -775,12 +796,10 @@ fn part_usage_bind_brace_body_recovers_without_aborting_siblings() {
         "part def should parse despite malformed bind connect body"
     );
     assert!(
-        !result.errors.iter().any(|e| {
-            matches!(
-                e.code.as_deref(),
-                Some("illegal_top_level_definition") | Some("expected_keyword")
-            )
-        }),
+        !result
+            .errors
+            .iter()
+            .any(|e| { matches!(e.code.as_deref(), Some("expected_keyword")) }),
         "malformed bind body should not cascade as top-level errors: {:?}",
         result.errors
     );

@@ -51,8 +51,7 @@ fn part_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PartDefBodyE
     }
     if matches!(
         recovery.code.as_str(),
-        "missing_member_name"
-            | "missing_type_reference"
+        "missing_type_reference"
             | "invalid_bare_identifier_in_action_body"
             | "invalid_bare_identifier_in_state_body"
             | "unexpected_keyword_in_scope"
@@ -234,7 +233,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(attribute_usage, PartDefBodyElement::AttributeUsage),
             map(
                 attribute_usage_shorthand,
-                PartDefBodyElement::AttributeUsage,
+                PartDefBodyElement::DefaultReferenceUsage,
             ),
             map(enum_usage, PartDefBodyElement::EnumerationUsage),
             map(requirement_usage, PartDefBodyElement::RequirementUsage),
@@ -400,10 +399,7 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    if !starts_with_any_keyword(
-        input.fragment(),
-        &[b"ref", b"connection"],
-    ) {
+    if !starts_with_any_keyword(input.fragment(), &[b"ref", b"connection"]) {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,

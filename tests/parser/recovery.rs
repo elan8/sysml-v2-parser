@@ -344,24 +344,13 @@ fn test_parse_with_diagnostics_accepts_structured_requirement_attributes() {
 }
 
 #[test]
-fn test_parse_with_diagnostics_reports_missing_actor_name_in_use_case_body() {
+fn test_parse_with_diagnostics_accepts_anonymous_actor_in_use_case_body() {
     let input = "package P {\nuse case def U {\nactor: User;\nobjective { }\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
-        !result.is_ok(),
-        "missing actor name should produce diagnostics"
-    );
-    let err = result
-        .errors
-        .iter()
-        .find(|e| e.code.as_deref() == Some("missing_member_name"))
-        .expect("expected missing_member_name diagnostic");
-    assert_eq!(err.expected.as_deref(), Some("actor name before ':'"));
-    assert!(
-        err.suggestion
-            .as_deref()
-            .is_some_and(|s| s.contains("actor user: User;")),
-        "diagnostic should show an actor example fix"
+        result.is_ok(),
+        "anonymous actor usage is valid SysML: {:?}",
+        result.errors
     );
 }
 
@@ -410,23 +399,13 @@ fn test_parse_with_diagnostics_reports_missing_actor_type_in_use_case_body() {
 }
 
 #[test]
-fn test_parse_with_diagnostics_reports_missing_state_name_in_state_body() {
+fn test_parse_with_diagnostics_accepts_anonymous_state_in_state_body() {
     let input = "package P {\nstate def Machine {\nstate: Mode;\ntransition t then Ready;\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
-        !result.is_ok(),
-        "missing state name should produce diagnostics"
-    );
-    let err = result
-        .errors
-        .iter()
-        .find(|e| e.expected.as_deref() == Some("state name before ':'"))
-        .expect("expected state-name diagnostic");
-    assert!(
-        err.suggestion
-            .as_deref()
-            .is_some_and(|s| s.contains("state ready: Mode;")),
-        "diagnostic should show a state example fix"
+        result.is_ok(),
+        "anonymous `state: Mode` is valid SysML; unexpected errors: {:?}",
+        result.errors
     );
 }
 
@@ -517,23 +496,13 @@ fn test_parse_with_diagnostics_reports_missing_occurrence_type_and_keeps_sibling
 }
 
 #[test]
-fn test_parse_with_diagnostics_reports_missing_part_name_in_part_body() {
+fn test_parse_with_diagnostics_accepts_anonymous_part_in_part_body() {
     let input = "package P {\npart def Vehicle {\npart: Wheel;\nattribute mass: MassValue;\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
-        !result.is_ok(),
-        "missing part name should produce diagnostics"
-    );
-    let err = result
-        .errors
-        .iter()
-        .find(|e| e.expected.as_deref() == Some("part name before ':'"))
-        .expect("expected part-name diagnostic");
-    assert!(
-        err.suggestion
-            .as_deref()
-            .is_some_and(|s| s.contains("part wheel: Wheel;")),
-        "diagnostic should show a part example fix"
+        result.is_ok(),
+        "anonymous `part: Wheel` is valid SysML; unexpected errors: {:?}",
+        result.errors
     );
 }
 
@@ -610,21 +579,21 @@ fn test_parse_with_diagnostics_accepts_expose_feature_chain() {
 }
 
 #[test]
-fn test_parse_with_diagnostics_reports_illegal_top_level_part_definition() {
+fn test_parse_with_diagnostics_accepts_root_level_part_definition() {
     let input = "part def TopLevel;";
     let result = parse_with_diagnostics(input);
-    assert!(!result.is_ok(), "top-level part def should fail");
-    let err = &result.errors[0];
-    assert_eq!(err.code.as_deref(), Some("illegal_top_level_definition"));
     assert!(
-        err.message.contains("illegal top-level"),
-        "message should describe illegal top-level declaration"
+        result.is_ok(),
+        "root-level part def is legal RootNamespace content: {:?}",
+        result.errors
     );
     assert!(
-        err.suggestion
-            .as_deref()
-            .is_some_and(|s| s.contains("package") && s.contains("namespace")),
-        "diagnostic should suggest wrapping in package or namespace"
+        matches!(
+            result.root.elements[0].value,
+            RootElement::Member(ref m) if matches!(m.value, sysml_v2_parser::ast::PackageBodyElement::PartDef(_))
+        ),
+        "expected RootElement::Member(PartDef), got {:?}",
+        result.root.elements[0].value
     );
 }
 
@@ -659,13 +628,27 @@ fn test_parse_with_diagnostics_reports_missing_closing_brace_for_unterminated_pa
 }
 
 #[test]
-fn test_parse_reports_illegal_top_level_part_definition() {
+fn test_parse_accepts_root_level_part_definition() {
     let input = "part def TopLevel;";
-    let err = parse(input).expect_err("top-level part def should fail");
-    assert_eq!(err.code.as_deref(), Some("illegal_top_level_definition"));
-    assert_eq!(
-        err.expected.as_deref(),
-        Some("'package', 'namespace', or 'import'")
+    let root = parse(input).expect("root-level part def is legal RootNamespace content");
+    assert!(
+        matches!(
+            root.elements[0].value,
+            RootElement::Member(ref m) if matches!(m.value, PackageBodyElement::PartDef(_))
+        ),
+        "expected RootElement::Member(PartDef), got {:?}",
+        root.elements[0].value
+    );
+}
+
+#[test]
+fn test_root_level_part_def_with_reference_usage_body_parses() {
+    let input = "part def V {\n\tm : ScalarValues::Integer;\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.is_ok(),
+        "root part def with bare typed member should parse: {:?}",
+        result.errors
     );
 }
 
@@ -677,7 +660,6 @@ fn test_invalid_input_corpus_is_handled_gracefully() {
         "package P { @@@ ??? }",
         "package P { /* unterminated",
         "namespace N { part def X { ;;; }",
-        "part def TopLevel;",
     ];
 
     for input in invalid_inputs {

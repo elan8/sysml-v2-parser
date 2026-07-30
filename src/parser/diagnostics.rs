@@ -5,39 +5,6 @@ use super::Input;
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 use nom::error::Error;
 const FOUND_SNIPPET_MAX_LEN: usize = 40;
-const ILLEGAL_TOP_LEVEL_STARTERS: &[&[u8]] = &[
-    b"action",
-    b"actor",
-    b"alias",
-    b"allocate",
-    b"allocation",
-    b"attribute",
-    b"bind",
-    b"calc",
-    b"case",
-    b"concern",
-    b"connection",
-    b"constraint",
-    b"dependency",
-    b"enum",
-    b"flow",
-    b"interface",
-    b"item",
-    b"metadata",
-    b"occurrence",
-    b"part",
-    b"perform",
-    b"port",
-    b"ref",
-    b"require",
-    b"requirement",
-    b"satisfy",
-    b"state",
-    b"use",
-    b"verification",
-    b"view",
-    b"viewpoint",
-];
 
 /// Take a short snippet from the input at the error position for "found" display.
 /// Uses first line or first FOUND_SNIPPET_MAX_LEN bytes, UTF-8 with replacement char.
@@ -121,27 +88,7 @@ pub(crate) fn nom_err_to_parse_error(
     if let Some(ctx) = expected_context {
         pe = pe.with_expected(ctx);
     }
-    let at_root = expected_context.is_some_and(|ctx| {
-        ctx.contains("'package', 'namespace', or 'import'") || ctx.contains("top level")
-    });
-    if at_root && is_illegal_top_level_definition(fragment) {
-        pe.message = "illegal top-level definition".to_string();
-        pe.code = Some("illegal_top_level_definition".to_string());
-        pe.expected = Some("'package', 'namespace', or 'import'".to_string());
-        pe.suggestion = Some(
-            "Wrap this declaration in `package ... { ... }` or `namespace ... { ... }`."
-                .to_string(),
-        );
-    }
     pe
-}
-
-pub(crate) fn is_illegal_top_level_definition(fragment: &[u8]) -> bool {
-    let trimmed = trim_ascii_start(fragment);
-    !trimmed.starts_with(b"}")
-        && !trimmed.starts_with(b"//")
-        && !trimmed.starts_with(b"/*")
-        && lex::starts_with_any_keyword(trimmed, ILLEGAL_TOP_LEVEL_STARTERS)
 }
 
 pub(crate) fn trim_ascii_start(mut fragment: &[u8]) -> &[u8] {
@@ -164,41 +111,6 @@ pub(crate) fn trim_ascii_end(mut fragment: &[u8]) -> &[u8] {
         }
     }
     fragment
-}
-
-fn starts_with_missing_name_after_keyword(
-    fragment: &[u8],
-    keyword: &[u8],
-    trailing_keywords: &[&[u8]],
-) -> bool {
-    let mut fragment = trim_ascii_start(fragment);
-    if !lex::starts_with_keyword(fragment, keyword) {
-        return false;
-    }
-    fragment = &fragment[keyword.len()..];
-    while let Some(first) = fragment.first() {
-        if first.is_ascii_whitespace() {
-            fragment = &fragment[1..];
-            continue;
-        }
-        break;
-    }
-    for trailing in trailing_keywords {
-        if lex::starts_with_keyword(fragment, trailing) {
-            fragment = &fragment[trailing.len()..];
-            while let Some(first) = fragment.first() {
-                if first.is_ascii_whitespace() {
-                    fragment = &fragment[1..];
-                    continue;
-                }
-                break;
-            }
-        }
-    }
-    fragment.starts_with(b":")
-        && !lex::starts_with_keyword(fragment, b":>>")
-        && !lex::starts_with_keyword(fragment, b":>")
-        && !lex::starts_with_keyword(fragment, b"::")
 }
 
 fn starts_with_missing_type_after_keyword(
@@ -282,61 +194,6 @@ fn starts_with_missing_type_after_keyword(
         || lex::starts_with_keyword(fragment, b"then")
         || lex::starts_with_keyword(fragment, b"if")
         || lex::starts_with_keyword(fragment, b"do")
-}
-
-pub(crate) fn missing_name_diagnostic(
-    fragment: &[u8],
-    scope_label: &str,
-) -> Option<(&'static str, String, String, String)> {
-    #[allow(clippy::type_complexity)]
-    let cases: &[(&[u8], &[&[u8]], &str, &str)] = &[
-        (
-            b"subject",
-            &[],
-            "subject name",
-            "Use `subject laptop: Laptop;`.",
-        ),
-        (b"actor", &[], "actor name", "Use `actor user: User;`."),
-        (b"state", &[], "state name", "Use `state ready: Mode;`."),
-        (b"part", &[], "part name", "Use `part wheel: Wheel;`."),
-        (b"ref", &[], "reference name", "Use `ref sensor: Sensor;`."),
-        (b"port", &[], "port name", "Use `port power: PowerPort;`."),
-        (
-            b"attribute",
-            &[],
-            "attribute name",
-            "Use `attribute mass: MassValue;`.",
-        ),
-        (b"in", &[], "input name", "Use `in speed: Real;`."),
-        (b"out", &[], "output name", "Use `out result: Real;`."),
-        (
-            b"perform",
-            &[b"action"],
-            "action name",
-            "Use `perform action run: Runner;`.",
-        ),
-        (b"return", &[], "return name", "Use `return result: Real;`."),
-    ];
-
-    let allow_anonymous_requirement_params = scope_label == "requirement body";
-    for (keyword, trailing, missing_what, suggestion) in cases {
-        if allow_anonymous_requirement_params
-            && (keyword == b"subject" || keyword == b"actor")
-            && starts_with_missing_name_after_keyword(fragment, keyword, trailing)
-        {
-            // SysML allows unnamed subject/actor parameters: `actor : Battery;`
-            continue;
-        }
-        if starts_with_missing_name_after_keyword(fragment, keyword, trailing) {
-            return Some((
-                "missing_member_name",
-                format!("expected {missing_what} before ':'"),
-                format!("{missing_what} before ':'"),
-                suggestion.to_string(),
-            ));
-        }
-    }
-    None
 }
 
 pub(crate) fn missing_type_diagnostic(
@@ -949,8 +806,6 @@ pub(crate) fn extra_closing_brace_at_eof(bytes: &[u8]) -> Option<ParseError> {
 pub(crate) fn category_from_code(code: &str) -> DiagnosticCategory {
     if code == "unsupported_annotation_syntax" {
         DiagnosticCategory::UnsupportedGrammarForm
-    } else if code == "unresolved_symbol" {
-        DiagnosticCategory::UnresolvedSymbol
     } else {
         DiagnosticCategory::ParseError
     }
@@ -977,8 +832,7 @@ fn eof_line_column(bytes: &[u8]) -> (u32, usize) {
 
 fn diagnostic_specificity(err: &ParseError) -> u8 {
     match err.code.as_deref() {
-        Some("missing_member_name")
-        | Some("missing_type_reference")
+        Some("missing_type_reference")
         | Some("invalid_qualified_name_separator")
         | Some("invalid_typing_operator")
         | Some("missing_expression_after_operator")
@@ -993,7 +847,6 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("invalid_bare_identifier_in_state_body")
         | Some("recovery_cascade_suppressed")
         | Some("unexpected_keyword_in_scope") => 5,
-        Some("illegal_top_level_definition") => 4,
         Some(code) if code.starts_with("recovered_") => 2,
         Some("expected_end_of_input") | Some("expected_keyword") => 1,
         _ => 3,

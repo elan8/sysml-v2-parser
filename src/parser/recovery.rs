@@ -4,8 +4,8 @@ use super::diagnostics::{
     category_from_code, invalid_bare_identifier_in_body_diagnostic,
     invalid_expose_separator_diagnostic, invalid_typing_operator_diagnostic,
     invalid_unit_reference_diagnostic, missing_expression_after_operator_diagnostic,
-    missing_name_diagnostic, missing_semicolon_or_body_diagnostic, missing_type_diagnostic,
-    trim_ascii_end, trim_ascii_start, unexpected_keyword_in_scope_diagnostic,
+    missing_semicolon_or_body_diagnostic, missing_type_diagnostic, trim_ascii_end,
+    trim_ascii_start, unexpected_keyword_in_scope_diagnostic,
 };
 use super::lex;
 use super::Input;
@@ -60,12 +60,6 @@ pub(crate) fn build_recovery_error_node(
 }
 
 enum RecoveryClassification {
-    MissingMemberName {
-        code: String,
-        message: String,
-        expected: String,
-        suggestion: String,
-    },
     MissingTypeReference {
         code: String,
         message: String,
@@ -126,17 +120,6 @@ fn classify_recovery(
     scope_label: &str,
 ) -> RecoveryClassification {
     let trimmed = trim_ascii_start(input.fragment());
-
-    if let Some((code, message, expected, suggestion)) =
-        missing_name_diagnostic(trimmed, scope_label)
-    {
-        return RecoveryClassification::MissingMemberName {
-            code: code.to_string(),
-            message,
-            expected,
-            suggestion,
-        };
-    }
 
     if let Some((code, message, expected, suggestion)) = missing_type_diagnostic(trimmed) {
         return RecoveryClassification::MissingTypeReference {
@@ -277,13 +260,7 @@ pub(crate) fn build_recovery_error_node_from_span(
     generic_code: &str,
 ) -> ParseErrorNode {
     match classify_recovery(input, recovery_end, starters, scope_label) {
-        RecoveryClassification::MissingMemberName {
-            code,
-            message,
-            expected,
-            suggestion,
-        }
-        | RecoveryClassification::MissingTypeReference {
+        RecoveryClassification::MissingTypeReference {
             code,
             message,
             expected,
@@ -347,12 +324,14 @@ pub(crate) fn build_recovery_error_node_from_span(
             category: Some(DiagnosticCategory::ParseError),
         },
         RecoveryClassification::UnsupportedAnnotation => ParseErrorNode {
-            message: format!("unsupported annotation syntax in {scope_label}"),
+            message: format!(
+                "incomplete parser support for annotation syntax in {scope_label}"
+            ),
             code: "unsupported_annotation_syntax".to_string(),
-            expected: Some(format!("valid {scope_label} element")),
+            expected: Some(format!("supported {scope_label} element or metadata form")),
             found: recovery_found_snippet_from_span(input, recovery_end),
             suggestion: Some(
-                "Remove this annotation or extend the parser to support annotated declarations."
+                "This `#`/`@` annotation form is legal SysML but not fully parsed yet; rewrite using a supported metadata form or simplify the annotated declaration."
                     .to_string(),
             ),
             category: Some(DiagnosticCategory::UnsupportedGrammarForm),

@@ -1,8 +1,12 @@
 use super::common::{Identification, Import};
-use super::package::{LibraryPackage, Package, PackageBody};
+use super::package::{LibraryPackage, Package, PackageBody, PackageBodyElement};
 use crate::ast::core::Node;
 
-/// KerML top-level element: package, namespace, import, or library package (BNF RootNamespace = PackageBodyElement*).
+/// KerML top-level element (BNF `RootNamespace = PackageBodyElement*`).
+///
+/// Package / library package / namespace / import are modeled as dedicated variants for
+/// consumers that walk the package tree. Any other legal package-body member at file root
+/// (definitions and usages) is [`RootElement::Member`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RootElement {
@@ -10,6 +14,8 @@ pub enum RootElement {
     LibraryPackage(Node<LibraryPackage>),
     Namespace(Node<NamespaceDecl>),
     Import(Node<Import>),
+    /// Definition or usage (or other package-body member) at root, per SysML `RootNamespace`.
+    Member(Box<Node<PackageBodyElement>>),
 }
 
 /// KerML NamespaceDeclaration: `namespace` Identification NamespaceBody (same body structure as Package).

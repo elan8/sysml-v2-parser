@@ -76,8 +76,7 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
             );
             if matches!(
                 recovery.code.as_str(),
-                "missing_member_name"
-                    | "missing_type_reference"
+                "missing_type_reference"
                     | "invalid_bare_identifier_in_state_body"
                     | "missing_semicolon"
                     | "missing_body_or_semicolon"
@@ -116,8 +115,7 @@ fn consume_state_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
             );
             if matches!(
                 recovery.code.as_str(),
-                "missing_member_name"
-                    | "missing_type_reference"
+                "missing_type_reference"
                     | "invalid_bare_identifier_in_state_body"
                     | "missing_semicolon"
                     | "missing_body_or_semicolon"
@@ -370,15 +368,26 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let (input, is_reference) =
         nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"state"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // SysML allows anonymous state usages: `state: Mode;` (Identification may be empty).
+    let (after_gap, _) = ws_and_comments(input)?;
     // `state def …` is a definition, not a usage named `def`.
-    if starts_with_keyword(input.fragment(), b"def") {
+    if starts_with_keyword(after_gap.fragment(), b"def") {
         return Err(nom::Err::Error(nom::error::Error::new(
-            input,
+            after_gap,
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, n) = name(input)?;
+    let (input, n) = if (after_gap.fragment().starts_with(b":")
+        && !after_gap.fragment().starts_with(b":>")
+        && !after_gap.fragment().starts_with(b":>>"))
+        || starts_with_keyword(after_gap.fragment(), b"defined")
+    {
+        (after_gap, String::new())
+    } else {
+        let (input, _) = ws1(input)?;
+        let (input, n) = name(input)?;
+        (input, n)
+    };
     let (input, leading) = crate::parser::usage::specialization_clauses(input)?;
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
     let (input, multiplicity) =

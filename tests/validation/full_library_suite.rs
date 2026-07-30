@@ -127,6 +127,7 @@ fn collect_bnf_decl_counts(root: &RootNamespace, counts: &mut BTreeMap<String, u
             }
             RootElement::Namespace(n) => collect_bnf_decl_counts_in_body(&n.value.body, counts),
             RootElement::Import(_) => {}
+            RootElement::Member(_) => {}
         }
     }
 }
@@ -180,6 +181,7 @@ fn collect_package_body_type_counts(root: &RootNamespace, counts: &mut BTreeMap<
             RootElement::LibraryPackage(p) => collect_body_type_counts(&p.value.body, counts),
             RootElement::Namespace(n) => collect_body_type_counts(&n.value.body, counts),
             RootElement::Import(_) => {}
+            RootElement::Member(_) => {}
         }
     }
 }
@@ -546,6 +548,7 @@ fn test_systems_library_node_types_no_extended() {
                         collect_extended_texts(&n.value.body, &mut snippets)
                     }
                     RootElement::Import(_) => {}
+                    RootElement::Member(_) => {}
                 }
             }
             for s in snippets.into_iter().take(2) {
@@ -645,6 +648,7 @@ fn test_full_library_node_types_no_extended() {
                         collect_extended_texts(&n.value.body, &mut snippets)
                     }
                     RootElement::Import(_) => {}
+                    RootElement::Member(_) => {}
                 }
             }
             for s in snippets.into_iter().take(2) {

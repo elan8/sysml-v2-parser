@@ -298,10 +298,8 @@ fn map_use_case_body_recovery(start: Input<'_>, end: Input<'_>) -> UseCaseDefBod
         "use case body",
         "recovered_use_case_body_element",
     );
-    let should_error = matches!(
-        recovery.code.as_str(),
-        "missing_member_name" | "missing_type_reference"
-    ) && !is_redefinition;
+    let should_error =
+        matches!(recovery.code.as_str(), "missing_type_reference") && !is_redefinition;
     if should_error {
         let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
         UseCaseDefBodyElement::Error(node)
@@ -341,8 +339,7 @@ fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDe
     );
     if matches!(
         diag.code.as_str(),
-        "missing_member_name"
-            | "missing_type_reference"
+        "missing_type_reference"
             | "unexpected_keyword_in_scope"
             | "missing_expression_after_operator"
             | "unsupported_annotation_syntax"
@@ -530,8 +527,18 @@ pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsag
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"actor"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, n) = name(input)?;
+    // SysML allows anonymous actors: `actor : User;` (Identification may be empty).
+    let (after_gap, _) = ws_and_comments(input)?;
+    let (input, n) = if after_gap.fragment().starts_with(b":")
+        && !after_gap.fragment().starts_with(b":>")
+        && !after_gap.fragment().starts_with(b":>>")
+    {
+        (after_gap, String::new())
+    } else {
+        let (input, _) = ws1(input)?;
+        let (input, n) = name(input)?;
+        (input, n)
+    };
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;

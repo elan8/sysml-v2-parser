@@ -77,6 +77,8 @@ Impact:
 - support is broader for common fixture forms than for the full grammar surface
 - extending support consistently across families is harder than it should be
 
+**Progress (2026-07-30 diagnostics audit):** bare `name : Type;` in part bodies is now first-class [`DefaultReferenceUsage`](../src/ast/structure.rs) (was mis-modeled as `AttributeUsage`). Root-level `DefinitionElement`/`UsageElement` members are accepted. Anonymous keyword usages (`part: T`, `actor : T`, `state: T`, …) parse. Remaining open: unified specialization grammar + completing `#`/`@` metadata coverage (see [`PARSER_BACKLOG_ROADMAP.md`](./PARSER_BACKLOG_ROADMAP.md)).
+
 ### Several families are parsed as useful subsets rather than full productions
 
 The parser now covers flows, allocations, case families, and other formerly missing areas, but many of those families still operate as subset parsers rather than complete grammar implementations.

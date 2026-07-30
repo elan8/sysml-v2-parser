@@ -355,134 +355,107 @@ fn collect_part_usage_body_errors(body: &PartUsageBody, errors: &mut Vec<ParseEr
 fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>) {
     if let PackageBody::Brace { elements } = body {
         for element in elements {
-            match &element.value {
-                PackageBodyElement::Error(n) => {
-                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
-                }
-                PackageBodyElement::Package(n) => {
-                    collect_package_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::LibraryPackage(n) => {
-                    collect_package_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::PartDef(n) => {
-                    collect_part_def_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::PartUsage(n) => {
-                    collect_part_usage_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::PortDef(n) => {
-                    collect_port_def_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::AttributeDef(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::ActionDef(n) => {
-                    collect_action_def_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::ActionUsage(n) => {
-                    collect_action_usage_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::RequirementDef(n) => {
-                    collect_requirement_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::RequirementUsage(n) => {
-                    collect_requirement_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::UseCaseDef(n) => {
-                    collect_use_case_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::UseCaseUsage(n) => {
-                    collect_use_case_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::CaseDef(n) => {
-                    collect_use_case_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::CaseUsage(n) => {
-                    collect_use_case_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::AnalysisCaseDef(n) => {
-                    collect_use_case_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::AnalysisCaseUsage(n) => {
-                    collect_use_case_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::VerificationCaseDef(n) => {
-                    collect_use_case_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::VerificationCaseUsage(n) => {
-                    collect_use_case_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::ConcernUsage(n) => {
-                    collect_requirement_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::ViewpointDef(n) => {
-                    collect_requirement_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::ViewpointUsage(n) => {
-                    collect_requirement_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::StateDef(n) => collect_state_body_errors(&n.value.body, errors),
-                PackageBodyElement::StateUsage(n) => {
-                    collect_state_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::ConstraintDef(n) => {
-                    collect_constraint_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::ConstraintUsage(n) => {
-                    collect_constraint_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::CalcDef(n) => collect_calc_body_errors(&n.value.body, errors),
-                PackageBodyElement::ViewDef(n) => {
-                    collect_view_def_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::ViewUsage(n) => collect_view_body_errors(&n.value.body, errors),
-                PackageBodyElement::RenderingDef(n) => {
-                    collect_rendering_def_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::MetadataDef(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::MetadataUsage(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::ItemDef(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::IndividualDef(n) => {
-                    collect_attribute_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::OccurrenceDef(n) => {
-                    collect_definition_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::OccurrenceUsage(n) => {
-                    collect_occurrence_usage_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::AllocationDef(n) => {
-                    collect_definition_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::AllocationUsage(n) => {
-                    collect_definition_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::FlowDef(n) => {
-                    collect_definition_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::FlowUsage(n) => {
-                    collect_definition_body_errors(&n.value.body, errors)
-                }
-                PackageBodyElement::Satisfy(n) => {
-                    if let Some(elems) = &n.value.body_elements {
-                        collect_constraint_body_element_errors(elems, errors);
-                    }
-                }
-                PackageBodyElement::TextualRep(n) => {
-                    if let Some(diag) = textual_rep_language_diagnostic(&element.span, &n.value) {
-                        errors.push(diag);
-                    }
-                }
-                _ => {}
+            collect_package_body_element_errors(element, errors);
+        }
+    }
+}
+
+fn collect_package_body_element_errors(
+    element: &crate::ast::Node<PackageBodyElement>,
+    errors: &mut Vec<ParseError>,
+) {
+    match &element.value {
+        PackageBodyElement::Error(n) => {
+            errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+        }
+        PackageBodyElement::Package(n) => collect_package_body_errors(&n.value.body, errors),
+        PackageBodyElement::LibraryPackage(n) => collect_package_body_errors(&n.value.body, errors),
+        PackageBodyElement::PartDef(n) => collect_part_def_body_errors(&n.value.body, errors),
+        PackageBodyElement::PartUsage(n) => collect_part_usage_body_errors(&n.value.body, errors),
+        PackageBodyElement::PortDef(n) => collect_port_def_body_errors(&n.value.body, errors),
+        PackageBodyElement::AttributeDef(n) => collect_attribute_body_errors(&n.value.body, errors),
+        PackageBodyElement::ActionDef(n) => collect_action_def_body_errors(&n.value.body, errors),
+        PackageBodyElement::ActionUsage(n) => {
+            collect_action_usage_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::RequirementDef(n) => {
+            collect_requirement_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::RequirementUsage(n) => {
+            collect_requirement_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::UseCaseDef(n) => collect_use_case_body_errors(&n.value.body, errors),
+        PackageBodyElement::UseCaseUsage(n) => collect_use_case_body_errors(&n.value.body, errors),
+        PackageBodyElement::CaseDef(n) => collect_use_case_body_errors(&n.value.body, errors),
+        PackageBodyElement::CaseUsage(n) => collect_use_case_body_errors(&n.value.body, errors),
+        PackageBodyElement::AnalysisCaseDef(n) => {
+            collect_use_case_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::AnalysisCaseUsage(n) => {
+            collect_use_case_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::VerificationCaseDef(n) => {
+            collect_use_case_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::VerificationCaseUsage(n) => {
+            collect_use_case_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::ConcernUsage(n) => {
+            collect_requirement_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::ViewpointDef(n) => {
+            collect_requirement_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::ViewpointUsage(n) => {
+            collect_requirement_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::StateDef(n) => collect_state_body_errors(&n.value.body, errors),
+        PackageBodyElement::StateUsage(n) => collect_state_body_errors(&n.value.body, errors),
+        PackageBodyElement::ConstraintDef(n) => {
+            collect_constraint_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::ConstraintUsage(n) => {
+            collect_constraint_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::CalcDef(n) => collect_calc_body_errors(&n.value.body, errors),
+        PackageBodyElement::ViewDef(n) => collect_view_def_body_errors(&n.value.body, errors),
+        PackageBodyElement::ViewUsage(n) => collect_view_body_errors(&n.value.body, errors),
+        PackageBodyElement::RenderingDef(n) => {
+            collect_rendering_def_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::MetadataDef(n) => collect_attribute_body_errors(&n.value.body, errors),
+        PackageBodyElement::MetadataUsage(n) => {
+            collect_attribute_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::ItemDef(n) => collect_attribute_body_errors(&n.value.body, errors),
+        PackageBodyElement::IndividualDef(n) => {
+            collect_attribute_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::OccurrenceDef(n) => {
+            collect_definition_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::OccurrenceUsage(n) => {
+            collect_occurrence_usage_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::AllocationDef(n) => {
+            collect_definition_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::AllocationUsage(n) => {
+            collect_definition_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::FlowDef(n) => collect_definition_body_errors(&n.value.body, errors),
+        PackageBodyElement::FlowUsage(n) => collect_definition_body_errors(&n.value.body, errors),
+        PackageBodyElement::Satisfy(n) => {
+            if let Some(elems) = &n.value.body_elements {
+                collect_constraint_body_element_errors(elems, errors);
             }
         }
+        PackageBodyElement::TextualRep(n) => {
+            if let Some(diag) = textual_rep_language_diagnostic(&element.span, &n.value) {
+                errors.push(diag);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -559,6 +532,9 @@ pub(crate) fn collect_recovery_errors(root: &RootNamespace) -> Vec<ParseError> {
                 collect_package_body_errors(&n.value.body, &mut errors)
             }
             crate::ast::RootElement::Import(_) => {}
+            crate::ast::RootElement::Member(n) => {
+                collect_package_body_element_errors(n, &mut errors)
+            }
         }
     }
     errors

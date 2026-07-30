@@ -69,8 +69,11 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
     let name = name.unwrap_or_default();
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
-    let (input, value) =
-        opt(nom::sequence::preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
+    let (input, value) = opt(nom::sequence::preceded(
+        ws_and_comments,
+        crate::parser::feature_value_part,
+    ))
+    .parse(input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -187,9 +190,10 @@ mod redefines_tests {
 
     #[test]
     fn item_usage_accepts_anonymous_redefinition_with_value() {
-        let (rest, node) =
-            item_usage(input("item :>> shape = new Box(4800 [mm], 1840 [mm], 1350 [mm]);"))
-                .expect("item usage");
+        let (rest, node) = item_usage(input(
+            "item :>> shape = new Box(4800 [mm], 1840 [mm], 1350 [mm]);",
+        ))
+        .expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "");
         assert!(node.value.redefines.is_some());
@@ -221,8 +225,8 @@ mod redefines_tests {
 
     #[test]
     fn item_usage_named_form_accepts_a_value() {
-        let (rest, node) = item_usage(input("item shape = new Box(1 [mm], 2 [mm], 3 [mm]);"))
-            .expect("item usage");
+        let (rest, node) =
+            item_usage(input("item shape = new Box(1 [mm], 2 [mm], 3 [mm]);")).expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "shape");
         assert!(node.value.value.is_some());

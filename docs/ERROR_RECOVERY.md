@@ -137,6 +137,16 @@ Recovery-node diagnostics now have more specific codes than before, but many par
 
 Starter tables are much better than snippet heuristics, but they are still manually curated. They must evolve with grammar coverage.
 
+### 5. Engine limits vs language rules
+
+Some diagnostic codes are **implementation limits**, not SysML language rules:
+
+| Code | Meaning |
+| ---- | ------- |
+| `nesting_too_deep` | The parser aborted because brace/construct nesting exceeded an internal safety limit. Legal SysML can still be rejected when models nest deeper than the engine allows. |
+
+Do not treat these as evidence that the textual notation forbids the construct. Prefer flattening or splitting the model for editor/tooling limits, or raise the limit in a dedicated change.
+
 ## Invariants
 
 The parser should preserve these recovery invariants:
