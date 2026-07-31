@@ -309,66 +309,36 @@ fn part_usage_body(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
     result
 }
 
+fn part_usage_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PartUsageBodyElement> {
+    // Always emit Error for unrecognized tokens (including non-starters). Hard-failing non-starters
+    // previously aborted the usage body so the package path swallowed the whole decl as
+    // ExtendedLibraryDecl with no diagnostic (GH-12).
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        PART_BODY_STARTERS,
+        "part usage body",
+        "recovered_part_usage_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        PartUsageBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
 fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            log::debug!("part_usage_body: brace ok, {} elements", elements.len());
-            return Ok((input, PartUsageBody::Brace { elements }));
-        }
-        match part_usage_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), PART_BODY_STARTERS) => {
-                let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(node_from_to(
-                    input,
-                    next,
-                    PartUsageBodyElement::Error(Node::new(
-                        crate::ast::Span::dummy(),
-                        build_recovery_error_node_from_span(
-                            input,
-                            next,
-                            PART_BODY_STARTERS,
-                            "part usage body",
-                            "recovered_part_usage_body_element",
-                        ),
-                    )),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )));
-            }
-        }
-    }
+    let (input, elements) = parse_structured_brace_members_with_skip(
+        input,
+        PART_BODY_STARTERS,
+        "part usage body",
+        "recovered_part_usage_body_element",
+        part_usage_body_element,
+        part_usage_body_recovery,
+        BraceMemberSkip::BodyElementRecover,
+    )?;
+    log::debug!("part_usage_body: brace ok, {} elements", elements.len());
+    Ok((input, PartUsageBody::Brace { elements }))
 }
 
 fn consume_part_usage_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
@@ -378,22 +348,7 @@ fn consume_part_usage_structured_brace(input: Input<'_>) -> IResult<Input<'_>, (
         "part usage body",
         "recovered_part_usage_body_element",
         part_usage_body_element,
-        |start, end| {
-            node_from_to(
-                start,
-                end,
-                PartUsageBodyElement::Error(Node::new(
-                    crate::ast::Span::dummy(),
-                    build_recovery_error_node_from_span(
-                        start,
-                        end,
-                        PART_BODY_STARTERS,
-                        "part usage body",
-                        "recovered_part_usage_body_element",
-                    ),
-                )),
-            )
-        },
+        part_usage_body_recovery,
         BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, ()))
@@ -1108,6 +1063,12 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             map(allocate_, PartUsageBodyElement::Allocate),
             map(variant_usage, PartUsageBodyElement::VariantUsage),
             map(attribute_usage, PartUsageBodyElement::AttributeUsage),
+            // Keyword-less `:>> name …` redefinition (GH-12 fallout: previously swallowed via
+            // ExtendedLibraryDecl). Same arm as occurrence bodies (§6 G15).
+            map(
+                redefinition_feature_binding,
+                PartUsageBodyElement::AttributeUsage,
+            ),
             map(
                 attribute_usage_shorthand,
                 PartUsageBodyElement::DefaultReferenceUsage,
@@ -1138,15 +1099,17 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         // -- both usage-form parsers have no guard against a bare `def` keyword (same bug class
         // fixed for `PartDefBodyElement` in a prior increment), so `port def Foo;`/
         // `connection def Foo;` would otherwise misparse as a usage named "def".
-        // `state_def`/`metadata_def`/`requirement_def`/`occurrence_def` are all
-        // `def_required()`-guarded internally and have no usage sibling dispatched in this body
-        // today, so no ordering risk for them either.
+        // `state_def`/`requirement_def`/`occurrence_def` are all `def_required()`-guarded
+        // internally. `metadata_usage` is tried before `metadata_def` (same pairing as part def).
         alt((
             map(state_def, PartUsageBodyElement::StateDef),
             map(
                 crate::parser::enumeration::enum_def,
                 PartUsageBodyElement::EnumDef,
             ),
+            // `metadata_usage` before `metadata_def` so bare `metadata Name { … }` does not misfire
+            // (metadata_def is def_required-guarded, but keep def/usage pairing explicit).
+            map(metadata_usage, PartUsageBodyElement::MetadataUsage),
             map(metadata_def, PartUsageBodyElement::MetadataDef),
             map(requirement_def, PartUsageBodyElement::RequirementDef),
             // §6 G5: the usage form was reachable from part *definition* bodies only.
@@ -1184,6 +1147,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             // `item_def_required` first, for the same bare-`def` reason as `constraint_def`.
             map(item_def_required, PartUsageBodyElement::ItemDef),
             map(item_usage, PartUsageBodyElement::ItemUsage),
+            // Analysis case members were reachable from part *definition* bodies only; GH-12
+            // recovery surfaced them as diagnostics in OMG Annex `10c-Fuel Economy Analysis.sysml`.
+            map(analysis_case_def, PartUsageBodyElement::AnalysisCaseDef),
+            map(analysis_case_usage, PartUsageBodyElement::AnalysisCaseUsage),
         )),
     ))
     .parse(input)?;
@@ -1246,6 +1213,41 @@ mod par_002_nested_def_tests {
             part_usage_body_element(input("metadata def MyMeta;")).expect("metadata def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PartUsageBodyElement::MetadataDef(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_metadata_usage() {
+        let (rest, node) = part_usage_body_element(input(
+            "metadata Classified { classificationLevel = ClassificationLevel::conf; }",
+        ))
+        .expect("metadata usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartUsageBodyElement::MetadataUsage(_)));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_redefinition_feature_binding() {
+        let text = ":>> mass : MassValue = sum((a.mass, b.mass));";
+        let (rest, node) =
+            part_usage_body_element(input(text)).expect("redefinition feature binding");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            PartUsageBodyElement::AttributeUsage(_)
+        ));
+    }
+
+    #[test]
+    fn part_usage_body_accepts_analysis_case_usage() {
+        let (rest, node) = part_usage_body_element(input(
+            "analysis cityFuelEconomyAnalysis : FuelEconomyAnalysis;",
+        ))
+        .expect("analysis case usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            PartUsageBodyElement::AnalysisCaseUsage(_)
+        ));
     }
 
     #[test]

@@ -10,7 +10,7 @@ pub(crate) use crate::ast::{
 pub(crate) use crate::parser::action::action_usage;
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};
 pub(crate) use crate::parser::attribute::{
-    attribute_def, attribute_usage, attribute_usage_shorthand,
+    attribute_def, attribute_usage, attribute_usage_shorthand, redefinition_feature_binding,
 };
 pub(crate) use crate::parser::body::{parse_structured_brace_members_with_skip, BraceMemberSkip};
 pub(crate) use crate::parser::build_recovery_error_node_from_span;
@@ -31,8 +31,8 @@ pub(crate) use crate::parser::flow::flow_def;
 pub(crate) use crate::parser::interface::{connect_body, interface_def_required};
 pub(crate) use crate::parser::item::{item_def_required, item_usage};
 pub(crate) use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, short_name_prefix,
-    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
+    identification, name, qualified_name, short_name_prefix, starts_with_any_keyword,
+    starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
 };
 pub(crate) use crate::parser::metadata::{metadata_def, metadata_usage};
 pub(crate) use crate::parser::metadata_annotation::{annotation, metadata_annotation};

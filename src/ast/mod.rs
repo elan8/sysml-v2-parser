@@ -890,6 +890,15 @@ fn normalize_part_usage_body_element_node(
         PartUsageBodyElement::ItemUsage(n) => {
             PartUsageBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
         }
+        PartUsageBodyElement::MetadataUsage(n) => {
+            PartUsageBodyElement::MetadataUsage(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::AnalysisCaseDef(n) => {
+            PartUsageBodyElement::AnalysisCaseDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::AnalysisCaseUsage(n) => {
+            PartUsageBodyElement::AnalysisCaseUsage(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }
