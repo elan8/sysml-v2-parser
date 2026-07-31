@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`exhibit state ... parallel { ... }` was rejected**
+  ([#17](https://github.com/elan8/sysml-v2-parser/issues/17)) — `exhibit_state` went straight
+  from the (optional) pre-body redefinition to `state_def_body`, never trying the
+  `parallel`/`initial` modifier that plain `state` usages accept there. But per the OMG spec
+  (§8.2.2.18.2), `ExhibitStateUsage` shares the same `StateUsageBody` production as `StateUsage`,
+  so the modifier is equally legal on `exhibit state` — as seen in the spec's own Annex A example,
+  `exhibit state vehicleStates parallel { ... }` (`5-State-based Behavior-2.sysml`). `exhibit_state`
+  now tries the same optional `parallel`/`initial` modifier before the body that `state_usage`
+  does. No AST changes (the modifier was already discarded, unretained, by `state_usage` too);
+  `PARSE_AST_VERSION` unchanged.
+
 - **Parsing the SysML v2 spec's own Annex A vehicle example crashed the process with
   `STATUS_STACK_OVERFLOW`** — unlike the earlier `expr.rs` stack-overflow class of bug (see
   below), this wasn't unbounded/attacker-controlled recursion: the file's real, legitimate

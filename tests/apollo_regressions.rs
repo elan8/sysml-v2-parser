@@ -429,6 +429,54 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
 }
 
 #[test]
+fn exhibit_state_supports_parallel_modifier() {
+    // GH-17: `exhibit state` shares `StateUsageBody` with plain `state` usages (OMG spec
+    // §8.2.2.18.2), so `parallel` is legal here too -- mirrors the `vehicleStates` example in
+    // Annex `5-State-based Behavior-2.sysml`.
+    let input = "package P {\npart def Vehicle {\nexhibit state vehicleStates parallel {\nstate operatingStates;\nstate healthStates;\n}\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let vehicle = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(def)
+                if def.value.identification.name.as_deref() == Some("Vehicle") =>
+            {
+                Some(&def.value)
+            }
+            _ => None,
+        })
+        .expect("expected Vehicle part def");
+    let PartDefBody::Brace { elements } = &vehicle.body else {
+        panic!("expected part body");
+    };
+    let exhibit = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartDefBodyElement::ExhibitState(exhibit) => Some(&exhibit.value),
+            _ => None,
+        })
+        .expect("exhibit state should be present");
+    assert_eq!(exhibit.name, "vehicleStates");
+    let StateDefBody::Brace { elements } = &exhibit.body else {
+        panic!("expected exhibit state body");
+    };
+    assert_eq!(elements.len(), 2);
+}
+
+#[test]
 fn exhibit_state_body_accepts_requirement_usage_members() {
     let input = "package P {\nrequirement def Goal;\nstate def MissionPhase;\npart def Mission {\nrequirement goals[1..*] : Goal;\nexhibit state phases : MissionPhase {\nrequirement goToMoon : Goal {\ndoc /* Example */\n} :> goals;\nstate launch;\n}\n}\n}";
     let result = parse_with_diagnostics(input);
