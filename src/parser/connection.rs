@@ -368,7 +368,14 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
         DefinitionPrefixOptions::new(b"connection")
             .with_hash_annotation()
             .with_captured_visibility()
-            .reject_header_keyword(b"connect"),
+            .reject_header_keyword(b"connect")
+            // GH-20: a `def`-less, non-`abstract` `connection name : Type { ... }` with no
+            // `:>`/`specializes` clause in its header (SysML v2 §7.13.2's plain named typed
+            // connection usage) is a `ConnectionUsageMember`, not a definition -- see
+            // `reject_plain_typed_header_without_def`'s doc comment. The bare Systems-Library
+            // definition shape this parser must keep accepting (PAR-006b) always carries
+            // `abstract` and/or a `:>` subclassification clause, so it's unaffected.
+            .reject_plain_typed_header_without_def(),
     )
 }
 
