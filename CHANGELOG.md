@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Package-level `connection name : Type { ... }` misclassified as `ConnectionDef`**
+  ([#20](https://github.com/elan8/sysml-v2-parser/issues/20)) — package/namespace-level structure
+  dispatch tries `connection_def` before `ConnectionUsage`'s `connection_usage_member`.
+  `connection_def` keeps `def` optional (PAR-006b) so genuine bare Systems-Library definitions
+  (`abstract connection connections: Connection[0..*] nonunique :> linkObjects, parts { ... }`)
+  still parse, but that same `def`-optional grammar is a strict superset of an ordinary named
+  typed connection *usage* (SysML v2 §7.13.2, e.g. `connection connection1 : DeviceConnection {
+  end part hub ::> mainSwitch[1]; ... }`), so the usage form never fell through to
+  `connection_usage_member` — it was misclassified as a `ConnectionDef` with `: DeviceConnection`
+  stored as a `TypingRelationship { kind: Typing }` on `specializes`. Downstream, Spec42
+  materialized it as a `connection def` and reported a false `incompatible_specializes_kind`
+  warning treating `connection1` as specializing a definition it can't specialize
+  ([elan8/spec42#1](https://github.com/elan8/spec42/issues/1)).
+
+  Added `DefinitionPrefixOptions::reject_plain_typed_header_without_def` (mirroring PAR-007's
+  `reject_header_keyword`): fails the definition parse for the `def`-less, non-`abstract` plain
+  `: Type` header shape (`kind: Typing`, no `:>`/`specializes` clause), leaving it for the sibling
+  usage parser. `abstract` and an actual `:>`/`specializes` clause in the header remain
+  unambiguous definition-only signals (a usage's own `:>` is a `subsets` clause positioned *after*
+  the body, not in this header), so the bare Systems-Library form and explicit `connection def
+  name : Type;` are both unaffected. Applied only to `connection_def`'s package-level entry point,
+  not `connection_def_required` (already `def`-required for nested contexts). No AST changes;
+  `PARSE_AST_VERSION` unchanged.
+
 - **Connection/interface `end` decl `::>`/`references` not modeled as reference subsetting**
   ([#19](https://github.com/elan8/sysml-v2-parser/issues/19)) — `end name ::> target;` was
   accepted by `connection.rs`'s `end_decl`, but the target was stored as typing (`type_name`)

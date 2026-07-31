@@ -3315,6 +3315,105 @@ fn test_interface_end_decl_typing_form_unaffected() {
     );
 }
 
+/// GH-20: package-level `connection name : Type { ... }` (SysML v2 §7.13.2's plain named typed
+/// connection usage, no `abstract`/`:>`/`specializes`) was misclassified as `ConnectionDef` --
+/// `try_package_body_structure` tries `connection_def` (kept `def`-optional so genuine bare
+/// Systems-Library definitions still parse) before `ConnectionUsage`'s
+/// `connection_usage_member`, and `connection_def`'s generic `: Type[mult] :> target` header scan
+/// is a strict grammar superset of the plain-typed-usage shape. This produced a
+/// `TypingRelationship { kind: Typing }` on `ConnectionDef.specializes`, and downstream Spec42
+/// then reported a false `incompatible_specializes_kind` warning treating `connection1` as
+/// specializing a `connection def` it can't specialize.
+#[test]
+fn test_package_level_named_typed_connection_dispatches_to_connection_usage() {
+    let input = r#"package test {
+part def Hub;
+part def Device;
+connection def DeviceConnection {
+end part hub : Hub;
+end part device : Device;
+}
+connection connection1 : DeviceConnection {
+end part hub ::> mainSwitch[1];
+end part device ::> sensorFeed[1];
+}
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(&e.value, PackageBodyElement::ConnectionDef(d) if d.value.identification.name.as_deref() == Some("DeviceConnection"))),
+        "`connection def DeviceConnection {{ ... }}` should still be a ConnectionDef: {:?}",
+        elements
+    );
+    let usage = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::ConnectionUsage(u) => Some(&u.value),
+            _ => None,
+        })
+        .expect("`connection connection1 : DeviceConnection { ... }` should be a ConnectionUsage, not a ConnectionDef");
+    assert_eq!(usage.name.as_deref(), Some("connection1"));
+    assert_eq!(usage.type_name.as_deref(), Some("DeviceConnection"));
+}
+
+/// GH-20 contrast case: the bare, `def`-less, `abstract` Systems-Library definition shape
+/// (PAR-006b) must keep dispatching to `ConnectionDef` at package level -- `abstract` is an
+/// unambiguous definition-only signal `reject_plain_typed_header_without_def` checks for.
+#[test]
+fn test_package_level_bare_abstract_connection_still_dispatches_to_connection_def() {
+    let input = "package P {\npart def Base1;\npart def Base2;\nabstract connection connections: Base1[0..*] nonunique :> linkObjects, parts { }\n}";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(e.value, PackageBodyElement::ConnectionDef(_))),
+        "bare abstract connection with nonunique/subclassification must still be a ConnectionDef: {:?}",
+        elements
+    );
+}
+
+/// GH-20 contrast case: an explicit `connection def name : Type { ... }` (no `abstract`, no
+/// `:>`) is unambiguous -- the user wrote `def` -- and must stay a `ConnectionDef` regardless of
+/// header shape.
+#[test]
+fn test_package_level_explicit_def_typed_connection_stays_connection_def() {
+    let input = "package P {\nconnection def Base;\nconnection def Foo : Base { }\n}";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    assert!(
+        elements.iter().any(|e| matches!(&e.value,
+            PackageBodyElement::ConnectionDef(d) if d.value.identification.name.as_deref() == Some("Foo"))),
+        "explicit `connection def Foo : Base {{ ... }}` must stay a ConnectionDef: {:?}",
+        elements
+    );
+}
+
 #[test]
 fn test_part_def_body_accepts_assert_constraint_and_satisfy() {
     // Regression: `assert_constraint_member` was only reachable from occurrence-def bodies,

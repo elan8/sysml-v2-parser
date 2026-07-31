@@ -24,7 +24,7 @@
 //! strict superset of the `_usage` parser's -- confirm which shapes only the usage parser accepts
 //! before assuming a guard is missing.
 
-use crate::ast::{Identification, Node, TypingRelationship, Visibility};
+use crate::ast::{Identification, Node, TypingKind, TypingRelationship, Visibility};
 use crate::parser::definition_header::parse_definition_header_after_ident;
 use crate::parser::lex::{contains_keyword, identification, ws1, ws_and_comments};
 use crate::parser::Input;
@@ -73,6 +73,11 @@ pub struct DefinitionPrefixOptions {
     /// keyword as part of its discarded trailing text. See
     /// [`DefinitionPrefixOptions::reject_header_keyword`].
     pub reject_header_keyword: Option<&'static [u8]>,
+    /// When set, fail this definition parse for the `def`-less, non-`abstract` plain `: Type`
+    /// header shape (the header parses to `kind: Typing`, i.e. no `:>`/`specializes` clause was
+    /// found before the body). See
+    /// [`DefinitionPrefixOptions::reject_plain_typed_header_without_def`].
+    pub reject_plain_typed_header_without_def: bool,
 }
 
 impl DefinitionPrefixOptions {
@@ -85,6 +90,7 @@ impl DefinitionPrefixOptions {
             visibility: VisibilityPrefix::None,
             annotation: AnnotationMode::None,
             reject_header_keyword: None,
+            reject_plain_typed_header_without_def: false,
         }
     }
 
@@ -124,6 +130,25 @@ impl DefinitionPrefixOptions {
     /// typing/subclassification header (it would wrongly reject those).
     pub const fn reject_header_keyword(mut self, keyword: &'static [u8]) -> Self {
         self.reject_header_keyword = Some(keyword);
+        self
+    }
+
+    /// Reject (fail) this definition parse for the `def`-less, non-`abstract` plain `: Type`
+    /// header shape (GH-20): e.g. `connection connection1 : DeviceConnection { ... }` at package
+    /// level. `def`-optional definition parsers like `connection_def` exist so genuine bare
+    /// library-style definitions (`abstract connection connections: Connection[0..*] nonunique
+    /// :> linkObjects, parts { ... }`) keep parsing -- but that grammar superset also swallows
+    /// ordinary named typed *usages* that were never meant to be definitions, since both share the
+    /// same `: Type { ... }` shape once `abstract` and a `:>`/`specializes` clause are absent.
+    /// `abstract` and an actual `:>`/`specializes` clause in the header (`kind:
+    /// TypingKind::Subclassification`) are unambiguous definition-only signals (a usage's `:>` is
+    /// a `subsets` clause positioned *after* the body, not in this header); their absence with
+    /// `def` also absent means this is a plain usage and should be left for the sibling usage
+    /// parser to claim, matching [`DefinitionPrefixOptions::reject_header_keyword`]'s "leave it
+    /// for the usage parser" rationale. Explicit `def` (`connection def name : Type;`) is always
+    /// honored regardless of header shape, since it's unambiguous.
+    pub const fn reject_plain_typed_header_without_def(mut self) -> Self {
+        self.reject_plain_typed_header_without_def = true;
         self
     }
 }
@@ -190,13 +215,16 @@ pub(crate) fn parse_definition_prefix(
         input
     };
 
-    let input = match options.def {
+    let (input, has_def) = match options.def {
         DefKeywordMode::Required => {
             let (input, _) = tag(&b"def"[..]).parse(input)?;
             let (input, _) = ws1(input)?;
-            input
+            (input, true)
         }
-        DefKeywordMode::Optional => opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?.0,
+        DefKeywordMode::Optional => {
+            let (input, found) = opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
+            (input, found.is_some())
+        }
     };
 
     let (input, identification) = identification(input)?;
@@ -214,6 +242,18 @@ pub(crate) fn parse_definition_prefix(
         }
     }
     let specializes = header.specializes;
+    if options.reject_plain_typed_header_without_def
+        && !has_def
+        && !is_abstract
+        && specializes
+            .as_ref()
+            .is_some_and(|s| s.value.kind == TypingKind::Typing)
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    }
 
     Ok((
         input,
