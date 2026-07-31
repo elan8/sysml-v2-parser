@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.1] - 2026-07-31
+
 ### Fixed
 
 - **Connection/interface `end` decl rejected a structural kind keyword and trailing multiplicity**
