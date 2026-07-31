@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parsing the SysML v2 spec's own Annex A vehicle example crashed the process with
+  `STATUS_STACK_OVERFLOW`** — unlike the earlier `expr.rs` stack-overflow class of bug (see
+  below), this wasn't unbounded/attacker-controlled recursion: the file's real, legitimate
+  nesting (well under `MAX_SYNTAX_NESTING`) was simply deep enough that unoptimized (debug)
+  builds — which spend far more stack per recursive-descent call frame than release builds do —
+  could exhaust a caller's default thread stack (e.g. the ~1 MiB Windows main-thread default)
+  purely from valid content, aborting the whole process instead of returning a `ParseError`.
+  `parse_root` and `parse_with_diagnostics` now run their recursive descent through
+  `stacker::maybe_grow`, switching to a generously-sized (64 MiB) stack segment whenever the
+  caller's current stack doesn't already have enough headroom for the worst case the grammar's
+  `MAX_SYNTAX_NESTING` limit allows; well-provisioned callers pay nothing extra. Added a
+  regression test parsing the real Annex A fixture (gated via `SYSML_V2_RELEASE_DIR`, same as
+  other release-fixture tests). No AST or behavior changes; `PARSE_AST_VERSION` unchanged.
+
 - **Typed `interface` usage rejected as a body member, and bracketed connect-end multiplicity
   broke every interface usage that had it** ([#16](https://github.com/elan8/sysml-v2-parser/issues/16)) —
   `interface_usage` unconditionally required either a `connect` clause or a bare `from to to`

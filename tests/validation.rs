@@ -146,3 +146,6 @@ mod use_case_ast_shapes;
 
 #[path = "validation/action_ast_shapes.rs"]
 mod action_ast_shapes;
+
+#[path = "validation/vehicle_annex_a_example.rs"]
+mod vehicle_annex_a_example;
