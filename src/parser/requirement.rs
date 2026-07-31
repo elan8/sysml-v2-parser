@@ -50,6 +50,7 @@ fn other_requirement_body_element(
         diag.code.as_str(),
         "missing_type_reference"
             | "unexpected_keyword_in_scope"
+            | "unrecognized_declaration_in_scope"
             | "missing_expression_after_operator"
             | "unsupported_annotation_syntax"
     ) && !is_redefinition

@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Misleading diagnostics and spurious recovery failures**
+  ([#18](https://github.com/elan8/sysml-v2-parser/issues/18)) — three related recovery/diagnostic
+  bugs, none requiring grammar changes:
+  - `invalid_unit_reference_diagnostic` scanned the *unbounded* rest of the file for `[`/`]`
+    patterns, so bracket-like text anywhere below the real error — including inside a `//` or
+    `/* */` doc comment (e.g. a `[ ]` TODO marker) — could override the true diagnostic with a
+    spurious `expected unit name inside '[ ]'`. It now scans only the local
+    statement/member window (`local_statement_window` in `diagnostics.rs`), stopping before any
+    comment, at the first depth-0 `;`, or at an unmatched closing delimiter.
+  - `unexpected_keyword_in_scope_diagnostic` labeled *any* unrecognized leading identifier as an
+    "unexpected keyword", even when it wasn't a SysML keyword at all (e.g. `test`,
+    `distancePerVolume`), inverting the debugging signal (implying unsupported valid syntax
+    instead of an input defect). It now checks the identifier against the reserved keyword list
+    of the SysML v2 textual notation (OMG SysML v2.0, §8.2.2.1.2; new
+    `lex::is_reserved_keyword`) and only reports `unexpected_keyword_in_scope` for genuine
+    keywords; anything else is reported as a new `unrecognized_declaration_in_scope` diagnostic
+    (`unrecognized declaration '<name>' in <scope>`).
+  - A comma-separated value list without sequence brackets (e.g. `part :>> readings = a, b;`)
+    stopped the expression parser at the comma and fell through to a generic `unexpected token in
+    part definition body` diagnostic that didn't call out the comma or the missing `( ... )`. A
+    new `bare_comma_sequence_diagnostic` detects a depth-0 `,` following a value-assignment `=`/
+    `:=` within the local statement window and reports a targeted `bare_comma_in_feature_value`
+    diagnostic instead.
+
+  No AST changes; `PARSE_AST_VERSION` unchanged. Two new stable diagnostic codes added to the
+  catalog: `unrecognized_declaration_in_scope`, `bare_comma_in_feature_value`.
+
 - **`exhibit state ... parallel { ... }` was rejected**
   ([#17](https://github.com/elan8/sysml-v2-parser/issues/17)) — `exhibit_state` went straight
   from the (optional) pre-body redefinition to `state_def_body`, never trying the

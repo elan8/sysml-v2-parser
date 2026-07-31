@@ -1,7 +1,7 @@
 //! Recovery error nodes and classification for structured body parsing.
 
 use super::diagnostics::{
-    category_from_code, invalid_bare_identifier_in_body_diagnostic,
+    bare_comma_sequence_diagnostic, category_from_code, invalid_bare_identifier_in_body_diagnostic,
     invalid_expose_separator_diagnostic, invalid_typing_operator_diagnostic,
     invalid_unit_reference_diagnostic, missing_expression_after_operator_diagnostic,
     missing_semicolon_or_body_diagnostic, missing_type_diagnostic, trim_ascii_end,
@@ -85,6 +85,12 @@ enum RecoveryClassification {
         suggestion: String,
     },
     InvalidUnitReference {
+        code: String,
+        message: String,
+        expected: String,
+        suggestion: String,
+    },
+    BareCommaSequence {
         code: String,
         message: String,
         expected: String,
@@ -176,6 +182,15 @@ fn classify_recovery(
         missing_semicolon_or_body_diagnostic(trimmed)
     {
         return RecoveryClassification::MissingBodyOrSemicolon {
+            code: code.to_string(),
+            message,
+            expected,
+            suggestion,
+        };
+    }
+
+    if let Some((code, message, expected, suggestion)) = bare_comma_sequence_diagnostic(trimmed) {
+        return RecoveryClassification::BareCommaSequence {
             code: code.to_string(),
             message,
             expected,
@@ -285,6 +300,12 @@ pub(crate) fn build_recovery_error_node_from_span(
             suggestion,
         }
         | RecoveryClassification::InvalidUnitReference {
+            code,
+            message,
+            expected,
+            suggestion,
+        }
+        | RecoveryClassification::BareCommaSequence {
             code,
             message,
             expected,

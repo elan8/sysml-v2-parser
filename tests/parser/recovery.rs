@@ -217,11 +217,13 @@ fn test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling() {
 fn test_package_body_recovery_skips_malformed_abstract_part_and_keeps_next_member() {
     // parse_root now rejects documents containing a genuinely malformed member (GH-2): `invalid`
     // is not a valid part-definition body element, so strict must reject the whole document.
+    // `invalid` is an ordinary identifier, not a SysML keyword, so the diagnostic reports it as an
+    // unrecognized declaration rather than a misused keyword (GH-18).
     let input = "package P {\nabstract part def Broken { invalid }\npart def Good;\n}";
     let strict_err = parse(input).expect_err("strict should reject the malformed member");
     assert_eq!(
         strict_err.code.as_deref(),
-        Some("unexpected_keyword_in_scope")
+        Some("unrecognized_declaration_in_scope")
     );
 
     // parse_with_diagnostics still recovers and preserves both part declarations.

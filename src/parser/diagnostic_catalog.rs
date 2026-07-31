@@ -9,6 +9,8 @@ pub const INVALID_UNIT_REFERENCE: &str = "invalid_unit_reference";
 pub const INVALID_BARE_IDENTIFIER_IN_ACTION_BODY: &str = "invalid_bare_identifier_in_action_body";
 pub const INVALID_BARE_IDENTIFIER_IN_STATE_BODY: &str = "invalid_bare_identifier_in_state_body";
 pub const UNEXPECTED_KEYWORD_IN_SCOPE: &str = "unexpected_keyword_in_scope";
+pub const UNRECOGNIZED_DECLARATION_IN_SCOPE: &str = "unrecognized_declaration_in_scope";
+pub const BARE_COMMA_IN_FEATURE_VALUE: &str = "bare_comma_in_feature_value";
 pub const INVALID_REQUIREMENT_SHORT_NAME_SYNTAX: &str = "invalid_requirement_short_name_syntax";
 pub const UNSUPPORTED_ANNOTATION_SYNTAX: &str = "unsupported_annotation_syntax";
 pub const RECOVERY_CASCADE_SUPPRESSED: &str = "recovery_cascade_suppressed";
@@ -36,6 +38,8 @@ pub const DOCUMENTED_CODES: &[&str] = &[
     INVALID_BARE_IDENTIFIER_IN_ACTION_BODY,
     INVALID_BARE_IDENTIFIER_IN_STATE_BODY,
     UNEXPECTED_KEYWORD_IN_SCOPE,
+    UNRECOGNIZED_DECLARATION_IN_SCOPE,
+    BARE_COMMA_IN_FEATURE_VALUE,
     INVALID_REQUIREMENT_SHORT_NAME_SYNTAX,
     UNSUPPORTED_ANNOTATION_SYNTAX,
     RECOVERY_CASCADE_SUPPRESSED,

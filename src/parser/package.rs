@@ -501,6 +501,7 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
                         | "missing_body_or_semicolon"
                         | "missing_expression_after_operator"
                         | "unexpected_keyword_in_scope"
+                        | "unrecognized_declaration_in_scope"
                         | "unsupported_annotation_syntax"
                 ) {
                     elements.push(node_from_to(
@@ -1040,6 +1041,7 @@ pub(crate) fn package_body_element(
                     | "missing_body_or_semicolon"
                     | "missing_expression_after_operator"
                     | "unexpected_keyword_in_scope"
+                    | "unrecognized_declaration_in_scope"
                     | "unsupported_annotation_syntax"
             ) {
                 return Err(nom::Err::Error(nom::error::Error::new(

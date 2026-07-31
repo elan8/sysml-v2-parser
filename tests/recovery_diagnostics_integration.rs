@@ -935,3 +935,91 @@ fn constraint_def_recovery_inserts_error_node_and_keeps_later_sibling() {
         "at least one diagnostic expected for malformed constraint def body"
     );
 }
+
+#[test]
+fn far_field_comment_bracket_does_not_poison_diagnostic() {
+    // GH-18 (Problem 1): a bracketed doc-comment far below the real error (a `[ ]` TODO marker,
+    // not a unit reference) must not override the diagnostic for the actual bad token with a
+    // misleading "expected unit name inside '[ ]'" message.
+    let input = fixture("far-field-comment-bracket-does-not-poison-diagnostic.sysml");
+    let result = parse_with_diagnostics(&input);
+
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("invalid_unit_reference")),
+        "a bracket-like token inside a comment must not be misclassified as a unit reference error: {:?}",
+        result.errors
+    );
+    assert!(
+        result.errors.iter().any(|e| e.line == Some(3)),
+        "the real error site (line 3) should be reported: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn unrecognized_identifier_is_not_reported_as_a_keyword() {
+    // GH-18 (Problem 2): `test` is an ordinary identifier, not a SysML keyword, so it must not be
+    // reported as "unexpected keyword" -- that would wrongly imply it's valid-but-unsupported
+    // syntax rather than an input defect.
+    let input = "package P { test; }";
+    let result = parse_with_diagnostics(input);
+
+    assert_eq!(
+        result.errors.len(),
+        1,
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let err = &result.errors[0];
+    assert_eq!(
+        err.code.as_deref(),
+        Some("unrecognized_declaration_in_scope")
+    );
+    assert!(err.message.contains("unrecognized declaration `test`"));
+    assert!(!err.message.contains("keyword"));
+}
+
+#[test]
+fn misused_real_keyword_is_still_reported_as_unexpected_keyword() {
+    // GH-18 (Problem 2, contrast case): a genuine SysML keyword used somewhere it isn't valid in
+    // this scope is a true grammar-context mismatch, so `unexpected_keyword_in_scope` (with the
+    // "unexpected keyword" wording) is still correct here.
+    let input = "package P { then; }";
+    let result = parse_with_diagnostics(input);
+
+    assert_eq!(
+        result.errors.len(),
+        1,
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let err = &result.errors[0];
+    assert_eq!(err.code.as_deref(), Some("unexpected_keyword_in_scope"));
+    assert!(err.message.contains("unexpected keyword `then`"));
+}
+
+#[test]
+fn bare_comma_sequence_reports_targeted_diagnostic() {
+    // GH-18 (Problem 3): `part :>> readings = a, b;` has no sequence brackets, so the expression
+    // parser stops at the comma. Recovery should point at the missing `( ... )` instead of a
+    // generic "unexpected token in part definition body" message.
+    let input = "package P { part def A { part :>> readings = a, b; } }";
+    let result = parse_with_diagnostics(input);
+
+    assert_eq!(
+        result.errors.len(),
+        1,
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let err = &result.errors[0];
+    assert_eq!(err.code.as_deref(), Some("bare_comma_in_feature_value"));
+    assert!(err.message.contains("use sequence brackets '(a, b)'"));
+    assert!(err
+        .suggestion
+        .as_deref()
+        .is_some_and(|s| s.contains("= (a, b)")));
+}
