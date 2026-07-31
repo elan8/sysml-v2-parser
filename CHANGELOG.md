@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`action def` nested inside a `part def` body rejected** ([#14](https://github.com/elan8/sysml-v2-parser/issues/14)) —
+  `part_def_body_element` dispatched every other nested `def` kind added under PAR-002
+  (`state def`, `flow def`, `connection def`, `port def`, `calc def`, …) but never wired
+  `action_def`, so a nested action *definition* fell through to opaque recovery with a
+  misleading `expected ';' or '{' after action definition header` diagnostic, even though
+  the corresponding usage (`action getTile;`) and the same definition at package level both
+  parsed fine. Added a new `PartDefBodyElement::ActionDef` variant and dispatch `action_def`
+  before `action_usage` (matching the guard pattern used for the other kinded defs). Bump
+  `PARSE_AST_VERSION` 55 → 56.
+
 - **Structural / assert / variation members rejected in action bodies** ([#13](https://github.com/elan8/sysml-v2-parser/issues/13)) —
   `ActionBodyItem` (BNF §8.2.2.17.1 via `NonBehaviorBodyItem`) admits
   `StructureUsageMember` (`part`, `item`, `snapshot`/`PortionUsage`) and

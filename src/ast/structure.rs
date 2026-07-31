@@ -1,6 +1,6 @@
 use super::behavior::{
-    ActionDefBodyElement, ActionUsage, ActionUsageBodyElement, Allocate, InOut, InOutDecl,
-    StateDefBody, StateUsage,
+    ActionDef, ActionDefBodyElement, ActionUsage, ActionUsageBodyElement, Allocate, InOut,
+    InOutDecl, StateDefBody, StateUsage,
 };
 use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
@@ -103,6 +103,10 @@ pub enum PartDefBodyElement {
     /// `action` / `ref action` usage inside a part definition body (Systems Library
     /// `Parts::performedActions` and similar). Previously fell through to [`OpaqueMember`].
     ActionUsage(Box<Node<ActionUsage>>),
+    /// `action def` nested inside a part definition body (GH-14: previously only `ActionUsage`
+    /// was reachable here, so a nested definition fell through to opaque recovery with a
+    /// misleading "expected ';' or '{' after action definition header" diagnostic).
+    ActionDef(Node<ActionDef>),
     /// `state` / `ref state` usage inside a part definition body. Previously fell through to
     /// [`OpaqueMember`].
     StateUsage(Node<StateUsage>),

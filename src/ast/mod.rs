@@ -439,6 +439,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::Import(n) => {
             PartDefBodyElement::Import(dummy_node(n, normalize_import(&n.value)))
         }
+        PartDefBodyElement::ActionDef(n) => {
+            PartDefBodyElement::ActionDef(dummy_node(n, normalize_action_def(&n.value)))
+        }
         PartDefBodyElement::ActionUsage(n) => PartDefBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),
         )),

@@ -7,7 +7,7 @@ pub(crate) use crate::ast::{
     PartUsageBodyElement, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
     RefDecl, VariantTypedUsage, VariantUsage,
 };
-pub(crate) use crate::parser::action::action_usage;
+pub(crate) use crate::parser::action::{action_def, action_usage};
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};
 pub(crate) use crate::parser::attribute::{
     attribute_def, attribute_usage, attribute_usage_shorthand, redefinition_feature_binding,

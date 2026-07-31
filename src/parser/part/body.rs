@@ -241,6 +241,12 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             // so `port def Foo {}` would otherwise misparse as `PortUsage { name: "def" }`.
             map(port_def_required, PartDefBodyElement::PortDef),
             map(port_usage, PartDefBodyElement::PortUsage),
+            // GH-14: `action_def` must be tried before `action_usage` -- the latter has no guard
+            // against a bare `def` keyword being consumed as the usage's name for most kinds (same
+            // bug class as `flow_usage_member`/`port_usage`/`calc_usage` above), but here it
+            // actively rejects a following `def` (see `action_usage`'s explicit check), so without
+            // this arm `action def Foo { }` fell through to opaque recovery entirely.
+            map(action_def, PartDefBodyElement::ActionDef),
             // Kinded usages before plain `ref` / opaque catch-all so Systems Library forms like
             // `abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances`
             // become real ActionUsage/StateUsage nodes.
@@ -901,5 +907,51 @@ mod par_002_nested_def_tests {
         let (rest, node) = part_def_body_element(input(src)).expect("part def body element");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PartDefBodyElement::Ref(_)));
+    }
+
+    /// GH-14: `action def` nested inside a `part def` body previously fell through to opaque
+    /// recovery with a misleading "expected ';' or '{' after action definition header" diagnostic,
+    /// even though the usage form (`action getTile;`) and the same definition at package level
+    /// both parsed fine.
+    #[test]
+    fn part_def_body_accepts_nested_action_def_not_misparsed_as_usage() {
+        let (rest, node) =
+            part_def_body_element(input("action def GetTile { }")).expect("action def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::ActionDef(_)));
+    }
+
+    #[test]
+    fn part_def_body_accepts_nested_action_usage() {
+        let (rest, node) =
+            part_def_body_element(input("action getTile;")).expect("action usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PartDefBodyElement::ActionUsage(_)));
+    }
+
+    #[test]
+    fn action_def_is_same_variant_kind_at_package_level_and_nested_in_part() {
+        use crate::parser::package::package_body_element;
+
+        let text = "action def GetTile { }";
+        let (_, package_node) =
+            package_body_element(input(text)).expect("package-level action def");
+        let (_, part_node) = part_def_body_element(input(text)).expect("nested action def");
+        assert!(matches!(
+            package_node.value,
+            crate::ast::PackageBodyElement::ActionDef(_)
+        ));
+        assert!(matches!(part_node.value, PartDefBodyElement::ActionDef(_)));
+    }
+
+    /// GH-14 issue sample: https://github.com/elan8/sysml-v2-parser/issues/14
+    #[test]
+    fn gh14_issue_sample_parses_cleanly() {
+        let sample = r#"package Shop {
+            part def TileCache {
+                action def GetTile { }
+            }
+        }"#;
+        crate::parse(sample).unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
     }
 }
