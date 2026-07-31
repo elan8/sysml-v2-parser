@@ -597,11 +597,46 @@ pub(crate) fn missing_expression_after_operator_diagnostic(
     None
 }
 
+/// Bounds `fragment` to the current statement/member: scanning stops before entering a `//` or
+/// `/* */` comment, at the first depth-0 `;`, or at a depth-0 closing `}`/`)`/`]` that isn't
+/// matched by an opener within the window (i.e. the enclosing scope's own delimiter). Local
+/// pattern-matching diagnostics (like [`invalid_unit_reference_diagnostic`] and
+/// [`bare_comma_sequence_diagnostic`]) must scan within this window rather than the unbounded rest
+/// of the file -- otherwise bracket- or comma-like text in unrelated code, or in a doc comment far
+/// below the real error site, can override the true diagnostic (GH-18).
+fn local_statement_window(fragment: &[u8]) -> &[u8] {
+    const MAX_WINDOW: usize = 400;
+    let mut depth: i32 = 0;
+    let mut end = 0usize;
+    while end < fragment.len() && end < MAX_WINDOW {
+        if fragment[end..].starts_with(b"/*") || fragment[end..].starts_with(b"//") {
+            break;
+        }
+        match fragment[end] {
+            b'{' | b'(' | b'[' => depth += 1,
+            b'}' | b')' | b']' => {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+            }
+            b';' if depth == 0 => {
+                end += 1;
+                break;
+            }
+            _ => {}
+        }
+        end += 1;
+    }
+    &fragment[..end]
+}
+
 pub(crate) fn invalid_unit_reference_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
     let fragment = trim_ascii_start(fragment);
-    let text = String::from_utf8_lossy(fragment);
+    let window = local_statement_window(fragment);
+    let text = String::from_utf8_lossy(window);
     if !(text.contains('[') && text.contains(']')) {
         return None;
     }
@@ -653,12 +688,59 @@ pub(crate) fn unexpected_keyword_in_scope_diagnostic(
         return None;
     }
     let keyword_text = String::from_utf8_lossy(keyword);
-    Some((
-        "unexpected_keyword_in_scope",
-        format!("unexpected keyword `{keyword_text}` in {scope_label}"),
-        format!("valid {scope_label} element"),
-        format!("Replace `{keyword_text}` with a valid {scope_label} member or remove it."),
-    ))
+    if lex::is_reserved_keyword(keyword) {
+        // A real SysML keyword used somewhere it isn't valid in this scope -- a grammar-context
+        // mismatch, so "unexpected keyword" is accurate.
+        Some((
+            "unexpected_keyword_in_scope",
+            format!("unexpected keyword `{keyword_text}` in {scope_label}"),
+            format!("valid {scope_label} element"),
+            format!("Replace `{keyword_text}` with a valid {scope_label} member or remove it."),
+        ))
+    } else {
+        // Not a SysML keyword at all -- an unrecognized identifier is an input defect, not a
+        // parser gap, so don't imply it's unsupported valid syntax (GH-18).
+        Some((
+            "unrecognized_declaration_in_scope",
+            format!("unrecognized declaration `{keyword_text}` in {scope_label}"),
+            format!("valid {scope_label} element"),
+            format!(
+                "`{keyword_text}` is not a SysML keyword; check for a typo or unsupported construct, or remove it."
+            ),
+        ))
+    }
+}
+
+/// Detects a comma-separated value list without sequence brackets, e.g.
+/// `part :>> readings = a, b;` -- the expression parser stops at the first bare `,`, so recovery
+/// otherwise reports a generic "unexpected token" for the whole member instead of pointing at the
+/// missing `( ... )` (GH-18).
+pub(crate) fn bare_comma_sequence_diagnostic(
+    fragment: &[u8],
+) -> Option<(&'static str, String, String, String)> {
+    let fragment = trim_ascii_start(fragment);
+    let window = local_statement_window(fragment);
+    let mut depth: i32 = 0;
+    let mut has_assign = false;
+    for &b in window {
+        match b {
+            b'(' | b'[' | b'{' => depth += 1,
+            b')' | b']' | b'}' => depth = depth.saturating_sub(1),
+            b'=' if depth == 0 => has_assign = true,
+            b',' if depth == 0 && has_assign => {
+                return Some((
+                    "bare_comma_in_feature_value",
+                    "unexpected ',' in feature value assignment; use sequence brackets '(a, b)' to assign multiple values"
+                        .to_string(),
+                    "sequence brackets '(a, b)' around a comma-separated value list".to_string(),
+                    "Wrap the comma-separated values in parentheses, for example `= (a, b)`."
+                        .to_string(),
+                ));
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 pub(crate) fn invalid_bare_identifier_in_body_diagnostic(
@@ -846,7 +928,9 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("invalid_bare_identifier_in_action_body")
         | Some("invalid_bare_identifier_in_state_body")
         | Some("recovery_cascade_suppressed")
-        | Some("unexpected_keyword_in_scope") => 5,
+        | Some("unexpected_keyword_in_scope")
+        | Some("unrecognized_declaration_in_scope")
+        | Some("bare_comma_in_feature_value") => 5,
         Some(code) if code.starts_with("recovered_") => 2,
         Some("expected_end_of_input") | Some("expected_keyword") => 1,
         _ => 3,
