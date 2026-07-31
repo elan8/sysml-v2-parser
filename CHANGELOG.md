@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ExtendedLibraryDecl`. Both paths now always recover unrecognized members as Error nodes with
   `unexpected token in part … body`, matching package/attribute/port. `part_usage_body_brace`
   uses the shared structured-brace recovery helper.
+  <br>Closing the silent fallthrough also required wiring part-*usage* body members that Annex
+  fixtures already rely on and that part-*definition* bodies already accepted:
+  keyword-less `:>>` redefinition bindings (`redefinition_feature_binding`), `metadata` usage,
+  and `analysis` / `analysis def` case members. Bump `PARSE_AST_VERSION` 53 → 54.
 
 - **`ref part … :> …` rejected as unexpected token** ([#10](https://github.com/elan8/sysml-v2-parser/issues/10)) —
   `part_ref_usage` only accepted `(visibility)? ref (part)? (:>>)? name (: type)? (= value)? body`,

@@ -486,6 +486,15 @@ pub enum PartUsageBodyElement {
     /// usage -- e.g. `part fuelTank : FuelTank { item fuel : Fuel; }` in the OMG spec Annex
     /// `3d-Function-based Behavior-item.sysml` -- fell into error recovery).
     ItemUsage(Node<ItemUsage>),
+    /// `metadata <name> { ... }` usage inside a part usage body (previously only reachable from
+    /// part *definition* bodies; GH-12 recovery made the silent `ExtendedLibraryDecl` fallthrough
+    /// visible). Real usage: OMG Annex `14a-Language Extensions.sysml`.
+    MetadataUsage(Node<MetadataUsage>),
+    /// `analysis def` nested inside a part usage body. See `MetadataUsage`.
+    AnalysisCaseDef(Node<crate::ast::requirement::AnalysisCaseDef>),
+    /// `analysis <name> : Type { ... }` usage inside a part usage body. Real usage: OMG Annex
+    /// `10c-Fuel Economy Analysis.sysml`.
+    AnalysisCaseUsage(Node<crate::ast::requirement::AnalysisCaseUsage>),
 }
 
 /// Variant member inside a variation part usage/def body: either an untyped reference to a

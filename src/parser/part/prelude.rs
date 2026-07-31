@@ -10,7 +10,7 @@ pub(crate) use crate::ast::{
 pub(crate) use crate::parser::action::action_usage;
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};
 pub(crate) use crate::parser::attribute::{
-    attribute_def, attribute_usage, attribute_usage_shorthand,
+    attribute_def, attribute_usage, attribute_usage_shorthand, redefinition_feature_binding,
 };
 pub(crate) use crate::parser::body::{parse_structured_brace_members_with_skip, BraceMemberSkip};
 pub(crate) use crate::parser::build_recovery_error_node_from_span;

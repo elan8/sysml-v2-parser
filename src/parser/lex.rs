@@ -106,6 +106,8 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"timeslice",
     b"variant",
     b"variation",
+    b"analysis",
+    b"metadata",
 ];
 
 pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
