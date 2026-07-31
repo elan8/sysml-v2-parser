@@ -18,7 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   these members reported `unexpected keyword … in action body`.
   <br>Wired `PartUsage` / `ItemUsage` / `AssertConstraint` / `OccurrenceUsage`
   into both `ActionDefBodyElement` and `ActionUsageBodyElement`, and added
-  `ActionUsage.is_variation`. Loop keyword remains `for` (`ForLoopNode`), not
+  `ActionUsage.is_variation`. Also accept `then perform …` (`ThenTarget::Perform`)
+  and anonymous `action accept`/`action send` payload forms used by the Systems
+  Library / Annex fixtures. Loop keyword remains `for` (`ForLoopNode`), not
   `foreach`. Bump `PARSE_AST_VERSION` 54 → 55.
 
 - **Arbitrary non-SysML text accepted inside part bodies** ([#12](https://github.com/elan8/sysml-v2-parser/issues/12)) —

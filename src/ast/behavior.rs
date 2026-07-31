@@ -101,7 +101,8 @@ pub struct ForLoop {
     pub body: ActionDefBody,
 }
 
-/// Succession to a following node: `then action ...`, `then merge <name>;`, or `then <name>;`.
+/// Succession to a following node: `then action ...`, `then perform ...`, `then merge <name>;`,
+/// or `then <name>;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThenAction {
@@ -116,6 +117,8 @@ pub struct ThenAction {
 pub enum ThenTarget {
     /// `then action <name> accept ...;` — an inline action usage declaration.
     Action(Box<Node<ActionUsage>>),
+    /// `then perform body;` — succession to a perform usage (Systems Library `Actions.sysml`).
+    Perform(Node<crate::ast::Perform>),
     /// `then merge continue;` — an inline merge node.
     Merge(Node<MergeStmt>),
     /// `then continue;` — a reference to an already-declared node.

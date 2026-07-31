@@ -450,7 +450,13 @@ pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenActio
     // `merge_stmt` must precede `action_usage`, which would otherwise take `merge` as a name.
     let (input, target) = alt((
         map(merge_stmt, ThenTarget::Merge),
-        // `action_usage` already accepts visibility / abstract / ref prefixes.
+        // `perform action …` before bare `perform …`; both before `action_usage`.
+        map(
+            crate::parser::part::perform_action_decl,
+            ThenTarget::Perform,
+        ),
+        map(crate::parser::part::perform_usage, ThenTarget::Perform),
+        // `action_usage` already accepts visibility / abstract / ref / variation prefixes.
         map(action_usage, |a| ThenTarget::Action(Box::new(a))),
         map(
             nom::sequence::terminated(path_expression, preceded(ws_and_comments, tag(&b";"[..]))),
@@ -1020,12 +1026,16 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     // Annex `3c-Function-based Behavior-structure mod-1.sysml` declares one directly in a part
     // usage body. Previously only the typed anonymous form (`action: Runner;`) was accepted, so
     // the bodied one fell through to opaque recovery.
+    // Also anonymous when the next token is the `accept`/`send` payload clause
+    // (`then action accept engineOff : EngineOff;` in `3a-Function-based Behavior-3.sysml`).
     let (input, (name_span, name_str)) = if (after_gap.fragment().starts_with(b":")
         && !after_gap.fragment().starts_with(b":>")
         && !after_gap.fragment().starts_with(b":>>"))
         || after_gap.fragment().starts_with(b"{")
         || after_gap.fragment().starts_with(b";")
         || starts_with_keyword(after_gap.fragment(), b"defined")
+        || starts_with_keyword(after_gap.fragment(), b"accept")
+        || starts_with_keyword(after_gap.fragment(), b"send")
     {
         (after_gap, (crate::ast::Span::dummy(), String::new()))
     } else {
@@ -1165,6 +1175,43 @@ mod control_node_gap_tests {
             .expect("then action");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value.target, ThenTarget::Action(_)));
+    }
+
+    #[test]
+    fn then_succession_accepts_anonymous_action_with_accept_payload() {
+        let (rest, node) =
+            then_action(input("then action accept engineOff : EngineOff;")).expect("then action accept");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value.target {
+            ThenTarget::Action(a) => {
+                assert!(a.value.name.is_empty(), "expected anonymous action");
+                assert!(a.value.accept.is_some());
+            }
+            other => panic!("expected Action target, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn then_succession_accepts_perform_target() {
+        let (rest, node) = then_action(input("then perform body;")).expect("then perform");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value.target {
+            ThenTarget::Perform(p) => assert_eq!(p.value.action_name, "body"),
+            other => panic!("expected Perform target, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn action_body_accepts_then_perform() {
+        let (rest, node) =
+            action_def_body_element(input("then perform body;")).expect("then perform body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::ThenAction(t) => {
+                assert!(matches!(t.value.target, ThenTarget::Perform(_)));
+            }
+            other => panic!("expected ThenAction, got {other:?}"),
+        }
     }
 
     /// GH-13 / BNF `ActionBodyItem` → `StructureUsageMember` → `PartUsage`.
