@@ -13,7 +13,7 @@ use crate::parser::lex::{name, qualified_name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
-use crate::parser::usage::reference_subsetting;
+use crate::parser::usage::{multiplicity_node, reference_subsetting};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -30,8 +30,17 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"end"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) =
-        nom::combinator::opt(preceded(ws_and_comments, tag(&b"port"[..]))).parse(input)?;
+    // Optional structural kind keyword (BNF `InterfaceOccurrenceUsageElement`/
+    // `StructureUsageElement`, e.g. `end part hub : Hub;`). Not retained as a separate field:
+    // `part`/`port` don't change this end's own grammar (name + type/reference), and `EndDecl`
+    // doesn't model usage-kind distinctions. Previously only `port` was accepted here; widened to
+    // also cover `part` (GH-19/GH-20: real-world `end part hub ::> mainSwitch[1];` examples were
+    // rejected because this keyword wasn't accepted at all).
+    let (input, _) = nom::combinator::opt(preceded(
+        ws_and_comments,
+        alt(((tag(&b"part"[..]), ws1), (tag(&b"port"[..]), ws1))),
+    ))
+    .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
 
@@ -40,6 +49,12 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     // subsetting clause uses -- not folded into `type_name`/typing like the `:` form below. This
     // previously only accepted `:`, so `end name references target;` fell through to recovery.
     if let Ok((input, references)) = reference_subsetting(input) {
+        // Trailing multiplicity on the reference target (e.g. `::> mainSwitch[1]`) is parsed the
+        // same way `part_usage_redefines_only`/other subsetting-family callers do: the shared
+        // `reference_subsetting` parser only consumes the qualified target, so any multiplicity
+        // is a separate, subsequent optional parse here (GH-20 real-world example).
+        let (input, multiplicity) =
+            nom::combinator::opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         let type_ref_span = references.value.span.clone();
         let type_name = references.value.target_display();
@@ -53,6 +68,7 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
                     type_name,
                     uses_derived_syntax: true,
                     references: Some(references),
+                    multiplicity,
                     name_span: Some(name_span),
                     type_ref_span: Some(type_ref_span),
                 },
@@ -69,6 +85,8 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
         ),
     )
     .parse(input)?;
+    let (input, multiplicity) =
+        nom::combinator::opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -84,6 +102,7 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
                 },
                 uses_derived_syntax: false,
                 references: None,
+                multiplicity,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
             },
