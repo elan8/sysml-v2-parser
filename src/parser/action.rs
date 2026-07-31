@@ -43,6 +43,11 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"attribute",
     b"calc",
     b"event",
+    b"part",
+    b"item",
+    b"assert",
+    b"variation",
+    b"snapshot",
     b"accept",
     b"decide",
     b"fork",
@@ -445,7 +450,13 @@ pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenActio
     // `merge_stmt` must precede `action_usage`, which would otherwise take `merge` as a name.
     let (input, target) = alt((
         map(merge_stmt, ThenTarget::Merge),
-        // `action_usage` already accepts visibility / abstract / ref prefixes.
+        // `perform action …` before bare `perform …`; both before `action_usage`.
+        map(
+            crate::parser::part::perform_action_decl,
+            ThenTarget::Perform,
+        ),
+        map(crate::parser::part::perform_usage, ThenTarget::Perform),
+        // `action_usage` already accepts visibility / abstract / ref / variation prefixes.
         map(action_usage, |a| ThenTarget::Action(Box::new(a))),
         map(
             nom::sequence::terminated(path_expression, preceded(ws_and_comments, tag(&b";"[..]))),
@@ -529,6 +540,21 @@ fn action_def_body_element(
             map(visibility_action_usage, |a| {
                 ActionDefBodyElement::ActionUsage(Box::new(a))
             }),
+            // GH-13 / BNF `ActionBodyItem` → `NonBehaviorBodyItem` /
+            // `StructureUsageMember` + `BehaviorUsageMember` (`AssertConstraintUsage`).
+            nom::branch::alt((
+                map(crate::parser::part::part_usage, |p| {
+                    ActionDefBodyElement::PartUsage(Box::new(p))
+                }),
+                map(crate::parser::item::item_usage, ActionDefBodyElement::ItemUsage),
+                map(
+                    crate::parser::occurrence_body::assert_constraint_member,
+                    ActionDefBodyElement::AssertConstraint,
+                ),
+                map(crate::parser::occurrence_body::snapshot_usage, |n| {
+                    ActionDefBodyElement::OccurrenceUsage(Box::new(n))
+                }),
+            )),
             // §6 G26: last, so every keyword-led member above keeps priority over the
             // keyword-less `name = expr;` binding.
             map(
@@ -789,6 +815,11 @@ fn peek_implicit_action_usage_body_end(input: Input<'_>) -> IResult<Input<'_>, (
                 b"message",
                 b"succession",
                 b"state",
+                b"part",
+                b"item",
+                b"assert",
+                b"variation",
+                b"snapshot",
                 b"doc",
                 b"@",
                 b"#",
@@ -876,6 +907,21 @@ pub(crate) fn action_usage_body_element(
             map(visibility_action_usage, |a| {
                 ActionUsageBodyElement::ActionUsage(Box::new(a))
             }),
+            // GH-13 / BNF `ActionBodyItem` → `NonBehaviorBodyItem` /
+            // `StructureUsageMember` + `BehaviorUsageMember` (`AssertConstraintUsage`).
+            nom::branch::alt((
+                map(crate::parser::part::part_usage, |p| {
+                    ActionUsageBodyElement::PartUsage(Box::new(p))
+                }),
+                map(crate::parser::item::item_usage, ActionUsageBodyElement::ItemUsage),
+                map(
+                    crate::parser::occurrence_body::assert_constraint_member,
+                    ActionUsageBodyElement::AssertConstraint,
+                ),
+                map(crate::parser::occurrence_body::snapshot_usage, |n| {
+                    ActionUsageBodyElement::OccurrenceUsage(Box::new(n))
+                }),
+            )),
             // §6 G26: last, so every keyword-led member above keeps priority over the
             // keyword-less `name = expr;` binding.
             map(
@@ -948,13 +994,56 @@ fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>
     ))
 }
 
-/// Action usage: `(visibility)? (abstract)? (ref)? action` name header (`accept` …)? body
+/// True when `action` is followed by an `accept`/`send` *payload* clause rather than a usage named
+/// `accept`/`send` (e.g. `action send typed by T;` keeps `send` as the name).
+fn is_anonymous_accept_or_send_payload(fragment: &[u8]) -> bool {
+    use crate::parser::diagnostics::trim_ascii_start;
+
+    let keyword = if starts_with_keyword(fragment, b"accept") {
+        &b"accept"[..]
+    } else if starts_with_keyword(fragment, b"send") {
+        &b"send"[..]
+    } else {
+        return false;
+    };
+    let after_kw = trim_ascii_start(&fragment[keyword.len()..]);
+    // Usage-declaration continuations after a name — not a control-node payload.
+    if after_kw.is_empty()
+        || after_kw.starts_with(b";")
+        || after_kw.starts_with(b"{")
+        || after_kw.starts_with(b"[")
+        || after_kw.starts_with(b":")
+        || starts_with_keyword(after_kw, b"typed")
+        || starts_with_keyword(after_kw, b"defined")
+        || starts_with_keyword(after_kw, b"subsets")
+        || starts_with_keyword(after_kw, b"redefines")
+        || starts_with_keyword(after_kw, b"references")
+        || starts_with_keyword(after_kw, b"crosses")
+        || starts_with_keyword(after_kw, b"intersects")
+        || starts_with_keyword(after_kw, b"ordered")
+        || starts_with_keyword(after_kw, b"nonunique")
+    {
+        return false;
+    }
+    true
+}
+
+/// Action usage: `(visibility)? (abstract|variation)? (ref)? action` name header (`accept` …)? body
 pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, is_abstract) =
-        nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // BNF `RefPrefix`: `( isAbstract ?= 'abstract' | isVariation ?= 'variation' )?`
+    let (input, abstract_or_variation) = opt(alt((
+        map(preceded(tag(&b"abstract"[..]), ws1), |_| true),
+        map(preceded(tag(&b"variation"[..]), ws1), |_| false),
+    )))
+    .parse(input)?;
+    let (is_abstract, is_variation) = match abstract_or_variation {
+        Some(true) => (true, false),
+        Some(false) => (false, true),
+        None => (false, false),
+    };
     let (input, is_reference) =
         nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
@@ -971,12 +1060,17 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     // Annex `3c-Function-based Behavior-structure mod-1.sysml` declares one directly in a part
     // usage body. Previously only the typed anonymous form (`action: Runner;`) was accepted, so
     // the bodied one fell through to opaque recovery.
+    // Also anonymous when the next token opens an `accept`/`send` *payload* clause
+    // (`then action accept engineOff : EngineOff;` in `3a-Function-based Behavior-3.sysml`).
+    // But `action send typed by T;` names the usage `send` — only treat accept/send as payload
+    // starters when the following token is not a usage-declaration continuation.
     let (input, (name_span, name_str)) = if (after_gap.fragment().starts_with(b":")
         && !after_gap.fragment().starts_with(b":>")
         && !after_gap.fragment().starts_with(b":>>"))
         || after_gap.fragment().starts_with(b"{")
         || after_gap.fragment().starts_with(b";")
         || starts_with_keyword(after_gap.fragment(), b"defined")
+        || is_anonymous_accept_or_send_payload(after_gap.fragment())
     {
         (after_gap, (crate::ast::Span::dummy(), String::new()))
     } else {
@@ -1021,7 +1115,8 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
             start,
             input,
             ActionUsage {
-                is_abstract: is_abstract.is_some(),
+                is_abstract,
+                is_variation,
                 is_reference: is_reference.is_some(),
                 name: name_str,
                 type_name,
@@ -1115,6 +1210,178 @@ mod control_node_gap_tests {
             .expect("then action");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value.target, ThenTarget::Action(_)));
+    }
+
+    #[test]
+    fn then_succession_accepts_anonymous_action_with_accept_payload() {
+        let (rest, node) =
+            then_action(input("then action accept engineOff : EngineOff;")).expect("then action accept");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value.target {
+            ThenTarget::Action(a) => {
+                assert!(a.value.name.is_empty(), "expected anonymous action");
+                assert!(a.value.accept.is_some());
+            }
+            other => panic!("expected Action target, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn then_succession_accepts_perform_target() {
+        let (rest, node) = then_action(input("then perform body;")).expect("then perform");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value.target {
+            ThenTarget::Perform(p) => assert_eq!(p.value.action_name, "body"),
+            other => panic!("expected Perform target, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn action_body_accepts_then_perform() {
+        let (rest, node) =
+            action_def_body_element(input("then perform body;")).expect("then perform body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::ThenAction(t) => {
+                assert!(matches!(t.value.target, ThenTarget::Perform(_)));
+            }
+            other => panic!("expected ThenAction, got {other:?}"),
+        }
+    }
+
+    /// GH-13 / BNF `ActionBodyItem` → `StructureUsageMember` → `PartUsage`.
+    #[test]
+    fn action_body_accepts_part_usage() {
+        let (rest, node) =
+            action_def_body_element(input("part rim : Wheel;")).expect("part usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::PartUsage(p) => assert_eq!(p.value.name, "rim"),
+            other => panic!("expected PartUsage, got {other:?}"),
+        }
+    }
+
+    /// GH-13: anonymous `part :>> name { }` redefinition in an action body.
+    #[test]
+    fn action_body_accepts_anonymous_part_redefinition() {
+        let (rest, node) =
+            action_def_body_element(input("part :>> station { }")).expect("part :>>");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, ActionDefBodyElement::PartUsage(_)));
+    }
+
+    /// GH-13 / BNF `ActionBodyItem` → `StructureUsageMember` → `ItemUsage`.
+    #[test]
+    fn action_body_accepts_item_usage_and_for_loop() {
+        let src = "item spokes : Spoke[*];";
+        let (rest, node) = action_def_body_element(input(src)).expect("item usage");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::ItemUsage(i) => assert_eq!(i.value.name, "spokes"),
+            other => panic!("expected ItemUsage, got {other:?}"),
+        }
+
+        // Spec keyword is `for` (ForLoopNode), not `foreach`.
+        let (rest, node) =
+            action_def_body_element(input("for s in spokes { action tighten; }")).expect("for");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, ActionDefBodyElement::ForLoop(_)));
+    }
+
+    /// GH-13 / BNF `AssertConstraintUsage` via `BehaviorUsageMember`.
+    #[test]
+    fn action_body_accepts_assert_constraint() {
+        let (rest, node) =
+            action_def_body_element(input("assert constraint { 1 > 0 }")).expect("assert");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            ActionDefBodyElement::AssertConstraint(_)
+        ));
+    }
+
+    /// GH-13 / BNF `RefPrefix.isVariation` on `ActionUsage`.
+    #[test]
+    fn action_body_accepts_variation_action_usage() {
+        let (rest, node) = action_def_body_element(input(
+            "variation action method { action byHand; action byJig; }",
+        ))
+        .expect("variation action");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::ActionUsage(a) => {
+                assert!(a.value.is_variation);
+                assert!(!a.value.is_abstract);
+                assert_eq!(a.value.name, "method");
+            }
+            other => panic!("expected ActionUsage, got {other:?}"),
+        }
+    }
+
+    /// GH-13 / BNF `StructureUsageMember` → `PortionUsage` (`snapshot`).
+    #[test]
+    fn action_body_accepts_snapshot_usage() {
+        let (rest, node) =
+            action_def_body_element(input("snapshot trued { }")).expect("snapshot");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::OccurrenceUsage(o) => {
+                assert_eq!(o.value.portion_kind.as_deref(), Some("snapshot"));
+                assert_eq!(o.value.name, "trued");
+            }
+            other => panic!("expected OccurrenceUsage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn action_usage_body_accepts_part_and_item_members() {
+        let (rest, node) =
+            action_usage_body_element(input("part rim : Wheel;")).expect("part in usage body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, ActionUsageBodyElement::PartUsage(_)));
+
+        let (rest, node) =
+            action_usage_body_element(input("item spokes : Spoke[*];")).expect("item");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, ActionUsageBodyElement::ItemUsage(_)));
+    }
+
+    /// End-to-end GH-13 samples from https://github.com/elan8/sysml-v2-parser/issues/13
+    #[test]
+    fn gh13_issue_samples_parse_cleanly() {
+        let samples = [
+            r#"package Shop {
+                part def Wheel;
+                action def Truing { part rim : Wheel; }
+            }"#,
+            r#"package Shop {
+                item def Spoke;
+                action def Truing {
+                    item spokes : Spoke[*];
+                    for s in spokes { action tighten; }
+                }
+            }"#,
+            r#"package Shop {
+                action def Truing { assert constraint { 1 > 0 } }
+            }"#,
+            r#"package Shop {
+                action def Truing {
+                    variation action method {
+                        action byHand;
+                        action byJig;
+                    }
+                }
+            }"#,
+            r#"package Shop {
+                action def Truing { snapshot trued { } }
+            }"#,
+            r#"package Shop {
+                action def Assembly { part :>> station { } }
+            }"#,
+        ];
+        for sample in samples {
+            crate::parse(sample).unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
+        }
     }
 }
 

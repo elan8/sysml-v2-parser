@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Structural / assert / variation members rejected in action bodies** ([#13](https://github.com/elan8/sysml-v2-parser/issues/13)) —
+  `ActionBodyItem` (BNF §8.2.2.17.1 via `NonBehaviorBodyItem`) admits
+  `StructureUsageMember` (`part`, `item`, `snapshot`/`PortionUsage`) and
+  `BehaviorUsageMember` (`assert constraint`), plus `RefPrefix.isVariation` on
+  nested `action` usages. The action-body dispatcher previously only covered
+  control nodes, behavior steps, and opaque `attribute`/`calc`/`event` decls, so
+  these members reported `unexpected keyword … in action body`.
+  <br>Wired `PartUsage` / `ItemUsage` / `AssertConstraint` / `OccurrenceUsage`
+  into both `ActionDefBodyElement` and `ActionUsageBodyElement`, and added
+  `ActionUsage.is_variation`. Also accept `then perform …` (`ThenTarget::Perform`)
+  and anonymous `action accept`/`action send` payload forms used by the Systems
+  Library / Annex fixtures. Loop keyword remains `for` (`ForLoopNode`), not
+  `foreach`. Bump `PARSE_AST_VERSION` 54 → 55.
+
 - **Arbitrary non-SysML text accepted inside part bodies** ([#12](https://github.com/elan8/sysml-v2-parser/issues/12)) —
   `part def` / `part` usage bodies silently accepted junk such as `%%% … %%%` with no diagnostic:
   definition recovery fell through to `PartDefBodyElement::Other` (ignored by error collection),

@@ -77,6 +77,33 @@ fn collect_action_def_body_errors(body: &ActionDefBody, errors: &mut Vec<ParseEr
                 ActionDefBodyElement::RefDecl(n) => {
                     collect_ref_body_errors(&n.value.body, errors);
                 }
+                ActionDefBodyElement::PartUsage(n) => {
+                    collect_part_usage_body_errors(&n.value.body, errors);
+                }
+                ActionDefBodyElement::OccurrenceUsage(n) => {
+                    collect_occurrence_usage_body_errors(&n.value.body, errors);
+                }
+                ActionDefBodyElement::AssertConstraint(n) => {
+                    collect_constraint_body_errors(&n.value.body, errors);
+                }
+                ActionDefBodyElement::ActionUsage(n) => {
+                    collect_action_usage_body_errors(&n.value.body, errors);
+                }
+                ActionDefBodyElement::ForLoop(n) => {
+                    collect_action_def_body_errors(&n.value.body, errors);
+                }
+                ActionDefBodyElement::WhileStmt(n) => {
+                    collect_action_def_body_errors(&n.value.body, errors);
+                }
+                ActionDefBodyElement::LoopStmt(n) => {
+                    collect_action_def_body_errors(&n.value.body, errors);
+                }
+                ActionDefBodyElement::IfStmt(n) => {
+                    collect_action_def_body_errors(&n.value.then_body, errors);
+                    if let Some(else_body) = &n.value.else_body {
+                        collect_action_def_body_errors(else_body, errors);
+                    }
+                }
                 _ => {}
             }
         }
@@ -112,7 +139,31 @@ fn collect_action_usage_body_errors(body: &ActionUsageBody, errors: &mut Vec<Par
                     errors.push(parse_error_from_recovery_node(&element.span, &n.value));
                 }
                 ActionUsageBodyElement::ActionUsage(n) => {
-                    collect_action_usage_body_errors(&n.value.body, errors)
+                    collect_action_usage_body_errors(&n.value.body, errors);
+                }
+                ActionUsageBodyElement::PartUsage(n) => {
+                    collect_part_usage_body_errors(&n.value.body, errors);
+                }
+                ActionUsageBodyElement::OccurrenceUsage(n) => {
+                    collect_occurrence_usage_body_errors(&n.value.body, errors);
+                }
+                ActionUsageBodyElement::AssertConstraint(n) => {
+                    collect_constraint_body_errors(&n.value.body, errors);
+                }
+                ActionUsageBodyElement::ForLoop(n) => {
+                    collect_action_def_body_errors(&n.value.body, errors);
+                }
+                ActionUsageBodyElement::WhileStmt(n) => {
+                    collect_action_def_body_errors(&n.value.body, errors);
+                }
+                ActionUsageBodyElement::LoopStmt(n) => {
+                    collect_action_def_body_errors(&n.value.body, errors);
+                }
+                ActionUsageBodyElement::IfStmt(n) => {
+                    collect_action_def_body_errors(&n.value.then_body, errors);
+                    if let Some(else_body) = &n.value.else_body {
+                        collect_action_def_body_errors(else_body, errors);
+                    }
                 }
                 _ => {}
             }
