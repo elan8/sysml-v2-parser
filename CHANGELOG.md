@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Typed `interface` usage rejected as a body member, and bracketed connect-end multiplicity
+  broke every interface usage that had it** ([#16](https://github.com/elan8/sysml-v2-parser/issues/16)) —
+  `interface_usage` unconditionally required either a `connect` clause or a bare `from to to`
+  form, so the plain declared form (BNF `InterfaceUsageDeclaration`'s `('connect'
+  InterfacePart)?` is optional) — e.g. `interface hubToRim : SpokeInterface;` — failed to parse
+  at all and fell through to opaque recovery with a misleading `expected valid part definition
+  body element` / `missing semicolon before next declaration` diagnostic depending on what
+  followed. Separately, `connector_end_expression` had no support whatsoever for the leading
+  cross-multiplicity Annex/Systems-Library fixtures write on connect ends (`connect [1] a to [1]
+  b;`), so *every* interface usage using that real, spec-legal shape failed too. Fixing the
+  multiplicity gap also surfaced a latent whitespace bug: combining a leading `[mult]` with a
+  named end-reference (`connect [1] p1 ::> a.p1 to ...;`) failed because the multiplicity
+  consumer didn't skip the following whitespace before the name/`::>` check ran.
+  <br>Added `InterfaceUsage::Declaration` for the connect-less form, gave `connector_end_expression`
+  bracketed-multiplicity support (discarded, matching the existing end-name handling — neither is
+  modeled on `InterfaceUsage::from`/`to` yet), and fixed the whitespace gap. Verified against the
+  SysML v2 spec grammar (`InterfaceUsageDeclaration`, §8.2.2.14.2) and real Annex fixtures
+  (`SysML v2 Spec Annex A SimpleVehicleModel.sysml`, `IssueMetadataExample.sysml`). Bump
+  `PARSE_AST_VERSION` 56 → 57.
+
 - **`action def` nested inside a `part def` body rejected** ([#14](https://github.com/elan8/sysml-v2-parser/issues/14)) —
   `part_def_body_element` dispatched every other nested `def` kind added under PAR-002
   (`state def`, `flow def`, `connection def`, `port def`, `calc def`, …) but never wired
