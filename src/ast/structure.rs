@@ -862,6 +862,10 @@ pub struct EndDecl {
     /// it must not be modeled as typing (`endType`) downstream. `None` for the `end name : Type;`
     /// typing form.
     pub references: Option<Node<SubsettingRelationship>>,
+    /// Optional multiplicity after the type/reference target, e.g. `[1]` in `end hub ::>
+    /// mainSwitch[1];` (BNF `DefaultInterfaceEnd`'s `Usage` production carries the same optional
+    /// multiplicity every other usage declaration does). `None` when absent.
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Span of the name (for semantic tokens).
     pub name_span: Option<Span>,
     /// Span of the type/reference target after `:`/`::>`/`references` (for semantic tokens).

@@ -41,6 +41,19 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"end"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // Optional structural kind keyword (BNF `InterfaceOccurrenceUsageElement`/
+    // `StructureUsageElement`, e.g. `end part hub : Hub;`, `end port p1 : P;`). Not retained as a
+    // separate field: `part`/`port` don't change this end's own grammar (name + type/reference),
+    // and `EndDecl` doesn't model usage-kind distinctions -- same simplification already made for
+    // interface.rs's `port` handling before this fix widened it to also cover `part` (GH-19/GH-20:
+    // real-world `end part hub ::> mainSwitch[1];` examples were rejected because this keyword
+    // wasn't accepted at all).
+    let (input, _) = opt(preceded(
+        ws_and_comments,
+        alt(((tag(&b"part"[..]), ws1), (tag(&b"port"[..]), ws1))),
+    ))
+    .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) =
         with_span(|input| alt((derived_end_name, name)).parse(input)).parse(input)?;
 
@@ -48,6 +61,12 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     // so it's modeled via the same structured `SubsettingRelationship` every other reference-
     // subsetting clause uses -- not folded into `type_name`/typing like the `:` form below.
     if let Ok((input, references)) = reference_subsetting(input) {
+        // Trailing multiplicity on the reference target (e.g. `::> mainSwitch[1]`) is parsed the
+        // same way `part_usage_redefines_only`/other subsetting-family callers do: the shared
+        // `reference_subsetting` parser only consumes the qualified target, so any multiplicity
+        // is a separate, subsequent optional parse here (GH-20 real-world example).
+        let (input, multiplicity) =
+            opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         let type_ref_span = references.value.span.clone();
         let type_name = references.value.target_display();
@@ -61,6 +80,7 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
                     type_name,
                     uses_derived_syntax: true,
                     references: Some(references),
+                    multiplicity,
                     name_span: Some(name_span),
                     type_ref_span: Some(type_ref_span),
                 },
@@ -71,6 +91,7 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, (type_ref_span, type_name)) =
         preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
+    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -82,6 +103,7 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
                 type_name,
                 uses_derived_syntax: false,
                 references: None,
+                multiplicity,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
             },

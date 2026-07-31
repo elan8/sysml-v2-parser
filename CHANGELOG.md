@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Connection/interface `end` decl rejected a structural kind keyword and trailing multiplicity**
+  (GH-19/GH-20 follow-up) — the real-world examples from both issues (and the upstream
+  [elan8/spec42#1](https://github.com/elan8/spec42/issues/1)/[#2](https://github.com/elan8/spec42/issues/2)
+  reports) use `end part hub : Hub;` and `end part hub ::> mainSwitch[1];`, neither of which
+  actually parsed even after the GH-19/GH-20 fixes landed: `connection.rs`'s `end_decl` accepted
+  no structural kind keyword at all (`interface.rs` only accepted a bare `port`, and it lacked a
+  word-boundary check — see below), and the shared `usage::reference_subsetting` parser only
+  consumes the qualified target, never a following `[mult]` bracket (matching every other
+  subsetting-family clause; callers that need one, like `part_usage_redefines_only`, already parse
+  it as a separate subsequent step). Both examples silently recovered to `Error` nodes with
+  `result.errors` staying empty, exactly the "recovery hides it" trap both issues warned about.
+
+  Both `end_decl`s now accept an optional `part`/`port` keyword after `end` (BNF
+  `InterfaceOccurrenceUsageElement`/`StructureUsageElement`; not retained as a separate field --
+  `EndDecl` doesn't model usage-kind distinctions, same simplification already made for
+  `interface.rs`'s pre-existing `port` handling) and an optional trailing multiplicity on both the
+  `:` typing and `::>`/`references` forms, captured in a new `EndDecl.multiplicity:
+  Option<Node<Multiplicity>>` field. `PARSE_AST_VERSION` bumped 58 → 59 (additive field).
+
+  Also fixed a latent word-boundary bug surfaced while adding the `part`/`port` keyword: a bare
+  `tag("part")`/`tag("port")` (the latter pre-existing in `interface.rs`) matches as a prefix of
+  any longer name starting with those letters (e.g. `end party ::> acmeLtd;` would have silently
+  split into keyword `part` + one-letter name `y`). Both keyword checks now require a following
+  `ws1` (mandatory whitespace), matching the same safety net `end`'s own `tag` + `ws1` already
+  relies on.
+
 ## [0.51.0] - 2026-07-31
 
 ### Fixed
