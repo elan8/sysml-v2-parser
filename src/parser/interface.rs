@@ -13,6 +13,7 @@ use crate::parser::lex::{name, qualified_name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
+use crate::parser::usage::reference_subsetting;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -23,7 +24,7 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// End declaration: `end` name `:` type `;`
+/// End declaration: `end` name (`:` type | (`::>` | `references`) target) `;`
 fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -33,6 +34,32 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
         nom::combinator::opt(preceded(ws_and_comments, tag(&b"port"[..]))).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+
+    // `::>` / `references` reference subsetting (GH-19): the target is a reference, not a type,
+    // so it's modeled via the same structured `SubsettingRelationship` every other reference-
+    // subsetting clause uses -- not folded into `type_name`/typing like the `:` form below. This
+    // previously only accepted `:`, so `end name references target;` fell through to recovery.
+    if let Ok((input, references)) = reference_subsetting(input) {
+        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        let type_ref_span = references.value.span.clone();
+        let type_name = references.value.target_display();
+        return Ok((
+            input,
+            node_from_to(
+                start,
+                input,
+                EndDecl {
+                    name: name_str,
+                    type_name,
+                    uses_derived_syntax: true,
+                    references: Some(references),
+                    name_span: Some(name_span),
+                    type_ref_span: Some(type_ref_span),
+                },
+            ),
+        ));
+    }
+
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, (tilde, (type_ref_span, type_name))) = preceded(
         ws_and_comments,
@@ -56,6 +83,7 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
                     type_name
                 },
                 uses_derived_syntax: false,
+                references: None,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
             },

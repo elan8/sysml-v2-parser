@@ -1164,6 +1164,7 @@ fn normalize_end_decl(e: &EndDecl) -> EndDecl {
         name: e.name.clone(),
         type_name: e.type_name.clone(),
         uses_derived_syntax: e.uses_derived_syntax,
+        references: e.references.clone(),
         name_span: None,
         type_ref_span: None,
     }

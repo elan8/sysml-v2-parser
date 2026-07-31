@@ -845,16 +845,26 @@ pub enum InterfaceDefBodyElement {
     PortUsage(Node<PortUsage>),
 }
 
-/// End declaration in interface def: `end` name `:` type `;`.
+/// End declaration in interface/connection def: `end` name (`:` type | (`::>` | `references`)
+/// target) `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
     pub name: String,
+    /// Display string for the type (`:` form) or reference target (`::>`/`references` form).
+    /// Kept for backward compatibility and simple display; see `references` for the structured
+    /// reference-subsetting form (GH-19).
     pub type_name: String,
+    /// True when this end used `::>`/`references` reference subsetting instead of `:` typing.
     pub uses_derived_syntax: bool,
+    /// Structured reference-subsetting relationship for the `::>`/`references` form (GH-19):
+    /// `end name ::> target;` / `end name references target;` names a reference, not a type, so
+    /// it must not be modeled as typing (`endType`) downstream. `None` for the `end name : Type;`
+    /// typing form.
+    pub references: Option<Node<SubsettingRelationship>>,
     /// Span of the name (for semantic tokens).
     pub name_span: Option<Span>,
-    /// Span of the type after `:` (for semantic tokens).
+    /// Span of the type/reference target after `:`/`::>`/`references` (for semantic tokens).
     pub type_ref_span: Option<Span>,
 }
 

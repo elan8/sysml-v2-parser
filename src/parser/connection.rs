@@ -16,7 +16,7 @@ use crate::parser::lex::{
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
-use crate::parser::usage::multiplicity_node;
+use crate::parser::usage::{multiplicity_node, reference_subsetting};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -43,31 +43,34 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
     let (input, _) = ws1(input)?;
     let (input, (name_span, name_str)) =
         with_span(|input| alt((derived_end_name, name)).parse(input)).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, uses_derived_syntax) = if let Ok((input, _)) =
-        tag::<_, _, nom::error::Error<Input<'_>>>(&b"::>"[..]).parse(input)
-    {
-        (input, true)
-    } else {
-        let (input, _) = tag(&b":"[..]).parse(input)?;
-        (input, false)
-    };
-    let (input, (type_ref_span, type_name)) = if uses_derived_syntax {
-        let (input, _) = ws_and_comments(input)?;
-        let start_type = input;
-        let (input, value) =
-            take_while1(|c: u8| c != b';' && c != b'\n' && c != b'\r').parse(input)?;
-        let type_name = String::from_utf8_lossy(value.fragment()).trim().to_string();
-        let span = crate::ast::Span {
-            offset: start_type.location_offset(),
-            line: start_type.location_line(),
-            column: start_type.get_column(),
-            len: value.fragment().len(),
-        };
-        (input, (span, type_name))
-    } else {
-        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?
-    };
+
+    // `::>` / `references` reference subsetting (GH-19): the target is a reference, not a type,
+    // so it's modeled via the same structured `SubsettingRelationship` every other reference-
+    // subsetting clause uses -- not folded into `type_name`/typing like the `:` form below.
+    if let Ok((input, references)) = reference_subsetting(input) {
+        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        let type_ref_span = references.value.span.clone();
+        let type_name = references.value.target_display();
+        return Ok((
+            input,
+            node_from_to(
+                start,
+                input,
+                EndDecl {
+                    name: name_str,
+                    type_name,
+                    uses_derived_syntax: true,
+                    references: Some(references),
+                    name_span: Some(name_span),
+                    type_ref_span: Some(type_ref_span),
+                },
+            ),
+        ));
+    }
+
+    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+    let (input, (type_ref_span, type_name)) =
+        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -77,7 +80,8 @@ fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
             EndDecl {
                 name: name_str,
                 type_name,
-                uses_derived_syntax,
+                uses_derived_syntax: false,
+                references: None,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
             },
