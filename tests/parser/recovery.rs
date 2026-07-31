@@ -288,7 +288,7 @@ fn test_part_def_nested_state_and_attribute_siblings() {
 
 #[test]
 fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
-    // Truly unmodeled keyword still lands in Other/Error recovery; later siblings stay intact.
+    // Unrecognized members land as Error (GH-12); later siblings stay intact.
     let input =
         "package P {\npart def Vehicle {\nwidget monitor: Mode;\nattribute mass: MassValue;\n}\n}";
     let result = parse_with_diagnostics(input);
@@ -312,11 +312,9 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
     assert!(
         elements.iter().any(|e| matches!(
             e.value,
-            sysml_v2_parser::ast::PartDefBodyElement::Other(_)
-                | sysml_v2_parser::ast::PartDefBodyElement::OpaqueMember(_)
-                | sysml_v2_parser::ast::PartDefBodyElement::Error(_)
+            sysml_v2_parser::ast::PartDefBodyElement::Error(_)
         )),
-        "library-tolerant unmodeled part members should be preserved explicitly"
+        "unmodeled part members should be preserved as Error nodes"
     );
     assert!(
         elements.iter().any(|e| matches!(

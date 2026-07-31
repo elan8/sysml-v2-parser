@@ -309,66 +309,36 @@ fn part_usage_body(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
     result
 }
 
+fn part_usage_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PartUsageBodyElement> {
+    // Always emit Error for unrecognized tokens (including non-starters). Hard-failing non-starters
+    // previously aborted the usage body so the package path swallowed the whole decl as
+    // ExtendedLibraryDecl with no diagnostic (GH-12).
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        PART_BODY_STARTERS,
+        "part usage body",
+        "recovered_part_usage_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        PartUsageBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
 fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            log::debug!("part_usage_body: brace ok, {} elements", elements.len());
-            return Ok((input, PartUsageBody::Brace { elements }));
-        }
-        match part_usage_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), PART_BODY_STARTERS) => {
-                let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(node_from_to(
-                    input,
-                    next,
-                    PartUsageBodyElement::Error(Node::new(
-                        crate::ast::Span::dummy(),
-                        build_recovery_error_node_from_span(
-                            input,
-                            next,
-                            PART_BODY_STARTERS,
-                            "part usage body",
-                            "recovered_part_usage_body_element",
-                        ),
-                    )),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )));
-            }
-        }
-    }
+    let (input, elements) = parse_structured_brace_members_with_skip(
+        input,
+        PART_BODY_STARTERS,
+        "part usage body",
+        "recovered_part_usage_body_element",
+        part_usage_body_element,
+        part_usage_body_recovery,
+        BraceMemberSkip::BodyElementRecover,
+    )?;
+    log::debug!("part_usage_body: brace ok, {} elements", elements.len());
+    Ok((input, PartUsageBody::Brace { elements }))
 }
 
 fn consume_part_usage_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
@@ -378,22 +348,7 @@ fn consume_part_usage_structured_brace(input: Input<'_>) -> IResult<Input<'_>, (
         "part usage body",
         "recovered_part_usage_body_element",
         part_usage_body_element,
-        |start, end| {
-            node_from_to(
-                start,
-                end,
-                PartUsageBodyElement::Error(Node::new(
-                    crate::ast::Span::dummy(),
-                    build_recovery_error_node_from_span(
-                        start,
-                        end,
-                        PART_BODY_STARTERS,
-                        "part usage body",
-                        "recovered_part_usage_body_element",
-                    ),
-                )),
-            )
-        },
+        part_usage_body_recovery,
         BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, ()))
