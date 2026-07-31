@@ -35,6 +35,8 @@ fn try_part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDe
 }
 
 fn part_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PartDefBodyElement> {
+    // Always emit Error (never Other): unrecognized tokens must surface as diagnostics for both
+    // `parse` and `parse_for_editor`, matching package/attribute/port body recovery (GH-12).
     let recovery = build_recovery_error_node_from_span(
         start,
         end,
@@ -42,33 +44,11 @@ fn part_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PartDefBodyE
         "part definition body",
         "recovered_part_def_body_element",
     );
-    if starts_with_any_keyword(start.fragment(), PART_BODY_STARTERS) {
-        return node_from_to(
-            start,
-            end,
-            PartDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
-        );
-    }
-    if matches!(
-        recovery.code.as_str(),
-        "missing_type_reference"
-            | "invalid_bare_identifier_in_action_body"
-            | "invalid_bare_identifier_in_state_body"
-            | "unexpected_keyword_in_scope"
-            | "missing_semicolon"
-            | "missing_body_or_semicolon"
-            | "invalid_requirement_short_name_syntax"
-    ) {
-        return node_from_to(
-            start,
-            end,
-            PartDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
-        );
-    }
-    let frag = start.fragment();
-    let take = frag.len().min(80);
-    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    node_from_to(start, end, PartDefBodyElement::Other(preview))
+    node_from_to(
+        start,
+        end,
+        PartDefBodyElement::Error(node_from_to(start, end, recovery)),
+    )
 }
 
 fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
