@@ -1170,6 +1170,19 @@ pub enum InterfaceUsage {
         to: Node<Expression>,
         body_elements: Vec<Node<InterfaceUsageBodyElement>>,
     },
+    /// `interface` (name (multiplicity)?)? (`:` Type)? body -- a declared interface usage with
+    /// no inline `connect` clause (GH-16). Per BNF `InterfaceUsageDeclaration = UsageDeclaration
+    /// ValuePart? ('connect' InterfacePart)? | InterfacePart`, the `connect` clause is optional:
+    /// ends may be declared inside the body instead, or omitted entirely (e.g. as a placeholder
+    /// to be redefined later). Previously this shape fell through to opaque recovery because
+    /// `interface_usage` unconditionally required either a `connect` clause or a bare `from to
+    /// to` form.
+    Declaration {
+        name: Option<String>,
+        interface_type: Option<String>,
+        body: ConnectBody,
+        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+    },
 }
 
 /// Element in interface usage body (e.g. ref redefinition).

@@ -767,20 +767,32 @@ fn connect_body_with_elements(
 }
 
 /// Connector end reference used in interface/connect syntax.
-/// Accepts either `path` or `endName ::> path`; the end name is currently ignored.
+/// Accepts an optional leading cross multiplicity (`[1]`, discarded -- `InterfaceUsage::from`/
+/// `to` don't model per-end multiplicity yet, same as the end name below; GH-16: real Systems
+/// Library / Annex fixtures write `connect [1] a to [1] b;`, which failed to parse at all before
+/// this), then either `path` or `endName ::> path`; the end name is currently ignored.
 fn connector_end_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt((name, preceded(ws_and_comments, tag(&b"::>"[..])))).parse(input)?;
     preceded(ws_and_comments, path_expression).parse(input)
 }
 
-/// Interface usage: `interface` ( name `:` )? ( `:Type` )? `connect` path `to` path body
-/// or `interface` path `to` path body. The optional interface member name is currently ignored.
+/// Interface usage: `interface` ( name (multiplicity)? `:` Type )? `connect` path `to` path body,
+/// or `interface path `to` path body (only legal when no name/type precedes it), or -- GH-16 --
+/// `interface` ( name (multiplicity)? )? ( `:` Type )? body with no inline `connect` clause at
+/// all (BNF `InterfaceUsageDeclaration`'s `('connect' InterfacePart)?` is optional: ends may be
+/// declared inside the body instead, or omitted entirely). The optional interface member name is
+/// captured only for the declaration-only form; the connect forms still ignore it.
 pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"interface"[..]).parse(input)?;
-    let (input, _) = if input.fragment().starts_with(b":") {
+    let (input, _) = if input.fragment().starts_with(b":")
+        || input.fragment().starts_with(b";")
+        || input.fragment().starts_with(b"{")
+    {
         (input, ())
     } else {
         ws1(input)?
@@ -792,15 +804,17 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
-    let (input, interface_type) = if let Some((_, _, _, interface_type)) = named_interface {
-        (input, Some(interface_type))
-    } else {
-        opt(preceded(
-            tag(&b":"[..]),
-            preceded(ws_and_comments, qualified_name),
-        ))
-        .parse(input)?
-    };
+    let (input, iface_name, interface_type) =
+        if let Some((iface_name, _, _, interface_type)) = named_interface {
+            (input, Some(iface_name), Some(interface_type))
+        } else {
+            let (input, interface_type) = opt(preceded(
+                tag(&b":"[..]),
+                preceded(ws_and_comments, qualified_name),
+            ))
+            .parse(input)?;
+            (input, None, interface_type)
+        };
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"connect") {
         let (input, _) = tag(&b"connect"[..]).parse(input)?;
@@ -809,7 +823,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
         let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
         let (input, (body, body_elements)) = connect_body_with_elements(input)?;
-        Ok((
+        return Ok((
             input,
             node_from_to(
                 start,
@@ -822,25 +836,48 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     body_elements,
                 },
             ),
-        ))
-    } else {
-        let (input, from_expr) = connector_end_expression(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
-        let (input, _) = opt(connect_body).parse(input)?;
-        Ok((
-            input,
-            node_from_to(
-                start,
-                input,
-                InterfaceUsage::Connection {
-                    from: from_expr,
-                    to: to_expr,
-                    body_elements: vec![],
-                },
-            ),
-        ))
+        ));
     }
+    // BNF: the bare `InterfacePart` alternative (no `connect` keyword) is only legal when there
+    // is no preceding `UsageDeclaration` at all -- i.e. no name and no type were captured above.
+    if iface_name.is_none() && interface_type.is_none() {
+        if let Ok((after_to, (from_expr, to_expr))) = (|| {
+            let (input, from_expr) = connector_end_expression(input)?;
+            let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
+            let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
+            Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (from_expr, to_expr)))
+        })() {
+            let (input, _) = opt(connect_body).parse(after_to)?;
+            return Ok((
+                input,
+                node_from_to(
+                    start,
+                    input,
+                    InterfaceUsage::Connection {
+                        from: from_expr,
+                        to: to_expr,
+                        body_elements: vec![],
+                    },
+                ),
+            ));
+        }
+    }
+    // GH-16: no `connect` clause (and, if unnamed/untyped, no bare `from to to` form either) --
+    // a plain declared interface usage. Ends, if any, are declared inside the body instead.
+    let (input, (body, body_elements)) = connect_body_with_elements(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            InterfaceUsage::Declaration {
+                name: iface_name,
+                interface_type,
+                body,
+                body_elements,
+            },
+        ),
+    ))
 }
 
 /// Bare reference usage: `(visibility)? ref` name (`:` type)? (`=` value)? body.
@@ -1629,5 +1666,124 @@ mod short_name_tests {
         assert!(node.value.is_reference);
         assert_eq!(node.value.name, "elements");
         assert_eq!(node.value.type_name, "SparePart");
+    }
+}
+
+#[cfg(test)]
+mod gh16_interface_usage_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    /// GH-16: a typed interface usage with no inline `connect` clause at all previously failed
+    /// to parse entirely (BNF `InterfaceUsageDeclaration`'s `('connect' InterfacePart)?` is
+    /// optional, so this is legal -- ends would be declared inside the body instead, or omitted).
+    #[test]
+    fn interface_usage_accepts_typed_declaration_with_no_connect_clause() {
+        let (rest, node) =
+            interface_usage(input("interface hubToRim : SpokeInterface;")).expect("declaration");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            InterfaceUsage::Declaration {
+                name,
+                interface_type,
+                ..
+            } => {
+                assert_eq!(name.as_deref(), Some("hubToRim"));
+                assert_eq!(interface_type.as_deref(), Some("SpokeInterface"));
+            }
+            other => panic!("expected Declaration, got {other:?}"),
+        }
+    }
+
+    /// A bare `interface;` (no name, no type, no connect) is likewise a plain declaration.
+    #[test]
+    fn interface_usage_accepts_bare_declaration_with_no_name_or_type() {
+        let (rest, node) = interface_usage(input("interface;")).expect("bare declaration");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, InterfaceUsage::Declaration { .. }));
+    }
+
+    /// GH-16: `connect [1] a to [1] b;` -- a leading cross multiplicity on each connect end
+    /// (real shape from the Systems Library / Vehicle Example Annex fixtures) previously failed
+    /// to parse; `connector_end_expression` had no support for it at all.
+    #[test]
+    fn interface_usage_accepts_bracketed_multiplicity_on_connect_ends() {
+        let (rest, node) = interface_usage(input(
+            "interface hubToRim : SpokeInterface connect [1] hub.p to [1] rim.p;",
+        ))
+        .expect("typed connect with bracketed multiplicity ends");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, InterfaceUsage::TypedConnect { .. }));
+    }
+
+    /// Multi-line form (the `connect` clause on its own line after the typed declaration) must
+    /// keep parsing -- this is the common real-world layout in the Annex fixtures.
+    #[test]
+    fn interface_usage_accepts_multiline_connect_with_bracketed_multiplicity() {
+        let (rest, node) = interface_usage(input(
+            "interface hubToRim : SpokeInterface\n    connect [1] hub.p to [1] rim.p;",
+        ))
+        .expect("multiline typed connect");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, InterfaceUsage::TypedConnect { .. }));
+    }
+
+    /// Existing named + multiplicity + `::>` end-reference form (Vehicle Example Annex) must
+    /// still parse once bracketed multiplicity is layered on top of it.
+    #[test]
+    fn interface_usage_accepts_end_name_with_bracketed_multiplicity() {
+        let (rest, node) = interface_usage(input(
+            "interface wheelHubInterface:WheelHubInterface connect [1] lugNutCompositePort ::> wheel1.lugNutCompositePort to [1] shankCompositePort ::> hub1.shankCompositePort;",
+        ))
+        .expect("named end with bracketed multiplicity");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, InterfaceUsage::TypedConnect { .. }));
+    }
+
+    /// Untyped/unnamed bare `interface a to b;` shorthand must still work (regression guard: the
+    /// declaration-only fallback must not shadow this legal BNF `InterfacePart` alternative).
+    #[test]
+    fn interface_usage_still_accepts_bare_connection_shorthand() {
+        let (rest, node) =
+            interface_usage(input("interface hub.p to rim.p;")).expect("bare connection");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, InterfaceUsage::Connection { .. }));
+    }
+
+    /// GH-16 issue samples: https://github.com/elan8/sysml-v2-parser/issues/16
+    #[test]
+    fn gh16_issue_samples_parse_cleanly() {
+        let samples = [
+            r#"package Shop {
+                port def HubPort;
+                interface def SpokeInterface { end p1 : HubPort; end p2 : HubPort; }
+                part def Hub { port p : HubPort; }
+                part def Rim { port p : HubPort; }
+                part def Wheel {
+                    part hub : Hub;
+                    part rim : Rim;
+                    interface hubToRim : SpokeInterface;
+                }
+            }"#,
+            r#"package Shop {
+                port def HubPort;
+                interface def SpokeInterface { end p1 : HubPort; end p2 : HubPort; }
+                part def Hub { port p : HubPort; }
+                part def Rim { port p : HubPort; }
+                part def Wheel {
+                    part hub : Hub;
+                    part rim : Rim;
+                    interface hubToRim : SpokeInterface
+                        connect [1] hub.p to [1] rim.p;
+                }
+            }"#,
+        ];
+        for sample in samples {
+            crate::parse(sample).unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
+        }
     }
 }
