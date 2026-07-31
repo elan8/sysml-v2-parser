@@ -3104,6 +3104,217 @@ end b : B;
     );
 }
 
+/// GH-19: `end name ::> target;` was accepted, but the target was stored as typing (`type_name`)
+/// rather than reference subsetting, and `end name references target;` (the keyword spelling of
+/// the same `::>` operator, per `references_operator`) wasn't accepted at all -- it fell through
+/// to recovery. Both spellings should now produce a structured `SubsettingRelationship` with
+/// `kind: References` on `EndDecl.references`, and `end name : Type;` typing must still work.
+#[test]
+fn test_connection_end_decl_accepts_references_reference_subsetting() {
+    let input = r#"package test {
+part def Organisation {}
+part def MySystem {}
+part acmeLtd : Organisation;
+part theSystem : MySystem;
+connection systemInterest {
+end party ::> acmeLtd;
+end systemOfInterest references theSystem;
+}
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let connection = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::ConnectionDef(c) => Some(&c.value),
+            _ => None,
+        })
+        .expect("expected connection def");
+    let ConnectionDefBody::Brace { elements } = &connection.body else {
+        panic!("expected connection def brace body");
+    };
+    assert_eq!(
+        elements.len(),
+        2,
+        "both ends should parse as structured EndDecl nodes, not recover to Error: {:?}",
+        elements
+    );
+
+    let ends: Vec<&EndDecl> = elements
+        .iter()
+        .map(|e| match &e.value {
+            ConnectionDefBodyElement::EndDecl(end) => &end.value,
+            other => panic!("expected EndDecl, got {:?}", other),
+        })
+        .collect();
+
+    let party = ends
+        .iter()
+        .find(|e| e.name == "party")
+        .expect("expected `party` end");
+    assert!(party.uses_derived_syntax);
+    let party_refs = party
+        .references
+        .as_ref()
+        .expect("`::>` end should populate structured references");
+    assert_eq!(party_refs.value.kind, SubsettingKind::References);
+    assert_eq!(party_refs.value.target_display(), "acmeLtd");
+
+    let system_of_interest = ends
+        .iter()
+        .find(|e| e.name == "systemOfInterest")
+        .expect("expected `systemOfInterest` end");
+    assert!(system_of_interest.uses_derived_syntax);
+    let soi_refs = system_of_interest
+        .references
+        .as_ref()
+        .expect("`references` keyword end should populate structured references");
+    assert_eq!(soi_refs.value.kind, SubsettingKind::References);
+    assert_eq!(soi_refs.value.target_display(), "theSystem");
+}
+
+/// GH-19 contrast case: plain `end name : Type;` typing must be unaffected by the reference-
+/// subsetting addition -- `references` stays `None` and `type_name`/`uses_derived_syntax` behave
+/// exactly as before.
+#[test]
+fn test_connection_end_decl_typing_form_unaffected() {
+    let input = "package P {\npart def A;\nconnection def C {\nend a : A;\n}\n}";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let connection = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::ConnectionDef(c) => Some(&c.value),
+            _ => None,
+        })
+        .expect("expected connection def");
+    let ConnectionDefBody::Brace { elements } = &connection.body else {
+        panic!("expected connection def brace body");
+    };
+    let end = match &elements[0].value {
+        ConnectionDefBodyElement::EndDecl(end) => &end.value,
+        other => panic!("expected EndDecl, got {:?}", other),
+    };
+    assert_eq!(end.type_name, "A");
+    assert!(!end.uses_derived_syntax);
+    assert!(
+        end.references.is_none(),
+        "`:` typing form must not populate references"
+    );
+}
+
+/// GH-19: `interface def`'s `end_decl` previously only accepted `:` typing at all -- neither
+/// `::>` nor `references` were recognized, so both fell through to recovery.
+#[test]
+fn test_interface_end_decl_accepts_references_reference_subsetting() {
+    let input = r#"package P {
+port def PowerPort;
+interface def PowerInterface {
+end supplier ::> a;
+end consumer references b;
+}
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let interface = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::InterfaceDef(i) => Some(&i.value),
+            _ => None,
+        })
+        .expect("expected interface def");
+    let InterfaceDefBody::Brace { elements } = &interface.body else {
+        panic!("expected interface def brace body");
+    };
+    assert_eq!(
+        elements.len(),
+        2,
+        "both ends should parse as structured EndDecl nodes, not recover to Error: {:?}",
+        elements
+    );
+    for (expected_name, expected_target) in [("supplier", "a"), ("consumer", "b")] {
+        let end = elements
+            .iter()
+            .find_map(|e| match &e.value {
+                InterfaceDefBodyElement::EndDecl(end) if end.value.name == expected_name => {
+                    Some(&end.value)
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("expected `{expected_name}` end"));
+        assert!(end.uses_derived_syntax);
+        let refs = end
+            .references
+            .as_ref()
+            .unwrap_or_else(|| panic!("`{expected_name}` end should populate references"));
+        assert_eq!(refs.value.kind, SubsettingKind::References);
+        assert_eq!(refs.value.target_display(), expected_target);
+    }
+}
+
+/// GH-19 contrast case: `interface def`'s pre-existing `end name : Type;` typing (with optional
+/// `~` conjugation) must be unaffected.
+#[test]
+fn test_interface_end_decl_typing_form_unaffected() {
+    let input = "package P {\nport def A;\ninterface def I {\nend a : A;\n}\n}";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let interface = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::InterfaceDef(i) => Some(&i.value),
+            _ => None,
+        })
+        .expect("expected interface def");
+    let InterfaceDefBody::Brace { elements } = &interface.body else {
+        panic!("expected interface def brace body");
+    };
+    let end = match &elements[0].value {
+        InterfaceDefBodyElement::EndDecl(end) => &end.value,
+        other => panic!("expected EndDecl, got {:?}", other),
+    };
+    assert_eq!(end.type_name, "A");
+    assert!(!end.uses_derived_syntax);
+    assert!(
+        end.references.is_none(),
+        "`:` typing form must not populate references"
+    );
+}
+
 #[test]
 fn test_part_def_body_accepts_assert_constraint_and_satisfy() {
     // Regression: `assert_constraint_member` was only reachable from occurrence-def bodies,

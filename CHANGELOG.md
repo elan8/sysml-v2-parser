@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Connection/interface `end` decl `::>`/`references` not modeled as reference subsetting**
+  ([#19](https://github.com/elan8/sysml-v2-parser/issues/19)) — `end name ::> target;` was
+  accepted by `connection.rs`'s `end_decl`, but the target was stored as typing (`type_name`)
+  rather than reference subsetting, and the keyword spelling `end name references target;`
+  (`references_operator` already treats `::>` and `references` as equivalent for usage headers —
+  that equivalence was missing here) wasn't accepted at all, falling through to recovery.
+  `interface.rs`'s `end_decl` only ever accepted `:` typing, so both spellings failed there.
+  Both `end_decl`s now try `usage::reference_subsetting` (the same `::>`/`references` parser
+  every other reference-subsetting clause uses) before falling back to `:` typing, and `EndDecl`
+  gained a new `references: Option<Node<SubsettingRelationship>>` field (`kind:
+  SubsettingKind::References`) alongside the existing `type_name`/`uses_derived_syntax` fields
+  (kept for display/backward compatibility, mirroring `RefDecl.type_name`/`typing`). `end name :
+  Type;` typing is unaffected. `PARSE_AST_VERSION` bumped 57 → 58 (additive `EndDecl` field).
+  Downstream, Spec42 should wire `referencesFeature`/`ReferenceSubsetting` from this field instead
+  of `endType` for the `::>`/`references` form.
+
 - **Misleading diagnostics and spurious recovery failures**
   ([#18](https://github.com/elan8/sysml-v2-parser/issues/18)) — three related recovery/diagnostic
   bugs, none requiring grammar changes:
