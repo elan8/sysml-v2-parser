@@ -133,6 +133,15 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
         let span = crate::parser::span_from_to(before_pre_body_redefines, input);
         subsetting_relationship_node(span, crate::ast::SubsettingKind::Redefines, target)
     });
+    // §8.2.2.18.2: `ExhibitStateUsage` shares `StateUsageBody` with plain `state` usages, so the
+    // same `parallel`/`initial` modifier is legal here too (OMG spec Annex `exhibit state
+    // vehicleStates parallel { ... }` in `5-State-based Behavior-2.sysml`) -- GH-17.
+    let (input, _) = opt(alt((
+        preceded(preceded(ws_and_comments, tag(&b"parallel"[..])), ws1),
+        preceded(preceded(ws_and_comments, tag(&b"initial"[..])), ws1),
+    )))
+    .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
     let (input, body) = crate::parser::state::state_def_body(input)?;
     let before_redefines = input;
     let (input, redefines) = opt(preceded(
