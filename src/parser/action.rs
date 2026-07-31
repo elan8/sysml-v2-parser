@@ -994,6 +994,40 @@ fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>
     ))
 }
 
+/// True when `action` is followed by an `accept`/`send` *payload* clause rather than a usage named
+/// `accept`/`send` (e.g. `action send typed by T;` keeps `send` as the name).
+fn is_anonymous_accept_or_send_payload(fragment: &[u8]) -> bool {
+    use crate::parser::diagnostics::trim_ascii_start;
+
+    let keyword = if starts_with_keyword(fragment, b"accept") {
+        &b"accept"[..]
+    } else if starts_with_keyword(fragment, b"send") {
+        &b"send"[..]
+    } else {
+        return false;
+    };
+    let after_kw = trim_ascii_start(&fragment[keyword.len()..]);
+    // Usage-declaration continuations after a name — not a control-node payload.
+    if after_kw.is_empty()
+        || after_kw.starts_with(b";")
+        || after_kw.starts_with(b"{")
+        || after_kw.starts_with(b"[")
+        || after_kw.starts_with(b":")
+        || starts_with_keyword(after_kw, b"typed")
+        || starts_with_keyword(after_kw, b"defined")
+        || starts_with_keyword(after_kw, b"subsets")
+        || starts_with_keyword(after_kw, b"redefines")
+        || starts_with_keyword(after_kw, b"references")
+        || starts_with_keyword(after_kw, b"crosses")
+        || starts_with_keyword(after_kw, b"intersects")
+        || starts_with_keyword(after_kw, b"ordered")
+        || starts_with_keyword(after_kw, b"nonunique")
+    {
+        return false;
+    }
+    true
+}
+
 /// Action usage: `(visibility)? (abstract|variation)? (ref)? action` name header (`accept` …)? body
 pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     let start = input;
@@ -1026,16 +1060,17 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     // Annex `3c-Function-based Behavior-structure mod-1.sysml` declares one directly in a part
     // usage body. Previously only the typed anonymous form (`action: Runner;`) was accepted, so
     // the bodied one fell through to opaque recovery.
-    // Also anonymous when the next token is the `accept`/`send` payload clause
+    // Also anonymous when the next token opens an `accept`/`send` *payload* clause
     // (`then action accept engineOff : EngineOff;` in `3a-Function-based Behavior-3.sysml`).
+    // But `action send typed by T;` names the usage `send` — only treat accept/send as payload
+    // starters when the following token is not a usage-declaration continuation.
     let (input, (name_span, name_str)) = if (after_gap.fragment().starts_with(b":")
         && !after_gap.fragment().starts_with(b":>")
         && !after_gap.fragment().starts_with(b":>>"))
         || after_gap.fragment().starts_with(b"{")
         || after_gap.fragment().starts_with(b";")
         || starts_with_keyword(after_gap.fragment(), b"defined")
-        || starts_with_keyword(after_gap.fragment(), b"accept")
-        || starts_with_keyword(after_gap.fragment(), b"send")
+        || is_anonymous_accept_or_send_payload(after_gap.fragment())
     {
         (after_gap, (crate::ast::Span::dummy(), String::new()))
     } else {
