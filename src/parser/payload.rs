@@ -112,6 +112,7 @@ fn control_node_payload_stmt<'a>(
             input,
             ActionUsage {
                 is_abstract: false,
+                is_variation: false,
                 is_reference: false,
                 name: control_name.to_string(),
                 type_name: String::new(),

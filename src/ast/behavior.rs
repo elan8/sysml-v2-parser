@@ -62,6 +62,14 @@ pub enum ActionDefBodyElement {
     IfStmt(Node<IfStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
+    /// `part` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
+    PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// `item` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
+    ItemUsage(Node<crate::ast::ItemUsage>),
+    /// `assert constraint` via `BehaviorUsageMember` / `AssertConstraintUsage` (GH-13).
+    AssertConstraint(Node<crate::ast::AssertConstraintMember>),
+    /// `snapshot` / portion usage via `StructureUsageMember` → `PortionUsage` (GH-13).
+    OccurrenceUsage(Box<Node<crate::ast::OccurrenceUsage>>),
     Assign(Node<AssignStmt>),
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),
@@ -205,12 +213,15 @@ pub enum TransitionEffect {
     Expression(Node<Expression>),
 }
 
-/// Action usage: `(abstract)? (ref)? action` name (`:` type)? (`[mult]`)? (`:>`/` :>>` …)? body.
+/// Action usage: `(abstract|variation)? (ref)? action` name (`:` type)? (`[mult]`)? (`:>`/` :>>` …)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionUsage {
     /// Leading `abstract` keyword (Systems Library e.g. `abstract ref action performedActions`).
     pub is_abstract: bool,
+    /// Leading `variation` keyword (`RefPrefix.isVariation`, GH-13). Mutually exclusive with
+    /// [`Self::is_abstract`] per BNF `RefPrefix`.
+    pub is_variation: bool,
     /// Leading `ref` keyword — reference feature usage rather than composite
     /// (`ref action …` inside a part body).
     pub is_reference: bool,
@@ -278,6 +289,14 @@ pub enum ActionUsageBodyElement {
     IfStmt(Node<IfStmt>),
     StateUsage(Node<StateUsage>),
     ActionUsage(Box<Node<ActionUsage>>),
+    /// `part` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
+    PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// `item` usage via `StructureUsageMember` in `ActionBodyItem` (GH-13).
+    ItemUsage(Node<crate::ast::ItemUsage>),
+    /// `assert constraint` via `BehaviorUsageMember` / `AssertConstraintUsage` (GH-13).
+    AssertConstraint(Node<crate::ast::AssertConstraintMember>),
+    /// `snapshot` / portion usage via `StructureUsageMember` → `PortionUsage` (GH-13).
+    OccurrenceUsage(Box<Node<crate::ast::OccurrenceUsage>>),
     Assign(Node<AssignStmt>),
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),

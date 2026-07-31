@@ -1255,6 +1255,18 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::ActionUsage(n) => ActionDefBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),
         )),
+        ActionDefBodyElement::PartUsage(n) => ActionDefBodyElement::PartUsage(Box::new(
+            dummy_node(n, normalize_part_usage(&n.value)),
+        )),
+        ActionDefBodyElement::ItemUsage(n) => {
+            ActionDefBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
+        }
+        ActionDefBodyElement::AssertConstraint(n) => {
+            ActionDefBodyElement::AssertConstraint(dummy_node(n, n.value.clone()))
+        }
+        ActionDefBodyElement::OccurrenceUsage(n) => {
+            ActionDefBodyElement::OccurrenceUsage(Box::new(dummy_node(n, n.value.clone())))
+        }
         ActionDefBodyElement::Assign(n) => {
             ActionDefBodyElement::Assign(dummy_node(n, n.value.clone()))
         }
@@ -1278,6 +1290,7 @@ fn normalize_action_def_body_element_node(
 fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
     ActionUsage {
         is_abstract: a.is_abstract,
+        is_variation: a.is_variation,
         is_reference: a.is_reference,
         name: a.name.clone(),
         type_name: a.type_name.clone(),
@@ -1385,6 +1398,18 @@ fn normalize_action_usage_body_element_node(
         ActionUsageBodyElement::ActionUsage(n) => ActionUsageBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),
         )),
+        ActionUsageBodyElement::PartUsage(n) => ActionUsageBodyElement::PartUsage(Box::new(
+            dummy_node(n, normalize_part_usage(&n.value)),
+        )),
+        ActionUsageBodyElement::ItemUsage(n) => {
+            ActionUsageBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::AssertConstraint(n) => {
+            ActionUsageBodyElement::AssertConstraint(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::OccurrenceUsage(n) => {
+            ActionUsageBodyElement::OccurrenceUsage(Box::new(dummy_node(n, n.value.clone())))
+        }
         ActionUsageBodyElement::Assign(n) => {
             ActionUsageBodyElement::Assign(dummy_node(n, n.value.clone()))
         }
