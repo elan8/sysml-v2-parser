@@ -477,6 +477,95 @@ fn exhibit_state_supports_parallel_modifier() {
 }
 
 #[test]
+fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
+    // GH-27: `exhibit_state` was a narrow, bespoke parser never wired up to the shared
+    // prefix/specialization machinery `state_usage` already uses, so modifiers legal on plain
+    // `state` (visibility, `abstract`, `:>` subsets, multiplicity, `ordered`) were rejected on
+    // `exhibit state`. Rebuilt on the same shared helpers `state_usage` composes
+    // (`visibility_prefix`, `abstract`/`ref`, `specialization_clauses`, `optional_typings`,
+    // `multiplicity_node`, `skip_usage_feature_modifiers`) so the two stay in sync.
+    let input = "package P {\npart def Base {\nstate baseStates;\n}\npart def Vehicle {\nabstract exhibit state abstractStates { state a; }\nprivate exhibit state privateStates { state a; }\nexhibit state subsetStates :> Base::baseStates { state a; }\nexhibit state multiplicityStates[1] { state a; }\nexhibit state orderedStates ordered { state a; }\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let vehicle = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(def)
+                if def.value.identification.name.as_deref() == Some("Vehicle") =>
+            {
+                Some(&def.value)
+            }
+            _ => None,
+        })
+        .expect("expected Vehicle part def");
+    let PartDefBody::Brace { elements } = &vehicle.body else {
+        panic!("expected part body");
+    };
+    let exhibits: Vec<_> = elements
+        .iter()
+        .filter_map(|e| match &e.value {
+            PartDefBodyElement::ExhibitState(exhibit) => Some(&exhibit.value),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(exhibits.len(), 5, "expected 5 exhibit state usages");
+
+    let abstract_states = exhibits
+        .iter()
+        .find(|e| e.name == "abstractStates")
+        .expect("abstractStates");
+    assert!(abstract_states.is_abstract);
+
+    let private_states = exhibits
+        .iter()
+        .find(|e| e.name == "privateStates")
+        .expect("privateStates");
+    assert_eq!(
+        private_states.membership.visibility,
+        Some(sysml_v2_parser::ast::Visibility::Private)
+    );
+
+    let subset_states = exhibits
+        .iter()
+        .find(|e| e.name == "subsetStates")
+        .expect("subsetStates");
+    assert_eq!(
+        subset_states
+            .subsets
+            .as_ref()
+            .map(|n| n.value.target_display()),
+        Some("Base::baseStates".to_string())
+    );
+
+    let multiplicity_states = exhibits
+        .iter()
+        .find(|e| e.name == "multiplicityStates")
+        .expect("multiplicityStates");
+    assert!(multiplicity_states.multiplicity.is_some());
+
+    let ordered_states = exhibits
+        .iter()
+        .find(|e| e.name == "orderedStates")
+        .expect("orderedStates");
+    let StateDefBody::Brace { elements } = &ordered_states.body else {
+        panic!("expected exhibit state body");
+    };
+    assert_eq!(elements.len(), 1);
+}
+
+#[test]
 fn exhibit_state_body_accepts_requirement_usage_members() {
     let input = "package P {\nrequirement def Goal;\nstate def MissionPhase;\npart def Mission {\nrequirement goals[1..*] : Goal;\nexhibit state phases : MissionPhase {\nrequirement goToMoon : Goal {\ndoc /* Example */\n} :> goals;\nstate launch;\n}\n}\n}";
     let result = parse_with_diagnostics(input);

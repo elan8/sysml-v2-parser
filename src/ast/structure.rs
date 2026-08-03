@@ -215,14 +215,29 @@ pub struct ConnectionUsageMember {
     pub membership: Membership,
 }
 
-/// Exhibit state usage: `exhibit state` name `:` type (`;` or body).
+/// Exhibit state usage: `(abstract)? (ref)? exhibit` (`state`)? name (`:` type)? (`:>`/`:>>` …)?
+/// body. GH-27: rebuilt on the same shared prefix/specialization helpers `state_usage` composes
+/// (see `crate::parser::part::body::exhibit_state`), so it carries the same header fields as
+/// [`StateUsage`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExhibitState {
+    /// Leading `abstract` keyword.
+    pub is_abstract: bool,
+    /// Leading `ref` keyword — reference feature usage (`ref exhibit …`).
+    pub is_reference: bool,
     pub name: String,
     pub type_name: Option<String>,
+    /// Structured typing clause when a `:` target was written.
+    pub typing: Option<Node<TypingRelationship>>,
+    /// Multiplicity after the type, when present.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// Optional `subsets` / `:>` clause.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Optional `redefines` / `:>>` clause, from before or after the body.
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: StateDefBody,
+    pub membership: Membership,
 }
 
 /// Attribute definition: `attribute` `def` name (`:>` | `:` type)? (`=` value)? body.
