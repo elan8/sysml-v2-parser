@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve the optional initializer expression on analysis and verification case return
+  declarations such as `return attribute result : Real = expression;` and
+  `return :>> result = expression;`. `CaseReturnDecl` now exposes the parsed expression through
+  `value_expression`, so semantic consumers do not need to reparse source text. Declarations
+  without an initializer remain supported and `return ref` continues to use its dedicated AST
+  variant. Fixes [#56](https://github.com/elan8/sysml-v2-parser/issues/56).
+  `PARSE_AST_VERSION` bumped 67 → 68.
+
 ## [0.53.0] - 2026-08-03
 
 ### Fixed
