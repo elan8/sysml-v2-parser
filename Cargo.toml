@@ -2,7 +2,7 @@
 name = "sysml-v2-parser"
 version = "0.51.3"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.88"
 description = "SysML v2 textual notation parser for Rust"
 license = "MIT"
 repository = "https://github.com/elan8/sysml-v2-parser"

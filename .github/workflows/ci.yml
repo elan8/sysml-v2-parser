@@ -54,6 +54,27 @@ jobs:
           SYSML_V2_RELEASE_DIR: ${{ github.workspace }}/sysml-v2-release
           CI: true
 
+  msrv:
+    name: MSRV (1.88)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Keep in sync with `rust-version` in Cargo.toml. cc's ar_archive_writer dependency
+      # (pulled in transitively via the stacker/psm build chain) currently requires 1.88;
+      # bumping this floor is a deliberate choice made when stacker/psm/cc were last updated
+      # rather than pinning those crates to old versions indefinitely.
+      - name: Install Rust (MSRV)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.88.0"
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo build (lib + all targets)
+        run: cargo build --all-targets --all-features
+
   validation:
     name: SysML v2 validation suite
     runs-on: ubuntu-latest
