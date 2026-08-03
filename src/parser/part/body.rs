@@ -1,6 +1,6 @@
 use super::prelude::*;
 use super::usage::{
-    allocate_, connect_, interface_usage, part_ref_usage, part_usage, perform_action_decl,
+    allocate_, bind_, connect_, interface_usage, part_ref_usage, part_usage, perform_action_decl,
     perform_usage, variant_usage,
 };
 use crate::parser::action::first_stmt;
@@ -310,6 +310,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             }),
             map(state_usage, PartDefBodyElement::StateUsage),
             map(part_ref_usage, PartDefBodyElement::Ref),
+            // GH-42 Gap 1: bare `bind a = b;` (BNF `BindingConnectorAsUsage`, §8.2.2.13.2) was
+            // never dispatched here, even though `bind_` was already wired into part *usage*
+            // bodies (`part_usage_body_element` below) -- mirrors that arm's placement.
+            map(bind_, PartDefBodyElement::Bind),
             map(|i| attribute_def(i, true), PartDefBodyElement::AttributeDef),
             map(attribute_usage, PartDefBodyElement::AttributeUsage),
             map(
@@ -1071,6 +1075,31 @@ mod par_002_nested_def_tests {
     fn part_def_body_rejects_bare_merge_and_decide_stmt() {
         assert!(part_def_body_element(input("merge M;")).is_err());
         assert!(part_def_body_element(input("decide D;")).is_err());
+    }
+
+    /// GH-42 Gap 1: bare `bind a = b;` (BNF `BindingConnectorAsUsage`, §8.2.2.13.2) was never
+    /// dispatched inside a part definition body -- `bind_` was already wired into part *usage*
+    /// bodies, same dispatch-gap class as `FirstStmt`/GH-40 above. Real usage:
+    /// `sysml-v2-release/sysml/src/examples/Simple Tests/ConnectionTest.sysml` line 22, inside a
+    /// `part def P { ... }` body. The `binding <name> (: Type)? bind ...` named-prefix form
+    /// (Gap 2, same issue) is tracked and fixed separately.
+    #[test]
+    fn part_def_body_accepts_bare_bind_stmt() {
+        let (rest, node) = part_def_body_element(input("bind a = b;")).expect("bind a = b;");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            PartDefBodyElement::Bind(bind) => {
+                assert!(matches!(
+                    &bind.value.left.value,
+                    crate::ast::Expression::FeatureRef(name) if name == "a"
+                ));
+                assert!(matches!(
+                    &bind.value.right.value,
+                    crate::ast::Expression::FeatureRef(name) if name == "b"
+                ));
+            }
+            other => panic!("expected Bind, got {other:?}"),
+        }
     }
 
     /// BNF `InitialNodeMember` (the `then`-less `first target;` marker) is likewise

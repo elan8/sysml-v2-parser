@@ -174,6 +174,11 @@ pub enum PartDefBodyElement {
     /// the generic `DefinitionBodyItem` grammar a part def body uses, so it is rejected by the
     /// parser rather than represented by this variant.
     FirstStmt(Node<crate::ast::behavior::FirstStmt>),
+    /// Bare `bind a = b;` (BNF `BindingConnectorAsUsage`, §8.2.2.13.2) nested directly inside a
+    /// part definition body (GH-42 Gap 1: previously only reachable inside a part *usage* body,
+    /// even though `ConnectionTest.sysml` uses it directly inside a `part def`, same dispatch-gap
+    /// class as `FirstStmt`/GH-40 above).
+    Bind(Node<Bind>),
 }
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.

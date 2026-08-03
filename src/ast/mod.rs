@@ -541,6 +541,7 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::FirstStmt(n) => {
             PartDefBodyElement::FirstStmt(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::Bind(n) => PartDefBodyElement::Bind(dummy_node(n, n.value.clone())),
     };
     dummy_node(el, value)
 }
