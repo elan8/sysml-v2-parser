@@ -905,7 +905,7 @@ dependencies = [
 
 [[package]]
 name = "sysml-v2-parser"
-version = "0.51.1"
+version = "0.51.2"
 dependencies = [
  "criterion",
  "env_logger",
