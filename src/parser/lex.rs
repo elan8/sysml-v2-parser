@@ -199,6 +199,11 @@ pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] =
 
 pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[b"connect", b"end", b"ref", b"doc"];
 
+/// GH-51: mirrors [`CONNECTION_DEF_BODY_STARTERS`] -- `interface_def_body` previously had no
+/// starter list at all (its own hand-rolled brace loop swallowed unparseable content silently,
+/// with no diagnostic).
+pub(crate) const INTERFACE_DEF_BODY_STARTERS: &[&[u8]] = &[b"connect", b"end", b"ref", b"doc"];
+
 /// Skip optional whitespace (space, tab, newline).
 pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _) =

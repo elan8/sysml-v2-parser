@@ -1048,3 +1048,70 @@ fn bare_comma_sequence_reports_targeted_diagnostic() {
         .as_deref()
         .is_some_and(|s| s.contains("= (a, b)")));
 }
+
+#[test]
+fn interface_def_body_recovery_surfaces_a_diagnostic() {
+    // GH-51: `interface_def_body` used to be a hand-rolled `many0` loop that fell back to
+    // `advance_to_closing_brace` with no diagnostic at all when an element failed to parse.
+    // Routed through the same `parse_structured_brace_members` + recovery-node machinery
+    // `connection_member_body` already used.
+    let input = "package P { interface def I { this is not valid sysml at all; } }";
+    let result = parse_with_diagnostics(input);
+
+    assert!(
+        !result.errors.is_empty(),
+        "malformed interface def body content must surface a diagnostic, not be silently dropped"
+    );
+    assert_eq!(
+        result.errors[0].code.as_deref(),
+        Some("unrecognized_declaration_in_scope")
+    );
+}
+
+#[test]
+fn interface_def_body_recovery_works_nested_in_a_part_def() {
+    // Same as above, but nested -- `PartDefBodyElement::InterfaceDef` previously had no dispatch
+    // arm in `collect_errors.rs` either (see next test for the same pre-existing gap on
+    // `connection_def`), so even a fixed `interface_def_body` alone would not have surfaced this.
+    let input = "package P { part def PP { interface def I { this is not valid at all; } } }";
+    let result = parse_with_diagnostics(input);
+
+    assert!(
+        !result.errors.is_empty(),
+        "nested interface def recovery must also surface a diagnostic: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn connection_def_body_recovery_diagnostics_reach_parse_with_diagnostics() {
+    // GH-51 (found while fixing the issue, not the issue's own repro): `connection_def_body`
+    // already generated a proper `ConnectionDefBodyElement::Error` recovery node via
+    // `connection_def_body_recovery`, but `collect_errors.rs` had no dispatch arm for
+    // `PackageBodyElement::ConnectionDef`/`PartDefBodyElement::ConnectionDef`/
+    // `PartUsageBodyElement::ConnectionDef` at all, so the diagnostic never reached
+    // `parse_with_diagnostics`'s `result.errors` regardless of nesting -- confirmed via a minimal
+    // repro before this fix. Both connection and interface defs now use the same collection path.
+    let input = "package P { connection def C { this is not valid at all; } }";
+    let result = parse_with_diagnostics(input);
+
+    assert!(
+        !result.errors.is_empty(),
+        "connection def recovery diagnostics must reach parse_with_diagnostics: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn valid_interface_def_body_still_parses_without_diagnostics() {
+    // No regression: the interface_def_body recovery-machinery change must not affect legitimate
+    // content, including the `~` conjugation / per-endpoint-multiplicity capabilities GH-33 added.
+    let input = "package P {\nport def PowerPort;\ninterface def I {\nend p1 : ~PowerPort;\nend p2 : PowerPort;\nconnect p1 to p2;\n}\n}";
+    let result = parse_with_diagnostics(input);
+
+    assert!(
+        result.errors.is_empty(),
+        "valid interface def body should not report diagnostics: {:?}",
+        result.errors
+    );
+}

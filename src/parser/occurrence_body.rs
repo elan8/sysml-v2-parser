@@ -13,8 +13,8 @@ use crate::parser::constraint::{structured_constraint_body, StructuredConstraint
 use crate::parser::expr::path_expression;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::lex::{
-    capture_opaque_member, name, qualified_name, recover_body_element, visibility_prefix, ws1,
-    ws_and_comments,
+    capture_opaque_member, name, qualified_name, recover_body_element, starts_with_keyword,
+    visibility_prefix, ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -144,6 +144,8 @@ struct OccurrencePrefix {
     is_then: bool,
     is_event: bool,
     is_reference: bool,
+    is_abstract: bool,
+    is_constant: bool,
     portion_kind: Option<String>,
     membership: Membership,
 }
@@ -155,6 +157,8 @@ impl Default for OccurrencePrefix {
             is_then: false,
             is_event: false,
             is_reference: false,
+            is_abstract: false,
+            is_constant: false,
             portion_kind: None,
             membership: Membership::feature(None, crate::ast::Span::dummy()),
         }
@@ -168,14 +172,35 @@ fn occurrence_ref_prefix(input: Input<'_>) -> IResult<Input<'_>, bool> {
     Ok((input, kw.is_some()))
 }
 
+/// GH-51: `abstract`/`constant` prefix keywords (BNF `RefPrefix`, §8.2.2.9.2), ahead of `ref` per
+/// that production's order. Real usage: Systems Library `Domain Libraries/Cause and Effect/
+/// CausationConnections.sysml`'s `abstract constant ref occurrence causes[1..*] :>> causes :>
+/// participant { ... }`.
+fn occurrence_abstract_constant_prefix(input: Input<'_>) -> IResult<Input<'_>, (bool, bool)> {
+    let (input, is_abstract) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"abstract"[..])),
+        ws1,
+    ))
+    .parse(input)?;
+    let (input, is_constant) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"constant"[..])),
+        ws1,
+    ))
+    .parse(input)?;
+    Ok((input, (is_abstract.is_some(), is_constant.is_some())))
+}
+
 pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
+    let (input, (is_abstract, is_constant)) = occurrence_abstract_constant_prefix(input)?;
     let (input, is_reference) = occurrence_ref_prefix(input)?;
     occurrence_usage_with_modifiers(
         input,
         OccurrencePrefix {
             is_reference,
+            is_abstract,
+            is_constant,
             membership: Membership::feature(visibility, visibility_span),
             ..Default::default()
         },
@@ -315,6 +340,9 @@ fn occurrence_usage_tail(
             name
         }
     });
+    // GH-51: real usage carries a multiplicity here (`causes[1..*]`); see `OccurrenceUsage::
+    // multiplicity`'s doc comment.
+    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
     let (input, body) = occurrence_usage_body(input)?;
     let (input, post_body_clauses) = specialization_clauses(input)?;
@@ -355,9 +383,12 @@ fn occurrence_usage_tail(
                 is_then: prefix.is_then,
                 is_event: prefix.is_event,
                 is_reference: prefix.is_reference,
+                is_abstract: prefix.is_abstract,
+                is_constant: prefix.is_constant,
                 portion_kind: prefix.portion_kind,
                 name: name_str,
                 type_name,
+                multiplicity,
                 subsets,
                 redefines,
                 references,
@@ -523,12 +554,32 @@ pub(crate) fn occurrence_body_element(
 /// `succession`) and from the action-body `first ... then ...` control node (`FirstStmt`,
 /// only valid inside an action body). Real usage from the SysML Systems Library
 /// (`Flows.sysml`): `succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`.
-fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
+pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = tag(&b"succession"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // GH-51: optional name for the succession usage itself (BNF `SuccessionAsUsage`'s
+    // `('succession' UsageDeclaration)?` prefix), e.g. `succession causalOrdering first a then
+    // b;` (real usage: Systems Library `Domain Libraries/Cause and Effect/
+    // CausationConnections.sysml`) -- mirrors `action::succession_prefix`'s name-optionality
+    // check for the sibling `first`-embedded form. `flow` is excluded so a malformed `succession
+    // flow ...` that reaches this parser (normally claimed first by `flow_usage_member`) doesn't
+    // misread the keyword as a name.
+    let (input, name) = {
+        let (peek, _) = ws_and_comments(input)?;
+        let frag = peek.fragment();
+        if starts_with_keyword(frag, b"first")
+            || starts_with_keyword(frag, b"flow")
+            || frag.starts_with(b"[")
+        {
+            (input, None)
+        } else {
+            let (input, parsed_name) = preceded(ws_and_comments, name).parse(input)?;
+            (input, Some(parsed_name))
+        }
+    };
     let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
     let (input, _) =
         opt(preceded(ws_and_comments, preceded(tag(&b"first"[..]), ws1))).parse(input)?;
@@ -546,6 +597,7 @@ fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage
             start,
             input,
             SuccessionUsage {
+                name,
                 multiplicity,
                 source,
                 source_multiplicity,
@@ -562,6 +614,8 @@ pub(crate) fn assert_constraint_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
     let start = input;
+    let (input, (visibility_span, visibility)) =
+        preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"assert"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, is_negated) = opt(preceded(tag(&b"not"[..]), ws1))
@@ -596,6 +650,7 @@ pub(crate) fn assert_constraint_member(
                 type_name,
                 body,
                 is_negated,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))

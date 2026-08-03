@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-08-03
+
+### Fixed
+
+- **`interface_def_body` silently discarded unparseable content with no diagnostic**
+  ([#51](https://github.com/elan8/sysml-v2-parser/issues/51)) — `interface_def_body`
+  (`src/parser/interface.rs`) was a hand-rolled `many0` loop whose only fallback for an
+  unrecognized member was `advance_to_closing_brace`, which skips straight to the closing `}`
+  with no diagnostic at all. Routed through the same `parse_structured_brace_members` +
+  recovery-node pattern `connection_member_body` already used; `InterfaceDefBodyElement` gained an
+  `Error` variant to carry the recovery node, mirroring `ConnectionDefBodyElement::Error`.
+
+  Fixing this properly required also wiring `collect_errors.rs` to walk `ConnectionDef`/
+  `InterfaceDef` bodies at all — previously **neither** was ever collected into
+  `parse_with_diagnostics`'s `result.errors`, at any nesting level (package-level, nested in a
+  `part def`/`part` usage), so even `connection_member_body`'s already-correct recovery nodes were
+  silently invisible before this fix. `collect_connection_def_body_errors`/
+  `collect_interface_def_body_errors` added and wired into `PackageBodyElement`,
+  `PartDefBodyElement`, and `PartUsageBodyElement` (connection only; interfaces aren't dispatched
+  there) dispatch.
+
+  Making these diagnostics visible for the first time surfaced several previously-invisible real
+  parser gaps against the vendored SysML v2 Systems/Domain Libraries (confirmed via the strict
+  full-library "zero diagnostics" validation gate going from silently green to honestly red — 5
+  of 94 files). Fixed the following, each confirmed against real library usage:
+  - `end` declarations: `:>>` redefines trailing the typed (`:`) form (`end source: Anything :>>
+    BinaryLinkObject::source;`, `Connections.sysml`) — `EndDecl` gained a `redefines` field.
+  - `end` declarations: leading multiplicity before the kind keyword/name (`end [1] part bead :
+    TireBead;`, `end [*] ref cause: Situation;`) and `ref` as an accepted end kind keyword
+    alongside `part`/`port`.
+  - `assert constraint` members with a visibility prefix, dispatched into connection/interface
+    def bodies for the first time (`private assert constraint disjointCauseEffect { ... }`,
+    `CausationConnections.sysml`/`DerivationConnections.sysml`) — `AssertConstraintMember` gained
+    a `membership` field; `assert_constraint_member` now parses a leading visibility prefix
+    everywhere it's used, not just in these two files.
+  - `occurrence` usages with `abstract`/`constant` prefixes and a multiplicity, dispatched into
+    connection def bodies for the first time (`abstract constant ref occurrence causes[1..*] :>>
+    causes :> participant { ... }`, `CausationConnections.sysml`) — `OccurrenceUsage` gained
+    `is_abstract`, `is_constant`, and `multiplicity` fields (none of which `occurrence_usage`
+    supported in *any* context before this).
+  - Named `succession` usages, dispatched into connection def bodies for the first time (`private
+    succession causalOrdering first [nCauses] causes.startShot then [nEffects] effects { ... }`,
+    `CausationConnections.sysml`) — `SuccessionUsage` gained a `name` field (previously
+    `succession_usage` had no way to name the succession itself, in any context).
+  - `ref_decl` rebuilt to support an optional kind keyword (`part`/`port`/`item`/`requirement`),
+    optional name (anonymous when redefining), `:>>` redefines (multi-target aware, reusing the
+    shared `redefinition` parser), `:>` subsets (new `RefDecl.subsets` field), multiplicity, and
+    `ordered`/`nonunique` modifiers — previously required a name and a `:` type unconditionally
+    with none of the above (`ref port :>> participant : Port [2..*] nonunique ordered { ... }`,
+    `ref port :>> Interface::participant, BinaryConnection::participant[2] nonunique ordered;`,
+    `Interfaces.sysml`; `ref requirement originalRequirement[1] :>> originalRequirements :>
+    participant { ... }`, `DerivationConnections.sysml` — `requirement` here is just another
+    `ref_decl` kind keyword, not the separate `requirement_usage` parser).
+
+  New regression tests in `tests/gh51_connection_interface_body_gaps.rs` cover each fix using the
+  real (trimmed) library lines that motivated it. `PARSE_AST_VERSION` bumped 65 → 66.
+
+  **Not fixed, tracked separately as [#53](https://github.com/elan8/sysml-v2-parser/issues/53):**
+  a still-unidentified `end` declaration shape appearing in exactly 2 files (`end theCauses [*]
+  occurrence theCause :> causes :>> source { ... }` in `CausationConnections.sysml`; `end
+  touchesToo [0..*] item touchedItemToo :>> separateSpaceToo, thisOccurrence;` in `Items.sysml`) —
+  a first name, multiplicity, kind keyword, and *second* name all on one `end`. The
+  `ConnectorEnd`/`ConnectorEndMember` BNF productions found while auditing this cover the `connect
+  ... to ...` statement's own arguments, not this member-declaration form, and no other matching
+  production was located; landing a guess at unverified grammar risks a silently-wrong AST, which
+  is worse than the current honest diagnostic. Both files are carried as a documented, tracked
+  exception in `tests/validation/full_library_suite.rs`'s `KNOWN_ISSUE_FILES` so the strict gate
+  stays otherwise green.
+
 ## [0.51.9] - 2026-08-03
 
 ### Changed

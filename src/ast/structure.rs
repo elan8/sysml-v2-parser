@@ -869,6 +869,11 @@ pub enum InterfaceDefBodyElement {
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
+    /// GH-51: `interface_def_body` previously had no recovery-error representation at all --
+    /// unparseable content was silently discarded by a hand-rolled `advance_to_closing_brace`
+    /// fallback with no diagnostic. See [`ConnectionDefBodyElement::Error`] for the sibling this
+    /// mirrors.
+    Error(Node<ParseErrorNode>),
     /// PAR-002 widening: this enum previously had no attribute/item/port coverage at all.
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
@@ -901,6 +906,11 @@ pub struct EndDecl {
     /// mainSwitch[1];` (BNF `DefaultInterfaceEnd`'s `Usage` production carries the same optional
     /// multiplicity every other usage declaration does). `None` when absent.
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// GH-51: `:>>` redefines clause trailing the `: Type` typed form (distinct from
+    /// `references`, which models the `::>`/`references` form used *instead* of `:` typing), e.g.
+    /// `end source: Anything :>> BinaryLinkObject::source;` (Systems Library `Connections.sysml`).
+    /// `None` when absent or when this end used the `::>`/`references` form instead.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// Span of the name (for semantic tokens).
     pub name_span: Option<Span>,
     /// Span of the type/reference target after `:`/`::>`/`references` (for semantic tokens).
@@ -924,6 +934,10 @@ pub struct RefDecl {
     /// Previously this whole `:>> target : type` combination silently discarded the redefines
     /// target and the entire typing clause as unparsed text once `:>>` was seen.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// GH-51: `:>` subsets clause, distinct from and independent of `redefines`, e.g. `ref
+    /// requirement originalRequirement[1] :>> originalRequirements :> participant { ... }`
+    /// (Systems Library `Domain Libraries/Requirement Derivation/DerivationConnections.sysml`).
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional binding value: `= expr` (SysML shorthand binding for references).
     pub value: Option<Node<FeatureValue>>,
     pub body: RefBody,
@@ -995,6 +1009,18 @@ pub enum ConnectionDefBodyElement {
     /// `port def`, using `port_def_required`. See `AttributeDef`.
     PortDef(Node<PortDef>),
     PortUsage(Node<PortUsage>),
+    /// GH-51: real Systems/Domain Library connection defs own `assert constraint`
+    /// (`Cause and Effect/CausationConnections.sysml`, `Requirement Derivation/
+    /// DerivationConnections.sysml`) and `occurrence` usages with `abstract`/`constant`/`ref`
+    /// prefixes (`CausationConnections.sysml`) as body members -- neither was dispatched here at
+    /// all. (`ref requirement ...` in `DerivationConnections.sysml` goes through `RefDecl` above,
+    /// not a separate requirement-usage path -- `requirement` is just another `ref_decl` kind
+    /// keyword there, same as `part`/`port`/`item`.)
+    AssertConstraint(Node<AssertConstraintMember>),
+    OccurrenceUsage(Box<Node<OccurrenceUsage>>),
+    /// `succession` usage (real usage: `CausationConnections.sysml`'s `private succession
+    /// causalOrdering first [nCauses] causes.startShot then [nEffects] effects { ... }`).
+    SuccessionUsage(Node<SuccessionUsage>),
 }
 
 // ---------------------------------------------------------------------------
@@ -1080,9 +1106,19 @@ pub struct OccurrenceUsage {
     /// Leading `ref` keyword (BNF `RefPrefix`, §6 G29), as in `ref individual :>> vehicleUnderTest
     /// : TestVehicle1 { ... }` from the OMG spec Annex `9-Verification-simplified.sysml`.
     pub is_reference: bool,
+    /// Leading `abstract` keyword (BNF `RefPrefix`, §8.2.2.9.2). GH-51: real usage in Systems
+    /// Library `Domain Libraries/Cause and Effect/CausationConnections.sysml`.
+    pub is_abstract: bool,
+    /// Leading `constant` keyword (BNF `RefPrefix`). See `is_abstract`.
+    pub is_constant: bool,
     pub portion_kind: Option<String>,
     pub name: String,
     pub type_name: Option<String>,
+    /// GH-51: `occurrence_usage` previously had no multiplicity support at all, so real usage
+    /// like `abstract constant ref occurrence causes[1..*] :>> causes :> participant { ... }`
+    /// (Systems Library `Domain Libraries/Cause and Effect/CausationConnections.sysml`) fell
+    /// through to recovery even without the `abstract`/`constant`/`ref` prefixes.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub references: Option<Node<SubsettingRelationship>>,
@@ -1116,6 +1152,10 @@ pub struct AssertConstraintMember {
     pub body: ConstraintDefBody,
     /// `true` for a negated assert: `assert not constraint ...`.
     pub is_negated: bool,
+    /// GH-51: `assert_constraint_member` previously never parsed a visibility prefix at all, so
+    /// real usage like `private assert constraint disjointCauseEffect { ... }` (Systems Library
+    /// `Domain Libraries/Cause and Effect/CausationConnections.sysml`) fell through to recovery.
+    pub membership: Membership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1152,6 +1192,12 @@ pub enum OccurrenceBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SuccessionUsage {
+    /// Name of the succession usage itself, e.g. `causalOrdering` in `succession causalOrdering
+    /// first a then b;` (BNF `SuccessionAsUsage`'s optional `'succession' UsageDeclaration`
+    /// prefix, mirrored by `action::succession_prefix` for the `first`-embedded form). GH-51:
+    /// real usage in Systems Library `Domain Libraries/Cause and Effect/
+    /// CausationConnections.sysml`.
+    pub name: Option<String>,
     /// Multiplicity of the succession feature itself, e.g. `[seBeforeNum]`.
     pub multiplicity: Option<Node<Multiplicity>>,
     pub source: Node<Expression>,

@@ -9,6 +9,9 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{ws_and_comments, CONNECTION_DEF_BODY_STARTERS};
 use crate::parser::node_from_to;
+use crate::parser::occurrence_body::{
+    assert_constraint_member, occurrence_usage, succession_usage,
+};
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
 use crate::parser::Input;
@@ -41,6 +44,16 @@ fn connection_def_body_element(
         map(item_usage, ConnectionDefBodyElement::ItemUsage),
         map(port_def_required, ConnectionDefBodyElement::PortDef),
         map(port_usage, ConnectionDefBodyElement::PortUsage),
+        // GH-51: real Systems/Domain Library connection defs use these member kinds too --
+        // see `ConnectionDefBodyElement`'s doc comment for the exact real-usage citations.
+        map(
+            assert_constraint_member,
+            ConnectionDefBodyElement::AssertConstraint,
+        ),
+        map(occurrence_usage, |n| {
+            ConnectionDefBodyElement::OccurrenceUsage(Box::new(n))
+        }),
+        map(succession_usage, ConnectionDefBodyElement::SuccessionUsage),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

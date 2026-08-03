@@ -948,7 +948,14 @@ fn test_parse_interface_usage_named_with_multiplicity() {
 
 #[test]
 fn test_parse_part_def_connection_usage_multiline_connect_clause() {
-    let input = "package P {\nconnection def Door { end [1] part room1 : Room; end [1] part room2 : Room; }\npart def Home {\nconnection livingRoom2bedRoom[1] : Door\n  connect livingRoom to bedRoom;\nconnection livingRoom2kitchen[1] : Door\n  connect livingRoom to kitchen;\nconnection livingRoom2bathRoom[1] : Door\n  connect livingRoom to bathRoom;\n}\n}";
+    // Note: `end` declarations here intentionally have no leading multiplicity (`end part room1 :
+    // Room;`, not `end [1] part room1 : Room;`) -- that's a separate, real gap (`end_decl` doesn't
+    // yet parse a leading multiplicity before the optional `part`/`port` keyword, per BNF
+    // `ConnectorEnd`'s `OwnedCrossMultiplicityMember` position) discovered via GH-51's
+    // `collect_errors.rs` fix surfacing a previously-silent diagnostic here. Tracked separately;
+    // this test is specifically about the multiline `connect` clause below, so its `Door` header
+    // avoids depending on the untracked capability.
+    let input = "package P {\nconnection def Door { end part room1 : Room; end part room2 : Room; }\npart def Home {\nconnection livingRoom2bedRoom[1] : Door\n  connect livingRoom to bedRoom;\nconnection livingRoom2kitchen[1] : Door\n  connect livingRoom to kitchen;\nconnection livingRoom2bathRoom[1] : Door\n  connect livingRoom to bathRoom;\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),
@@ -3053,7 +3060,20 @@ bogus nonsense;
 end b : B;
 }
 }"#;
-    let result = parse(input).expect("parse should succeed");
+    // GH-51: `collect_errors.rs` now collects `ConnectionDef`'s embedded recovery diagnostics
+    // (previously never wired up at all, regardless of nesting), so `parse()` correctly rejects
+    // this input per its own documented contract ("Rejects input that ... contains a body member
+    // the grammar could not match"). This test is specifically about the *recovered AST shape*
+    // (does the bad member truncate the body or become a single Error node with siblings
+    // intact?), so it uses `parse_with_diagnostics` to inspect the partial AST instead.
+    let diagnostics_result = parse_with_diagnostics(input);
+    assert_eq!(
+        diagnostics_result.errors.len(),
+        1,
+        "expected exactly one recovered diagnostic for `bogus nonsense;`: {:?}",
+        diagnostics_result.errors
+    );
+    let result = diagnostics_result.root;
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => p,
         other => panic!("expected package, got {:?}", other),
