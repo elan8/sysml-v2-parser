@@ -30,7 +30,7 @@ jobs:
         run: cargo fmt --check
 
       - name: cargo clippy
-        run: cargo clippy --all-targets --all-features -- -W clippy::all
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Fetch SysML v2 Release (pinned)
         run: bash ./scripts/fetch-sysml-v2-release.sh
