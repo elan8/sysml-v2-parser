@@ -23,28 +23,9 @@ struct LibraryScan {
     files: usize,
     files_with_diagnostics: usize,
     diagnostic_count: usize,
-    /// Of `files_with_diagnostics`/`diagnostic_count` above, how many belong to
-    /// [`KNOWN_ISSUE_FILE_NAMES`] -- kept separate so the scorecard's own reported numbers stay
-    /// honest (unfiltered) while the strict zero-diagnostics assertions in
-    /// `write_layered_conformance_scorecard` can subtract the tracked exception.
-    known_issue_files_with_diagnostics: usize,
-    known_issue_diagnostic_count: usize,
     extended_library_decl: usize,
     kerml_semantic_decl: usize,
     kerml_feature_decl: usize,
-}
-
-/// #53 (follow-up to #51): files with a confirmed, still-unidentified `end` declaration shape --
-/// mirrors `tests/validation/full_library_suite.rs`'s `KNOWN_ISSUE_FILES` (kept as a separate
-/// list here rather than shared, since this test binary and `validation.rs`'s module tree don't
-/// otherwise share code). Matched by filename only, same rationale as that file's
-/// `is_known_issue_file`.
-const KNOWN_ISSUE_FILE_NAMES: &[&str] = &["CausationConnections.sysml", "Items.sysml"];
-
-fn is_known_issue_file(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|f| f.to_str())
-        .is_some_and(|name| KNOWN_ISSUE_FILE_NAMES.contains(&name))
 }
 
 /// Output file paths for [`write_scorecard`].
@@ -152,10 +133,6 @@ fn scan_library(dir: &Path) -> LibraryScan {
         if !result.errors.is_empty() {
             scan.files_with_diagnostics += 1;
             scan.diagnostic_count += result.errors.len();
-            if is_known_issue_file(file) {
-                scan.known_issue_files_with_diagnostics += 1;
-                scan.known_issue_diagnostic_count += result.errors.len();
-            }
         }
         let mut type_counts = BTreeMap::new();
         collect_package_body_type_counts(&result.root, &mut type_counts);
@@ -559,24 +536,19 @@ fn write_layered_conformance_scorecard() {
         target.release_tag
     );
     if let (Some(systems), Some(full)) = (systems.as_ref(), full.as_ref()) {
-        // #53: subtract the tracked, documented exception (see `KNOWN_ISSUE_FILE_NAMES`) rather
-        // than letting it silently reappear as a hard gate failure -- the scorecard's own
-        // `diagnostic_count`/`files_with_diagnostics` fields above stay unfiltered/honest.
         assert_eq!(
-            systems.files_with_diagnostics - systems.known_issue_files_with_diagnostics,
-            0,
-            "L2 Systems Library diagnostics (excluding tracked #53 exception): {}",
-            systems.diagnostic_count - systems.known_issue_diagnostic_count
+            systems.files_with_diagnostics, 0,
+            "L2 Systems Library diagnostics: {}",
+            systems.diagnostic_count
         );
         assert_eq!(
             systems.extended_library_decl, 0,
             "L2 Systems Library ExtendedLibraryDecl != 0"
         );
         assert_eq!(
-            full.files_with_diagnostics - full.known_issue_files_with_diagnostics,
-            0,
-            "L2 full library diagnostics (excluding tracked #53 exception): {}",
-            full.diagnostic_count - full.known_issue_diagnostic_count
+            full.files_with_diagnostics, 0,
+            "L2 full library diagnostics: {}",
+            full.diagnostic_count
         );
         assert_eq!(
             full.extended_library_decl, 0,

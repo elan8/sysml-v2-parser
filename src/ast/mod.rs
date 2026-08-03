@@ -1183,6 +1183,7 @@ fn normalize_end_decl(e: &EndDecl) -> EndDecl {
         references: e.references.clone(),
         multiplicity: e.multiplicity.clone(),
         redefines: e.redefines.clone(),
+        nested_usage: e.nested_usage.clone(),
         name_span: None,
         type_ref_span: None,
     }
