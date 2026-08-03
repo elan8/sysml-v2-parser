@@ -126,10 +126,21 @@ fn feature_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
     ))
 }
 
-/// Exhibit state usage: `exhibit state` name (`:` type)? (`;` or body)
+/// Exhibit state usage: `OccurrenceUsagePrefix` subset `exhibit` (`state`)? name (`:` type)?
+/// (`:>`/`:>>` …)? body. GH-27: rebuilt on the same shared prefix/specialization helpers
+/// `state_usage` (`crate::parser::state::state_usage`) composes -- `visibility_prefix`,
+/// `abstract`/`ref` prefix handling, `specialization_clauses`, `optional_typings`,
+/// `multiplicity_node`, `skip_usage_feature_modifiers` -- so the two stay in sync with the shared
+/// `StateUsageBody` tail. This still stops short of the full BNF `OccurrenceUsagePrefix`
+/// (direction, `derived`, `individual`, portion kind): `state_usage` itself doesn't support those
+/// either, so extending them is a separate gap, not one `exhibit state` drifted into on its own.
 pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"exhibit"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // §6 G18: the `state` keyword is optional -- `exhibit 'vehicle states' :>> VehicleA::'vehicle
@@ -137,23 +148,19 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     // state usage by redefinition, without redeclaring its kind.
     let (input, _) = opt(preceded(tag(&b"state"[..]), ws1)).parse(input)?;
     let (input, name_str) = feature_name_path(input)?;
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    // §6 G18: `:>>` may also come *before* the body, which is where the redefinition form above
-    // puts it. The post-body position below predates it and stays supported.
-    let before_pre_body_redefines = input;
-    let (input, pre_body_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let pre_body_redefines = pre_body_redefines.map(|target| {
-        let span = crate::parser::span_from_to(before_pre_body_redefines, input);
-        subsetting_relationship_node(span, crate::ast::SubsettingKind::Redefines, target)
-    });
+    let (input, leading) = specialization_clauses(input)?;
+    let (input, type_result) = optional_typings(input)?;
+    let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
+    let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
+    let (input, trailing) = specialization_clauses(input)?;
+    let (_type_ref_span, type_name, typing) =
+        crate::parser::usage::typing_fields_from_result(type_result);
+    let subsets = trailing
+        .subsets
+        .clone()
+        .or(leading.subsets.clone())
+        .map(|(target, _)| target);
+    let redefines_before_body = trailing.redefines.clone().or(leading.redefines.clone());
     // §8.2.2.18.2: `ExhibitStateUsage` shares `StateUsageBody` with plain `state` usages, so the
     // same `parallel`/`initial` modifier is legal here too (OMG spec Annex `exhibit state
     // vehicleStates parallel { ... }` in `5-State-based Behavior-2.sysml`) -- GH-17.
@@ -164,33 +171,45 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = crate::parser::state::state_def_body(input)?;
-    let before_redefines = input;
-    let (input, redefines) = opt(preceded(
+    // `:>>` may also come *after* the body -- this predates the before-body support above (via
+    // `specialization_clauses`) and stays supported; when present it wins over a before-body one.
+    let before_post_body_redefines = input;
+    let (input, post_body_redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
-    let redefines = redefines.map(|target| {
-        let span = crate::parser::span_from_to(before_redefines, input);
+    let post_body_redefines = post_body_redefines.map(|target| {
+        let span = crate::parser::span_from_to(before_post_body_redefines, input);
         subsetting_relationship_node(span, crate::ast::SubsettingKind::Redefines, target)
     });
-    let input = if redefines.is_some() {
+    let input = if post_body_redefines.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
     } else {
         input
     };
-    let redefines = redefines.or(pre_body_redefines);
+    let redefines = post_body_redefines.or(redefines_before_body);
     Ok((
         input,
         node_from_to(
             start,
             input,
             ExhibitState {
+                is_abstract: is_abstract.is_some(),
+                is_reference: is_reference.is_some(),
                 name: name_str,
-                type_name,
+                type_name: if type_name.is_empty() {
+                    None
+                } else {
+                    Some(type_name)
+                },
+                typing,
+                multiplicity,
+                subsets,
                 redefines,
                 body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))

@@ -1200,22 +1200,20 @@ pub(crate) fn exhibit_state_as_state_usage(
 ) -> IResult<Input<'_>, Node<crate::ast::StateUsage>> {
     let (input, exhibit) = exhibit_state(input)?;
     let state = crate::ast::StateUsage {
-        is_abstract: false,
-        is_reference: false,
+        is_abstract: exhibit.value.is_abstract,
+        is_reference: exhibit.value.is_reference,
         name: exhibit.value.name,
         type_name: exhibit.value.type_name,
-        typing: None,
-        multiplicity: None,
-        subsets: None,
+        typing: exhibit.value.typing,
+        multiplicity: exhibit.value.multiplicity,
+        subsets: exhibit.value.subsets,
         // §6 G18: previously dropped, which silently lost the redefinition target of
         // `exhibit <name> :>> <target>;`.
         redefines: exhibit.value.redefines,
         body: exhibit.value.body,
-        // `ExhibitState` (the struct this adapts from) has no `membership`/visibility field of
-        // its own -- out of this item's scope, see `CHANGELOG.md`'s Item 4b entries -- so there
-        // is nothing to thread through here; ad hoc site, `visibility: None` per this rollout's
-        // established convention (see `AttributeUsage`'s ad hoc sites).
-        membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
+        // GH-27: `ExhibitState` now carries its own `membership` (visibility prefix), so thread
+        // it through instead of the previous ad hoc `visibility: None`.
+        membership: exhibit.value.membership,
     };
     Ok((input, Node::new(exhibit.span, state)))
 }

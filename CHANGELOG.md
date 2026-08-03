@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.4] - 2026-08-03
+
+### Fixed
+
+- **`exhibit state` rejected modifiers legal on plain `state` usages**
+  ([#27](https://github.com/elan8/sysml-v2-parser/issues/27)) — follow-up to
+  [#17](https://github.com/elan8/sysml-v2-parser/issues/17). `exhibit_state`
+  (`src/parser/part/body.rs`) was a narrow, bespoke parser never wired up to the shared
+  prefix/specialization machinery `state_usage` (`src/parser/state.rs`) already uses, so
+  `abstract`/visibility/`:>` subsets/multiplicity/`ordered`/`nonunique` were all rejected on
+  `exhibit state` even though the equivalent plain `state` usage accepted them.
+
+  `exhibit_state` is now built on the same shared helpers `state_usage` composes
+  (`visibility_prefix`, `abstract`/`ref` prefix handling, `specialization_clauses`,
+  `optional_typings`, `multiplicity_node`, `skip_usage_feature_modifiers`), so the two stay in
+  sync with the shared `StateUsageBody` tail. `ExhibitState` (`src/ast/structure.rs`) gained
+  `is_abstract`, `is_reference`, `typing`, `multiplicity`, `subsets`, and `membership` fields to
+  carry the newly-parsed data, mirroring `StateUsage`'s shape; `exhibit_state_as_state_usage`
+  (`src/parser/part/usage.rs`) now threads these through instead of hardcoding them away.
+  `PARSE_AST_VERSION` bumped 61 → 62.
+
+  Out of scope, per the issue: direction (`in`/`out`/`inout`), `derived`, `individual`, and
+  portion-kind prefixes are part of the full BNF `OccurrenceUsagePrefix` but aren't supported by
+  `state_usage` itself either — extending both together is a separate, pre-existing gap, not one
+  `exhibit_state` drifted into on its own.
+
 ## [0.51.3] - 2026-08-03
 
 ### Fixed
