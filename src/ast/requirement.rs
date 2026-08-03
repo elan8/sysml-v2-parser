@@ -469,6 +469,8 @@ pub struct CaseReturnDecl {
     pub name: String,
     pub name_span: Option<Span>,
     pub type_name: Option<String>,
+    /// Optional value expression following `=`.
+    pub value_expression: Option<Node<crate::ast::Expression>>,
     /// True for `return :>> name` redefine form.
     pub is_redefine: bool,
 }

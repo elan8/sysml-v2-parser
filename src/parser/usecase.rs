@@ -8,6 +8,7 @@ use crate::parser::attribute::attribute_def;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::constraint::return_expression_stmt;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, skip_statement_or_block, take_until_terminator,
     visibility_prefix, ws1, ws_and_comments, USE_CASE_BODY_STARTERS,
@@ -225,8 +226,15 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
         } else {
             (input, None)
         };
-    // Consume the rest of the statement (= expr ;) opaquely.
-    let (input, _) = skip_statement_or_block(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, value_expression) = if input.fragment().starts_with(b"=") {
+        let (input, _) = tag(&b"="[..]).parse(input)?;
+        let (input, value_expression) = preceded(ws_and_comments, expression).parse(input)?;
+        (input, Some(value_expression))
+    } else {
+        (input, None)
+    };
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -236,6 +244,7 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
                 name: n,
                 name_span: Some(name_span),
                 type_name,
+                value_expression,
                 is_redefine,
             },
         ),

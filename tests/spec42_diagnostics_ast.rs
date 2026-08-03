@@ -827,6 +827,10 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
     assert!(!ret1.is_redefine);
     assert_eq!(ret1.type_name.as_deref(), Some("VerdictKind"));
     assert!(ret1.name_span.is_some(), "name_span should be set");
+    assert!(
+        ret1.value_expression.is_some(),
+        "plain return initializer should be retained"
+    );
 
     // element 2: `return :>> result = ...`
     let ret2 = match &vc_body[2].value {
@@ -835,6 +839,22 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
     };
     assert_eq!(ret2.name, "result");
     assert!(ret2.is_redefine);
+    assert!(
+        ret2.value_expression.is_some(),
+        "redefined return initializer should be retained"
+    );
+
+    // element 3: `return attribute score : Real = 42.0`
+    let ret3 = match &vc_body[3].value {
+        UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
+        other => panic!("expected CaseReturnDecl (attribute form), got {other:?}"),
+    };
+    assert_eq!(ret3.name, "score");
+    assert_eq!(ret3.type_name.as_deref(), Some("Real"));
+    assert!(
+        ret3.value_expression.is_some(),
+        "attribute return initializer should be retained"
+    );
 
     // analysis case def — one return decl
     let acase = match &elements[1].value {
@@ -845,12 +865,16 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         UseCaseDefBody::Brace { elements } => elements,
         _ => panic!("expected brace body"),
     };
-    let ret3 = match &ac_body[1].value {
+    let ret4 = match &ac_body[1].value {
         UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
         other => panic!("expected CaseReturnDecl in analysis body, got {other:?}"),
     };
-    assert_eq!(ret3.name, "thrust");
-    assert_eq!(ret3.type_name.as_deref(), Some("ForceValue"));
+    assert_eq!(ret4.name, "thrust");
+    assert_eq!(ret4.type_name.as_deref(), Some("ForceValue"));
+    assert!(
+        ret4.value_expression.is_none(),
+        "declaration without initializer should remain empty"
+    );
 }
 
 #[test]
