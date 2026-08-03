@@ -37,6 +37,15 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      # See ci.yml's audit job for why these two are ignored.
+      - name: cargo audit
+        run: cargo audit --ignore RUSTSEC-2026-0190 --ignore RUSTSEC-2026-0097
+
       - name: Fetch SysML v2 Release (pinned)
         run: bash ./scripts/fetch-sysml-v2-release.sh
 
