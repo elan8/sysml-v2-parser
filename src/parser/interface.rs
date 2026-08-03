@@ -2,11 +2,12 @@
 
 use crate::ast::{InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, Membership, Node};
 use crate::parser::attribute::{attribute_def, attribute_usage};
-use crate::parser::body::advance_to_closing_brace;
+use crate::parser::body::parse_structured_brace_members;
+use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::item::{item_def_required, item_usage};
-use crate::parser::lex::ws_and_comments;
+use crate::parser::lex::{ws_and_comments, INTERFACE_DEF_BODY_STARTERS};
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
@@ -14,8 +15,6 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
-use nom::multi::many0;
-use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
@@ -50,24 +49,42 @@ fn interface_def_body_element(
     Ok((input, node_from_to(start, input, elem)))
 }
 
+fn interface_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<InterfaceDefBodyElement> {
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        INTERFACE_DEF_BODY_STARTERS,
+        "interface definition body",
+        "recovered_interface_def_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        InterfaceDefBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
 /// Interface def body: `;` or `{` InterfaceDefBodyElement* `}`
+///
+/// GH-51: previously a hand-rolled `many0` loop that fell back to `advance_to_closing_brace` with
+/// no diagnostic at all when an element failed to parse -- unlike `connection_member_body`
+/// (`src/parser/connection.rs`), which already used `parse_structured_brace_members` and surfaced
+/// a real `Error` element via a recovery callback for the same situation. Now routed through the
+/// same shared recovery machinery.
 fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
         return Ok((input, InterfaceDefBody::Semicolon));
     }
-    let (input, _) = tag(&b"{"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, elements) =
-        many0(preceded(ws_and_comments, interface_def_body_element)).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = if input.fragment().starts_with(b"}") {
-        (input, ())
-    } else {
-        advance_to_closing_brace(input)?
-    };
-    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        INTERFACE_DEF_BODY_STARTERS,
+        "interface definition body",
+        "recovered_interface_def_body_element",
+        interface_def_body_element,
+        interface_def_body_recovery,
+    )?;
     Ok((input, InterfaceDefBody::Brace { elements }))
 }
 

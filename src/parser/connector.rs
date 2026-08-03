@@ -29,7 +29,9 @@ use crate::parser::body::advance_to_closing_brace;
 use crate::parser::expr::path_expression;
 use crate::parser::lex::{name, qualified_name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::usage::{multiplicity_node, reference_subsetting, single_target_typing};
+use crate::parser::usage::{
+    multiplicity_node, redefinition, reference_subsetting, single_target_typing, subsetting,
+};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -52,8 +54,8 @@ fn derived_end_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     ))
 }
 
-/// End declaration: `end` (`part`|`port`)? name (`:` (`~`)? type | (`::>`|`references`) target)
-/// multiplicity? `;`.
+/// End declaration: `end` multiplicity? (`part`|`port`|`ref`)? name (`:` (`~`)? type |
+/// (`::>`|`references`) target) multiplicity? `;`.
 ///
 /// `allow_derived_name` gates the `#name` form above -- `true` for `connection.rs` (tested real
 /// usage), `false` for `interface.rs` (no matching evidence; preserves existing behavior exactly).
@@ -65,14 +67,27 @@ pub(crate) fn end_decl(
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"end"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // GH-51: a leading multiplicity may precede the kind keyword/name (BNF `ConnectorEnd`'s
+    // `OwnedCrossMultiplicityMember` position), e.g. `end [1] part bead : TireBead;` (Systems
+    // Library training `09. Connections/Connections Example.sysml`), `end [*] ref cause:
+    // Situation;` (OMG spec Annex `14c-Language Extensions.sysml`). Distinct from the trailing
+    // multiplicity parsed after the type/reference target below (e.g. `end touchesToo [0..*]
+    // item ...` in `Items.sysml` -- both positions occur in real usage).
+    let (input, leading_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     // Optional structural kind keyword (BNF `InterfaceOccurrenceUsageElement`/
-    // `StructureUsageElement`, e.g. `end part hub : Hub;`, `end port p1 : P;`). Not retained as a
-    // separate field: `part`/`port` don't change this end's own grammar (name + type/reference),
-    // and `EndDecl` doesn't model usage-kind distinctions (GH-19/GH-20: real-world `end part hub
-    // ::> mainSwitch[1];` examples were rejected before this widened to also cover `part`).
+    // `StructureUsageElement`, e.g. `end part hub : Hub;`, `end port p1 : P;`, `end [*] ref
+    // cause: Situation;`). Not retained as a separate field: none of `part`/`port`/`ref` change
+    // this end's own grammar (name + type/reference), and `EndDecl` doesn't model usage-kind
+    // distinctions (GH-19/GH-20: real-world `end part hub ::> mainSwitch[1];` examples were
+    // rejected before this widened to also cover `part`; GH-51 widened it further to `ref`).
     let (input, _) = opt(preceded(
         ws_and_comments,
-        alt(((tag(&b"part"[..]), ws1), (tag(&b"port"[..]), ws1))),
+        alt((
+            (tag(&b"part"[..]), ws1),
+            (tag(&b"port"[..]), ws1),
+            (tag(&b"ref"[..]), ws1),
+        )),
     ))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -90,7 +105,7 @@ pub(crate) fn end_decl(
         // same way `part_usage_redefines_only`/other subsetting-family callers do: the shared
         // `reference_subsetting` parser only consumes the qualified target, so any multiplicity
         // is a separate, subsequent optional parse here (GH-20 real-world example).
-        let (input, multiplicity) =
+        let (input, trailing_multiplicity) =
             opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         let type_ref_span = references.value.span.clone();
@@ -105,7 +120,8 @@ pub(crate) fn end_decl(
                     type_name,
                     uses_derived_syntax: true,
                     references: Some(references),
-                    multiplicity,
+                    multiplicity: trailing_multiplicity.or(leading_multiplicity),
+                    redefines: None,
                     name_span: Some(name_span),
                     type_ref_span: Some(type_ref_span),
                 },
@@ -124,7 +140,12 @@ pub(crate) fn end_decl(
     } else {
         type_name
     };
-    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, trailing_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    // GH-51: `:>>` redefines may trail the typed form, e.g. `end source: Anything :>>
+    // BinaryLinkObject::source;` (Systems Library `Connections.sysml`) -- distinct from the
+    // `::>`/`references` form used *instead* of `:` typing above.
+    let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -136,7 +157,8 @@ pub(crate) fn end_decl(
                 type_name,
                 uses_derived_syntax: false,
                 references: None,
-                multiplicity,
+                multiplicity: trailing_multiplicity.or(leading_multiplicity),
+                redefines,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
             },
@@ -161,20 +183,72 @@ pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
     .parse(input)
 }
 
-/// Ref declaration: `ref` name `:` type body.
+/// Ref declaration: `ref` (`part`|`port`|`item`)? name? multiplicity? (`:>>` redefines)? (`:`
+/// type)? (`nonunique`|`ordered`)* body.
+///
+/// GH-51: previously required a name and a `:` type unconditionally, with no redefines or
+/// multiplicity support at all -- real usage needs both optional (mirrors
+/// `action::action_ref_decl`'s equivalent widening, adapted for the `part`/`port`/`item` kind
+/// keywords this context uses instead of `action`): `ref port :>> participant : Port [2..*]
+/// nonunique ordered { ... }` (Systems Library `Interfaces.sysml`, no name at all -- the
+/// redefinition target stands in for it).
 pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, (type_ref_span, type_name)) =
-        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
-    let typing = Some(single_target_typing(
-        type_ref_span.clone(),
-        type_name.clone(),
-    ));
+    let (input, _) = opt(preceded(
+        ws_and_comments,
+        alt((
+            (tag(&b"part"[..]), ws1),
+            (tag(&b"port"[..]), ws1),
+            (tag(&b"item"[..]), ws1),
+            (tag(&b"requirement"[..]), ws1),
+        )),
+    ))
+    .parse(input)?;
+    // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
+    let (input, parsed_name) = opt(preceded(ws_and_comments, with_span(name))).parse(input)?;
+    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
+
+    // `redefinition` (shared with every other `:>>` call site) already handles the comma-separated
+    // multi-target form, e.g. `ref port :>> Interface::participant, BinaryConnection::
+    // participant[2] nonunique ordered;` (`Interfaces.sysml`).
+    let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+
+    let (input, type_ref_span, type_name, typing) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
+            let (input, (type_ref_span, type_name)) = preceded(
+                ws_and_comments,
+                preceded(tag(&b":"[..]), with_span(qualified_name)),
+            )
+            .parse(input)?;
+            let typing = Some(single_target_typing(
+                type_ref_span.clone(),
+                type_name.clone(),
+            ));
+            (input, Some(type_ref_span), type_name, typing)
+        } else {
+            (input, None, String::new(), None)
+        }
+    };
+    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    // `:>` subsets, independent of and in addition to `:>>` redefines, e.g. `ref requirement
+    // originalRequirement[1] :>> originalRequirements :> participant { ... }` (Systems Library
+    // `Domain Libraries/Requirement Derivation/DerivationConnections.sysml`).
+    let (input, subsets) = opt(preceded(ws_and_comments, subsetting)).parse(input)?;
+    let subsets = subsets.map(|(target, _value)| target);
+    // `nonunique`/`ordered` feature modifiers (real usage: `Interfaces.sysml`'s `ref port :>>
+    // participant : Port [2..*] nonunique ordered { ... }`); accepted and discarded, matching
+    // `RefDecl`'s existing "don't model every shorthand" scope (see `value`'s doc comment for the
+    // same rationale on the binding form).
+    let (input, _) = nom::multi::many0(preceded(
+        ws_and_comments,
+        alt((tag(&b"nonunique"[..]), tag(&b"ordered"[..]))),
+    ))
+    .parse(input)?;
     let (input, body) = ref_body(input)?;
     Ok((
         input,
@@ -185,11 +259,12 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 name: name_str,
                 type_name,
                 typing,
-                redefines: None,
+                subsets,
+                redefines,
                 value: None,
                 body,
                 name_span: Some(name_span),
-                type_ref_span: Some(type_ref_span),
+                type_ref_span,
                 membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),

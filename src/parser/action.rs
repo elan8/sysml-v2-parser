@@ -206,6 +206,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
                 type_name,
                 typing,
                 redefines,
+                subsets: None,
                 value,
                 body,
                 name_span: Some(name_span),

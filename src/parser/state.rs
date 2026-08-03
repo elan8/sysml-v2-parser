@@ -262,6 +262,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 type_name,
                 typing,
                 redefines: None,
+                subsets: None,
                 value,
                 body,
                 name_span: Some(name_span),

@@ -1080,6 +1080,15 @@ fn normalize_connection_def_body_element_node(
         ConnectionDefBodyElement::PortUsage(n) => {
             ConnectionDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
+        ConnectionDefBodyElement::AssertConstraint(n) => {
+            ConnectionDefBodyElement::AssertConstraint(dummy_node(n, n.value.clone()))
+        }
+        ConnectionDefBodyElement::OccurrenceUsage(n) => {
+            ConnectionDefBodyElement::OccurrenceUsage(Box::new(dummy_node(n, n.value.clone())))
+        }
+        ConnectionDefBodyElement::SuccessionUsage(n) => {
+            ConnectionDefBodyElement::SuccessionUsage(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }
@@ -1141,6 +1150,9 @@ fn normalize_interface_def_body_element_node(
         InterfaceDefBodyElement::ConnectStmt(n) => {
             InterfaceDefBodyElement::ConnectStmt(dummy_node(n, n.value.clone()))
         }
+        InterfaceDefBodyElement::Error(n) => {
+            InterfaceDefBodyElement::Error(dummy_node(n, n.value.clone()))
+        }
         InterfaceDefBodyElement::AttributeDef(n) => {
             InterfaceDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
         }
@@ -1170,6 +1182,7 @@ fn normalize_end_decl(e: &EndDecl) -> EndDecl {
         uses_derived_syntax: e.uses_derived_syntax,
         references: e.references.clone(),
         multiplicity: e.multiplicity.clone(),
+        redefines: e.redefines.clone(),
         name_span: None,
         type_ref_span: None,
     }
@@ -1181,6 +1194,7 @@ fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
         type_name: r.type_name.clone(),
         typing: r.typing.clone(),
         redefines: r.redefines.clone(),
+        subsets: r.subsets.clone(),
         value: r.value.clone(),
         body: r.body.clone(),
         name_span: None,

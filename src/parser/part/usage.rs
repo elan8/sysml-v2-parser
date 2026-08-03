@@ -1008,6 +1008,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
                 type_name,
                 typing,
                 redefines: None,
+                subsets: None,
                 value,
                 body,
                 name_span: None,

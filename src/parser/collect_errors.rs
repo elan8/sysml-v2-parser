@@ -4,8 +4,9 @@ use super::diagnostics::trim_ascii_start;
 use super::recovery::parse_error_from_recovery_node;
 use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AttributeBody,
-    AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConstraintDefBody,
-    ConstraintDefBodyElement, DefinitionBody, DefinitionBodyElement, OccurrenceBodyElement,
+    AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
+    ConnectionDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, DefinitionBody,
+    DefinitionBodyElement, InterfaceDefBody, InterfaceDefBodyElement, OccurrenceBodyElement,
     OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
     PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RefBody,
     RenderingDefBody, RenderingDefBodyElement, RequirementDefBody, RequirementDefBodyElement,
@@ -363,6 +364,12 @@ fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>
                 PartDefBodyElement::OccurrenceUsage(n) => {
                     collect_occurrence_usage_body_errors(&n.value.body, errors)
                 }
+                PartDefBodyElement::ConnectionDef(n) => {
+                    collect_connection_def_body_errors(&n.value.body, errors)
+                }
+                PartDefBodyElement::InterfaceDef(n) => {
+                    collect_interface_def_body_errors(&n.value.body, errors)
+                }
                 _ => {}
             }
         }
@@ -417,7 +424,36 @@ fn collect_part_usage_body_errors(body: &PartUsageBody, errors: &mut Vec<ParseEr
                         collect_constraint_body_element_errors(elems, errors);
                     }
                 }
+                PartUsageBodyElement::ConnectionDef(n) => {
+                    collect_connection_def_body_errors(&n.value.body, errors)
+                }
                 _ => {}
+            }
+        }
+    }
+}
+
+/// GH-51: `ConnectionDef`/`InterfaceDef` bodies previously had no dispatch arm anywhere in this
+/// file, so their `Error` recovery nodes -- even `ConnectionDefBodyElement::Error`, which already
+/// existed -- were never collected into `parse_with_diagnostics`'s `result.errors`, regardless of
+/// nesting context. Fixing `interface_def_body`'s own recovery loop alone wasn't sufficient
+/// without this.
+fn collect_connection_def_body_errors(body: &ConnectionDefBody, errors: &mut Vec<ParseError>) {
+    if let ConnectionDefBody::Brace { elements } = body {
+        for element in elements {
+            if let ConnectionDefBodyElement::Error(n) = &element.value {
+                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+            }
+        }
+    }
+}
+
+/// See [`collect_connection_def_body_errors`].
+fn collect_interface_def_body_errors(body: &InterfaceDefBody, errors: &mut Vec<ParseError>) {
+    if let InterfaceDefBody::Brace { elements } = body {
+        for element in elements {
+            if let InterfaceDefBodyElement::Error(n) = &element.value {
+                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
             }
         }
     }
@@ -444,6 +480,12 @@ fn collect_package_body_element_errors(
         PackageBodyElement::PartDef(n) => collect_part_def_body_errors(&n.value.body, errors),
         PackageBodyElement::PartUsage(n) => collect_part_usage_body_errors(&n.value.body, errors),
         PackageBodyElement::PortDef(n) => collect_port_def_body_errors(&n.value.body, errors),
+        PackageBodyElement::ConnectionDef(n) => {
+            collect_connection_def_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::InterfaceDef(n) => {
+            collect_interface_def_body_errors(&n.value.body, errors)
+        }
         PackageBodyElement::AttributeDef(n) => collect_attribute_body_errors(&n.value.body, errors),
         PackageBodyElement::ActionDef(n) => collect_action_def_body_errors(&n.value.body, errors),
         PackageBodyElement::ActionUsage(n) => {
