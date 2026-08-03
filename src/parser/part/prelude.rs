@@ -18,9 +18,9 @@ pub(crate) use crate::parser::case::{
     analysis_case_def, analysis_case_usage, case_def, case_usage, verification_case_def,
     verification_case_usage,
 };
-pub(crate) use crate::parser::connection::connect_ends;
 pub(crate) use crate::parser::connection::connection_def_required;
 pub(crate) use crate::parser::connection::connection_member_body;
+pub(crate) use crate::parser::connector::{connect_body, connect_ends};
 pub(crate) use crate::parser::constraint::calc_def_required;
 pub(crate) use crate::parser::constraint::calc_usage;
 pub(crate) use crate::parser::constraint::{constraint_def, constraint_usage};
@@ -28,7 +28,7 @@ pub(crate) use crate::parser::dependency::dependency;
 pub(crate) use crate::parser::enumeration::enum_usage;
 pub(crate) use crate::parser::expr::{expression, path_expression};
 pub(crate) use crate::parser::flow::flow_def;
-pub(crate) use crate::parser::interface::{connect_body, interface_def_required};
+pub(crate) use crate::parser::interface::interface_def_required;
 pub(crate) use crate::parser::item::{item_def_required, item_usage};
 pub(crate) use crate::parser::lex::{
     identification, name, qualified_name, short_name_prefix, starts_with_any_keyword,

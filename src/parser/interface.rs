@@ -1,20 +1,15 @@
 //! Interface definition and usage parsing.
 
-use crate::ast::{
-    ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, InterfaceDef, InterfaceDefBody,
-    InterfaceDefBodyElement, Membership, Node, RefBody, RefDecl,
-};
+use crate::ast::{InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, Membership, Node};
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::body::advance_to_closing_brace;
+use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::path_expression;
 use crate::parser::item::{item_def_required, item_usage};
-use crate::parser::lex::{name, qualified_name, ws1, ws_and_comments};
+use crate::parser::lex::ws_and_comments;
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
-use crate::parser::usage::{multiplicity_node, reference_subsetting};
-use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -24,242 +19,6 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// End declaration: `end` name (`:` type | (`::>` | `references`) target) `;`
-fn end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<EndDecl>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"end"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    // Optional structural kind keyword (BNF `InterfaceOccurrenceUsageElement`/
-    // `StructureUsageElement`, e.g. `end part hub : Hub;`). Not retained as a separate field:
-    // `part`/`port` don't change this end's own grammar (name + type/reference), and `EndDecl`
-    // doesn't model usage-kind distinctions. Previously only `port` was accepted here; widened to
-    // also cover `part` (GH-19/GH-20: real-world `end part hub ::> mainSwitch[1];` examples were
-    // rejected because this keyword wasn't accepted at all).
-    let (input, _) = nom::combinator::opt(preceded(
-        ws_and_comments,
-        alt(((tag(&b"part"[..]), ws1), (tag(&b"port"[..]), ws1))),
-    ))
-    .parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-
-    // `::>` / `references` reference subsetting (GH-19): the target is a reference, not a type,
-    // so it's modeled via the same structured `SubsettingRelationship` every other reference-
-    // subsetting clause uses -- not folded into `type_name`/typing like the `:` form below. This
-    // previously only accepted `:`, so `end name references target;` fell through to recovery.
-    if let Ok((input, references)) = reference_subsetting(input) {
-        // Trailing multiplicity on the reference target (e.g. `::> mainSwitch[1]`) is parsed the
-        // same way `part_usage_redefines_only`/other subsetting-family callers do: the shared
-        // `reference_subsetting` parser only consumes the qualified target, so any multiplicity
-        // is a separate, subsequent optional parse here (GH-20 real-world example).
-        let (input, multiplicity) =
-            nom::combinator::opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        let type_ref_span = references.value.span.clone();
-        let type_name = references.value.target_display();
-        return Ok((
-            input,
-            node_from_to(
-                start,
-                input,
-                EndDecl {
-                    name: name_str,
-                    type_name,
-                    uses_derived_syntax: true,
-                    references: Some(references),
-                    multiplicity,
-                    name_span: Some(name_span),
-                    type_ref_span: Some(type_ref_span),
-                },
-            ),
-        ));
-    }
-
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, (tilde, (type_ref_span, type_name))) = preceded(
-        ws_and_comments,
-        (
-            nom::combinator::opt(tag(&b"~"[..])),
-            with_span(qualified_name),
-        ),
-    )
-    .parse(input)?;
-    let (input, multiplicity) =
-        nom::combinator::opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            EndDecl {
-                name: name_str,
-                type_name: if tilde.is_some() {
-                    format!("~{}", type_name)
-                } else {
-                    type_name
-                },
-                uses_derived_syntax: false,
-                references: None,
-                multiplicity,
-                name_span: Some(name_span),
-                type_ref_span: Some(type_ref_span),
-            },
-        ),
-    ))
-}
-
-/// Ref body: `;` or `{` ... `}`
-fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| RefBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| RefBody::Brace { elements: vec![] },
-        ),
-    ))
-    .parse(input)
-}
-
-/// Ref declaration: `ref` name `:` type body
-fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"ref"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, (type_ref_span, type_name)) =
-        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
-    let typing = Some(crate::parser::usage::single_target_typing(
-        type_ref_span.clone(),
-        type_name.clone(),
-    ));
-    let (input, body) = ref_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            RefDecl {
-                name: name_str,
-                type_name,
-                typing,
-                redefines: None,
-                value: None,
-                body,
-                name_span: Some(name_span),
-                type_ref_span: Some(type_ref_span),
-                membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
-            },
-        ),
-    ))
-}
-
-/// Connect body: `;` or `{` ... `}`
-pub(crate) fn connect_body(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| ConnectBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| ConnectBody::Brace,
-        ),
-    ))
-    .parse(input)
-}
-
-/// Wrap a parsed endpoint expression in a `ConnectionEnd` node, reusing the expression's own
-/// span (see `ast::core::ConnectionEnd`'s doc comment). This file's ends are semantically
-/// "interface ends" (`InterfaceEnd` is a type alias for `ConnectionEnd` -- checked that an
-/// interface end carries nothing beyond a generic connection end, see that alias's doc comment).
-fn connect_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
-    let span = expr.span.clone();
-    Node::new(
-        span.clone(),
-        ConnectionEnd {
-            expression: expr,
-            multiplicity: None,
-            span,
-        },
-    )
-}
-
-/// `(from, to, extra_ends)` for a parsed connect statement.
-type ConnectEnds = (
-    Node<ConnectionEnd>,
-    Node<ConnectionEnd>,
-    Vec<Node<ConnectionEnd>>,
-);
-
-/// Connect ends: the n-ary `'(' end (',' end)+ ')'` form (`NaryInterfacePart`), or the ordinary
-/// binary `from ... to ...` form. Returns `(from, to, extra_ends)`.
-fn connect_ends(input: Input<'_>) -> IResult<Input<'_>, ConnectEnds> {
-    alt((
-        map(
-            (
-                preceded(ws_and_comments, tag(&b"("[..])),
-                preceded(ws_and_comments, path_expression),
-                nom::multi::many1(preceded(
-                    preceded(ws_and_comments, tag(&b","[..])),
-                    preceded(ws_and_comments, path_expression),
-                )),
-                preceded(ws_and_comments, tag(&b")"[..])),
-            ),
-            |(_, first, mut rest, _)| {
-                let to = rest.remove(0);
-                (
-                    connect_end(first),
-                    connect_end(to),
-                    rest.into_iter().map(connect_end).collect(),
-                )
-            },
-        ),
-        map(
-            (
-                path_expression,
-                preceded(ws_and_comments, tag(&b"to"[..])),
-                preceded(ws_and_comments, path_expression),
-            ),
-            |(from, _, to)| (connect_end(from), connect_end(to), Vec::new()),
-        ),
-    ))
-    .parse(input)
-}
-
-/// Connect statement: `connect` from `to` to body, or `connect` `(` a `,` b (`,` c)* `)` body
-fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectStmt>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"connect"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, (from_expr, to_expr, extra_ends)) = connect_ends(input)?;
-    let (input, body) = connect_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            ConnectStmt {
-                from: from_expr,
-                to: to_expr,
-                extra_ends,
-                body,
-            },
-        ),
-    ))
-}
-
 fn interface_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceDefBodyElement>> {
@@ -267,7 +26,10 @@ fn interface_def_body_element(
     let start = input;
     let (input, elem) = alt((
         map(doc_comment, InterfaceDefBodyElement::Doc),
-        map(end_decl, InterfaceDefBodyElement::EndDecl),
+        // GH-33: interfaces don't allow the `#name` derived-end-name form connections do (no
+        // matching real-usage evidence found for interfaces) -- see `connector::end_decl`'s doc
+        // comment.
+        map(|i| end_decl(i, false), InterfaceDefBodyElement::EndDecl),
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),
         // PAR-002 widening: this body previously had no attribute/item/port coverage at all.

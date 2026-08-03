@@ -6,9 +6,9 @@ use crate::ast::{
     SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody, ViewDefBodyElement,
     ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
+use crate::parser::connector::connect_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     capture_opaque_member, name, qualified_name, starts_with_any_keyword, visibility_prefix, ws1,
     ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,

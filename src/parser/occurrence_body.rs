@@ -8,10 +8,10 @@ use crate::ast::{
 use crate::parser::attribute::attribute_usage;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
+use crate::parser::connector::connect_body;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::expr::path_expression;
 use crate::parser::flow::flow_usage_member;
-use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     capture_opaque_member, name, qualified_name, recover_body_element, visibility_prefix, ws1,
     ws_and_comments,
