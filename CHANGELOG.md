@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.3] - 2026-08-03
+
+### Fixed
+
+- **`part def` bodies did not accept `first`/`succession` succession syntax**
+  ([#40](https://github.com/elan8/sysml-v2-parser/issues/40)) — flagged as out of scope while
+  fixing [#38](https://github.com/elan8/sysml-v2-parser/issues/38): not even the bare
+  `first a then b;` form (already supported inside action bodies) parsed inside a `part def`
+  body. Real-world evidence: `sysml-v2-release/sysml/src/examples/Simple
+  Tests/ConnectionTest.sysml`'s `part def P { ... }` body uses all three forms back to back
+  (`first a then b;`, `succession s first a then b;`, `succession s1 : AB first a then b;`), all
+  of which previously failed with `unexpected keyword 'first' in part definition body` /
+  `unexpected token in part definition body`.
+
+  `part_def_body_element` (`src/parser/part/body.rs`) now dispatches to the same `first_stmt`
+  parser action bodies already use (`src/parser/action.rs`, made `pub(crate)`), wrapped so the
+  `then` clause is mandatory (see below). `first` was added to `PART_BODY_STARTERS`
+  (`succession` was already listed as a starter keyword but had no parser wired up, so it always
+  fell through to recovery). `PartDefBodyElement` gained a `FirstStmt` variant wrapping the
+  existing `FirstStmt` AST node (no new AST type). `PARSE_AST_VERSION` bumped 60 → 61.
+
+  Per BNF `SuccessionAsUsage` (§8.2.2.13.3), this succession form is reachable from the generic
+  `DefinitionBodyItem` grammar `PartDefinition` uses (via `NonOccurrenceUsageElement`), so it
+  belongs in a `part def` body. `merge`/`decide`/`join`/`fork` (BNF `ActionNode`) do **not**: per
+  the BNF, `ActionNodeMember` is reachable only from `ActionBodyItem` (action def/usage bodies),
+  not `DefinitionBodyItem` — no example in the vendored library nests them in a `part def` body
+  either. An earlier draft of this fix wired all four in; checked against the spec text and
+  narrowed to just `first`/`succession`. Likewise, the `then`-less `first target;` initial-node
+  marker (BNF `InitialNodeMember`) is `ActionBodyItem`-only, so the shared `first_stmt` parser is
+  wrapped to reject it here even though it's accepted (as an optional `then`) inside action
+  bodies.
+
+  Out of scope: a bare `bind a = b;` member (without the `binding` keyword) inside a `part def`
+  body also fails to parse — a separate, pre-existing gap `ConnectionTest.sysml` happens to
+  exercise a few lines above the succession syntax fixed here — tracked separately, not fixed in
+  this change.
+
 ## [0.51.2] - 2026-08-03
 
 ### Fixed

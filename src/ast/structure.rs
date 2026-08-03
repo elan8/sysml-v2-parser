@@ -166,6 +166,14 @@ pub enum PartDefBodyElement {
     AnalysisCaseUsage(Node<crate::ast::requirement::AnalysisCaseUsage>),
     VerificationCaseDef(Node<crate::ast::requirement::VerificationCaseDef>),
     VerificationCaseUsage(Node<crate::ast::requirement::VerificationCaseUsage>),
+    /// `first ... then ...` succession (BNF `SuccessionAsUsage`, §8.2.2.13.3) nested directly
+    /// inside a part definition body (GH-40: previously only reachable inside action bodies,
+    /// even though `ConnectionTest.sysml` uses the bare and `succession`-prefixed forms directly
+    /// inside a `part def`). `then` is mandatory here -- unlike inside an action body, the
+    /// `then`-less `first target;` initial-node marker (BNF `InitialNodeMember`) is not part of
+    /// the generic `DefinitionBodyItem` grammar a part def body uses, so it is rejected by the
+    /// parser rather than represented by this variant.
+    FirstStmt(Node<crate::ast::behavior::FirstStmt>),
 }
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.
