@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.8] - 2026-08-03
+
+### Fixed
+
+- **`missing_expression_after_operator_diagnostic` scanned the unbounded rest of the file, same
+  far-field poisoning bug shape as GH-18** ([#29](https://github.com/elan8/sysml-v2-parser/issues/29))
+  — follow-up audit after #18/#28. That earlier fix added `local_statement_window`
+  (`src/parser/diagnostics.rs`) to bound `invalid_unit_reference_diagnostic` and
+  `bare_comma_sequence_diagnostic` to the current statement, but was scoped narrowly to the one
+  function #18 reported. `missing_expression_after_operator_diagnostic`
+  (checking `.contains("= ;")`/` then ;`/` to ;`/` by ;`, etc.) had the identical bug: it scanned
+  `String::from_utf8_lossy(fragment)` over the unbounded rest of the file rather than the local
+  window, so an unrelated `= ;`-like substring in a comment far below the real error could
+  override the true diagnostic (e.g. a genuinely malformed `bind x = 123abc!;` misreported as
+  "expected expression after '='" because of a doc comment two lines later reading `// unrelated
+  note: default = ; here`).
+
+  Routed it through the same `local_statement_window` bound. Audited every other classifier in
+  `src/parser/diagnostics.rs` and `src/parser/recovery.rs` for the same anti-pattern
+  (unbounded `.contains()`/string-scan instead of a bounded local window): `missing_type_diagnostic`,
+  `invalid_expose_separator_diagnostic`, `missing_semicolon_or_body_diagnostic`,
+  `invalid_typing_operator_diagnostic`, `invalid_bare_identifier_in_body_diagnostic`, and
+  `unexpected_keyword_in_scope_diagnostic` already self-bound via prefix-anchored token walks or
+  their own delimiter-position logic; the `recovery.rs` classification sites bound their scans to
+  the actual recovery-consumed span, not the unbounded fragment. Confirmed
+  `missing_expression_after_operator_diagnostic` was the only other instance.
+
+  No AST changes; diagnostics-only.
+
 ## [0.51.7] - 2026-08-03
 
 ### Fixed

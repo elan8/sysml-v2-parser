@@ -548,11 +548,16 @@ pub(crate) fn missing_expression_after_operator_diagnostic(
         ),
     ];
 
+    // GH-29: bound the scan to the current statement (mirrors `invalid_unit_reference_diagnostic`/
+    // `bare_comma_sequence_diagnostic`, GH-18/#28) -- otherwise a `.contains()` match on unrelated
+    // text or a comment further down the file (e.g. a doc comment mentioning `= ;`) can override
+    // the true diagnostic for a genuinely malformed statement here.
+    let window = local_statement_window(fragment);
+    let text = String::from_utf8_lossy(window);
     for (keyword, expected, suggestion) in cases {
         if !lex::starts_with_keyword(fragment, keyword) {
             continue;
         }
-        let text = String::from_utf8_lossy(fragment);
         if text.contains("= ;") || text.trim_end().ends_with('=') {
             return Some((
                 "missing_expression_after_operator",

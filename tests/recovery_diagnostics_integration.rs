@@ -960,6 +960,31 @@ fn far_field_comment_bracket_does_not_poison_diagnostic() {
 }
 
 #[test]
+fn far_field_comment_does_not_poison_missing_expression_diagnostic() {
+    // GH-29: `missing_expression_after_operator_diagnostic` scanned the unbounded rest of the
+    // file for `= ;`/` then ;`/etc. patterns, so an unrelated comment far below the real error
+    // (containing `= ;`) could override the true diagnostic for a genuinely malformed `bind`
+    // expression with a misleading "expected expression after '='" message.
+    let input = fixture("far-field-comment-poisons-missing-expression-diagnostic.sysml");
+    let result = parse_with_diagnostics(&input);
+
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("missing_expression_after_operator")),
+        "an '= ;'-like substring inside an unrelated comment must not be misclassified as a \
+         missing expression after '=': {:?}",
+        result.errors
+    );
+    assert!(
+        result.errors.iter().any(|e| e.line == Some(3)),
+        "the real error site (line 3) should be reported: {:?}",
+        result.errors
+    );
+}
+
+#[test]
 fn unrecognized_identifier_is_not_reported_as_a_keyword() {
     // GH-18 (Problem 2): `test` is an ordinary identifier, not a SysML keyword, so it must not be
     // reported as "unexpected keyword" -- that would wrongly imply it's valid-but-unsupported
