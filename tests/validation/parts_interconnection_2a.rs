@@ -733,8 +733,13 @@ fn part_vehicle1_c1() -> PartUsage {
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::Bind(n(Bind {
+                    binding_name: None,
+                    binding_type: None,
+                    binding_multiplicity: None,
                     left: expr_path("fuelCmdPort"),
+                    left_multiplicity: None,
                     right: expr_path("engine.fuelCmdPort"),
+                    right_multiplicity: None,
                     body: Some(ConnectBody::Semicolon),
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
@@ -826,13 +831,23 @@ fn part_vehicle1_c1() -> PartUsage {
                     part_rear_axle_assembly(),
                 )))),
                 n(PartUsageBodyElement::Bind(n(Bind {
+                    binding_name: None,
+                    binding_type: None,
+                    binding_multiplicity: None,
                     left: expr_path("rearAxleAssembly.leftWheel.wheelToRoadPort"),
+                    left_multiplicity: None,
                     right: expr_path("vehicleToRoadPort.leftWheelToRoadPort"),
+                    right_multiplicity: None,
                     body: Some(ConnectBody::Semicolon),
                 }))),
                 n(PartUsageBodyElement::Bind(n(Bind {
+                    binding_name: None,
+                    binding_type: None,
+                    binding_multiplicity: None,
                     left: expr_path("rearAxleAssembly.rightWheel.wheelToRoadPort"),
+                    left_multiplicity: None,
                     right: expr_path("vehicleToRoadPort.rightWheelToRoadPort"),
+                    right_multiplicity: None,
                     body: Some(ConnectBody::Semicolon),
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
@@ -932,8 +947,13 @@ fn part_rear_axle_assembly() -> PartUsage {
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::Bind(n(Bind {
+                    binding_name: None,
+                    binding_type: None,
+                    binding_multiplicity: None,
                     left: expr_path("shaftPort_d"),
+                    left_multiplicity: None,
                     right: expr_path("differential.shaftPort_d"),
+                    right_multiplicity: None,
                     body: Some(ConnectBody::Semicolon),
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(

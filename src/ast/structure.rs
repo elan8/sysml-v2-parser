@@ -1195,8 +1195,24 @@ pub enum DefinitionBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Bind {
+    /// Name of the binding connector itself, e.g. `binding ab bind a = b;` (BNF
+    /// `BindingConnectorAsUsage`'s optional `'binding' UsageDeclaration` prefix, §8.2.2.13.2).
+    /// `None` for the bare `bind a = b;` form (no `binding` keyword) or an unnamed `binding`
+    /// prefix (e.g. `binding [1] bind ...`).
+    pub binding_name: Option<String>,
+    /// Type of the binding connector itself, e.g. `binding ab1 : AB bind a = b;`.
+    pub binding_type: Option<String>,
+    /// Multiplicity of the binding connector feature itself, e.g. `binding [1] bind ...`
+    /// (Systems Library `Domain Libraries/Geometry/ShapeItems.sysml`).
+    pub binding_multiplicity: Option<Node<Multiplicity>>,
     pub left: Node<Expression>,
+    /// Multiplicity on the left (`bind`) end, e.g. `bind [0..*] base.edges = ...` -- same
+    /// per-endpoint-multiplicity shape as `Connect`'s `ConnectionEnd`/§6 G24 and `FirstStmt`'s
+    /// `first_multiplicity`/`then_multiplicity`.
+    pub left_multiplicity: Option<Node<Multiplicity>>,
     pub right: Node<Expression>,
+    /// Multiplicity on the right (`=`) end, e.g. `... = [0..*] be;`.
+    pub right_multiplicity: Option<Node<Multiplicity>>,
     /// Optional body after the bind (semicolon or brace); 3a fixture uses `bind x = y { }`.
     pub body: Option<ConnectBody>,
 }
