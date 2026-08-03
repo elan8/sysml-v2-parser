@@ -84,6 +84,7 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"enum",
     b"event",
     b"exhibit",
+    b"first",
     b"flow",
     b"import",
     b"individual",

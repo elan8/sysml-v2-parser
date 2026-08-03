@@ -637,7 +637,7 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
 }
 
 /// First stmt: (`succession` prefix)? `first` `[mult]`? path (`then` `[mult]`? path)? body
-fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
+pub(crate) fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, succession) = opt(succession_prefix).parse(input)?;

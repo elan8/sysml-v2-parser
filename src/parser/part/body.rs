@@ -3,6 +3,7 @@ use super::usage::{
     allocate_, connect_, interface_usage, part_ref_usage, part_usage, perform_action_decl,
     perform_usage, variant_usage,
 };
+use crate::parser::action::first_stmt;
 
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
 pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
@@ -49,6 +50,26 @@ fn part_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PartDefBodyE
         end,
         PartDefBodyElement::Error(node_from_to(start, end, recovery)),
     )
+}
+
+/// GH-40 / BNF `SuccessionAsUsage` (§8.2.2.13.3): the generic `DefinitionBodyItem` grammar a
+/// `part def` body uses only reaches `first`/`succession` succession syntax through
+/// `NonOccurrenceUsageMember` -> `SuccessionAsUsage`, whose `'then' ownedRelationship +=
+/// ConnectorEndMember` clause is mandatory. The bare `first target;` marker (no `then`) is a
+/// distinct production, `InitialNodeMember`, reachable only from `ActionBodyItem` (action
+/// def/usage bodies) -- not from `DefinitionBodyItem`. `first_stmt` is shared with action bodies
+/// and makes `then` optional there (§6 G13), so this wrapper rejects the `then`-less form to keep
+/// part def body dispatch grammar-accurate; `merge`/`decide`/`join`/`fork` (BNF `ActionNode`, via
+/// `ActionNodeMember`) are `ActionBodyItem`-only outright and are intentionally not wired up here.
+fn part_def_succession_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::FirstStmt>> {
+    let (rest, node) = first_stmt(input)?;
+    if node.value.then.is_none() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    }
+    Ok((rest, node))
 }
 
 fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
@@ -330,6 +351,13 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(use_case_def, PartDefBodyElement::UseCaseDef),
             map(use_case_usage, PartDefBodyElement::UseCaseUsage),
         )),
+        // GH-40 / BNF `SuccessionAsUsage` (§8.2.2.13.3, `NonOccurrenceUsageElement`): the bare and
+        // `succession`-prefixed `first ... then ...` forms, previously only reachable inside
+        // action bodies, even though `ConnectionTest.sysml` uses them directly inside a `part def`
+        // body. `merge`/`decide`/`join`/`fork` (BNF `ActionNode`) are NOT included: per the BNF,
+        // `ActionNodeMember` is reachable only from `ActionBodyItem`, not the generic
+        // `DefinitionBodyItem` a part def body uses -- no real usage exercises them here either.
+        map(part_def_succession_stmt, PartDefBodyElement::FirstStmt),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -959,6 +987,89 @@ mod par_002_nested_def_tests {
         let sample = r#"package Shop {
             part def TileCache {
                 action def GetTile { }
+            }
+        }"#;
+        crate::parse(sample).unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
+    }
+
+    // --- GH-40: `first`/`succession` succession syntax (BNF `SuccessionAsUsage`) nested directly
+    // in a part definition body, previously only reachable inside action bodies. `merge`/`decide`
+    // (BNF `ActionNode`) are deliberately NOT covered here -- per the BNF, `ActionNodeMember` is
+    // reachable only from `ActionBodyItem`, not the generic `DefinitionBodyItem` a part def body
+    // uses. ---
+
+    #[test]
+    fn part_def_body_accepts_bare_first_then_stmt() {
+        let (rest, node) =
+            part_def_body_element(input("first a then b;")).expect("first ... then ...");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            PartDefBodyElement::FirstStmt(stmt) => {
+                assert!(stmt.value.succession_name.is_none());
+                assert!(stmt.value.then.is_some());
+            }
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn part_def_body_accepts_named_succession_first_then_stmt() {
+        let (rest, node) = part_def_body_element(input("succession s first a then b;"))
+            .expect("succession first ... then ...");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            PartDefBodyElement::FirstStmt(stmt) => {
+                assert_eq!(stmt.value.succession_name.as_deref(), Some("s"));
+                assert!(stmt.value.succession_type.is_none());
+            }
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn part_def_body_accepts_named_typed_succession_first_then_stmt() {
+        let (rest, node) = part_def_body_element(input("succession s1 : AB first a then b;"))
+            .expect("succession : Type first ... then ...");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            PartDefBodyElement::FirstStmt(stmt) => {
+                assert_eq!(stmt.value.succession_name.as_deref(), Some("s1"));
+                assert_eq!(stmt.value.succession_type.as_deref(), Some("AB"));
+            }
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    /// BNF `ActionNode` (`merge`/`decide`/`join`/`fork`) is reachable only from `ActionBodyItem`
+    /// (action def/usage bodies), not the generic `DefinitionBodyItem` a part def body uses, so
+    /// these bare control nodes must still fall through to recovery here.
+    #[test]
+    fn part_def_body_rejects_bare_merge_and_decide_stmt() {
+        assert!(part_def_body_element(input("merge M;")).is_err());
+        assert!(part_def_body_element(input("decide D;")).is_err());
+    }
+
+    /// BNF `InitialNodeMember` (the `then`-less `first target;` marker) is likewise
+    /// `ActionBodyItem`-only; only the full `SuccessionAsUsage` form with a mandatory `then` is
+    /// part of `DefinitionBodyItem`.
+    #[test]
+    fn part_def_body_rejects_first_stmt_without_then() {
+        assert!(part_def_body_element(input("first a;")).is_err());
+    }
+
+    /// GH-40 issue sample: https://github.com/elan8/sysml-v2-parser/issues/40 -- the
+    /// `first`/`succession` lines from `sysml-v2-release/sysml/src/examples/Simple
+    /// Tests/ConnectionTest.sysml`'s `part def P { ... }` body.
+    #[test]
+    fn gh40_issue_sample_parses_cleanly() {
+        let sample = r#"package ConnectionTest {
+            part def P {
+                part a;
+                part b;
+
+                first a then b;
+                succession s first a then b;
+                succession s1 : AB first a then b;
             }
         }"#;
         crate::parse(sample).unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
