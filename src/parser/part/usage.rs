@@ -600,14 +600,60 @@ pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> 
     ))
 }
 
-/// Bind: `bind` path `=` path (`;` or `{ }`)
+/// `(name)? (: Type)? (multiplicity)?` for the optional `binding` prefix (BNF
+/// `BindingConnectorAsUsage = UsagePrefix ('binding' UsageDeclaration)? 'bind' ...`,
+/// §8.2.2.13.2). Mirrors `action::succession_prefix`'s exact structure for the sibling
+/// `SuccessionAsUsage = UsagePrefix ('succession' UsageDeclaration)? 'first' ...` production --
+/// same anonymous-prefix shape, confirmed by matching real usage (`binding [1] bind ...` in
+/// Systems Library `Domain Libraries/Geometry/ShapeItems.sysml` mirrors `succession [seBeforeNum]
+/// first ...` in `Flows.sysml`).
+type BindingPrefix = (
+    Option<String>,
+    Option<String>,
+    Option<Node<crate::ast::Multiplicity>>,
+);
+
+fn binding_prefix(input: Input<'_>) -> IResult<Input<'_>, BindingPrefix> {
+    let (input, _) = tag(&b"binding"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    let frag = peek.fragment();
+    let (input, binding_name) = if starts_with_keyword(frag, b"bind") || frag.starts_with(b"[") {
+        (input, None)
+    } else {
+        let (input, parsed_name) = preceded(ws_and_comments, name).parse(input)?;
+        (input, Some(parsed_name))
+    };
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, binding_type) =
+        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
+            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            (input, Some(type_name))
+        } else {
+            (input, None)
+        };
+    let (input, binding_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    Ok((input, (binding_name, binding_type, binding_multiplicity)))
+}
+
+/// Bind: (`binding` name? (`: Type`)? multiplicity?)? `bind` multiplicity? path `=` multiplicity?
+/// path (`;` or `{ }`). The per-endpoint multiplicity mirrors `connect_`'s `from_multiplicity`/
+/// `to_multiplicity` (§6 G24) -- confirmed by real usage: `binding [1] bind [0..*] base.edges =
+/// [0..*] be;` in Systems Library `Domain Libraries/Geometry/ShapeItems.sysml` (13 occurrences).
 pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"bind"[..]).parse(input)?;
+    let (input, prefix) = opt(binding_prefix).parse(input)?;
+    let (binding_name, binding_type, binding_multiplicity) = prefix.unwrap_or((None, None, None));
+    let (input, _) = preceded(ws_and_comments, tag(&b"bind"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, left) = path_expression(input)?;
+    let (input, left_multiplicity) = opt(multiplicity_node).parse(input)?;
+    let (input, left) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+    let (input, right_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, right) = preceded(ws_and_comments, path_expression).parse(input)?;
     let mut body_parser = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
@@ -620,7 +666,20 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
     let (input, body) = body_parser.parse(input)?;
     Ok((
         input,
-        node_from_to(start, input, Bind { left, right, body }),
+        node_from_to(
+            start,
+            input,
+            Bind {
+                binding_name,
+                binding_type,
+                binding_multiplicity,
+                left,
+                left_multiplicity,
+                right,
+                right_multiplicity,
+                body,
+            },
+        ),
     ))
 }
 
@@ -1788,5 +1847,72 @@ mod gh16_interface_usage_tests {
             crate::parse(sample)
                 .unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
         }
+    }
+}
+
+#[cfg(test)]
+mod gh48_bind_prefix_and_multiplicity_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    /// GH-48 Gap 2a: bare `bind a = b;` (no `binding` prefix) must keep working exactly as
+    /// before -- no regression from adding the optional prefix.
+    #[test]
+    fn bind_still_accepts_bare_form() {
+        let (rest, node) = bind_(input("bind a = b;")).expect("bind a = b;");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.binding_name.is_none());
+        assert!(node.value.binding_type.is_none());
+        assert!(node.value.binding_multiplicity.is_none());
+    }
+
+    /// GH-48 Gap 2a: `binding <name> bind a = b;` -- named binding connector prefix, no type.
+    /// Real usage: `sysml-v2-release/sysml/src/examples/Simple Tests/ConnectionTest.sysml`
+    /// line 23.
+    #[test]
+    fn bind_accepts_named_binding_prefix() {
+        let (rest, node) = bind_(input("binding ab bind a = b;")).expect("binding ab bind a = b;");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.binding_name.as_deref(), Some("ab"));
+        assert!(node.value.binding_type.is_none());
+    }
+
+    /// GH-48 Gap 2a: `binding <name> : <Type> bind a = b;` -- named and typed binding connector
+    /// prefix. Real usage: `ConnectionTest.sysml` line 24.
+    #[test]
+    fn bind_accepts_named_typed_binding_prefix() {
+        let (rest, node) =
+            bind_(input("binding ab1 : AB bind a = b;")).expect("binding ab1 : AB bind a = b;");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.binding_name.as_deref(), Some("ab1"));
+        assert_eq!(node.value.binding_type.as_deref(), Some("AB"));
+    }
+
+    /// GH-48 Gap 2b: per-endpoint multiplicity on `bind`'s own two operands, plus an anonymous
+    /// (name-less) `binding` prefix carrying its own multiplicity. Real usage (13 occurrences):
+    /// `sysml-v2-release/sysml.library/Domain Libraries/Geometry/ShapeItems.sysml` lines 431-433,
+    /// e.g. `binding [1] bind [0..*] base.edges = [0..*] be;`.
+    #[test]
+    fn bind_accepts_anonymous_binding_prefix_and_per_endpoint_multiplicity() {
+        let (rest, node) = bind_(input("binding [1] bind [0..*] base.edges = [0..*] be;"))
+            .expect("binding [1] bind [0..*] base.edges = [0..*] be;");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.binding_name.is_none());
+        assert!(node.value.binding_multiplicity.is_some());
+        assert!(node.value.left_multiplicity.is_some());
+        assert!(node.value.right_multiplicity.is_some());
+    }
+
+    /// Guard against `bind_` swallowing an identifier that merely starts with the `bind`/
+    /// `binding` keywords (e.g. a hypothetical `bindFoo`/`bindingFoo` name) -- `ws1` after each
+    /// keyword requires actual whitespace, mirroring the same guard already used for `connect`/
+    /// `succession`/etc. elsewhere in this crate.
+    #[test]
+    fn bind_rejects_bind_prefixed_identifier_without_separator() {
+        assert!(bind_(input("bindFoo = b;")).is_err());
     }
 }

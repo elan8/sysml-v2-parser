@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.7] - 2026-08-03
+
+### Fixed
+
+- **`bind_` never parsed the `binding` name/type/multiplicity prefix, nor per-endpoint
+  multiplicity on `bind`'s own operands** ([#48](https://github.com/elan8/sysml-v2-parser/issues/48),
+  Gap 2 of [#42](https://github.com/elan8/sysml-v2-parser/issues/42), refined with additional
+  real-usage evidence found while scoping it — Gap 1 landed in
+  [#47](https://github.com/elan8/sysml-v2-parser/pull/47)). `bind_`
+  (`src/parser/part/usage.rs`) only ever parsed the bare `bind a = b;` form.
+
+  Two gaps, both evidenced by the vendored SysML v2 Systems Library / spec Annex examples:
+  - **Gap 2a**: the optional `'binding' UsageDeclaration` prefix (BNF `BindingConnectorAsUsage`,
+    §8.2.2.13.2) — naming/typing the binding connector itself, e.g. `binding ab bind a = b;` /
+    `binding ab1 : AB bind a = b;` (`ConnectionTest.sysml` lines 23–24). Added `binding_prefix`,
+    mirroring `succession_prefix`'s exact structure for the sibling `SuccessionAsUsage` production
+    (added for #38) — same optional name / `: Type` / multiplicity shape.
+  - **Gap 2b**, found while checking real usage before scoping Gap 2a (not in the original #42
+    description): each of `bind`'s own two operands (`ConnectorEnd` per the BNF) may carry its own
+    leading multiplicity, e.g. `binding [1] bind [0..*] base.edges = [0..*] be;` — 13 occurrences
+    in Systems Library `Domain Libraries/Geometry/ShapeItems.sysml`. Mirrors `connect_`'s
+    `from_multiplicity`/`to_multiplicity` (§6 G24).
+
+  `Bind` (`src/ast/structure.rs`) gained `binding_name`, `binding_type`,
+  `binding_multiplicity`, `left_multiplicity`, and `right_multiplicity` fields, following
+  `FirstStmt`'s flat-fields shape (plain `Option<Node<Multiplicity>>` alongside the existing
+  `left`/`right: Node<Expression>`) rather than restructuring into `ConnectionEnd`, to keep the
+  change additive for existing `Bind` construction sites. `PARSE_AST_VERSION` bumped 64 → 65.
+
 ## [0.51.6] - 2026-08-03
 
 ### Fixed
