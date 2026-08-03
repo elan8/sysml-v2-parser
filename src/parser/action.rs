@@ -3,8 +3,8 @@
 use crate::ast::{
     ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
     ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstStmt, ForLoop, ForkStmt,
-    IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt, Node, ParseErrorNode, TerminateStmt,
-    ThenAction, ThenTarget, WhileStmt,
+    IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode,
+    TerminateStmt, ThenAction, ThenTarget, WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -14,6 +14,7 @@ use crate::parser::lex::{
     name, qualified_name, starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
     ws_and_comments,
 };
+use crate::parser::usage::multiplicity_node;
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
@@ -39,6 +40,7 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"assign",
     b"then",
     b"for",
+    b"succession",
     b"action",
     b"attribute",
     b"calc",
@@ -596,20 +598,71 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
 }
 
 /// First stmt: `first` path `then` path body
+/// Optional leading `succession` (name)? (`:` Type)? (`[mult]`)? prefix before `first`/`then`
+/// (SysML v2 §8.2.2.13.3 `SuccessionAsUsage`, GH-38). Only called once the `succession` keyword
+/// itself has been peeked; consumes it plus whatever of the optional trailing name/type/
+/// multiplicity is present. Real usage: Systems Library `Flows.sysml`'s unnamed
+/// `succession [seBeforeNum] first ...` (multiplicity, no name), `States.sysml`'s
+/// `succession stateSequencing first ...` (name, no type), and
+/// `sysml/src/examples/Simple Tests/ConnectionTest.sysml`'s `succession s first a then b;` /
+/// `succession s1 : AB first a then b;` (name, and name + type).
+/// `(name, type, multiplicity)` of a parsed `succession` prefix, all `None` when absent.
+type SuccessionPrefix = (Option<String>, Option<String>, Option<Node<Multiplicity>>);
+
+fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
+    let (input, _) = tag(&b"succession"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    let frag = peek.fragment();
+    let (input, succession_name) =
+        if starts_with_keyword(frag, b"first") || frag.starts_with(b"[") {
+            (input, None)
+        } else {
+            let (input, parsed_name) = preceded(ws_and_comments, name).parse(input)?;
+            (input, Some(parsed_name))
+        };
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, succession_type) = if peek.fragment().starts_with(b":")
+        && !peek.fragment().starts_with(b":>")
+    {
+        let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+        let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+        (input, Some(type_name))
+    } else {
+        (input, None)
+    };
+    let (input, succession_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    Ok((input, (succession_name, succession_type, succession_multiplicity)))
+}
+
+/// First stmt: (`succession` prefix)? `first` `[mult]`? path (`then` `[mult]`? path)? body
 fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"first"[..]).parse(input)?;
+    let (input, succession) = opt(succession_prefix).parse(input)?;
+    let (succession_name, succession_type, succession_multiplicity) =
+        succession.unwrap_or((None, None, None));
+    let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, first_expr) = path_expression(input)?;
+    let (input, first_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, first_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     // §6 G13: `then` is optional -- `first start;` on its own marks an initial node without
     // declaring a succession (OMG spec Annex `3a-Function-based Behavior-2.sysml`, where the
     // following `then merge continue;` / `then action ...;` lines supply the targets).
-    let (input, then_expr) = opt(preceded(
+    let (input, then_parts) = opt(preceded(
         preceded(ws_and_comments, tag(&b"then"[..])),
-        preceded(ws_and_comments, path_expression),
+        (
+            opt(preceded(ws_and_comments, multiplicity_node)),
+            preceded(ws_and_comments, path_expression),
+        ),
     ))
     .parse(input)?;
+    let (then_multiplicity, then_expr) = match then_parts {
+        Some((mult, expr)) => (mult, Some(expr)),
+        None => (None, None),
+    };
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
@@ -617,8 +670,13 @@ fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
             start,
             input,
             FirstStmt {
+                succession_name,
+                succession_type,
+                succession_multiplicity,
                 first: first_expr,
+                first_multiplicity,
                 then: then_expr,
+                then_multiplicity,
                 body,
             },
         ),
@@ -1165,6 +1223,97 @@ mod control_node_gap_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::FirstStmt(f) => assert!(f.value.then.is_some()),
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    /// GH-38: `succession first ... then ...;` -- the bare `succession` keyword prefix, no
+    /// name/type/multiplicity.
+    #[test]
+    fn action_body_accepts_bare_succession_prefix() {
+        let (rest, node) =
+            action_def_body_element(input("succession first validate then checkRoute;"))
+                .expect("succession first/then stmt");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::FirstStmt(f) => {
+                assert_eq!(f.value.succession_name, None);
+                assert_eq!(f.value.succession_type, None);
+                assert!(f.value.then.is_some());
+            }
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    /// GH-38: `succession s first a then b;` -- named succession (real usage:
+    /// `ConnectionTest.sysml`).
+    #[test]
+    fn action_body_accepts_named_succession_prefix() {
+        let (rest, node) = action_def_body_element(input("succession s first a then b;"))
+            .expect("named succession stmt");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::FirstStmt(f) => {
+                assert_eq!(f.value.succession_name.as_deref(), Some("s"));
+                assert_eq!(f.value.succession_type, None);
+            }
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    /// GH-38: `succession s1 : AB first a then b;` -- named and typed succession (real usage:
+    /// `ConnectionTest.sysml`).
+    #[test]
+    fn action_body_accepts_named_and_typed_succession_prefix() {
+        let (rest, node) = action_def_body_element(input("succession s1 : AB first a then b;"))
+            .expect("named + typed succession stmt");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::FirstStmt(f) => {
+                assert_eq!(f.value.succession_name.as_deref(), Some("s1"));
+                assert_eq!(f.value.succession_type.as_deref(), Some("AB"));
+            }
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    /// GH-38: `succession [mult] first [mult] a then [mult] b;` -- multiplicity on the
+    /// succession itself and on each end (real usage: Systems Library `Flows.sysml`:
+    /// `succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`).
+    #[test]
+    fn action_body_accepts_succession_and_end_multiplicities() {
+        let (rest, node) = action_def_body_element(input(
+            "succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;",
+        ))
+        .expect("succession with multiplicities stmt");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::FirstStmt(f) => {
+                assert_eq!(f.value.succession_name, None);
+                assert!(f.value.succession_multiplicity.is_some());
+                assert!(f.value.first_multiplicity.is_some());
+                assert!(f.value.then_multiplicity.is_some());
+            }
+            other => panic!("expected FirstStmt, got {other:?}"),
+        }
+    }
+
+    /// GH-38: `succession name first [mult] a then [mult] b { ... }` -- named succession with
+    /// end multiplicities and a brace body (real usage: Systems Library `States.sysml`).
+    #[test]
+    fn action_body_accepts_named_succession_with_end_multiplicities_and_brace_body() {
+        let (rest, node) = action_def_body_element(input(
+            "succession stateSequencing first [0..1] exclusiveStates then [0..1] exclusiveStates { }",
+        ))
+        .expect("named succession with multiplicities + brace body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match node.value {
+            ActionDefBodyElement::FirstStmt(f) => {
+                assert_eq!(f.value.succession_name.as_deref(), Some("stateSequencing"));
+                assert!(f.value.first_multiplicity.is_some());
+                assert!(f.value.then_multiplicity.is_some());
+                assert!(matches!(f.value.body, FirstMergeBody::Brace));
+            }
             other => panic!("expected FirstStmt, got {other:?}"),
         }
     }

@@ -362,14 +362,30 @@ pub struct FlowUsage {
     pub membership: Membership,
 }
 
-/// First/then control flow: `first` expr `then` expr body.
+/// First/then control flow: `first` expr `then` expr body, with an optional leading `succession`
+/// keyword prefix (SysML v2 §8.2.2.13.3 `SuccessionAsUsage`, GH-38) that may itself carry a
+/// name, a type, and/or a multiplicity, e.g. `succession first a then b;`,
+/// `succession s1 : AB first a then b;`, `succession [seBeforeNum] first [0..1] a then [0..1]
+/// b;` (Systems Library `Flows.sysml`/`States.sysml`, `ConnectionTest.sysml`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FirstStmt {
+    /// Name of the succession itself, e.g. `succession s first a then b;`. `None` when the
+    /// bare `first ... then ...` form is used (no `succession` keyword) or the `succession`
+    /// prefix is unnamed.
+    pub succession_name: Option<String>,
+    /// Type of the succession itself, e.g. `succession s1 : AB first a then b;`.
+    pub succession_type: Option<String>,
+    /// Multiplicity of the succession feature itself, e.g. `succession [seBeforeNum] first ...`.
+    pub succession_multiplicity: Option<Node<Multiplicity>>,
     pub first: Node<Expression>,
+    /// Multiplicity on the `first` end, e.g. `first [0..1] sourceEvent`.
+    pub first_multiplicity: Option<Node<Multiplicity>>,
     /// `None` for the standalone initial-node marker `first start;` (§6 G13), which names a
     /// starting node without declaring a succession to a target.
     pub then: Option<Node<Expression>>,
+    /// Multiplicity on the `then` end, e.g. `then [0..1] self`.
+    pub then_multiplicity: Option<Node<Multiplicity>>,
     pub body: FirstMergeBody,
 }
 

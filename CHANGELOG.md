@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.2] - 2026-08-03
+
+### Fixed
+
+- **Optional `succession` keyword prefix on `first ... then ...` statements not accepted**
+  ([#38](https://github.com/elan8/sysml-v2-parser/issues/38)) — per BNF `SuccessionAsUsage`
+  (§8.2.2.13.3), the `first ... then ...` control node inside an action body may carry a leading
+  `succession` keyword, optionally itself named, typed, and/or given a multiplicity, before the
+  `first`/`then` clause. `first_stmt` (`src/parser/action.rs`) only ever accepted the bare
+  `first ... then ...;` form. Real-world evidence: the vendored SysML v2 Systems Library uses the
+  unnamed, multiplicity-bearing form extensively (`Flows.sysml`: `succession [seBeforeNum] first
+  [0..1] sourceEvent then [0..1] self;`; `States.sysml`: `succession stateSequencing first [0..1]
+  exclusiveStates then [0..1] exclusiveStates { ... }`), and `sysml/src/examples/Simple
+  Tests/ConnectionTest.sysml` uses the named and named+typed forms (`succession s first a then
+  b;`, `succession s1 : AB first a then b;`).
+
+  `first_stmt` now accepts an optional `succession` (name)? (`: Type`)? (`[mult]`)? prefix, plus
+  an optional multiplicity on each of the `first`/`then` ends (`first [0..1] a then [0..1] b`),
+  mirroring the `[mult]` end-multiplicity handling `connection.rs`'s `connect_ends` already has
+  for `connect [0..1] a to [1] b;`. `FirstStmt` gained `succession_name: Option<String>`,
+  `succession_type: Option<String>`, `succession_multiplicity: Option<Node<Multiplicity>>`,
+  `first_multiplicity: Option<Node<Multiplicity>>`, and `then_multiplicity:
+  Option<Node<Multiplicity>>` (all additive, `None` for the pre-existing bare `first ... then
+  ...;` form). `PARSE_AST_VERSION` bumped 59 → 60.
+
+  Out of scope: `part def` bodies don't accept *any* `first`/`succession`/`merge`/`decide`
+  control-node syntax at all (a much wider, pre-existing gap `ConnectionTest.sysml` also happens
+  to exercise) — tracked separately, not fixed here.
+
 ## [0.51.1] - 2026-07-31
 
 ### Fixed
