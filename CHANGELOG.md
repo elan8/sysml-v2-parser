@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.6] - 2026-08-03
+
+### Fixed
+
+- **Bare `bind a = b;` not dispatched inside a `part def` body**
+  ([#42](https://github.com/elan8/sysml-v2-parser/issues/42) Gap 1) — discovered while fixing
+  [#40](https://github.com/elan8/sysml-v2-parser/issues/40). Real usage:
+  `sysml-v2-release/sysml/src/examples/Simple Tests/ConnectionTest.sysml` line 22, inside a
+  `part def P { ... }` body. `bind_` (BNF `BindingConnectorAsUsage`, §8.2.2.13.2,
+  `src/parser/part/usage.rs`) was already wired into part *usage* bodies
+  (`part_usage_body_element`), but `part_def_body_element` (`src/parser/part/body.rs`) had no
+  `Bind`/`bind_` arm and `PartDefBodyElement` had no `Bind` variant at all — same class of missing
+  dispatch-wiring gap as `first`/`succession` (#40). `PartDefBodyElement` gained a `Bind` variant
+  wrapping the existing `Bind` AST node (no new AST type). `PARSE_AST_VERSION` bumped 63 → 64.
+
+  Out of scope, per the issue: the `binding <name> (: Type)? bind ...` named-prefix form (Gap 2)
+  doesn't parse anywhere yet, in either def or usage bodies — a bigger fix requiring `bind_` to
+  grow a new sub-parser mirroring #38's `succession_prefix` pattern, tracked separately.
+
 ## [0.51.5] - 2026-08-03
 
 ### Fixed
