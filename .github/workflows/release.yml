@@ -21,10 +21,16 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt --check
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        run: cargo clippy -- -W clippy::all
 
       - name: Fetch SysML v2 Release (pinned)
         run: bash ./scripts/fetch-sysml-v2-release.sh
@@ -34,9 +40,6 @@ jobs:
         env:
           SYSML_V2_RELEASE_DIR: ${{ github.workspace }}/sysml-v2-release
           CI: true
-
-      - name: cargo clippy
-        run: cargo clippy -- -W clippy::all
 
       - name: cargo test (full validation suite)
         run: cargo test --test validation -- --include-ignored

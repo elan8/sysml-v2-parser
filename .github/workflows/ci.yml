@@ -8,6 +8,26 @@ on:
     branches: [main, master]
 
 jobs:
+  lint:
+    name: Lint (fmt, clippy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt --check
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        run: cargo clippy -- -W clippy::all
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -16,8 +36,6 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
@@ -30,9 +48,6 @@ jobs:
         env:
           SYSML_V2_RELEASE_DIR: ${{ github.workspace }}/sysml-v2-release
           CI: true
-
-      - name: cargo clippy
-        run: cargo clippy -- -W clippy::all
 
   validation:
     name: SysML v2 validation suite
