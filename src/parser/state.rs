@@ -615,7 +615,7 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     let (input, _) = ws1(input)?;
     let (input, target) = expression(input)?;
     let (input, body) =
-        preceded(ws_and_comments, crate::parser::interface::connect_body).parse(input)?;
+        preceded(ws_and_comments, crate::parser::connector::connect_body).parse(input)?;
     Ok((
         input,
         node_from_to(

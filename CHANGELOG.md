@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.9] - 2026-08-03
+
+### Changed
+
+- **Deduplicated `connection.rs`/`interface.rs`'s seven near-identical connector-end functions**
+  ([#33](https://github.com/elan8/sysml-v2-parser/issues/33)) — `end_decl`, `ref_body`,
+  `ref_decl`, `connect_body`, the connection-end wrapper, `connect_ends`, and `connect_stmt` were
+  each implemented twice, once per file, with only cosmetic naming differences
+  (`connection_end`/`connect_end`, etc.). This had already cost real double work once
+  ([#19](https://github.com/elan8/sysml-v2-parser/issues/19) required the same reference-
+  subsetting fix in both files), and, worse, had silently drifted into two genuine behavior gaps
+  neither file's own tests caught:
+  - `connection.rs`'s typed `end` form (`end name : Type;`) never accepted the `~`
+    conjugated-type prefix `interface.rs`'s did (e.g. `end p1 : ~PowerPort;`, real usage in
+    `KitchenTimer.sysml`/`SurveillanceDrone.sysml`) — no BNF basis for the restriction, since
+    `ConnectorEnd` and `InterfaceEnd` (§8.2.2.13.2/§8.2.2.14.2) are the same production.
+  - `interface.rs`'s `connect_ends` never accepted the §6 G24 per-endpoint multiplicity
+    (`connect [0..1] a to [1] b;`) `connection.rs`'s did — same reasoning, no BNF basis for
+    restricting it to connections only.
+
+  Both gaps are now fixed for both contexts by construction: all seven functions moved into a new
+  shared module, `src/parser/connector.rs`, and `connection.rs`/`interface.rs` call into it
+  instead of each maintaining their own copy. The one genuine, evidenced difference between the
+  two — connections accept the `#name` derived-end-name form (tested in
+  `tests/derivation_connections.rs`), interfaces have no matching real-usage evidence for it —
+  stays an explicit parameter (`end_decl`'s `allow_derived_name`) rather than being blindly
+  unified or silently dropped.
+
+  New regression tests in `tests/gh33_connector_consolidation.rs` assert that a capability added
+  to the shared implementation is visible from both `connection_def` and `interface_def` parsing,
+  so a future two-file-fix regression like #19 would be caught structurally here rather than
+  relying on remembering to test both files. No AST schema changes (same fields throughout, only
+  the accepted syntax widened); `PARSE_AST_VERSION` unchanged.
+
+  Also noted, not fixed here (pre-existing, unrelated to this consolidation): `interface_def_body`
+  silently discards unparseable body content via `advance_to_closing_brace` with no diagnostic,
+  unlike `connection_member_body`'s proper `parse_structured_brace_members`-based recovery — found
+  while testing the `#name` parameter above (confirmed on `main` before this change too, with a
+  minimal unrelated-malformed-content repro). Tracked as a follow-up, not part of GH-33's
+  connector-end-duplication scope.
+
 ## [0.51.8] - 2026-08-03
 
 ### Fixed

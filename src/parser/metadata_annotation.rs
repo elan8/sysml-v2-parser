@@ -2,7 +2,7 @@
 
 use crate::ast::{Annotation, AttributeBody, MetadataAnnotation, MetadataKeywordUsage, Node};
 use crate::parser::attribute::metadata_body;
-use crate::parser::interface::connect_body;
+use crate::parser::connector::connect_body;
 use crate::parser::lex::{
     name, qualified_name, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
 };
