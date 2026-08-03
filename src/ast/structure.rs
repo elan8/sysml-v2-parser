@@ -215,17 +215,24 @@ pub struct ConnectionUsageMember {
     pub membership: Membership,
 }
 
-/// Exhibit state usage: `(abstract)? (ref)? exhibit` (`state`)? name (`:` type)? (`:>`/`:>>` …)?
-/// body. GH-27: rebuilt on the same shared prefix/specialization helpers `state_usage` composes
-/// (see `crate::parser::part::body::exhibit_state`), so it carries the same header fields as
-/// [`StateUsage`].
+/// Exhibit state usage: `OccurrenceUsagePrefix` subset `exhibit` (`state`)? name (`:` type)?
+/// (`:>`/`:>>` …)? body. GH-27: rebuilt on the same shared prefix/specialization helpers
+/// `state_usage` composes (see `crate::parser::part::body::exhibit_state`), so it carries the
+/// same header fields as [`StateUsage`], including the `direction`/`is_derived`/`is_individual`
+/// slots added for GH-45.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExhibitState {
+    /// Leading direction (`in`/`out`/`inout`).
+    pub direction: Option<InOut>,
+    /// Leading `derived` keyword.
+    pub is_derived: bool,
     /// Leading `abstract` keyword.
     pub is_abstract: bool,
     /// Leading `ref` keyword — reference feature usage (`ref exhibit …`).
     pub is_reference: bool,
+    /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).
+    pub is_individual: bool,
     pub name: String,
     pub type_name: Option<String>,
     /// Structured typing clause when a `:` target was written.
