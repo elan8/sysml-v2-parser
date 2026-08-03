@@ -3484,7 +3484,9 @@ end part device ::> sensorFeed[1];
     let usage_ends = elements
         .iter()
         .find_map(|e| match &e.value {
-            PackageBodyElement::ConnectionUsage(u) if u.value.name.as_deref() == Some("connection1") => {
+            PackageBodyElement::ConnectionUsage(u)
+                if u.value.name.as_deref() == Some("connection1") =>
+            {
                 match &u.value.body {
                     ConnectionDefBody::Brace { elements } => Some(elements),
                     _ => None,

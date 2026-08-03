@@ -844,7 +844,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         if let Ok((after_to, (from_expr, to_expr))) = (|| {
             let (input, from_expr) = connector_end_expression(input)?;
             let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-            let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
+            let (input, to_expr) =
+                preceded(ws_and_comments, connector_end_expression).parse(input)?;
             Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (from_expr, to_expr)))
         })() {
             let (input, _) = opt(connect_body).parse(after_to)?;
@@ -1783,7 +1784,8 @@ mod gh16_interface_usage_tests {
             }"#,
         ];
         for sample in samples {
-            crate::parse(sample).unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
+            crate::parse(sample)
+                .unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
         }
     }
 }

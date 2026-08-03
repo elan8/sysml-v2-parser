@@ -312,10 +312,9 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
         panic!("expected part def body");
     };
     assert!(
-        elements.iter().any(|e| matches!(
-            e.value,
-            sysml_v2_parser::ast::PartDefBodyElement::Error(_)
-        )),
+        elements
+            .iter()
+            .any(|e| matches!(e.value, sysml_v2_parser::ast::PartDefBodyElement::Error(_))),
         "unmodeled part members should be preserved as Error nodes"
     );
     assert!(

@@ -960,8 +960,7 @@ mod par_002_nested_def_tests {
 
     #[test]
     fn part_def_body_accepts_nested_action_usage() {
-        let (rest, node) =
-            part_def_body_element(input("action getTile;")).expect("action usage");
+        let (rest, node) = part_def_body_element(input("action getTile;")).expect("action usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PartDefBodyElement::ActionUsage(_)));
     }

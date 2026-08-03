@@ -14,10 +14,10 @@ use crate::parser::lex::{
     name, qualified_name, starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
     ws_and_comments,
 };
-use crate::parser::usage::multiplicity_node;
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
+use crate::parser::usage::multiplicity_node;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -548,7 +548,10 @@ fn action_def_body_element(
                 map(crate::parser::part::part_usage, |p| {
                     ActionDefBodyElement::PartUsage(Box::new(p))
                 }),
-                map(crate::parser::item::item_usage, ActionDefBodyElement::ItemUsage),
+                map(
+                    crate::parser::item::item_usage,
+                    ActionDefBodyElement::ItemUsage,
+                ),
                 map(
                     crate::parser::occurrence_body::assert_constraint_member,
                     ActionDefBodyElement::AssertConstraint,
@@ -614,26 +617,28 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     let (input, _) = ws1(input)?;
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
-    let (input, succession_name) =
-        if starts_with_keyword(frag, b"first") || frag.starts_with(b"[") {
-            (input, None)
-        } else {
-            let (input, parsed_name) = preceded(ws_and_comments, name).parse(input)?;
-            (input, Some(parsed_name))
-        };
-    let (peek, _) = ws_and_comments(input)?;
-    let (input, succession_type) = if peek.fragment().starts_with(b":")
-        && !peek.fragment().starts_with(b":>")
+    let (input, succession_name) = if starts_with_keyword(frag, b"first") || frag.starts_with(b"[")
     {
-        let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-        let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
-        (input, Some(type_name))
-    } else {
         (input, None)
+    } else {
+        let (input, parsed_name) = preceded(ws_and_comments, name).parse(input)?;
+        (input, Some(parsed_name))
     };
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, succession_type) =
+        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
+            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            (input, Some(type_name))
+        } else {
+            (input, None)
+        };
     let (input, succession_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-    Ok((input, (succession_name, succession_type, succession_multiplicity)))
+    Ok((
+        input,
+        (succession_name, succession_type, succession_multiplicity),
+    ))
 }
 
 /// First stmt: (`succession` prefix)? `first` `[mult]`? path (`then` `[mult]`? path)? body
@@ -971,7 +976,10 @@ pub(crate) fn action_usage_body_element(
                 map(crate::parser::part::part_usage, |p| {
                     ActionUsageBodyElement::PartUsage(Box::new(p))
                 }),
-                map(crate::parser::item::item_usage, ActionUsageBodyElement::ItemUsage),
+                map(
+                    crate::parser::item::item_usage,
+                    ActionUsageBodyElement::ItemUsage,
+                ),
                 map(
                     crate::parser::occurrence_body::assert_constraint_member,
                     ActionUsageBodyElement::AssertConstraint,
@@ -1363,8 +1371,8 @@ mod control_node_gap_tests {
 
     #[test]
     fn then_succession_accepts_anonymous_action_with_accept_payload() {
-        let (rest, node) =
-            then_action(input("then action accept engineOff : EngineOff;")).expect("then action accept");
+        let (rest, node) = then_action(input("then action accept engineOff : EngineOff;"))
+            .expect("then action accept");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value.target {
             ThenTarget::Action(a) => {
@@ -1401,8 +1409,7 @@ mod control_node_gap_tests {
     /// GH-13 / BNF `ActionBodyItem` → `StructureUsageMember` → `PartUsage`.
     #[test]
     fn action_body_accepts_part_usage() {
-        let (rest, node) =
-            action_def_body_element(input("part rim : Wheel;")).expect("part usage");
+        let (rest, node) = action_def_body_element(input("part rim : Wheel;")).expect("part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::PartUsage(p) => assert_eq!(p.value.name, "rim"),
@@ -1470,8 +1477,7 @@ mod control_node_gap_tests {
     /// GH-13 / BNF `StructureUsageMember` → `PortionUsage` (`snapshot`).
     #[test]
     fn action_body_accepts_snapshot_usage() {
-        let (rest, node) =
-            action_def_body_element(input("snapshot trued { }")).expect("snapshot");
+        let (rest, node) = action_def_body_element(input("snapshot trued { }")).expect("snapshot");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::OccurrenceUsage(o) => {
@@ -1529,7 +1535,8 @@ mod control_node_gap_tests {
             }"#,
         ];
         for sample in samples {
-            crate::parse(sample).unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
+            crate::parse(sample)
+                .unwrap_or_else(|e| panic!("parse failed for sample:\n{sample}\n{e}"));
         }
     }
 }
