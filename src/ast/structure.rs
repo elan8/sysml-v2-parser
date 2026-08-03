@@ -101,14 +101,14 @@ pub enum PartDefBodyElement {
     /// (§6 G16). See [`PartUsageBodyElement::Import`].
     Import(Node<crate::ast::Import>),
     /// `action` / `ref action` usage inside a part definition body (Systems Library
-    /// `Parts::performedActions` and similar). Previously fell through to [`OpaqueMember`].
+    /// `Parts::performedActions` and similar). Previously fell through to [`OpaqueMemberDecl`].
     ActionUsage(Box<Node<ActionUsage>>),
     /// `action def` nested inside a part definition body (GH-14: previously only `ActionUsage`
     /// was reachable here, so a nested definition fell through to opaque recovery with a
     /// misleading "expected ';' or '{' after action definition header" diagnostic).
     ActionDef(Node<ActionDef>),
     /// `state` / `ref state` usage inside a part definition body. Previously fell through to
-    /// [`OpaqueMember`].
+    /// [`OpaqueMemberDecl`].
     StateUsage(Node<StateUsage>),
     /// Enumeration usage (`enum` keyword) inside a part definition body.
     EnumerationUsage(Node<EnumerationUsage>),
@@ -225,7 +225,7 @@ pub struct ExhibitState {
     pub body: StateDefBody,
 }
 
-/// Attribute definition: `attribute` [`def`] name (`:>` | `:` type)? (`=` value)? body.
+/// Attribute definition: `attribute` `def` name (`:>` | `:` type)? (`=` value)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeDef {
@@ -251,7 +251,7 @@ pub struct AttributeDef {
     /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
     pub nonunique: bool,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
-    /// [`MembershipKind::OwningMembership`] for a `*Def` -- a nested attribute definition becomes
+    /// [`crate::ast::MembershipKind::OwningMembership`] for a `*Def` -- a nested attribute definition becomes
     /// a new named member of its owning namespace, not a feature of it. `visibility` captures an
     /// explicit `private`/`protected`/`public` prefix when written (previously matched and
     /// discarded by `attribute_def`'s parser); `None` means no explicit prefix was written (the
@@ -653,9 +653,9 @@ pub struct AttributeUsage {
     /// declaration (`end name : Type;`), not this boolean prefix modifier.
     pub is_end: bool,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
-    /// [`MembershipKind::FeatureMembership`] for a `*Usage` -- a nested attribute usage
+    /// [`crate::ast::MembershipKind::FeatureMembership`] for a `*Usage` -- a nested attribute usage
     /// contributes a feature to its owning type, as opposed to a `*Def`'s
-    /// [`MembershipKind::OwningMembership`]. See [`AttributeDef::membership`] for the
+    /// [`crate::ast::MembershipKind::OwningMembership`]. See [`AttributeDef::membership`] for the
     /// `visibility` capture rationale; the same "matched and previously discarded" prefix applies
     /// here.
     pub membership: Membership,

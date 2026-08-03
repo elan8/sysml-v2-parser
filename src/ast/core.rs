@@ -234,9 +234,9 @@ pub enum Expression {
         base: Box<Node<Expression>>,
         index: Box<Node<Expression>>,
     },
-    /// [unit] e.g. [kg].
+    /// `[unit]` e.g. `[kg]`.
     Bracket(Box<Node<Expression>>),
-    /// value [unit] e.g. 1750 [kg].
+    /// value `[unit]` e.g. `1750 [kg]`.
     LiteralWithUnit {
         value: Box<Node<Expression>>,
         unit: Box<Node<Expression>>,

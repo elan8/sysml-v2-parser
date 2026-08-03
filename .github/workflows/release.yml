@@ -32,6 +32,11 @@ jobs:
       - name: cargo clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      - name: cargo doc
+        run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
       - name: Fetch SysML v2 Release (pinned)
         run: bash ./scripts/fetch-sysml-v2-release.sh
 
