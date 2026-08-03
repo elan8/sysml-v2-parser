@@ -1,15 +1,16 @@
 //! Nom-based parser for SysML v2 textual notation.
 //!
-//! Organized into modules:
-//! - [lex]: whitespace, comments, names, qualified names, skip helpers
-//! - [diagnostics]: nom error mapping, diagnostic classification, deduplication
-//! - [recovery]: recovery error nodes for structured body parsing
-//! - [collect_errors]: aggregate diagnostics from AST recovery nodes
-//! - [parse]: `parse_root` and `parse_with_diagnostics` entry points
-//! - [attribute]: attribute definition and usage
-//! - [import]: import and relationship body
-//! - [part]: part definition and part usage
-//! - [package]: package and root namespace
+//! Organized into modules (all private except [`diagnostic_catalog`]; listed here for
+//! contributors reading source, not as public doc links):
+//! - `lex`: whitespace, comments, names, qualified names, skip helpers
+//! - `diagnostics`: nom error mapping, diagnostic classification, deduplication
+//! - `recovery`: recovery error nodes for structured body parsing
+//! - `collect_errors`: aggregate diagnostics from AST recovery nodes
+//! - `parse`: `parse_root` and `parse_with_diagnostics` entry points
+//! - `attribute`: attribute definition and usage
+//! - `import`: import and relationship body
+//! - `part`: part definition and part usage
+//! - `package`: package and root namespace
 
 mod action;
 mod alias;

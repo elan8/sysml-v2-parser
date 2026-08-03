@@ -17,8 +17,8 @@
 use crate::ast::core::Span;
 
 /// A dot-separated feature chain, e.g. `engine.fuelCmdPort.flowRate` -> `["engine",
-/// "fuelCmdPort", "flowRate"]`. Distinct from a `::`-qualified name (see
-/// [`crate::parser::lex::qualified_name`]), which separates namespace/type segments rather than
+/// "fuelCmdPort", "flowRate"]`. Distinct from a `::`-qualified name (see the private
+/// `crate::parser::lex::qualified_name`), which separates namespace/type segments rather than
 /// feature-access segments.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

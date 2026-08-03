@@ -41,9 +41,7 @@ fn assert_rejects_with_unexpected_token(input: &str, scope_substr: &str) {
 
 #[test]
 fn part_def_body_rejects_arbitrary_non_sysml_text() {
-    let input = format!(
-        "package Shop {{\n    part def Wheel {{\n        {JUNK}\n    }}\n}}\n"
-    );
+    let input = format!("package Shop {{\n    part def Wheel {{\n        {JUNK}\n    }}\n}}\n");
     assert_rejects_with_unexpected_token(&input, "part definition body");
 
     let result = parse_with_diagnostics(&input);
@@ -108,10 +106,7 @@ fn part_usage_body_rejects_arbitrary_non_sysml_text() {
 #[test]
 fn other_body_kinds_still_reject_same_junk() {
     let cases = [
-        (
-            format!("package P {{\n    {JUNK}\n}}\n"),
-            "package body",
-        ),
+        (format!("package P {{\n    {JUNK}\n}}\n"), "package body"),
         (
             format!("package P {{\n    action def A {{\n        {JUNK}\n    }}\n}}\n"),
             "action",

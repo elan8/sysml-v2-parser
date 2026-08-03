@@ -1272,9 +1272,9 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::ActionUsage(n) => ActionDefBodyElement::ActionUsage(Box::new(
             dummy_node(n, normalize_action_usage(&n.value)),
         )),
-        ActionDefBodyElement::PartUsage(n) => ActionDefBodyElement::PartUsage(Box::new(
-            dummy_node(n, normalize_part_usage(&n.value)),
-        )),
+        ActionDefBodyElement::PartUsage(n) => {
+            ActionDefBodyElement::PartUsage(Box::new(dummy_node(n, normalize_part_usage(&n.value))))
+        }
         ActionDefBodyElement::ItemUsage(n) => {
             ActionDefBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
         }

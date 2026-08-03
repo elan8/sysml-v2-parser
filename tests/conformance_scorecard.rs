@@ -28,6 +28,33 @@ struct LibraryScan {
     kerml_feature_decl: usize,
 }
 
+/// Output file paths for [`write_scorecard`].
+struct ScorecardPaths<'a> {
+    json: &'a Path,
+    md: &'a Path,
+}
+
+/// Whether the fetched release tree's `.elan8-conformance-target` stamp matches the pinned tag.
+struct ReleaseStamp<'a> {
+    tag: Option<&'a str>,
+    matches_pin: bool,
+}
+
+/// L1 (syntax-acceptance) BNF coverage counts and overall pass/fail for [`write_scorecard`].
+struct L1Coverage<'a> {
+    sysml_counts: &'a BTreeMap<CoverageStatus, usize>,
+    kerml_counts: &'a BTreeMap<CoverageStatus, usize>,
+    ok: bool,
+}
+
+/// L2 (structured AST) library scan results for [`write_scorecard`]; `None` scans mean L2 was
+/// skipped, with `skip_reason` explaining why.
+struct L2Coverage<'a> {
+    systems: Option<&'a LibraryScan>,
+    full: Option<&'a LibraryScan>,
+    skip_reason: Option<&'a str>,
+}
+
 fn scorecard_dir() -> PathBuf {
     if let Some(path) = std::env::var_os("CONFORMANCE_SCORECARD_DIR") {
         return PathBuf::from(path);
@@ -145,19 +172,24 @@ fn layer_status(pass: bool) -> &'static str {
 }
 
 fn write_scorecard(
-    json_path: &Path,
-    md_path: &Path,
+    paths: ScorecardPaths,
     parser_version: &str,
     target: &common::ConformanceTarget,
-    stamp_tag: Option<&str>,
-    stamp_ok: bool,
-    sysml_counts: &BTreeMap<CoverageStatus, usize>,
-    kerml_counts: &BTreeMap<CoverageStatus, usize>,
-    l1_ok: bool,
-    systems: Option<&LibraryScan>,
-    full: Option<&LibraryScan>,
-    l2_skip_reason: Option<&str>,
+    stamp: ReleaseStamp,
+    l1: L1Coverage,
+    l2: L2Coverage,
 ) {
+    let json_path = paths.json;
+    let md_path = paths.md;
+    let stamp_tag = stamp.tag;
+    let stamp_ok = stamp.matches_pin;
+    let sysml_counts = l1.sysml_counts;
+    let kerml_counts = l1.kerml_counts;
+    let l1_ok = l1.ok;
+    let systems = l2.systems;
+    let full = l2.full;
+    let l2_skip_reason = l2.skip_reason;
+
     let l2_systems_ok = systems.is_some_and(|s| {
         s.files > 0 && s.files_with_diagnostics == 0 && s.extended_library_decl == 0
     });
@@ -473,18 +505,26 @@ fn write_layered_conformance_scorecard() {
     let json_path = out_dir.join("conformance-scorecard.json");
     let md_path = out_dir.join("conformance-scorecard.md");
     write_scorecard(
-        &json_path,
-        &md_path,
+        ScorecardPaths {
+            json: &json_path,
+            md: &md_path,
+        },
         parser_version,
         &target,
-        stamp_tag.as_deref(),
-        stamp_ok,
-        &sysml_counts,
-        &kerml_counts,
-        l1_ok,
-        systems.as_ref(),
-        full.as_ref(),
-        l2_skip_reason,
+        ReleaseStamp {
+            tag: stamp_tag.as_deref(),
+            matches_pin: stamp_ok,
+        },
+        L1Coverage {
+            sysml_counts: &sysml_counts,
+            kerml_counts: &kerml_counts,
+            ok: l1_ok,
+        },
+        L2Coverage {
+            systems: systems.as_ref(),
+            full: full.as_ref(),
+            skip_reason: l2_skip_reason,
+        },
     );
 
     eprintln!("Wrote {}", json_path.display());
