@@ -1326,8 +1326,11 @@ fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
 
 fn normalize_state_usage(s: &StateUsage) -> StateUsage {
     StateUsage {
+        direction: s.direction,
+        is_derived: s.is_derived,
         is_abstract: s.is_abstract,
         is_reference: s.is_reference,
+        is_individual: s.is_individual,
         name: s.name.clone(),
         type_name: s.type_name.clone(),
         typing: s.typing.clone(),

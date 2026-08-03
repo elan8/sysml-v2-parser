@@ -589,14 +589,25 @@ pub struct FinalState {
     pub name_span: Span,
 }
 
-/// State usage: `(abstract)? (ref)? state` name (`:` type)? (`:>`/` :>>` …)? body.
+/// State usage: `OccurrenceUsagePrefix` subset `state` name (`:` type)? (`:>`/` :>>` …)? body.
+/// GH-45: `direction`/`is_derived`/`is_individual` cover the rest of the BNF `RefPrefix`/
+/// `OccurrenceUsagePrefix` slots that real usage justified (see
+/// `crate::parser::state::state_usage`'s doc comment) — `constant` and portion kind
+/// (`snapshot`/`timeslice`) are still not covered, with zero real-usage evidence found on state
+/// usages to justify them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StateUsage {
+    /// Leading direction (`in`/`out`/`inout`).
+    pub direction: Option<InOut>,
+    /// Leading `derived` keyword.
+    pub is_derived: bool,
     /// Leading `abstract` keyword.
     pub is_abstract: bool,
     /// Leading `ref` keyword — reference feature usage (`ref state …`).
     pub is_reference: bool,
+    /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).
+    pub is_individual: bool,
     pub name: String,
     pub type_name: Option<String>,
     /// Structured typing clause when a `:` target was written.

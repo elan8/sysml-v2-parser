@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.5] - 2026-08-03
+
+### Fixed
+
+- **`state`/`exhibit state` rejected `direction`/`derived`/`individual` prefixes**
+  ([#45](https://github.com/elan8/sysml-v2-parser/issues/45)) — follow-up to
+  [#27](https://github.com/elan8/sysml-v2-parser/issues/27). Per BNF `RefPrefix`/
+  `OccurrenceUsagePrefix` (§8.2.2.9.2, §8.2.2.18.2), `state_usage`
+  (`src/parser/state.rs`) and `exhibit_state` (`src/parser/part/body.rs`) only ever implemented
+  the visibility/`abstract`/`ref` slice of that prefix — direction (`in`/`out`/`inout`),
+  `derived`, and `individual` were all rejected, even though the same keyword handling already
+  backs `part`/`item`/`attribute` usages elsewhere in this parser
+  (`crate::parser::attribute::direction_prefix`, the `derived`/`individual` opt-tag pattern in
+  `src/parser/part/usage.rs::part_usage`).
+
+  Checked against the vendored SysML v2 Systems Library / spec Annex examples before scoping:
+  zero real usage of `constant` or portion kind (`snapshot`/`timeslice`) on state usages, so those
+  two remaining `OccurrenceUsagePrefix` slots are intentionally still not implemented — direction,
+  `derived`, and `individual` were the only ones the issue asked for and that mirror
+  already-proven patterns elsewhere in the crate.
+
+  `StateUsage` (`src/ast/behavior.rs`) and `ExhibitState` (`src/ast/structure.rs`) both gained
+  `direction: Option<InOut>`, `is_derived: bool`, and `is_individual: bool` fields, in the BNF's
+  prefix order (direction, `derived`, `abstract`, `ref`, `individual`). `exhibit_state` was
+  updated in lockstep with `state_usage` so the two shared-grammar parsers stay in sync, per the
+  approach #27 established. `PARSE_AST_VERSION` bumped 62 → 63.
+
 ## [0.51.4] - 2026-08-03
 
 ### Fixed

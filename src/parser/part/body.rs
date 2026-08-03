@@ -129,18 +129,21 @@ fn feature_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
 /// Exhibit state usage: `OccurrenceUsagePrefix` subset `exhibit` (`state`)? name (`:` type)?
 /// (`:>`/`:>>` …)? body. GH-27: rebuilt on the same shared prefix/specialization helpers
 /// `state_usage` (`crate::parser::state::state_usage`) composes -- `visibility_prefix`,
-/// `abstract`/`ref` prefix handling, `specialization_clauses`, `optional_typings`,
-/// `multiplicity_node`, `skip_usage_feature_modifiers` -- so the two stay in sync with the shared
-/// `StateUsageBody` tail. This still stops short of the full BNF `OccurrenceUsagePrefix`
-/// (direction, `derived`, `individual`, portion kind): `state_usage` itself doesn't support those
-/// either, so extending them is a separate gap, not one `exhibit state` drifted into on its own.
+/// direction/`derived`/`abstract`/`ref`/`individual` prefix handling, `specialization_clauses`,
+/// `optional_typings`, `multiplicity_node`, `skip_usage_feature_modifiers` -- so the two stay in
+/// sync with the shared `StateUsageBody` tail. GH-45 added direction/`derived`/`individual` to
+/// both in lockstep; `constant` and portion kind remain unsupported on both, see
+/// `state_usage`'s doc comment for why.
 pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
+    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
+    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
     let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
+    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"exhibit"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // §6 G18: the `state` keyword is optional -- `exhibit 'vehicle states' :>> VehicleA::'vehicle
@@ -196,8 +199,11 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
             start,
             input,
             ExhibitState {
+                direction,
+                is_derived: is_derived.is_some(),
                 is_abstract: is_abstract.is_some(),
                 is_reference: is_reference.is_some(),
+                is_individual: is_individual.is_some(),
                 name: name_str,
                 type_name: if type_name.is_empty() {
                     None

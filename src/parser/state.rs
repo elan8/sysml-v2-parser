@@ -359,14 +359,29 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
     parser.parse(input)
 }
 
+/// State usage: `OccurrenceUsagePrefix` subset `state` name (`:` type)? (`:>`/`:>>` …)? body.
+/// GH-45: `direction`/`derived`/`individual` prefix keywords follow BNF `RefPrefix`/
+/// `OccurrenceUsagePrefix` order (§8.2.2.9.2, §8.2.2.18.2, reached via `StateUsage =
+/// OccurrenceUsagePrefix 'state' ...` -> `OccurrenceUsagePrefix : BasicUsagePrefix ...` ->
+/// `BasicUsagePrefix : RefPrefix ...`): direction, `derived`, `abstract`, `ref`, then
+/// `individual` -- mirrors `part::usage::part_usage`'s identical composition. `constant` and
+/// portion kind (`snapshot`/`timeslice`) are the remaining `OccurrenceUsagePrefix` slots; left
+/// out for now, no real usage evidence found on state usages to justify them (checked against the
+/// vendored SysML v2 Systems Library / spec Annex examples).
 pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
+    let (input, direction) =
+        nom::combinator::opt(crate::parser::attribute::direction_prefix).parse(input)?;
+    let (input, is_derived) =
+        nom::combinator::opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
     let (input, is_abstract) =
         nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, is_reference) =
         nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
+    let (input, is_individual) =
+        nom::combinator::opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"state"[..]).parse(input)?;
     // SysML allows anonymous state usages: `state: Mode;` (Identification may be empty).
     let (after_gap, _) = ws_and_comments(input)?;
@@ -416,8 +431,11 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
             start,
             input,
             StateUsage {
+                direction,
+                is_derived: is_derived.is_some(),
                 is_abstract: is_abstract.is_some(),
                 is_reference: is_reference.is_some(),
+                is_individual: is_individual.is_some(),
                 name: n,
                 type_name: if type_name.is_empty() {
                     None

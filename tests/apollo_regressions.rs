@@ -1,8 +1,9 @@
 use sysml_v2_parser::ast::{
     ActionDefBody, ConnectionDefBody, ConnectionDefBodyElement, ConstraintDefBody,
-    ConstraintDefBodyElement, Expression, OccurrenceBodyElement, OccurrenceUsageBody, PackageBody,
-    PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement,
-    RequirementDefBody, RequirementDefBodyElement, RootElement, StateDefBody, StateDefBodyElement,
+    ConstraintDefBodyElement, Expression, InOut, OccurrenceBodyElement, OccurrenceUsageBody,
+    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody,
+    PartUsageBodyElement, RequirementDefBody, RequirementDefBodyElement, RootElement, StateDefBody,
+    StateDefBodyElement,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
@@ -563,6 +564,90 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
         panic!("expected exhibit state body");
     };
     assert_eq!(elements.len(), 1);
+}
+
+#[test]
+fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
+    // GH-45: `state_usage`/`exhibit_state` only implemented the visibility/`abstract`/`ref`
+    // slice of BNF `RefPrefix`/`OccurrenceUsagePrefix` (§8.2.2.9.2, §8.2.2.18.2); `direction`
+    // (`in`/`out`/`inout`), `derived`, and `individual` were rejected on both, even though the
+    // same helpers (`crate::parser::attribute::direction_prefix` and the `derived`/`individual`
+    // keyword pattern) already back `part`/`item`/`attribute` usages elsewhere in this parser.
+    let input = "package P {\npart def Vehicle {\nin state directionStates { state a; }\nderived state derivedStates { state a; }\nindividual state individualStates { state a; }\nin exhibit state directionExhibit { state a; }\nderived exhibit state derivedExhibit { state a; }\nindividual exhibit state individualExhibit { state a; }\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let vehicle = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(def)
+                if def.value.identification.name.as_deref() == Some("Vehicle") =>
+            {
+                Some(&def.value)
+            }
+            _ => None,
+        })
+        .expect("expected Vehicle part def");
+    let PartDefBody::Brace { elements } = &vehicle.body else {
+        panic!("expected part body");
+    };
+
+    let state_usages: Vec<_> = elements
+        .iter()
+        .filter_map(|e| match &e.value {
+            PartDefBodyElement::StateUsage(state) => Some(&state.value),
+            _ => None,
+        })
+        .collect();
+    let direction_states = state_usages
+        .iter()
+        .find(|s| s.name == "directionStates")
+        .expect("directionStates");
+    assert_eq!(direction_states.direction, Some(InOut::In));
+    let derived_states = state_usages
+        .iter()
+        .find(|s| s.name == "derivedStates")
+        .expect("derivedStates");
+    assert!(derived_states.is_derived);
+    let individual_states = state_usages
+        .iter()
+        .find(|s| s.name == "individualStates")
+        .expect("individualStates");
+    assert!(individual_states.is_individual);
+
+    let exhibits: Vec<_> = elements
+        .iter()
+        .filter_map(|e| match &e.value {
+            PartDefBodyElement::ExhibitState(exhibit) => Some(&exhibit.value),
+            _ => None,
+        })
+        .collect();
+    let direction_exhibit = exhibits
+        .iter()
+        .find(|e| e.name == "directionExhibit")
+        .expect("directionExhibit");
+    assert_eq!(direction_exhibit.direction, Some(InOut::In));
+    let derived_exhibit = exhibits
+        .iter()
+        .find(|e| e.name == "derivedExhibit")
+        .expect("derivedExhibit");
+    assert!(derived_exhibit.is_derived);
+    let individual_exhibit = exhibits
+        .iter()
+        .find(|e| e.name == "individualExhibit")
+        .expect("individualExhibit");
+    assert!(individual_exhibit.is_individual);
 }
 
 #[test]
