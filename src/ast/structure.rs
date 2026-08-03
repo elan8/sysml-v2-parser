@@ -885,8 +885,18 @@ pub enum InterfaceDefBodyElement {
     PortUsage(Node<PortUsage>),
 }
 
+/// GH-53: the nested-usage kinds confirmed by real usage as an [`EndDecl`]'s target (see
+/// `EndDecl::nested_usage`'s doc comment). Only `occurrence`/`item` are evidenced; extend this
+/// only alongside a matching real-usage citation, not speculatively.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum EndNestedUsage {
+    Occurrence(Box<Node<OccurrenceUsage>>),
+    Item(Box<Node<ItemUsage>>),
+}
+
 /// End declaration in interface/connection def: `end` name (`:` type | (`::>` | `references`)
-/// target) `;`.
+/// target | nested `occurrence`/`item` usage, see [`nested_usage`](EndDecl::nested_usage)) `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
@@ -911,6 +921,14 @@ pub struct EndDecl {
     /// `end source: Anything :>> BinaryLinkObject::source;` (Systems Library `Connections.sysml`).
     /// `None` when absent or when this end used the `::>`/`references` form instead.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// GH-53: an alternative end-declaration form where the target is itself a complete, nested
+    /// kind-prefixed usage rather than a bare type/reference, e.g. `end theCauses [*] occurrence
+    /// theCause :> causes :>> source { ... }` (Systems Library `Domain Libraries/Cause and
+    /// Effect/CausationConnections.sysml`) / `end touchesToo [0..*] item touchedItemToo :>>
+    /// separateSpaceToo, thisOccurrence;` (`Items.sysml`). `theCauses`/`touchesToo` is still this
+    /// `EndDecl`'s own `name`; the nested usage supplies this end's typing/structure instead of a
+    /// `:`/`::>` clause. `None` for the ordinary forms above.
+    pub nested_usage: Option<Box<EndNestedUsage>>,
     /// Span of the name (for semantic tokens).
     pub name_span: Option<Span>,
     /// Span of the type/reference target after `:`/`::>`/`references` (for semantic tokens).

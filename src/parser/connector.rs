@@ -24,11 +24,15 @@
 //! Consolidating here fixes the first two gaps for both callers at once and makes the third an
 //! explicit, visible choice at each call site instead of an accidental omission.
 
-use crate::ast::{ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, Node, RefBody, RefDecl};
+use crate::ast::{
+    ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, EndNestedUsage, Node, RefBody, RefDecl,
+};
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::expr::path_expression;
-use crate::parser::lex::{name, qualified_name, ws1, ws_and_comments};
+use crate::parser::item::item_usage;
+use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws1, ws_and_comments};
 use crate::parser::node_from_to;
+use crate::parser::occurrence_body::occurrence_usage;
 use crate::parser::usage::{
     multiplicity_node, redefinition, reference_subsetting, single_target_typing, subsetting,
 };
@@ -54,8 +58,8 @@ fn derived_end_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     ))
 }
 
-/// End declaration: `end` multiplicity? (`part`|`port`|`ref`)? name (`:` (`~`)? type |
-/// (`::>`|`references`) target) multiplicity? `;`.
+/// End declaration: `end` multiplicity? (`part`|`port`|`ref`)? name multiplicity? (`:` (`~`)?
+/// type | (`::>`|`references`) target | nested `occurrence`/`item` usage) multiplicity? `;`.
 ///
 /// `allow_derived_name` gates the `#name` form above -- `true` for `connection.rs` (tested real
 /// usage), `false` for `interface.rs` (no matching evidence; preserves existing behavior exactly).
@@ -96,6 +100,12 @@ pub(crate) fn end_decl(
     } else {
         with_span(name).parse(input)?
     };
+    // GH-53: a multiplicity may also appear right after the name, before the target -- the most
+    // common position for most usage kinds (e.g. `end touchesToo [0..*] item ...` in
+    // `Items.sysml`, `end theCauses [*] occurrence ...` in `CausationConnections.sysml`).
+    let (input, mid_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let leading_multiplicity = mid_multiplicity.or(leading_multiplicity);
 
     // `::>` / `references` reference subsetting (GH-19): the target is a reference, not a type, so
     // it's modeled via the same structured `SubsettingRelationship` every other reference-
@@ -122,8 +132,59 @@ pub(crate) fn end_decl(
                     references: Some(references),
                     multiplicity: trailing_multiplicity.or(leading_multiplicity),
                     redefines: None,
+                    nested_usage: None,
                     name_span: Some(name_span),
                     type_ref_span: Some(type_ref_span),
+                },
+            ),
+        ));
+    }
+
+    // GH-53: an alternative form where the target is a complete, nested kind-prefixed usage
+    // rather than a bare type/reference -- see `EndDecl::nested_usage`'s doc comment. Only
+    // `occurrence`/`item` are evidenced; each of those parsers already handles its own full
+    // grammar (specialization clauses, multiplicity, body), so this end's own `name`/multiplicity
+    // above are everything this branch itself needs to contribute.
+    let (peek, _) = ws_and_comments(input)?;
+    let peek_frag = peek.fragment();
+    if starts_with_keyword(peek_frag, b"occurrence") {
+        let (input, nested) = occurrence_usage(input)?;
+        return Ok((
+            input,
+            node_from_to(
+                start,
+                input,
+                EndDecl {
+                    name: name_str,
+                    type_name: String::new(),
+                    uses_derived_syntax: false,
+                    references: None,
+                    multiplicity: leading_multiplicity,
+                    redefines: None,
+                    nested_usage: Some(Box::new(EndNestedUsage::Occurrence(Box::new(nested)))),
+                    name_span: Some(name_span),
+                    type_ref_span: None,
+                },
+            ),
+        ));
+    }
+    if starts_with_keyword(peek_frag, b"item") {
+        let (input, nested) = item_usage(input)?;
+        return Ok((
+            input,
+            node_from_to(
+                start,
+                input,
+                EndDecl {
+                    name: name_str,
+                    type_name: String::new(),
+                    uses_derived_syntax: false,
+                    references: None,
+                    multiplicity: leading_multiplicity,
+                    redefines: None,
+                    nested_usage: Some(Box::new(EndNestedUsage::Item(Box::new(nested)))),
+                    name_span: Some(name_span),
+                    type_ref_span: None,
                 },
             ),
         ));
@@ -159,6 +220,7 @@ pub(crate) fn end_decl(
                 references: None,
                 multiplicity: trailing_multiplicity.or(leading_multiplicity),
                 redefines,
+                nested_usage: None,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
             },

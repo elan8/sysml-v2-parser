@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-08-03
+
+### Fixed
+
+- **`end` declaration: unidentified dual-name/kind shape**
+  ([#53](https://github.com/elan8/sysml-v2-parser/issues/53)) — resolves the shape tracked as a
+  known issue in [0.52.0](#0520---2026-08-03): `end theCauses [*] occurrence theCause :> causes
+  :>> source { ... }` (`Domain Libraries/Cause and Effect/CausationConnections.sysml`) and `end
+  touchesToo [0..*] item touchedItemToo :>> separateSpaceToo, thisOccurrence;` (`Items.sysml`).
+
+  Reverse-engineering the BNF text further did not turn up a matching production. The shape was
+  identified empirically instead: the text after the first name/multiplicity (`occurrence
+  theCause :> causes :>> source { ... }` / `item touchedItemToo :>> separateSpaceToo,
+  thisOccurrence;`) parses standalone, with zero diagnostics, as a complete `occurrence_usage`/
+  `item_usage`. So `end`'s target position has a third alternative beyond `:` typing and
+  `::>`/`references`: a fully embedded, kind-prefixed nested usage. `EndDecl` gained a
+  `nested_usage: Option<Box<EndNestedUsage>>` field (new `EndNestedUsage` enum, `Occurrence`/
+  `Item` variants — only these two are evidenced). `end_decl` (`src/parser/connector.rs`) also
+  gained a "middle" multiplicity position, between the end's own name and this nested usage
+  (`theCauses [*]`/`touchesToo [0..*]` above), distinct from the pre-existing leading and trailing
+  multiplicity positions.
+
+  Both previously-known-issue files now parse with zero diagnostics; the `KNOWN_ISSUE_FILES`/
+  `is_known_issue_file` tracking removed from `tests/validation/full_library_suite.rs` and
+  `tests/conformance_scorecard.rs` since the underlying gate now genuinely passes. New regression
+  tests in `tests/gh53_end_decl_nested_usage.rs` cover both nested-usage kinds plus confirmation
+  that the pre-existing `end` forms (typed, `::>`/`references`, trailing `:>>` redefines) are
+  unaffected. `PARSE_AST_VERSION` bumped 66 → 67.
+
 ## [0.52.0] - 2026-08-03
 
 ### Fixed
