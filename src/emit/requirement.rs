@@ -6,7 +6,7 @@ use super::structure::{
     self, emit_attribute_body, emit_direction, emit_multiplicity, emit_subsetting_clause,
     emit_typing_clause,
 };
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{emit_visibility, format_name, format_qualified_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     ConcernUsage, ConnectBody, Dependency, EnumerationUsage, ItemUsage, RelationshipBodyElement,
@@ -50,7 +50,7 @@ pub(crate) fn emit_requirement_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -114,7 +114,7 @@ fn emit_requirement_body_element(
             }
             if !a.value.type_name.is_empty() {
                 w.push_str(" : ");
-                w.push_str(&a.value.type_name);
+                w.push_str(&format_qualified_name(&a.value.type_name));
             }
             w.push_char(';');
             Ok(())
@@ -130,14 +130,14 @@ fn emit_requirement_body_element(
             w.push_str(&format_name(&s.value.name));
             if let Some(ty) = &s.value.type_name {
                 w.push_str(" : ");
-                w.push_str(ty);
+                w.push_str(&format_qualified_name(ty));
             }
             w.push_char(';');
             Ok(())
         }
         RequirementDefBodyElement::Purpose(p) => {
             w.push_str("purpose ");
-            w.push_str(&p.value.target);
+            w.push_str(&format_qualified_name(&p.value.target));
             w.push_char(';');
             Ok(())
         }
@@ -160,7 +160,7 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
     }
     if !subject.type_name.is_empty() {
         w.push_str(" : ");
-        w.push_str(&subject.type_name);
+        w.push_str(&format_qualified_name(&subject.type_name));
     }
     w.push_char(';');
     Ok(())
@@ -299,7 +299,7 @@ pub(crate) fn emit_item_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -323,7 +323,7 @@ pub(crate) fn emit_concern_usage(
     w.push_str(&format_name(&concern.name));
     if let Some(ty) = &concern.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     emit_requirement_body(w, path, &concern.body)
 }
@@ -358,7 +358,7 @@ pub(crate) fn emit_use_case_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     emit_use_case_body(w, path, &usage.body)
 }
@@ -393,7 +393,7 @@ pub(crate) fn emit_analysis_case_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     emit_use_case_body(w, path, &usage.body)
 }
@@ -449,14 +449,14 @@ fn emit_use_case_body_element(
             w.push_str(&format_name(&a.value.name));
             if !a.value.type_name.is_empty() {
                 w.push_str(" : ");
-                w.push_str(&a.value.type_name);
+                w.push_str(&format_qualified_name(&a.value.type_name));
             }
             w.push_char(';');
             Ok(())
         }
         UseCaseDefBodyElement::FirstSuccession(f) => {
             w.push_str("first ");
-            w.push_str(&format_name(&f.value.target));
+            w.push_str(&format_qualified_name(&f.value.target));
             w.push_char(';');
             Ok(())
         }
@@ -535,7 +535,7 @@ pub(crate) fn emit_enumeration_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -557,7 +557,7 @@ pub(crate) fn emit_satisfy(
         w.push_str(&format_name(&inline.name));
         if let Some(ty) = &inline.type_name {
             w.push_str(" : ");
-            w.push_str(ty);
+            w.push_str(&format_qualified_name(ty));
         }
         w.push_str(" by ");
         emit_expression(w, &satisfy.target.value)?;

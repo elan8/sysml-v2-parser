@@ -1,6 +1,6 @@
 //! Expression emission.
 
-use super::writer::EmitWriter;
+use super::writer::{format_qualified_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     Argument, BinaryOperator, CollectionOperator, Expression, FeatureValue, FeatureValueKind, Node,
@@ -95,7 +95,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             }
             w.push_str(type_check_str(kind));
             w.push_char(' ');
-            w.push_str(type_name);
+            w.push_str(&format_qualified_name(type_name));
         }
         Expression::Select { base, selector } => {
             emit_expression(w, &base.value)?;
@@ -115,7 +115,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
         }
         Expression::Constructor { type_name, args } => {
             w.push_str("new ");
-            w.push_str(type_name);
+            w.push_str(&format_qualified_name(type_name));
             emit_args(w, args)?;
         }
         Expression::FeatureChainRef(chain) => {

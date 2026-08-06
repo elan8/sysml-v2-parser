@@ -1,6 +1,6 @@
 //! Root namespace / package / import emission.
 
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{emit_visibility, format_name, format_qualified_name, EmitWriter};
 use super::EmitError;
 use super::{behavior, requirement, structure, view};
 use crate::ast::{
@@ -176,8 +176,8 @@ pub(crate) fn emit_package_body_element(
 pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(), EmitError> {
     emit_visibility(w, import.membership.visibility);
     w.push_str("import ");
-    // `target` already includes `::*` when is_import_all.
-    w.push_str(&import.target);
+    // `target` already includes `::*` when is_import_all; segments are unquoted in the AST.
+    w.push_str(&format_qualified_name(&import.target));
     if import.is_recursive && !import.target.ends_with("::**") {
         w.push_str("::**");
     }

@@ -4,7 +4,7 @@ use super::behavior::emit_inout_decl;
 use super::expr::emit_expression;
 use super::root::{emit_doc, emit_identification};
 use super::structure::emit_typing_clause;
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{emit_visibility, format_name, format_qualified_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     AssertConstraintMember, CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef,
@@ -37,7 +37,7 @@ pub(crate) fn emit_constraint_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     emit_constraint_body(w, path, &usage.body)
 }
@@ -116,7 +116,7 @@ pub(crate) fn emit_calc_usage(
     emit_identification(w, &usage.identification);
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     emit_calc_body(w, path, &usage.body)
 }
@@ -176,7 +176,7 @@ fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), Emit
     } else {
         w.push_str(": ");
     }
-    w.push_str(&ret.type_name);
+    w.push_str(&format_qualified_name(&ret.type_name));
     w.push_char(';');
     Ok(())
 }
@@ -197,7 +197,7 @@ pub(crate) fn emit_assert_constraint(
     }
     if let Some(ty) = &assert.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     emit_constraint_body(w, path, &assert.body)
 }
@@ -271,7 +271,7 @@ pub(crate) fn emit_view_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(mult) = &usage.multiplicity {
         super::structure::emit_multiplicity(w, &mult.value)?;
@@ -308,7 +308,7 @@ pub(crate) fn emit_view_usage(
                     }
                     crate::ast::ViewBodyElement::Expose(e) => {
                         w.push_str("expose ");
-                        w.push_str(&e.value.target);
+                        w.push_str(&format_qualified_name(&e.value.target));
                         w.push_char(';');
                     }
                     crate::ast::ViewBodyElement::Satisfy(_) => {
@@ -340,7 +340,7 @@ fn emit_view_rendering(
     w.push_str(&format_name(&r.name));
     if let Some(ty) = &r.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     match &r.body {
         crate::ast::RenderingUsageBody::Semicolon => {

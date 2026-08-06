@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Import emit drops quotes on package names that need them (#71).**
+  `emit_import` wrote `Import.target` raw, so spaced / digit-leading names like
+  `'2a-Parts Interconnection'::*` reprinted as bare tokens and failed reparse. Targets are
+  now emitted via `format_qualified_name`, which quotes each `::` segment when required while
+  leaving `*` / `**` / `$` alone. The same quoting is applied to typing / subsetting / alias
+  relationship targets and string `type_name` fields. Adjacent emit fixes needed for the listed
+  fixtures to reparse: omit redundant `occurrence` after `individual`/`snapshot`/`timeslice`,
+  emit occurrence-body state usages as `exhibit` (§6 G30), and quote `.`-separated feature paths
+  per segment.
+
 ### Added
 
 - **L2.5 emit-fidelity roundtrip gate expanded beyond `01-Parts Tree/` (#68).**
