@@ -144,7 +144,9 @@ fn emit_action_def_body_element(
         ActionDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ActionDefBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
         ActionDefBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
-        ActionDefBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
+        ActionDefBodyElement::ItemUsage(i) => {
+            super::requirement::emit_item_usage(w, path, &i.value)
+        }
         ActionDefBodyElement::Perform(p) => emit_perform(w, path, &p.value),
         ActionDefBodyElement::Bind(b) => structure::emit_bind(w, path, &b.value),
         ActionDefBodyElement::RefDecl(r) => structure::emit_ref_decl(w, path, &r.value),
@@ -404,16 +406,15 @@ fn emit_perform_body_element(
         PerformBodyElement::Variant(v) => structure::emit_variant_usage(w, path, &v.value),
         PerformBodyElement::Action(a) => emit_action_usage_body_element(w, path, &a.value),
         PerformBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
-        PerformBodyElement::ItemUsage(i) => {
-            super::requirement::emit_item_usage(w, path, &i.value)
-        }
-        PerformBodyElement::AttributeUsage(a) => {
-            structure::emit_attribute_usage(w, path, &a.value)
-        }
+        PerformBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
+        PerformBodyElement::AttributeUsage(a) => structure::emit_attribute_usage(w, path, &a.value),
     }
 }
 
-fn emit_perform_inout(w: &mut EmitWriter<'_>, binding: &PerformInOutBinding) -> Result<(), EmitError> {
+fn emit_perform_inout(
+    w: &mut EmitWriter<'_>,
+    binding: &PerformInOutBinding,
+) -> Result<(), EmitError> {
     emit_direction(w, binding.direction);
     w.push_str(&format_name(&binding.name));
     w.push_str(" = ");
@@ -1017,9 +1018,7 @@ pub(crate) fn emit_occurrence_body_element(
             super::requirement::emit_satisfy(w, path, &s.value)
         }
         crate::ast::OccurrenceBodyElement::StateUsage(s) => emit_state_usage(w, path, &s.value),
-        crate::ast::OccurrenceBodyElement::SuccessionUsage(s) => {
-            emit_succession_usage(w, &s.value)
-        }
+        crate::ast::OccurrenceBodyElement::SuccessionUsage(s) => emit_succession_usage(w, &s.value),
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),

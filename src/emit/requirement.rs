@@ -105,9 +105,7 @@ fn emit_requirement_body_element(
         RequirementDefBodyElement::AttributeUsage(a) => {
             structure::emit_attribute_usage(w, path, &a.value)
         }
-        RequirementDefBodyElement::RequirementUsage(r) => {
-            emit_requirement_usage(w, path, &r.value)
-        }
+        RequirementDefBodyElement::RequirementUsage(r) => emit_requirement_usage(w, path, &r.value),
         RequirementDefBodyElement::SubjectDecl(s) => emit_subject_decl(w, &s.value),
         RequirementDefBodyElement::RequirementActorDecl(a) => {
             w.push_str("actor ");
@@ -121,7 +119,9 @@ fn emit_requirement_body_element(
             w.push_char(';');
             Ok(())
         }
-        RequirementDefBodyElement::RequireConstraint(r) => emit_require_constraint(w, path, &r.value),
+        RequirementDefBodyElement::RequireConstraint(r) => {
+            emit_require_constraint(w, path, &r.value)
+        }
         RequirementDefBodyElement::Constraint(c) => {
             super::view::emit_constraint_usage(w, path, &c.value)
         }
@@ -491,9 +491,7 @@ fn emit_use_case_body_element(
             w.push_str("objective ");
             emit_requirement_usage(w, path, &o.value.requirement.value)
         }
-        UseCaseDefBodyElement::AttributeDef(a) => {
-            structure::emit_attribute_def(w, path, &a.value)
-        }
+        UseCaseDefBodyElement::AttributeDef(a) => structure::emit_attribute_def(w, path, &a.value),
         UseCaseDefBodyElement::Assign(a) => {
             w.push_str("assign ");
             emit_expression(w, &a.value.lhs.value)?;

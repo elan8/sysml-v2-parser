@@ -1,8 +1,8 @@
 //! Root namespace / package / import emission.
 
-use super::{behavior, requirement, structure, view};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
+use super::{behavior, requirement, structure, view};
 use crate::ast::{
     CommentAnnotation, DocComment, FilterMember, Identification, Import, LibraryPackage, Package,
     PackageBody, PackageBodyElement, RootElement, RootNamespace, TextualRepresentation,

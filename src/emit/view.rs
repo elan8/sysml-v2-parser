@@ -3,7 +3,7 @@
 use super::behavior::emit_inout_decl;
 use super::expr::emit_expression;
 use super::root::{emit_doc, emit_identification};
-use super::structure::{emit_typing_clause};
+use super::structure::emit_typing_clause;
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
@@ -121,11 +121,7 @@ pub(crate) fn emit_calc_usage(
     emit_calc_body(w, path, &usage.body)
 }
 
-fn emit_calc_body(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    body: &CalcDefBody,
-) -> Result<(), EmitError> {
+fn emit_calc_body(w: &mut EmitWriter<'_>, path: &str, body: &CalcDefBody) -> Result<(), EmitError> {
     match body {
         CalcDefBody::Semicolon => {
             w.push_char(';');
@@ -316,10 +312,7 @@ pub(crate) fn emit_view_usage(
                         w.push_char(';');
                     }
                     crate::ast::ViewBodyElement::Satisfy(_) => {
-                        return w.unsupported(
-                            &format!("{path}/body[{i}]"),
-                            "ViewBody Satisfy",
-                        );
+                        return w.unsupported(&format!("{path}/body[{i}]"), "ViewBody Satisfy");
                     }
                 }
                 w.newline();

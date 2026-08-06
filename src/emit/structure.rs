@@ -244,9 +244,7 @@ fn emit_part_def_body_element(
         PartDefBodyElement::ItemDef(i) => emit_item_def(w, path, &i.value),
         PartDefBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
         PartDefBodyElement::ActionDef(a) => super::behavior::emit_action_def(w, path, &a.value),
-        PartDefBodyElement::ActionUsage(a) => {
-            super::behavior::emit_action_usage(w, path, &a.value)
-        }
+        PartDefBodyElement::ActionUsage(a) => super::behavior::emit_action_usage(w, path, &a.value),
         PartDefBodyElement::Perform(p) => super::behavior::emit_perform(w, path, &p.value),
         PartDefBodyElement::ExhibitState(e) => {
             super::behavior::emit_exhibit_state(w, path, &e.value)
@@ -268,9 +266,7 @@ fn emit_part_def_body_element(
         PartDefBodyElement::MetadataDef(m) => emit_metadata_def(w, path, &m.value),
         PartDefBodyElement::MetadataUsage(m) => emit_metadata_usage(w, path, &m.value),
         PartDefBodyElement::EnumDef(e) => emit_enum_def(w, path, &e.value),
-        PartDefBodyElement::ConstraintDef(c) => {
-            super::view::emit_constraint_def(w, path, &c.value)
-        }
+        PartDefBodyElement::ConstraintDef(c) => super::view::emit_constraint_def(w, path, &c.value),
         PartDefBodyElement::ConstraintUsage(c) => {
             super::view::emit_constraint_usage(w, path, &c.value)
         }
@@ -281,9 +277,7 @@ fn emit_part_def_body_element(
         PartDefBodyElement::StateUsage(s) => super::behavior::emit_state_usage(w, path, &s.value),
         PartDefBodyElement::Allocate(a) => super::behavior::emit_allocate(w, path, &a.value),
         PartDefBodyElement::Satisfy(s) => super::requirement::emit_satisfy(w, path, &s.value),
-        PartDefBodyElement::Dependency(d) => {
-            super::requirement::emit_dependency(w, path, &d.value)
-        }
+        PartDefBodyElement::Dependency(d) => super::requirement::emit_dependency(w, path, &d.value),
         PartDefBodyElement::EnumerationUsage(e) => {
             super::requirement::emit_enumeration_usage(w, path, &e.value)
         }
@@ -388,9 +382,7 @@ fn emit_part_usage_body_element(
             super::requirement::emit_enumeration_usage(w, path, &e.value)
         }
         PartUsageBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
-        PartUsageBodyElement::MetadataAnnotation(m) => {
-            emit_metadata_annotation(w, path, &m.value)
-        }
+        PartUsageBodyElement::MetadataAnnotation(m) => emit_metadata_annotation(w, path, &m.value),
         PartUsageBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }
@@ -578,9 +570,7 @@ fn emit_port_def_body_element(
         PortDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
         PortDefBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortDefBodyElement::ItemDef(i) => emit_item_def(w, path, &i.value),
-        PortDefBodyElement::ItemUsage(i) => {
-            super::requirement::emit_item_usage(w, path, &i.value)
-        }
+        PortDefBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
         PortDefBodyElement::EnumerationUsage(e) => {
             super::requirement::emit_enumeration_usage(w, path, &e.value)
         }
@@ -627,9 +617,7 @@ fn emit_port_body_element(
         PortBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
         PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
-        PortBodyElement::ItemUsage(i) => {
-            super::requirement::emit_item_usage(w, path, &i.value)
-        }
+        PortBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
     }
 }
 
@@ -944,7 +932,11 @@ fn emit_interface_usage_body_element(
     }
 }
 
-pub(crate) fn emit_ref_decl(w: &mut EmitWriter<'_>, path: &str, decl: &RefDecl) -> Result<(), EmitError> {
+pub(crate) fn emit_ref_decl(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    decl: &RefDecl,
+) -> Result<(), EmitError> {
     emit_visibility(w, decl.membership.visibility);
     w.push_str("ref ");
     w.push_str(&format_name(&decl.name));
@@ -1114,7 +1106,10 @@ pub(crate) fn emit_subsetting_clause(
     Ok(())
 }
 
-pub(crate) fn emit_multiplicity(w: &mut EmitWriter<'_>, mult: &Multiplicity) -> Result<(), EmitError> {
+pub(crate) fn emit_multiplicity(
+    w: &mut EmitWriter<'_>,
+    mult: &Multiplicity,
+) -> Result<(), EmitError> {
     w.push_char('[');
     if mult.lower == mult.upper {
         emit_bound(w, &mult.lower)?;
@@ -1481,4 +1476,3 @@ fn emit_connection_def_body_element(
         ),
     }
 }
-
