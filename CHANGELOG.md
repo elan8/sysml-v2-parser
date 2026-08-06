@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Identifiers beginning with `null`, `true`, or `false` were mis-lexed.** `literal_boolean`
+  and `null_expression` (`src/parser/expr.rs`) matched these three literal keywords with a bare
+  `tag()`, without the trailing word-boundary check `keyword_token` already applies to every
+  other bare keyword in the same file (`not`/`and`/`or`/`istype`/`as`/`new`/…) — so an identifier
+  that merely starts with one of them split into the literal plus an unparseable trailing
+  fragment, e.g. `flow env to nullPoint.env;` failed with an unexpected-token error. Fixed with a
+  new `literal_keyword_token` helper: deliberately distinct from `keyword_token`, since that
+  helper's boundary check (`starts_with_keyword`) only accepts whitespace or `{`/`:`/`;`/`[` as a
+  follower — correct for operator/declaration keywords, which are always followed by an operand
+  or a body-opening token, but wrong for *literal* keywords, which can legally sit immediately
+  before any non-identifier byte a value can precede (`f(true)`, `x == null`, `[false, true]`).
+  `literal_keyword_token` instead rejects only a following identifier-continuation byte
+  (alphanumeric or `_`). Fixes [#58](https://github.com/elan8/sysml-v2-parser/issues/58).
+  No AST changes; `PARSE_AST_VERSION` unchanged.
+
 - Preserve the optional initializer expression on analysis and verification case return
   declarations such as `return attribute result : Real = expression;` and
   `return :>> result = expression;`. `CaseReturnDecl` now exposes the parsed expression through
