@@ -2,29 +2,43 @@
 
 Each SysML file under `sysml-v2-release/sysml/src/validation/` can have a corresponding Rust test module in this directory. Populate `./sysml-v2-release/` with `scripts/fetch-sysml-v2-release.ps1` or `scripts/fetch-sysml-v2-release.sh`, or point `SYSML_V2_RELEASE_DIR` at an unpacked release tree.
 
+## Preferred quality gate: roundtrip (L2.5)
+
+Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validation.rs`**:
+
+`parse → opacity-clean → emit → reparse → AST-eq`
+
+**Iteration 1 scope:** only `sysml/src/validation/01-Parts Tree/`.
+
+- Add fixtures to `ROUNDTRIP_PASS` when they roundtrip (currently `1a`, `1c`, `1d`).
+- Other files in that folder are known gaps and must still fail; if one starts passing, promote it.
+- Fixtures outside `01-Parts Tree/` are out of scope for this iteration.
+- Run: `cargo test --test roundtrip_validation -- --include-ignored` (with release tree available).
+
+Debug AST snapshots below are **regression canaries only**. They store `Debug` dumps of the AST and fail when that dump changes. Regenerating with `UPDATE_VALIDATION_AST=1` locks in current parser output — including wrong classifications — so snapshots are not a correctness oracle. Prefer roundtrip for new coverage; do not grow the snapshot set.
+
 ## Layout
 
 - **`tests/validation.rs`** – Shared helpers (`release_root`, `validation_fixture_path`, `assert_ast_eq`, `assert_ast_snapshot`) and module wiring.
-- **`tests/validation/<name>.rs`** – One module per validation fixture.
-- **`tests/validation/snapshots/`** – Normalized AST snapshots for fixtures that use `assert_ast_snapshot`.
+- **`tests/validation/<name>.rs`** – One module per validation fixture (parse / shape / snapshot).
+- **`tests/validation/snapshots/`** – Normalized AST Debug snapshots (frozen regression canaries).
+- **`tests/roundtrip_validation.rs`** – Emit-fidelity roundtrip suite (L2.5).
 
 ## Adding a new validation test
 
-1. Add a new `.rs` file in `tests/validation/`.
-2. Use `super::validation_fixture_path(relative)` for the fixture path.
-3. Compare with `assert_ast_eq` (hand-built expected AST) or `assert_ast_snapshot` (checked-in snapshot).
-4. Wire the module in `tests/validation.rs`.
+1. Prefer extending roundtrip coverage (promote a fixture into `ROUNDTRIP_PASS` once the emitter supports it).
+2. For targeted construct probes, add a `.rs` file in `tests/validation/` and wire it in `tests/validation.rs`.
+3. Use `assert_ast_eq` only for small hand-built expected trees; avoid new Debug snapshots.
 
 ## When to regenerate snapshots
 
-Refresh checked-in AST snapshots **in the same PR** whenever parser output changes, for example:
+Refresh checked-in AST snapshots **in the same PR** whenever parser output changes for the three existing snapshot fixtures, for example:
 
-- new optional fields on existing AST structs (`AttributeDef.value_span`, usage header spans, …)
-- new enum variants on body-element types (`MetadataAnnotation`, `MetadataKeywordUsage`, …)
-- a construct now parses into a different variant (e.g. `@Tag : Type` as `MetadataAnnotation` instead of `Annotation`)
-- structured brace parsing replaces `advance_to_closing_brace` / silent skip
+- new optional fields on existing AST structs
+- new enum variants on body-element types
+- a construct now parses into a different variant
 
-CI always runs `cargo test -- --include-ignored`; local `cargo test` alone does **not** run these snapshot tests.
+CI always runs `cargo test -- --include-ignored`; local `cargo test` alone does **not** run these ignored tests.
 
 ## Regenerate
 

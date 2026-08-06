@@ -1,0 +1,234 @@
+//! Root namespace / package / import emission.
+
+use super::structure;
+use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::EmitError;
+use crate::ast::{
+    CommentAnnotation, DocComment, FilterMember, Identification, Import, LibraryPackage,
+    Package, PackageBody, PackageBodyElement, RootElement, RootNamespace, TextualRepresentation,
+};
+
+pub(crate) fn emit_root(w: &mut EmitWriter<'_>, root: &RootNamespace) -> Result<(), EmitError> {
+    for (i, el) in root.elements.iter().enumerate() {
+        if i > 0 {
+            w.newline();
+        }
+        emit_root_element(w, &format!("root[{i}]"), &el.value)?;
+        w.newline();
+    }
+    Ok(())
+}
+
+fn emit_root_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &RootElement,
+) -> Result<(), EmitError> {
+    match el {
+        RootElement::Package(p) => emit_package(w, path, &p.value),
+        RootElement::LibraryPackage(p) => emit_library_package(w, path, &p.value),
+        RootElement::Namespace(n) => {
+            w.push_str("namespace ");
+            emit_identification(w, &n.value.identification);
+            emit_package_body(w, path, &n.value.body)
+        }
+        RootElement::Import(i) => emit_import(w, &i.value),
+        RootElement::Member(m) => emit_package_body_element(w, path, &m.value),
+    }
+}
+
+pub(crate) fn emit_package(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    pkg: &Package,
+) -> Result<(), EmitError> {
+    w.push_str("package ");
+    emit_identification(w, &pkg.identification);
+    emit_package_body(w, path, &pkg.body)
+}
+
+fn emit_library_package(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    pkg: &LibraryPackage,
+) -> Result<(), EmitError> {
+    if pkg.is_standard {
+        w.push_str("standard ");
+    }
+    w.push_str("library package ");
+    emit_identification(w, &pkg.identification);
+    emit_package_body(w, path, &pkg.body)
+}
+
+fn emit_package_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &PackageBody,
+) -> Result<(), EmitError> {
+    match body {
+        PackageBody::Semicolon => {
+            w.push_char(';');
+            Ok(())
+        }
+        PackageBody::Brace { elements } => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                emit_package_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
+        }
+    }
+}
+
+pub(crate) fn emit_package_body_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &PackageBodyElement,
+) -> Result<(), EmitError> {
+    match el {
+        PackageBodyElement::Error(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::ParseError,
+        }),
+        PackageBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PackageBodyElement::Comment(c) => emit_comment(w, &c.value),
+        PackageBodyElement::TextualRep(t) => emit_textual_rep(w, &t.value),
+        PackageBodyElement::Filter(f) => emit_filter(w, &f.value),
+        PackageBodyElement::Package(p) => emit_package(w, path, &p.value),
+        PackageBodyElement::LibraryPackage(p) => emit_library_package(w, path, &p.value),
+        PackageBodyElement::Import(i) => emit_import(w, &i.value),
+        PackageBodyElement::PartDef(p) => structure::emit_part_def(w, path, &p.value),
+        PackageBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
+        PackageBodyElement::AttributeDef(a) => structure::emit_attribute_def(w, path, &a.value),
+        PackageBodyElement::AttributeUsage(a) => {
+            structure::emit_attribute_usage(w, path, &a.value)
+        }
+        PackageBodyElement::FeatureDecl(_)
+        | PackageBodyElement::ClassifierDecl(_)
+        | PackageBodyElement::KermlSemanticDecl(_)
+        | PackageBodyElement::KermlFeatureDecl(_)
+        | PackageBodyElement::ExtendedLibraryDecl(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::ExtendedLibraryDecl,
+        }),
+        other => w.unsupported(path, format!("{other:?}").chars().take(64).collect::<String>()),
+    }
+}
+
+pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(), EmitError> {
+    emit_visibility(w, import.membership.visibility);
+    w.push_str("import ");
+    // `target` already includes `::*` when is_import_all.
+    w.push_str(&import.target);
+    if import.is_recursive {
+        if !import.target.ends_with("::**") {
+            if import.target.ends_with("::*") {
+                w.push_str("::**");
+            } else {
+                w.push_str("::**");
+            }
+        }
+    }
+    if let Some(filters) = &import.filter_members {
+        for f in filters {
+            w.push_str(" [");
+            super::expr::emit_expression(w, &f.value.expression.value)?;
+            w.push_char(']');
+        }
+    }
+    w.push_char(';');
+    Ok(())
+}
+
+pub(crate) fn emit_identification(w: &mut EmitWriter<'_>, id: &Identification) {
+    if let Some(short) = &id.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short));
+        w.push_str("> ");
+    }
+    if let Some(name) = &id.name {
+        w.push_str(&format_name(name));
+    }
+}
+
+pub(crate) fn emit_doc(w: &mut EmitWriter<'_>, doc: &DocComment) -> Result<(), EmitError> {
+    if !w.emit_comments() {
+        return Ok(());
+    }
+    w.push_str("doc");
+    if let Some(id) = &doc.identification {
+        w.push_char(' ');
+        emit_identification(w, id);
+    }
+    if let Some(locale) = &doc.locale {
+        w.push_str(" locale \"");
+        w.push_str(locale);
+        w.push_char('"');
+    }
+    w.newline();
+    emit_regular_comment_body(w, &doc.text);
+    Ok(())
+}
+
+pub(crate) fn emit_comment(
+    w: &mut EmitWriter<'_>,
+    comment: &CommentAnnotation,
+) -> Result<(), EmitError> {
+    if !w.emit_comments() {
+        return Ok(());
+    }
+    if comment.identification.is_some() || comment.locale.is_some() {
+        w.push_str("comment");
+        if let Some(id) = &comment.identification {
+            w.push_char(' ');
+            emit_identification(w, id);
+        }
+        if let Some(locale) = &comment.locale {
+            w.push_str(" locale \"");
+            w.push_str(locale);
+            w.push_char('"');
+        }
+        w.newline();
+    }
+    emit_regular_comment_body(w, &comment.text);
+    Ok(())
+}
+
+fn emit_textual_rep(
+    w: &mut EmitWriter<'_>,
+    rep: &TextualRepresentation,
+) -> Result<(), EmitError> {
+    if !w.emit_comments() {
+        return Ok(());
+    }
+    if let Some(id) = &rep.rep_identification {
+        w.push_str("rep ");
+        emit_identification(w, id);
+        w.push_char(' ');
+    }
+    w.push_str("language \"");
+    w.push_str(&rep.language);
+    w.push_char('"');
+    w.newline();
+    emit_regular_comment_body(w, &rep.text);
+    Ok(())
+}
+
+fn emit_filter(w: &mut EmitWriter<'_>, filter: &FilterMember) -> Result<(), EmitError> {
+    emit_visibility(w, filter.visibility);
+    w.push_str("filter ");
+    super::expr::emit_expression(w, &filter.condition.value)?;
+    w.push_char(';');
+    Ok(())
+}
+
+fn emit_regular_comment_body(w: &mut EmitWriter<'_>, text: &str) {
+    w.push_str("/*");
+    w.push_str(text);
+    w.push_str("*/");
+}
