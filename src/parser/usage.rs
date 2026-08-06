@@ -329,8 +329,21 @@ pub(crate) fn single_target_typing(span: Span, name: String) -> Node<TypingRelat
 /// plain qualified-name string and its span, mirroring [`single_target_typing`] for the same
 /// ad hoc `ref`-declaration call sites.
 pub(crate) fn single_target_redefines(span: Span, name: String) -> Node<SubsettingRelationship> {
+    single_target_subsetting(span, SubsettingKind::Redefines, name)
+}
+
+/// Single-target convenience over [`subsetting_relationship_node`] for ad hoc `:>`/`:>>`-family
+/// shapes parsed directly outside `specialization_targets` (a bare, unqualified feature name --
+/// these ad hoc shapes never parse a qualified `::`/`.`-segmented target). Shared by
+/// `attribute.rs` (`attribute_feature_binding`, `metadata_binding`) and `part/body.rs`
+/// (`exhibit_state`, `connection_usage_member`), which previously each redefined this themselves.
+pub(crate) fn single_target_subsetting(
+    span: Span,
+    kind: SubsettingKind,
+    name: String,
+) -> Node<SubsettingRelationship> {
     let target = Node::new(span.clone(), RelationshipTarget::single(name, span.clone()));
-    subsetting_relationship_node(vec![target], SubsettingKind::Redefines, span)
+    subsetting_relationship_node(vec![target], kind, span)
 }
 
 /// Build a `SubsettingRelationship` node from target(s) and the span of the whole clause
