@@ -1,6 +1,6 @@
 //! Expression emission.
 
-use super::writer::{format_qualified_name, EmitWriter};
+use super::writer::{format_feature_path, format_name, format_qualified_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     Argument, BinaryOperator, CollectionOperator, Expression, FeatureValue, FeatureValueKind, Node,
@@ -17,7 +17,15 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             w.push_char('"');
         }
         Expression::LiteralBoolean(b) => w.push_str(if *b { "true" } else { "false" }),
-        Expression::FeatureRef(name) => w.push_str(name),
+        Expression::FeatureRef(name) => {
+            if name.contains("::") {
+                w.push_str(&format_qualified_name(name));
+            } else if name.contains('.') {
+                w.push_str(&format_feature_path(name));
+            } else {
+                w.push_str(&format_name(name));
+            }
+        }
         Expression::MemberAccess(base, member) => {
             emit_expression(w, &base.value)?;
             w.push_char('.');
@@ -123,7 +131,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
                 if i > 0 {
                     w.push_char('.');
                 }
-                w.push_str(seg);
+                w.push_str(&format_name(seg));
             }
         }
         Expression::CollectionOp { op, base, args } => {

@@ -145,13 +145,19 @@ pub enum InOut {
 }
 
 /// Typed payload on accept/send control nodes: `accept name : Type` or `send name : Type`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PayloadClause {
     pub name: String,
     pub type_name: Option<String>,
     pub name_span: Span,
     pub type_span: Option<Span>,
+}
+
+impl PartialEq for PayloadClause {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.type_name == other.type_name
+    }
 }
 
 /// Transition accept trigger: typed payload or shorthand expression (`accept StartPressed`).
@@ -217,7 +223,7 @@ pub enum TransitionEffect {
 }
 
 /// Action usage: `(abstract|variation)? (ref)? action` name (`:` type)? (`[mult]`)? (`:>`/` :>>` …)? body.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionUsage {
     /// Leading `abstract` keyword (Systems Library e.g. `abstract ref action performedActions`).
@@ -253,6 +259,24 @@ pub struct ActionUsage {
     /// constructor (`control_node_payload_stmt`) has no visibility grammar of its own and always
     /// sets `visibility: None`, matching this rollout's ad hoc-site convention.
     pub membership: Membership,
+}
+
+impl PartialEq for ActionUsage {
+    fn eq(&self, other: &Self) -> bool {
+        self.is_abstract == other.is_abstract
+            && self.is_variation == other.is_variation
+            && self.is_reference == other.is_reference
+            && self.name == other.name
+            && self.type_name == other.type_name
+            && self.typing == other.typing
+            && self.multiplicity == other.multiplicity
+            && self.subsets == other.subsets
+            && self.redefines == other.redefines
+            && self.accept == other.accept
+            && self.send == other.send
+            && self.body == other.body
+            && self.membership == other.membership
+    }
 }
 
 /// Body of an action usage: `;` or `{` ActionUsageBodyElement* `}`.

@@ -11,7 +11,7 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 **Iteration 2 scope:** the full pinned `sysml/src/validation/` tree is under known-gap scan. Fixtures in `ROUNDTRIP_PASS` must roundtrip; every other `.sysml` must still fail until promoted.
 
 - Add fixtures to `ROUNDTRIP_PASS` when they roundtrip.
-- Currently required-pass: all of `01-Parts Tree/` (`1a`/`1c`/`1d`), all of `02-Parts Interconnection/` (`2a`/`2c`), `04` (`4a`), `13b`, plus incidental `14b` / `15_02` / `15_03` / `15_06` / `15_07`.
+- Currently required-pass: all of `01-Parts Tree/` (`1a`/`1c`/`1d`), all of `02-Parts Interconnection/` (`2a`/`2c`), all of `03` `3a` (`1`/`2`/`3`) plus `3c-1`/`3c-3`, `04` (`4a`), `13b`, plus incidental `14b` / `15_02` / `15_03` / `15_06` / `15_07`.
 - Run: `cargo test --test roundtrip_validation -- --include-ignored` (with release tree available). The known-gap test prints a per-folder pass/gap inventory.
 - Diagnose remaining gaps: `$env:ROUNDTRIP_DIAG=1; cargo test --test roundtrip_validation roundtrip_known_gaps_must_still_fail -- --include-ignored --nocapture`
 
@@ -21,7 +21,7 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 | ------ | ---- | --------- |
 | 01-Parts Tree | 3 | 0 |
 | 02-Parts Interconnection | 2 | 0 |
-| 03-Function-based Behavior | 0 | 8 |
+| 03-Function-based Behavior | 5 | 3 |
 | 04-Functional Allocation | 1 | 0 |
 | 05-State-based Behavior | 0 | 3 |
 | 06-Individual and Snapshots | 0 | 1 |
@@ -36,7 +36,7 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 | 15-Properties-Values-Expressions | 4 | 10 |
 | 17-Sequence Modeling | 0 | 2 |
 | 18-Use Case | 0 | 1 |
-| **Totals** | **12** | **44** |
+| **Totals** | **17** | **39** |
 
 ### Remaining known-gap classes (after emitter expansion)
 
@@ -47,6 +47,10 @@ With emit arms in place for ports, interfaces, actions, states, requirements, co
 | `opacity` / `emit opaque` (`Other`, `ExtendedLibraryDecl`, KerML decls) | Parser recovered opaquely | Parser structure recovery |
 | `AST-eq` | Emits and reparses, but AST differs | Emit fidelity or lost parse fields (e.g. assume vs require) |
 | `reparse` | Emitted text is not accepted | Emit quoting/shape bugs, or missing grammar in reparse path |
+
+### Intentional AST PartialEq normalization (#74)
+
+Roundtrip AST equality ignores source locations that do not affect semantics. `Membership` / `Node` already did this; #74 extended the same convention to `PayloadClause` (payload / via / feature_chain spans) and `ActionUsage` (`name_span` / `type_ref_span`). Remaining `AST-eq` fixtures (`3c-2`, `7a1`, …) usually differ for real structural reasons, not leftover span noise.
 
 Set `ROUNDTRIP_DIAG=1` when running the known-gap test to print the first failure reason per fixture.
 

@@ -65,6 +65,23 @@ pub(crate) fn emit_action_usage(
     if usage.is_reference {
         w.push_str("ref ");
     }
+    // Standalone control nodes (`accept name : Type;`) are stored as ActionUsage with
+    // `name == "accept"|"send"` plus a payload clause — do not emit `action accept accept …`.
+    let control_node = match (usage.name.as_str(), &usage.accept, &usage.send) {
+        ("accept", Some(payload), None) => Some(("accept", payload)),
+        ("send", None, Some(payload)) => Some(("send", payload)),
+        _ => None,
+    };
+    if let Some((kw, payload)) = control_node {
+        w.push_str(kw);
+        w.push_char(' ');
+        w.push_str(&format_name(&payload.name));
+        if let Some(ty) = &payload.type_name {
+            w.push_str(" : ");
+            w.push_str(&format_qualified_name(ty));
+        }
+        return emit_action_usage_body(w, path, &usage.body);
+    }
     w.push_str("action ");
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
@@ -346,17 +363,24 @@ pub(crate) fn emit_perform(
 ) -> Result<(), EmitError> {
     emit_definition_prefix(w, perform.usage_prefix.as_ref());
     w.push_str("perform ");
-    // Emit `action` when the form is clearly the `perform action ...` production.
+    // `perform action …` vs bare `perform <path>`: part-usage bodies only accept the former
+    // (`perform_action_decl`). Prefer the `action` keyword unless this is clearly a dotted
+    // feature-path perform (`perform providePower.generateTorque`).
     let needs_action_kw = perform.usage_prefix.is_some()
         || perform.action_name.is_empty()
         || perform.redefines.is_some()
         || perform.type_name.is_some()
-        || perform.value.is_some();
+        || perform.value.is_some()
+        || !perform.action_name.contains('.');
     if needs_action_kw {
         w.push_str("action ");
     }
     if !perform.action_name.is_empty() {
-        w.push_str(&format_name(&perform.action_name));
+        if perform.action_name.contains('.') {
+            w.push_str(&format_feature_path(&perform.action_name));
+        } else {
+            w.push_str(&format_name(&perform.action_name));
+        }
     }
     if let Some(ty) = &perform.type_name {
         w.push_str(" : ");
@@ -364,7 +388,7 @@ pub(crate) fn emit_perform(
     }
     if let Some(redef) = &perform.redefines {
         w.push_str(" :>> ");
-        w.push_str(redef);
+        w.push_str(&format_qualified_name(redef));
     }
     if let Some(value) = &perform.value {
         emit_feature_value(w, value)?;
@@ -688,7 +712,12 @@ pub(crate) fn emit_flow_usage(
         }
     }
     if let Some(from) = &flow.from {
-        w.push_str(" from ");
+        // Unnamed flows use shorthand `flow <from> to <to>` so `from` is not reparsed as a name.
+        if flow.name.is_some() || flow.payload.is_some() || flow.type_name.is_some() {
+            w.push_str(" from ");
+        } else {
+            w.push_char(' ');
+        }
         emit_expression(w, &from.value)?;
     }
     if let Some(to) = &flow.to {

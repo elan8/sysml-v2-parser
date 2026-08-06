@@ -245,6 +245,17 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
         map(preceded(tag(&b"inout"[..]), ws1), |_| InOut::InOut),
     ))
     .parse(input)?;
+    // `in item …` / `in part …` are StructureUsageMembers, not plain InOutDecl parameters.
+    // Fail here (before the unstructured fallback) so action-body dispatch can try those arms.
+    let (peek, _) = ws_and_comments(input)?;
+    if starts_with_keyword(peek.fragment(), b"item")
+        || starts_with_keyword(peek.fragment(), b"part")
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let (input, _) = nom::combinator::opt(preceded(tag(&b"attribute"[..]), ws1)).parse(input)?;
     let parsed = (|| {
         // Library shorthand: `in action body { ... }` (treat as name `body` typed as `action`)
@@ -553,10 +564,15 @@ fn action_def_body_element(
             }),
             // GH-13 / BNF `ActionBodyItem` → `NonBehaviorBodyItem` /
             // `StructureUsageMember` + `BehaviorUsageMember` (`AssertConstraintUsage`).
+            // Directed `in item`/`in part` reach here after `in_out_decl` rejects those keywords.
             nom::branch::alt((
                 map(crate::parser::part::part_usage, |p| {
                     ActionDefBodyElement::PartUsage(Box::new(p))
                 }),
+                map(
+                    crate::parser::item::directed_item_usage,
+                    ActionDefBodyElement::ItemUsage,
+                ),
                 map(
                     crate::parser::item::item_usage,
                     ActionDefBodyElement::ItemUsage,
@@ -981,10 +997,15 @@ pub(crate) fn action_usage_body_element(
             }),
             // GH-13 / BNF `ActionBodyItem` → `NonBehaviorBodyItem` /
             // `StructureUsageMember` + `BehaviorUsageMember` (`AssertConstraintUsage`).
+            // Directed `in item`/`in part` reach here after `in_out_decl` rejects those keywords.
             nom::branch::alt((
                 map(crate::parser::part::part_usage, |p| {
                     ActionUsageBodyElement::PartUsage(Box::new(p))
                 }),
+                map(
+                    crate::parser::item::directed_item_usage,
+                    ActionUsageBodyElement::ItemUsage,
+                ),
                 map(
                     crate::parser::item::item_usage,
                     ActionUsageBodyElement::ItemUsage,

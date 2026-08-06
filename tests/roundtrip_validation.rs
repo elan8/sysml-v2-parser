@@ -22,6 +22,12 @@ const ROUNDTRIP_PASS: &[&str] = &[
     "01-Parts Tree/1d-Parts Tree with Reference.sysml",
     "02-Parts Interconnection/2a-Parts Interconnection.sysml",
     "02-Parts Interconnection/2c-Parts Interconnection-Multiple Decompositions.sysml",
+    // Promoted by #74 AST-eq / emit-shape work (perform action, accept control nodes, span eq).
+    "03-Function-based Behavior/3a-Function-based Behavior-1.sysml",
+    "03-Function-based Behavior/3a-Function-based Behavior-2.sysml",
+    "03-Function-based Behavior/3a-Function-based Behavior-3.sysml",
+    "03-Function-based Behavior/3c-Function-based Behavior-structure mod-1.sysml",
+    "03-Function-based Behavior/3c-Function-based Behavior-structure mod-3.sysml",
     // Promoted by import/type quoting (#71) once spaced names reparse cleanly.
     "04-Functional Allocation/4a-Functional Allocation.sysml",
     "13-Model Containment/13b-Safety and Security Features Element Group.sysml",
@@ -142,8 +148,12 @@ fn try_roundtrip(src: &str) -> RoundtripOutcome {
         let pa = strip_span_noise(&format!("{na:?}"));
         let pb = strip_span_noise(&format!("{nb:?}"));
         let (pos, orig_snip, reparse_snip) = diff_debug_both(&pa, &pb);
+        let orig_ch = pa.chars().nth(pos).unwrap_or('∅');
+        let rep_ch = pb.chars().nth(pos).unwrap_or('∅');
         return RoundtripOutcome::Failed(format!(
-            "AST-eq failed at char {pos};\n  original: ...{orig_snip}...\n  reparse:  ...{reparse_snip}...\n  emitted head:\n{}",
+            "AST-eq failed at char {pos} (orig={orig_ch:?} reparse={rep_ch:?}, lens {} vs {});\n  original: ...{orig_snip}...\n  reparse:  ...{reparse_snip}...\n  emitted head:\n{}",
+            pa.len(),
+            pb.len(),
             emitted.chars().take(600).collect::<String>()
         ));
     }
@@ -461,6 +471,48 @@ package QuotedImports {
     match try_roundtrip(src) {
         RoundtripOutcome::Ok => {}
         RoundtripOutcome::Failed(msg) => panic!("quoted import smoke failed: {msg}"),
+    }
+}
+
+#[test]
+fn roundtrip_handwritten_redefines_multiplicity_order_smoke() {
+    // #74 / 7a1: multiplicity belongs after `:>> target`, not before the clause.
+    let src = r#"
+package RedefMult {
+    part part3;
+    abstract part def SubsystemA {
+        abstract part :>> part3[0..1];
+    }
+}
+"#;
+    match try_roundtrip(src) {
+        RoundtripOutcome::Ok => {}
+        RoundtripOutcome::Failed(msg) => panic!("redefines/multiplicity order smoke failed: {msg}"),
+    }
+}
+
+#[test]
+fn roundtrip_handwritten_perform_action_in_part_usage_smoke() {
+    // #74 / 3e: part-usage bodies require `perform action`, not bare `perform`.
+    let src = r#"
+package PerformAction {
+    item def VehicleAssembly;
+    item def Transmission;
+    part AssemblyLine {
+        perform action 'assemble vehicle' {
+            action 'assemble transmission into vehicle' {
+                in item transmission : Transmission;
+            }
+            flow 'assemble transmission into vehicle'.transmission
+                to 'assemble transmission into vehicle'.transmission;
+        }
+        perform action providePower;
+    }
+}
+"#;
+    match try_roundtrip(src) {
+        RoundtripOutcome::Ok => {}
+        RoundtripOutcome::Failed(msg) => panic!("perform action in part usage smoke failed: {msg}"),
     }
 }
 
