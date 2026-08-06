@@ -79,6 +79,48 @@ pub(crate) fn format_name(name: &str) -> String {
     }
 }
 
+/// Quote each `::`-separated segment of a qualified name when required.
+///
+/// Import targets store unquoted segment text (e.g. `2a-Parts Interconnection::*`);
+/// wildcards (`*` / `**`) and the KerML root marker (`$`) are left as-is.
+pub(crate) fn format_qualified_name(qname: &str) -> String {
+    qname
+        .split("::")
+        .map(|seg| match seg {
+            "*" | "**" | "$" => seg.to_string(),
+            other => format_name(other),
+        })
+        .collect::<Vec<_>>()
+        .join("::")
+}
+
+/// Quote each `.`-separated segment of a feature path (e.g. `vehicleStates.on`).
+pub(crate) fn format_feature_path(path: &str) -> String {
+    path.split('.')
+        .map(format_name)
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+/// Quote each segment of a structured relationship target for emission.
+pub(crate) fn format_relationship_target(target: &crate::ast::RelationshipTarget) -> String {
+    use crate::ast::SegmentSeparator;
+    let mut out = String::new();
+    for segment in &target.segments {
+        match segment.separator {
+            Some(SegmentSeparator::ColonColon) => out.push_str("::"),
+            Some(SegmentSeparator::Dot) => out.push('.'),
+            None => {}
+        }
+        if segment.name == "$" {
+            out.push_str(&segment.name);
+        } else {
+            out.push_str(&format_name(&segment.name));
+        }
+    }
+    out
+}
+
 fn needs_quotes(name: &str) -> bool {
     if name.is_empty() {
         return true;
@@ -101,5 +143,76 @@ pub(crate) fn emit_visibility(w: &mut EmitWriter<'_>, visibility: Option<crate::
         Some(Visibility::Protected) => w.push_str("protected "),
         Some(Visibility::Public) => w.push_str("public "),
         None => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_name_quotes_when_needed() {
+        assert_eq!(format_name("Vehicle"), "Vehicle");
+        assert_eq!(
+            format_name("2a-Parts Interconnection"),
+            "'2a-Parts Interconnection'"
+        );
+        assert_eq!(format_name("_ok"), "_ok");
+    }
+
+    #[test]
+    fn format_qualified_name_quotes_segments_preserves_wildcards() {
+        assert_eq!(format_qualified_name("SI::kg"), "SI::kg");
+        assert_eq!(
+            format_qualified_name("2a-Parts Interconnection::*"),
+            "'2a-Parts Interconnection'::*"
+        );
+        assert_eq!(
+            format_qualified_name("Safety Features::*"),
+            "'Safety Features'::*"
+        );
+        assert_eq!(format_qualified_name("$::ISQ::*"), "$::ISQ::*");
+        assert_eq!(format_qualified_name("Pkg::**"), "Pkg::**");
+    }
+
+    #[test]
+    fn format_feature_path_quotes_segments() {
+        assert_eq!(format_feature_path("vehicleStates.on"), "vehicleStates.on");
+        assert_eq!(
+            format_feature_path("vehicle states.on"),
+            "'vehicle states'.on"
+        );
+    }
+
+    #[test]
+    fn format_relationship_target_quotes_segments() {
+        use crate::ast::{RelationshipTarget, RelationshipTargetSegment, SegmentSeparator, Span};
+
+        let target = RelationshipTarget {
+            segments: vec![RelationshipTargetSegment {
+                name: "Temporal-Spatial Reference".into(),
+                separator: None,
+            }],
+            span: Span::dummy(),
+        };
+        assert_eq!(
+            format_relationship_target(&target),
+            "'Temporal-Spatial Reference'"
+        );
+
+        let chained = RelationshipTarget {
+            segments: vec![
+                RelationshipTargetSegment {
+                    name: "ISQ".into(),
+                    separator: None,
+                },
+                RelationshipTargetSegment {
+                    name: "mass".into(),
+                    separator: Some(SegmentSeparator::ColonColon),
+                },
+            ],
+            span: Span::dummy(),
+        };
+        assert_eq!(format_relationship_target(&chained), "ISQ::mass");
     }
 }

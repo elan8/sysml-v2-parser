@@ -22,6 +22,9 @@ const ROUNDTRIP_PASS: &[&str] = &[
     "01-Parts Tree/1d-Parts Tree with Reference.sysml",
     "02-Parts Interconnection/2a-Parts Interconnection.sysml",
     "02-Parts Interconnection/2c-Parts Interconnection-Multiple Decompositions.sysml",
+    // Promoted by import/type quoting (#71) once spaced names reparse cleanly.
+    "04-Functional Allocation/4a-Functional Allocation.sysml",
+    "13-Model Containment/13b-Safety and Security Features Element Group.sysml",
     // Promoted by the full-tree known-gap scan once port/interface/connect emit landed;
     // not deliberately targeted by this iteration beyond inventory.
     "14-Language Extensions/14b-Language Extensions.sysml",
@@ -184,6 +187,69 @@ fn strip_span_noise(s: &str) -> String {
         }
     }
     s
+}
+
+#[test]
+#[ignore = "requires SysML v2 release; run with --include-ignored"]
+fn emit_quoted_import_targets_reparse_gh71() {
+    // Acceptance for #71: these fixtures previously failed *reparse* because import
+    // targets dropped quotes. They may still fail opacity / AST-eq later.
+    const FIXTURES: &[&str] = &[
+        "04-Functional Allocation/4a-Functional Allocation.sysml",
+        "06-Individual and Snapshots/6-Individual and Snapshots.sysml",
+        "13-Model Containment/13a-Model Containment.sysml",
+        "13-Model Containment/13b-Safety and Security Features Element Group.sysml",
+        "14-Language Extensions/14a-Language Extensions.sysml",
+    ];
+
+    let root = validation_dir();
+    if !root.exists() {
+        eprintln!(
+            "skipping: validation dir missing at {} (set SYSML_V2_RELEASE_DIR)",
+            root.display()
+        );
+        return;
+    }
+
+    let mut failures = Vec::new();
+    for rel in FIXTURES {
+        let path = root.join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
+        let src = match fs::read_to_string(&path) {
+            Ok(s) => s.replace("\r\n", "\n").replace('\r', "\n"),
+            Err(e) => {
+                failures.push(format!("{rel}: read failed: {e}"));
+                continue;
+            }
+        };
+        let ast1 = match parse(&src) {
+            Ok(a) => a,
+            Err(e) => {
+                failures.push(format!("{rel}: parse failed: {e}"));
+                continue;
+            }
+        };
+        let emitted = match emit_sysml(&ast1) {
+            Ok(s) => s,
+            Err(e) => {
+                failures.push(format!("{rel}: emit failed: {e}"));
+                continue;
+            }
+        };
+        if let Err(e) = parse(&emitted) {
+            failures.push(format!(
+                "{rel}: reparse failed: {e}; emitted head=\n{}",
+                emitted.chars().take(500).collect::<String>()
+            ));
+        } else {
+            eprintln!("✓ reparse after emit {rel}");
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "quoted-import reparse failures (#71):\n{}",
+        failures.join("\n")
+    );
 }
 
 #[test]
@@ -379,6 +445,22 @@ package Interfaces {
     match try_roundtrip(src) {
         RoundtripOutcome::Ok => {}
         RoundtripOutcome::Failed(msg) => panic!("interface smoke failed: {msg}"),
+    }
+}
+
+#[test]
+fn roundtrip_handwritten_quoted_import_smoke() {
+    let src = r#"
+package QuotedImports {
+    private import '2a-Parts Interconnection'::*;
+    public import 'Safety Features'::*;
+    private import 'User Defined Extensions'::*;
+    private import SI::kg;
+}
+"#;
+    match try_roundtrip(src) {
+        RoundtripOutcome::Ok => {}
+        RoundtripOutcome::Failed(msg) => panic!("quoted import smoke failed: {msg}"),
     }
 }
 

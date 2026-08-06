@@ -2,7 +2,9 @@
 
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_comment, emit_doc, emit_identification, emit_import};
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{
+    emit_visibility, format_name, format_qualified_name, format_relationship_target, EmitWriter,
+};
 use super::EmitError;
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectBody,
@@ -66,7 +68,7 @@ pub(crate) fn emit_part_usage(
         emit_typing_clause(w, &typing.value)?;
     } else if !usage.type_name.is_empty() {
         w.push_str(" : ");
-        w.push_str(&usage.type_name);
+        w.push_str(&format_qualified_name(&usage.type_name));
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -488,7 +490,7 @@ pub(crate) fn emit_port_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -731,7 +733,7 @@ fn emit_end_decl(w: &mut EmitWriter<'_>, path: &str, end: &EndDecl) -> Result<()
         emit_subsetting_clause(w, &references.value)?;
     } else if !end.type_name.is_empty() {
         w.push_str(" : ");
-        w.push_str(&end.type_name);
+        w.push_str(&format_qualified_name(&end.type_name));
     }
     if let Some(mult) = &end.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -836,7 +838,7 @@ pub(crate) fn emit_interface_usage(
             w.push_str("interface ");
             if let Some(ty) = interface_type {
                 w.push_str(": ");
-                w.push_str(ty);
+                w.push_str(&format_qualified_name(ty));
                 w.push_char(' ');
             }
             w.push_str("connect ");
@@ -872,7 +874,7 @@ pub(crate) fn emit_interface_usage(
                 } else {
                     w.push_str(": ");
                 }
-                w.push_str(ty);
+                w.push_str(&format_qualified_name(ty));
             }
             emit_interface_usage_body(w, path, body, body_elements)
         }
@@ -950,7 +952,7 @@ pub(crate) fn emit_ref_decl(
         emit_typing_clause(w, &typing.value)?;
     } else if !decl.type_name.is_empty() {
         w.push_str(" : ");
-        w.push_str(&decl.type_name);
+        w.push_str(&format_qualified_name(&decl.type_name));
     }
     if let Some(value) = &decl.value {
         emit_feature_value(w, value)?;
@@ -1024,7 +1026,7 @@ pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, _path: &str, bind: &Bind) -> Res
         }
         if let Some(ty) = &bind.binding_type {
             w.push_str(" : ");
-            w.push_str(ty);
+            w.push_str(&format_qualified_name(ty));
         }
         w.push_char(' ');
     }
@@ -1087,7 +1089,13 @@ pub(crate) fn emit_typing_clause(
     if typing.is_conjugated {
         w.push_char('~');
     }
-    w.push_str(&typing.target_display());
+    let formatted = typing
+        .target
+        .iter()
+        .map(|n| format_relationship_target(&n.value))
+        .collect::<Vec<_>>()
+        .join(", ");
+    w.push_str(&formatted);
     Ok(())
 }
 
@@ -1102,7 +1110,13 @@ pub(crate) fn emit_subsetting_clause(
         SubsettingKind::Crosses => w.push_str(" => "),
         SubsettingKind::Intersects => w.push_str(" intersects "),
     }
-    w.push_str(&rel.target_display());
+    let formatted = rel
+        .target
+        .iter()
+        .map(|n| format_relationship_target(&n.value))
+        .collect::<Vec<_>>()
+        .join(", ");
+    w.push_str(&formatted);
     Ok(())
 }
 
@@ -1144,7 +1158,7 @@ pub(crate) fn emit_alias_def(
     w.push_str("alias ");
     emit_identification(w, &alias.identification);
     w.push_str(" for ");
-    w.push_str(&alias.target.to_display_string());
+    w.push_str(&format_relationship_target(&alias.target));
     match &alias.body {
         crate::ast::AliasBody::Semicolon => {
             w.push_char(';');
@@ -1246,7 +1260,7 @@ pub(crate) fn emit_metadata_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if !usage.about_targets.is_empty() {
         w.push_str(" about ");
@@ -1328,7 +1342,7 @@ pub(crate) fn emit_metadata_annotation(
     w.push_str(&format_name(&ann.name));
     if let Some(ty) = &ann.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if !ann.about_targets.is_empty() {
         w.push_str(" about ");
@@ -1351,7 +1365,7 @@ pub(crate) fn emit_metadata_keyword_usage(
     w.push_str(&usage.keyword);
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if !usage.about_targets.is_empty() {
         w.push_str(" about ");
@@ -1391,7 +1405,7 @@ pub(crate) fn emit_connection_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;

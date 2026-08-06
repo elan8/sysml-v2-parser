@@ -6,7 +6,9 @@ use super::structure::{
     self, emit_definition_prefix, emit_direction, emit_multiplicity, emit_subsetting_clause,
     emit_typing_clause,
 };
-use super::writer::{emit_visibility, format_name, EmitWriter};
+use super::writer::{
+    emit_visibility, format_feature_path, format_name, format_qualified_name, EmitWriter,
+};
 use super::EmitError;
 use crate::ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
@@ -24,7 +26,7 @@ pub(crate) fn emit_inout_decl(
     w.push_str(&format_name(&decl.name));
     if !decl.type_name.is_empty() {
         w.push_str(" : ");
-        w.push_str(&decl.type_name);
+        w.push_str(&format_qualified_name(&decl.type_name));
     }
     if let Some(value) = &decl.value {
         w.push_str(" = ");
@@ -71,7 +73,7 @@ pub(crate) fn emit_action_usage(
         emit_typing_clause(w, &typing.value)?;
     } else if !usage.type_name.is_empty() {
         w.push_str(" : ");
-        w.push_str(&usage.type_name);
+        w.push_str(&format_qualified_name(&usage.type_name));
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -87,7 +89,7 @@ pub(crate) fn emit_action_usage(
         w.push_str(&format_name(&accept.name));
         if let Some(ty) = &accept.type_name {
             w.push_str(" : ");
-            w.push_str(ty);
+            w.push_str(&format_qualified_name(ty));
         }
     }
     if let Some(send) = &usage.send {
@@ -95,7 +97,7 @@ pub(crate) fn emit_action_usage(
         w.push_str(&format_name(&send.name));
         if let Some(ty) = &send.type_name {
             w.push_str(" : ");
-            w.push_str(ty);
+            w.push_str(&format_qualified_name(ty));
         }
     }
     emit_action_usage_body(w, path, &usage.body)
@@ -358,7 +360,7 @@ pub(crate) fn emit_perform(
     }
     if let Some(ty) = &perform.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(redef) = &perform.redefines {
         w.push_str(" :>> ");
@@ -460,13 +462,13 @@ pub(crate) fn emit_state_usage(
     }
     w.push_str("state ");
     if !usage.name.is_empty() {
-        w.push_str(&format_name(&usage.name));
+        w.push_str(&format_feature_path(&usage.name));
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
     } else if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -501,15 +503,16 @@ pub(crate) fn emit_exhibit_state(
     if exhibit.is_individual {
         w.push_str("individual ");
     }
-    w.push_str("exhibit state ");
+    w.push_str("exhibit ");
+    // `state` after `exhibit` is optional (§6 G18); omit so `exhibit vehicleStates.on` roundtrips.
     if !exhibit.name.is_empty() {
-        w.push_str(&format_name(&exhibit.name));
+        w.push_str(&format_feature_path(&exhibit.name));
     }
     if let Some(typing) = &exhibit.typing {
         emit_typing_clause(w, &typing.value)?;
     } else if let Some(ty) = &exhibit.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(mult) = &exhibit.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -640,7 +643,7 @@ pub(crate) fn emit_allocation_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let (Some(source), Some(target)) = (&usage.source, &usage.target) {
         w.push_str(" allocate ");
@@ -667,7 +670,7 @@ pub(crate) fn emit_flow_usage(
     }
     if let Some(ty) = &flow.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(payload) = &flow.payload {
         w.push_str(" of ");
@@ -678,7 +681,7 @@ pub(crate) fn emit_flow_usage(
             }
         }
         if let Some(ty) = &payload.value.type_name {
-            w.push_str(ty);
+            w.push_str(&format_qualified_name(ty));
         }
         if let Some(mult) = &payload.value.multiplicity {
             emit_multiplicity(w, &mult.value)?;
@@ -770,7 +773,7 @@ fn emit_transition(
                 w.push_str(&format_name(&p.name));
                 if let Some(ty) = &p.type_name {
                     w.push_str(" : ");
-                    w.push_str(ty);
+                    w.push_str(&format_qualified_name(ty));
                 }
                 if let Some(v) = via {
                     w.push_str(" via ");
@@ -810,7 +813,7 @@ fn emit_transition(
                 }
                 if let Some(ty) = type_name {
                     w.push_str(" : ");
-                    w.push_str(ty);
+                    w.push_str(&format_qualified_name(ty));
                 }
             }
             crate::ast::TransitionEffect::Accept {
@@ -822,7 +825,7 @@ fn emit_transition(
                 emit_expression(w, &payload.value)?;
                 if let Some(ty) = type_name {
                     w.push_str(" : ");
-                    w.push_str(ty);
+                    w.push_str(&format_qualified_name(ty));
                 }
                 if let Some(v) = via {
                     w.push_str(" via ");
@@ -839,7 +842,7 @@ fn emit_transition(
                 emit_expression(w, &payload.value)?;
                 if let Some(ty) = type_name {
                     w.push_str(" : ");
-                    w.push_str(ty);
+                    w.push_str(&format_qualified_name(ty));
                 }
                 if let Some(v) = via {
                     w.push_str(" via ");
@@ -886,7 +889,7 @@ fn emit_first_stmt(w: &mut EmitWriter<'_>, first: &crate::ast::FirstStmt) -> Res
         }
         if let Some(ty) = &first.succession_type {
             w.push_str(": ");
-            w.push_str(ty);
+            w.push_str(&format_qualified_name(ty));
             w.push_char(' ');
         }
     }
@@ -936,16 +939,20 @@ pub(crate) fn emit_occurrence_usage(
         w.push_str("event ");
     }
     if let Some(portion) = &usage.portion_kind {
+        // `snapshot` / `timeslice` usages parse without an `occurrence` keyword.
         w.push_str(portion);
         w.push_char(' ');
+    } else if usage.is_event || !usage.is_individual {
+        // Plain `occurrence …` and `event occurrence …`. Bare `individual <name>` omits
+        // the keyword (see `individual_usage` → `occurrence_usage_tail`).
+        w.push_str("occurrence ");
     }
-    w.push_str("occurrence ");
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(ty);
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -1017,13 +1024,59 @@ pub(crate) fn emit_occurrence_body_element(
         crate::ast::OccurrenceBodyElement::Satisfy(s) => {
             super::requirement::emit_satisfy(w, path, &s.value)
         }
-        crate::ast::OccurrenceBodyElement::StateUsage(s) => emit_state_usage(w, path, &s.value),
+        crate::ast::OccurrenceBodyElement::StateUsage(s) => {
+            // Occurrence-body `StateUsage` nodes are exhibit usages (§6 G30 / G18).
+            emit_occurrence_exhibit(w, path, &s.value)
+        }
         crate::ast::OccurrenceBodyElement::SuccessionUsage(s) => emit_succession_usage(w, &s.value),
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
     }
+}
+
+fn emit_occurrence_exhibit(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    usage: &StateUsage,
+) -> Result<(), EmitError> {
+    emit_visibility(w, usage.membership.visibility);
+    if let Some(dir) = usage.direction {
+        emit_direction(w, dir);
+    }
+    if usage.is_derived {
+        w.push_str("derived ");
+    }
+    if usage.is_abstract {
+        w.push_str("abstract ");
+    }
+    if usage.is_reference {
+        w.push_str("ref ");
+    }
+    if usage.is_individual {
+        w.push_str("individual ");
+    }
+    w.push_str("exhibit ");
+    if !usage.name.is_empty() {
+        w.push_str(&format_feature_path(&usage.name));
+    }
+    if let Some(typing) = &usage.typing {
+        emit_typing_clause(w, &typing.value)?;
+    } else if let Some(ty) = &usage.type_name {
+        w.push_str(" : ");
+        w.push_str(&format_qualified_name(ty));
+    }
+    if let Some(mult) = &usage.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
+    emit_state_def_body(w, path, &usage.body)
 }
 
 fn emit_succession_usage(
