@@ -134,11 +134,36 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
                 w.push_str(&format_name(seg));
             }
         }
-        Expression::CollectionOp { op, base, args } => {
+        Expression::CollectionOp {
+            op,
+            base,
+            args,
+            brace_body,
+        } => {
             emit_expression(w, &base.value)?;
             w.push_str("->");
             w.push_str(collection_op_str(op));
-            emit_args(w, args)?;
+            if let Some(body) = brace_body {
+                w.push_str(body);
+            } else {
+                emit_args(w, args)?;
+            }
+        }
+        Expression::Conditional {
+            test,
+            then_expr,
+            else_expr,
+        } => {
+            w.push_str("if ");
+            emit_expression(w, &test.value)?;
+            w.push_str(" ? ");
+            emit_expression(w, &then_expr.value)?;
+            w.push_str(" else ");
+            emit_expression(w, &else_expr.value)?;
+        }
+        Expression::Extent { target } => {
+            w.push_str("all ");
+            w.push_str(&format_qualified_name(target));
         }
         Expression::MetadataAccess(base) => {
             emit_expression(w, &base.value)?;

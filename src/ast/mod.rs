@@ -758,10 +758,28 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
             segments: chain.segments.clone(),
             span: Span::dummy(),
         }),
-        Expression::CollectionOp { op, base, args } => Expression::CollectionOp {
+        Expression::CollectionOp {
+            op,
+            base,
+            args,
+            brace_body,
+        } => Expression::CollectionOp {
             op: op.clone(),
             base: Box::new(normalize_expression_node(base)),
             args: args.iter().map(normalize_argument).collect(),
+            brace_body: brace_body.clone(),
+        },
+        Expression::Conditional {
+            test,
+            then_expr,
+            else_expr,
+        } => Expression::Conditional {
+            test: Box::new(normalize_expression_node(test)),
+            then_expr: Box::new(normalize_expression_node(then_expr)),
+            else_expr: Box::new(normalize_expression_node(else_expr)),
+        },
+        Expression::Extent { target } => Expression::Extent {
+            target: target.clone(),
         },
         Expression::MetadataAccess(inner) => {
             Expression::MetadataAccess(Box::new(normalize_expression_node(inner)))

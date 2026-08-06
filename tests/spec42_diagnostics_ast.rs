@@ -828,7 +828,7 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
     assert_eq!(ret1.type_name.as_deref(), Some("VerdictKind"));
     assert!(ret1.name_span.is_some(), "name_span should be set");
     assert!(
-        ret1.value_expression.is_some(),
+        ret1.value.is_some(),
         "plain return initializer should be retained"
     );
 
@@ -840,7 +840,7 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
     assert_eq!(ret2.name, "result");
     assert!(ret2.is_redefine);
     assert!(
-        ret2.value_expression.is_some(),
+        ret2.value.is_some(),
         "redefined return initializer should be retained"
     );
 
@@ -852,7 +852,7 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
     assert_eq!(ret3.name, "score");
     assert_eq!(ret3.type_name.as_deref(), Some("Real"));
     assert!(
-        ret3.value_expression.is_some(),
+        ret3.value.is_some(),
         "attribute return initializer should be retained"
     );
 
@@ -872,7 +872,7 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
     assert_eq!(ret4.name, "thrust");
     assert_eq!(ret4.type_name.as_deref(), Some("ForceValue"));
     assert!(
-        ret4.value_expression.is_none(),
+        ret4.value.is_none(),
         "declaration without initializer should remain empty"
     );
 }

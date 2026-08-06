@@ -132,6 +132,8 @@ pub struct InOutDecl {
     pub direction: InOut,
     pub name: String,
     pub type_name: String,
+    /// True for `in :>> name = expr;` / `out :>> name;` redefinition form (validation `08`).
+    pub is_redefinition: bool,
     /// Optional default value: `= expr` initializer on in/out parameters.
     pub value: Option<Node<Expression>>,
 }
@@ -607,19 +609,31 @@ pub struct ExitAction {
 }
 
 /// Then (initial state): `then` name `;`
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThenStmt {
     pub state_name: String,
     pub name_span: Option<Span>,
 }
 
+impl PartialEq for ThenStmt {
+    fn eq(&self, other: &Self) -> bool {
+        self.state_name == other.state_name
+    }
+}
+
 /// Final state: `final` name `;` or `final state` name `;`
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FinalState {
     pub state_name: String,
     pub name_span: Span,
+}
+
+impl PartialEq for FinalState {
+    fn eq(&self, other: &Self) -> bool {
+        self.state_name == other.state_name
+    }
 }
 
 /// State usage: `OccurrenceUsagePrefix` subset `state` name (`:` type)? (`:>`/` :>>` …)? body.

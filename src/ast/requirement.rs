@@ -6,9 +6,9 @@ use super::membership::Membership;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
-    MetadataKeywordUsage,
+    MetadataKeywordUsage, VariantUsage,
 };
-use super::view::{ConstraintDefBodyElement, ConstraintUsage};
+use super::view::{CalcUsage, ConstraintDefBodyElement, ConstraintUsage};
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
@@ -58,6 +58,8 @@ pub enum RequirementDefBodyElement {
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Import(Node<Import>),
     SubjectDecl(Node<SubjectDecl>),
+    /// `subject;` shorthand (concern / viewpoint bodies; validation `11a`).
+    SubjectRef(Node<SubjectRef>),
     RequirementActorDecl(Node<RequirementActorDecl>),
     /// Composite requirement usage nested in a requirement definition or usage.
     ///
@@ -68,6 +70,8 @@ pub enum RequirementDefBodyElement {
     Purpose(Node<PurposeMember>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
+    /// `variant name;` / typed variant inside a `variation requirement` body (validation `7b`).
+    VariantUsage(Node<VariantUsage>),
     VerifyRequirement(Node<VerifyRequirementMember>),
     RequireConstraint(Node<RequireConstraint>),
     /// A bare `constraint` member nested inside a `requirement def { ... }` body -- distinct
@@ -80,30 +84,49 @@ pub enum RequirementDefBodyElement {
     Doc(Node<DocComment>),
 }
 
-/// Viewpoint stakeholder: typed parameter or shorthand concern reference.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Viewpoint stakeholder: typed parameter, shorthand concern reference, or `:>>` redefinition.
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StakeholderMember {
     pub name: String,
     pub type_name: Option<String>,
+    /// True for `stakeholder :>> name;` (validation `11a`).
+    pub is_redefinition: bool,
     pub name_span: Span,
     pub type_span: Option<Span>,
 }
 
+impl PartialEq for StakeholderMember {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.type_name == other.type_name
+            && self.is_redefinition == other.is_redefinition
+    }
+}
+
 /// Viewpoint purpose concern reference.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PurposeMember {
     pub target: String,
     pub target_span: Span,
 }
 
-/// Subject declaration: `subject` name `:` type `;`.
+impl PartialEq for PurposeMember {
+    fn eq(&self, other: &Self) -> bool {
+        self.target == other.target
+    }
+}
+
+/// Subject declaration: `subject` name? (`:` type)? multiplicity? (`=` value)? `;`
+/// or the bare binding `subject = expr;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubjectDecl {
     pub name: String,
     pub type_name: String,
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub value: Option<Node<Expression>>,
 }
 
 /// Actor parameter in a requirement body: `actor` name? `:` type `;`.
@@ -120,6 +143,9 @@ pub struct RequirementActorDecl {
 pub struct RequireConstraint {
     /// True when spelled `assume` rather than `require`.
     pub is_assume: bool,
+    /// True when the `constraint` keyword follows `require`/`assume`.
+    /// False for `require name;` / `require name { … }` (validation `08`).
+    pub has_constraint_keyword: bool,
     /// Optional usage name (`assume constraint fuelConstraint { … }`).
     pub name: Option<String>,
     pub body: RequireConstraintBody,
@@ -136,6 +162,8 @@ pub struct VerifyRequirementMember {
     pub requirement: Option<Node<RequirementUsage>>,
     /// Shorthand verified requirement reference (`verify QualifiedName;`).
     pub target: Option<String>,
+    /// Redefinition target after `:>>` (`verify vehicleMassRequirement :>> massRequirement;`).
+    pub redefines: Option<String>,
 }
 
 /// Require constraint body: `;` or `{` ConstraintDefBodyElement* `}`.
@@ -184,11 +212,18 @@ pub struct RequirementUsage {
     pub short_name: Option<String>,
     pub type_name: Option<String>,
     pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Reference subsetting after `::>` / `references` (validation `08`:
+    /// `requirement references vehicleMass1 { … }`).
+    pub references: Option<Node<SubsettingRelationship>>,
     /// True for `abstract requirement ...`.
     pub is_abstract: bool,
     /// True for `variation requirement ...` (§6 G5) — a variation point whose body holds
     /// `variant` members.
     pub is_variation: bool,
+    /// `= expr` binding (`in requirement r = cityFuelEconomyRequirement;`, validation `10c`).
+    pub value: Option<Node<FeatureValue>>,
+    /// Set when parsed as `in`/`out`/`inout requirement` (validation `10c`).
+    pub direction: Option<crate::ast::InOut>,
     pub body: RequirementDefBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
     /// [`crate::ast::MembershipKind::FeatureMembership`]. Only captured with real visibility for
@@ -475,19 +510,43 @@ pub struct RefRedefinition {
     pub body: String,
 }
 
-/// `return [attribute] <name> [: <type>] [= <expr>] ;`
-/// or `return :>> <name> [= <expr>] ;`
+/// Optional feature-kind keyword on a case return (`return part …` / `return attribute …`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum CaseReturnFeatureKind {
+    Part,
+    Attribute,
+}
+
+/// `return [attribute|part] [:>>] <name> [:|:> <type>] [mult] [=|:= <expr>] ;`
 /// — return parameter declaration in analysis/verification case bodies.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CaseReturnDecl {
     pub name: String,
     pub name_span: Option<Span>,
     pub type_name: Option<String>,
-    /// Optional value expression following `=`.
-    pub value_expression: Option<Node<crate::ast::Expression>>,
-    /// True for `return :>> name` redefine form.
+    /// Optional value after `=` / `:=` (validation `10d` uses `:= ()`).
+    pub value: Option<Node<FeatureValue>>,
+    /// True for `return :>> name` / `return part :>> name` redefine form.
     pub is_redefine: bool,
+    /// True when the type is introduced with `:>` rather than `:`.
+    pub is_subsetting: bool,
+    /// Optional `part` / `attribute` keyword after `return`.
+    pub feature_kind: Option<CaseReturnFeatureKind>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+}
+
+impl PartialEq for CaseReturnDecl {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.type_name == other.type_name
+            && self.value == other.value
+            && self.is_redefine == other.is_redefine
+            && self.is_subsetting == other.is_subsetting
+            && self.feature_kind == other.feature_kind
+            && self.multiplicity == other.multiplicity
+    }
 }
 
 /// `return ref <name><multiplicity?> { ... }` used in SysML v2 release libraries.
@@ -533,15 +592,32 @@ pub enum UseCaseDefBodyElement {
     Assign(Node<AssignStmt>),
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),
+    /// Nested `action` usage in analysis/verification case bodies (validation `09`).
+    ActionUsage(Box<Node<crate::ast::ActionUsage>>),
+    /// Nested `analysis` usage in analysis case bodies (validation `10a`).
+    AnalysisCaseUsage(Box<Node<AnalysisCaseUsage>>),
+    /// Nested `calc` usage in analysis case bodies (validation `10b`).
+    CalcUsage(Box<Node<CalcUsage>>),
+    /// `attribute` usage / directed `in attribute …` (validation `10c`/`10d`).
+    AttributeUsage(Node<AttributeUsage>),
+    /// Directed `in requirement …` parameter (validation `10c`).
+    RequirementUsage(Box<Node<RequirementUsage>>),
+    /// Directed `in part …` / nested part usage in analysis bodies.
+    PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// Bare result expression in analysis case bodies (validation `10a`: `vehicle.mass`).
+    Expression(Node<Expression>),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
 }
 
-/// actor usage `actor pilot : Operator;`
+/// actor usage `actor pilot : Operator;` / `actor passengers : Person[0..4];`
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActorUsage {
     pub name: String,
     pub type_name: String,
+    /// Optional multiplicity after the type, e.g. `[0..4]` in `actor passengers : Person[0..4];`
+    /// (validation `18-Use Case`).
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Ownership/visibility/kind wrapper (parser work item 4b final sweep), `kind` always
     /// [`crate::ast::MembershipKind::ActorMembership`] -- confirmed against
     /// `SysML-textual-bnf.kebnf`'s `ActorMember : ActorMembership = MemberPrefix

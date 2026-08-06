@@ -60,7 +60,18 @@ pub(crate) fn part_usage_named<'a>(
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let (input, ordered_before_type) = usage_ordered_modifier(input)?;
-    let (input, type_result) = optional_typings(input)?;
+    let (input, early_typing) = optional_typings(input)?;
+    let (input, trailing_multiplicity_opt) = opt(multiplicity_node).parse(input)?;
+    let multiplicity_opt = multiplicity_opt.or(trailing_multiplicity_opt);
+    let (input, ordered_after_type) = usage_ordered_modifier(input)?;
+    let ordered = ordered_before_type || ordered_after_type;
+    let (input, leading_clauses) = specialization_clauses(input)?;
+    // Typing may follow redefinition: `in part anEngine :>> alternative : Engine;` (validation `10b`).
+    let (input, type_result) = if early_typing.is_some() {
+        (input, early_typing)
+    } else {
+        optional_typings(input)?
+    };
     let typing = type_result
         .clone()
         .map(|(s, is_conjugated, targets)| typing_node(s, is_conjugated, targets));
@@ -70,11 +81,6 @@ pub(crate) fn part_usage_named<'a>(
             (Some(s), if is_conjugated { format!("~{t}") } else { t })
         })
         .unwrap_or((None, String::new()));
-    let (input, trailing_multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let multiplicity_opt = multiplicity_opt.or(trailing_multiplicity_opt);
-    let (input, ordered_after_type) = usage_ordered_modifier(input)?;
-    let ordered = ordered_before_type || ordered_after_type;
-    let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
     let (input, ordered_after_clauses) = usage_ordered_modifier(input)?;

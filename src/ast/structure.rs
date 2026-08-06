@@ -256,7 +256,7 @@ pub struct ExhibitState {
 }
 
 /// Attribute definition: `attribute` `def` name (`:>` | `:` type)? (`=` value)? body.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeDef {
     pub name: String,
@@ -289,6 +289,19 @@ pub struct AttributeDef {
     /// `attribute_def` unconditionally builds one, using `visibility: None` when no prefix was
     /// written.
     pub membership: Membership,
+}
+
+impl PartialEq for AttributeDef {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.short_name == other.short_name
+            && self.typing == other.typing
+            && self.value == other.value
+            && self.body == other.body
+            && self.ordered == other.ordered
+            && self.nonunique == other.nonunique
+            && self.membership == other.membership
+    }
 }
 
 /// Body of an attribute (def or usage): `;` or `{` AttributeBodyElement* `}`.
@@ -326,6 +339,11 @@ pub enum AttributeBodyElement {
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// `assert constraint …` in attribute / item bodies (#72 / validation `15_01`, `15_08`).
     AssertConstraint(Node<AssertConstraintMember>),
+    /// `ref` / `ref part` / `ref :>> …` members in attribute / item bodies (validation `15_11`,
+    /// `15_19`, `17a`, `17b`).
+    RefDecl(Node<RefDecl>),
+    /// Nested `part` usage inside an item / attribute body (validation `3e`, `14c`).
+    PartUsage(Box<Node<PartUsage>>),
     Other(String),
 }
 
@@ -354,7 +372,7 @@ pub struct IndividualDef {
 }
 
 /// Part usage: `part` name `:` type multiplicity? `ordered`? (`redefines`|`:>>`)? value? body.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartUsage {
     /// Optional `abstract` or `variation` prefix on a part usage.
@@ -406,6 +424,28 @@ pub struct PartUsage {
     pub membership: Membership,
 }
 
+impl PartialEq for PartUsage {
+    fn eq(&self, other: &Self) -> bool {
+        self.usage_prefix == other.usage_prefix
+            && self.is_individual == other.is_individual
+            && self.is_reference == other.is_reference
+            && self.direction == other.direction
+            && self.is_derived == other.is_derived
+            && self.is_constant == other.is_constant
+            && self.name == other.name
+            && self.short_name == other.short_name
+            && self.type_name == other.type_name
+            && self.typing == other.typing
+            && self.multiplicity == other.multiplicity
+            && self.ordered == other.ordered
+            && self.subsets == other.subsets
+            && self.redefines == other.redefines
+            && self.value == other.value
+            && self.body == other.body
+            && self.membership == other.membership
+    }
+}
+
 /// Body of a part usage: `;` or `{` PartUsageBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -417,7 +457,7 @@ pub enum PartUsageBody {
 }
 
 /// Metadata annotation on usage: `@` Name (`:` Type)? (`about` targets)? MetadataBody.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataAnnotation {
     pub name: String,
@@ -428,8 +468,17 @@ pub struct MetadataAnnotation {
     pub type_span: Option<Span>,
 }
 
+impl PartialEq for MetadataAnnotation {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.type_name == other.type_name
+            && self.about_targets == other.about_targets
+            && self.body == other.body
+    }
+}
+
 /// User-defined metadata keyword usage: `#keyword` (`:` Type)? (`about` targets)? body.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataKeywordUsage {
     pub keyword: String,
@@ -440,8 +489,17 @@ pub struct MetadataKeywordUsage {
     pub type_span: Option<Span>,
 }
 
+impl PartialEq for MetadataKeywordUsage {
+    fn eq(&self, other: &Self) -> bool {
+        self.keyword == other.keyword
+            && self.type_name == other.type_name
+            && self.about_targets == other.about_targets
+            && self.body == other.body
+    }
+}
+
 /// Generic annotation or metadata usage captured in body scopes.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Annotation {
     pub sigil: String,
@@ -450,6 +508,15 @@ pub struct Annotation {
     pub body: ConnectBody,
     pub head_span: Option<Span>,
     pub type_span: Option<Span>,
+}
+
+impl PartialEq for Annotation {
+    fn eq(&self, other: &Self) -> bool {
+        self.sigil == other.sigil
+            && self.head == other.head
+            && self.type_name == other.type_name
+            && self.body == other.body
+    }
 }
 
 /// Element inside a part usage body.
@@ -635,7 +702,7 @@ pub struct PerformInOutBinding {
 }
 
 /// Attribute usage: `attribute` name (`:>` | `:` type)? `redefines`? value? body.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeUsage {
     pub name: String,
@@ -693,10 +760,33 @@ pub struct AttributeUsage {
     pub membership: Membership,
 }
 
+impl PartialEq for AttributeUsage {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.short_name == other.short_name
+            && self.typing == other.typing
+            && self.subsets == other.subsets
+            && self.redefines == other.redefines
+            && self.references == other.references
+            && self.crosses == other.crosses
+            && self.intersects == other.intersects
+            && self.value == other.value
+            && self.body == other.body
+            && self.direction == other.direction
+            && self.multiplicity == other.multiplicity
+            && self.ordered == other.ordered
+            && self.nonunique == other.nonunique
+            && self.is_derived == other.is_derived
+            && self.is_constant == other.is_constant
+            && self.is_end == other.is_end
+            && self.membership == other.membership
+    }
+}
+
 /// SysML `DefaultReferenceUsage` (BNF §8.2.2.6 / Spec §7.6.4): a usage without a kind keyword,
 /// e.g. `Capacity : Real;`. Distinct from [`AttributeUsage`], which requires the `attribute`
 /// keyword. Historically parsed via `attribute_usage_shorthand` into `AttributeUsage`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefaultReferenceUsage {
     pub name: String,
@@ -707,6 +797,15 @@ pub struct DefaultReferenceUsage {
     pub name_span: Option<Span>,
     pub typing_span: Option<Span>,
     pub membership: Membership,
+}
+
+impl PartialEq for DefaultReferenceUsage {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.typing == other.typing
+            && self.value == other.value
+            && self.membership == other.membership
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -760,7 +859,7 @@ pub enum PortDefBodyElement {
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortUsage {
     /// Direction prefix when parsed as `in`/`out`/`inout port ...` (BNF `RefPrefix`, reachable
@@ -801,6 +900,27 @@ pub struct PortUsage {
     /// same "genuine new grammar coverage, not just discarded data" rationale -- `port_usage` did
     /// not previously accept a visibility prefix either.
     pub membership: Membership,
+}
+
+impl PartialEq for PortUsage {
+    fn eq(&self, other: &Self) -> bool {
+        self.direction == other.direction
+            && self.is_abstract == other.is_abstract
+            && self.is_derived == other.is_derived
+            && self.is_constant == other.is_constant
+            && self.name == other.name
+            && self.short_name == other.short_name
+            && self.type_name == other.type_name
+            && self.multiplicity == other.multiplicity
+            && self.subsets == other.subsets
+            && self.redefines == other.redefines
+            && self.references == other.references
+            && self.crosses == other.crosses
+            && self.intersects == other.intersects
+            && self.value == other.value
+            && self.body == other.body
+            && self.membership == other.membership
+    }
 }
 
 /// Body of a port usage: `;` or `{` PortBodyElement* `}`.
@@ -958,7 +1078,7 @@ impl PartialEq for EndDecl {
 }
 
 /// Ref declaration in interface def: `ref` name `:` type body.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RefDecl {
     pub name: String,
@@ -988,6 +1108,19 @@ pub struct RefDecl {
     /// Ownership/visibility wrapper (`FeatureMembership`). Populated when a visibility prefix
     /// precedes `ref` (e.g. `private ref mass : MassValue;`).
     pub membership: Membership,
+}
+
+impl PartialEq for RefDecl {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.type_name == other.type_name
+            && self.typing == other.typing
+            && self.redefines == other.redefines
+            && self.subsets == other.subsets
+            && self.value == other.value
+            && self.body == other.body
+            && self.membership == other.membership
+    }
 }
 
 /// Body of a ref declaration: `;` or `{` members `}`.

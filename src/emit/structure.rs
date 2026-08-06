@@ -314,6 +314,12 @@ fn emit_part_def_body_element(
         PartDefBodyElement::OccurrenceUsage(o) => {
             super::behavior::emit_occurrence_usage(w, path, &o.value)
         }
+        PartDefBodyElement::AnalysisCaseDef(a) => {
+            super::requirement::emit_analysis_case_def(w, path, &a.value)
+        }
+        PartDefBodyElement::AnalysisCaseUsage(a) => {
+            super::requirement::emit_analysis_case_usage(w, path, &a.value)
+        }
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -414,6 +420,12 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::OccurrenceUsage(o) => {
             super::behavior::emit_occurrence_usage(w, path, &o.value)
         }
+        PartUsageBodyElement::AnalysisCaseDef(a) => {
+            super::requirement::emit_analysis_case_def(w, path, &a.value)
+        }
+        PartUsageBodyElement::AnalysisCaseUsage(a) => {
+            super::requirement::emit_analysis_case_usage(w, path, &a.value)
+        }
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -463,13 +475,18 @@ fn emit_attribute_body_element(
         AttributeBodyElement::Doc(d) => emit_doc(w, &d.value),
         AttributeBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         AttributeBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
+        AttributeBodyElement::OccurrenceUsage(o) => {
+            super::behavior::emit_occurrence_usage(w, path, &o.value)
+        }
+        AttributeBodyElement::Connect(c) => emit_connect(w, path, &c.value),
+        AttributeBodyElement::MetadataKeywordUsage(m) => {
+            emit_metadata_keyword_usage(w, path, &m.value)
+        }
         AttributeBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }
-        other => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        AttributeBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
+        AttributeBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
     }
 }
 

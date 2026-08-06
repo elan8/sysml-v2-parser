@@ -257,12 +257,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
         match &el.value {
             UseCaseDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             UseCaseDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
-            UseCaseDefBodyElement::ActorRedefinitionAssignment(_) => {
-                hit(report, &p, OpacityKind::RawRhsString)
-            }
-            UseCaseDefBodyElement::RefRedefinition(_) => {
-                hit(report, &p, OpacityKind::RawBodyString)
-            }
+            // Actor/ref `:>>` forms carry raw RHS/body text but emit faithfully (#78 follow-up).
             UseCaseDefBodyElement::ReturnRef(_) => hit(report, &p, OpacityKind::RawBodyString),
             _ => {}
         }

@@ -183,6 +183,12 @@ pub(crate) fn constraint_def_body_element(
         map(in_out_decl, ConstraintDefBodyElement::InOutDecl).parse(input)?
     } else if starts_with_keyword(input.fragment(), b"constraint") {
         map(constraint_usage, ConstraintDefBodyElement::Constraint).parse(input)?
+    } else if input.fragment().starts_with(b":>>") || input.fragment().starts_with(b":>") {
+        map(
+            crate::parser::attribute::redefinition_feature_binding,
+            |n| ConstraintDefBodyElement::AttributeUsage(Box::new(n)),
+        )
+        .parse(input)?
     } else {
         map(expression, ConstraintDefBodyElement::Expression).parse(input)?
     };
@@ -190,17 +196,40 @@ pub(crate) fn constraint_def_body_element(
     Ok((input, node_from_to(start, input, elem)))
 }
 
-/// Calculation usage: `calc` Identification (`:` type)? body (SysML §7.19.2).
+/// Calculation usage: `calc` Identification (`:` type)? (`=` value)? body (SysML §7.19.2).
 pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, identification) = identification(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (identification, redefines)) = if input.fragment().starts_with(b":>>") {
+        let (input, _) = tag(&b":>>"[..]).parse(input)?;
+        let (input, target) = preceded(ws_and_comments, qualified_name).parse(input)?;
+        (
+            input,
+            (
+                crate::ast::Identification {
+                    short_name: None,
+                    name: Some(target.clone()),
+                },
+                Some(target),
+            ),
+        )
+    } else {
+        // `ws_and_comments` above already skipped gaps after `calc`; do not require `ws1`
+        // here or `calc name …` fails once the space was consumed (validation `10c`).
+        let (input, identification) = identification(input)?;
+        (input, (identification, None))
+    };
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
         preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
+    let (input, value) = opt(preceded(
+        ws_and_comments,
+        crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
     let (input, body) = calc_def_body(input)?;
@@ -212,6 +241,9 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
             CalcUsage {
                 identification,
                 type_name,
+                redefines,
+                value,
+                direction: None,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -315,13 +347,19 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         || starts_with_keyword(input.fragment(), b"out")
         || starts_with_keyword(input.fragment(), b"inout")
     {
-        if named_in_out_missing_type(input) {
+        // Prefer directed `in part …` before plain InOutDecl (which rejects `in part`).
+        if let Ok((input, part)) = crate::parser::part::part_usage(input) {
+            (input, CalcDefBodyElement::PartUsage(Box::new(part)))
+        } else if named_in_out_missing_type(input) {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
             )));
+        } else {
+            map(in_out_decl, CalcDefBodyElement::InOutDecl).parse(input)?
         }
-        map(in_out_decl, CalcDefBodyElement::InOutDecl).parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"calc") {
+        map(calc_usage, |n| CalcDefBodyElement::CalcUsage(Box::new(n))).parse(input)?
     } else if starts_with_keyword(input.fragment(), b"return") {
         if named_return_missing_type(input) {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -478,14 +516,50 @@ fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement>
 pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     let start = input;
     let (input, _) = tag(&b"return"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, n) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    // `return :>> name : Type = expr;`
+    let (input, is_redefine) = if input.fragment().starts_with(b":>>") {
+        let (input, _) = tag(&b":>>"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        (input, true)
+    } else {
+        (input, false)
+    };
+    // Anonymous typed form: `return : Type [= expr];`
+    let (input, n) = if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
+        (input, String::new())
+    } else {
+        let (input, n) = name(input)?;
+        (input, n)
+    };
+    let (input, _) = ws_and_comments(input)?;
+    let (input, is_subsetting) = if input.fragment().starts_with(b":>") {
+        let (input, _) = tag(&b":>"[..]).parse(input)?;
+        (input, true)
+    } else {
+        let (input, _) = tag(&b":"[..]).parse(input)?;
+        (input, false)
+    };
     let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, value) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"="[..])),
+        preceded(ws_and_comments, crate::parser::expr::expression),
+    ))
+    .parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
-        node_from_to(start, input, ReturnDecl { name: n, type_name }),
+        node_from_to(
+            start,
+            input,
+            ReturnDecl {
+                name: n,
+                type_name,
+                is_redefine,
+                is_subsetting,
+                value,
+            },
+        ),
     ))
 }
 

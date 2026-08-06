@@ -48,7 +48,7 @@ pub struct FilterPackageMember {
 }
 
 /// Import: `private`? `import` `all`? QualifiedName (`::` `*`)? or FilterPackage form.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Import {
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006 continuation), `kind`
@@ -81,6 +81,17 @@ pub struct Import {
     /// only). `None` when the body is a semicolon terminator.
     pub body_elements: Option<Vec<Node<crate::ast::structure::RelationshipBodyElement>>>,
 }
+
+impl PartialEq for Import {
+    fn eq(&self, other: &Self) -> bool {
+        self.membership == other.membership
+            && self.is_import_all == other.is_import_all
+            && self.target == other.target
+            && self.is_recursive == other.is_recursive
+            && self.filter_members == other.filter_members
+            && self.body_elements == other.body_elements
+    }
+}
 /// KerML Documentation: 'doc' Identification? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -103,13 +114,21 @@ pub struct CommentAnnotation {
 }
 
 /// KerML TextualRepresentation: ( 'rep' Identification )? 'language' STRING_VALUE body.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TextualRepresentation {
     pub rep_identification: Option<Identification>,
     pub language: String,
     pub language_span: Option<Span>,
     pub text: String,
+}
+
+impl PartialEq for TextualRepresentation {
+    fn eq(&self, other: &Self) -> bool {
+        self.rep_identification == other.rep_identification
+            && self.language == other.language
+            && self.text == other.text
+    }
 }
 /// Body of a connect statement: `;` or `{` ... `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]

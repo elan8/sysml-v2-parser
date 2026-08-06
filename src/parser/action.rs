@@ -257,6 +257,32 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
         )));
     }
     let (input, _) = nom::combinator::opt(preceded(tag(&b"attribute"[..]), ws1)).parse(input)?;
+    // `in :>> name = expr;` / `out :>> name;` (validation `08` require bodies).
+    let (peek_redef, _) = ws_and_comments(input)?;
+    if peek_redef.fragment().starts_with(b":>>") {
+        let (input, _) = tag(&b":>>"[..]).parse(input)?;
+        let (input, param_name) = preceded(ws_and_comments, name).parse(input)?;
+        let (input, value) = opt(preceded(
+            preceded(ws_and_comments, tag(&b"="[..])),
+            preceded(ws_and_comments, expression),
+        ))
+        .parse(input)?;
+        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        return Ok((
+            input,
+            node_from_to(
+                start,
+                input,
+                InOutDecl {
+                    direction,
+                    name: param_name,
+                    type_name: String::new(),
+                    is_redefinition: true,
+                    value,
+                },
+            ),
+        ));
+    }
     let parsed = (|| {
         // Library shorthand: `in action body { ... }` (treat as name `body` typed as `action`)
         let (input, action_typed_name) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
@@ -348,6 +374,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                 direction,
                 name: param_name,
                 type_name,
+                is_redefinition: false,
                 value,
             },
         ),

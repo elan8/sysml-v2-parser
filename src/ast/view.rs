@@ -55,6 +55,8 @@ pub enum ConstraintDefBodyElement {
     /// from another constraint). Not boxed: `ConstraintUsage` is a small struct and the
     /// recursion into its own `body: ConstraintDefBody` already passes through a `Vec`.
     Constraint(Node<ConstraintUsage>),
+    /// Keyword-less `:>> name = …` binding inside `require name { … }` (validation `10c`).
+    AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
     /// Unmodeled constraint-body element captured as raw text (used for library parsing).
     Other(String),
 }
@@ -82,6 +84,12 @@ pub struct CalcDef {
 pub struct CalcUsage {
     pub identification: Identification,
     pub type_name: Option<String>,
+    /// Redefinition target for `calc :>> name { … }` (validation `10b`).
+    pub redefines: Option<String>,
+    /// `= expr` / `:= expr` binding (`in calc scenario = cityScenario;`, validation `10c`).
+    pub value: Option<Node<crate::ast::FeatureValue>>,
+    /// Set when parsed as `in`/`out`/`inout calc` (validation `10c`).
+    pub direction: Option<crate::ast::InOut>,
     pub body: CalcDefBody,
     pub membership: Membership,
 }
@@ -104,16 +112,26 @@ pub enum CalcDefBodyElement {
     ReturnDecl(Node<ReturnDecl>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // formula
+    /// Nested `calc` usage inside a calc body (validation `10b` rollups).
+    CalcUsage(Box<Node<CalcUsage>>),
+    /// Directed `in part …` parameter (validation `10b`).
+    PartUsage(Box<Node<crate::ast::PartUsage>>),
     /// Unmodeled calc-body element captured as raw text (used for library parsing).
     Other(String),
 }
 
-/// Return declaration: `return` name `:` type `;`.
+/// Return declaration: `return` [`:>>`] name? (`:`|`:>`) type (`=` expr)? `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReturnDecl {
+    /// Empty for anonymous `return : Type [= expr];` (validation `10c`, `10d`).
     pub name: String,
     pub type_name: String,
+    /// True for `return :>> name : Type = …` (validation `10b`).
+    pub is_redefine: bool,
+    /// True when the type is introduced with `:>` rather than `:` (validation `10b` rollups).
+    pub is_subsetting: bool,
+    pub value: Option<Node<crate::ast::Expression>>,
 }
 
 // ---------------------------------------------------------------------------

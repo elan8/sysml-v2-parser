@@ -312,6 +312,8 @@ pub enum Expression {
         op: CollectionOperator,
         base: Box<Node<Expression>>,
         args: Vec<Argument>,
+        /// Brace-body form `->forAll { … }` (validation `15_05`, `7b`); paren form leaves this `None`.
+        brace_body: Option<String>,
     },
     /// Metadata-access expression: `expr.metadata` (KerML `MetadataAccessExpression`, BNF
     /// 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`). Distinct from [`Expression::Classification`]
@@ -319,6 +321,17 @@ pub enum Expression {
     /// [`Expression::MetaCast`] (`expr meta Metaclass`, reflective cast) -- this accesses the
     /// metadata Feature/Element object itself for the referenced element.
     MetadataAccess(Box<Node<Expression>>),
+    /// Conditional: `if <test> ? <then> else <else>` (KerML ConditionalExpression; validation
+    /// `15_04`, `7b`).
+    Conditional {
+        test: Box<Node<Expression>>,
+        then_expr: Box<Node<Expression>>,
+        else_expr: Box<Node<Expression>>,
+    },
+    /// Extent expression: `all QualifiedName` (KerML; validation `10b`).
+    Extent {
+        target: String,
+    },
 }
 
 /// Move every direct `Node<Expression>` child out of `expr`, replacing each with a cheap
@@ -365,6 +378,15 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
             out.push(take_box(base));
             out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
         }
+        Expression::Conditional {
+            test,
+            then_expr,
+            else_expr,
+        } => {
+            out.push(take_box(test));
+            out.push(take_box(then_expr));
+            out.push(take_box(else_expr));
+        }
         Expression::Constructor { args, .. } => {
             out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
         }
@@ -383,7 +405,8 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
         | Expression::FeatureRef(_)
         | Expression::Classification { .. }
         | Expression::Null
-        | Expression::FeatureChainRef(_) => {}
+        | Expression::FeatureChainRef(_)
+        | Expression::Extent { .. } => {}
     }
 }
 

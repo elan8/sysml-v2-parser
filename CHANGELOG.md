@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+  - Promoted remaining analysis fixtures into `ROUNDTRIP_PASS` (`10b`/`10c`/`10d`): directed
+    `in calc`/`in requirement`/`in part`/`in attribute`, nested calc rollups, `return :>>` /
+    `return part|attribute` (incl. `:>`/`:=`), analysis `for` loops, and keyword-less `:>>`
+    bindings inside `require name { … }`.
+  - L2.5 validation inventory is now **56 required-pass / 0 known-gap**.
+
+- **L2.5 remaining AST-eq gaps (#78).**
+  - Extended span-ignoring `PartialEq` to attribute/part/port/ref/metadata/import/state
+    `Then`/`Final` (and related) AST types — clears phantom AST-eq where Debug matched after
+    span strip.
+  - `dependency from A to B` no longer stores `"from"` as a client (validation `12a`).
+  - Bare `allocate src to dst` emits as shorthand (not `allocation allocate …`) — `12b`.
+  - `ref` / `ref part` in attribute & item bodies; actor multiplicity; `occurrence def` emit;
+    use-case `actor :>>` / `ref :>>` emit; objective body emit (no `requirement objective`).
+  - Requirement/concern body: `subject;` / `subject = expr` / braced subject, `stakeholder :>>`,
+    keyword-less `:>>` bindings, `variant`, `requirement references`, `require name` (with/without
+    `constraint`), `in :>>` params, verify `:>>`.
+  - Expressions: `if ? else` Conditional, `all Name` extent, `->forAll {…}` brace CollectionOp.
+  - Package/part emit: verification/case/viewpoint/rendering, `#` metadata prefix, nested analysis.
+  - Promoted ~33 fixtures into `ROUNDTRIP_PASS` (span phantoms + structural follow-ups).
+
 - **L2.5 ExtendedLibraryDecl / KermlFeatureDecl opacity (#73).**
   - `requirement <'1.1'> name : Type { … }` parses as `RequirementUsage` (short name), not
     `ExtendedLibraryDecl` (validation `08`, `09`).
@@ -31,8 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Transition emit always writes `first` when a source is present; member-access emit quotes
     spaced names.
   - Promoted `5-State-based Behavior-1a` and `15_01-Constants` into `ROUNDTRIP_PASS`.
-  - Remaining: `05-1`/`05-2`/`15_08` are opacity-clean but still AST-eq phantoms (equal Debug after
-    span strip, unequal PartialEq).
+  - Remaining after #78: other `Other` / emit-opaque fixtures still under #72.
 
 - **L2.5 AST-eq / emit-shape gaps for function-based behavior (#74).**
   - Redefines-only part usages emit multiplicity after `:>> target` (`part :>> part3[0..1];`).
