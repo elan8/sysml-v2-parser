@@ -106,6 +106,11 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
         PackageBodyElement::AttributeDef(a) => structure::emit_attribute_def(w, path, &a.value),
         PackageBodyElement::AttributeUsage(a) => structure::emit_attribute_usage(w, path, &a.value),
+        PackageBodyElement::PortDef(p) => structure::emit_port_def(w, path, &p.value),
+        PackageBodyElement::PortUsage(p) => structure::emit_port_usage(w, path, &p.value),
+        PackageBodyElement::InterfaceDef(i) => structure::emit_interface_def(w, path, &i.value),
+        PackageBodyElement::InterfaceUsage(i) => structure::emit_interface_usage(w, path, &i.value),
+        PackageBodyElement::Connect(c) => structure::emit_connect(w, path, &c.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)

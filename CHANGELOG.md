@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **L2.5 emit-fidelity roundtrip gate expanded beyond `01-Parts Tree/` (#68).**
+  Known-gap scan now covers the full pinned `sysml/src/validation/` tree. Emitter support for
+  `port def` / `port` usage, `connect`, and `interface def` / `interface` usage unblocks
+  `02-Parts Interconnection` (`2a` / `2c` required-pass). Incidental promotions from the
+  full-tree scan: `14b`, `15_02`, `15_06`, `15_07`. See `docs/CONFORMANCE.md` and
+  `tests/validation/README.md` for the per-folder inventory.
+
 ### Fixed
 
 - **Several relationship/`ref` bodies discarded their entire content, with no diagnostic.**

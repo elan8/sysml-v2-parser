@@ -6,23 +6,28 @@
 //! Requires `SYSML_V2_RELEASE_DIR` or `./sysml-v2-release`. Run with:
 //! `cargo test --test roundtrip_validation -- --include-ignored`
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use sysml_v2_parser::{emit_sysml, opacity_report, parse, EmitError, RootNamespace};
 
-/// Iteration-1 scope: only fixtures under `01-Parts Tree/`.
-const ROUNDTRIP_SCOPE_PREFIX: &str = "01-Parts Tree/";
-
-/// Fixtures in scope that must currently roundtrip successfully.
+/// Fixtures that must currently roundtrip successfully.
 ///
-/// Other `.sysml` files under [`ROUNDTRIP_SCOPE_PREFIX`] are known gaps and must still
-/// fail. When a gap starts passing, add it here. Fixtures outside this folder are ignored
-/// in this iteration.
+/// Every other `.sysml` under the pinned release `sysml/src/validation/` tree is a known
+/// gap and must still fail. When a gap starts passing, add it here.
 const ROUNDTRIP_PASS: &[&str] = &[
     "01-Parts Tree/1a-Parts Tree.sysml",
     "01-Parts Tree/1c-Parts Tree Redefinition.sysml",
     "01-Parts Tree/1d-Parts Tree with Reference.sysml",
+    "02-Parts Interconnection/2a-Parts Interconnection.sysml",
+    "02-Parts Interconnection/2c-Parts Interconnection-Multiple Decompositions.sysml",
+    // Promoted by the full-tree known-gap scan once port/interface/connect emit landed;
+    // not deliberately targeted by this iteration beyond inventory.
+    "14-Language Extensions/14b-Language Extensions.sysml",
+    "15-Properties-Values-Expressions/15_02-Basic Value Properties.sysml",
+    "15-Properties-Values-Expressions/15_06-System of Quantities.sysml",
+    "15-Properties-Values-Expressions/15_07-System of Units and Scales.sysml",
 ];
 
 fn release_root() -> PathBuf {
@@ -57,6 +62,10 @@ fn rel_validation_path(file: &Path, root: &Path) -> String {
         .unwrap_or(file)
         .to_string_lossy()
         .replace('\\', "/")
+}
+
+fn folder_of(rel: &str) -> &str {
+    rel.split('/').next().unwrap_or(rel)
 }
 
 fn diff_debug_strings(parsed: &str, expected: &str) -> (usize, String) {
@@ -225,30 +234,28 @@ fn roundtrip_known_gaps_must_still_fail() {
         return;
     }
 
-    let scope_root = root.join(ROUNDTRIP_SCOPE_PREFIX.trim_end_matches('/'));
-    let files = find_sysml_files(&scope_root).expect("list scoped validation files");
+    let files = find_sysml_files(&root).expect("list validation files");
     assert!(
         !files.is_empty(),
         "no .sysml files under {}",
-        ROUNDTRIP_SCOPE_PREFIX
+        root.display()
     );
 
     let pass: std::collections::HashSet<&str> = ROUNDTRIP_PASS.iter().copied().collect();
     let mut unexpected_passes = Vec::new();
     let mut gap_count = 0usize;
-    let mut missing_from_pass = Vec::new();
+    let mut inventory: BTreeMap<String, (usize, usize)> = BTreeMap::new();
 
     for file in &files {
         let rel = rel_validation_path(file, &root);
-        assert!(
-            rel.starts_with(ROUNDTRIP_SCOPE_PREFIX),
-            "scoped scan escaped prefix: {rel}"
-        );
+        let folder = folder_of(&rel).to_string();
+        let entry = inventory.entry(folder).or_insert((0, 0));
         if pass.contains(rel.as_str()) {
+            entry.0 += 1;
             continue;
         }
+        entry.1 += 1;
         gap_count += 1;
-        missing_from_pass.push(rel.clone());
         let src = fs::read_to_string(file).expect("read known-gap fixture");
         match try_roundtrip(&src) {
             RoundtripOutcome::Ok => unexpected_passes.push(rel),
@@ -256,16 +263,18 @@ fn roundtrip_known_gaps_must_still_fail() {
         }
     }
 
+    eprintln!("L2.5 validation inventory (pass / known-gap) against pinned release:");
+    for (folder, (pass_n, gap_n)) in &inventory {
+        eprintln!("  {folder}: {pass_n} pass, {gap_n} known-gap");
+    }
     eprintln!(
-        "scope {}: {} required-pass, {} known-gap ({})",
-        ROUNDTRIP_SCOPE_PREFIX,
+        "totals: {} required-pass, {} known-gap",
         ROUNDTRIP_PASS.len(),
-        gap_count,
-        missing_from_pass.join(", ")
+        gap_count
     );
     assert!(
         unexpected_passes.is_empty(),
-        "these scoped fixtures now roundtrip — add them to ROUNDTRIP_PASS:\n{}",
+        "these validation fixtures now roundtrip — add them to ROUNDTRIP_PASS:\n{}",
         unexpected_passes.join("\n")
     );
 }
@@ -300,6 +309,69 @@ package P {
     match try_roundtrip(src) {
         RoundtripOutcome::Ok => {}
         RoundtripOutcome::Failed(msg) => panic!("handwritten smoke failed: {msg}"),
+    }
+}
+
+#[test]
+fn roundtrip_handwritten_ports_connect_smoke() {
+    let src = r#"
+package PortsConnect {
+    port def FuelCmdPort;
+    port def WheelToRoadPort;
+    port def VehicleToRoadPort {
+        port wheelToRoadPort: WheelToRoadPort[2];
+    }
+    part def Engine {
+        port fuelCmdPort: FuelCmdPort;
+    }
+    part def C1 {
+        port pa;
+        port pb;
+    }
+    part def C2 {
+        port pc;
+    }
+    part a {
+        part c1: C1;
+        part c2: C2;
+        connect c1.pa to c2.pc;
+        port :>> pe = c1.pb;
+    }
+}
+"#;
+    match try_roundtrip(src) {
+        RoundtripOutcome::Ok => {}
+        RoundtripOutcome::Failed(msg) => panic!("ports/connect smoke failed: {msg}"),
+    }
+}
+
+#[test]
+fn roundtrip_handwritten_interface_smoke() {
+    let src = r#"
+package Interfaces {
+    port def DrivePwrPort;
+    port def ClutchPort;
+    part def Engine {
+        port drivePwrPort: DrivePwrPort;
+    }
+    part def Transmission {
+        port clutchPort: ClutchPort;
+    }
+    interface def EngineToTransmissionInterface {
+        end drivePwrPort: DrivePwrPort;
+        end clutchPort: ClutchPort;
+    }
+    part vehicle {
+        part engine: Engine;
+        part transmission: Transmission;
+        interface :EngineToTransmissionInterface
+            connect engine.drivePwrPort to transmission.clutchPort;
+    }
+}
+"#;
+    match try_roundtrip(src) {
+        RoundtripOutcome::Ok => {}
+        RoundtripOutcome::Failed(msg) => panic!("interface smoke failed: {msg}"),
     }
 }
 

@@ -5,10 +5,12 @@ use super::root::{emit_comment, emit_doc, emit_identification, emit_import};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
-    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, ConnectBody,
-    DefinitionPrefix, InOut, Multiplicity, Node, PartDef, PartDefBody, PartDefBodyElement,
-    PartUsage, PartUsageBody, PartUsageBodyElement, RefBody, RefDecl, SubsettingKind,
-    SubsettingRelationship, TypingKind, TypingRelationship,
+    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectBody,
+    ConnectStmt, ConnectionEnd, DefinitionPrefix, EndDecl, InOut, InterfaceDef, InterfaceDefBody,
+    InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node,
+    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
+    PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
+    RefDecl, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
 };
 
 pub(crate) fn emit_part_def(
@@ -234,6 +236,11 @@ fn emit_part_def_body_element(
         PartDefBodyElement::Import(i) => emit_import(w, &i.value),
         PartDefBodyElement::Bind(b) => emit_bind(w, path, &b.value),
         PartDefBodyElement::Ref(r) => emit_ref_decl(w, path, &r.value),
+        PartDefBodyElement::PortDef(p) => emit_port_def(w, path, &p.value),
+        PartDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        PartDefBodyElement::InterfaceDef(i) => emit_interface_def(w, path, &i.value),
+        PartDefBodyElement::InterfaceUsage(i) => emit_interface_usage(w, path, &i.value),
+        PartDefBodyElement::Connect(c) => emit_connect(w, path, &c.value),
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -282,6 +289,10 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::Import(i) => emit_import(w, &i.value),
         PartUsageBodyElement::Ref(r) => emit_ref_decl(w, path, &r.value),
         PartUsageBodyElement::Bind(b) => emit_bind(w, path, &b.value),
+        PartUsageBodyElement::PortDef(p) => emit_port_def(w, path, &p.value),
+        PartUsageBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        PartUsageBodyElement::InterfaceUsage(i) => emit_interface_usage(w, path, &i.value),
+        PartUsageBodyElement::Connect(c) => emit_connect(w, path, &c.value),
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -338,6 +349,493 @@ fn emit_attribute_body_element(
     }
 }
 
+pub(crate) fn emit_port_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &PortDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    w.push_str("port def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    emit_port_def_body(w, path, &def.body)
+}
+
+pub(crate) fn emit_port_usage(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    usage: &PortUsage,
+) -> Result<(), EmitError> {
+    emit_visibility(w, usage.membership.visibility);
+    if let Some(dir) = usage.direction {
+        emit_direction(w, dir);
+    }
+    if usage.is_abstract {
+        w.push_str("abstract ");
+    }
+    if usage.is_derived {
+        w.push_str("derived ");
+    }
+    if usage.is_constant {
+        w.push_str("constant ");
+    }
+    w.push_str("port ");
+    if let Some(short) = &usage.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short));
+        w.push_str("> ");
+    }
+    if !usage.name.is_empty() {
+        w.push_str(&format_name(&usage.name));
+    }
+    if let Some(ty) = &usage.type_name {
+        w.push_str(" : ");
+        w.push_str(ty);
+    }
+    if let Some(mult) = &usage.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some((subsets, subset_value)) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+        if let Some(expr) = subset_value {
+            w.push_str(" = ");
+            emit_expression(w, &expr.value)?;
+        }
+    }
+    if let Some(redefines) = &usage.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(references) = &usage.references {
+        emit_subsetting_clause(w, &references.value)?;
+    }
+    if let Some(crosses) = &usage.crosses {
+        emit_subsetting_clause(w, &crosses.value)?;
+    }
+    if let Some(intersects) = &usage.intersects {
+        emit_subsetting_clause(w, &intersects.value)?;
+    }
+    if let Some(value) = &usage.value {
+        if usage
+            .subsets
+            .as_ref()
+            .and_then(|(_, v)| v.as_ref())
+            .is_none()
+        {
+            emit_feature_value(w, value)?;
+        }
+    }
+    emit_port_body(w, path, &usage.body)
+}
+
+fn emit_port_def_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &PortDefBody,
+) -> Result<(), EmitError> {
+    match body {
+        PortDefBody::Semicolon => {
+            w.push_char(';');
+            Ok(())
+        }
+        PortDefBody::Brace { elements } => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                emit_port_def_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
+        }
+    }
+}
+
+fn emit_port_def_body_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &PortDefBodyElement,
+) -> Result<(), EmitError> {
+    match el {
+        PortDefBodyElement::Error(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::ParseError,
+        }),
+        PortDefBodyElement::Other(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::Other,
+        }),
+        PortDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PortDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
+        PortDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
+        PortDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
+    }
+}
+
+fn emit_port_body(w: &mut EmitWriter<'_>, path: &str, body: &PortBody) -> Result<(), EmitError> {
+    match body {
+        PortBody::Semicolon => {
+            w.push_char(';');
+            Ok(())
+        }
+        PortBody::Brace { elements } => {
+            if elements.is_empty() {
+                w.push_str(" {}");
+                Ok(())
+            } else {
+                w.push_str(" {");
+                w.newline();
+                w.indent();
+                for (i, el) in elements.iter().enumerate() {
+                    emit_port_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                    w.newline();
+                }
+                w.dedent();
+                w.push_char('}');
+                Ok(())
+            }
+        }
+    }
+}
+
+fn emit_port_body_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &PortBodyElement,
+) -> Result<(), EmitError> {
+    match el {
+        PortBodyElement::Error(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::ParseError,
+        }),
+        PortBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PortBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
+    }
+}
+
+pub(crate) fn emit_connect(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    connect: &Connect,
+) -> Result<(), EmitError> {
+    w.push_str("connect ");
+    emit_connection_end(w, &connect.from.value)?;
+    w.push_str(" to ");
+    emit_connection_end(w, &connect.to.value)?;
+    // Brace bodies are opacity-gated for `Connect` (no structured members).
+    match &connect.body {
+        ConnectBody::Semicolon => {
+            w.push_char(';');
+            Ok(())
+        }
+        ConnectBody::Brace => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::OpaqueConnectBrace,
+        }),
+    }
+}
+
+fn emit_connection_end(w: &mut EmitWriter<'_>, end: &ConnectionEnd) -> Result<(), EmitError> {
+    if let Some(mult) = &end.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+        w.push_char(' ');
+    }
+    emit_expression(w, &end.expression.value)
+}
+
+pub(crate) fn emit_interface_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &InterfaceDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    w.push_str("interface def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    emit_interface_def_body(w, path, &def.body)
+}
+
+fn emit_interface_def_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &InterfaceDefBody,
+) -> Result<(), EmitError> {
+    match body {
+        InterfaceDefBody::Semicolon => {
+            w.push_char(';');
+            Ok(())
+        }
+        InterfaceDefBody::Brace { elements } => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                emit_interface_def_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
+        }
+    }
+}
+
+fn emit_interface_def_body_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &InterfaceDefBodyElement,
+) -> Result<(), EmitError> {
+    match el {
+        InterfaceDefBodyElement::Error(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::ParseError,
+        }),
+        InterfaceDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        InterfaceDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
+        InterfaceDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
+        InterfaceDefBodyElement::ConnectStmt(c) => emit_connect_stmt(w, path, &c.value),
+        InterfaceDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
+        InterfaceDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
+        InterfaceDefBodyElement::PortDef(p) => emit_port_def(w, path, &p.value),
+        InterfaceDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
+    }
+}
+
+fn emit_end_decl(w: &mut EmitWriter<'_>, path: &str, end: &EndDecl) -> Result<(), EmitError> {
+    w.push_str("end ");
+    w.push_str(&format_name(&end.name));
+    if let Some(nested) = &end.nested_usage {
+        return w.unsupported(
+            path,
+            format!("EndDecl nested_usage {nested:?}")
+                .chars()
+                .take(64)
+                .collect::<String>(),
+        );
+    }
+    if let Some(references) = &end.references {
+        emit_subsetting_clause(w, &references.value)?;
+    } else if !end.type_name.is_empty() {
+        w.push_str(" : ");
+        w.push_str(&end.type_name);
+    }
+    if let Some(mult) = &end.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(redefines) = &end.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
+    w.push_char(';');
+    Ok(())
+}
+
+fn emit_connect_stmt(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    stmt: &ConnectStmt,
+) -> Result<(), EmitError> {
+    w.push_str("connect ");
+    emit_connection_end(w, &stmt.from.value)?;
+    if stmt.extra_ends.is_empty() {
+        w.push_str(" to ");
+        emit_connection_end(w, &stmt.to.value)?;
+    } else {
+        // N-ary form: connect (a, b, c, ...)
+        // Keep a conservative unsupported until a fixture needs it.
+        let _ = path;
+        return w.unsupported(path, "n-ary ConnectStmt");
+    }
+    emit_connect_stmt_body(w, path, stmt)
+}
+
+fn emit_connect_stmt_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    stmt: &ConnectStmt,
+) -> Result<(), EmitError> {
+    match &stmt.body {
+        ConnectBody::Semicolon => {
+            w.push_char(';');
+            Ok(())
+        }
+        ConnectBody::Brace => {
+            if stmt.body_elements.is_empty() {
+                w.push_str(" {}");
+                Ok(())
+            } else {
+                w.push_str(" {");
+                w.newline();
+                w.indent();
+                for (i, el) in stmt.body_elements.iter().enumerate() {
+                    emit_relationship_body_element_local(
+                        w,
+                        &format!("{path}/connect-body[{i}]"),
+                        &el.value,
+                    )?;
+                    w.newline();
+                }
+                w.dedent();
+                w.push_char('}');
+                Ok(())
+            }
+        }
+    }
+}
+
+fn emit_relationship_body_element_local(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &crate::ast::RelationshipBodyElement,
+) -> Result<(), EmitError> {
+    use crate::ast::RelationshipBodyElement;
+    match el {
+        RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
+        RelationshipBodyElement::Error(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::ParseError,
+        }),
+        RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::Other,
+        }),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
+    }
+}
+
+pub(crate) fn emit_interface_usage(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    usage: &InterfaceUsage,
+) -> Result<(), EmitError> {
+    match usage {
+        InterfaceUsage::TypedConnect {
+            interface_type,
+            from,
+            to,
+            body,
+            body_elements,
+        } => {
+            w.push_str("interface ");
+            if let Some(ty) = interface_type {
+                w.push_str(": ");
+                w.push_str(ty);
+                w.push_char(' ');
+            }
+            w.push_str("connect ");
+            emit_expression(w, &from.value)?;
+            w.push_str(" to ");
+            emit_expression(w, &to.value)?;
+            emit_interface_usage_body(w, path, body, body_elements)
+        }
+        InterfaceUsage::Connection {
+            from,
+            to,
+            body_elements,
+        } => {
+            w.push_str("interface ");
+            emit_expression(w, &from.value)?;
+            w.push_str(" to ");
+            emit_expression(w, &to.value)?;
+            emit_interface_usage_body(w, path, &ConnectBody::Brace, body_elements)
+        }
+        InterfaceUsage::Declaration {
+            name,
+            interface_type,
+            body,
+            body_elements,
+        } => {
+            w.push_str("interface ");
+            if let Some(n) = name {
+                w.push_str(&format_name(n));
+            }
+            if let Some(ty) = interface_type {
+                if name.is_some() {
+                    w.push_str(" : ");
+                } else {
+                    w.push_str(": ");
+                }
+                w.push_str(ty);
+            }
+            emit_interface_usage_body(w, path, body, body_elements)
+        }
+    }
+}
+
+fn emit_interface_usage_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &ConnectBody,
+    elements: &[Node<InterfaceUsageBodyElement>],
+) -> Result<(), EmitError> {
+    match body {
+        ConnectBody::Semicolon if elements.is_empty() => {
+            w.push_char(';');
+            Ok(())
+        }
+        ConnectBody::Semicolon | ConnectBody::Brace => {
+            if elements.is_empty() {
+                // Preserve brace vs semicolon: empty TypedConnect brace → `{}`.
+                if matches!(body, ConnectBody::Brace) {
+                    w.push_str(" {}");
+                } else {
+                    w.push_char(';');
+                }
+                Ok(())
+            } else {
+                w.push_str(" {");
+                w.newline();
+                w.indent();
+                for (i, el) in elements.iter().enumerate() {
+                    emit_interface_usage_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                    w.newline();
+                }
+                w.dedent();
+                w.push_char('}');
+                Ok(())
+            }
+        }
+    }
+}
+
+fn emit_interface_usage_body_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &InterfaceUsageBodyElement,
+) -> Result<(), EmitError> {
+    match el {
+        InterfaceUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
+        InterfaceUsageBodyElement::RefRedef { name, value, body } => {
+            w.push_str("ref :>> ");
+            w.push_str(&format_name(name));
+            w.push_str(" = ");
+            emit_expression(w, &value.value)?;
+            emit_ref_body(w, path, body)
+        }
+    }
+}
+
 fn emit_ref_decl(w: &mut EmitWriter<'_>, path: &str, decl: &RefDecl) -> Result<(), EmitError> {
     emit_visibility(w, decl.membership.visibility);
     w.push_str("ref ");
@@ -371,10 +869,42 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
                 w.push_str(" {}");
                 Ok(())
             } else {
-                // Nested action-body members inside ref braces are not yet emitted.
-                w.unsupported(path, "RefBody with nested ActionDefBodyElement members")
+                w.push_str(" {");
+                w.newline();
+                w.indent();
+                for (i, el) in elements.iter().enumerate() {
+                    emit_ref_body_element(w, &format!("{path}/ref-body[{i}]"), &el.value)?;
+                    w.newline();
+                }
+                w.dedent();
+                w.push_char('}');
+                Ok(())
             }
         }
+    }
+}
+
+fn emit_ref_body_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &crate::ast::RefBodyElement,
+) -> Result<(), EmitError> {
+    use crate::ast::RefBodyElement;
+    match el {
+        RefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RefBodyElement::Comment(c) => emit_comment(w, &c.value),
+        RefBodyElement::Error(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::ParseError,
+        }),
+        RefBodyElement::Other(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::Other,
+        }),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
     }
 }
 

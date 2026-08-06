@@ -36,7 +36,7 @@ matches the pin.
 
 L2.5 does **not** claim semantic correctness. It claims that the AST for listed fixtures is structured enough to reprint as SysML and reparse to an equivalent tree. Opaque / recovery nodes (`Other`, `OpaqueMember`, KerML fallbacks, `ParseError`, …) fail the gate rather than fake-passing by reprinting raw text.
 
-**Iteration 1:** only `sysml/src/validation/01-Parts Tree/` (`1a` / `1c` / `1d` required).
+**Iteration 2:** known-gap scan covers the full pinned `sysml/src/validation/` tree. Required-pass fixtures currently include all of `01-Parts Tree/` and `02-Parts Interconnection/`, plus a few incidental passers elsewhere (`14b`, `15_02`, `15_06`, `15_07`). Remaining fixtures must still fail until promoted into `ROUNDTRIP_PASS`.
 
 Debug AST snapshots under `tests/validation/snapshots/` remain **regression canaries** only (they detect that parser output changed). They are not a correctness oracle: regenerating them locks in whatever the parser currently produces. New validation coverage should prefer roundtrip over growing Debug snapshots.
 
