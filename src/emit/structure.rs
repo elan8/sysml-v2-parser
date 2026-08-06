@@ -301,6 +301,12 @@ fn emit_part_def_body_element(
             super::requirement::emit_enumeration_usage(w, path, &e.value)
         }
         PartDefBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
+        PartDefBodyElement::AllocationDef(a) => {
+            super::behavior::emit_allocation_def(w, path, &a.value)
+        }
+        PartDefBodyElement::AllocationUsage(a) => {
+            super::behavior::emit_allocation_usage(w, path, &a.value)
+        }
         PartDefBodyElement::MetadataAnnotation(m) => emit_metadata_annotation(w, path, &m.value),
         PartDefBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
@@ -737,7 +743,11 @@ fn emit_interface_def_body_element(
     }
 }
 
-fn emit_end_decl(w: &mut EmitWriter<'_>, path: &str, end: &EndDecl) -> Result<(), EmitError> {
+pub(crate) fn emit_end_decl(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    end: &EndDecl,
+) -> Result<(), EmitError> {
     w.push_str("end ");
     w.push_str(&format_name(&end.name));
     if let Some(nested) = &end.nested_usage {

@@ -32,6 +32,8 @@ const ROUNDTRIP_PASS: &[&str] = &[
     "05-State-based Behavior/5-State-based Behavior-1a.sysml",
     // Promoted by import/type quoting (#71) once spaced names reparse cleanly.
     "04-Functional Allocation/4a-Functional Allocation.sysml",
+    // Promoted by #73: AllocationDef emit + structured `end` in allocation bodies.
+    "12-Dependency Relationships/12b-Allocation-1.sysml",
     "13-Model Containment/13b-Safety and Security Features Element Group.sysml",
     // Promoted by the full-tree known-gap scan once port/interface/connect emit landed;
     // not deliberately targeted by this iteration beyond inventory.

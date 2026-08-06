@@ -60,14 +60,9 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
 
 // Note: "succession" is intentionally NOT in this list — `succession_usage()` in
 // `occurrence_body_element` now parses the standalone succession usage for real (see below).
-const DEFINITION_BODY_OPAQUE_STARTERS: &[&[u8]] = &[
-    b"end",
-    b"ref",
-    b"abstract",
-    b"private",
-    b"in",
-    b"connection",
-];
+// `end` is structured via `OccurrenceBodyElement::EndDecl` (#73 / 12b-Allocation-1).
+const DEFINITION_BODY_OPAQUE_STARTERS: &[&[u8]] =
+    &[b"ref", b"abstract", b"private", b"in", b"connection"];
 
 /// `;` or brace body with occurrence-style members (`attribute`, `part`, `occurrence`, …).
 pub(crate) fn occurrence_definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
@@ -343,6 +338,9 @@ fn occurrence_usage_tail(
     // GH-51: real usage carries a multiplicity here (`causes[1..*]`); see `OccurrenceUsage::
     // multiplicity`'s doc comment.
     let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    // `#73`: `abstract occurrence situations : Situation[*] nonunique;` — feature modifiers after
+    // multiplicity; without skipping them the usage fails and becomes `KermlFeatureDecl`.
+    let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
     let (input, body) = occurrence_usage_body(input)?;
     let (input, post_body_clauses) = specialization_clauses(input)?;
@@ -513,6 +511,11 @@ pub(crate) fn occurrence_body_element(
         map(flow_usage_member, OccurrenceBodyElement::FlowUsage),
         map(succession_usage, OccurrenceBodyElement::SuccessionUsage),
         map(satisfy, OccurrenceBodyElement::Satisfy),
+        // Allocation / connection ends in structured definition bodies (`allocation def { end …; }`).
+        map(
+            |i| crate::parser::connector::end_decl(i, true),
+            OccurrenceBodyElement::EndDecl,
+        ),
         // §6 G17: a nested `allocate` decomposing the enclosing allocation usage.
         map(
             crate::parser::part::allocate_,
@@ -782,6 +785,17 @@ mod membership_tests {
     fn occurrence_usage_without_visibility_prefix_has_no_membership_visibility() {
         let (_, node) = occurrence_usage(input("occurrence o1 : O1;")).expect("occurrence usage");
         assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn occurrence_usage_accepts_abstract_nonunique() {
+        let (rest, node) = occurrence_usage(input(
+            "abstract occurrence situations : Situation[*] nonunique;",
+        ))
+        .expect("abstract nonunique occurrence");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_abstract);
+        assert_eq!(node.value.name, "situations");
     }
 
     #[test]

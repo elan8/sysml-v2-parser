@@ -114,10 +114,14 @@ pub struct RequirementActorDecl {
     pub type_name: String,
 }
 
-/// Require constraint: `require constraint { ... }`.
+/// Require/assume constraint: `(require|assume) constraint` name? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RequireConstraint {
+    /// True when spelled `assume` rather than `require`.
+    pub is_assume: bool,
+    /// Optional usage name (`assume constraint fuelConstraint { … }`).
+    pub name: Option<String>,
     pub body: RequireConstraintBody,
 }
 
@@ -176,6 +180,8 @@ pub struct InlineSatisfyRequirement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RequirementUsage {
     pub name: String,
+    /// Short name from `< ... >` when present (e.g. `requirement <'1.1'> vehicleMass1 : …`).
+    pub short_name: Option<String>,
     pub type_name: Option<String>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// True for `abstract requirement ...`.

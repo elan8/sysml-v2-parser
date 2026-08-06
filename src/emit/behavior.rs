@@ -363,16 +363,10 @@ pub(crate) fn emit_perform(
 ) -> Result<(), EmitError> {
     emit_definition_prefix(w, perform.usage_prefix.as_ref());
     w.push_str("perform ");
-    // `perform action …` vs bare `perform <path>`: part-usage bodies only accept the former
-    // (`perform_action_decl`). Prefer the `action` keyword unless this is clearly a dotted
-    // feature-path perform (`perform providePower.generateTorque`).
-    let needs_action_kw = perform.usage_prefix.is_some()
-        || perform.action_name.is_empty()
-        || perform.redefines.is_some()
-        || perform.type_name.is_some()
-        || perform.value.is_some()
-        || !perform.action_name.contains('.');
-    if needs_action_kw {
+    // Part-usage bodies accept `perform action <name>` for simple names, but dotted
+    // feature-path performs must stay bare (`perform providePower.generateTorque :>> …`).
+    // Emitting `perform action a.b` reparse-fails (validation `12b-Allocation-1`).
+    if !perform.action_name.contains('.') {
         w.push_str("action ");
     }
     if !perform.action_name.is_empty() {
@@ -666,6 +660,20 @@ pub(crate) fn emit_allocate(
         crate::ast::ConnectBody::Brace => w.push_str(" {}"),
     }
     Ok(())
+}
+
+pub(crate) fn emit_allocation_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::AllocationDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    w.push_str("allocation def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    emit_definition_body(w, path, &def.body)
 }
 
 pub(crate) fn emit_allocation_usage(
@@ -1063,6 +1071,9 @@ pub(crate) fn emit_occurrence_body_element(
             emit_occurrence_usage(w, path, &o.value)
         }
         crate::ast::OccurrenceBodyElement::Allocate(a) => emit_allocate(w, path, &a.value),
+        crate::ast::OccurrenceBodyElement::EndDecl(e) => {
+            structure::emit_end_decl(w, path, &e.value)
+        }
         crate::ast::OccurrenceBodyElement::Satisfy(s) => {
             super::requirement::emit_satisfy(w, path, &s.value)
         }
