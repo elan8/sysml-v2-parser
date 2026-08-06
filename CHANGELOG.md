@@ -87,6 +87,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   variant. Fixes [#56](https://github.com/elan8/sysml-v2-parser/issues/56).
   `PARSE_AST_VERSION` bumped 67 → 68.
 
+### Changed
+
+- **Deduplicated `subsetting_relationship_node`** ([#34](https://github.com/elan8/sysml-v2-parser/issues/34))
+  — the same "wrap a single bare feature-name target in a `SubsettingRelationship` node" helper
+  was implemented three times: the real, shared one in `usage.rs` (used by
+  `subsets`/`redefinition`/`reference_subsetting`/`cross_subsetting`/`intersecting`), and
+  byte-identical copies in `attribute.rs` and `part/body.rs` for their own ad hoc `:>`/`:>>`
+  prefix shapes (`attribute_feature_binding`, `metadata_binding`, `exhibit_state`,
+  `connection_usage_member`), each admitting in its own doc comment to "mirroring" the shared one.
+  `usage.rs` gained a new `single_target_subsetting(span, kind, name)` convenience — the same
+  pattern `single_target_redefines` (now implemented in terms of it) already established — and
+  both local copies were deleted in favor of it. No behavior change: `cargo test` and
+  `cargo test --test validation -- --include-ignored` pass identically before and after,
+  confirmed via a clean re-run (no golden AST snapshot changes, since output is byte-identical).
+  Also documented `DefinitionPrefixOptions`'s two ad hoc disambiguation booleans
+  (`reject_header_keyword`/`reject_plain_typed_header_without_def`) in `definition_prefix.rs`
+  itself as a known, not-yet-unified pattern — no third case has appeared yet to justify
+  unifying them, per the issue's acceptance criteria.
+
 ## [0.53.0] - 2026-08-03
 
 ### Fixed
