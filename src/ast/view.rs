@@ -120,7 +120,7 @@ pub enum CalcDefBodyElement {
     Other(String),
 }
 
-/// Return declaration: `return` [`:>>`] name? (`:`|`:>`) type (`=` expr)? `;`.
+/// Return declaration: `return` (`:>>`)? name? (`:`|`:>`) type (`=` expr)? `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReturnDecl {

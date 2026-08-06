@@ -180,10 +180,12 @@ fn verification_local_attribute_has_name_span() {
         UseCaseDefBody::Brace { elements } => elements
             .iter()
             .find_map(|e| match &e.value {
-                UseCaseDefBodyElement::AttributeDef(a) => Some(&a.value),
+                // A bare, `def`-less `attribute count : Integer = 0;` is a usage, not a
+                // definition (PAR-001 disambiguation, see `definition_prefix.rs`).
+                UseCaseDefBodyElement::AttributeUsage(a) => Some(&a.value),
                 _ => None,
             })
-            .expect("attribute def"),
+            .expect("attribute usage"),
         _ => panic!("expected brace verification body"),
     };
     assert_eq!(attr.name, "count");
