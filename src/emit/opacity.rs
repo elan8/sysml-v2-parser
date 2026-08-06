@@ -273,6 +273,40 @@ fn walk_state_def_body(report: &mut OpacityReport, path: &str, body: &StateDefBo
         match &el.value {
             StateDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             StateDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
+            StateDefBodyElement::Entry(n) => walk_state_def_body(report, &p, &n.value.body),
+            StateDefBodyElement::Do(n) => walk_state_def_body(report, &p, &n.value.body),
+            StateDefBodyElement::Exit(n) => walk_state_def_body(report, &p, &n.value.body),
+            StateDefBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
+            StateDefBodyElement::Ref(n) => {
+                if let crate::ast::RefBody::Brace { elements } = &n.value.body {
+                    for (j, nested) in elements.iter().enumerate() {
+                        if let crate::ast::RefBodyElement::State(s) = &nested.value {
+                            let nested_path = format!("{p}/body[{j}]");
+                            match &s.value {
+                                StateDefBodyElement::Error(_) => {
+                                    hit(report, &nested_path, OpacityKind::ParseError)
+                                }
+                                StateDefBodyElement::Other(_) => {
+                                    hit(report, &nested_path, OpacityKind::Other)
+                                }
+                                StateDefBodyElement::Entry(e) => {
+                                    walk_state_def_body(report, &nested_path, &e.value.body)
+                                }
+                                StateDefBodyElement::Do(d) => {
+                                    walk_state_def_body(report, &nested_path, &d.value.body)
+                                }
+                                StateDefBodyElement::Exit(e) => {
+                                    walk_state_def_body(report, &nested_path, &e.value.body)
+                                }
+                                StateDefBodyElement::StateUsage(u) => {
+                                    walk_state_def_body(report, &nested_path, &u.value.body)
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }

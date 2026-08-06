@@ -29,7 +29,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
         Expression::MemberAccess(base, member) => {
             emit_expression(w, &base.value)?;
             w.push_char('.');
-            w.push_str(member);
+            w.push_str(&format_name(member));
         }
         Expression::Index { base, index } => {
             emit_expression(w, &base.value)?;

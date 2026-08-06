@@ -553,6 +553,9 @@ pub enum StateDefBodyElement {
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Other(String),
+    /// `in`/`out`/`inout` parameter redecl inside `entry`/`do`/`exit` action bodies
+    /// (e.g. `do 'sense temperature' { out temp; }`, validation `05`).
+    InOutDecl(Node<InOutDecl>),
     /// `entry` (`;` or body) - entry action.
     Entry(Node<EntryAction>),
     /// `do` (`;` or body) - do action.
@@ -563,7 +566,7 @@ pub enum StateDefBodyElement {
     Then(Node<ThenStmt>),
     /// `final` / `final state` name `;` - explicit final state.
     FinalState(Node<FinalState>),
-    /// `ref` name `:` type body ÔÇô reference binding in state.
+    /// `ref` name `:` type body – reference binding in state.
     Ref(Node<RefDecl>),
     RequirementUsage(Node<RequirementUsage>),
     StateUsage(Node<StateUsage>),
@@ -574,8 +577,10 @@ pub enum StateDefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EntryAction {
-    /// For `entry action name body` form; None for plain `entry` body.
+    /// For `entry action name body` / `entry name body`; None for plain `entry` body.
     pub action_name: Option<String>,
+    /// True when the `action` keyword was written (`entry action name` vs `entry name`).
+    pub has_action_keyword: bool,
     pub body: StateDefBody,
 }
 
@@ -583,8 +588,10 @@ pub struct EntryAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DoAction {
-    /// For `do action name body` form; None for plain `do` body.
+    /// For `do action name body` / `do name body`; None for plain `do` body.
     pub action_name: Option<String>,
+    /// True when the `action` keyword was written (`do action name` vs `do name`).
+    pub has_action_keyword: bool,
     pub body: StateDefBody,
 }
 
@@ -592,8 +599,10 @@ pub struct DoAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExitAction {
-    /// For `exit action name body` form; None for plain `exit` body.
+    /// For `exit action name body` / `exit name body`; None for plain `exit` body.
     pub action_name: Option<String>,
+    /// True when the `action` keyword was written (`exit action name` vs `exit name`).
+    pub has_action_keyword: bool,
     pub body: StateDefBody,
 }
 

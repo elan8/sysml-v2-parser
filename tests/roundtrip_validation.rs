@@ -28,12 +28,15 @@ const ROUNDTRIP_PASS: &[&str] = &[
     "03-Function-based Behavior/3a-Function-based Behavior-3.sysml",
     "03-Function-based Behavior/3c-Function-based Behavior-structure mod-1.sysml",
     "03-Function-based Behavior/3c-Function-based Behavior-structure mod-3.sysml",
+    // Promoted by #72 Other-opacity work (state do/out/accept; attribute assert constraint).
+    "05-State-based Behavior/5-State-based Behavior-1a.sysml",
     // Promoted by import/type quoting (#71) once spaced names reparse cleanly.
     "04-Functional Allocation/4a-Functional Allocation.sysml",
     "13-Model Containment/13b-Safety and Security Features Element Group.sysml",
     // Promoted by the full-tree known-gap scan once port/interface/connect emit landed;
     // not deliberately targeted by this iteration beyond inventory.
     "14-Language Extensions/14b-Language Extensions.sysml",
+    "15-Properties-Values-Expressions/15_01-Constants.sysml",
     "15-Properties-Values-Expressions/15_02-Basic Value Properties.sysml",
     "15-Properties-Values-Expressions/15_03-Value Expression.sysml",
     "15-Properties-Values-Expressions/15_06-System of Quantities.sysml",
@@ -513,6 +516,30 @@ package PerformAction {
     match try_roundtrip(src) {
         RoundtripOutcome::Ok => {}
         RoundtripOutcome::Failed(msg) => panic!("perform action in part usage smoke failed: {msg}"),
+    }
+}
+
+#[test]
+fn roundtrip_handwritten_state_do_out_and_assert_smoke() {
+    // #72: state do/out + attribute assert constraint must stay structured (not Other).
+    let src = r#"
+package StateDoOut {
+    attribute def TemperatureValue;
+    attribute def Real;
+    action def 'Sense Temperature' { out temp: TemperatureValue; }
+    attribute e: Real {
+        assert constraint { e > 0.0 }
+    }
+    state 'health' {
+        do 'sense temperature' { out temp; }
+        accept 'Return to Normal' then normal;
+        state normal;
+    }
+}
+"#;
+    match try_roundtrip(src) {
+        RoundtripOutcome::Ok => {}
+        RoundtripOutcome::Failed(msg) => panic!("state do/out + assert smoke failed: {msg}"),
     }
 }
 
