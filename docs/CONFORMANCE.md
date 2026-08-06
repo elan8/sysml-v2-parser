@@ -31,7 +31,14 @@ matches the pin.
 | ----- | ----- | -------- |
 | **L1 — Syntax acceptance** | Every textual BNF production in the pinned release is classified `implemented` in [`bnf_coverage.map`](./bnf_coverage.map) | `cargo test --test bnf_compliance`; scorecard `layers.L1` |
 | **L2 — Structured AST** | Systems Library and full `sysml.library` parse with zero diagnostics and zero `ExtendedLibraryDecl` | ignored validation gates; scorecard `layers.L2` |
+| **L2.5 — Emit fidelity** | Selected release validation fixtures roundtrip: parse → opacity-clean → emit canonical SysML → reparse → AST-eq | `cargo test --test roundtrip_validation -- --include-ignored` |
 | **L3 — Semantics** | Not claimed (Spec42 / other tools) | scorecard `layers.L3.status = not_claimed` |
+
+L2.5 does **not** claim semantic correctness. It claims that the AST for listed fixtures is structured enough to reprint as SysML and reparse to an equivalent tree. Opaque / recovery nodes (`Other`, `OpaqueMember`, KerML fallbacks, `ParseError`, …) fail the gate rather than fake-passing by reprinting raw text.
+
+**Iteration 1:** only `sysml/src/validation/01-Parts Tree/` (`1a` / `1c` / `1d` required).
+
+Debug AST snapshots under `tests/validation/snapshots/` remain **regression canaries** only (they detect that parser output changed). They are not a correctness oracle: regenerating them locks in whatever the parser currently produces. New validation coverage should prefer roundtrip over growing Debug snapshots.
 
 ## Scorecard (CI artifact)
 

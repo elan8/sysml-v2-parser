@@ -7,6 +7,7 @@
 )]
 
 pub mod ast;
+pub mod emit;
 pub mod error;
 pub mod parser;
 
@@ -28,6 +29,10 @@ pub use ast::{
     RequirementDefBody, RequirementDefBodyElement, RequirementUsage, RootElement, RootNamespace,
     Span, TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind, VerificationCaseDef,
     VerificationCaseUsage, Visibility,
+};
+pub use emit::{
+    emit_sysml, emit_sysml_with_options, opacity_report, EmitError, EmitOptions, OpacityHit,
+    OpacityKind, OpacityReport,
 };
 pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
