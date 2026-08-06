@@ -77,6 +77,9 @@ pub struct Import {
     pub is_recursive: bool,
     /// KerML FilterPackage form: one or more `[ expr ]` members. When present, this is a namespace import of a filter package.
     pub filter_members: Option<Vec<Node<FilterPackageMember>>>,
+    /// Real annotation content from a braced body (BNF `RelationshipBody`: doc/comment/metadata
+    /// only). `None` when the body is a semicolon terminator.
+    pub body_elements: Option<Vec<Node<crate::ast::structure::RelationshipBodyElement>>>,
 }
 /// KerML Documentation: 'doc' Identification? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 #[derive(Debug, Clone, PartialEq, Eq)]

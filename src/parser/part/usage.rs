@@ -341,8 +341,10 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
     Ok((input, PartUsageBody::Brace { elements }))
 }
 
-fn consume_part_usage_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _elements) = parse_structured_brace_members_with_skip(
+fn consume_part_usage_structured_brace(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<Node<PartUsageBodyElement>>> {
+    parse_structured_brace_members_with_skip(
         input,
         PART_BODY_STARTERS,
         "part usage body",
@@ -350,8 +352,7 @@ fn consume_part_usage_structured_brace(input: Input<'_>) -> IResult<Input<'_>, (
         part_usage_body_element,
         part_usage_body_recovery,
         BraceMemberSkip::BodyElementRecover,
-    )?;
-    Ok((input, ()))
+    )
 }
 
 /// Action path for perform: name ( '.' name )* -> joined with ".".
@@ -657,13 +658,13 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
     let (input, right) = preceded(ws_and_comments, path_expression).parse(input)?;
     let mut body_parser = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            Some(ConnectBody::Semicolon)
+            (Some(ConnectBody::Semicolon), Vec::new())
         }),
-        map(consume_part_usage_structured_brace, |_| {
-            Some(ConnectBody::Brace)
+        map(consume_part_usage_structured_brace, |elements| {
+            (Some(ConnectBody::Brace), elements)
         }),
     ));
-    let (input, body) = body_parser.parse(input)?;
+    let (input, (body, body_elements)) = body_parser.parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -678,6 +679,7 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
                 right,
                 right_multiplicity,
                 body,
+                body_elements,
             },
         ),
     ))
@@ -788,8 +790,16 @@ fn ref_body_parse(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| RefBody::Semicolon),
-        map(consume_part_usage_structured_brace, |_| RefBody::Brace {
-            elements: vec![],
+        map(consume_part_usage_structured_brace, |elements| {
+            RefBody::Brace {
+                elements: elements
+                    .into_iter()
+                    .map(|e| {
+                        let span = e.span.clone();
+                        Node::new(span, RefBodyElement::PartUsage(e))
+                    })
+                    .collect(),
+            }
         }),
     ))
     .parse(input)
@@ -992,8 +1002,16 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
         ws_and_comments,
         alt((
             map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(consume_part_usage_structured_brace, |_| RefBody::Brace {
-                elements: vec![],
+            map(consume_part_usage_structured_brace, |elements| {
+                RefBody::Brace {
+                    elements: elements
+                        .into_iter()
+                        .map(|e| {
+                            let span = e.span.clone();
+                            Node::new(span, RefBodyElement::PartUsage(e))
+                        })
+                        .collect(),
+                }
             }),
         )),
     )

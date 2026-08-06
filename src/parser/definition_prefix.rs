@@ -23,6 +23,20 @@
 //! keyword is not automatically the PAR-001 bug class if the `_def` parser's grammar is already a
 //! strict superset of the `_usage` parser's -- confirm which shapes only the usage parser accepts
 //! before assuming a guard is missing.
+//!
+//! **`reject_header_keyword`/`reject_plain_typed_header_without_def` are two instances of the
+//! same underlying question, not yet unified ([#34](https://github.com/elan8/sysml-v2-parser/issues/34)).**
+//! Both exist because `connection`/`interface`/`port`/`constraint`/`calc` are deliberately
+//! `def`-optional (see above), which makes their definition grammar a strict superset of the
+//! sibling usage grammar -- so telling "genuine bare definition" apart from "usage that the
+//! def-optional grammar happened to swallow" needs a real check, not just optionality. Each was
+//! added ad hoc to fix one specific reported bug (PAR-007's `connect` clause; GH-20's plain `:
+//! Type` header) rather than modeling "does this header actually look like a definition" (some
+//! combination of `is_abstract`, a genuine `:>`/`specializes` clause, or an explicit `def`) once.
+//! Two options isn't unreasonable to carry as-is, but if a third disambiguation guard is ever
+//! needed here (`port`/`constraint`/`calc` are the most likely next candidates, per the same
+//! def-optional shape), that's the signal to stop adding narrow booleans and unify them into one
+//! general definition-shape check instead.
 
 use crate::ast::{Identification, Node, TypingKind, TypingRelationship, Visibility};
 use crate::parser::definition_header::parse_definition_header_after_ident;

@@ -3,6 +3,7 @@ use super::common::TextualRepresentation;
 use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
+use super::structure::RelationshipBodyElement;
 use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
     MetadataKeywordUsage,
@@ -248,6 +249,9 @@ pub struct Dependency {
     pub clients: Vec<String>,
     pub suppliers: Vec<String>,
     pub body: ConnectBody,
+    /// Real annotation content from a braced body (BNF `RelationshipBody`: doc/comment/metadata
+    /// only). `None` when the body is a semicolon terminator.
+    pub body_elements: Option<Vec<Node<RelationshipBodyElement>>>,
 }
 
 /// Framed concern member in requirement body: `frame` name (`;` or body).

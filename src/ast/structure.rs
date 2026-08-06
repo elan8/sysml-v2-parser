@@ -1,8 +1,11 @@
 use super::behavior::{
     ActionDef, ActionDefBodyElement, ActionUsage, ActionUsageBodyElement, Allocate, InOut,
-    InOutDecl, StateDefBody, StateUsage,
+    InOutDecl, StateDefBody, StateDefBodyElement, StateUsage,
 };
-use super::common::{CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode};
+use super::common::{
+    CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode,
+    TextualRepresentation,
+};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::relationship_target::RelationshipTarget;
@@ -835,6 +838,11 @@ pub struct ConnectStmt {
     /// ordinary binary `from ... to ...` form.
     pub extra_ends: Vec<Node<ConnectionEnd>>,
     pub body: ConnectBody,
+    /// Real annotation content from a braced body (`body: ConnectBody::Brace`), tracked
+    /// separately from `body` since `ConnectBody` itself is shared as a bare semicolon/brace
+    /// marker across several very differently-shaped contexts (bind, TypedConnect, this plain
+    /// connect statement). Empty for `ConnectBody::Semicolon`.
+    pub body_elements: Vec<Node<RelationshipBodyElement>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -973,11 +981,53 @@ pub struct RefDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RefBody {
     Semicolon,
-    /// Braced body. `elements` is populated for action-context ref bodies;
-    /// other contexts (state, part, interface) produce an empty vec.
-    Brace {
-        elements: Vec<Node<ActionDefBodyElement>>,
-    },
+    Brace { elements: Vec<Node<RefBodyElement>> },
+}
+
+/// Element of a ref declaration's braced body (`RefBody::Brace`), wrapping whichever member
+/// shape is real for the owning context. BNF `ReferenceUsage` resolves `ref`'s body to a generic
+/// `Usage` body, so its real content follows whatever the owning context allows: full nested
+/// action members inside an action body, part-usage members inside a part usage body, state
+/// members inside a state body. Connection/interface `ref` bodies don't yet have a dedicated
+/// member grammar, so they get the same doc/comment/metadata + recovery baseline as
+/// [`RelationshipBodyElement`].
+///
+/// `PartUsageBodyElement`/`ActionDefBodyElement` are inherently larger than the annotation-only
+/// variants (same size-difference tradeoff already accepted for `AttributeUsage` in several
+/// other body-element enums crate-wide); not boxing keeps this variant shape consistent with
+/// those siblings rather than partially addressing the size difference.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RefBodyElement {
+    Action(Node<ActionDefBodyElement>),
+    PartUsage(Node<PartUsageBodyElement>),
+    State(Node<StateDefBodyElement>),
+    Doc(Node<DocComment>),
+    Comment(Node<CommentAnnotation>),
+    TextualRep(Node<TextualRepresentation>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
+    Error(Node<ParseErrorNode>),
+    /// Unmodeled body content captured as raw text (used for library parsing).
+    Other(String),
+}
+
+/// Shared annotation-only body element for KerML `RelationshipBody` contexts -- BNF
+/// `RelationshipBody : Relationship = ';' | '{' (ownedRelationship += OwnedAnnotation)* '}'`,
+/// used by `AliasMember`/`Import`/`Dependency` -- and other leaf bodies where a full
+/// nested-member grammar isn't (yet) modeled (plain `connect` statement bodies): doc/comment/
+/// metadata annotations are retained; anything else recovers to `Error`/`Other` instead of being
+/// silently discarded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RelationshipBodyElement {
+    Doc(Node<DocComment>),
+    Comment(Node<CommentAnnotation>),
+    TextualRep(Node<TextualRepresentation>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
+    Error(Node<ParseErrorNode>),
+    /// Unmodeled body content captured as raw text (used for library parsing).
+    Other(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -1279,6 +1329,10 @@ pub struct Bind {
     pub right_multiplicity: Option<Node<Multiplicity>>,
     /// Optional body after the bind (semicolon or brace); 3a fixture uses `bind x = y { }`.
     pub body: Option<ConnectBody>,
+    /// Real content from a braced body (`body: Some(ConnectBody::Brace)`), the same part-usage
+    /// member set `PartUsageBody` uses (BNF `BindingConnectorAsUsage`'s body is `UsageBody`, the
+    /// same general usage-member production). Empty otherwise.
+    pub body_elements: Vec<Node<PartUsageBodyElement>>,
 }
 
 /// Interface usage: typed+connect or connection form.
@@ -1370,5 +1424,7 @@ pub struct AliasDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AliasBody {
     Semicolon,
-    Brace,
+    Brace {
+        elements: Vec<Node<RelationshipBodyElement>>,
+    },
 }

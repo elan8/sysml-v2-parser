@@ -2,7 +2,7 @@
 
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Membership,
-    Multiplicity, Node, RelationshipTarget, SubsettingKind, SubsettingRelationship, TypingKind,
+    Multiplicity, Node, SubsettingKind, SubsettingRelationship, TypingKind,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -13,35 +13,11 @@ use crate::parser::lex::{
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
-    multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
-    typing_node, typing_relationship_node, typings,
+    multiplicity_node, optional_typings, prefix_redefinition_target, single_target_subsetting,
+    specialization_clauses, typing_node, typing_relationship_node, typings,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
-
-/// Wrap a subsetting-family target in a `SubsettingRelationship` node, mirroring
-/// `usage::subsetting_relationship_node` for the ad hoc `:>`/`:>>` prefix shapes parsed directly
-/// in this file (`attribute_feature_binding`, `metadata_binding`) rather than through
-/// `usage::specialization_clauses`. `target` is a single bare feature name (no `::`/`.`
-/// segments) -- these ad hoc shapes only ever parse a plain `name`, never a qualified name.
-fn subsetting_relationship_node(
-    span: crate::ast::Span,
-    kind: SubsettingKind,
-    target: String,
-) -> Node<SubsettingRelationship> {
-    Node::new(
-        span.clone(),
-        SubsettingRelationship {
-            target: vec![Node::new(
-                span.clone(),
-                RelationshipTarget::single(target, span.clone()),
-            )],
-            kind,
-            span,
-            is_implied: false,
-        },
-    )
-}
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, value};
@@ -299,7 +275,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     let (input, body) = attribute_body(input)?;
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
-            Some(subsetting_relationship_node(
+            Some(single_target_subsetting(
                 prefix_span,
                 SubsettingKind::Subsets,
                 name_str.clone(),
@@ -308,7 +284,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
         ),
         Some(MetadataBindingPrefix::Redefines) => (
             None,
-            Some(subsetting_relationship_node(
+            Some(single_target_subsetting(
                 prefix_span,
                 SubsettingKind::Redefines,
                 name_str.clone(),
@@ -820,7 +796,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
-            Some(subsetting_relationship_node(
+            Some(single_target_subsetting(
                 prefix_span,
                 SubsettingKind::Subsets,
                 name_str.clone(),
@@ -829,7 +805,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
         ),
         Some(MetadataBindingPrefix::Redefines) => (
             None,
-            Some(subsetting_relationship_node(
+            Some(single_target_subsetting(
                 prefix_span,
                 SubsettingKind::Redefines,
                 name_str.clone(),

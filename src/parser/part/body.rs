@@ -85,30 +85,6 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
     Ok((input, PartDefBody::Brace { elements }))
 }
 
-/// Build a `SubsettingRelationship` node from a target and the span of the whole clause,
-/// mirroring `usage::subsetting_relationship_node` for the ad hoc `:>`/`:>>` trailing-clause
-/// shapes parsed directly in this file (`exhibit_state`, `connection_usage_member`) rather than
-/// through `usage::specialization_clauses`. `target` is a single bare feature name (no `::`/`.`
-/// segments) -- these ad hoc shapes only ever parse a plain `name`, never a qualified name.
-fn subsetting_relationship_node(
-    span: crate::ast::Span,
-    kind: crate::ast::SubsettingKind,
-    target: String,
-) -> Node<crate::ast::SubsettingRelationship> {
-    Node::new(
-        span.clone(),
-        crate::ast::SubsettingRelationship {
-            target: vec![Node::new(
-                span.clone(),
-                crate::ast::RelationshipTarget::single(target, span.clone()),
-            )],
-            kind,
-            span,
-            is_implied: false,
-        },
-    )
-}
-
 /// Dotted feature path for exhibit/perform-style names: `name ( '.' name )*`.
 fn feature_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, first) = name(input)?;
@@ -184,7 +160,7 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     .parse(input)?;
     let post_body_redefines = post_body_redefines.map(|target| {
         let span = crate::parser::span_from_to(before_post_body_redefines, input);
-        subsetting_relationship_node(span, crate::ast::SubsettingKind::Redefines, target)
+        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
     });
     let input = if post_body_redefines.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
@@ -446,7 +422,7 @@ pub(crate) fn connection_usage_member(
     .parse(input)?;
     let subsets = trailing_subsets.map(|target| {
         let span = crate::parser::span_from_to(before_subsets, input);
-        subsetting_relationship_node(span, crate::ast::SubsettingKind::Subsets, target)
+        single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target)
     });
     let before_redefines = input;
     let (input, trailing_redefines) = opt(preceded(
@@ -456,7 +432,7 @@ pub(crate) fn connection_usage_member(
     .parse(input)?;
     let redefines = trailing_redefines.map(|target| {
         let span = crate::parser::span_from_to(before_redefines, input);
-        subsetting_relationship_node(span, crate::ast::SubsettingKind::Redefines, target)
+        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
     });
     let input = if subsets.is_some() || redefines.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;

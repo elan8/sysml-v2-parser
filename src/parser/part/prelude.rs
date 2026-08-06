@@ -5,7 +5,7 @@ pub(crate) use crate::ast::{
     ExhibitState, Expression, InOut, InterfaceUsage, InterfaceUsageBodyElement, Membership, Node,
     OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
     PartUsageBodyElement, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
-    RefDecl, VariantTypedUsage, VariantUsage,
+    RefBodyElement, RefDecl, VariantTypedUsage, VariantUsage,
 };
 pub(crate) use crate::parser::action::{action_def, action_usage};
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};
@@ -48,8 +48,8 @@ pub(crate) use crate::parser::requirement::{
 pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
 pub(crate) use crate::parser::state::{state_def, state_usage};
 pub(crate) use crate::parser::usage::{
-    multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
-    targets_display_string, typing_node, typings,
+    multiplicity_node, optional_typings, prefix_redefinition_target, single_target_subsetting,
+    specialization_clauses, targets_display_string, typing_node, typings,
 };
 pub(crate) use crate::parser::usecase::{use_case_def, use_case_usage};
 pub(crate) use crate::parser::view::{

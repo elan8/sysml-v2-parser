@@ -1,6 +1,7 @@
 use crate::ast::{
-    DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefBody, RefDecl, StateDef,
-    StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition, TransitionEffect,
+    DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefBody, RefBodyElement,
+    RefDecl, StateDef, StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition,
+    TransitionEffect,
 };
 use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
 use crate::parser::build_recovery_error_node_from_span;
@@ -97,9 +98,11 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
     Ok((input, StateDefBody::Brace { elements }))
 }
 
-/// Parse `{` state-body members `}` with recovery, discarding elements (opaque ref bodies).
-fn consume_state_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _elements) = parse_structured_brace_members(
+/// Parse `{` state-body members `}` with recovery.
+fn consume_state_structured_brace(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<Node<StateDefBodyElement>>> {
+    parse_structured_brace_members(
         input,
         STATE_BODY_STARTERS,
         "state body",
@@ -132,8 +135,7 @@ fn consume_state_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
                 node_from_to(start, end, StateDefBodyElement::Other(preview))
             }
         },
-    )?;
-    Ok((input, ()))
+    )
 }
 
 /// Entry action: `entry` (`;` or body)  or  `entry action` name body
@@ -246,8 +248,14 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         ws_and_comments,
         alt((
             map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(consume_state_structured_brace, |_| RefBody::Brace {
-                elements: vec![],
+            map(consume_state_structured_brace, |elements| RefBody::Brace {
+                elements: elements
+                    .into_iter()
+                    .map(|e| {
+                        let span = e.span.clone();
+                        Node::new(span, RefBodyElement::State(e))
+                    })
+                    .collect(),
             }),
         )),
     )

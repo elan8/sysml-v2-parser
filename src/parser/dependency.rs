@@ -79,7 +79,7 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
         ),
     ))
     .parse(input)?;
-    let (input, body) = relationship_body_connect(input)?;
+    let (input, (body, body_elements)) = relationship_body_connect(input)?;
     Ok((
         input,
         node_from_to(
@@ -90,24 +90,22 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
                 clients,
                 suppliers,
                 body,
+                body_elements,
             },
         ),
     ))
 }
 
-fn relationship_body_connect(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, body) = alt((
-        map(tag(&b";"[..]), |_| ConnectBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                crate::parser::body::advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| ConnectBody::Brace,
-        ),
-    ))
-    .parse(input)?;
-    Ok((input, body))
+type RelationshipConnectBody = (
+    ConnectBody,
+    Option<Vec<Node<crate::ast::RelationshipBodyElement>>>,
+);
+
+/// `RelationshipBody`: `;` or `{` doc/comment/rep/metadata* `}`.
+fn relationship_body_connect(input: Input<'_>) -> IResult<Input<'_>, RelationshipConnectBody> {
+    let (input, elements) = crate::parser::body::relationship_body_annotations(input)?;
+    match &elements {
+        None => Ok((input, (ConnectBody::Semicolon, None))),
+        Some(_) => Ok((input, (ConnectBody::Brace, elements))),
+    }
 }
