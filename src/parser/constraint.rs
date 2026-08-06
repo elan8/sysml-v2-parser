@@ -181,6 +181,8 @@ pub(crate) fn constraint_def_body_element(
             )));
         }
         map(in_out_decl, ConstraintDefBodyElement::InOutDecl).parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"constraint") {
+        map(constraint_usage, ConstraintDefBodyElement::Constraint).parse(input)?
     } else {
         map(expression, ConstraintDefBodyElement::Expression).parse(input)?
     };

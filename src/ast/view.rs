@@ -50,6 +50,11 @@ pub enum ConstraintDefBodyElement {
     InOutDecl(Node<InOutDecl>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
+    /// A `constraint` member nested inside a `constraint def { ... }` body (e.g. the Systems
+    /// Library's `RequirementConstraintCheck::assumptions`/`::constraints`, redefined/subset
+    /// from another constraint). Not boxed: `ConstraintUsage` is a small struct and the
+    /// recursion into its own `body: ConstraintDefBody` already passes through a `Vec`.
+    Constraint(Node<ConstraintUsage>),
     /// Unmodeled constraint-body element captured as raw text (used for library parsing).
     Other(String),
 }

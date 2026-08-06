@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Nested `constraint` members mis-parsed inside `constraint def` / `requirement def`
+  bodies.** Neither `ConstraintDefBodyElement` (`src/ast/view.rs`) nor `RequirementDefBodyElement`
+  (`src/ast/requirement.rs`) had a dispatch arm for a nested `constraint` member: inside a
+  `constraint def { ... }` body it fell back to the generic `expression` parser (mis-parsed as a
+  garbage `Expression`); inside a `requirement def { ... }` body it fell through to the opaque
+  `Other(preview)` text bucket. Confirmed against real, vendored OMG Systems Library content —
+  `Systems Library/Requirements.sysml`'s `RequirementConstraintCheck` (`constraint
+  assumptions[0..*] :> constraintChecks, subperformances { ... }`, nested inside a `constraint def`
+  body) and `RequirementCheck` (`constraint assumptions :>> RequirementConstraintCheck::assumptions;`,
+  nested inside a `requirement def` body, redefining an inherited constraint). `constraint_usage`
+  itself already fully supported every one of these shapes standalone — it was only missing a
+  body-element enum variant + dispatch arm in these two contexts, the same "nested-dispatch bug
+  class" already closed for `dependency`/`case`/`concern`/`first`/`succession` members elsewhere.
+  Both body-element enums gained a `Constraint(Node<ConstraintUsage>)` variant, wired into
+  `constraint_def_body_element` (`src/parser/constraint.rs`) and `requirement_def_body_element`
+  (`src/parser/requirement.rs`); `collect_errors.rs` now recurses into nested `Constraint`
+  elements so errors inside a nested constraint body are still surfaced. Distinct from
+  `RequireConstraint`, which continues to handle the separate `assume`/`require`-prefixed member
+  kind. Fixes [#59](https://github.com/elan8/sysml-v2-parser/issues/59).
+  `PARSE_AST_VERSION` bumped 68 → 69 (new AST variants).
+
 - **Identifiers beginning with `null`, `true`, or `false` were mis-lexed.** `literal_boolean`
   and `null_expression` (`src/parser/expr.rs`) matched these three literal keywords with a bare
   `tag()`, without the trailing word-boundary check `keyword_token` already applies to every
