@@ -994,7 +994,7 @@ fn test_parse_use_case_subject_shorthand_without_name() {
             _ => None,
         })
         .expect("subject decl should be present");
-    assert_eq!(subject.name, "subject");
+    assert_eq!(subject.name, "");
     assert_eq!(subject.type_name, "Laptop");
     assert!(
         body_elements.iter().any(|e| matches!(

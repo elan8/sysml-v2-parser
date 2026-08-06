@@ -247,8 +247,7 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
     } else {
         (input, (false, None))
     };
-    let (input, multiplicity) =
-        opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    let (input, multiplicity) = opt(crate::parser::usage::multiplicity_node).parse(input)?;
     let (input, value) = opt(preceded(
         ws_and_comments,
         crate::parser::feature_value::feature_value_part,
@@ -574,6 +573,10 @@ pub(crate) fn use_case_def_body_element(
                 UseCaseDefBodyElement::PartUsage(Box::new(n))
             }),
             map(
+                crate::parser::flow::flow_usage_member,
+                UseCaseDefBodyElement::FlowUsage,
+            ),
+            map(
                 |i| {
                     let (i, _) = ws_and_comments(i)?;
                     // Don't steal declaration keywords as FeatureRef expressions.
@@ -588,10 +591,6 @@ pub(crate) fn use_case_def_body_element(
                     Ok((i, expr))
                 },
                 UseCaseDefBodyElement::Expression,
-            ),
-            map(
-                crate::parser::flow::flow_usage_member,
-                UseCaseDefBodyElement::FlowUsage,
             ),
             other_use_case_body_element,
         )),
@@ -620,6 +619,7 @@ fn is_use_case_statement_keyword(frag: &[u8]) -> bool {
         || crate::parser::lex::starts_with_keyword(frag, b"subject")
         || crate::parser::lex::starts_with_keyword(frag, b"actor")
         || crate::parser::lex::starts_with_keyword(frag, b"objective")
+        || crate::parser::lex::starts_with_keyword(frag, b"flow")
 }
 
 fn directed_calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
