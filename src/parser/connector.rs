@@ -82,16 +82,20 @@ pub(crate) fn end_decl(
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     // Optional structural kind keyword (BNF `InterfaceOccurrenceUsageElement`/
     // `StructureUsageElement`, e.g. `end part hub : Hub;`, `end port p1 : P;`, `end [*] ref
-    // cause: Situation;`). Not retained as a separate field: none of `part`/`port`/`ref` change
-    // this end's own grammar (name + type/reference), and `EndDecl` doesn't model usage-kind
-    // distinctions (GH-19/GH-20: real-world `end part hub ::> mainSwitch[1];` examples were
-    // rejected before this widened to also cover `part`; GH-51 widened it further to `ref`).
+    // cause: Situation;`). Also KerML/SysML library forms `end feature source: …` (Transfers.kerml)
+    // and `end occurrence source: …` (Flows.sysml). Not retained as a separate field: none of these
+    // keywords change this end's own grammar (name + type/reference), and `EndDecl` doesn't model
+    // usage-kind distinctions (GH-19/GH-20/GH-51; #73 library regression).
+    // Nested `end name [*] occurrence nestedName …` (GH-53) is unaffected: `occurrence` appears
+    // *after* the end's own name there, so it is not consumed by this optional kind.
     let (input, _) = opt(preceded(
         ws_and_comments,
         alt((
             (tag(&b"part"[..]), ws1),
             (tag(&b"port"[..]), ws1),
             (tag(&b"ref"[..]), ws1),
+            (tag(&b"feature"[..]), ws1),
+            (tag(&b"occurrence"[..]), ws1),
         )),
     ))
     .parse(input)?;
@@ -487,4 +491,43 @@ pub(crate) fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectS
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod end_decl_kind_tests {
+    use super::end_decl;
+    use nom_locate::LocatedSpan;
+
+    fn input(text: &str) -> crate::parser::Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn end_decl_accepts_feature_kind_with_redefines() {
+        let (rest, node) = end_decl(
+            input(
+                "end feature source: Occurrence redefines FlowTransfer::source, transfers::source;",
+            ),
+            true,
+        )
+        .expect("end feature");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "source");
+        assert_eq!(node.value.type_name, "Occurrence");
+        assert!(node.value.redefines.is_some());
+    }
+
+    #[test]
+    fn end_decl_accepts_occurrence_kind_with_redefines() {
+        let (rest, node) = end_decl(
+            input("end occurrence source: Occurrence :>> Message::source, FlowTransfer::source;"),
+            true,
+        )
+        .expect("end occurrence");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "source");
+        assert_eq!(node.value.type_name, "Occurrence");
+        assert!(node.value.redefines.is_some());
+        assert!(node.value.nested_usage.is_none());
+    }
 }

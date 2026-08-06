@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **L2.5 ExtendedLibraryDecl / KermlFeatureDecl opacity (#73).**
+  - `requirement <'1.1'> name : Type { … }` parses as `RequirementUsage` (short name), not
+    `ExtendedLibraryDecl` (validation `08`, `09`).
+  - `allocation … allocate end ::> src to end ::> dst` parses reference ends (validation `12b-1`).
+  - `abstract occurrence name : Type[*] nonunique;` no longer falls to `KermlFeatureDecl` (`14c`).
+  - Named `assume|require constraint name { … }` keeps the name and assume/require keyword.
+  - `allocation def` emit + structured `end` members in occurrence/definition bodies; dotted
+    `perform a.b :>> …` stays bare (no `action` keyword) so part bodies reparse.
+  - `EndDecl` PartialEq ignores name/type spans (same convention as `Membership`).
+  - `end feature` / `end occurrence` kinds accepted (Systems/Kernel library Flows & Transfers).
+  - Promoted `12b-Allocation-1` into `ROUNDTRIP_PASS`.
+  - Remaining on `08`/`09`/`14c`: nested `Other` / verification-case emit — #72-class leftovers.
+
 - **L2.5 Other opacity in state and attribute bodies (#72).**
   - State `entry`/`do`/`exit` keep a referenced action name (`do 'sense temperature' { out temp; }`)
     and record whether the `action` keyword was written.

@@ -110,6 +110,9 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::RequirementDef(r) => {
             walk_requirement_def_body(report, path, &r.value.body)
         }
+        PackageBodyElement::RequirementUsage(r) => {
+            walk_requirement_def_body(report, path, &r.value.body)
+        }
         PackageBodyElement::StateDef(s) => walk_state_def_body(report, path, &s.value.body),
         PackageBodyElement::UseCaseDef(u) => walk_use_case_def_body(report, path, &u.value.body),
         PackageBodyElement::ViewDef(v) => walk_view_def_body(report, path, &v.value.body),
@@ -121,6 +124,8 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::OccurrenceUsage(o) => {
             walk_occurrence_usage_body(report, path, &o.value.body)
         }
+        PackageBodyElement::AllocationDef(a) => walk_definition_body(report, path, &a.value.body),
+        PackageBodyElement::AllocationUsage(a) => walk_definition_body(report, path, &a.value.body),
         _ => {}
     }
 }

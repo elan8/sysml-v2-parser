@@ -45,6 +45,11 @@ pub(crate) fn emit_requirement_usage(
         w.push_str("variation ");
     }
     w.push_str("requirement ");
+    if let Some(short) = &usage.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short));
+        w.push_str("> ");
+    }
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }
@@ -171,8 +176,15 @@ fn emit_require_constraint(
     path: &str,
     req: &RequireConstraint,
 ) -> Result<(), EmitError> {
-    // Parser currently drops assume vs require; emit the `require` form.
-    w.push_str("require constraint");
+    if req.is_assume {
+        w.push_str("assume constraint");
+    } else {
+        w.push_str("require constraint");
+    }
+    if let Some(name) = &req.name {
+        w.push_char(' ');
+        w.push_str(&format_name(name));
+    }
     match &req.body {
         crate::ast::RequireConstraintBody::Semicolon => {
             w.push_char(';');

@@ -1,4 +1,4 @@
-use crate::ast::{AllocationDef, AllocationUsage, Membership, Node};
+use crate::ast::{AllocationDef, AllocationUsage, Expression, Membership, Node};
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
@@ -11,6 +11,17 @@ use nom::combinator::opt;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
+
+/// Allocate end: optional `endName ::>` then an expression (`logical ::> torqueGenerator`).
+fn allocation_end_expr(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let (input, _) = opt((
+        name,
+        preceded(ws_and_comments, tag(&b"::>"[..])),
+        ws_and_comments,
+    ))
+    .parse(input)?;
+    expression(input)
+}
 
 pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<AllocationDef>> {
     let start = input;
@@ -47,15 +58,17 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     let (input, name_str) = name(input)?;
     let (input, header) = feature_usage_header(input)?;
     let type_name = header.type_name;
+    // `#73`: `allocate logical ::> torqueGenerator to physical ::> powerTrain` — optional
+    // end-name + `::>` before each allocate expression (same shape as connect ends).
     let (input, source) = opt(preceded(
         preceded(ws_and_comments, tag(&b"allocate"[..])),
-        preceded(ws1, expression),
+        preceded(ws1, allocation_end_expr),
     ))
     .parse(input)?;
     let (input, target) = match source {
         Some(_) => {
             let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-            let (input, target) = preceded(ws1, expression).parse(input)?;
+            let (input, target) = preceded(ws1, allocation_end_expr).parse(input)?;
             (input, Some(target))
         }
         None => (input, None),
@@ -84,9 +97,9 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"allocate"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, source) = expression(input)?;
+    let (input, source) = allocation_end_expr(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-    let (input, target) = preceded(ws1, expression).parse(input)?;
+    let (input, target) = preceded(ws1, allocation_end_expr).parse(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
@@ -115,6 +128,29 @@ mod membership_tests {
     }
 
     // --- parser work item 4b (final sweep): Membership on AllocationDef/AllocationUsage ---
+
+    #[test]
+    fn allocation_def_parses_end_members() {
+        let (rest, node) = allocation_def(input(
+            "allocation def LogicalToPhysical {\n\tend logical : LogicalElement;\n\tend physical : PhysicalElement;\n}",
+        ))
+        .expect("allocation def with ends");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let crate::ast::DefinitionBody::Brace { elements } = &node.value.body else {
+            panic!("expected brace body");
+        };
+        assert_eq!(elements.len(), 2);
+        for el in elements {
+            let crate::ast::DefinitionBodyElement::OccurrenceMember(m) = &el.value else {
+                panic!("expected OccurrenceMember, got {:?}", el.value);
+            };
+            assert!(
+                matches!(m.value, crate::ast::OccurrenceBodyElement::EndDecl(_)),
+                "expected EndDecl, got {:?}",
+                m.value
+            );
+        }
+    }
 
     #[test]
     fn allocation_def_visibility_prefix_is_captured_on_membership() {
@@ -156,6 +192,17 @@ mod membership_tests {
     fn allocation_usage_without_visibility_prefix_has_no_membership_visibility() {
         let (_, node) = allocation_usage(input("allocation a1;")).expect("allocation usage");
         assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn allocation_usage_accepts_named_reference_ends() {
+        let (rest, node) = allocation_usage(input(
+            "allocation a : T allocate logical ::> src to physical ::> dst;",
+        ))
+        .expect("allocation with ::> ends");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.source.is_some());
+        assert!(node.value.target.is_some());
     }
 
     #[test]

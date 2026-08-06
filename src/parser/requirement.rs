@@ -13,8 +13,8 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_statement_or_block, ws, ws1, ws_and_comments,
-    REQUIREMENT_BODY_STARTERS,
+    identification, name, qualified_name, short_name_prefix, skip_statement_or_block, ws, ws1,
+    ws_and_comments, REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -228,6 +228,9 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
     // Support usage extension keywords where this parser already tolerates them.
     let (input, abstract_kws) = many0(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let is_abstract = already_abstract || !abstract_kws.is_empty();
+    // `#73`: `requirement <'1.1'> vehicleMass1 : Type { … }` — short name before the usage name.
+    // Without this, the `<…>` form fails `name()` and falls through to `ExtendedLibraryDecl`.
+    let (input, short_name) = short_name_prefix(input)?;
     let (input, name) = {
         let (peek, _) = ws_and_comments(input)?;
         if let Some(default) = default_name {
@@ -237,10 +240,16 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
             {
                 (input, default.to_string())
             } else {
-                name(input)?
+                preceded(ws_and_comments, name).parse(input)?
             }
+        } else if peek.fragment().starts_with(b":")
+            || peek.fragment().starts_with(b";")
+            || peek.fragment().starts_with(b"{")
+        {
+            // Anonymous usage with only a short name is unusual; allow empty name after `<…>`.
+            (input, String::new())
         } else {
-            name(input)?
+            preceded(ws_and_comments, name).parse(input)?
         }
     };
     let (input, _multiplicity) = opt(multiplicity).parse(input)?;
@@ -257,6 +266,7 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
         input,
         RequirementUsage {
             name,
+            short_name,
             type_name: header.type_name,
             subsets: post_body_specialization
                 .subsets
@@ -438,17 +448,37 @@ fn requirement_parameter_decl<'a>(
 
 pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<RequireConstraint>> {
     let start = input;
-    let (input, _) = preceded(
+    let (input, assume_kw) = preceded(
         ws_and_comments,
-        alt((tag(&b"require"[..]), tag(&b"assume"[..]))),
+        alt((
+            map(tag(&b"assume"[..]), |_| true),
+            map(tag(&b"require"[..]), |_| false),
+        )),
     )
     .parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    // `#73` / validation `08`: `assume constraint fuelConstraint { … }` — optional name before body.
+    let (input, name) = if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";")
+    {
+        (input, None)
+    } else {
+        let (input, n) = name(input)?;
+        (input, Some(n))
+    };
     let (input, body) = require_constraint_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, RequireConstraint { body }),
+        node_from_to(
+            start,
+            input,
+            RequireConstraint {
+                is_assume: assume_kw,
+                name,
+                body,
+            },
+        ),
     ))
 }
 
@@ -870,5 +900,20 @@ mod membership_tests {
             .requirement
             .expect("inline requirement usage present");
         assert_eq!(inline.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn requirement_usage_accepts_short_name() {
+        let (rest, node) = requirement_usage(input(
+            "requirement <'1.1'> vehicleMass1: MassLimitationRequirement { subject vehicle : Vehicle; }",
+        ))
+        .expect("requirement usage with short name");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.short_name.as_deref(), Some("1.1"));
+        assert_eq!(node.value.name, "vehicleMass1");
+        assert_eq!(
+            node.value.type_name.as_deref(),
+            Some("MassLimitationRequirement")
+        );
     }
 }

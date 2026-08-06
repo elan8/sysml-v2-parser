@@ -907,7 +907,7 @@ pub enum EndNestedUsage {
 
 /// End declaration in interface/connection def: `end` name (`:` type | (`::>` | `references`)
 /// target | nested `occurrence`/`item` usage, see [`nested_usage`](EndDecl::nested_usage)) `;`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
     pub name: String,
@@ -943,6 +943,18 @@ pub struct EndDecl {
     pub name_span: Option<Span>,
     /// Span of the type/reference target after `:`/`::>`/`references` (for semantic tokens).
     pub type_ref_span: Option<Span>,
+}
+
+impl PartialEq for EndDecl {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.type_name == other.type_name
+            && self.uses_derived_syntax == other.uses_derived_syntax
+            && self.references == other.references
+            && self.multiplicity == other.multiplicity
+            && self.redefines == other.redefines
+            && self.nested_usage == other.nested_usage
+    }
 }
 
 /// Ref declaration in interface def: `ref` name `:` type body.
@@ -1248,6 +1260,9 @@ pub enum OccurrenceBodyElement {
     /// `allocate <source> to <target>;` nested inside an allocation usage body (§6 G17), which
     /// decomposes the outer allocation. Real usage: OMG spec Annex `12b-Allocation.sysml`.
     Allocate(Node<Allocate>),
+    /// `end name : Type;` (or `::>` / nested forms) inside allocation / connection-like
+    /// definition bodies. Real usage: OMG Annex `12b-Allocation-1.sysml` (`end logical : …`).
+    EndDecl(Node<EndDecl>),
     /// `exhibit (state)? <name> ...` inside an occurrence body (§6 G30). An individual/snapshot
     /// exhibits states just as a part usage does -- real usage: `exhibit vehicleStates.on { ... }`
     /// in the OMG spec Annex `6-Individual and Snapshots.sysml`.

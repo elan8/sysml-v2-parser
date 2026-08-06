@@ -144,6 +144,7 @@ pub(crate) fn emit_package_body_element(
             requirement::emit_enumeration_usage(w, path, &e.value)
         }
         PackageBodyElement::FlowUsage(f) => behavior::emit_flow_usage(w, path, &f.value),
+        PackageBodyElement::AllocationDef(a) => behavior::emit_allocation_def(w, path, &a.value),
         PackageBodyElement::AllocationUsage(a) => {
             behavior::emit_allocation_usage(w, path, &a.value)
         }

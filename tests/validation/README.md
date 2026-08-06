@@ -48,6 +48,14 @@ With emit arms in place for ports, interfaces, actions, states, requirements, co
 | `AST-eq` | Emits and reparses, but AST differs | Emit fidelity or lost parse fields (e.g. assume vs require) |
 | `reparse` | Emitted text is not accepted | Emit quoting/shape bugs, or missing grammar in reparse path |
 
+### ExtendedLibraryDecl / KermlFeatureDecl (#73)
+
+Package-level fallbacks for SysML keywords that failed structured dispatch. Cleared for validation
+fixtures `08`, `09`, `12b-Allocation-1`, and `14c` by parsing requirement short names, allocation
+`::>` ends, and `nonunique` occurrence usages. `12b-Allocation-1` is in `ROUNDTRIP_PASS` (AllocationDef
+emit + structured body `end`). Remaining failures on `08`/`09`/`14c` are nested `Other` /
+unsupported emit (not those fallback kinds).
+
 ### Intentional AST PartialEq normalization (#74)
 
 Roundtrip AST equality ignores source locations that do not affect semantics. `Membership` / `Node` already did this; #74 extended the same convention to `PayloadClause` (payload / via / feature_chain spans) and `ActionUsage` (`name_span` / `type_ref_span`). Remaining `AST-eq` fixtures (`3c-2`, `05-1`/`05-2`, `15_08`, `7a1`, …) usually differ for real structural reasons or leftover span noise on nested expression nodes, not missing `Other` recovery.
