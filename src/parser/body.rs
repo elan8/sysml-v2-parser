@@ -1,17 +1,86 @@
 //! Shared definition body terminators (semicolon or structured brace).
 
-use crate::ast::{DefinitionBody, Node};
+use crate::ast::{DefinitionBody, Node, ParseErrorNode, RelationshipBodyElement};
 use crate::parser::lex::{
     recover_body_element, skip_statement_or_block, skip_until_brace_end, ws_and_comments,
+    RELATIONSHIP_BODY_STARTERS,
 };
+use crate::parser::metadata_annotation::metadata_annotation;
 use crate::parser::occurrence_body::occurrence_definition_body;
-use crate::parser::Input;
+use crate::parser::requirement::{comment_annotation, doc_comment, textual_representation};
+use crate::parser::{build_recovery_error_node_from_span, node_from_to, Input};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
+
+/// Parse a KerML `RelationshipBody`-shaped brace body (`;` or `{`
+/// doc/comment/rep/metadata* `}`), with recovery-to-`Error` for anything else instead of
+/// silently discarding it (BNF `RelationshipBody : Relationship = ';' | '{' (ownedRelationship
+/// += OwnedAnnotation)* '}'`). Shared by alias/import/dependency bodies and other leaf bodies
+/// with the same annotation-only shape (plain `connect` statement bodies).
+pub(crate) fn relationship_body_annotations(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<Vec<Node<RelationshipBodyElement>>>> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, None));
+    }
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        RELATIONSHIP_BODY_STARTERS,
+        "relationship body",
+        "recovered_relationship_body_element",
+        relationship_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                RELATIONSHIP_BODY_STARTERS,
+                "relationship body",
+                "recovered_relationship_body_element",
+            );
+            let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+            node_from_to(start, end, RelationshipBodyElement::Error(node))
+        },
+    )?;
+    Ok((input, Some(elements)))
+}
+
+fn relationship_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b"@") {
+        let (input, elem) = map(
+            metadata_annotation,
+            RelationshipBodyElement::MetadataAnnotation,
+        )
+        .parse(input)?;
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    if let Ok((input, elem)) = map(doc_comment, RelationshipBodyElement::Doc).parse(input) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    if let Ok((input, elem)) =
+        map(comment_annotation, RelationshipBodyElement::Comment).parse(input)
+    {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    if let Ok((input, elem)) =
+        map(textual_representation, RelationshipBodyElement::TextualRep).parse(input)
+    {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Alt,
+    )))
+}
 
 /// How to advance past a member that failed to parse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

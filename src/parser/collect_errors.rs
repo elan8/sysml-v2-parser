@@ -3,15 +3,16 @@
 use super::diagnostics::trim_ascii_start;
 use super::recovery::parse_error_from_recovery_node;
 use crate::ast::{
-    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AttributeBody,
-    AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
+    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AliasBody,
+    AttributeBody, AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
     ConnectionDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, DefinitionBody,
     DefinitionBodyElement, InterfaceDefBody, InterfaceDefBodyElement, OccurrenceBodyElement,
     OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
-    PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RefBody,
-    RenderingDefBody, RenderingDefBodyElement, RequirementDefBody, RequirementDefBodyElement,
-    RootNamespace, StateDefBody, StateDefBodyElement, TextualRepresentation, UseCaseDefBody,
-    UseCaseDefBodyElement, ViewBody, ViewBodyElement, ViewDefBody, ViewDefBodyElement,
+    PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RefBody, RefBodyElement,
+    RelationshipBodyElement, RenderingDefBody, RenderingDefBodyElement, RequirementDefBody,
+    RequirementDefBodyElement, RootNamespace, StateDefBody, StateDefBodyElement,
+    TextualRepresentation, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
+    ViewDefBody, ViewDefBodyElement,
 };
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
@@ -117,8 +118,26 @@ fn collect_action_def_body_errors(body: &ActionDefBody, errors: &mut Vec<ParseEr
 fn collect_ref_body_errors(body: &RefBody, errors: &mut Vec<ParseError>) {
     if let RefBody::Brace { elements } = body {
         for element in elements {
-            if let ActionDefBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+            match &element.value {
+                RefBodyElement::Error(n) => {
+                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+                }
+                RefBodyElement::Action(n) => {
+                    if let ActionDefBodyElement::Error(inner) = &n.value {
+                        errors.push(parse_error_from_recovery_node(&n.span, &inner.value));
+                    }
+                }
+                RefBodyElement::PartUsage(n) => {
+                    if let PartUsageBodyElement::Error(inner) = &n.value {
+                        errors.push(parse_error_from_recovery_node(&n.span, &inner.value));
+                    }
+                }
+                RefBodyElement::State(n) => {
+                    if let StateDefBodyElement::Error(inner) = &n.value {
+                        errors.push(parse_error_from_recovery_node(&n.span, &inner.value));
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -130,6 +149,17 @@ fn collect_constraint_body_element_errors(
 ) {
     for element in elements {
         if let ConstraintDefBodyElement::Error(n) = &element.value {
+            errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+        }
+    }
+}
+
+fn collect_relationship_body_element_errors(
+    elements: &[crate::ast::Node<RelationshipBodyElement>],
+    errors: &mut Vec<ParseError>,
+) {
+    for element in elements {
+        if let RelationshipBodyElement::Error(n) = &element.value {
             errors.push(parse_error_from_recovery_node(&element.span, &n.value));
         }
     }
@@ -570,6 +600,16 @@ fn collect_package_body_element_errors(
         PackageBodyElement::Satisfy(n) => {
             if let Some(elems) = &n.value.body_elements {
                 collect_constraint_body_element_errors(elems, errors);
+            }
+        }
+        PackageBodyElement::AliasDef(n) => {
+            if let AliasBody::Brace { elements } = &n.value.body {
+                collect_relationship_body_element_errors(elements, errors);
+            }
+        }
+        PackageBodyElement::Dependency(n) => {
+            if let Some(elems) = &n.value.body_elements {
+                collect_relationship_body_element_errors(elems, errors);
             }
         }
         PackageBodyElement::TextualRep(n) => {

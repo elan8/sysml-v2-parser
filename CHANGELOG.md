@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Several relationship/`ref` bodies discarded their entire content, with no diagnostic.**
+  `alias`/`import`/`dependency` bodies, plain `connect` statement bodies, and connection/
+  interface/part-usage/state `ref` bodies all parsed via `advance_to_closing_brace`
+  (`src/parser/body.rs`), which skips to the matching `}` and returns `()` — content between the
+  braces was entirely discarded, not even captured as opaque text. A `doc`/`comment`/`@metadata`
+  annotation (or, for `ref` bodies, real nested members) inside any of these would silently
+  vanish with zero indication anything was dropped — worse than the `Other(preview)`/`Error`
+  fallbacks used elsewhere in this parser for exactly this reason.
+  - New `RelationshipBodyElement` (BNF `RelationshipBody : Relationship = ';' | '{'
+    (ownedRelationship += OwnedAnnotation)* '}'`, used by `AliasMember`/`Import`/`Dependency`)
+    and shared `relationship_body_annotations` helper (`src/parser/body.rs`): doc/comment/rep/
+    metadata retained, anything else recovers to `Error` instead of vanishing. Wired into
+    `alias.rs` (`AliasBody::Brace` gained a real `elements` field), `import.rs` (`Import` gained
+    `body_elements`), `dependency.rs` (`Dependency` gained `body_elements`), and `connector.rs`'s
+    plain `connect` statement (`ConnectStmt` gained `body_elements`) — the last two follow the
+    `ConnectBody` + separate sibling-field pattern `Satisfy` already established, since
+    `ConnectBody` itself is shared as a bare marker across several differently-shaped contexts
+    (`connect_body`, unchanged, is still used marker-only by ~7 unrelated callers with no
+    evidence of real content).
+  - `RefBody::Brace`'s `elements` field changed from a hardcoded `Vec<Node<ActionDefBodyElement>>`
+    (populated only for the action-context `ref` body; every other context produced an empty
+    `vec![]` despite already computing real elements internally, via `consume_part_usage_
+    structured_brace`/`consume_state_structured_brace`, and then discarding them due to the type
+    mismatch) to a new `RefBodyElement` wrapper enum with per-context variants (`Action`,
+    `PartUsage`, `State`, plus the same annotation set as `RelationshipBodyElement`). BNF
+    `ReferenceUsage` resolves `ref`'s body to a generic `Usage` body, so real content follows
+    whatever the owning context allows; connection/interface `ref` bodies don't have a dedicated
+    member grammar yet, so they get the annotation-only baseline instead.
+  - `collect_errors.rs` updated to recurse through the new wrapper types so errors inside these
+    bodies are still surfaced as diagnostics.
+  - `PARSE_AST_VERSION` bumped 69 → 70 (new/changed AST variants: `AliasBody::Brace`,
+    `Import`/`Dependency`/`ConnectStmt`/`Bind` gained fields, `RefBody::Brace`'s element type
+    changed).
+
 - **Nested `constraint` members mis-parsed inside `constraint def` / `requirement def`
   bodies.** Neither `ConstraintDefBodyElement` (`src/ast/view.rs`) nor `RequirementDefBodyElement`
   (`src/ast/requirement.rs`) had a dispatch arm for a nested `constraint` member: inside a

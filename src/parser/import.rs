@@ -1,35 +1,26 @@
 //! Import and relationship body parsing.
 
-use crate::ast::{FilterPackageMember, Import, Membership, MembershipKind, Node};
-use crate::parser::body::advance_to_closing_brace;
+use crate::ast::{
+    FilterPackageMember, Import, Membership, MembershipKind, Node, RelationshipBodyElement,
+};
+use crate::parser::body::relationship_body_annotations;
 use crate::parser::expr::expression;
 use crate::parser::lex::{qualified_name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::span::with_span;
 use crate::parser::Input;
-use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, opt};
+use nom::combinator::opt;
 use nom::multi::many1;
 use nom::sequence::{delimited, preceded};
 use nom::IResult;
 use nom::Parser;
 
-/// RelationshipBody: ';' or '{' ... '}'. For '{' we skip content until matching '}'.
-pub(crate) fn relationship_body(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| ()),
-        map(
-            delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| (),
-        ),
-    ))
-    .parse(input)
+/// RelationshipBody: `;` or `{` doc/comment/rep/metadata* `}`.
+pub(crate) fn relationship_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<Vec<Node<RelationshipBodyElement>>>> {
+    relationship_body_annotations(input)
 }
 
 /// Import: visibility? 'import' isImportAll? (QualifiedName | QualifiedName '::' '*') RelationshipBody
@@ -105,7 +96,7 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
             .parse(input)?;
             (input, qname, false, rec_opt.is_some(), None)
         };
-    let (input, _) = relationship_body(input)?;
+    let (input, body_elements) = relationship_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -118,6 +109,7 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
                 target_span: qname_span,
                 is_recursive,
                 filter_members,
+                body_elements,
             },
         ),
     ))

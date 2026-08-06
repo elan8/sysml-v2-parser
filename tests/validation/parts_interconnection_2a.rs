@@ -190,6 +190,7 @@ fn expected_ast() -> RootNamespace {
                         target_span: Span::dummy(),
                         is_recursive: false,
                         filter_members: None,
+                        body_elements: None,
                     }))),
                     n(PackageBodyElement::Import(n(Import {
                         membership: public_import_membership(),
@@ -198,6 +199,7 @@ fn expected_ast() -> RootNamespace {
                         target_span: Span::dummy(),
                         is_recursive: false,
                         filter_members: None,
+                        body_elements: None,
                     }))),
                     n(PackageBodyElement::Package(n(definitions_package()))),
                     n(PackageBodyElement::Package(n(usages_package()))),
@@ -698,12 +700,14 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                     to: end(expr_path("driveshaft.shaftPort_b")),
                     extra_ends: vec![],
                     body: ConnectBody::Brace,
+                    body_elements: vec![],
                 }))),
                 n(InterfaceDefBodyElement::ConnectStmt(n(ConnectStmt {
                     from: end(expr_path("driveshaft.shaftPort_c")),
                     to: end(n(Expression::FeatureRef("shaftPort_d".to_string()))),
                     extra_ends: vec![],
                     body: ConnectBody::Semicolon,
+                    body_elements: vec![],
                 }))),
             ],
         },
@@ -750,6 +754,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     right: expr_path("engine.fuelCmdPort"),
                     right_multiplicity: None,
                     body: Some(ConnectBody::Semicolon),
+                    body_elements: vec![],
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
                     usage_prefix: None,
@@ -848,6 +853,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     right: expr_path("vehicleToRoadPort.leftWheelToRoadPort"),
                     right_multiplicity: None,
                     body: Some(ConnectBody::Semicolon),
+                    body_elements: vec![],
                 }))),
                 n(PartUsageBodyElement::Bind(n(Bind {
                     binding_name: None,
@@ -858,6 +864,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     right: expr_path("vehicleToRoadPort.rightWheelToRoadPort"),
                     right_multiplicity: None,
                     body: Some(ConnectBody::Semicolon),
+                    body_elements: vec![],
                 }))),
                 n(PartUsageBodyElement::PortUsage(n(PortUsage {
                     is_abstract: false,
@@ -964,6 +971,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     right: expr_path("differential.shaftPort_d"),
                     right_multiplicity: None,
                     body: Some(ConnectBody::Semicolon),
+                    body_elements: vec![],
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(
                     part_differential(),

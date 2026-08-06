@@ -193,7 +193,15 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
                 node_from_to(start, end, ActionDefBodyElement::Error(node))
             },
         )?;
-        (input, crate::ast::RefBody::Brace { elements })
+        (
+            input,
+            crate::ast::RefBody::Brace {
+                elements: elements
+                    .into_iter()
+                    .map(|e| Node::new(e.span.clone(), crate::ast::RefBodyElement::Action(e)))
+                    .collect(),
+            },
+        )
     };
 
     Ok((
