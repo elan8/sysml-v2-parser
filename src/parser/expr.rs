@@ -135,8 +135,8 @@ fn literal_boolean(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, v) = alt((
-        map(tag(&b"true"[..]), |_| true),
-        map(tag(&b"false"[..]), |_| false),
+        map(|i| literal_keyword_token(i, b"true"), |_| true),
+        map(|i| literal_keyword_token(i, b"false"), |_| false),
     ))
     .parse(input)?;
     Ok((
@@ -282,7 +282,7 @@ fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 fn null_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"null"[..]).parse(input)?;
+    let (input, _) = literal_keyword_token(input, b"null")?;
     Ok((input, node_from_to(start, input, Expression::Null)))
 }
 
@@ -335,6 +335,37 @@ fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> 
 /// why none of the existing diagnostic-count-based tests caught them.
 fn keyword_token<'a>(input: Input<'a>, keyword: &'static [u8]) -> IResult<Input<'a>, Input<'a>> {
     if !starts_with_keyword(input.fragment(), keyword) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    tag(keyword).parse(input)
+}
+
+/// Match a literal keyword (`true`/`false`/`null`), requiring a word boundary immediately after
+/// it. Deliberately distinct from [`keyword_token`]: that helper's boundary check
+/// ([`starts_with_keyword`]) only accepts whitespace or `{`/`:`/`;`/`[` as a follower, which is
+/// correct for operator keywords (`not`/`and`/`or`/...) and declaration keywords (always
+/// followed by an operand or a body-opening token) but wrong for *literal* keywords, which can be
+/// legally followed by any non-identifier byte a value can be followed by -- `)`, `,`, `==`, `!=`,
+/// end of input, etc. (e.g. `f(true)`, `x == null`). Reusing `keyword_token` verbatim here would
+/// trade the mis-lexing bug this fixes for a new one: valid literals immediately followed by
+/// punctuation outside that narrow allowlist would stop parsing as literals at all.
+///
+/// Without any boundary check at all (the bug this fixes, GH-58), a bare `tag()` on `true`/
+/// `false`/`null` also matches as a prefix of any longer identifier that merely starts with the
+/// same letters -- e.g. `nullPoint`, `trueValue`, `falseAlarm` -- silently misparsing as the
+/// literal followed by a stray, unparseable identifier fragment.
+fn literal_keyword_token<'a>(
+    input: Input<'a>,
+    keyword: &'static [u8],
+) -> IResult<Input<'a>, Input<'a>> {
+    let is_ident_boundary = input
+        .fragment()
+        .get(keyword.len())
+        .is_none_or(|b| !b.is_ascii_alphanumeric() && *b != b'_');
+    if !input.fragment().starts_with(keyword) || !is_ident_boundary {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -1165,6 +1196,44 @@ mod tests {
                 node.value
             );
         }
+    }
+
+    #[test]
+    fn literal_prefixed_identifiers_stay_plain_identifiers() {
+        for text in ["nullPoint", "trueValue", "falseAlarm", "zeroPoint"] {
+            let input = span_input(text);
+            let (rest, node) = expression(input).unwrap_or_else(|e| {
+                panic!("expected {text:?} to parse as a plain identifier, got error: {e:?}")
+            });
+            assert!(rest.fragment().is_empty(), "did not fully consume {text:?}");
+            assert!(
+                matches!(&node.value, Expression::FeatureRef(s) if s == text),
+                "expected FeatureRef({text:?}), got {:?}",
+                node.value
+            );
+        }
+    }
+
+    #[test]
+    fn literal_keywords_still_work_immediately_before_punctuation() {
+        // `true`/`false`/`null` are values, not operators: unlike `keyword_token`'s narrow
+        // allowlist (whitespace or `{`/`:`/`;`/`[`), they can be legally followed by any
+        // non-identifier byte with no space -- a closing paren, comma, or comparison operator.
+        // Tested directly against the leaf parsers (not `expression()`) so a comparison operator
+        // like `==` can't be misread as evidence the literal itself was rejected: `expression()`
+        // would still produce *a* result for `null == x` even if `null_expression` failed here and
+        // some other alternative absorbed the input differently.
+        let (rest, node) = literal_boolean(span_input("true)")).expect("literal_boolean");
+        assert_eq!(rest.fragment(), b")");
+        assert!(matches!(&node.value, Expression::LiteralBoolean(true)));
+
+        let (rest, node) = literal_boolean(span_input("false,")).expect("literal_boolean");
+        assert_eq!(rest.fragment(), b",");
+        assert!(matches!(&node.value, Expression::LiteralBoolean(false)));
+
+        let (rest, node) = null_expression(span_input("null==x")).expect("null_expression");
+        assert_eq!(rest.fragment(), b"==x");
+        assert!(matches!(&node.value, Expression::Null));
     }
 
     #[test]
