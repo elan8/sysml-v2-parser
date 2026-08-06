@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `allocation def` emit + structured `end` members in occurrence/definition bodies; dotted
     `perform a.b :>> …` stays bare (no `action` keyword) so part bodies reparse.
   - `EndDecl` PartialEq ignores name/type spans (same convention as `Membership`).
+  - `end feature` / `end occurrence` kinds accepted (Systems/Kernel library Flows & Transfers).
   - Promoted `12b-Allocation-1` into `ROUNDTRIP_PASS`.
   - Remaining on `08`/`09`/`14c`: nested `Other` / verification-case emit — #72-class leftovers.
 
