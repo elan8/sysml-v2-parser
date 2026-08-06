@@ -1,32 +1,23 @@
 //! Alias definition parsing.
 
 use crate::ast::{AliasBody, AliasDef, Node, RelationshipTarget};
-use crate::parser::body::advance_to_closing_brace;
+use crate::parser::body::relationship_body_annotations;
 use crate::parser::lex::{identification, qualified_name_segments, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::{span_from_to, Input};
-use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::map;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// Alias body: `;` or `{` ... `}`
+/// Alias body: `;` or `{` doc/comment/rep/metadata* `}` (BNF `RelationshipBody`).
 fn alias_body(input: Input<'_>) -> IResult<Input<'_>, AliasBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| AliasBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| AliasBody::Brace,
-        ),
-    ))
-    .parse(input)
+    let (input, elements) = relationship_body_annotations(input)?;
+    let body = match elements {
+        None => AliasBody::Semicolon,
+        Some(elements) => AliasBody::Brace { elements },
+    };
+    Ok((input, body))
 }
 
 /// Alias definition: `alias` Identification `for` qualified_name body

@@ -25,9 +25,10 @@
 //! explicit, visible choice at each call site instead of an accidental omission.
 
 use crate::ast::{
-    ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, EndNestedUsage, Node, RefBody, RefDecl,
+    ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, EndNestedUsage, Node, RefBody,
+    RefBodyElement, RefDecl,
 };
-use crate::parser::body::advance_to_closing_brace;
+use crate::parser::body::{advance_to_closing_brace, relationship_body_annotations};
 use crate::parser::expr::path_expression;
 use crate::parser::item::item_usage;
 use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws1, ws_and_comments};
@@ -228,21 +229,42 @@ pub(crate) fn end_decl(
     ))
 }
 
-/// Ref body: `;` or `{` ... `}`.
+/// Ref body for a connection/interface `ref` declaration: `;` or `{` doc/comment/rep/metadata*
+/// `}`. Connection/interface `ref` bodies don't have a dedicated member grammar yet (unlike the
+/// action-context `ref` body in `action.rs`, which allows full nested action members), so this
+/// gets the same doc/comment/metadata + recovery baseline as [`RelationshipBodyElement`] instead
+/// of silently discarding everything.
 pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| RefBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| RefBody::Brace { elements: vec![] },
-        ),
-    ))
-    .parse(input)
+    let (input, elements) = relationship_body_annotations(input)?;
+    let body = match elements {
+        None => RefBody::Semicolon,
+        Some(elements) => RefBody::Brace {
+            elements: elements
+                .into_iter()
+                .map(|e| {
+                    let span = e.span.clone();
+                    let wrapped = match e.value {
+                        crate::ast::RelationshipBodyElement::Doc(n) => RefBodyElement::Doc(n),
+                        crate::ast::RelationshipBodyElement::Comment(n) => {
+                            RefBodyElement::Comment(n)
+                        }
+                        crate::ast::RelationshipBodyElement::TextualRep(n) => {
+                            RefBodyElement::TextualRep(n)
+                        }
+                        crate::ast::RelationshipBodyElement::MetadataAnnotation(n) => {
+                            RefBodyElement::MetadataAnnotation(n)
+                        }
+                        crate::ast::RelationshipBodyElement::Error(n) => RefBodyElement::Error(n),
+                        crate::ast::RelationshipBodyElement::Other(text) => {
+                            RefBodyElement::Other(text)
+                        }
+                    };
+                    Node::new(span, wrapped)
+                })
+                .collect(),
+        },
+    };
+    Ok((input, body))
 }
 
 /// Ref declaration: `ref` (`part`|`port`|`item`)? name? multiplicity? (`:>>` redefines)? (`:`
@@ -333,7 +355,10 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     ))
 }
 
-/// Connect body: `;` or `{` ... `}`.
+/// Connect body: `;` or `{` ... `}`. Marker-only (no content preserved): shared by many callers
+/// beyond `connect_stmt` (`Message`, `Allocate`, view/metadata constructs, ...) with no evidence
+/// of real content ever appearing in their braces. See [`connect_stmt_body`] for `connect_stmt`'s
+/// own body, which does preserve doc/comment/metadata annotations.
 pub(crate) fn connect_body(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
@@ -348,6 +373,20 @@ pub(crate) fn connect_body(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> 
         ),
     ))
     .parse(input)
+}
+
+/// Connect statement body: `;` or `{` doc/comment/rep/metadata* `}` (BNF `RelationshipBody`).
+/// Distinct from the shared marker-only [`connect_body`] above: `ConnectStmt` is the one real,
+/// evidenced call site for this (a plain `connect a to b { ... }` statement can carry `doc`/
+/// annotations same as any other relationship).
+fn connect_stmt_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (ConnectBody, Vec<Node<crate::ast::RelationshipBodyElement>>)> {
+    let (input, elements) = relationship_body_annotations(input)?;
+    match elements {
+        None => Ok((input, (ConnectBody::Semicolon, Vec::new()))),
+        Some(elements) => Ok((input, (ConnectBody::Brace, elements))),
+    }
 }
 
 /// Wrap a parsed endpoint expression in a `ConnectionEnd` node with no multiplicity, reusing the
@@ -433,7 +472,7 @@ pub(crate) fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectS
     let (input, _) = tag(&b"connect"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, (from_expr, to_expr, extra_ends)) = connect_ends(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, (body, body_elements)) = connect_stmt_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -444,6 +483,7 @@ pub(crate) fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectS
                 to: to_expr,
                 extra_ends,
                 body,
+                body_elements,
             },
         ),
     ))
