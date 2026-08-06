@@ -128,14 +128,24 @@ fn try_roundtrip(src: &str) -> RoundtripOutcome {
         // points at a real semantic mismatch rather than offset noise.
         let pa = strip_span_noise(&format!("{na:?}"));
         let pb = strip_span_noise(&format!("{nb:?}"));
-        let (pos, snippet) = diff_debug_strings(&pa, &pb);
+        let (pos, orig_snip, reparse_snip) = diff_debug_both(&pa, &pb);
         return RoundtripOutcome::Failed(format!(
-            "AST-eq failed at char {pos}; snippet ...{snippet}...; emitted head:\n{}",
-            emitted.chars().take(400).collect::<String>()
+            "AST-eq failed at char {pos};\n  original: ...{orig_snip}...\n  reparse:  ...{reparse_snip}...\n  emitted head:\n{}",
+            emitted.chars().take(600).collect::<String>()
         ));
     }
 
     RoundtripOutcome::Ok
+}
+
+fn diff_debug_both(original: &str, reparsed: &str) -> (usize, String, String) {
+    let pos = original
+        .chars()
+        .zip(reparsed.chars())
+        .position(|(a, b)| a != b)
+        .unwrap_or(original.len().min(reparsed.len()));
+    let snip = |s: &str| -> String { s.chars().skip(pos.saturating_sub(80)).take(200).collect() };
+    (pos, snip(original), snip(reparsed))
 }
 
 /// Remove `Span { ... }` blobs from Debug output used only for mismatch location.
@@ -276,7 +286,7 @@ package P {
         part def HitchBall;
     }
     package Usages {
-        private import Definitions::*;
+        private import Definitions::* {}
         part vehicle1: Vehicle {
             attribute mass :>> Vehicle::mass = 1750 [kg];
             part wheel: Axle[2] ordered;

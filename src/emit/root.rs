@@ -136,8 +136,49 @@ pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(),
             w.push_char(']');
         }
     }
-    w.push_char(';');
+    // Preserve RelationshipBody shape: `None` → `;`, `Some` → `{ ... }` even when empty
+    // (brace bodies with only trivia comments parse as `Some([])`).
+    match &import.body_elements {
+        None => w.push_char(';'),
+        Some(elements) if elements.is_empty() => w.push_str(" {}"),
+        Some(elements) => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                emit_relationship_body_element(w, &format!("import/body[{i}]"), &el.value)?;
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+        }
+    }
     Ok(())
+}
+
+fn emit_relationship_body_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &crate::ast::RelationshipBodyElement,
+) -> Result<(), EmitError> {
+    use crate::ast::RelationshipBodyElement;
+    match el {
+        RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
+        RelationshipBodyElement::TextualRep(r) => emit_textual_rep(w, &r.value),
+        RelationshipBodyElement::Error(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::ParseError,
+        }),
+        RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
+            path: path.to_string(),
+            kind: super::OpacityKind::Other,
+        }),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
+    }
 }
 
 pub(crate) fn emit_identification(w: &mut EmitWriter<'_>, id: &Identification) {
