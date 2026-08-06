@@ -4,8 +4,8 @@ use super::structure;
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
-    CommentAnnotation, DocComment, FilterMember, Identification, Import, LibraryPackage,
-    Package, PackageBody, PackageBodyElement, RootElement, RootNamespace, TextualRepresentation,
+    CommentAnnotation, DocComment, FilterMember, Identification, Import, LibraryPackage, Package,
+    PackageBody, PackageBodyElement, RootElement, RootNamespace, TextualRepresentation,
 };
 
 pub(crate) fn emit_root(w: &mut EmitWriter<'_>, root: &RootNamespace) -> Result<(), EmitError> {
@@ -105,9 +105,7 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::PartDef(p) => structure::emit_part_def(w, path, &p.value),
         PackageBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
         PackageBodyElement::AttributeDef(a) => structure::emit_attribute_def(w, path, &a.value),
-        PackageBodyElement::AttributeUsage(a) => {
-            structure::emit_attribute_usage(w, path, &a.value)
-        }
+        PackageBodyElement::AttributeUsage(a) => structure::emit_attribute_usage(w, path, &a.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)
@@ -116,7 +114,10 @@ pub(crate) fn emit_package_body_element(
             path: path.to_string(),
             kind: super::OpacityKind::ExtendedLibraryDecl,
         }),
-        other => w.unsupported(path, format!("{other:?}").chars().take(64).collect::<String>()),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
     }
 }
 
@@ -125,14 +126,8 @@ pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(),
     w.push_str("import ");
     // `target` already includes `::*` when is_import_all.
     w.push_str(&import.target);
-    if import.is_recursive {
-        if !import.target.ends_with("::**") {
-            if import.target.ends_with("::*") {
-                w.push_str("::**");
-            } else {
-                w.push_str("::**");
-            }
-        }
+    if import.is_recursive && !import.target.ends_with("::**") {
+        w.push_str("::**");
     }
     if let Some(filters) = &import.filter_members {
         for f in filters {
@@ -199,10 +194,7 @@ pub(crate) fn emit_comment(
     Ok(())
 }
 
-fn emit_textual_rep(
-    w: &mut EmitWriter<'_>,
-    rep: &TextualRepresentation,
-) -> Result<(), EmitError> {
+fn emit_textual_rep(w: &mut EmitWriter<'_>, rep: &TextualRepresentation) -> Result<(), EmitError> {
     if !w.emit_comments() {
         return Ok(());
     }

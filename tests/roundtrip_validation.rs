@@ -9,9 +9,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use sysml_v2_parser::{
-    emit_sysml, opacity_report, parse_root, parse_with_diagnostics, EmitError, RootNamespace,
-};
+use sysml_v2_parser::{emit_sysml, opacity_report, parse, EmitError, RootNamespace};
 
 /// Iteration-1 scope: only fixtures under `01-Parts Tree/`.
 const ROUNDTRIP_SCOPE_PREFIX: &str = "01-Parts Tree/";
@@ -34,10 +32,7 @@ fn release_root() -> PathBuf {
 }
 
 fn validation_dir() -> PathBuf {
-    release_root()
-        .join("sysml")
-        .join("src")
-        .join("validation")
+    release_root().join("sysml").join("src").join("validation")
 }
 
 fn find_sysml_files(dir: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
@@ -85,19 +80,13 @@ enum RoundtripOutcome {
 }
 
 fn try_roundtrip(src: &str) -> RoundtripOutcome {
-    let parsed = parse_with_diagnostics(src);
-    if !parsed.errors.is_empty() {
-        return RoundtripOutcome::Failed(format!(
-            "parse diagnostics: {:?}",
-            parsed
-                .errors
-                .iter()
-                .take(3)
-                .map(|d| d.message.clone())
-                .collect::<Vec<_>>()
-        ));
-    }
-    let ast1 = parsed.root;
+    // Normalize newlines so Windows CRLF checkouts and Linux CI fixtures compare equally.
+    let src = src.replace("\r\n", "\n").replace('\r', "\n");
+
+    let ast1 = match parse(&src) {
+        Ok(a) => a,
+        Err(e) => return RoundtripOutcome::Failed(format!("parse failed: {e}")),
+    };
 
     let opacity = opacity_report(&ast1);
     if !opacity.is_clean() {
@@ -122,7 +111,7 @@ fn try_roundtrip(src: &str) -> RoundtripOutcome {
         }
     };
 
-    let ast2 = match parse_root(&emitted) {
+    let ast2 = match parse(&emitted) {
         Ok(a) => a,
         Err(e) => {
             return RoundtripOutcome::Failed(format!(
@@ -135,8 +124,10 @@ fn try_roundtrip(src: &str) -> RoundtripOutcome {
     let na = ast1.normalize_for_test_comparison();
     let nb = ast2.normalize_for_test_comparison();
     if na != nb {
-        let pa = format!("{na:?}");
-        let pb = format!("{nb:?}");
+        // Debug includes spans that PartialEq ignores; strip them so the snippet
+        // points at a real semantic mismatch rather than offset noise.
+        let pa = strip_span_noise(&format!("{na:?}"));
+        let pb = strip_span_noise(&format!("{nb:?}"));
         let (pos, snippet) = diff_debug_strings(&pa, &pb);
         return RoundtripOutcome::Failed(format!(
             "AST-eq failed at char {pos}; snippet ...{snippet}...; emitted head:\n{}",
@@ -145,6 +136,34 @@ fn try_roundtrip(src: &str) -> RoundtripOutcome {
     }
 
     RoundtripOutcome::Ok
+}
+
+/// Remove `Span { ... }` blobs from Debug output used only for mismatch location.
+fn strip_span_noise(s: &str) -> String {
+    let mut s = s.to_string();
+    while let Some(start) = s.find("Span {") {
+        let rest = &s[start + 6..];
+        let mut depth = 1usize;
+        let mut end = None;
+        for (i, ch) in rest.char_indices() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = Some(start + 6 + i + 1);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        match end {
+            Some(e) => s.replace_range(start..e, "Span(_)"),
+            None => break,
+        }
+    }
+    s
 }
 
 #[test]

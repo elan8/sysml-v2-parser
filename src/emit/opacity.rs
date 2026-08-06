@@ -332,7 +332,11 @@ fn walk_occurrence_usage_body(report: &mut OpacityReport, path: &str, body: &Occ
     }
 }
 
-fn walk_occurrence_body_element(report: &mut OpacityReport, path: &str, el: &OccurrenceBodyElement) {
+fn walk_occurrence_body_element(
+    report: &mut OpacityReport,
+    path: &str,
+    el: &OccurrenceBodyElement,
+) {
     match el {
         OccurrenceBodyElement::Error(_) => hit(report, path, OpacityKind::ParseError),
         OccurrenceBodyElement::Other(_) => hit(report, path, OpacityKind::Other),

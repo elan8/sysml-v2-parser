@@ -39,15 +39,9 @@ impl Default for EmitOptions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EmitError {
     /// An opaque / recovery node was encountered; emission refuses to reprint raw text.
-    Opaque {
-        path: String,
-        kind: OpacityKind,
-    },
+    Opaque { path: String, kind: OpacityKind },
     /// A structured construct is not yet implemented by the emitter.
-    Unsupported {
-        path: String,
-        construct: String,
-    },
+    Unsupported { path: String, construct: String },
 }
 
 impl std::fmt::Display for EmitError {
@@ -92,9 +86,8 @@ pub fn emit_sysml_with_options(
 mod tests {
     use super::*;
     use crate::ast::{
-        Identification, Membership, MembershipKind, Node, Package, PackageBody,
-        PackageBodyElement, PartDef, PartDefBody, PartDefBodyElement, RootElement, RootNamespace,
-        Span, Visibility,
+        Identification, Membership, MembershipKind, Node, Package, PackageBody, PackageBodyElement,
+        PartDef, PartDefBody, PartDefBodyElement, RootElement, RootNamespace, Span, Visibility,
     };
 
     fn owning() -> Membership {

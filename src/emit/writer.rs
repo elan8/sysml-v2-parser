@@ -94,10 +94,7 @@ fn needs_quotes(name: &str) -> bool {
 }
 
 /// Emit visibility keyword followed by a space when present.
-pub(crate) fn emit_visibility(
-    w: &mut EmitWriter<'_>,
-    visibility: Option<crate::ast::Visibility>,
-) {
+pub(crate) fn emit_visibility(w: &mut EmitWriter<'_>, visibility: Option<crate::ast::Visibility>) {
     use crate::ast::Visibility;
     match visibility {
         Some(Visibility::Private) => w.push_str("private "),

@@ -1,7 +1,7 @@
 //! Structure emission: part / attribute (and shared helpers).
 
 use super::expr::{emit_expression, emit_feature_value};
-use super::root::{emit_doc, emit_identification, emit_import};
+use super::root::{emit_comment, emit_doc, emit_identification, emit_import};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
@@ -226,6 +226,7 @@ fn emit_part_def_body_element(
             kind: super::OpacityKind::OpaqueMember,
         }),
         PartDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PartDefBodyElement::Comment(c) => emit_comment(w, &c.value),
         PartDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PartDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PartDefBodyElement::PartDef(p) => emit_part_def(w, path, &p.value),
@@ -233,7 +234,10 @@ fn emit_part_def_body_element(
         PartDefBodyElement::Import(i) => emit_import(w, &i.value),
         PartDefBodyElement::Bind(b) => emit_bind(w, path, &b.value),
         PartDefBodyElement::Ref(r) => emit_ref_decl(w, path, &r.value),
-        other => w.unsupported(path, format!("{other:?}").chars().take(64).collect::<String>()),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
     }
 }
 
@@ -278,7 +282,10 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::Import(i) => emit_import(w, &i.value),
         PartUsageBodyElement::Ref(r) => emit_ref_decl(w, path, &r.value),
         PartUsageBodyElement::Bind(b) => emit_bind(w, path, &b.value),
-        other => w.unsupported(path, format!("{other:?}").chars().take(64).collect::<String>()),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
     }
 }
 
@@ -324,7 +331,10 @@ fn emit_attribute_body_element(
         AttributeBodyElement::Doc(d) => emit_doc(w, &d.value),
         AttributeBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         AttributeBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
-        other => w.unsupported(path, format!("{other:?}").chars().take(64).collect::<String>()),
+        other => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
     }
 }
 
@@ -362,10 +372,7 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
                 Ok(())
             } else {
                 // Nested action-body members inside ref braces are not yet emitted.
-                w.unsupported(
-                    path,
-                    "RefBody with nested ActionDefBodyElement members",
-                )
+                w.unsupported(path, "RefBody with nested ActionDefBodyElement members")
             }
         }
     }
@@ -439,7 +446,10 @@ fn emit_direction(w: &mut EmitWriter<'_>, dir: InOut) {
     }
 }
 
-fn emit_typing_clause(w: &mut EmitWriter<'_>, typing: &TypingRelationship) -> Result<(), EmitError> {
+fn emit_typing_clause(
+    w: &mut EmitWriter<'_>,
+    typing: &TypingRelationship,
+) -> Result<(), EmitError> {
     match typing.kind {
         TypingKind::Typing => w.push_str(" : "),
         TypingKind::Subclassification => w.push_str(" :> "),
