@@ -589,11 +589,16 @@ fn emit_state_def_body_element(
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
+        StateDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         StateDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         StateDefBodyElement::Entry(e) => {
             w.push_str("entry");
             if let Some(name) = &e.value.action_name {
-                w.push_str(" action ");
+                if e.value.has_action_keyword {
+                    w.push_str(" action ");
+                } else {
+                    w.push_char(' ');
+                }
                 w.push_str(&format_name(name));
             }
             emit_state_def_body(w, path, &e.value.body)
@@ -601,7 +606,11 @@ fn emit_state_def_body_element(
         StateDefBodyElement::Do(d) => {
             w.push_str("do");
             if let Some(name) = &d.value.action_name {
-                w.push_str(" action ");
+                if d.value.has_action_keyword {
+                    w.push_str(" action ");
+                } else {
+                    w.push_char(' ');
+                }
                 w.push_str(&format_name(name));
             }
             emit_state_def_body(w, path, &d.value.body)
@@ -609,7 +618,11 @@ fn emit_state_def_body_element(
         StateDefBodyElement::Exit(e) => {
             w.push_str("exit");
             if let Some(name) = &e.value.action_name {
-                w.push_str(" action ");
+                if e.value.has_action_keyword {
+                    w.push_str(" action ");
+                } else {
+                    w.push_char(' ');
+                }
                 w.push_str(&format_name(name));
             }
             emit_state_def_body(w, path, &e.value.body)
@@ -789,9 +802,9 @@ fn emit_transition(
         w.push_char(' ');
     }
     if let Some(source) = &t.source {
-        if t.is_initial {
-            w.push_str("first ");
-        }
+        // Always emit `first` when a source was parsed; `is_initial` only marks unnamed
+        // `transition first …` forms and must not gate the keyword.
+        w.push_str("first ");
         emit_expression(w, &source.value)?;
         w.push_char(' ');
     }

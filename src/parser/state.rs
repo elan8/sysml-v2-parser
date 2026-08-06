@@ -138,60 +138,92 @@ fn consume_state_structured_brace(
     )
 }
 
-/// Entry action: `entry` (`;` or body)  or  `entry action` name body
+/// Shared `entry`/`do`/`exit` header: optional `action` keyword + optional referenced name.
+fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, (bool, Option<String>)> {
+    let (input, has_action_keyword) = opt(preceded(ws_and_comments, tag(&b"action"[..])))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") || input.fragment().starts_with(b"{") {
+        return Ok((input, (has_action_keyword, None)));
+    }
+    // Bare referenced action usage: `do 'sense temperature' { … }` / `entry initial;`.
+    // When `action` was written, the name is required by the grammar; when not, still try a name
+    // before the body terminator (do not swallow transition effects like `do send …`).
+    if !has_action_keyword
+        && (starts_with_keyword(input.fragment(), b"send")
+            || starts_with_keyword(input.fragment(), b"accept")
+            || starts_with_keyword(input.fragment(), b"assign"))
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, action_name) = name(input)?;
+    Ok((input, (has_action_keyword, Some(action_name))))
+}
+
+/// Entry action: `entry` (`;` or body)  or  `entry action` name body / `entry` name body
 fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     let start = input;
     let (input, _) = tag(&b"entry"[..]).parse(input)?;
-    let (input, action_name) = opt((
-        preceded(ws_and_comments, tag(&b"action"[..])),
-        preceded(ws1, name),
-    ))
-    .parse(input)?;
-    let action_name = action_name.map(|(_, n)| n);
+    let (input, (has_action_keyword, action_name)) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, UNTIL_BODY)?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, EntryAction { action_name, body }),
+        node_from_to(
+            start,
+            input,
+            EntryAction {
+                action_name,
+                has_action_keyword,
+                body,
+            },
+        ),
     ))
 }
 
-/// Do action: `do` (`;` or body)  or  `do action` name body
+/// Do action: `do` (`;` or body)  or  `do action` name body / `do` name body
 fn do_action(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
     let start = input;
     let (input, _) = tag(&b"do"[..]).parse(input)?;
-    let (input, action_name) = opt((
-        preceded(ws_and_comments, tag(&b"action"[..])),
-        preceded(ws1, name),
-    ))
-    .parse(input)?;
-    let action_name = action_name.map(|(_, n)| n);
+    let (input, (has_action_keyword, action_name)) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, UNTIL_BODY)?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, DoAction { action_name, body }),
+        node_from_to(
+            start,
+            input,
+            DoAction {
+                action_name,
+                has_action_keyword,
+                body,
+            },
+        ),
     ))
 }
 
-/// Exit action: `exit` (`;` or body)  or  `exit action` name body
+/// Exit action: `exit` (`;` or body)  or  `exit action` name body / `exit` name body
 fn exit_action(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
     let start = input;
     let (input, _) = tag(&b"exit"[..]).parse(input)?;
-    let (input, action_name) = opt((
-        preceded(ws_and_comments, tag(&b"action"[..])),
-        preceded(ws1, name),
-    ))
-    .parse(input)?;
-    let action_name = action_name.map(|(_, n)| n);
+    let (input, (has_action_keyword, action_name)) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, UNTIL_BODY)?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, ExitAction { action_name, body }),
+        node_from_to(
+            start,
+            input,
+            ExitAction {
+                action_name,
+                has_action_keyword,
+                body,
+            },
+        ),
     ))
 }
 
@@ -361,7 +393,13 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
         map(state_usage, |n| {
             node_from_to(start, input, StateDefBodyElement::StateUsage(n))
         }),
+        map(crate::parser::action::in_out_decl, |n| {
+            node_from_to(start, input, StateDefBodyElement::InOutDecl(n))
+        }),
         map(transition, |n| {
+            node_from_to(start, input, StateDefBodyElement::Transition(Box::new(n)))
+        }),
+        map(transition_shorthand, |n| {
             node_from_to(start, input, StateDefBodyElement::Transition(Box::new(n)))
         }),
     ));
@@ -584,6 +622,7 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     let (input, n) = {
         let (peek, _) = ws_and_comments(input)?;
         if starts_with_keyword(peek.fragment(), b"first")
+            || starts_with_keyword(peek.fragment(), b"accept")
             || starts_with_keyword(peek.fragment(), b"if")
             || starts_with_keyword(peek.fragment(), b"do")
             || starts_with_keyword(peek.fragment(), b"then")
@@ -594,6 +633,33 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
             (input, Some(n))
         }
     };
+    transition_tail(start, input, n)
+}
+
+/// Shorthand transition without the `transition` keyword (validation `05-2`):
+/// `accept … [if …] [do …] then target;` or `first … then …;` / `if … then …;` / `then …;`.
+fn transition_shorthand(input: Input<'_>) -> IResult<Input<'_>, Node<Transition>> {
+    let start = input;
+    let (peek, _) = ws_and_comments(input)?;
+    if !(starts_with_keyword(peek.fragment(), b"first")
+        || starts_with_keyword(peek.fragment(), b"accept")
+        || starts_with_keyword(peek.fragment(), b"if")
+        || starts_with_keyword(peek.fragment(), b"then"))
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            peek,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // Bare `do … then …` is uncommon and would fight `do_action`; omit that starter here.
+    transition_tail(start, input, None)
+}
+
+fn transition_tail<'a>(
+    start: Input<'a>,
+    input: Input<'a>,
+    name: Option<String>,
+) -> IResult<Input<'a>, Node<Transition>> {
     // Optional: `first` source with optional `accept` trigger.
     let (input, first_clause) = opt((
         preceded(ws_and_comments, tag(&b"first"[..])),
@@ -602,10 +668,17 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
         opt(transition_accept),
     ))
     .parse(input)?;
-    let (source, accept, is_initial) = match first_clause {
+    let (source, accept_from_first, is_initial) = match first_clause {
         // Named transitions use `first` for the source state; only unnamed transitions are initial.
-        Some((_, _, src, acc)) => (Some(src), acc, n.is_none()),
+        Some((_, _, src, acc)) => (Some(src), acc, name.is_none()),
         None => (None, None, false),
+    };
+    // Shorthand may start with a top-level `accept` (no `first` source).
+    let (input, accept) = if accept_from_first.is_some() {
+        (input, accept_from_first)
+    } else {
+        let (input, acc) = opt(transition_accept).parse(input)?;
+        (input, acc)
     };
     // Optional: `if` guard and `do` effect before `then`
     let (input, guard) = opt((
@@ -631,7 +704,7 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
             start,
             input,
             Transition {
-                name: n,
+                name,
                 source,
                 is_initial,
                 accept,
@@ -693,5 +766,33 @@ mod membership_tests {
     fn state_usage_without_visibility_prefix_has_no_membership_visibility() {
         let (_, node) = state_usage(input("state s1 : S1;")).expect("state usage");
         assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn do_action_keeps_bare_name_and_out_param() {
+        let (rest, node) = super::do_action(input("do 'sense temperature' { out temp; }"))
+            .expect("do with bare name and out");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.action_name.as_deref(), Some("sense temperature"));
+        assert!(!node.value.has_action_keyword);
+        match &node.value.body {
+            crate::ast::StateDefBody::Brace { elements } => {
+                assert!(matches!(
+                    elements[0].value,
+                    crate::ast::StateDefBodyElement::InOutDecl(_)
+                ));
+            }
+            other => panic!("expected brace body, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn shorthand_accept_transition_parses_without_transition_keyword() {
+        let (rest, node) = super::transition_shorthand(input("accept 'Start Signal' then on;"))
+            .expect("shorthand accept transition");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.accept.is_some());
+        assert!(node.value.name.is_none());
+        assert!(node.value.source.is_none());
     }
 }

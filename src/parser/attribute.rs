@@ -52,7 +52,6 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
     b"ref",
     b"item",
-    b"assert",
     b"constraint",
     b"private",
     b"derived",
@@ -210,6 +209,11 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(
             crate::parser::metadata_annotation::metadata_keyword_prefix,
             AttributeBodyElement::MetadataKeywordUsage,
+        ),
+        // #72: `assert constraint` inside attribute / item bodies (15_01, 15_08).
+        map(
+            crate::parser::occurrence_body::assert_constraint_member,
+            AttributeBodyElement::AssertConstraint,
         ),
         map(
             |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
@@ -1260,6 +1264,19 @@ mod attribute_body_tests {
         assert!(matches!(
             node.value,
             AttributeBodyElement::MetadataKeywordUsage(_)
+        ));
+    }
+
+    #[test]
+    fn attribute_body_accepts_assert_constraint() {
+        let (rest, node) = attribute_body_element(input(
+            "assert constraint { round(e * 1E20) == 271828182845904523536.0 }",
+        ))
+        .expect("assert constraint in attribute body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            AttributeBodyElement::AssertConstraint(_)
         ));
     }
 }

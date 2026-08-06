@@ -324,6 +324,8 @@ pub enum AttributeBodyElement {
     /// (see `PackageBodyElement::MetadataKeywordUsage`). `14c-Language Extensions.sysml`'s FMEA
     /// library example prefixes almost every member in these shared bodies with one.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `assert constraint …` in attribute / item bodies (#72 / validation `15_01`, `15_08`).
+    AssertConstraint(Node<AssertConstraintMember>),
     Other(String),
 }
 

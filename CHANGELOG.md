@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **L2.5 Other opacity in state and attribute bodies (#72).**
+  - State `entry`/`do`/`exit` keep a referenced action name (`do 'sense temperature' { out temp; }`)
+    and record whether the `action` keyword was written.
+  - State bodies parse `in`/`out`/`inout` parameters and shorthand `accept … then …` transitions
+    (no `transition` keyword).
+  - Attribute / item bodies parse `assert constraint` (clears `15_01` / `15_08` Other recovery).
+  - Transition emit always writes `first` when a source is present; member-access emit quotes
+    spaced names.
+  - Promoted `5-State-based Behavior-1a` and `15_01-Constants` into `ROUNDTRIP_PASS`.
+  - Remaining: `05-1`/`05-2`/`15_08` are opacity-clean but still AST-eq phantoms (equal Debug after
+    span strip, unequal PartialEq).
+
 - **L2.5 AST-eq / emit-shape gaps for function-based behavior (#74).**
   - Redefines-only part usages emit multiplicity after `:>> target` (`part :>> part3[0..1];`).
   - `perform action` is preferred for non-dotted performs so part-usage bodies reparse.
