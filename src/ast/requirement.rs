@@ -7,7 +7,7 @@ use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
     MetadataKeywordUsage,
 };
-use super::view::ConstraintDefBodyElement;
+use super::view::{ConstraintDefBodyElement, ConstraintUsage};
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
@@ -69,6 +69,11 @@ pub enum RequirementDefBodyElement {
     AttributeUsage(Node<AttributeUsage>),
     VerifyRequirement(Node<VerifyRequirementMember>),
     RequireConstraint(Node<RequireConstraint>),
+    /// A bare `constraint` member nested inside a `requirement def { ... }` body -- distinct
+    /// from `RequireConstraint`, which handles the `assume`/`require`-prefixed forms. Real
+    /// usage: the Systems Library's `RequirementCheck` redefining `RequirementConstraintCheck`'s
+    /// `assumptions`/`constraints` (`constraint assumptions :>> RequirementConstraintCheck::assumptions;`).
+    Constraint(Node<ConstraintUsage>),
     Frame(Node<FrameMember>),
     TextualRep(Node<TextualRepresentation>),
     Doc(Node<DocComment>),

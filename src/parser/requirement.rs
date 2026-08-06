@@ -6,7 +6,9 @@ use crate::ast::{
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::body::parse_structured_brace_members;
-use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
+use crate::parser::constraint::{
+    constraint_usage, structured_constraint_body, StructuredConstraintBody,
+};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
@@ -194,6 +196,7 @@ fn requirement_def_body_element(
                 require_constraint,
                 RequirementDefBodyElement::RequireConstraint,
             ),
+            map(constraint_usage, RequirementDefBodyElement::Constraint),
             map(frame_member, RequirementDefBodyElement::Frame),
             map(stakeholder_member, RequirementDefBodyElement::Stakeholder),
             map(purpose_member, RequirementDefBodyElement::Purpose),

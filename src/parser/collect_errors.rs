@@ -62,6 +62,9 @@ fn collect_requirement_body_errors(body: &RequirementDefBody, errors: &mut Vec<P
                         errors.push(diag);
                     }
                 }
+                RequirementDefBodyElement::Constraint(n) => {
+                    collect_constraint_body_errors(&n.value.body, errors)
+                }
                 _ => {}
             }
         }
@@ -207,8 +210,14 @@ fn collect_use_case_body_errors(body: &UseCaseDefBody, errors: &mut Vec<ParseErr
 fn collect_constraint_body_errors(body: &ConstraintDefBody, errors: &mut Vec<ParseError>) {
     if let ConstraintDefBody::Brace { elements } = body {
         for element in elements {
-            if let ConstraintDefBodyElement::Error(n) = &element.value {
-                errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+            match &element.value {
+                ConstraintDefBodyElement::Error(n) => {
+                    errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+                }
+                ConstraintDefBodyElement::Constraint(n) => {
+                    collect_constraint_body_errors(&n.value.body, errors)
+                }
+                _ => {}
             }
         }
     }
