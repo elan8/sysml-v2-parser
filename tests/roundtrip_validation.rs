@@ -22,6 +22,9 @@ const ROUNDTRIP_PASS: &[&str] = &[
     "01-Parts Tree/1d-Parts Tree with Reference.sysml",
     "02-Parts Interconnection/2a-Parts Interconnection.sysml",
     "02-Parts Interconnection/2c-Parts Interconnection-Multiple Decompositions.sysml",
+    // Promoted by import/type quoting (#71) once spaced names reparse cleanly.
+    "04-Functional Allocation/4a-Functional Allocation.sysml",
+    "13-Model Containment/13b-Safety and Security Features Element Group.sysml",
     // Promoted by the full-tree known-gap scan once port/interface/connect emit landed;
     // not deliberately targeted by this iteration beyond inventory.
     "14-Language Extensions/14b-Language Extensions.sysml",

@@ -11,7 +11,7 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 **Iteration 2 scope:** the full pinned `sysml/src/validation/` tree is under known-gap scan. Fixtures in `ROUNDTRIP_PASS` must roundtrip; every other `.sysml` must still fail until promoted.
 
 - Add fixtures to `ROUNDTRIP_PASS` when they roundtrip.
-- Currently required-pass: all of `01-Parts Tree/` (`1a`/`1c`/`1d`), all of `02-Parts Interconnection/` (`2a`/`2c`), plus incidental `14b` / `15_02` / `15_03` / `15_06` / `15_07`.
+- Currently required-pass: all of `01-Parts Tree/` (`1a`/`1c`/`1d`), all of `02-Parts Interconnection/` (`2a`/`2c`), `04` (`4a`), `13b`, plus incidental `14b` / `15_02` / `15_03` / `15_06` / `15_07`.
 - Run: `cargo test --test roundtrip_validation -- --include-ignored` (with release tree available). The known-gap test prints a per-folder pass/gap inventory.
 - Diagnose remaining gaps: `$env:ROUNDTRIP_DIAG=1; cargo test --test roundtrip_validation roundtrip_known_gaps_must_still_fail -- --include-ignored --nocapture`
 
@@ -22,7 +22,7 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 | 01-Parts Tree | 3 | 0 |
 | 02-Parts Interconnection | 2 | 0 |
 | 03-Function-based Behavior | 0 | 8 |
-| 04-Functional Allocation | 0 | 1 |
+| 04-Functional Allocation | 1 | 0 |
 | 05-State-based Behavior | 0 | 3 |
 | 06-Individual and Snapshots | 0 | 1 |
 | 07-Variant Configuration | 0 | 3 |
@@ -31,12 +31,12 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 | 10-Analysis and Trades | 0 | 4 |
 | 11-View and Viewpoint | 0 | 2 |
 | 12-Dependency Relationships | 0 | 3 |
-| 13-Model Containment | 0 | 4 |
+| 13-Model Containment | 1 | 3 |
 | 14-Language Extensions | 1 | 2 |
 | 15-Properties-Values-Expressions | 4 | 10 |
 | 17-Sequence Modeling | 0 | 2 |
 | 18-Use Case | 0 | 1 |
-| **Totals** | **10** | **46** |
+| **Totals** | **12** | **44** |
 
 ### Remaining known-gap classes (after emitter expansion)
 

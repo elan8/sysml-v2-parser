@@ -36,7 +36,7 @@ matches the pin.
 
 L2.5 does **not** claim semantic correctness. It claims that the AST for listed fixtures is structured enough to reprint as SysML and reparse to an equivalent tree. Opaque / recovery nodes (`Other`, `OpaqueMember`, KerML fallbacks, `ParseError`, …) fail the gate rather than fake-passing by reprinting raw text.
 
-**Iteration 2:** known-gap scan covers the full pinned `sysml/src/validation/` tree. Required-pass fixtures currently include all of `01-Parts Tree/` and `02-Parts Interconnection/`, plus incidental passers in `14`/`15` (`14b`, `15_02`, `15_03`, `15_06`, `15_07`). Remaining fixtures must still fail until promoted into `ROUNDTRIP_PASS`.
+**Iteration 2:** known-gap scan covers the full pinned `sysml/src/validation/` tree. Required-pass fixtures currently include all of `01-Parts Tree/` and `02-Parts Interconnection/`, `4a`, `13b`, plus incidental passers in `14`/`15` (`14b`, `15_02`, `15_03`, `15_06`, `15_07`). Remaining fixtures must still fail until promoted into `ROUNDTRIP_PASS`.
 
 Emitter coverage for the validation set is largely in place; remaining known gaps are dominated by **parser opacity** (`Other`, `ExtendedLibraryDecl`, KerML fallbacks), **AST-eq / reparse fidelity**, and a few structured constructs that still need parser work (not missing emit arms). Run `ROUNDTRIP_DIAG=1 cargo test --test roundtrip_validation roundtrip_known_gaps_must_still_fail -- --include-ignored --nocapture` for a per-fixture classification.
 

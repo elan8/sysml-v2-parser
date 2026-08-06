@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   relationship targets and string `type_name` fields. Adjacent emit fixes needed for the listed
   fixtures to reparse: omit redundant `occurrence` after `individual`/`snapshot`/`timeslice`,
   emit occurrence-body state usages as `exhibit` (§6 G30), and quote `.`-separated feature paths
-  per segment.
+  per segment. Incidental full-roundtrip promotions: `4a`, `13b`.
 
 ### Added
 
