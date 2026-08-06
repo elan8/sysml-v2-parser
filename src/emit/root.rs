@@ -1,6 +1,6 @@
 //! Root namespace / package / import emission.
 
-use super::structure;
+use super::{behavior, requirement, structure, view};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
@@ -111,6 +111,53 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::InterfaceDef(i) => structure::emit_interface_def(w, path, &i.value),
         PackageBodyElement::InterfaceUsage(i) => structure::emit_interface_usage(w, path, &i.value),
         PackageBodyElement::Connect(c) => structure::emit_connect(w, path, &c.value),
+        PackageBodyElement::AliasDef(a) => structure::emit_alias_def(w, path, &a.value),
+        PackageBodyElement::ItemDef(i) => structure::emit_item_def(w, path, &i.value),
+        PackageBodyElement::ItemUsage(i) => requirement::emit_item_usage(w, path, &i.value),
+        PackageBodyElement::IndividualDef(i) => structure::emit_individual_def(w, path, &i.value),
+        PackageBodyElement::ActionDef(a) => behavior::emit_action_def(w, path, &a.value),
+        PackageBodyElement::ActionUsage(a) => behavior::emit_action_usage(w, path, &a.value),
+        PackageBodyElement::RequirementDef(r) => {
+            requirement::emit_requirement_def(w, path, &r.value)
+        }
+        PackageBodyElement::RequirementUsage(r) => {
+            requirement::emit_requirement_usage(w, path, &r.value)
+        }
+        PackageBodyElement::ConnectionDef(c) => structure::emit_connection_def(w, path, &c.value),
+        PackageBodyElement::ConnectionUsage(c) => {
+            structure::emit_connection_usage(w, path, &c.value)
+        }
+        PackageBodyElement::MetadataDef(m) => structure::emit_metadata_def(w, path, &m.value),
+        PackageBodyElement::MetadataUsage(m) => structure::emit_metadata_usage(w, path, &m.value),
+        PackageBodyElement::EnumDef(e) => structure::emit_enum_def(w, path, &e.value),
+        PackageBodyElement::Dependency(d) => requirement::emit_dependency(w, path, &d.value),
+        PackageBodyElement::ConstraintDef(c) => view::emit_constraint_def(w, path, &c.value),
+        PackageBodyElement::ConstraintUsage(c) => view::emit_constraint_usage(w, path, &c.value),
+        PackageBodyElement::CalcDef(c) => view::emit_calc_def(w, path, &c.value),
+        PackageBodyElement::ConcernUsage(c) => requirement::emit_concern_usage(w, path, &c.value),
+        PackageBodyElement::UseCaseDef(u) => requirement::emit_use_case_def(w, path, &u.value),
+        PackageBodyElement::UseCaseUsage(u) => requirement::emit_use_case_usage(w, path, &u.value),
+        PackageBodyElement::StateDef(s) => behavior::emit_state_def(w, path, &s.value),
+        PackageBodyElement::StateUsage(s) => behavior::emit_state_usage(w, path, &s.value),
+        PackageBodyElement::Satisfy(s) => requirement::emit_satisfy(w, path, &s.value),
+        PackageBodyElement::EnumerationUsage(e) => {
+            requirement::emit_enumeration_usage(w, path, &e.value)
+        }
+        PackageBodyElement::FlowUsage(f) => behavior::emit_flow_usage(w, path, &f.value),
+        PackageBodyElement::AllocationUsage(a) => {
+            behavior::emit_allocation_usage(w, path, &a.value)
+        }
+        PackageBodyElement::AnalysisCaseDef(a) => {
+            requirement::emit_analysis_case_def(w, path, &a.value)
+        }
+        PackageBodyElement::AnalysisCaseUsage(a) => {
+            requirement::emit_analysis_case_usage(w, path, &a.value)
+        }
+        PackageBodyElement::OccurrenceUsage(o) => {
+            behavior::emit_occurrence_usage(w, path, &o.value)
+        }
+        PackageBodyElement::ViewDef(v) => view::emit_view_def(w, path, &v.value),
+        PackageBodyElement::ViewUsage(v) => view::emit_view_usage(w, path, &v.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)
@@ -257,7 +304,7 @@ fn emit_textual_rep(w: &mut EmitWriter<'_>, rep: &TextualRepresentation) -> Resu
     Ok(())
 }
 
-fn emit_filter(w: &mut EmitWriter<'_>, filter: &FilterMember) -> Result<(), EmitError> {
+pub(crate) fn emit_filter(w: &mut EmitWriter<'_>, filter: &FilterMember) -> Result<(), EmitError> {
     emit_visibility(w, filter.visibility);
     w.push_str("filter ");
     super::expr::emit_expression(w, &filter.condition.value)?;

@@ -11,8 +11,9 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 **Iteration 2 scope:** the full pinned `sysml/src/validation/` tree is under known-gap scan. Fixtures in `ROUNDTRIP_PASS` must roundtrip; every other `.sysml` must still fail until promoted.
 
 - Add fixtures to `ROUNDTRIP_PASS` when they roundtrip.
-- Currently required-pass: all of `01-Parts Tree/` (`1a`/`1c`/`1d`), all of `02-Parts Interconnection/` (`2a`/`2c`), plus incidental `14b` / `15_02` / `15_06` / `15_07`.
+- Currently required-pass: all of `01-Parts Tree/` (`1a`/`1c`/`1d`), all of `02-Parts Interconnection/` (`2a`/`2c`), plus incidental `14b` / `15_02` / `15_03` / `15_06` / `15_07`.
 - Run: `cargo test --test roundtrip_validation -- --include-ignored` (with release tree available). The known-gap test prints a per-folder pass/gap inventory.
+- Diagnose remaining gaps: `$env:ROUNDTRIP_DIAG=1; cargo test --test roundtrip_validation roundtrip_known_gaps_must_still_fail -- --include-ignored --nocapture`
 
 ### Inventory (pinned `2026-04`)
 
@@ -32,10 +33,22 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 | 12-Dependency Relationships | 0 | 3 |
 | 13-Model Containment | 0 | 4 |
 | 14-Language Extensions | 1 | 2 |
-| 15-Properties-Values-Expressions | 3 | 11 |
+| 15-Properties-Values-Expressions | 4 | 10 |
 | 17-Sequence Modeling | 0 | 2 |
 | 18-Use Case | 0 | 1 |
-| **Totals** | **9** | **47** |
+| **Totals** | **10** | **46** |
+
+### Remaining known-gap classes (after emitter expansion)
+
+With emit arms in place for ports, interfaces, actions, states, requirements, constraints, calcs, flows, views, metadata, etc., remaining failures classify roughly as:
+
+| Class | Meaning | Typical next work |
+| ----- | ------- | ----------------- |
+| `opacity` / `emit opaque` (`Other`, `ExtendedLibraryDecl`, KerML decls) | Parser recovered opaquely | Parser structure recovery |
+| `AST-eq` | Emits and reparses, but AST differs | Emit fidelity or lost parse fields (e.g. assume vs require) |
+| `reparse` | Emitted text is not accepted | Emit quoting/shape bugs, or missing grammar in reparse path |
+
+Set `ROUNDTRIP_DIAG=1` when running the known-gap test to print the first failure reason per fixture.
 
 Debug AST snapshots below are **regression canaries only**. They store `Debug` dumps of the AST and fail when that dump changes. Regenerating with `UPDATE_VALIDATION_AST=1` locks in current parser output — including wrong classifications — so snapshots are not a correctness oracle. Prefer roundtrip for new coverage; do not grow the snapshot set.
 

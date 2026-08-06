@@ -26,6 +26,7 @@ const ROUNDTRIP_PASS: &[&str] = &[
     // not deliberately targeted by this iteration beyond inventory.
     "14-Language Extensions/14b-Language Extensions.sysml",
     "15-Properties-Values-Expressions/15_02-Basic Value Properties.sysml",
+    "15-Properties-Values-Expressions/15_03-Value Expression.sysml",
     "15-Properties-Values-Expressions/15_06-System of Quantities.sysml",
     "15-Properties-Values-Expressions/15_07-System of Units and Scales.sysml",
 ];
@@ -259,7 +260,13 @@ fn roundtrip_known_gaps_must_still_fail() {
         let src = fs::read_to_string(file).expect("read known-gap fixture");
         match try_roundtrip(&src) {
             RoundtripOutcome::Ok => unexpected_passes.push(rel),
-            RoundtripOutcome::Failed(_) => {}
+            RoundtripOutcome::Failed(msg) => {
+                if std::env::var_os("ROUNDTRIP_DIAG").is_some() {
+                    let head = msg.lines().next().unwrap_or(&msg);
+                    let brief: String = head.chars().take(140).collect();
+                    eprintln!("GAP {rel}: {brief}");
+                }
+            }
         }
     }
 
