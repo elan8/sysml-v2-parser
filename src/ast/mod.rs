@@ -1320,6 +1320,15 @@ fn normalize_action_def_body_element_node(
     dummy_node(el, value)
 }
 
+fn normalize_payload_clause(p: &PayloadClause) -> PayloadClause {
+    PayloadClause {
+        name: p.name.clone(),
+        type_name: p.type_name.clone(),
+        name_span: Span::dummy(),
+        type_span: p.type_span.as_ref().map(|_| Span::dummy()),
+    }
+}
+
 fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
     ActionUsage {
         is_abstract: a.is_abstract,
@@ -1331,8 +1340,8 @@ fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
         multiplicity: a.multiplicity.clone(),
         subsets: a.subsets.clone(),
         redefines: a.redefines.clone(),
-        accept: a.accept.clone(),
-        send: a.send.clone(),
+        accept: a.accept.as_ref().map(normalize_payload_clause),
+        send: a.send.as_ref().map(normalize_payload_clause),
         body: normalize_action_usage_body(&a.body),
         name_span: None,
         type_ref_span: None,

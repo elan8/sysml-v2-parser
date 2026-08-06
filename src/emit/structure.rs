@@ -70,11 +70,20 @@ pub(crate) fn emit_part_usage(
         w.push_str(" : ");
         w.push_str(&format_qualified_name(&usage.type_name));
     }
-    if let Some(mult) = &usage.multiplicity {
-        emit_multiplicity(w, &mult.value)?;
-    }
-    if usage.ordered {
-        w.push_str(" ordered");
+    // Redefines-only form (`part :>> target[0..1];`) attaches multiplicity after `:>> target`
+    // (BNF / `part_usage_redefines_only`), not before the clause.
+    let redefines_only = usage.name.is_empty()
+        && usage.redefines.is_some()
+        && usage.typing.is_none()
+        && usage.type_name.is_empty()
+        && usage.subsets.is_none();
+    if !redefines_only {
+        if let Some(mult) = &usage.multiplicity {
+            emit_multiplicity(w, &mult.value)?;
+        }
+        if usage.ordered {
+            w.push_str(" ordered");
+        }
     }
     if let Some((subsets, subset_value)) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -85,6 +94,14 @@ pub(crate) fn emit_part_usage(
     }
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if redefines_only {
+        if let Some(mult) = &usage.multiplicity {
+            emit_multiplicity(w, &mult.value)?;
+        }
+        if usage.ordered {
+            w.push_str(" ordered");
+        }
     }
     if let Some(value) = &usage.value {
         // Avoid double-emitting when subsets already carried `= expr`.

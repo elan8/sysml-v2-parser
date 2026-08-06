@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **L2.5 AST-eq / emit-shape gaps for function-based behavior (#74).**
+  - Redefines-only part usages emit multiplicity after `:>> target` (`part :>> part3[0..1];`).
+  - `perform action` is preferred for non-dotted performs so part-usage bodies reparse.
+  - `in item`/`in part` are no longer swallowed by action-body `in_out_decl` fallback.
+  - Standalone `accept`/`send` control nodes emit without a duplicated `action accept accept`.
+  - Unnamed flows use shorthand `flow <from> to <to>` (avoid reparsing `from` as a name).
+  - Feature refs / chains quote name segments; `PayloadClause` / `ActionUsage` PartialEq ignore
+    source spans (same convention as `Membership` / `Node`).
+  - Promoted all `3a-Function-based Behavior-{1,2,3}` and `3c-{1,3}` into `ROUNDTRIP_PASS`.
+  - Remaining intentional gaps: `3c-2`/`7a1` still AST-eq for other reasons; `3e` still hits
+    opaque `Other` deeper in the fixture despite the perform-action smoke.
+
 - **Import emit drops quotes on package names that need them (#71).**
   `emit_import` wrote `Import.target` raw, so spaced / digit-leading names like
   `'2a-Parts Interconnection'::*` reprinted as bare tokens and failed reparse. Targets are
