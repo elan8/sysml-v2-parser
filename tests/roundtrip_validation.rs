@@ -27,22 +27,73 @@ const ROUNDTRIP_PASS: &[&str] = &[
     "03-Function-based Behavior/3a-Function-based Behavior-2.sysml",
     "03-Function-based Behavior/3a-Function-based Behavior-3.sysml",
     "03-Function-based Behavior/3c-Function-based Behavior-structure mod-1.sysml",
+    "03-Function-based Behavior/3c-Function-based Behavior-structure mod-2.sysml",
     "03-Function-based Behavior/3c-Function-based Behavior-structure mod-3.sysml",
+    "03-Function-based Behavior/3d-Function-based Behavior-item.sysml",
+    // Promoted by #78 follow-up: `part` in item/attribute bodies.
+    "03-Function-based Behavior/3e-Function-based Behavior-item.sysml",
     // Promoted by #72 Other-opacity work (state do/out/accept; attribute assert constraint).
+    "05-State-based Behavior/5-State-based Behavior-1.sysml",
     "05-State-based Behavior/5-State-based Behavior-1a.sysml",
+    "05-State-based Behavior/5-State-based Behavior-2.sysml",
     // Promoted by import/type quoting (#71) once spaced names reparse cleanly.
     "04-Functional Allocation/4a-Functional Allocation.sysml",
+    // Promoted by #78 AST-eq span PartialEq + dependency `from` fix.
+    "06-Individual and Snapshots/6-Individual and Snapshots.sysml",
+    "07-Variant Configuration/7a-Variant Configuration - General Concept.sysml",
+    "07-Variant Configuration/7a1-Variant Configuration - General Concept-a.sysml",
+    // Promoted by #78 follow-up: Conditional `if ? else` + `->forAll {…}` brace bodies.
+    "07-Variant Configuration/7b-Variant Configurations.sysml",
+    // Promoted by #78 follow-up: `requirement references`, `require name`, `in :>>`.
+    "08-Requirements/8-Requirements.sysml",
+    // Promoted by #78 follow-up: verification case emit + action in case bodies + `:>>` bindings.
+    "09-Verification/9-Verification-simplified.sysml",
+    // Promoted by #78 follow-up: concern `subject;` / `stakeholder :>>` + viewpoint/view satisfy emit.
+    "11-View and Viewpoint/11a-View-Viewpoint.sysml",
+    "11-View and Viewpoint/11b-Safety and Security Feature Views.sysml",
+    // Promoted by #78 follow-up: nested analysis usage emit in part/case bodies.
+    "10-Analysis and Trades/10a-Analysis.sysml",
+    // Promoted by #78 follow-up: `in part`/`in calc`/`in requirement`/`return part|attribute`,
+    // nested calc rollups, and analysis for-loops.
+    "10-Analysis and Trades/10b-Trade-off Among Alternative Configurations.sysml",
+    "10-Analysis and Trades/10c-Fuel Economy Analysis.sysml",
+    "10-Analysis and Trades/10d-Dynamics Analysis.sysml",
+    "12-Dependency Relationships/12a-Dependency.sysml",
     // Promoted by #73: AllocationDef emit + structured `end` in allocation bodies.
     "12-Dependency Relationships/12b-Allocation-1.sysml",
+    // Promoted by #78 follow-up: bare `allocate` shorthand emit (not `allocation allocate`).
+    "12-Dependency Relationships/12b-Allocation.sysml",
+    "13-Model Containment/13a-Model Containment.sysml",
     "13-Model Containment/13b-Safety and Security Features Element Group.sysml",
+    "13-Model Containment/13b-Safety and Security Features Element Group-1.sysml",
+    "13-Model Containment/13b-Safety and Security Features Element Group-2.sysml",
     // Promoted by the full-tree known-gap scan once port/interface/connect emit landed;
     // not deliberately targeted by this iteration beyond inventory.
+    "14-Language Extensions/14a-Language Extensions.sysml",
     "14-Language Extensions/14b-Language Extensions.sysml",
+    // Promoted by #78 follow-up: package `#` metadata prefix + `part` in item bodies.
+    "14-Language Extensions/14c-Language Extensions.sysml",
     "15-Properties-Values-Expressions/15_01-Constants.sysml",
     "15-Properties-Values-Expressions/15_02-Basic Value Properties.sysml",
     "15-Properties-Values-Expressions/15_03-Value Expression.sysml",
+    // Promoted by #78 follow-up: ConditionalExpression + CollectionOp brace body.
+    "15-Properties-Values-Expressions/15_04-Logical Expressions.sysml",
+    "15-Properties-Values-Expressions/15_05-Unification of Expression and Constraint Definition.sysml",
     "15-Properties-Values-Expressions/15_06-System of Quantities.sysml",
     "15-Properties-Values-Expressions/15_07-System of Units and Scales.sysml",
+    "15-Properties-Values-Expressions/15_08-Range Restriction.sysml",
+    "15-Properties-Values-Expressions/15_10-Primitive Data Types.sysml",
+    // Promoted by #78 follow-up: `ref` / `ref part` in attribute & item bodies.
+    "15-Properties-Values-Expressions/15_11-Variable Length Collection Types.sysml",
+    "15-Properties-Values-Expressions/15_12-Compound Value Type.sysml",
+    "15-Properties-Values-Expressions/15_13-Discretely Sampled Function Value.sysml",
+    "15-Properties-Values-Expressions/15_19-Materials with Properties.sysml",
+    "15-Properties-Values-Expressions/15_19a-Materials with Properties.sysml",
+    // Promoted by #78 follow-up: occurrence def emit + event/message sequence bodies.
+    "17-Sequence Modeling/17a-Sequence-Modeling.sysml",
+    "17-Sequence Modeling/17b-Sequence-Modeling.sysml",
+    // Promoted by #78 follow-up: objective body emit (no `requirement objective` reprint).
+    "18-Use Case/18-Use Case.sysml",
 ];
 
 fn release_root() -> PathBuf {

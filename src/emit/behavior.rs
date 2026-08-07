@@ -23,6 +23,9 @@ pub(crate) fn emit_inout_decl(
     decl: &InOutDecl,
 ) -> Result<(), EmitError> {
     emit_direction(w, decl.direction);
+    if decl.is_redefinition {
+        w.push_str(":>> ");
+    }
     w.push_str(&format_name(&decl.name));
     if !decl.type_name.is_empty() {
         w.push_str(" : ");
@@ -120,7 +123,7 @@ pub(crate) fn emit_action_usage(
     emit_action_usage_body(w, path, &usage.body)
 }
 
-fn emit_action_def_body(
+pub(crate) fn emit_action_def_body(
     w: &mut EmitWriter<'_>,
     path: &str,
     body: &ActionDefBody,
@@ -209,6 +212,14 @@ fn emit_action_def_body_element(
                 emit_action_def_body(w, path, else_body)?;
             }
             Ok(())
+        }
+        ActionDefBodyElement::ForLoop(f) => {
+            w.push_str("for ");
+            w.push_str(&format_name(&f.value.var));
+            w.push_str(" in ");
+            emit_expression(w, &f.value.range.value)?;
+            w.push_char(' ');
+            emit_action_def_body(w, path, &f.value.body)
         }
         other => w.unsupported(
             path,
@@ -682,6 +693,19 @@ pub(crate) fn emit_allocation_usage(
     usage: &crate::ast::AllocationUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
+    // Bare `allocate src to dst` (package-level `allocate_usage`) must not be rewritten as
+    // `allocation allocate …` — that form reparses as ExtendedLibraryDecl (validation `12b`).
+    let shorthand = usage.name.is_empty() && usage.type_name.is_none();
+    if shorthand {
+        w.push_str("allocate ");
+        let (Some(source), Some(target)) = (&usage.source, &usage.target) else {
+            return w.unsupported(path, "allocate shorthand without ends");
+        };
+        emit_expression(w, &source.value)?;
+        w.push_str(" to ");
+        emit_expression(w, &target.value)?;
+        return emit_definition_body(w, path, &usage.body);
+    }
     w.push_str("allocation ");
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
@@ -962,6 +986,23 @@ fn emit_first_stmt(w: &mut EmitWriter<'_>, first: &crate::ast::FirstStmt) -> Res
         crate::ast::FirstMergeBody::Brace => w.push_str(" {}"),
     }
     Ok(())
+}
+
+pub(crate) fn emit_occurrence_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::OccurrenceDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    if def.is_abstract {
+        w.push_str("abstract ");
+    }
+    w.push_str("occurrence def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    emit_definition_body(w, path, &def.body)
 }
 
 pub(crate) fn emit_occurrence_usage(

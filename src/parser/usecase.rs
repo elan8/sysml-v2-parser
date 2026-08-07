@@ -1,5 +1,5 @@
 use crate::ast::{
-    ActorDecl, ActorRedefinitionAssignment, ActorUsage, CaseReturnDecl, FirstSuccession,
+    ActorDecl, ActorRedefinitionAssignment, ActorUsage, CalcUsage, CaseReturnDecl, FirstSuccession,
     IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition, ReturnRef,
     SubjectRef, ThenDone, ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody,
     UseCaseDefBodyElement, UseCaseUsage, Visibility,
@@ -184,8 +184,8 @@ fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition
     ))
 }
 
-/// Parses `return [attribute] <name> [: <type>] [= <expr>] ;`
-/// or `return :>> <name> [= <expr>] ;`.
+/// Parses `return [attribute|part]? [:>>]? <name>? [:|:> <type>] [mult]? [=|:= <expr>] ;`
+/// or anonymous `return : Type [= expr];`.
 ///
 /// Handles the common verification/analysis case body forms where `return` declares
 /// the output parameter (e.g. `return verdict : VerdictKind = ...`).
@@ -202,38 +202,57 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
             nom::error::ErrorKind::Tag,
         )));
     }
-    // Handle `return :>> name ...` redefine form.
-    let (input, is_redefine) = if after_ws.fragment().starts_with(b":>>") {
-        let (input, _) = ws_and_comments(input)?;
+    // Optional `attribute` / `part` keywords (`return part :>> selectedAlternative : Engine;`).
+    let (input, _) = ws_and_comments(input)?;
+    let (input, feature_kind) = opt(alt((
+        map(nom::bytes::complete::tag(&b"attribute"[..]), |_| {
+            crate::ast::CaseReturnFeatureKind::Attribute
+        }),
+        map(nom::bytes::complete::tag(&b"part"[..]), |_| {
+            crate::ast::CaseReturnFeatureKind::Part
+        }),
+    )))
+    .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    // Optional `:>>` redefine — may appear before or after the feature-kind keyword; we already
+    // consumed the keyword above, so only the post-keyword form remains here.
+    let (input, is_redefine) = if input.fragment().starts_with(b":>>") {
         let (input, _) = tag(&b":>>"[..]).parse(input)?;
         (input, true)
     } else {
         (input, false)
     };
-    // Skip optional `attribute` keyword.
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(nom::bytes::complete::tag(&b"attribute"[..])).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, n)) = with_span(name).parse(input)?;
-    // Optional `: type`.
-    let (input, _) = ws_and_comments(input)?;
-    let (input, type_name) =
+    // Anonymous typed form: `return : Type [= expr];`
+    let (input, (name_span, n)) =
         if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
-            let (input, _) = tag(&b":"[..]).parse(input)?;
-            let (input, _) = ws_and_comments(input)?;
-            let (input, tn) = crate::parser::lex::qualified_name(input)?;
-            (input, Some(tn))
+            (input, (crate::ast::Span::dummy(), String::new()))
         } else {
-            (input, None)
+            with_span(name).parse(input)?
         };
+    // Optional `: type` or `:> type`.
     let (input, _) = ws_and_comments(input)?;
-    let (input, value_expression) = if input.fragment().starts_with(b"=") {
-        let (input, _) = tag(&b"="[..]).parse(input)?;
-        let (input, value_expression) = preceded(ws_and_comments, expression).parse(input)?;
-        (input, Some(value_expression))
+    let (input, (is_subsetting, type_name)) = if input.fragment().starts_with(b":>>") {
+        (input, (false, None))
+    } else if input.fragment().starts_with(b":>") {
+        let (input, _) = tag(&b":>"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        let (input, tn) = crate::parser::lex::qualified_name(input)?;
+        (input, (true, Some(tn)))
+    } else if input.fragment().starts_with(b":") {
+        let (input, _) = tag(&b":"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        let (input, tn) = crate::parser::lex::qualified_name(input)?;
+        (input, (false, Some(tn)))
     } else {
-        (input, None)
+        (input, (false, None))
     };
+    let (input, multiplicity) = opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    let (input, value) = opt(preceded(
+        ws_and_comments,
+        crate::parser::feature_value::feature_value_part,
+    ))
+    .parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -244,8 +263,11 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
                 name: n,
                 name_span: Some(name_span),
                 type_name,
-                value_expression,
+                value,
                 is_redefine,
+                is_subsetting,
+                feature_kind,
+                multiplicity,
             },
         ),
     ))
@@ -485,8 +507,16 @@ pub(crate) fn use_case_def_body_element(
                 UseCaseDefBodyElement::MetadataKeywordUsage,
             ),
             map(
-                |i| attribute_def(i, false),
+                |i| attribute_def(i, true),
                 UseCaseDefBodyElement::AttributeDef,
+            ),
+            map(
+                crate::parser::attribute::directed_attribute_usage,
+                UseCaseDefBodyElement::AttributeUsage,
+            ),
+            map(
+                crate::parser::attribute::attribute_usage,
+                UseCaseDefBodyElement::AttributeUsage,
             ),
             map(subject_decl, UseCaseDefBodyElement::SubjectDecl),
             map(subject_ref, UseCaseDefBodyElement::SubjectRef),
@@ -521,15 +551,91 @@ pub(crate) fn use_case_def_body_element(
                 crate::parser::action::then_action,
                 UseCaseDefBodyElement::ThenAction,
             ),
+            map(crate::parser::action::action_usage, |n| {
+                UseCaseDefBodyElement::ActionUsage(Box::new(n))
+            }),
+            map(crate::parser::case::analysis_case_usage, |n| {
+                UseCaseDefBodyElement::AnalysisCaseUsage(Box::new(n))
+            }),
+            map(directed_calc_usage, |n| {
+                UseCaseDefBodyElement::CalcUsage(Box::new(n))
+            }),
+            map(crate::parser::constraint::calc_usage, |n| {
+                UseCaseDefBodyElement::CalcUsage(Box::new(n))
+            }),
+            map(directed_requirement_usage, |n| {
+                UseCaseDefBodyElement::RequirementUsage(Box::new(n))
+            }),
+            map(crate::parser::requirement::requirement_usage, |n| {
+                UseCaseDefBodyElement::RequirementUsage(Box::new(n))
+            }),
+            map(crate::parser::part::part_usage, |n| {
+                UseCaseDefBodyElement::PartUsage(Box::new(n))
+            }),
             map(
                 crate::parser::flow::flow_usage_member,
                 UseCaseDefBodyElement::FlowUsage,
+            ),
+            map(
+                |i| {
+                    let (i, _) = ws_and_comments(i)?;
+                    // Don't steal declaration keywords as FeatureRef expressions.
+                    if is_use_case_statement_keyword(i.fragment()) {
+                        return Err(nom::Err::Error(nom::error::Error::new(
+                            i,
+                            nom::error::ErrorKind::Tag,
+                        )));
+                    }
+                    let (i, expr) = expression(i)?;
+                    let (i, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(i)?;
+                    Ok((i, expr))
+                },
+                UseCaseDefBodyElement::Expression,
             ),
             other_use_case_body_element,
         )),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
+}
+
+fn is_use_case_statement_keyword(frag: &[u8]) -> bool {
+    crate::parser::lex::starts_with_keyword(frag, b"in")
+        || crate::parser::lex::starts_with_keyword(frag, b"out")
+        || crate::parser::lex::starts_with_keyword(frag, b"inout")
+        || crate::parser::lex::starts_with_keyword(frag, b"return")
+        || crate::parser::lex::starts_with_keyword(frag, b"calc")
+        || crate::parser::lex::starts_with_keyword(frag, b"requirement")
+        || crate::parser::lex::starts_with_keyword(frag, b"attribute")
+        || crate::parser::lex::starts_with_keyword(frag, b"part")
+        || crate::parser::lex::starts_with_keyword(frag, b"private")
+        || crate::parser::lex::starts_with_keyword(frag, b"protected")
+        || crate::parser::lex::starts_with_keyword(frag, b"public")
+        || crate::parser::lex::starts_with_keyword(frag, b"action")
+        || crate::parser::lex::starts_with_keyword(frag, b"analysis")
+        || crate::parser::lex::starts_with_keyword(frag, b"for")
+        || crate::parser::lex::starts_with_keyword(frag, b"assign")
+        || crate::parser::lex::starts_with_keyword(frag, b"perform")
+        || crate::parser::lex::starts_with_keyword(frag, b"subject")
+        || crate::parser::lex::starts_with_keyword(frag, b"actor")
+        || crate::parser::lex::starts_with_keyword(frag, b"objective")
+        || crate::parser::lex::starts_with_keyword(frag, b"flow")
+}
+
+fn directed_calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
+    let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
+    let (input, mut usage) = crate::parser::constraint::calc_usage(input)?;
+    usage.value.direction = Some(direction);
+    Ok((input, usage))
+}
+
+fn directed_requirement_usage(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::RequirementUsage>> {
+    let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
+    let (input, mut usage) = crate::parser::requirement::requirement_usage(input)?;
+    usage.value.direction = Some(direction);
+    Ok((input, usage))
 }
 
 pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
@@ -551,6 +657,7 @@ pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsag
     };
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -560,6 +667,7 @@ pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsag
             ActorUsage {
                 name: n,
                 type_name,
+                multiplicity,
                 membership: Membership::actor(visibility, visibility_span),
             },
         ),
@@ -664,5 +772,15 @@ mod membership_tests {
     fn actor_usage_without_visibility_prefix_has_no_membership_visibility() {
         let (_, node) = actor_usage(input("actor a1 : A1;")).expect("actor usage");
         assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn actor_usage_accepts_multiplicity() {
+        let (rest, node) = actor_usage(input("actor passengers : Person[0..4];"))
+            .expect("actor with multiplicity");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "passengers");
+        assert_eq!(node.value.type_name, "Person");
+        assert!(node.value.multiplicity.is_some());
     }
 }

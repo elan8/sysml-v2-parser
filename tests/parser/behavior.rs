@@ -250,7 +250,7 @@ action def Compute {
     match &assign.rhs.value {
         // PAR-005 item 2: `->size()` is now a dedicated `CollectionOp`, not a generic
         // `Invocation` wrapping `MemberAccess`.
-        Expression::CollectionOp { op, base, args } => {
+        Expression::CollectionOp { op, base, args, .. } => {
             assert_eq!(op, &sysml_v2_parser::ast::CollectionOperator::Size);
             assert!(args.is_empty());
             assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "collection"));

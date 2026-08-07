@@ -30,6 +30,7 @@ use crate::ast::{
 };
 use crate::parser::body::{advance_to_closing_brace, relationship_body_annotations};
 use crate::parser::expr::path_expression;
+use crate::parser::feature_value::feature_value_part;
 use crate::parser::item::item_usage;
 use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws1, ws_and_comments};
 use crate::parser::node_from_to;
@@ -323,6 +324,14 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         }
     };
     let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    // `:>>` redefines may also follow the type instead of preceding it, e.g. `ref self: Item
+    // :>> Object::self;` (Systems Library `Items.sysml`) -- only retry if the earlier attempt
+    // (before the type) didn't already find one.
+    let (input, redefines) = if redefines.is_none() {
+        opt(preceded(ws_and_comments, redefinition)).parse(input)?
+    } else {
+        (input, redefines)
+    };
     // `:>` subsets, independent of and in addition to `:>>` redefines, e.g. `ref requirement
     // originalRequirement[1] :>> originalRequirements :> participant { ... }` (Systems Library
     // `Domain Libraries/Requirement Derivation/DerivationConnections.sysml`).
@@ -337,6 +346,9 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         alt((tag(&b"nonunique"[..]), tag(&b"ordered"[..]))),
     ))
     .parse(input)?;
+    // Optional value/default clause, e.g. `ref item :>> localClock : Clock[1] default
+    // Time::universalClock { ... }` (Domain Libraries `SpatialItems.sysml`).
+    let (input, value) = opt(preceded(ws_and_comments, feature_value_part)).parse(input)?;
     let (input, body) = ref_body(input)?;
     Ok((
         input,
@@ -349,7 +361,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 typing,
                 subsets,
                 redefines,
-                value: None,
+                value,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,

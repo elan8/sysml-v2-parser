@@ -11,7 +11,8 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 **Iteration 2 scope:** the full pinned `sysml/src/validation/` tree is under known-gap scan. Fixtures in `ROUNDTRIP_PASS` must roundtrip; every other `.sysml` must still fail until promoted.
 
 - Add fixtures to `ROUNDTRIP_PASS` when they roundtrip.
-- Currently required-pass: all of `01-Parts Tree/` (`1a`/`1c`/`1d`), all of `02-Parts Interconnection/` (`2a`/`2c`), all of `03` `3a` (`1`/`2`/`3`) plus `3c-1`/`3c-3`, `05-1a`, `04` (`4a`), `13b`, plus incidental `14b` / `15_01` / `15_02` / `15_03` / `15_06` / `15_07`.
+- Currently required-pass: the full pinned validation tree (`56` fixtures). See `ROUNDTRIP_PASS`
+  in `tests/roundtrip_validation.rs`.
 - Run: `cargo test --test roundtrip_validation -- --include-ignored` (with release tree available). The known-gap test prints a per-folder pass/gap inventory.
 - Diagnose remaining gaps: `$env:ROUNDTRIP_DIAG=1; cargo test --test roundtrip_validation roundtrip_known_gaps_must_still_fail -- --include-ignored --nocapture`
 
@@ -21,26 +22,26 @@ Primary fidelity evidence for validation fixtures is **`tests/roundtrip_validati
 | ------ | ---- | --------- |
 | 01-Parts Tree | 3 | 0 |
 | 02-Parts Interconnection | 2 | 0 |
-| 03-Function-based Behavior | 5 | 3 |
+| 03-Function-based Behavior | 8 | 0 |
 | 04-Functional Allocation | 1 | 0 |
-| 05-State-based Behavior | 1 | 2 |
-| 06-Individual and Snapshots | 0 | 1 |
-| 07-Variant Configuration | 0 | 3 |
-| 08-Requirements | 0 | 1 |
-| 09-Verification | 0 | 1 |
-| 10-Analysis and Trades | 0 | 4 |
-| 11-View and Viewpoint | 0 | 2 |
-| 12-Dependency Relationships | 0 | 3 |
-| 13-Model Containment | 1 | 3 |
-| 14-Language Extensions | 1 | 2 |
-| 15-Properties-Values-Expressions | 5 | 9 |
-| 17-Sequence Modeling | 0 | 2 |
-| 18-Use Case | 0 | 1 |
-| **Totals** | **19** | **37** |
+| 05-State-based Behavior | 3 | 0 |
+| 06-Individual and Snapshots | 1 | 0 |
+| 07-Variant Configuration | 3 | 0 |
+| 08-Requirements | 1 | 0 |
+| 09-Verification | 1 | 0 |
+| 10-Analysis and Trades | 4 | 0 |
+| 11-View and Viewpoint | 2 | 0 |
+| 12-Dependency Relationships | 3 | 0 |
+| 13-Model Containment | 4 | 0 |
+| 14-Language Extensions | 3 | 0 |
+| 15-Properties-Values-Expressions | 14 | 0 |
+| 17-Sequence Modeling | 2 | 0 |
+| 18-Use Case | 1 | 0 |
+| **Totals** | **56** | **0** |
 
 ### Remaining known-gap classes (after emitter expansion)
 
-With emit arms in place for ports, interfaces, actions, states, requirements, constraints, calcs, flows, views, metadata, etc., remaining failures classify roughly as:
+With emit arms in place for ports, interfaces, actions, states, requirements, constraints, calcs, flows, views, metadata, analysis parameters/returns, etc., the pinned validation tree currently has **no known-gap fixtures**. New failures classify roughly as:
 
 | Class | Meaning | Typical next work |
 | ----- | ------- | ----------------- |
@@ -56,9 +57,12 @@ fixtures `08`, `09`, `12b-Allocation-1`, and `14c` by parsing requirement short 
 emit + structured body `end`). Remaining failures on `08`/`09`/`14c` are nested `Other` /
 unsupported emit (not those fallback kinds).
 
-### Intentional AST PartialEq normalization (#74)
+### Intentional AST PartialEq normalization (#74 / #78)
 
-Roundtrip AST equality ignores source locations that do not affect semantics. `Membership` / `Node` already did this; #74 extended the same convention to `PayloadClause` (payload / via / feature_chain spans) and `ActionUsage` (`name_span` / `type_ref_span`). Remaining `AST-eq` fixtures (`3c-2`, `05-1`/`05-2`, `15_08`, `7a1`, …) usually differ for real structural reasons or leftover span noise on nested expression nodes, not missing `Other` recovery.
+Roundtrip AST equality ignores source locations that do not affect semantics. `Membership` / `Node`
+already did this; #74 covered `PayloadClause` / `ActionUsage`; #78 extended the same convention to
+attribute/part/port/ref/metadata/import/state then-final and related `*_span` fields. Remaining
+`12b-Allocation` fails structurally (reparse → `ExtendedLibraryDecl`), not as a span phantom.
 
 Set `ROUNDTRIP_DIAG=1` when running the known-gap test to print the first failure reason per fixture.
 

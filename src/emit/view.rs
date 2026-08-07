@@ -1,7 +1,7 @@
 //! View / calc / constraint emission.
 
 use super::behavior::emit_inout_decl;
-use super::expr::emit_expression;
+use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_doc, emit_identification};
 use super::structure::emit_typing_clause;
 use super::writer::{emit_visibility, format_name, format_qualified_name, EmitWriter};
@@ -89,6 +89,24 @@ pub(crate) fn emit_constraint_body_element(
             Ok(())
         }
         ConstraintDefBodyElement::Constraint(c) => emit_constraint_usage(w, path, &c.value),
+        ConstraintDefBodyElement::AttributeUsage(a) => {
+            // Keyword-less `:>> name = …` inside `require name { … }` (validation `10c`).
+            if a.value.redefines.is_some()
+                && a.value.subsets.is_none()
+                && a.value.references.is_none()
+                && a.value.direction.is_none()
+                && !a.value.is_end
+                && a.value.short_name.is_none()
+                && a.value
+                    .redefines
+                    .as_ref()
+                    .is_some_and(|r| r.value.target_display() == a.value.name)
+            {
+                super::requirement::emit_redefinition_attribute_binding(w, path, &a.value)
+            } else {
+                super::structure::emit_attribute_usage(w, path, &a.value)
+            }
+        }
         ConstraintDefBodyElement::MetadataAnnotation(_) => {
             w.unsupported(path, "Constraint MetadataAnnotation")
         }
@@ -112,11 +130,22 @@ pub(crate) fn emit_calc_usage(
     usage: &CalcUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
+    if let Some(dir) = usage.direction {
+        super::structure::emit_direction(w, dir);
+    }
     w.push_str("calc ");
-    emit_identification(w, &usage.identification);
+    if let Some(redefines) = &usage.redefines {
+        w.push_str(":>> ");
+        w.push_str(&format_qualified_name(redefines));
+    } else {
+        emit_identification(w, &usage.identification);
+    }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_str(&format_qualified_name(ty));
+    }
+    if let Some(value) = &usage.value {
+        emit_feature_value(w, value)?;
     }
     emit_calc_body(w, path, &usage.body)
 }
@@ -159,6 +188,9 @@ fn emit_calc_body_element(
         CalcDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
+        CalcDefBodyElement::CalcUsage(c) => emit_calc_usage(w, path, &c.value),
+        CalcDefBodyElement::CalcDef(c) => emit_calc_def(w, path, &c.value),
+        CalcDefBodyElement::PartUsage(p) => super::structure::emit_part_usage(w, path, &p.value),
         CalcDefBodyElement::Expression(e) => {
             emit_expression(w, &e.value)?;
             w.push_char(';');
@@ -170,13 +202,24 @@ fn emit_calc_body_element(
 
 fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {
     w.push_str("return ");
+    if ret.is_redefine {
+        w.push_str(":>> ");
+    }
     if !ret.name.is_empty() {
         w.push_str(&format_name(&ret.name));
-        w.push_str(" : ");
-    } else {
+    }
+    if ret.is_subsetting {
+        w.push_str(":>");
+    } else if ret.name.is_empty() {
         w.push_str(": ");
+    } else {
+        w.push_str(" : ");
     }
     w.push_str(&format_qualified_name(&ret.type_name));
+    if let Some(value) = &ret.value {
+        w.push_str(" = ");
+        emit_expression(w, &value.value)?;
+    }
     w.push_char(';');
     Ok(())
 }
@@ -311,8 +354,13 @@ pub(crate) fn emit_view_usage(
                         w.push_str(&format_qualified_name(&e.value.target));
                         w.push_char(';');
                     }
-                    crate::ast::ViewBodyElement::Satisfy(_) => {
-                        return w.unsupported(&format!("{path}/body[{i}]"), "ViewBody Satisfy");
+                    crate::ast::ViewBodyElement::Satisfy(s) => {
+                        w.push_str("satisfy ");
+                        w.push_str(&format_qualified_name(&s.value.viewpoint_ref));
+                        match &s.value.body {
+                            crate::ast::ConnectBody::Semicolon => w.push_char(';'),
+                            crate::ast::ConnectBody::Brace => w.push_str(" {}"),
+                        }
                     }
                 }
                 w.newline();
@@ -360,6 +408,129 @@ fn emit_view_rendering(
                     crate::ast::RenderingUsageBodyElement::Error(_) => {
                         return Err(EmitError::Opaque {
                             path: format!("{path}/render[{i}]"),
+                            kind: super::OpacityKind::ParseError,
+                        });
+                    }
+                    crate::ast::RenderingUsageBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingUsageBodyElement::ViewUsage(v) => {
+                        emit_view_usage(w, path, &v.value)?;
+                    }
+                }
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
+        }
+    }
+}
+
+pub(crate) fn emit_viewpoint_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::ViewpointDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    w.push_str("viewpoint def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    super::requirement::emit_requirement_body_pub(w, path, &def.body)
+}
+
+pub(crate) fn emit_viewpoint_usage(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    usage: &crate::ast::ViewpointUsage,
+) -> Result<(), EmitError> {
+    emit_visibility(w, usage.membership.visibility);
+    w.push_str("viewpoint ");
+    w.push_str(&format_name(&usage.name));
+    if !usage.type_name.is_empty() {
+        w.push_str(" : ");
+        w.push_str(&format_qualified_name(&usage.type_name));
+    }
+    super::requirement::emit_requirement_body_pub(w, path, &usage.body)
+}
+
+pub(crate) fn emit_rendering_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::RenderingDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    w.push_str("rendering def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    match &def.body {
+        crate::ast::RenderingDefBody::Semicolon => {
+            w.push_char(';');
+            Ok(())
+        }
+        crate::ast::RenderingDefBody::Brace { elements } => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                match &el.value {
+                    crate::ast::RenderingDefBodyElement::Error(_) => {
+                        return Err(EmitError::Opaque {
+                            path: format!("{path}/body[{i}]"),
+                            kind: super::OpacityKind::ParseError,
+                        });
+                    }
+                    crate::ast::RenderingDefBodyElement::Other(_) => {
+                        return Err(EmitError::Opaque {
+                            path: format!("{path}/body[{i}]"),
+                            kind: super::OpacityKind::Other,
+                        });
+                    }
+                    crate::ast::RenderingDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingDefBodyElement::Filter(f) => {
+                        super::root::emit_filter(w, &f.value)?;
+                    }
+                    crate::ast::RenderingDefBodyElement::ViewRendering(r) => {
+                        emit_view_rendering(w, path, &r.value)?;
+                    }
+                }
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
+        }
+    }
+}
+
+pub(crate) fn emit_rendering_usage(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    usage: &crate::ast::RenderingUsage,
+) -> Result<(), EmitError> {
+    emit_visibility(w, usage.membership.visibility);
+    w.push_str("rendering ");
+    w.push_str(&format_name(&usage.name));
+    if let Some(ty) = &usage.type_name {
+        w.push_str(" : ");
+        w.push_str(&format_qualified_name(ty));
+    }
+    match &usage.body {
+        crate::ast::RenderingUsageBody::Semicolon => {
+            w.push_char(';');
+            Ok(())
+        }
+        crate::ast::RenderingUsageBody::Brace { elements } => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                match &el.value {
+                    crate::ast::RenderingUsageBodyElement::Error(_) => {
+                        return Err(EmitError::Opaque {
+                            path: format!("{path}/body[{i}]"),
                             kind: super::OpacityKind::ParseError,
                         });
                     }

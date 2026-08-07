@@ -17,7 +17,7 @@ use crate::parser::lex::{
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
-use crate::parser::usage::multiplicity_node;
+use crate::parser::usage::{multiplicity_node, redefinition, targets_display_string};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -257,6 +257,36 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
         )));
     }
     let (input, _) = nom::combinator::opt(preceded(tag(&b"attribute"[..]), ws1)).parse(input)?;
+    // `in :>> name = expr;` / `out :>> name;` (validation `08` require bodies). Also covers the
+    // multiplicity form (`in :>> payload [0..*];`) and the comma-separated multi-target form
+    // (`in :>> MessageTransfer::payload, MessageAction::payload;`), both from Systems Library
+    // `Actions.sysml`'s `SendAction`/`TransitionAction`.
+    let (peek_redef, _) = ws_and_comments(input)?;
+    if peek_redef.fragment().starts_with(b":>>") {
+        let (input, redefines) = redefinition(input)?;
+        let param_name = targets_display_string(&redefines.value.target);
+        let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+        let (input, value) = opt(preceded(
+            preceded(ws_and_comments, tag(&b"="[..])),
+            preceded(ws_and_comments, expression),
+        ))
+        .parse(input)?;
+        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+        return Ok((
+            input,
+            node_from_to(
+                start,
+                input,
+                InOutDecl {
+                    direction,
+                    name: param_name,
+                    type_name: String::new(),
+                    is_redefinition: true,
+                    value,
+                },
+            ),
+        ));
+    }
     let parsed = (|| {
         // Library shorthand: `in action body { ... }` (treat as name `body` typed as `action`)
         let (input, action_typed_name) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
@@ -348,6 +378,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                 direction,
                 name: param_name,
                 type_name,
+                is_redefinition: false,
                 value,
             },
         ),

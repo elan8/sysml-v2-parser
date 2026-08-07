@@ -50,13 +50,11 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
-    b"ref",
     b"item",
     b"constraint",
     b"private",
     b"derived",
     b"abstract",
-    b"part",
     b"binding",
     b"connection",
     b":>>",
@@ -215,6 +213,16 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
             crate::parser::occurrence_body::assert_constraint_member,
             AttributeBodyElement::AssertConstraint,
         ),
+        // `ref` / `ref part` / `ref :>> …` in attribute / item bodies (15_11, 15_19, 17a, 17b).
+        // Before opaque capture so these no longer land in `Other`.
+        map(
+            crate::parser::connector::ref_decl,
+            AttributeBodyElement::RefDecl,
+        ),
+        // Nested `part` in item / attribute bodies (validation `3e`, `14c`).
+        map(crate::parser::part::part_usage, |n| {
+            AttributeBodyElement::PartUsage(Box::new(n))
+        }),
         map(
             |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
             AttributeBodyElement::Other,
@@ -1278,5 +1286,25 @@ mod attribute_body_tests {
             node.value,
             AttributeBodyElement::AssertConstraint(_)
         ));
+    }
+
+    /// Attribute / item bodies own `ref` members (validation 15_11 / 17a).
+    #[test]
+    fn attribute_body_accepts_ref_part_redefines() {
+        let (rest, node) =
+            attribute_body_element(input("ref part :>> elements: Person;")).expect("ref part :>>");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, AttributeBodyElement::RefDecl(_)));
+    }
+
+    #[test]
+    fn attribute_body_accepts_ref_part_name() {
+        let (rest, node) =
+            attribute_body_element(input("ref part subscriber;")).expect("ref part name");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match &node.value {
+            AttributeBodyElement::RefDecl(r) => assert_eq!(r.value.name, "subscriber"),
+            other => panic!("expected RefDecl, got {other:?}"),
+        }
     }
 }

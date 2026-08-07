@@ -410,6 +410,8 @@ fn type_check_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> 
 fn primary_atom(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
     alt((
+        conditional_expression,
+        extent_expression,
         literal_with_unit,
         literal_only,
         null_expression,
@@ -420,6 +422,100 @@ fn primary_atom(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         feature_ref_primary,
     ))
     .parse(input)
+}
+
+/// `if <test> ? <then> else <else>`
+fn conditional_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, _) = keyword_token(input, b"if")?;
+    let (input, test) = expression(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"?"[..])).parse(input)?;
+    let (input, then_expr) = expression(input)?;
+    let (input, _) = preceded(ws_and_comments, |i| keyword_token(i, b"else")).parse(input)?;
+    let (input, else_expr) = expression(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            Expression::Conditional {
+                test: Box::new(test),
+                then_expr: Box::new(then_expr),
+                else_expr: Box::new(else_expr),
+            },
+        ),
+    ))
+}
+
+/// `all QualifiedName`
+fn extent_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, _) = keyword_token(input, b"all")?;
+    let (input, target) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, Expression::Extent { target }),
+    ))
+}
+
+/// Capture a balanced `{ ... }` including the braces.
+fn take_balanced_braces(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, _) = ws_and_comments(input)?;
+    if !input.fragment().starts_with(b"{") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let frag = input.fragment();
+    let mut depth = 0i32;
+    let mut i = 0usize;
+    while i < frag.len() {
+        match frag[i] {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    let take = i + 1;
+                    let s = String::from_utf8_lossy(&frag[..take]).to_string();
+                    let (input, _) = nom::bytes::complete::take(take).parse(input)?;
+                    return Ok((input, s));
+                }
+            }
+            b'"' => {
+                i += 1;
+                while i < frag.len() {
+                    if frag[i] == b'\\' && i + 1 < frag.len() {
+                        i += 2;
+                        continue;
+                    }
+                    if frag[i] == b'"' {
+                        break;
+                    }
+                    i += 1;
+                }
+            }
+            b'\'' => {
+                i += 1;
+                while i < frag.len() {
+                    if frag[i] == b'\\' && i + 1 < frag.len() {
+                        i += 2;
+                        continue;
+                    }
+                    if frag[i] == b'\'' {
+                        break;
+                    }
+                    i += 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Tag,
+    )))
 }
 
 fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
@@ -791,6 +887,7 @@ fn build_frame_node<'a>(frame: Frame<'a>, end: Input<'a>) -> Node<Expression> {
                 op: CollectionOperator::from_name(&member),
                 base: Box::new(base),
                 args: items,
+                brace_body: None,
             },
         ),
         FrameKind::Constructor { type_name } => node_from_to(
@@ -982,6 +1079,19 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                 let (next, _) = ws_and_comments(next)?;
                 let (next, member) = name(next)?;
                 let (after_name, _) = ws_and_comments(next)?;
+                // Brace-body form: `collection->forAll { in ref w; expr }`
+                if after_name.fragment().starts_with(b"{") {
+                    let (after_brace, body) = take_balanced_braces(after_name)?;
+                    let expr = Expression::CollectionOp {
+                        op: CollectionOperator::from_name(&member),
+                        base: Box::new(atom),
+                        args: Vec::new(),
+                        brace_body: Some(body),
+                    };
+                    atom = node_from_to(primary_start, after_brace, expr);
+                    input = after_brace;
+                    continue;
+                }
                 // KerML arrow-invocation, e.g. `collection->size()`, `xs->select(p)`.
                 if after_name.fragment().starts_with(b"(") {
                     let (after_paren, _) = tag(&b"("[..]).parse(after_name)?;
@@ -992,6 +1102,7 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                             op: CollectionOperator::from_name(&member),
                             base: Box::new(atom),
                             args: Vec::new(),
+                            brace_body: None,
                         };
                         atom = node_from_to(primary_start, after_close, expr);
                         input = after_close;
@@ -1319,7 +1430,7 @@ mod tests {
         let input = span_input("powerProfile->size()");
         let (_, node) = expression(input).expect("expression");
         match &node.value {
-            Expression::CollectionOp { op, base, args } => {
+            Expression::CollectionOp { op, base, args, .. } => {
                 assert_eq!(op, &CollectionOperator::Size);
                 assert!(args.is_empty());
                 assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "powerProfile"));
@@ -1337,7 +1448,7 @@ mod tests {
                 assert_eq!(op, &BinaryOperator::Sub);
                 assert!(matches!(&right.value, Expression::LiteralInteger(1)));
                 match &left.value {
-                    Expression::CollectionOp { op, base, args } => {
+                    Expression::CollectionOp { op, base, args, .. } => {
                         assert_eq!(op, &CollectionOperator::Other("c".to_string()));
                         assert!(args.is_empty());
                         match &base.value {
@@ -1453,7 +1564,7 @@ mod tests {
         let input = span_input("items->collect(f)");
         let (_, node) = expression(input).expect("expression");
         match &node.value {
-            Expression::CollectionOp { op, base, args } => {
+            Expression::CollectionOp { op, base, args, .. } => {
                 assert_eq!(op, &CollectionOperator::Collect);
                 assert_eq!(args.len(), 1);
                 assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "items"));

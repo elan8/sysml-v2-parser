@@ -141,6 +141,9 @@ pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"stakeholder",
     b"purpose",
     b"verify",
+    b"variant",
+    b":>>",
+    b":>",
 ];
 
 #[allow(dead_code)]
@@ -169,11 +172,12 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
     b"abstract",
     b"action",
     b"actor",
+    b"analysis",
     b"assign",
     b"attribute",
     b"bind",
-    b"case",
     b"calc",
+    b"case",
     b"doc",
     b"first",
     b"flow",
@@ -182,10 +186,12 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
     b"in",
     b"objective",
     b"out",
+    b"part",
     b"perform",
     b"private",
     b"protected",
     b"ref",
+    b"requirement",
     b"return",
     b"public",
     b"state",
@@ -193,16 +199,25 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
     b"then",
 ];
 
-pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] =
-    &[b"doc", b"@", b"in", b"out", b"inout", b"constraint"];
+pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b"@", b"doc", b"in", b"out", b"inout", b"return", b"calc", b"part",
+];
+
+pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b"doc",
+    b"@",
+    b"in",
+    b"out",
+    b"inout",
+    b"constraint",
+    b":>>",
+    b":>",
+];
 
 /// Starters for `RelationshipBody`-shaped brace bodies (alias/import/dependency and other
 /// annotation-only leaf bodies): BNF `RelationshipBody : Relationship = ';' | '{'
 /// (ownedRelationship += OwnedAnnotation)* '}'`.
 pub(crate) const RELATIONSHIP_BODY_STARTERS: &[&[u8]] = &[b"doc", b"comment", b"rep", b"@"];
-
-pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] =
-    &[b"@", b"doc", b"in", b"out", b"inout", b"return"];
 
 pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] =
     &[b"@", b"doc", b"filter", b"render", b"ref", b"abstract"];

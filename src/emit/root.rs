@@ -154,11 +154,28 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::AnalysisCaseUsage(a) => {
             requirement::emit_analysis_case_usage(w, path, &a.value)
         }
+        PackageBodyElement::VerificationCaseDef(v) => {
+            requirement::emit_verification_case_def(w, path, &v.value)
+        }
+        PackageBodyElement::VerificationCaseUsage(v) => {
+            requirement::emit_verification_case_usage(w, path, &v.value)
+        }
+        PackageBodyElement::CaseDef(c) => requirement::emit_case_def(w, path, &c.value),
+        PackageBodyElement::CaseUsage(c) => requirement::emit_case_usage(w, path, &c.value),
         PackageBodyElement::OccurrenceUsage(o) => {
             behavior::emit_occurrence_usage(w, path, &o.value)
         }
+        PackageBodyElement::OccurrenceDef(o) => behavior::emit_occurrence_def(w, path, &o.value),
         PackageBodyElement::ViewDef(v) => view::emit_view_def(w, path, &v.value),
         PackageBodyElement::ViewUsage(v) => view::emit_view_usage(w, path, &v.value),
+        PackageBodyElement::ViewpointDef(v) => view::emit_viewpoint_def(w, path, &v.value),
+        PackageBodyElement::ViewpointUsage(v) => view::emit_viewpoint_usage(w, path, &v.value),
+        PackageBodyElement::RenderingDef(r) => view::emit_rendering_def(w, path, &r.value),
+        PackageBodyElement::RenderingUsage(r) => view::emit_rendering_usage(w, path, &r.value),
+        PackageBodyElement::MetadataKeywordUsage(m) => {
+            structure::emit_metadata_keyword_usage(w, path, &m.value)
+        }
+        PackageBodyElement::Ref(r) => structure::emit_ref_decl(w, path, &r.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)
