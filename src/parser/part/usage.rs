@@ -1300,7 +1300,9 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             // §6 G5: the usage form was reachable from part *definition* bodies only.
             map(requirement_usage, PartUsageBodyElement::RequirementUsage),
             map(occurrence_def, PartUsageBodyElement::OccurrenceDef),
+            // `calc_def_required` before `calc_usage` for the same bare-`def` reason (GH-91.2).
             map(calc_def_required, PartUsageBodyElement::CalcDef),
+            map(calc_usage, PartUsageBodyElement::CalcUsage),
             // `constraint_def` before `constraint_usage` for the same bare-`def` reason.
             map(constraint_def, PartUsageBodyElement::ConstraintDef),
             map(constraint_usage, PartUsageBodyElement::ConstraintUsage),

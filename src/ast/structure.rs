@@ -587,6 +587,11 @@ pub enum PartUsageBodyElement {
     /// `constraint <name>[: Type] { ... }` usage inside a part usage body (§6 G4). See
     /// `PartDefBodyElement::ConstraintUsage`.
     ConstraintUsage(Node<ConstraintUsage>),
+    /// `calc <name>[: Type] { ... }` usage inside a part usage body (GH-91.2), e.g. `calc 'Solve
+    /// for Pressure1' : 'Ideal Gas Law';` (`Analysis Examples/Turbojet Stage
+    /// Analysis.sysml:88`). `calc_usage` itself already fully supports quoted names -- only
+    /// `calc_def_required` (`CalcDef` above) was dispatched here.
+    CalcUsage(Node<crate::ast::view::CalcUsage>),
     /// `(private|public|protected)? import <qualified-name>;` inside a part usage body (§6 G16).
     /// Imports are namespace members, and a part usage body is a namespace; real usage is
     /// OMG spec Annex `8-Requirements.sysml`.

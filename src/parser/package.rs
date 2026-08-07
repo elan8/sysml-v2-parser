@@ -36,8 +36,8 @@ use crate::parser::occurrence::{
 use crate::parser::part::{interface_usage, part_def_or_usage, PartDefOrUsage};
 use crate::parser::port::{port_def, port_usage};
 use crate::parser::requirement::{
-    comment_annotation, concern_usage, doc_comment, requirement_def, requirement_usage, satisfy,
-    textual_representation,
+    bare_locale_comment, comment_annotation, concern_usage, doc_comment, requirement_def,
+    requirement_usage, satisfy, textual_representation,
 };
 use crate::parser::state::state_def;
 use crate::parser::state::state_usage;
@@ -617,6 +617,13 @@ fn try_package_body_annotations<'a>(
         input,
         start,
         comment_annotation,
+        PackageBodyElement::Comment
+    );
+    // GH-91.1: bare `locale "en_US" /* ... */` package member (no `comment` keyword).
+    try_package_body_dispatch!(
+        input,
+        start,
+        bare_locale_comment,
         PackageBodyElement::Comment
     );
     try_package_body_dispatch!(

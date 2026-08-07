@@ -104,6 +104,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Promoted `Camera Example/Camera.sysml`, `Mass Roll-up Example/MassConstraintExample.sysml`, and
     `Simple Tests/AliasTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
 
+- **Standalone `locale` package member and quoted `calc` usage name/type (#91).**
+  - `doc_comment`/`comment_annotation` (`src/parser/requirement.rs`) now peek for a leading
+    `locale` keyword before attempting `identification` -- previously `identification` greedily
+    consumed the bare word `locale` itself as the doc/comment's own name whenever no real
+    identification was present, leaving nothing for the subsequent `locale` keyword check to
+    match. Fixes `doc locale "en_US" /* ... */` with no identification (`Simple Tests/
+    CommentTest.sysml:32`).
+  - New `bare_locale_comment` parser (reusing `CommentAnnotation`, since KerML `Comment`'s
+    `('comment' Identification?)?` prefix is entirely optional) dispatches a standalone `locale
+    "en_US" /* ... */` package member with no `comment` keyword at all -- previously not
+    dispatched anywhere. `Simple Tests/CommentTest.sysml:25`.
+  - `calc_usage` is now dispatched inside `part_usage_body_element` (new
+    `PartUsageBodyElement::CalcUsage` variant) -- previously only `calc_def_required` (`CalcDef`)
+    was, so a calc *usage* nested in a part usage body had no dispatch path at all.
+    `calc_usage` itself already fully supported quoted names. `Analysis Examples/Turbojet Stage
+    Analysis.sysml:88`.
+  - `PARSE_AST_VERSION` bumped 74 -> 75 for the `PartUsageBodyElement::CalcUsage` addition.
+  - Promoted `Simple Tests/CommentTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
+
 ## [0.54.0] - 2026-08-07
 
 ### Fixed
