@@ -688,6 +688,7 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                     type_ref_span: None,
                 }))),
                 n(InterfaceDefBodyElement::RefDecl(n(RefDecl {
+                    direction: None,
                     name: "driveshaft".to_string(),
                     type_name: "Driveshaft".to_string(),
                     typing: Some(typed("Driveshaft")),

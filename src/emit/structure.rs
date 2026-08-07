@@ -160,8 +160,12 @@ pub(crate) fn emit_attribute_usage(
     if usage.is_derived {
         w.push_str("derived ");
     }
+    emit_definition_prefix(w, usage.usage_prefix.as_ref());
     if usage.is_constant {
         w.push_str("constant ");
+    }
+    if usage.is_reference {
+        w.push_str("ref ");
     }
     w.push_str("attribute ");
     if let Some(short) = &usage.short_name {
@@ -1016,6 +1020,9 @@ pub(crate) fn emit_ref_decl(
     decl: &RefDecl,
 ) -> Result<(), EmitError> {
     emit_visibility(w, decl.membership.visibility);
+    if let Some(dir) = decl.direction {
+        emit_direction(w, dir);
+    }
     w.push_str("ref ");
     w.push_str(&format_name(&decl.name));
     if let Some(redefines) = &decl.redefines {
