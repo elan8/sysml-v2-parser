@@ -1,8 +1,11 @@
-use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
+use super::common::{
+    ConnectBody, DocComment, Identification, ParseErrorNode, TextualRepresentation,
+};
 use super::membership::Membership;
 use super::requirement::RequirementUsage;
 use super::structure::{
-    Annotation, Bind, DefinitionBody, MetadataAnnotation, MetadataKeywordUsage, Perform, RefDecl,
+    Annotation, Bind, DefinitionBody, MetadataAnnotation, MetadataKeywordUsage, MetadataUsage,
+    Perform, RefDecl,
 };
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
@@ -46,6 +49,14 @@ pub enum ActionDefBodyElement {
     Annotation(Node<Annotation>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// Literal `metadata` keyword form (BNF `MetadataUsage`'s `('@' | 'metadata')` alternative,
+    /// GH-86), e.g. `metadata ToolExecution { toolName = "ModelCenter"; }` (Analysis Examples/
+    /// AnalysisAnnotation.sysml). Previously only dispatched at package-body scope.
+    MetadataUsage(Node<MetadataUsage>),
+    /// KerML `TextualRepresentation` (GH-86), e.g. `language "alf" /* c.x = newX; */` (Simple
+    /// Tests/TextualRepresentationTest.sysml). Previously not reachable from an action body at
+    /// all (only package/relationship/requirement bodies dispatched it).
+    TextualRep(Node<TextualRepresentation>),
     RefDecl(Node<RefDecl>),
     Perform(Node<Perform>),
     Bind(Node<Bind>),
@@ -121,6 +132,15 @@ pub enum ThenTarget {
     Perform(Node<crate::ast::Perform>),
     /// `then merge continue;` — an inline merge node.
     Merge(Node<MergeStmt>),
+    /// `then fork F { in a; out b1; out b2; }` — an inline fork node (GH-86, Simple Tests/
+    /// ControlNodeTest.sysml).
+    Fork(Node<ForkStmt>),
+    /// `then decide D;` — an inline decision node (GH-86, Simple Tests/DecisionTest.sysml).
+    Decide(Node<DecisionStmt>),
+    /// `then accept S;` — an inline accept trigger, reusing the same shorthand/payload/
+    /// time-trigger forms already supported after a state `transition` (GH-86, Simple Tests/
+    /// ActionTest.sysml).
+    Accept(Node<TransitionAccept>),
     /// `then continue;` — a reference to an already-declared node.
     Feature(Node<Expression>),
 }
@@ -160,6 +180,20 @@ impl PartialEq for PayloadClause {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.type_name == other.type_name
     }
+}
+
+/// Payload on a standalone `send` control-node statement (GH-86): either the typed-name form
+/// (`send name : Type;`, e.g. Systems Library `SendAction`) or a general expression (`send new
+/// Publish(someTopic, somePublication);`, Interaction Sequencing Examples/
+/// ServerSequenceOutsideRealization-2.sysml). BNF `SendNode`'s payload is `NodeParameterMember`
+/// (`FeatureBinding = OwnedExpression`) -- a general expression -- unlike `accept`'s
+/// `PayloadParameter`, which stays typed-name-only (kept as [`PayloadClause`] on
+/// [`ActionUsage::accept`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SendPayload {
+    Typed(PayloadClause),
+    Expression(Node<Expression>),
 }
 
 /// Transition accept trigger: typed payload or shorthand expression (`accept StartPressed`).
@@ -248,8 +282,16 @@ pub struct ActionUsage {
     pub redefines: Option<Node<SubsettingRelationship>>,
     /// For `action ... accept param : Type` form.
     pub accept: Option<PayloadClause>,
-    /// For standalone `send param : Type` control-node statements.
-    pub send: Option<PayloadClause>,
+    /// For standalone `send` control-node statements: `send param : Type` or a general
+    /// expression payload (`send new Publish(x, y)`, GH-86).
+    pub send: Option<SendPayload>,
+    /// Optional `via <expr>` targeting clause on a standalone `accept`/`send` control-node
+    /// statement (BNF `AcceptParameterPart`/`SenderReceiverPart`, GH-86), e.g. `send new
+    /// Publish(someTopic, somePublication) via publicationPort;`.
+    pub via: Option<Node<Expression>>,
+    /// Optional trailing `to <expr>` clause on a standalone `send` statement (BNF
+    /// `SenderReceiverPart`, GH-86), e.g. `then send new S() to b;` (Simple Tests/ActionTest.sysml).
+    pub to: Option<Node<Expression>>,
     pub body: ActionUsageBody,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -276,6 +318,8 @@ impl PartialEq for ActionUsage {
             && self.redefines == other.redefines
             && self.accept == other.accept
             && self.send == other.send
+            && self.via == other.via
+            && self.to == other.to
             && self.body == other.body
             && self.membership == other.membership
     }
@@ -302,6 +346,14 @@ pub enum ActionUsageBodyElement {
     Annotation(Node<Annotation>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// Literal `metadata` keyword form (BNF `MetadataUsage`'s `('@' | 'metadata')` alternative,
+    /// GH-86), e.g. `metadata ToolExecution { toolName = "ModelCenter"; }` (Analysis Examples/
+    /// AnalysisAnnotation.sysml). Previously only dispatched at package-body scope.
+    MetadataUsage(Node<MetadataUsage>),
+    /// KerML `TextualRepresentation` (GH-86), e.g. `language "alf" /* c.x = newX; */` (Simple
+    /// Tests/TextualRepresentationTest.sysml). Previously not reachable from an action body at
+    /// all (only package/relationship/requirement bodies dispatched it).
+    TextualRep(Node<TextualRepresentation>),
     InOutDecl(Node<InOutDecl>),
     RefDecl(Node<RefDecl>),
     Bind(Node<Bind>),

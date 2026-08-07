@@ -68,20 +68,34 @@ pub(crate) fn emit_action_usage(
     if usage.is_reference {
         w.push_str("ref ");
     }
-    // Standalone control nodes (`accept name : Type;`) are stored as ActionUsage with
-    // `name == "accept"|"send"` plus a payload clause — do not emit `action accept accept …`.
-    let control_node = match (usage.name.as_str(), &usage.accept, &usage.send) {
-        ("accept", Some(payload), None) => Some(("accept", payload)),
-        ("send", None, Some(payload)) => Some(("send", payload)),
-        _ => None,
-    };
-    if let Some((kw, payload)) = control_node {
+    // Standalone control nodes (`accept name : Type;`, `send new Publish(x, y) via p;`) are
+    // stored as ActionUsage with `name == "accept"|"send"` plus a payload — do not emit
+    // `action accept accept …`.
+    let is_standalone_accept =
+        usage.name == "accept" && usage.accept.is_some() && usage.send.is_none();
+    let is_standalone_send = usage.name == "send" && usage.accept.is_none() && usage.send.is_some();
+    if is_standalone_accept || is_standalone_send {
+        let kw = if is_standalone_accept {
+            "accept"
+        } else {
+            "send"
+        };
         w.push_str(kw);
-        w.push_char(' ');
-        w.push_str(&format_name(&payload.name));
-        if let Some(ty) = &payload.type_name {
-            w.push_str(" : ");
-            w.push_str(&format_qualified_name(ty));
+        if let Some(accept) = &usage.accept {
+            w.push_char(' ');
+            emit_payload_clause(w, accept);
+        }
+        if let Some(send) = &usage.send {
+            w.push_char(' ');
+            emit_send_payload(w, path, send)?;
+        }
+        if let Some(via) = &usage.via {
+            w.push_str(" via ");
+            emit_expression(w, &via.value)?;
+        }
+        if let Some(to) = &usage.to {
+            w.push_str(" to ");
+            emit_expression(w, &to.value)?;
         }
         return emit_action_usage_body(w, path, &usage.body);
     }
@@ -106,21 +120,43 @@ pub(crate) fn emit_action_usage(
     }
     if let Some(accept) = &usage.accept {
         w.push_str(" accept ");
-        w.push_str(&format_name(&accept.name));
-        if let Some(ty) = &accept.type_name {
-            w.push_str(" : ");
-            w.push_str(&format_qualified_name(ty));
-        }
+        emit_payload_clause(w, accept);
     }
     if let Some(send) = &usage.send {
         w.push_str(" send ");
-        w.push_str(&format_name(&send.name));
-        if let Some(ty) = &send.type_name {
-            w.push_str(" : ");
-            w.push_str(&format_qualified_name(ty));
-        }
+        emit_send_payload(w, path, send)?;
+    }
+    if let Some(via) = &usage.via {
+        w.push_str(" via ");
+        emit_expression(w, &via.value)?;
+    }
+    if let Some(to) = &usage.to {
+        w.push_str(" to ");
+        emit_expression(w, &to.value)?;
     }
     emit_action_usage_body(w, path, &usage.body)
+}
+
+fn emit_payload_clause(w: &mut EmitWriter<'_>, payload: &crate::ast::PayloadClause) {
+    w.push_str(&format_name(&payload.name));
+    if let Some(ty) = &payload.type_name {
+        w.push_str(" : ");
+        w.push_str(&format_qualified_name(ty));
+    }
+}
+
+fn emit_send_payload(
+    w: &mut EmitWriter<'_>,
+    _path: &str,
+    payload: &crate::ast::SendPayload,
+) -> Result<(), EmitError> {
+    match payload {
+        crate::ast::SendPayload::Typed(p) => {
+            emit_payload_clause(w, p);
+            Ok(())
+        }
+        crate::ast::SendPayload::Expression(e) => emit_expression(w, &e.value),
+    }
 }
 
 pub(crate) fn emit_action_def_body(
@@ -356,6 +392,17 @@ pub(crate) fn emit_then_action_pub(
         ThenTarget::Merge(m) => {
             w.push_str("merge ");
             emit_expression(w, &m.value.merge.value)?;
+            w.push_char(';');
+            Ok(())
+        }
+        // `FirstMergeBody::Brace` doesn't capture its pin contents (same pre-existing limitation
+        // as standalone `fork F { ... };` -- ForkStmt has no emit arm at all yet, GH-93 territory).
+        ThenTarget::Fork(_) => w.unsupported(path, "ThenTarget::Fork"),
+        // Same `FirstMergeBody::Brace` opacity as Fork; DecisionStmt has no emit arm either.
+        ThenTarget::Decide(_) => w.unsupported(path, "ThenTarget::Decide"),
+        ThenTarget::Accept(a) => {
+            w.push_str("accept ");
+            emit_transition_accept(w, &a.value)?;
             w.push_char(';');
             Ok(())
         }
@@ -823,6 +870,43 @@ fn emit_definition_body(
     }
 }
 
+/// Shared by `emit_transition`'s `accept` trigger and `ThenTarget::Accept` (GH-86, `then accept
+/// S;`) -- same `TransitionAccept` shape in both positions.
+fn emit_transition_accept(
+    w: &mut EmitWriter<'_>,
+    accept: &crate::ast::TransitionAccept,
+) -> Result<(), EmitError> {
+    match accept {
+        crate::ast::TransitionAccept::Payload(p, via) => {
+            w.push_str(&format_name(&p.name));
+            if let Some(ty) = &p.type_name {
+                w.push_str(" : ");
+                w.push_str(&format_qualified_name(ty));
+            }
+            if let Some(v) = via {
+                w.push_str(" via ");
+                emit_expression(w, &v.value)?;
+            }
+        }
+        crate::ast::TransitionAccept::Shorthand(e, via) => {
+            emit_expression(w, &e.value)?;
+            if let Some(v) = via {
+                w.push_str(" via ");
+                emit_expression(w, &v.value)?;
+            }
+        }
+        crate::ast::TransitionAccept::TimeTrigger(kind, e) => {
+            match kind {
+                crate::ast::TriggerKind::At => w.push_str("at "),
+                crate::ast::TriggerKind::When => w.push_str("when "),
+                crate::ast::TriggerKind::After => w.push_str("after "),
+            }
+            emit_expression(w, &e.value)?;
+        }
+    }
+    Ok(())
+}
+
 fn emit_transition(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -842,34 +926,7 @@ fn emit_transition(
     }
     if let Some(accept) = &t.accept {
         w.push_str("accept ");
-        match accept {
-            crate::ast::TransitionAccept::Payload(p, via) => {
-                w.push_str(&format_name(&p.name));
-                if let Some(ty) = &p.type_name {
-                    w.push_str(" : ");
-                    w.push_str(&format_qualified_name(ty));
-                }
-                if let Some(v) = via {
-                    w.push_str(" via ");
-                    emit_expression(w, &v.value)?;
-                }
-            }
-            crate::ast::TransitionAccept::Shorthand(e, via) => {
-                emit_expression(w, &e.value)?;
-                if let Some(v) = via {
-                    w.push_str(" via ");
-                    emit_expression(w, &v.value)?;
-                }
-            }
-            crate::ast::TransitionAccept::TimeTrigger(kind, e) => {
-                match kind {
-                    crate::ast::TriggerKind::At => w.push_str("at "),
-                    crate::ast::TriggerKind::When => w.push_str("when "),
-                    crate::ast::TriggerKind::After => w.push_str("after "),
-                }
-                emit_expression(w, &e.value)?;
-            }
-        }
+        emit_transition_accept(w, accept)?;
         w.push_char(' ');
     }
     if let Some(guard) = &t.guard {

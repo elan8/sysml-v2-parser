@@ -1,14 +1,19 @@
 //! Shared parsers for accept/send payload clauses and transition accept triggers.
 
-use crate::ast::{ActionUsage, Expression, Node, PayloadClause, TransitionAccept, TriggerKind};
+use crate::ast::{
+    ActionUsage, Expression, Node, PayloadClause, SendPayload, Span, TransitionAccept, TriggerKind,
+};
 use crate::parser::action::action_usage_body;
 use crate::parser::expr::expression;
-use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws1, ws_and_comments};
+use crate::parser::lex::{
+    name, qualified_name, starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::Input;
+use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::opt;
+use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -84,6 +89,15 @@ pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, Transiti
 }
 
 /// Standalone control-node statement: `accept|send` payload (`;` or body).
+///
+/// BNF `AcceptNode`'s payload (`PayloadParameter`) is mandatory and typed-name-only;
+/// `SendNode`'s payload (`NodeParameterMember` = `FeatureBinding` = a general `OwnedExpression`)
+/// is optional and accepts either the same typed-name shorthand or a general expression, e.g.
+/// `send new Publish(someTopic, somePublication) via publicationPort;` (GH-86, Interaction
+/// Sequencing Examples/ServerSequenceOutsideRealization-2.sysml). Both accept an optional
+/// trailing `via <expr>` (BNF `AcceptParameterPart`/`SenderReceiverPart`); send additionally
+/// accepts a trailing `to <expr>` (BNF `SenderReceiverPart`), e.g. `then send new S() to b;`
+/// (Simple Tests/ActionTest.sysml).
 fn control_node_payload_stmt<'a>(
     input: Input<'a>,
     keyword: &'a [u8],
@@ -93,18 +107,59 @@ fn control_node_payload_stmt<'a>(
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(keyword).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, payload) = typed_payload_clause(input)?;
-    let name_span = payload.name_span.clone();
-    let type_ref_span = payload.type_span.clone();
+    let is_send = keyword == b"send";
+
+    let (input, name_span, type_ref_span, accept, send) = if is_send {
+        // Peek for `via`/`to` first: neither is reserved in `name`/`expression`, so an empty
+        // payload (BNF `EmptyParameterMember`) would otherwise be greedily consumed as a bare
+        // feature reference instead of being left for the `via`/`to` clauses below.
+        let (peek, _) = ws_and_comments(input)?;
+        let payload_follows = !starts_with_any_keyword(peek.fragment(), &[b"via", b"to"]);
+        let (input, payload) = if payload_follows {
+            opt(alt((
+                map(typed_payload_clause, SendPayload::Typed),
+                map(expression, SendPayload::Expression),
+            )))
+            .parse(input)?
+        } else {
+            (input, None)
+        };
+        let name_span = match &payload {
+            Some(SendPayload::Typed(p)) => p.name_span.clone(),
+            Some(SendPayload::Expression(e)) => e.span.clone(),
+            None => Span::dummy(),
+        };
+        let type_ref_span = match &payload {
+            Some(SendPayload::Typed(p)) => p.type_span.clone(),
+            _ => None,
+        };
+        (input, name_span, type_ref_span, None, payload)
+    } else {
+        let (input, payload) = typed_payload_clause(input)?;
+        let name_span = payload.name_span.clone();
+        let type_ref_span = payload.type_span.clone();
+        (input, name_span, type_ref_span, Some(payload), None)
+    };
+
+    let (input, via) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"via"[..])),
+        preceded(ws1, expression),
+    ))
+    .parse(input)?;
+    let (input, to) = if is_send {
+        opt(preceded(
+            preceded(ws_and_comments, tag(&b"to"[..])),
+            preceded(ws1, expression),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = action_usage_body(input)?;
     let (input, _) =
         nom::combinator::opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
-    let (accept, send) = if keyword == b"accept" {
-        (Some(payload), None)
-    } else {
-        (None, Some(payload))
-    };
     Ok((
         input,
         node_from_to(
@@ -122,6 +177,8 @@ fn control_node_payload_stmt<'a>(
                 redefines: None,
                 accept,
                 send,
+                via,
+                to,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,

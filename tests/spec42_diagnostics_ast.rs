@@ -117,10 +117,15 @@ fn send_payload_on_control_node_action() {
     };
     assert_eq!(send_usage.name, "send");
     let send = send_usage.send.as_ref().expect("send payload");
-    assert_eq!(send.name, "message");
-    assert_eq!(send.type_name.as_deref(), Some("AlertMessage"));
-    assert!(send.name_span.len > 0);
-    assert!(send.type_span.is_some());
+    match send {
+        sysml_v2_parser::ast::SendPayload::Typed(p) => {
+            assert_eq!(p.name, "message");
+            assert_eq!(p.type_name.as_deref(), Some("AlertMessage"));
+            assert!(p.name_span.len > 0);
+            assert!(p.type_span.is_some());
+        }
+        other => panic!("expected a Typed payload, got {other:?}"),
+    }
 }
 
 #[test]

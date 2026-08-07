@@ -758,22 +758,32 @@ pub(crate) fn textual_representation(
 ) -> IResult<Input<'_>, Node<TextualRepresentation>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"rep"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // BNF: `('rep' Identification)?` is entirely optional -- a bare `language "alf" /* ... */`
+    // with no `rep` prefix is valid on its own (GH-86, e.g. `action def setX { language "alf"
+    // /* c.x = newX; */ }`, Simple Tests/TextualRepresentationTest.sysml). Previously `rep` was
+    // parsed as an unconditional mandatory tag, so this bare form failed even wherever
+    // `textual_representation` itself was already dispatched.
     let (input, rep_identification) = {
         let (peek, _) = ws_and_comments(input)?;
-        if crate::parser::lex::starts_with_keyword(peek.fragment(), b"language") {
-            (input, None)
+        if crate::parser::lex::starts_with_keyword(peek.fragment(), b"rep") {
+            let (input, _) = tag(&b"rep"[..]).parse(input)?;
+            let (input, _) = ws1(input)?;
+            let (peek, _) = ws_and_comments(input)?;
+            if crate::parser::lex::starts_with_keyword(peek.fragment(), b"language") {
+                (input, None)
+            } else {
+                let (input, id) = identification(input)?;
+                (
+                    input,
+                    if id.short_name.is_some() || id.name.is_some() {
+                        Some(id)
+                    } else {
+                        None
+                    },
+                )
+            }
         } else {
-            let (input, id) = identification(input)?;
-            (
-                input,
-                if id.short_name.is_some() || id.name.is_some() {
-                    Some(id)
-                } else {
-                    None
-                },
-            )
+            (input, None)
         }
     };
     // `language STRING_VALUE` is required by the grammar but we parse it
