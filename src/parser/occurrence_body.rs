@@ -580,14 +580,33 @@ pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Succ
     let (input, name) = {
         let (peek, _) = ws_and_comments(input)?;
         let frag = peek.fragment();
+        // GH-92.3: a bare `:` (type clause with no name) also means "no name" here, e.g.
+        // `succession : HappensJustBefore first a then b;` (`Vehicle Example/
+        // VehicleIndividuals.sysml:49`) -- previously only "no name, `first`/multiplicity
+        // follows directly" was recognized, so a leading `:` fell through to the name parser
+        // below and failed outright.
         if starts_with_keyword(frag, b"first")
             || starts_with_keyword(frag, b"flow")
             || frag.starts_with(b"[")
+            || (frag.starts_with(b":") && !frag.starts_with(b":>") && !frag.starts_with(b":>>"))
         {
             (input, None)
         } else {
             let (input, parsed_name) = preceded(ws_and_comments, name).parse(input)?;
             (input, Some(parsed_name))
+        }
+    };
+    // GH-92.3: optional `: Type` clause on the succession usage itself, mirroring
+    // `action::succession_prefix`'s identical `succession_type` handling for the sibling
+    // action-body `first`-embedded form.
+    let (input, type_name) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
+            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            (input, Some(type_name))
+        } else {
+            (input, None)
         }
     };
     let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
@@ -608,6 +627,7 @@ pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Succ
             input,
             SuccessionUsage {
                 name,
+                type_name,
                 multiplicity,
                 source,
                 source_multiplicity,

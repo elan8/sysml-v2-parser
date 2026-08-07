@@ -734,7 +734,13 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     let (input, _) = ws1(input)?;
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
-    let (input, succession_name) = if starts_with_keyword(frag, b"first") || frag.starts_with(b"[")
+    // GH-92.3: unnamed `succession : Type first a then b;` (a `:` type clause with no name at
+    // all) -- previously only "no name, multiplicity/`first` follows directly" was recognized as
+    // the name-less case; a leading `:` (not `:>`/`:>>`) fell through to the name parser below
+    // and failed outright. Real usage: `Vehicle Example/VehicleIndividuals.sysml:49`.
+    let (input, succession_name) = if starts_with_keyword(frag, b"first")
+        || frag.starts_with(b"[")
+        || (frag.starts_with(b":") && !frag.starts_with(b":>") && !frag.starts_with(b":>>"))
     {
         (input, None)
     } else {

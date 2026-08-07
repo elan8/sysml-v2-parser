@@ -547,6 +547,11 @@ pub enum PartUsageBodyElement {
     Connect(Node<Connect>),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
     Perform(Node<Perform>),
+    /// `succession` (name)? (`: Type`)? multiplicity? `first` ... `then` ...`;` (GH-92.3, BNF
+    /// `SuccessionAsUsage`), e.g. `succession : HappensJustBefore first vehicle1_t0 then
+    /// vehicle1_t0_t1;` (`Vehicle Example/VehicleIndividuals.sysml:49`). Already modeled/parsed
+    /// for `ConnectionDefBodyElement`/`OccurrenceBodyElement`; just not dispatched here.
+    SuccessionUsage(Node<SuccessionUsage>),
     Allocate(Node<Allocate>),
     Satisfy(Node<Satisfy>),
     StateUsage(Node<StateUsage>),
@@ -1496,6 +1501,12 @@ pub struct SuccessionUsage {
     /// real usage in Systems Library `Domain Libraries/Cause and Effect/
     /// CausationConnections.sysml`.
     pub name: Option<String>,
+    /// Type of the succession usage itself (BNF `UsageDeclaration`'s `FeatureSpecializationPart`),
+    /// e.g. `HappensJustBefore` in the unnamed `succession : HappensJustBefore first a then b;`
+    /// (GH-92.3, `Vehicle Example/VehicleIndividuals.sysml:49`). Mirrors
+    /// `FirstStmt::succession_type`'s identical field for the sibling action-body `first`-embedded
+    /// form.
+    pub type_name: Option<String>,
     /// Multiplicity of the succession feature itself, e.g. `[seBeforeNum]`.
     pub multiplicity: Option<Node<Multiplicity>>,
     pub source: Node<Expression>,

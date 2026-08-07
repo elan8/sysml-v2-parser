@@ -411,6 +411,9 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }
+        PartUsageBodyElement::SuccessionUsage(s) => {
+            super::behavior::emit_succession_usage(w, &s.value)
+        }
         PartUsageBodyElement::StateDef(s) => super::behavior::emit_state_def(w, path, &s.value),
         PartUsageBodyElement::StateUsage(s) => super::behavior::emit_state_usage(w, path, &s.value),
         PartUsageBodyElement::Allocate(a) => super::behavior::emit_allocate(w, path, &a.value),
