@@ -1267,6 +1267,12 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::MetadataKeywordUsage(n) => {
             ActionDefBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
         }
+        ActionDefBodyElement::MetadataUsage(n) => {
+            ActionDefBodyElement::MetadataUsage(dummy_node(n, n.value.clone()))
+        }
+        ActionDefBodyElement::TextualRep(n) => {
+            ActionDefBodyElement::TextualRep(dummy_node(n, n.value.clone()))
+        }
         ActionDefBodyElement::RefDecl(n) => {
             ActionDefBodyElement::RefDecl(dummy_node(n, normalize_ref_decl(&n.value)))
         }
@@ -1351,6 +1357,17 @@ fn normalize_payload_clause(p: &PayloadClause) -> PayloadClause {
     }
 }
 
+fn normalize_send_payload(p: &crate::ast::SendPayload) -> crate::ast::SendPayload {
+    match p {
+        crate::ast::SendPayload::Typed(t) => {
+            crate::ast::SendPayload::Typed(normalize_payload_clause(t))
+        }
+        crate::ast::SendPayload::Expression(e) => {
+            crate::ast::SendPayload::Expression(dummy_node(e, e.value.clone()))
+        }
+    }
+}
+
 fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
     ActionUsage {
         is_abstract: a.is_abstract,
@@ -1363,7 +1380,9 @@ fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
         subsets: a.subsets.clone(),
         redefines: a.redefines.clone(),
         accept: a.accept.as_ref().map(normalize_payload_clause),
-        send: a.send.as_ref().map(normalize_payload_clause),
+        send: a.send.as_ref().map(normalize_send_payload),
+        via: a.via.as_ref().map(|v| dummy_node(v, v.value.clone())),
+        to: a.to.as_ref().map(|v| dummy_node(v, v.value.clone())),
         body: normalize_action_usage_body(&a.body),
         name_span: None,
         type_ref_span: None,
@@ -1419,6 +1438,12 @@ fn normalize_action_usage_body_element_node(
         }
         ActionUsageBodyElement::MetadataKeywordUsage(n) => {
             ActionUsageBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::MetadataUsage(n) => {
+            ActionUsageBodyElement::MetadataUsage(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::TextualRep(n) => {
+            ActionUsageBodyElement::TextualRep(dummy_node(n, n.value.clone()))
         }
         ActionUsageBodyElement::InOutDecl(n) => {
             ActionUsageBodyElement::InOutDecl(dummy_node(n, n.value.clone()))
