@@ -15,9 +15,10 @@ use super::requirement::{
     UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
 };
 use super::structure::{
-    AliasDef, AttributeDef, AttributeUsage, Connect, ConnectionDef, ConnectionUsageMember, EnumDef,
-    IndividualDef, InterfaceDef, InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage,
-    MetadataUsage, OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
+    AliasDef, AttributeDef, AttributeUsage, Connect, ConnectionDef, ConnectionUsageMember,
+    DefaultReferenceUsage, EnumDef, IndividualDef, InterfaceDef, InterfaceUsage, ItemDef,
+    MetadataDef, MetadataKeywordUsage, MetadataUsage, OccurrenceDef, OccurrenceUsage, PartDef,
+    PartUsage, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
     CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
@@ -143,4 +144,8 @@ pub enum PackageBodyElement {
     /// `#violation connect 'Glucose Meter in Use' to req2;` in `14c-Language Extensions.sysml`).
     /// See `AttributeUsage` for the general PAR-002 rationale.
     Connect(Node<Connect>),
+    /// Keyword-less `name;` / `name = expr;` feature binding at package scope (§6 G26, GH-87),
+    /// e.g. `pressure = force / length^2;` (v1 Spec Examples/8.4.1 Wheel Hub Assembly/Wheel
+    /// Package.sysml:9). Previously only reachable inside part/attribute/action bodies.
+    DefaultReferenceUsage(Node<DefaultReferenceUsage>),
 }

@@ -792,6 +792,12 @@ pub struct DefaultReferenceUsage {
     pub name: String,
     /// Type after `:` / `defined by` / `typed by`.
     pub typing: Option<Node<TypingRelationship>>,
+    /// Optional `:>` subsetting clause (GH-87), e.g. `torquePerCurrent :>
+    /// Quantities::scalarQuantities = ISQ::torque / ISQ::electricCurrent;` (State Space
+    /// Representation Examples/EVSample.sysml:47).
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Optional `:>>` redefinition clause (GH-87), same shorthand position as `subsets`.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// Optional feature value after `=` / `default`.
     pub value: Option<Node<FeatureValue>>,
     pub name_span: Option<Span>,
@@ -803,6 +809,8 @@ impl PartialEq for DefaultReferenceUsage {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
             && self.typing == other.typing
+            && self.subsets == other.subsets
+            && self.redefines == other.redefines
             && self.value == other.value
             && self.membership == other.membership
     }
@@ -1396,6 +1404,10 @@ pub enum OccurrenceBodyElement {
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
     AttributeUsage(Node<AttributeUsage>),
     PartUsage(Box<Node<PartUsage>>),
+    /// `item x;` inside an occurrence definition/usage body (GH-87), e.g. `occurrence def Occ {
+    /// item x; }` (Simple Tests/OccurrenceTest.sysml:6). `item_usage` itself already fully
+    /// supports the bare (untyped, no value) form -- it just wasn't dispatched here.
+    ItemUsage(Node<ItemUsage>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
     SuccessionUsage(Node<SuccessionUsage>),
     /// `satisfy <ref> (by <expr>)?;` inside an occurrence definition body (previously only

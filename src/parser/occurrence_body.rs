@@ -524,6 +524,13 @@ pub(crate) fn occurrence_body_element(
         map(part_usage, |p| {
             OccurrenceBodyElement::PartUsage(Box::new(p))
         }),
+        // GH-87: `item x;` inside an occurrence body -- `item_usage` already fully supports the
+        // bare (untyped, no value) form, it just wasn't dispatched here (`part_usage` above
+        // already was).
+        map(
+            crate::parser::item::item_usage,
+            OccurrenceBodyElement::ItemUsage,
+        ),
         map(individual_usage, |n| {
             OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
         }),

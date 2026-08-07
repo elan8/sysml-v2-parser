@@ -20,7 +20,7 @@ use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, value};
+use nom::combinator::{map, opt, value};
 use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::IResult;
@@ -346,6 +346,12 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
 ///
 /// Real usage: `measurement = testVehicle.mass;` inside the perform body of the OMG spec Annex
 /// `9-Verification-simplified.sysml`.
+///
+/// The value is mandatory here deliberately: action bodies have a *targeted* recovery diagnostic
+/// for a bare identifier with no value at all (`invalid_bare_identifier_in_action_body`, "did you
+/// mean `perform batCap`?" -- `tests/recovery_actions.rs`), which a permissive bare-`name;` arm
+/// would silently swallow before that diagnostic ever runs. [`bare_or_valued_feature_binding`] is
+/// the value-optional sibling used outside action bodies, where no such diagnostic exists.
 pub(crate) fn feature_value_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
@@ -358,8 +364,28 @@ pub(crate) fn feature_value_binding(
             nom::error::ErrorKind::Tag,
         )));
     }
+    // GH-87: optional `:>`/`:>>` clause between the name and the value, e.g. `torquePerCurrent
+    // :> Quantities::scalarQuantities = ISQ::torque / ISQ::electricCurrent;` (State Space
+    // Representation Examples/EVSample.sysml:47). `subsetting()` (called by
+    // `specialization_clauses`) already optionally consumes its own trailing `= expr` as part of
+    // the `:>` clause itself -- reuse that captured value (via `wrap_bind_expression`, the same
+    // helper `attribute_feature_binding` already uses for this exact "subsets target = expr"
+    // shape) instead of also requiring a *second*, separate `= expr` afterward.
+    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
+    let leading_value = spec.subsets.as_ref().and_then(|(_, v)| v.clone());
     let (input, value) =
-        preceded(ws_and_comments, crate::parser::feature_value_part).parse(input)?;
+        nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
+            .parse(input)?;
+    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
+    let (input, value) = match value {
+        Some(v) => (input, v),
+        None => {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                start,
+                nom::error::ErrorKind::Tag,
+            )))
+        }
+    };
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -369,7 +395,59 @@ pub(crate) fn feature_value_binding(
             crate::ast::DefaultReferenceUsage {
                 name: name_str,
                 typing: None,
+                subsets: spec.subsets.map(|(target, _value)| target),
+                redefines: spec.redefines,
                 value: Some(value),
+                name_span: Some(name_span),
+                typing_span: None,
+                membership: Membership::feature(None, crate::ast::Span::dummy()),
+            },
+        ),
+    ))
+}
+
+/// GH-87: the same keyword-less binding as [`feature_value_binding`], but with the value made
+/// optional -- a fully bare `name;` (no type, no value) is a legal `DefaultReferenceUsage` too,
+/// e.g. `part def V { m; }` (Simple Tests/AnalysisTest.sysml:4). Kept as a separate function
+/// (rather than widening `feature_value_binding` itself) so action bodies' targeted bare-identifier
+/// recovery diagnostic keeps firing -- see that function's doc comment.
+pub(crate) fn bare_or_valued_feature_binding(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    if is_reserved_shorthand_starter(&name_str) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    // GH-87: optional `:>`/`:>>` clause between the name and the (also optional) value, e.g.
+    // `inflationPressure :> pressure;` (v1 Spec Examples/8.4.1 Wheel Hub Assembly/Wheel
+    // Package.sysml:21) -- no `=` value at all, the value is inherited from what it subsets.
+    // `subsetting()` (called by `specialization_clauses`) already optionally consumes its own
+    // trailing `= expr` as part of the `:>` clause itself (e.g. `torquePerCurrent :>
+    // Quantities::scalarQuantities = ISQ::torque / ISQ::electricCurrent;`, EVSample.sysml:47) --
+    // reuse that captured value (via `wrap_bind_expression`) instead of requiring a *second*,
+    // separate `= expr` afterward.
+    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
+    let leading_value = spec.subsets.as_ref().and_then(|(_, v)| v.clone());
+    let (input, value) =
+        opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
+    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::DefaultReferenceUsage {
+                name: name_str,
+                typing: None,
+                subsets: spec.subsets.map(|(target, _value)| target),
+                redefines: spec.redefines,
+                value,
                 name_span: Some(name_span),
                 typing_span: None,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
@@ -948,6 +1026,11 @@ pub(crate) fn attribute_usage_shorthand(
             crate::ast::DefaultReferenceUsage {
                 name: name_str,
                 typing,
+                // Leading `:>>` (before the name) is a different shape from GH-87's `name :>
+                // Target` (target after the name) -- see this function's doc comment; that form's
+                // target isn't captured here today, unchanged from before GH-87.
+                subsets: None,
+                redefines: None,
                 value,
                 name_span: Some(name_span),
                 typing_span: Some(typing_span),

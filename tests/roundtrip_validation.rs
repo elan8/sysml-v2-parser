@@ -120,6 +120,7 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Packet Example/Packets.sysml",
     "Requirements Examples/HSUVRequirements.sysml",
     "Room Model/RoomModel.sysml",
+    "Simple Tests/AnalysisTest.sysml",
     "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/DefaultValueTest.sysml",
     "Simple Tests/DependencyTest.sysml",

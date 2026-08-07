@@ -1165,6 +1165,9 @@ pub(crate) fn emit_occurrence_body_element(
         crate::ast::OccurrenceBodyElement::PartUsage(p) => {
             structure::emit_part_usage(w, path, &p.value)
         }
+        crate::ast::OccurrenceBodyElement::ItemUsage(i) => {
+            super::requirement::emit_item_usage(w, path, &i.value)
+        }
         crate::ast::OccurrenceBodyElement::OccurrenceUsage(o) => {
             emit_occurrence_usage(w, path, &o.value)
         }

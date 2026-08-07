@@ -295,6 +295,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::Connect(n) => {
             PackageBodyElement::Connect(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::DefaultReferenceUsage(n) => PackageBodyElement::DefaultReferenceUsage(
+            dummy_node(n, normalize_default_reference_usage(&n.value)),
+        ),
         PackageBodyElement::InterfaceUsage(n) => {
             PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
         }
@@ -587,6 +590,8 @@ fn normalize_default_reference_usage(u: &DefaultReferenceUsage) -> DefaultRefere
     DefaultReferenceUsage {
         name: u.name.clone(),
         typing: u.typing.clone(),
+        subsets: u.subsets.clone(),
+        redefines: u.redefines.clone(),
         value: u.value.clone(),
         name_span: None,
         typing_span: None,
