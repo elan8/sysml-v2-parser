@@ -358,15 +358,14 @@ fn skip_calc_modifiers(input: Input<'_>) -> IResult<Input<'_>, bool> {
     Ok((input, visibility.is_some() || is_abstract.is_some()))
 }
 
-/// True when `input` is a modifier-prefixed `calc def` (e.g. `private calc def Linear {`); the
-/// plain, unprefixed case is already covered by `starts_with_keyword(.., b"calc")`.
+/// True when `input` is a nested `calc def` (e.g. plain `calc def Inner {` or modifier-prefixed
+/// `private calc def Linear {`) -- distinct from the `def`-less `calc` usage form, which
+/// `starts_with_keyword(.., b"calc")` alone can't tell apart from this one (both start with
+/// `calc`).
 fn calc_def_follows_visibility(input: Input<'_>) -> bool {
-    let Ok((after_mods, had_modifiers)) = skip_calc_modifiers(input) else {
+    let Ok((after_mods, _)) = skip_calc_modifiers(input) else {
         return false;
     };
-    if !had_modifiers {
-        return false;
-    }
     let Ok((after_calc, _)) = preceded(tag(&b"calc"[..]), ws1).parse(after_mods) else {
         return false;
     };

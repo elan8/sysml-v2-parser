@@ -25,6 +25,16 @@ matches the pin.
 ./scripts/fetch-sysml-v2-release.sh 2026-04   # optional override
 ```
 
+## Entry points
+
+Conformance/roundtrip gates (L1/L2/L2.5 below) must use `parse()` (strict, all-or-nothing),
+never `parse_for_editor()` (partial AST + diagnostics, for IDE/LSP use). The two are guaranteed
+to agree on clean input -- same errors-empty verdict, same AST once spans are normalized out --
+but must not be mixed for the same document within one caller (e.g. parsing once with each and
+comparing across them): that was the GH-66/GH-69 roundtrip-harness bug class, where an apparent
+AST mismatch was really the two entry points disagreeing, not an emit/parser bug. See `src/lib.rs`
+crate docs and `tests/validation/parse_entry_point_equivalence.rs` (GH-70).
+
 ## Claim layers
 
 | Layer | Claim | Evidence |
