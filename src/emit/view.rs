@@ -189,6 +189,7 @@ fn emit_calc_body_element(
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
         CalcDefBodyElement::CalcUsage(c) => emit_calc_usage(w, path, &c.value),
+        CalcDefBodyElement::CalcDef(c) => emit_calc_def(w, path, &c.value),
         CalcDefBodyElement::PartUsage(p) => super::structure::emit_part_usage(w, path, &p.value),
         CalcDefBodyElement::Expression(e) => {
             emit_expression(w, &e.value)?;

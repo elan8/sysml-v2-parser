@@ -12,7 +12,7 @@ use crate::parser::lex::{
     starts_with_keyword, visibility_prefix, ws1, ws_and_comments, CALC_DEF_BODY_STARTERS,
     CONSTRAINT_DEF_BODY_STARTERS,
 };
-use crate::parser::usage::feature_usage_header;
+use crate::parser::usage::{feature_usage_header, redefinition, targets_display_string};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::bytes::complete::tag;
@@ -201,6 +201,10 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    // `abstract calc subcalculations: Calculation :> calculations, subactions { ... }` (Systems
+    // Library `Calculations.sysml`); accepted and discarded, matching `RefDecl`'s "don't model
+    // every shorthand" scope for feature modifiers.
+    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (identification, redefines)) = if input.fragment().starts_with(b":>>") {
@@ -227,6 +231,23 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    // `:>>` redefines may also follow the type instead of preceding the identification, e.g.
+    // `calc self: Calculation :>> Action::self, Evaluation::self;` (Systems Library
+    // `Calculations.sysml`) -- only retry if the earlier attempt (right after `calc`) didn't
+    // already find one, and reuse the shared comma-separated multi-target parser.
+    let (input, redefines) = if redefines.is_none() {
+        opt(preceded(ws_and_comments, redefinition))
+            .parse(input)
+            .map(|(input, r)| (input, r.map(|n| targets_display_string(&n.value.target))))?
+    } else {
+        (input, redefines)
+    };
+    // `:>` subsets, independent of `:>>` redefines, e.g. `abstract calc subcalculations:
+    // Calculation :> calculations, subactions { ... }` (Systems Library `Calculations.sysml`);
+    // accepted and discarded -- `CalcUsage` doesn't model subsetting separately from redefines,
+    // matching `RefDecl`'s "don't model every shorthand" scope for feature modifiers.
+    let (input, _) =
+        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
     let (input, value) = opt(preceded(
         ws_and_comments,
         crate::parser::feature_value::feature_value_part,
@@ -328,6 +349,40 @@ fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
     Ok((input, CalcDefBody::Brace { elements }))
 }
 
+/// Skips an optional `(private|protected|public)?` `abstract`? prefix and reports whether either
+/// was present, for the dispatch-gate peeks below (`calc_usage`/`parse_calc_def` themselves also
+/// consume `abstract`/visibility, so this only needs to decide *which* branch to try).
+fn skip_calc_modifiers(input: Input<'_>) -> IResult<Input<'_>, bool> {
+    let (input, (_, visibility)) = visibility_prefix(input)?;
+    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    Ok((input, visibility.is_some() || is_abstract.is_some()))
+}
+
+/// True when `input` is a modifier-prefixed `calc def` (e.g. `private calc def Linear {`); the
+/// plain, unprefixed case is already covered by `starts_with_keyword(.., b"calc")`.
+fn calc_def_follows_visibility(input: Input<'_>) -> bool {
+    let Ok((after_mods, had_modifiers)) = skip_calc_modifiers(input) else {
+        return false;
+    };
+    if !had_modifiers {
+        return false;
+    }
+    let Ok((after_calc, _)) = preceded(tag(&b"calc"[..]), ws1).parse(after_mods) else {
+        return false;
+    };
+    starts_with_keyword(after_calc.fragment(), b"def")
+}
+
+/// True when `input` is a modifier-prefixed, `def`-less `calc` usage (e.g. `abstract calc
+/// subcalculations: ...` / `private calc getElapsedUtcTime {`); `calc_usage` itself already
+/// consumes those modifiers, this just widens the dispatch gate to reach it.
+fn calc_usage_follows_visibility(input: Input<'_>) -> bool {
+    let Ok((after_mods, had_modifiers)) = skip_calc_modifiers(input) else {
+        return false;
+    };
+    had_modifiers && starts_with_keyword(after_mods.fragment(), b"calc")
+}
+
 fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -358,7 +413,16 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         } else {
             map(in_out_decl, CalcDefBodyElement::InOutDecl).parse(input)?
         }
-    } else if starts_with_keyword(input.fragment(), b"calc") {
+    } else if calc_def_follows_visibility(input) {
+        // Nested `(private|protected|public)? calc def Name { ... }` rollup helper (Domain
+        // Libraries `SampledFunctions.sysml`'s `Linear`), distinct from the def-less `calc`
+        // usage form handled below.
+        map(calc_def_required, |n| {
+            CalcDefBodyElement::CalcDef(Box::new(n))
+        })
+        .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"calc") || calc_usage_follows_visibility(input)
+    {
         map(calc_usage, |n| CalcDefBodyElement::CalcUsage(Box::new(n))).parse(input)?
     } else if starts_with_keyword(input.fragment(), b"return") {
         if named_return_missing_type(input) {

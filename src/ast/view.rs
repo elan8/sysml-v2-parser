@@ -114,6 +114,9 @@ pub enum CalcDefBodyElement {
     Expression(Node<Expression>), // formula
     /// Nested `calc` usage inside a calc body (validation `10b` rollups).
     CalcUsage(Box<Node<CalcUsage>>),
+    /// Nested `calc def` inside a calc body (Domain Libraries `SampledFunctions.sysml`'s
+    /// private `Linear` rollup helper).
+    CalcDef(Box<Node<CalcDef>>),
     /// Directed `in part …` parameter (validation `10b`).
     PartUsage(Box<Node<crate::ast::PartUsage>>),
     /// Unmodeled calc-body element captured as raw text (used for library parsing).

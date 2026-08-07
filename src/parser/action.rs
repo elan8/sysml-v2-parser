@@ -17,7 +17,7 @@ use crate::parser::lex::{
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
-use crate::parser::usage::multiplicity_node;
+use crate::parser::usage::{multiplicity_node, redefinition, targets_display_string};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -257,11 +257,15 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
         )));
     }
     let (input, _) = nom::combinator::opt(preceded(tag(&b"attribute"[..]), ws1)).parse(input)?;
-    // `in :>> name = expr;` / `out :>> name;` (validation `08` require bodies).
+    // `in :>> name = expr;` / `out :>> name;` (validation `08` require bodies). Also covers the
+    // multiplicity form (`in :>> payload [0..*];`) and the comma-separated multi-target form
+    // (`in :>> MessageTransfer::payload, MessageAction::payload;`), both from Systems Library
+    // `Actions.sysml`'s `SendAction`/`TransitionAction`.
     let (peek_redef, _) = ws_and_comments(input)?;
     if peek_redef.fragment().starts_with(b":>>") {
-        let (input, _) = tag(&b":>>"[..]).parse(input)?;
-        let (input, param_name) = preceded(ws_and_comments, name).parse(input)?;
+        let (input, redefines) = redefinition(input)?;
+        let param_name = targets_display_string(&redefines.value.target);
+        let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let (input, value) = opt(preceded(
             preceded(ws_and_comments, tag(&b"="[..])),
             preceded(ws_and_comments, expression),
