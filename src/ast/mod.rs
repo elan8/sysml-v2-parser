@@ -1189,6 +1189,9 @@ fn normalize_interface_def_body_element_node(
         InterfaceDefBodyElement::PortUsage(n) => {
             InterfaceDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }
+        InterfaceDefBodyElement::FlowUsage(n) => {
+            InterfaceDefBodyElement::FlowUsage(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }
@@ -1201,6 +1204,7 @@ fn normalize_end_decl(e: &EndDecl) -> EndDecl {
         references: e.references.clone(),
         multiplicity: e.multiplicity.clone(),
         redefines: e.redefines.clone(),
+        crosses: e.crosses.clone(),
         nested_usage: e.nested_usage.clone(),
         name_span: None,
         type_ref_span: None,

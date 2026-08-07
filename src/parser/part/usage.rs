@@ -753,18 +753,29 @@ fn connection_end_with_multiplicity(
     )
 }
 
-/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), or `doc`.
+/// Interface usage body elements: `ref` `:>>` name `=` value body (RefRedef), `end` member
+/// (GH-85), or `doc`.
 fn interface_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<InterfaceUsageBodyElement>> {
     alt((
         interface_usage_ref_redef,
+        map(interface_usage_end_decl, |end| {
+            let span = end.span.clone();
+            Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))
+        }),
         map(doc_comment, |doc| {
             let span = doc.span.clone();
             Node::new(span, InterfaceUsageBodyElement::Doc(doc))
         }),
     ))
     .parse(input)
+}
+
+// GH-85: interfaces don't allow the `#name` derived-end-name form (same as
+// `interface_def_body_element`'s `end_decl` call -- see `connector::end_decl`'s doc comment).
+fn interface_usage_end_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::EndDecl>> {
+    crate::parser::connector::end_decl(input, false)
 }
 
 fn interface_usage_ref_redef(
@@ -883,12 +894,30 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         if let Some((iface_name, _, _, interface_type)) = named_interface {
             (input, Some(iface_name), Some(interface_type))
         } else {
-            let (input, interface_type) = opt(preceded(
-                tag(&b":"[..]),
-                preceded(ws_and_comments, qualified_name),
+            // GH-85: a bare name with no `: Type` at all, immediately followed by `connect`, e.g.
+            // `interface userToFlashlight connect user.onOffCmdPort to
+            // flashlight.onOffCmdPort { ... }` (OMG spec Annex `Flashlight Example/Flashlight
+            // Example.sysml`). Only *peeks* the `connect` keyword (doesn't consume it) so the
+            // `starts_with(b"connect")` dispatch below still finds it; guarded on the literal
+            // keyword following so a genuinely anonymous `interface connect a to b;` can't have
+            // `connect` itself misread as this name (that would require a second `connect`
+            // immediately after it, which never occurs in real source).
+            let (input, bare_named) = opt((
+                name,
+                opt(multiplicity_node),
+                preceded(ws_and_comments, nom::combinator::peek(tag(&b"connect"[..]))),
             ))
             .parse(input)?;
-            (input, None, interface_type)
+            if let Some((iface_name, _, _)) = bare_named {
+                (input, Some(iface_name), None)
+            } else {
+                let (input, interface_type) = opt(preceded(
+                    tag(&b":"[..]),
+                    preceded(ws_and_comments, qualified_name),
+                ))
+                .parse(input)?;
+                (input, None, interface_type)
+            }
         };
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"connect") {
@@ -904,6 +933,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 start,
                 input,
                 InterfaceUsage::TypedConnect {
+                    name: iface_name,
                     interface_type,
                     from: from_expr,
                     to: to_expr,

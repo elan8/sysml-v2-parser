@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Connector-end / interface / flow shorthand gaps (#85).**
+  - `end_decl` (`src/parser/connector.rs`, shared by `connection.rs`/`interface.rs`): accepts
+    `item` as an end's leading kind keyword (`end [0..1] item cart: ShoppingCart[1];`); accepts a
+    `#tag` metadata-prefix annotation before an end (`end #cause cause1 : Causer1;`, distinct from
+    the existing `#name`-as-derived-name form); accepts a trailing `crosses <target>;` clause
+    after the type (new `EndDecl.crosses` field); accepts a trailing `::>`/`references` clause
+    *in addition to* (not just instead of) an explicit `: Type` (`end port p3: P ::> p.p1;`).
+  - `interface_def_body_element` (`src/parser/interface.rs`): accepts bare `flow <a> to <b>;`
+    shorthand connecting two of the interface's own ends (new `InterfaceDefBodyElement::FlowUsage`
+    variant).
+  - `interface_usage` (`src/parser/part/usage.rs`): accepts a named-but-untyped `connect` form,
+    `interface name connect a to b { ... }` (new `InterfaceUsage::TypedConnect.name` field); its
+    typed, non-`connect` declaration body now accepts `end` members, parallel to the
+    already-supported `connection name: Type { end ...; }` form (new
+    `InterfaceUsageBodyElement::EndDecl` variant).
+  - Promoted `Simple Tests/ConjugationTest.sysml` and `Vehicle Example/VehicleDefinitions.sysml`
+    into `EXAMPLES_ROUNDTRIP_PASS` (#83). Several other files targeted by #85 (Association
+    Examples, Cause and Effect Examples, Flashlight Example, Requirements Examples, the other
+    Vehicle Example file) now parse past their originally-reported failure into a *different*,
+    previously-hidden gap further into the same file -- tracked separately, not blocking here.
+
 ### Added
 
 - **`examples/` robustness tracker (#83, part 1).**
