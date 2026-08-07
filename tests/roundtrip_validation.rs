@@ -96,6 +96,40 @@ const ROUNDTRIP_PASS: &[&str] = &[
     "18-Use Case/18-Use Case.sysml",
 ];
 
+/// Fixtures under the release's `sysml/src/examples/` tree that must currently roundtrip
+/// successfully. Unlike [`ROUNDTRIP_PASS`] (the pinned, curated conformance target this parser
+/// claims L1/L2/L2.5 against), `examples/` isn't a conformance gate: it's a much wider, less
+/// curated sample of real-world SysML v2 source used only to track general parser
+/// robustness (GH-83). `examples_roundtrip_scan` fails if any of these regress, or if a file
+/// outside this list starts roundtripping (promote it here instead of letting it pass silently)
+/// -- same discipline as `roundtrip_known_gaps_must_still_fail` applies to `ROUNDTRIP_PASS` --
+/// but does *not* fail just because most of `examples/` still doesn't roundtrip; that's expected
+/// and tracked as backlog, not a regression.
+const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
+    "Arrowhead Framework Example/AHFProfileLib.sysml",
+    "Camera Example/PictureTaking.sysml",
+    "Comment Examples/Comments.sysml",
+    "Geometry Examples/CarWithEnvelopingShape.sysml",
+    "Import Tests/AliasImport.sysml",
+    "Import Tests/CircularImport.sysml",
+    "Import Tests/PrivateImportTest.sysml",
+    "Import Tests/QualifiedNameImportTest.sysml",
+    "Interaction Sequencing Examples/ServerSequenceModel.sysml",
+    "Metadata Examples/IssueMetadataExample.sysml",
+    "Packet Example/PacketUsage.sysml",
+    "Packet Example/Packets.sysml",
+    "Requirements Examples/HSUVRequirements.sysml",
+    "Room Model/RoomModel.sysml",
+    "Simple Tests/DefaultValueTest.sysml",
+    "Simple Tests/DependencyTest.sysml",
+    "Simple Tests/FeaturePathTest.sysml",
+    "Simple Tests/ImportTest.sysml",
+    "Simple Tests/MultiplicityTest.sysml",
+    "Simple Tests/ParameterTest.sysml",
+    "Simple Tests/RootPackageTest.sysml",
+    "Simple Tests/TradeStudyTest.sysml",
+];
+
 fn release_root() -> PathBuf {
     std::env::var_os("SYSML_V2_RELEASE_DIR")
         .map(PathBuf::from)
@@ -104,6 +138,10 @@ fn release_root() -> PathBuf {
 
 fn validation_dir() -> PathBuf {
     release_root().join("sysml").join("src").join("validation")
+}
+
+fn examples_dir() -> PathBuf {
+    release_root().join("sysml").join("src").join("examples")
 }
 
 fn find_sysml_files(dir: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
@@ -414,6 +452,94 @@ fn roundtrip_known_gaps_must_still_fail() {
     assert!(
         unexpected_passes.is_empty(),
         "these validation fixtures now roundtrip — add them to ROUNDTRIP_PASS:\n{}",
+        unexpected_passes.join("\n")
+    );
+}
+
+/// GH-83: same roundtrip pipeline as `roundtrip_known_gaps_must_still_fail`, run against the
+/// release's `sysml/src/examples/` tree instead of the pinned `validation/` conformance target.
+///
+/// This is a robustness tracker, not a conformance gate: `examples/` is a much wider, less
+/// curated sample of real-world SysML v2 source, and most of it is expected to still fail (see
+/// `EXAMPLES_ROUNDTRIP_PASS`'s doc comment). The test only fails on a *regression* -- something
+/// in `EXAMPLES_ROUNDTRIP_PASS` no longer roundtripping, or something outside it now roundtripping
+/// silently (promote it into the list instead). It never fails just because the overall pass rate
+/// is low.
+///
+/// Run `ROUNDTRIP_DIAG=1 cargo test --test roundtrip_validation examples_roundtrip_scan --
+/// --include-ignored --nocapture` for the per-file gap list.
+#[test]
+#[ignore = "requires SysML v2 release; run with --include-ignored"]
+fn examples_roundtrip_scan() {
+    let root = examples_dir();
+    if !root.exists() {
+        eprintln!(
+            "skipping: examples dir missing at {} (set SYSML_V2_RELEASE_DIR)",
+            root.display()
+        );
+        return;
+    }
+
+    let files = find_sysml_files(&root).expect("list example files");
+    assert!(
+        !files.is_empty(),
+        "no .sysml files under {}",
+        root.display()
+    );
+
+    let pass: std::collections::HashSet<&str> = EXAMPLES_ROUNDTRIP_PASS.iter().copied().collect();
+    let mut regressions = Vec::new();
+    let mut unexpected_passes = Vec::new();
+    let mut gap_count = 0usize;
+    let mut inventory: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+
+    for file in &files {
+        let rel = rel_validation_path(file, &root);
+        let folder = folder_of(&rel).to_string();
+        let entry = inventory.entry(folder).or_insert((0, 0));
+        let src = fs::read_to_string(file).expect("read example fixture");
+        let outcome = try_roundtrip(&src);
+
+        if pass.contains(rel.as_str()) {
+            entry.0 += 1;
+            if let RoundtripOutcome::Failed(msg) = outcome {
+                regressions.push(format!("{rel}: {msg}"));
+            }
+            continue;
+        }
+
+        entry.1 += 1;
+        gap_count += 1;
+        match outcome {
+            RoundtripOutcome::Ok => unexpected_passes.push(rel),
+            RoundtripOutcome::Failed(msg) => {
+                if std::env::var_os("ROUNDTRIP_DIAG").is_some() {
+                    let head = msg.lines().next().unwrap_or(&msg);
+                    let brief: String = head.chars().take(160).collect();
+                    eprintln!("GAP {rel}: {brief}");
+                }
+            }
+        }
+    }
+
+    eprintln!("examples/ robustness inventory (pass / known-gap):");
+    for (folder, (pass_n, gap_n)) in &inventory {
+        eprintln!("  {folder}: {pass_n} pass, {gap_n} known-gap");
+    }
+    eprintln!(
+        "totals: {} tracked-pass, {gap_count} known-gap, {} files",
+        EXAMPLES_ROUNDTRIP_PASS.len(),
+        files.len()
+    );
+
+    assert!(
+        regressions.is_empty(),
+        "EXAMPLES_ROUNDTRIP_PASS regressions:\n{}",
+        regressions.join("\n")
+    );
+    assert!(
+        unexpected_passes.is_empty(),
+        "these example fixtures now roundtrip — add them to EXAMPLES_ROUNDTRIP_PASS:\n{}",
         unexpected_passes.join("\n")
     );
 }
