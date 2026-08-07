@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Action-body control-flow gaps (#86).**
+  - `in_out_decl`'s `:>>` redefinition branch (`src/parser/action.rs`) accepts an optional
+    trailing `: Type` clause between the redefinition target and the `= value`
+    (`out attribute :>> a_out : AccelerationValue = Acceleration(dt, tm, tp);`).
+  - The literal `metadata` keyword form of `MetadataUsage` (BNF `('@' | 'metadata')`) is now
+    dispatched inside action bodies -- `crate::parser::metadata::metadata_usage` already fully
+    implemented it, it just wasn't reachable outside package-body scope (new
+    `ActionDefBodyElement::MetadataUsage` / `ActionUsageBodyElement::MetadataUsage` variants).
+  - `textual_representation` (`src/parser/requirement.rs`) no longer treats `rep` as a mandatory
+    prefix -- the BNF makes `('rep' Identification)?` fully optional, so a bare
+    `language "alf" /* ... */` now parses; it's also now dispatched inside action bodies (new
+    `ActionDefBodyElement::TextualRep` / `ActionUsageBodyElement::TextualRep` variants).
+  - `then_action`'s target list (`src/parser/action.rs`) accepts bare `fork`/`accept`/`decide`
+    control-node references (`then accept S;`, `then fork F { in a; out b1; out b2; }`,
+    `then decide D;`) -- new `ThenTarget::Fork`/`Accept`/`Decide` variants reusing
+    `fork_stmt`/`transition_accept`/`decision_stmt`, which already fully parsed these standalone.
+  - `if_stmt` accepts the non-brace `then`/`else` succession shorthand (`if x == 1 then A1;`,
+    `if x > 1 then A2; else A3;`, a guarded succession per BNF `GuardExpressionMember` +
+    `TransitionSuccessionMember`) and `else if ...` chaining (BNF `IfNode`'s
+    `IfNodeParameterMember` else-alternative). Both wrap into the same AST shape the equivalent
+    braced spelling already produces, so no new `IfStmt` fields were needed.
+  - `send`'s standalone-statement payload (`control_node_payload_stmt` in `src/parser/payload.rs`,
+    and the `action <name> send ...` inline-suffix form in `action_usage`) now accepts a general
+    expression (`send new Publish(someTopic, somePublication) via publicationPort;`), not just
+    `name : Type` -- BNF `SendNode`'s payload is `NodeParameterMember` (`FeatureBinding` =
+    `OwnedExpression`), unlike `accept`'s typed-name-only `PayloadParameter`. Both `accept`/`send`
+    now accept an optional `via <expr>` clause; `send` additionally accepts a trailing
+    `to <expr>` clause, including with an empty payload (`send via this to aa.target;`) -- new
+    `SendPayload` enum (`ActionUsage.send: Option<SendPayload>`, was `Option<PayloadClause>`) and
+    new `ActionUsage.via`/`.to: Option<Node<Expression>>` fields. Also fixes a related
+    correctness bug (not just a missing-feature gap): `action <name> send ...` previously fused
+    incorrectly -- the name and the send payload landed as two disconnected sibling elements
+    instead of one named send node, since the inline suffix only recognized `accept`.
+  - `PARSE_AST_VERSION` bumped 71 -> 72 for the `ActionUsage`/`ThenTarget`/`ActionDefBodyElement`/
+    `ActionUsageBodyElement` shape changes above.
 - **Keyword-less minimal feature-declaration shorthand gaps (#87).**
   - A fully bare `name;` (no type, no value) is now accepted as a `DefaultReferenceUsage` inside
     `part def` bodies (`bare_or_valued_feature_binding`, a new value-optional sibling of the
@@ -26,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `item x;` (bare, untyped item usage) is now dispatched inside occurrence definition/usage
     bodies (new `OccurrenceBodyElement::ItemUsage` variant) -- `item_usage` itself already fully
     supported the bare form, it just wasn't reachable there (`part_usage` already was).
-  - `PARSE_AST_VERSION` bumped 71 -> 72 for the `DefaultReferenceUsage`/`PackageBodyElement`/
+  - `PARSE_AST_VERSION` bumped 72 -> 73 for the `DefaultReferenceUsage`/`PackageBodyElement`/
     `OccurrenceBodyElement` shape changes above.
   - Promoted `Simple Tests/AnalysisTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
 

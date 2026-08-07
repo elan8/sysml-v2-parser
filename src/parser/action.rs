@@ -265,6 +265,14 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
     if peek_redef.fragment().starts_with(b":>>") {
         let (input, redefines) = redefinition(input)?;
         let param_name = targets_display_string(&redefines.value.target);
+        // Optional trailing `: Type` between the redefinition target and the value, e.g.
+        // `out attribute :>> a_out : AccelerationValue = Acceleration(dt, tm, tp);`
+        // (Systems Library-adjacent Analysis Examples/Dynamics.sysml:64, GH-86).
+        let (input, type_name) = opt(preceded(
+            preceded(ws_and_comments, tag(&b":"[..])),
+            preceded(ws_and_comments, qualified_name),
+        ))
+        .parse(input)?;
         let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let (input, value) = opt(preceded(
             preceded(ws_and_comments, tag(&b"="[..])),
@@ -280,7 +288,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                 InOutDecl {
                     direction,
                     name: param_name,
-                    type_name: String::new(),
+                    type_name: type_name.unwrap_or_default(),
                     is_redefinition: true,
                     value,
                 },
@@ -493,16 +501,30 @@ pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
     ))
 }
 
-pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenAction>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"then"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+/// The succession target itself, shared by `then <target>;` and the `else <target>;` shorthand
+/// used as an unbraced `if`/`else` branch (GH-86, `if x > 1 then A2; else A3;`,
+/// Simple Tests/DecisionTest.sysml:5-7). Keyword consumption is the caller's job.
+fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
     // §6 G23: `then merge <name>;` and `then <name>;` are the succession shorthand that follows
     // `first <name>;`; only the inline-declaration form (`then action ...`) was accepted before.
     // `merge_stmt` must precede `action_usage`, which would otherwise take `merge` as a name.
-    let (input, target) = alt((
+    alt((
         map(merge_stmt, ThenTarget::Merge),
+        // Bare `fork`/`accept`/`decide` control-node references (GH-86): all already fully
+        // parse standalone (`fork_stmt`/`transition_accept`/`decision_stmt`), just weren't tried
+        // as a `then` target.
+        map(fork_stmt, ThenTarget::Fork),
+        map(decision_stmt, ThenTarget::Decide),
+        map(
+            with_span(|i| {
+                nom::sequence::terminated(
+                    crate::parser::payload::transition_accept,
+                    preceded(ws_and_comments, tag(&b";"[..])),
+                )
+                .parse(i)
+            }),
+            |(span, accept)| ThenTarget::Accept(Node::new(span, accept)),
+        ),
         // `perform action …` before bare `perform …`; both before `action_usage`.
         map(
             crate::parser::part::perform_action_decl,
@@ -516,7 +538,29 @@ pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenActio
             ThenTarget::Feature,
         ),
     ))
-    .parse(input)?;
+    .parse(input)
+}
+
+pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenAction>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"then"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, target) = then_or_else_target(input)?;
+    Ok((input, node_from_to(start, input, ThenAction { target })))
+}
+
+/// The unbraced `else <target>;` shorthand `if`-branch (GH-86 non-brace `if`/`decide` gap), for
+/// use *after* the caller has already consumed the `else` keyword itself (unlike
+/// [`then_action`]/[`if_stmt`]'s `then` branch, which consumes its own leading keyword since
+/// nothing else does so for it). Reuses [`ThenAction`]/[`ThenTarget`] for the target: which
+/// keyword introduced it is already captured positionally by `IfStmt.then_body`/`else_body`, so
+/// no separate AST type is needed -- `if_stmt` wraps the result as a synthetic one-element
+/// `{ then <target>; }` body, identical to what the braced spelling of the same statement already
+/// produces, so it re-emits/reparses to the same structure either way.
+fn else_target_shorthand(input: Input<'_>) -> IResult<Input<'_>, Node<ThenAction>> {
+    let start = input;
+    let (input, target) = then_or_else_target(input)?;
     Ok((input, node_from_to(start, input, ThenAction { target })))
 }
 
@@ -584,6 +628,20 @@ fn action_def_body_element(
             map(while_stmt, ActionDefBodyElement::WhileStmt),
             map(loop_stmt, ActionDefBodyElement::LoopStmt),
             map(if_stmt, ActionDefBodyElement::IfStmt),
+            // Literal `metadata` keyword form of `MetadataUsage` (BNF `('@' | 'metadata')`,
+            // GH-86), e.g. `metadata ToolExecution { ... }`. Previously only dispatched at
+            // package-body scope even though `crate::parser::metadata::metadata_usage` already
+            // implements it fully (including rejecting `metadata def ...`).
+            map(
+                crate::parser::metadata::metadata_usage,
+                ActionDefBodyElement::MetadataUsage,
+            ),
+            // KerML `TextualRepresentation` (GH-86), e.g. `language "alf" /* c.x = newX; */`.
+            // Previously not reachable from any action body.
+            map(
+                crate::parser::requirement::textual_representation,
+                ActionDefBodyElement::TextualRep,
+            ),
             // Nested `action def` must win over `action_usage` (which would otherwise treat
             // `def` as a usage name).
             map(nested_action_def_decl, ActionDefBodyElement::Decl),
@@ -861,17 +919,58 @@ fn loop_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
     Ok((input, node_from_to(start, input, LoopStmt { body })))
 }
 
-/// If control node: `if` condition `{` thenBody `}` (`else` `{` elseBody `}`)?
+/// Wraps a single `then <target>;`/`else <target>;` shorthand statement (GH-86, no `{ }`) into
+/// the same one-element `ActionDefBody::Brace` shape the braced spelling `{ then <target>; }`
+/// already produces, so both forms are indistinguishable in the AST from here on.
+fn wrap_then_action_as_body(node: Node<ThenAction>) -> ActionDefBody {
+    let span = node.span.clone();
+    ActionDefBody::Brace {
+        elements: vec![Node::new(span, ActionDefBodyElement::ThenAction(node))],
+    }
+}
+
+/// Wraps a nested `else if ...` (BNF `IfNode`'s `IfNodeParameterMember` else-alternative, GH-86)
+/// into the same one-element `ActionDefBody::Brace` shape `else { if ... }` already produces.
+fn wrap_if_stmt_as_body(node: Node<IfStmt>) -> ActionDefBody {
+    let span = node.span.clone();
+    ActionDefBody::Brace {
+        elements: vec![Node::new(span, ActionDefBodyElement::IfStmt(node))],
+    }
+}
+
+/// If control node: `if` condition (`{` thenBody `}` | `then` target `;`) (`else` (`{` elseBody
+/// `}` | `if` ... | target `;`))?
+///
+/// The non-brace `then`/`else` shorthand (GH-86) is real SysML v2 usage, not a parser
+/// convenience: `if x == 1 then A1;` and `if x > 1 then A2; else A3;` (Simple Tests/
+/// DecisionTest.sysml:5-7) are guarded successions written without an enclosing action body.
+/// `else if ...` chaining (also GH-86, Simple Tests/StructuredControlTest.sysml:7-13) is BNF
+/// `IfNode`'s `('else' (ActionBodyParameterMember | IfNodeParameterMember))?` -- the else branch
+/// can itself be a nested `IfNode`, not just a body.
 fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"if"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, condition) = expression(input)?;
-    let (input, then_body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
+    let (input, then_body) = preceded(
+        ws_and_comments,
+        alt((
+            action_def_body_brace,
+            map(then_action, wrap_then_action_as_body),
+        )),
+    )
+    .parse(input)?;
     let (input, else_body) = opt(preceded(
         preceded(ws_and_comments, tag(&b"else"[..])),
-        preceded(ws_and_comments, action_def_body_brace),
+        preceded(
+            ws_and_comments,
+            alt((
+                action_def_body_brace,
+                map(if_stmt, wrap_if_stmt_as_body),
+                map(else_target_shorthand, wrap_then_action_as_body),
+            )),
+        ),
     ))
     .parse(input)?;
     Ok((
@@ -1019,6 +1118,20 @@ pub(crate) fn action_usage_body_element(
             map(while_stmt, ActionUsageBodyElement::WhileStmt),
             map(loop_stmt, ActionUsageBodyElement::LoopStmt),
             map(if_stmt, ActionUsageBodyElement::IfStmt),
+            // Literal `metadata` keyword form of `MetadataUsage` (BNF `('@' | 'metadata')`,
+            // GH-86), e.g. `metadata ToolExecution { ... }`. Previously only dispatched at
+            // package-body scope even though `crate::parser::metadata::metadata_usage` already
+            // implements it fully (including rejecting `metadata def ...`).
+            map(
+                crate::parser::metadata::metadata_usage,
+                ActionUsageBodyElement::MetadataUsage,
+            ),
+            // KerML `TextualRepresentation` (GH-86), e.g. `language "alf" /* c.x = newX; */`.
+            // Previously not reachable from any action body.
+            map(
+                crate::parser::requirement::textual_representation,
+                ActionUsageBodyElement::TextualRep,
+            ),
             map(nested_action_def_decl, ActionUsageBodyElement::Decl),
             map(control_node_action_usage, |a| {
                 ActionUsageBodyElement::ActionUsage(Box::new(a))
@@ -1225,10 +1338,66 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
         preceded(ws1, crate::parser::payload::typed_payload_clause),
     ))
     .parse(input)?;
+    // `action <name> send ...` (GH-86, e.g. `action publish send new Publish(someTopic,
+    // somePublication) via publicationPort;`, Interaction Sequencing Examples/
+    // ServerSequenceOutsideRealization-2.sysml): BNF's `SendNodeDeclaration` fuses the naming
+    // `ActionNodeUsageDeclaration` prefix and the `send` payload into one node, mirroring the
+    // `accept` suffix above. Without this, `<name> send ...` fell through as an anonymous
+    // empty-bodied `<name>` usage followed by a *separate* unnamed `send` sibling statement.
+    // The payload itself is optional (BNF `EmptyParameterMember` alternative), e.g. `action
+    // snd2 send via this to aa.target;` (Simple Tests/ActionTest.sysml) -- so `saw_send_keyword`
+    // is tracked separately from whether a payload was actually captured, to gate the `to`
+    // clause correctly even when the payload is absent.
+    let (input, saw_send_keyword, send) = if accept.is_none() {
+        let (input, send_kw) =
+            nom::combinator::opt(preceded(ws_and_comments, tag(&b"send"[..]))).parse(input)?;
+        if send_kw.is_some() {
+            // Peek for the `via`/`to` keywords first: neither is reserved in `name`/`expression`,
+            // so without this guard an empty payload (BNF `EmptyParameterMember`) would greedily
+            // swallow `via`/`to` itself as a bare feature reference instead of leaving it for the
+            // `via`/`to` clauses below (GH-86, `action snd2 send via this to aa.target;`).
+            let (peek, _) = ws_and_comments(input)?;
+            let payload_follows = !starts_with_any_keyword(peek.fragment(), &[b"via", b"to"]);
+            let (input, send) = if payload_follows {
+                nom::combinator::opt(preceded(
+                    ws1,
+                    nom::branch::alt((
+                        nom::combinator::map(
+                            crate::parser::payload::typed_payload_clause,
+                            crate::ast::SendPayload::Typed,
+                        ),
+                        nom::combinator::map(expression, crate::ast::SendPayload::Expression),
+                    )),
+                ))
+                .parse(input)?
+            } else {
+                (input, None)
+            };
+            (input, true, send)
+        } else {
+            (input, false, None)
+        }
+    } else {
+        (input, false, None)
+    };
     let type_ref_span = accept
         .as_ref()
         .and_then(|p| p.type_span.clone())
         .or(type_ref_span);
+    let (input, via) = nom::combinator::opt(preceded(
+        preceded(ws_and_comments, tag(&b"via"[..])),
+        preceded(ws1, expression),
+    ))
+    .parse(input)?;
+    let (input, to) = if saw_send_keyword {
+        nom::combinator::opt(preceded(
+            preceded(ws_and_comments, tag(&b"to"[..])),
+            preceded(ws1, expression),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = action_usage_body(input)?;
     // Spec-wise, a braced body does not require a trailing semicolon. However, in practice some
@@ -1252,7 +1421,9 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 subsets,
                 redefines,
                 accept,
-                send: None,
+                send,
+                via,
+                to,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
