@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Keyword-less minimal feature-declaration shorthand gaps (#87).**
+  - A fully bare `name;` (no type, no value) is now accepted as a `DefaultReferenceUsage` inside
+    `part def` bodies (`bare_or_valued_feature_binding`, a new value-optional sibling of the
+    existing `feature_value_binding`) -- e.g. `part def V { m; }`. Action bodies keep the
+    value-mandatory `feature_value_binding` so the existing targeted bare-identifier recovery
+    diagnostic there still fires.
+  - The keyword-less `name = expr;` binding shorthand is now dispatched at package-body scope too
+    (new `PackageBodyElement::DefaultReferenceUsage` variant), previously only reachable inside
+    part/attribute/action bodies -- e.g. `pressure = force / length^2;`. Value-mandatory here for
+    the same bare-identifier-diagnostic reason as above.
+  - The shorthand now accepts a leading `:>`/`:>>` specialization clause before the value (new
+    `DefaultReferenceUsage.subsets`/`.redefines` fields) -- e.g. `torquePerCurrent :>
+    Quantities::scalarQuantities = ISQ::torque / ISQ::electricCurrent;`, and the value-less form
+    `inflationPressure :> pressure;` where the value is inherited from what it subsets.
+  - `item x;` (bare, untyped item usage) is now dispatched inside occurrence definition/usage
+    bodies (new `OccurrenceBodyElement::ItemUsage` variant) -- `item_usage` itself already fully
+    supported the bare form, it just wasn't reachable there (`part_usage` already was).
+  - `PARSE_AST_VERSION` bumped 71 -> 72 for the `DefaultReferenceUsage`/`PackageBodyElement`/
+    `OccurrenceBodyElement` shape changes above.
+  - Promoted `Simple Tests/AnalysisTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
+
 ## [0.54.0] - 2026-08-07
 
 ### Fixed

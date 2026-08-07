@@ -363,6 +363,14 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         // `ActionNodeMember` is reachable only from `ActionBodyItem`, not the generic
         // `DefinitionBodyItem` a part def body uses -- no real usage exercises them here either.
         map(part_def_succession_stmt, PartDefBodyElement::FirstStmt),
+        // GH-87: keyword-less `name;` / `name = expr;` feature binding (§6 G26), previously only
+        // reachable inside action bodies even though `part def V { m; }` is real usage (Simple
+        // Tests/AnalysisTest.sysml:4). Tried absolute last, after `attribute_usage_shorthand`
+        // above (which requires `: Type`), so every keyword-led/typed member keeps priority.
+        map(
+            crate::parser::attribute::bare_or_valued_feature_binding,
+            PartDefBodyElement::DefaultReferenceUsage,
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

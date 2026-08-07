@@ -1021,6 +1021,28 @@ pub(crate) fn package_body_element(
             }
         }
     }
+    // GH-87: keyword-less `name = expr;` binding (§6 G26), previously only reachable inside
+    // part/attribute/action bodies, even though official OMG spec-derived examples use it at
+    // package scope: `pressure = force / length^2;` (v1 Spec Examples/8.4.1 Wheel Hub Assembly/
+    // Wheel Package.sysml:9) and `T1 = 10.0 [N * m];` (Vehicle Example/VehicleUsages.sysml:14).
+    // Tried after every specific dispatcher above (including the `#`/`@` metadata-tag forms) so
+    // real keyword-led/typed members keep priority, but before the KerML-opaque fallback below.
+    // Deliberately value-*mandatory* (`feature_value_binding`, not the bare-name-permitting
+    // `bare_or_valued_feature_binding` used in part def bodies for #87.1): package bodies have
+    // their own existing recovery diagnostics for a bare identifier/misused keyword with no value
+    // (`unrecognized_identifier_is_not_reported_as_a_keyword` /
+    // `misused_real_keyword_is_still_reported_as_unexpected_keyword`,
+    // `tests/recovery_diagnostics_integration.rs`) that a permissive bare-`name;` arm here would
+    // silently swallow before those diagnostics ever ran -- same class of regression already
+    // avoided for action bodies, see `feature_value_binding`'s doc comment.
+    if let Ok((input, elem)) = map(
+        crate::parser::attribute::feature_value_binding,
+        PackageBodyElement::DefaultReferenceUsage,
+    )
+    .parse(input)
+    {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
     if let Ok((input, elem)) =
         map(kerml_feature_decl, PackageBodyElement::KermlFeatureDecl).parse(input)
     {

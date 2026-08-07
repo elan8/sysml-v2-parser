@@ -1290,6 +1290,12 @@ pub(crate) fn emit_default_reference_usage(
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
     }
+    if let Some(subsets) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
     }
