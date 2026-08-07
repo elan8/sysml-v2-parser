@@ -776,8 +776,15 @@ pub struct AttributeUsage {
     /// `derived` keyword from `RefPrefix` (BNF §8.2.2.6.2) -- usage-only, no `Definition`
     /// equivalent (`AttributeDefinition` uses `DefinitionPrefix`, which has no `derived`).
     pub is_derived: bool,
+    /// `abstract`/`variation` keyword from `RefPrefix` (GH-88.3), e.g. `abstract attribute
+    /// minMass :> ISQ::mass;` (`Mass Roll-up Example/MassRollup.sysml:21`). Named `usage_prefix`
+    /// to match `PartUsage::usage_prefix`'s identical `DefinitionPrefix` reuse.
+    pub usage_prefix: Option<DefinitionPrefix>,
     /// `constant` keyword from `RefPrefix` -- usage-only, same rationale as `is_derived`.
     pub is_constant: bool,
+    /// `ref` keyword from `BasicUsagePrefix` (GH-88.2), e.g. `derived constant ref attribute y
+    /// :> x;` (`Simple Tests/PartTest.sysml:9`).
+    pub is_reference: bool,
     /// `end` keyword from `EndUsagePrefix` (BNF §8.2.2.6.2, `isEnd ?= 'end'`) -- an alternative
     /// to `RefPrefix` reached through the same `UsagePrefix` production `AttributeUsage` uses
     /// (`UsagePrefix 'attribute' Usage`). Distinct from the unrelated `EndDecl`/`end_decl`
@@ -1133,6 +1140,10 @@ impl PartialEq for EndDecl {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RefDecl {
+    /// Leading `in`/`out`/`inout` direction (GH-88.4), e.g. `private in ref y: A, B;` inside a
+    /// `part def` body (`Simple Tests/ItemTest.sysml:15`). Only parsed by `part_ref_usage`;
+    /// `connector::ref_decl`'s call sites have no confirmed real usage for a leading direction.
+    pub direction: Option<InOut>,
     pub name: String,
     /// Type after `:`, e.g. "Vehicle". A comma-separated multi-target clause joins into one
     /// display string here; see `typing` for the structured, multi-target-capable form.

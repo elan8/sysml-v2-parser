@@ -586,7 +586,9 @@ fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
         ordered: a.ordered,
         nonunique: a.nonunique,
         is_derived: a.is_derived,
+        usage_prefix: a.usage_prefix.clone(),
         is_constant: a.is_constant,
+        is_reference: a.is_reference,
         is_end: a.is_end,
         membership: a.membership.clone(),
     }
@@ -1241,6 +1243,7 @@ fn normalize_end_decl(e: &EndDecl) -> EndDecl {
 
 fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
     RefDecl {
+        direction: r.direction,
         name: r.name.clone(),
         type_name: r.type_name.clone(),
         typing: r.typing.clone(),

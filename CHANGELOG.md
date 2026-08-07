@@ -104,6 +104,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Promoted `Camera Example/Camera.sysml`, `Mass Roll-up Example/MassConstraintExample.sysml`, and
     `Simple Tests/AliasTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
 
+- **Attribute/reference usage modifier gaps (#88).**
+  - `attribute_usage` (`src/parser/attribute.rs`) now accepts `::>` (reference-subsetting) as a
+    name-standing-in prefix, same pattern as the existing `:>>` (redefines) handling (new
+    `AttributeUsageHead::PrefixReferences`) -- `attribute ::> m = ms.totalMass;` (`Simple Tests/
+    CalculationTest.sysml:14`).
+  - `attribute_usage`'s `RefPrefix` handling now accepts the full BNF-legal modifier stack:
+    `derived`? (`abstract`|`variation`)? `constant`? `ref`? (previously only `derived`/`constant`
+    were recognized; `abstract`/`variation`/`ref` were incorrectly assumed illegal on an
+    attribute usage) -- new `AttributeUsage.usage_prefix`/`.is_reference` fields. `derived
+    constant ref attribute y :> x;` (`Simple Tests/PartTest.sysml:9`), `abstract attribute
+    minMass :> ISQ::mass;` (`Mass Roll-up Example/MassRollup.sysml:21`).
+  - `part_ref_usage` (`src/parser/part/usage.rs`) now accepts a leading `in`/`out`/`inout`
+    direction prefix (new `RefDecl.direction` field) -- the comma-separated multi-target type
+    list already worked via `optional_typings`. `private in ref y: A, B;` (`Simple Tests/
+    ItemTest.sysml:15`).
+  - `attribute_usage` now accepts a bare `:>` (subsets, no name) as a name-standing-in prefix,
+    same pattern as `::>`/`:>>` above (new `AttributeUsageHead::PrefixSubsets`) -- `attribute :>
+    differencesOf[1] { ... }` (`Geometry Examples/CarWithShapeAndCSG.sysml:84`, also
+    `SimpleQuadcopter.sysml`).
+  - `PARSE_AST_VERSION` bumped 74 -> 75 for the AST shape changes above.
+
 ## [0.54.0] - 2026-08-07
 
 ### Fixed

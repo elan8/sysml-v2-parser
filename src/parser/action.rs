@@ -210,6 +210,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
             start,
             input,
             crate::ast::RefDecl {
+                direction: None,
                 name: name_str,
                 type_name,
                 typing,
