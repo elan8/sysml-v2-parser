@@ -690,6 +690,17 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
     let (input, _) = ws1(input)?;
     let (input, ident_parsed, locale) = if input.fragment().starts_with(b"/*") {
         (input, None, None)
+    } else if starts_with_keyword(input.fragment(), b"locale") {
+        // GH-91.1: `doc locale "en_US" /* ... */` (no identification) -- without this guard,
+        // `identification` below greedily consumes the bare word `locale` itself as the doc
+        // comment's own name, leaving nothing for the subsequent `locale` keyword check to
+        // match. Real usage: `Simple Tests/CommentTest.sysml:32`.
+        let (input, locale) = preceded(
+            preceded(ws_and_comments, tag(&b"locale"[..])),
+            preceded(ws1, string_value),
+        )
+        .parse(input)?;
+        (input, None, Some(locale))
     } else {
         let (input, ident_parsed) = opt(identification).parse(input)?;
         let (input, locale) = opt(preceded(
@@ -719,17 +730,64 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
     ))
 }
 
+/// Bare `locale STRING_VALUE /* ... */` package member (GH-91.1): KerML `Comment`'s
+/// `('comment' Identification?)?` prefix is entirely optional, so a comment can legally omit
+/// the `comment` keyword altogether, leaving just `('locale' STRING_VALUE)? RegularComment`.
+/// `comment_annotation` below requires the `comment` keyword unconditionally, so this handles
+/// the omitted-keyword case as its own small parser rather than widening that one (which is
+/// reused across many other body contexts). Real usage: `Simple Tests/CommentTest.sysml:25`.
+pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"locale"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, locale) = string_value(input)?;
+    // Use ws (not ws_and_comments) so we don't consume the comment body as a block comment.
+    let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
+    let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
+    let (input, _) = tag(&b"*/"[..]).parse(input)?;
+    let text = String::from_utf8_lossy(text_bytes.fragment()).to_string();
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            CommentAnnotation {
+                identification: None,
+                locale: Some(locale),
+                text,
+            },
+        ),
+    ))
+}
+
 /// KerML Comment: ( 'comment' Identification? )? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"comment"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, ident_parsed) = opt(identification).parse(input)?;
-    let (input, locale) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"locale"[..])),
-        preceded(ws1, string_value),
-    ))
-    .parse(input)?;
+    let (input, ident_parsed, locale) = if starts_with_keyword(input.fragment(), b"locale") {
+        // GH-91.1: `comment locale "en_US" /* ... */` (no identification) -- without this
+        // guard, `identification` below greedily consumes the bare word `locale` itself as the
+        // comment's own name, leaving nothing for the subsequent `locale` keyword check to
+        // match. This is exactly the shape `emit_comment` produces for a `CommentAnnotation`
+        // with `identification: None, locale: Some(..)` (e.g. from `bare_locale_comment`'s
+        // identification-less form), so without this fix that emitted output would fail to
+        // roundtrip.
+        let (input, locale) = preceded(
+            preceded(ws_and_comments, tag(&b"locale"[..])),
+            preceded(ws1, string_value),
+        )
+        .parse(input)?;
+        (input, None, Some(locale))
+    } else {
+        let (input, ident_parsed) = opt(identification).parse(input)?;
+        let (input, locale) = opt(preceded(
+            preceded(ws_and_comments, tag(&b"locale"[..])),
+            preceded(ws1, string_value),
+        ))
+        .parse(input)?;
+        (input, ident_parsed, locale)
+    };
     let (input, _) = nom::bytes::complete::take_until::<_, _, nom::error::Error<Input>>(&b"/*"[..])
         .parse(input)?;
     // Use ws so we don't consume the comment body as a block comment.
