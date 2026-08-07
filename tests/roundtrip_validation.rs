@@ -125,6 +125,7 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Room Model/RoomModel.sysml",
     "Simple Tests/AliasTest.sysml",
     "Simple Tests/AnalysisTest.sysml",
+    "Simple Tests/CommentTest.sysml",
     "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/DefaultValueTest.sysml",
     "Simple Tests/DependencyTest.sysml",

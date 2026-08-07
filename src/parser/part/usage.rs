@@ -1037,6 +1037,9 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
 pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    // GH-88.4: leading `in`/`out`/`inout` direction, e.g. `private in ref y: A, B;` (Simple
+    // Tests/ItemTest.sysml:15).
+    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // Reject kinded refs so those forms parse as real PartUsage/ActionUsage/StateUsage/…
@@ -1101,6 +1104,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             start,
             input,
             RefDecl {
+                direction,
                 name: name_str,
                 type_name,
                 typing,
@@ -1331,7 +1335,9 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             // §6 G5: the usage form was reachable from part *definition* bodies only.
             map(requirement_usage, PartUsageBodyElement::RequirementUsage),
             map(occurrence_def, PartUsageBodyElement::OccurrenceDef),
+            // `calc_def_required` before `calc_usage` for the same bare-`def` reason (GH-91.2).
             map(calc_def_required, PartUsageBodyElement::CalcDef),
+            map(calc_usage, PartUsageBodyElement::CalcUsage),
             // `constraint_def` before `constraint_usage` for the same bare-`def` reason.
             map(constraint_def, PartUsageBodyElement::ConstraintDef),
             map(constraint_usage, PartUsageBodyElement::ConstraintUsage),

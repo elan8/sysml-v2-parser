@@ -51,6 +51,11 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
     b"item",
+    // GH-90.1: `individual item ii : II1;` / `individual item :>> i : II2;` inside `item def`
+    // bodies (Simple Tests/IndividualTest.sysml:4,15) -- opaquely captured like the un-prefixed
+    // `item` starter above, matching this body's existing "not fully modeled, but accepted"
+    // convention for item/part usages.
+    b"individual",
     b"constraint",
     b"private",
     b"derived",
@@ -195,6 +200,16 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(crate::parser::occurrence_body::occurrence_usage, |n| {
             AttributeBodyElement::OccurrenceUsage(Box::new(n))
         }),
+        // GH-90.2: `timeslice`/`snapshot` portion usages inside attribute/item bodies, e.g.
+        // `timeslice asPresident : Person [0..*] { ... }` (Individuals Examples/
+        // JohnIndividualExample.sysml:11). Both already fully parse via `timeslice_usage`/
+        // `snapshot_usage` (used elsewhere, e.g. part def bodies) -- just not dispatched here.
+        map(crate::parser::occurrence_body::timeslice_usage, |n| {
+            AttributeBodyElement::OccurrenceUsage(Box::new(n))
+        }),
+        map(crate::parser::occurrence_body::snapshot_usage, |n| {
+            AttributeBodyElement::OccurrenceUsage(Box::new(n))
+        }),
         // This body is also shared with `item def`/`item` usage bodies, which legally own
         // connector members (`connect a to b;`) and metadata tags (`#keyword`, bare or
         // prefixing the next member) -- see the OMG spec Annex `14c-Language Extensions.sysml`
@@ -332,7 +347,9 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
                 ordered: mods.ordered,
                 nonunique: mods.nonunique,
                 is_derived: false,
+                usage_prefix: None,
                 is_constant: false,
+                is_reference: false,
                 is_end: false,
                 // No visibility prefix exists on this ad hoc `(':>>' | ':>')? name` feature-binding
                 // shape (see `prefix_span`'s comment above) -- always `FeatureMembership`, no
@@ -656,6 +673,19 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             redefines_span: crate::ast::Span,
             redefines: Node<SubsettingRelationship>,
         },
+        /// `attribute ::> m = ms.totalMass;` (GH-88.1, `Simple Tests/CalculationTest.sysml:14`):
+        /// the `::>` reference-subsetting target stands in for the name, same pattern as
+        /// `PrefixRedefines` for `:>>`.
+        PrefixReferences {
+            references: Node<SubsettingRelationship>,
+        },
+        /// `attribute :> differencesOf[1] { ... }` (GH-88.5, `Geometry Examples/
+        /// CarWithShapeAndCSG.sysml:84`): the `:>` subsets target stands in for the name, same
+        /// pattern as `PrefixRedefines`/`PrefixReferences` for `:>>`/`::>`.
+        PrefixSubsets {
+            subsets: Node<SubsettingRelationship>,
+            subsets_value: Option<Node<crate::ast::Expression>>,
+        },
     }
 
     let start = input;
@@ -669,21 +699,35 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     // construct (a separate named-connector-end declaration, `end name : Type;`).
     let (input, is_end) = nom::combinator::opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
     let is_end = is_end.is_some();
-    // RefPrefix (BNF §8.2.2.6.2): `derived`? (`abstract`|`variation`)? `constant`? -- usage-only
-    // prefix keywords, no `Definition` equivalent. `abstract`/`variation` aren't legal on an
-    // attribute usage per the Systems Library's actual usage (attributes are never abstract), so
-    // only `derived`/`constant` are recognized here; anything else falls through unconsumed.
+    // `BasicUsagePrefix = RefPrefix ('ref')?`, `RefPrefix = 'derived'? ('abstract'|'variation')?
+    // 'constant'?` (BNF §8.2.2.6.2) -- usage-only prefix keywords, no `Definition` equivalent.
+    // GH-88.2/88.3: `abstract`/`variation`/`ref` are all legal here per the BNF (confirmed real
+    // usage: `derived constant ref attribute y :> x;`, Simple Tests/PartTest.sysml:9; `abstract
+    // attribute minMass :> ISQ::mass;`, Mass Roll-up Example/MassRollup.sysml:21) -- a previous
+    // assumption that `abstract`/`variation` "aren't legal on an attribute usage" was incorrect.
     // Skipped entirely when `end` already matched, since the two are alternatives.
-    let (input, is_derived, is_constant) = if is_end {
-        (input, false, false)
+    let (input, is_derived, usage_prefix, is_constant, is_reference) = if is_end {
+        (input, false, None, false, false)
     } else {
         let (input, is_derived) =
             nom::combinator::opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
         let is_derived = is_derived.is_some();
+        let (input, usage_prefix) = nom::combinator::opt(alt((
+            map(preceded(tag(&b"abstract"[..]), ws1), |_| {
+                crate::ast::DefinitionPrefix::Abstract
+            }),
+            map(preceded(tag(&b"variation"[..]), ws1), |_| {
+                crate::ast::DefinitionPrefix::Variation
+            }),
+        )))
+        .parse(input)?;
         let (input, is_constant) =
             nom::combinator::opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?;
         let is_constant = is_constant.is_some();
-        (input, is_derived, is_constant)
+        let (input, is_reference) =
+            nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
+        let is_reference = is_reference.is_some();
+        (input, is_derived, usage_prefix, is_constant, is_reference)
     };
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     // SysML allows anonymous attribute usages: `attribute: Real;` (Identification may be empty).
@@ -709,97 +753,184 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     // path (where `ws1` above already fully consumed it).
     let (input, _) = ws_and_comments(input)?;
     let peek = input;
-    let (input, usage_head) = if (peek.fragment().starts_with(b":")
-        && !peek.fragment().starts_with(b":>")
-        && !peek.fragment().starts_with(b":>>"))
-        || starts_with_keyword(peek.fragment(), b"defined")
-    {
-        (
-            input,
-            AttributeUsageHead::Named {
-                name_span: crate::ast::Span::dummy(),
-                name: String::new(),
-            },
-        )
-    } else {
-        alt((
-            map(
-                preceded(ws_and_comments, prefix_redefinition_target),
-                |(redefines_span, redefines)| AttributeUsageHead::PrefixRedefines {
-                    redefines_span,
-                    redefines,
+    let (input, usage_head) =
+        if let Ok((input, references)) = crate::parser::usage::reference_subsetting(peek) {
+            // Checked before the generic `:`-anonymous branch below: `::>` starts with `:` but not
+            // `:>`/`:>>`, so without this it would wrongly fall into that branch and leave `::>`
+            // itself unconsumed.
+            (input, AttributeUsageHead::PrefixReferences { references })
+        } else if (peek.fragment().starts_with(b":")
+            && !peek.fragment().starts_with(b":>")
+            && !peek.fragment().starts_with(b":>>"))
+            || starts_with_keyword(peek.fragment(), b"defined")
+        {
+            (
+                input,
+                AttributeUsageHead::Named {
+                    name_span: crate::ast::Span::dummy(),
+                    name: String::new(),
                 },
-            ),
-            map(with_span(name), |(name_span, name)| {
-                AttributeUsageHead::Named { name_span, name }
-            }),
-        ))
-        .parse(input)?
-    };
-    let (input, name_span, name_str, typing_span, typing, redefines_span, redefines, mods0) =
-        match usage_head {
-            AttributeUsageHead::PrefixRedefines {
-                redefines_span,
-                redefines,
-            } => {
-                let (input, pre_typing_mods) = feature_modifiers(input)?;
-                let (input, typing_result) = optional_typings(input)?;
-                let (typing_span, typing) = typing_result
-                    .map(|(span, is_conj, s)| {
-                        (Some(span.clone()), Some(typing_node(span, is_conj, s)))
-                    })
-                    .unwrap_or((None, None));
-                let (input, mods0) = feature_modifiers(input)?;
-                let mods0 = pre_typing_mods.merge(mods0);
-                (
-                    input,
-                    None,
-                    redefines
-                        .value
-                        .first_target()
-                        .and_then(|t| t.local_name())
-                        .unwrap_or_default()
-                        .to_string(),
-                    typing_span,
-                    typing,
-                    Some(redefines_span),
-                    Some(redefines),
-                    mods0,
-                )
-            }
-            AttributeUsageHead::Named { name_span, name } => {
-                // §6 G10: the multiplicity may precede the typing clause -- `attribute
-                // occurs[0..1]: Real;` (OMG spec Annex `14c-Language Extensions.sysml`). Only the
-                // trailing position (`attribute a : Real[0..1];`) was accepted before, so the
-                // leading one left `: Real` unconsumed and the member fell through to recovery.
-                // `FeatureModifiers::merge` is first-wins, so reading both positions is safe.
-                let (input, pre_typing_mods) = feature_modifiers(input)?;
-                let (input, typing_result) = optional_typings(input)?;
-                let (typing_span, typing) = typing_result
-                    .map(|(span, is_conj, s)| {
-                        (Some(span.clone()), Some(typing_node(span, is_conj, s)))
-                    })
-                    .unwrap_or((None, None));
-                let (input, mods0) = feature_modifiers(input)?;
-                let mods0 = pre_typing_mods.merge(mods0);
-                (
-                    input,
-                    Some(name_span),
-                    name,
-                    typing_span,
-                    typing,
-                    None,
-                    None,
-                    mods0,
-                )
-            }
+            )
+        } else {
+            alt((
+                map(
+                    preceded(ws_and_comments, prefix_redefinition_target),
+                    |(redefines_span, redefines)| AttributeUsageHead::PrefixRedefines {
+                        redefines_span,
+                        redefines,
+                    },
+                ),
+                // GH-88.5: `attribute :> differencesOf[1] { ... }` -- tried after `:>>` above (whose
+                // own tag would otherwise be partially matched by this one) since `:>` is a strict
+                // prefix of `:>>`.
+                map(
+                    preceded(ws_and_comments, crate::parser::usage::subsetting),
+                    |(subsets, subsets_value)| AttributeUsageHead::PrefixSubsets {
+                        subsets,
+                        subsets_value,
+                    },
+                ),
+                map(with_span(name), |(name_span, name)| {
+                    AttributeUsageHead::Named { name_span, name }
+                }),
+            ))
+            .parse(input)?
         };
+    let (
+        input,
+        name_span,
+        name_str,
+        typing_span,
+        typing,
+        redefines_span,
+        redefines,
+        head_references,
+        head_subsets,
+        head_subsets_value,
+        mods0,
+    ) = match usage_head {
+        AttributeUsageHead::PrefixRedefines {
+            redefines_span,
+            redefines,
+        } => {
+            let (input, pre_typing_mods) = feature_modifiers(input)?;
+            let (input, typing_result) = optional_typings(input)?;
+            let (typing_span, typing) = typing_result
+                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .unwrap_or((None, None));
+            let (input, mods0) = feature_modifiers(input)?;
+            let mods0 = pre_typing_mods.merge(mods0);
+            (
+                input,
+                None,
+                redefines
+                    .value
+                    .first_target()
+                    .and_then(|t| t.local_name())
+                    .unwrap_or_default()
+                    .to_string(),
+                typing_span,
+                typing,
+                Some(redefines_span),
+                Some(redefines),
+                None,
+                None,
+                None,
+                mods0,
+            )
+        }
+        AttributeUsageHead::PrefixReferences { references } => {
+            let (input, pre_typing_mods) = feature_modifiers(input)?;
+            let (input, typing_result) = optional_typings(input)?;
+            let (typing_span, typing) = typing_result
+                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .unwrap_or((None, None));
+            let (input, mods0) = feature_modifiers(input)?;
+            let mods0 = pre_typing_mods.merge(mods0);
+            (
+                input,
+                None,
+                references
+                    .value
+                    .first_target()
+                    .and_then(|t| t.local_name())
+                    .unwrap_or_default()
+                    .to_string(),
+                typing_span,
+                typing,
+                None,
+                None,
+                Some(references),
+                None,
+                None,
+                mods0,
+            )
+        }
+        AttributeUsageHead::PrefixSubsets {
+            subsets,
+            subsets_value,
+        } => {
+            let (input, pre_typing_mods) = feature_modifiers(input)?;
+            let (input, typing_result) = optional_typings(input)?;
+            let (typing_span, typing) = typing_result
+                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .unwrap_or((None, None));
+            let (input, mods0) = feature_modifiers(input)?;
+            let mods0 = pre_typing_mods.merge(mods0);
+            (
+                input,
+                None,
+                subsets
+                    .value
+                    .first_target()
+                    .and_then(|t| t.local_name())
+                    .unwrap_or_default()
+                    .to_string(),
+                typing_span,
+                typing,
+                None,
+                None,
+                None,
+                Some(subsets),
+                subsets_value,
+                mods0,
+            )
+        }
+        AttributeUsageHead::Named { name_span, name } => {
+            // §6 G10: the multiplicity may precede the typing clause -- `attribute
+            // occurs[0..1]: Real;` (OMG spec Annex `14c-Language Extensions.sysml`). Only the
+            // trailing position (`attribute a : Real[0..1];`) was accepted before, so the
+            // leading one left `: Real` unconsumed and the member fell through to recovery.
+            // `FeatureModifiers::merge` is first-wins, so reading both positions is safe.
+            let (input, pre_typing_mods) = feature_modifiers(input)?;
+            let (input, typing_result) = optional_typings(input)?;
+            let (typing_span, typing) = typing_result
+                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .unwrap_or((None, None));
+            let (input, mods0) = feature_modifiers(input)?;
+            let mods0 = pre_typing_mods.merge(mods0);
+            (
+                input,
+                Some(name_span),
+                name,
+                typing_span,
+                typing,
+                None,
+                None,
+                None,
+                None,
+                None,
+                mods0,
+            )
+        }
+    };
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, mods1) = feature_modifiers(input)?;
     let leading_subsets_value = leading_clauses
         .subsets
         .as_ref()
-        .and_then(|(_, value)| value.clone());
+        .and_then(|(_, value)| value.clone())
+        .or(head_subsets_value);
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
@@ -813,8 +944,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     let subsets = trailing_clauses
         .subsets
         .or(leading_clauses.subsets)
-        .map(|(target, _)| target);
-    let references = trailing_clauses.references.or(leading_clauses.references);
+        .map(|(target, _)| target)
+        .or(head_subsets);
+    let references = trailing_clauses
+        .references
+        .or(leading_clauses.references)
+        .or(head_references);
     let crosses = trailing_clauses.crosses.or(leading_clauses.crosses);
     let intersects = trailing_clauses.intersects.or(leading_clauses.intersects);
     let value =
@@ -844,7 +979,9 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 ordered: mods.ordered,
                 nonunique: mods.nonunique,
                 is_derived,
+                usage_prefix,
                 is_constant,
+                is_reference,
                 is_end,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -934,7 +1071,9 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 ordered: mods.ordered,
                 nonunique: mods.nonunique,
                 is_derived: false,
+                usage_prefix: None,
                 is_constant: false,
+                is_reference: false,
                 is_end: false,
                 // No visibility prefix on a metadata binding shape either (see
                 // `attribute_feature_binding`'s identical note above).

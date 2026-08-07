@@ -393,6 +393,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             start,
             input,
             RefDecl {
+                direction: None,
                 name: name_str,
                 type_name,
                 typing,

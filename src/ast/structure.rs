@@ -355,6 +355,9 @@ pub enum AttributeBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemDef {
+    /// `individual item def John :> Person { ... }` (GH-90.1, `Individuals Examples/
+    /// JohnIndividualExample.sysml:19`).
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
@@ -592,6 +595,11 @@ pub enum PartUsageBodyElement {
     /// `constraint <name>[: Type] { ... }` usage inside a part usage body (§6 G4). See
     /// `PartDefBodyElement::ConstraintUsage`.
     ConstraintUsage(Node<ConstraintUsage>),
+    /// `calc <name>[: Type] { ... }` usage inside a part usage body (GH-91.2), e.g. `calc 'Solve
+    /// for Pressure1' : 'Ideal Gas Law';` (`Analysis Examples/Turbojet Stage
+    /// Analysis.sysml:88`). `calc_usage` itself already fully supports quoted names -- only
+    /// `calc_def_required` (`CalcDef` above) was dispatched here.
+    CalcUsage(Node<crate::ast::view::CalcUsage>),
     /// `(private|public|protected)? import <qualified-name>;` inside a part usage body (§6 G16).
     /// Imports are namespace members, and a part usage body is a namespace; real usage is
     /// OMG spec Annex `8-Requirements.sysml`.
@@ -781,8 +789,15 @@ pub struct AttributeUsage {
     /// `derived` keyword from `RefPrefix` (BNF §8.2.2.6.2) -- usage-only, no `Definition`
     /// equivalent (`AttributeDefinition` uses `DefinitionPrefix`, which has no `derived`).
     pub is_derived: bool,
+    /// `abstract`/`variation` keyword from `RefPrefix` (GH-88.3), e.g. `abstract attribute
+    /// minMass :> ISQ::mass;` (`Mass Roll-up Example/MassRollup.sysml:21`). Named `usage_prefix`
+    /// to match `PartUsage::usage_prefix`'s identical `DefinitionPrefix` reuse.
+    pub usage_prefix: Option<DefinitionPrefix>,
     /// `constant` keyword from `RefPrefix` -- usage-only, same rationale as `is_derived`.
     pub is_constant: bool,
+    /// `ref` keyword from `BasicUsagePrefix` (GH-88.2), e.g. `derived constant ref attribute y
+    /// :> x;` (`Simple Tests/PartTest.sysml:9`).
+    pub is_reference: bool,
     /// `end` keyword from `EndUsagePrefix` (BNF §8.2.2.6.2, `isEnd ?= 'end'`) -- an alternative
     /// to `RefPrefix` reached through the same `UsagePrefix` production `AttributeUsage` uses
     /// (`UsagePrefix 'attribute' Usage`). Distinct from the unrelated `EndDecl`/`end_decl`
@@ -1138,6 +1153,10 @@ impl PartialEq for EndDecl {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RefDecl {
+    /// Leading `in`/`out`/`inout` direction (GH-88.4), e.g. `private in ref y: A, B;` inside a
+    /// `part def` body (`Simple Tests/ItemTest.sysml:15`). Only parsed by `part_ref_usage`;
+    /// `connector::ref_decl`'s call sites have no confirmed real usage for a leading direction.
+    pub direction: Option<InOut>,
     pub name: String,
     /// Type after `:`, e.g. "Vehicle". A comma-separated multi-target clause joins into one
     /// display string here; see `typing` for the structured, multi-target-capable form.
@@ -1363,6 +1382,8 @@ pub struct EnumeratedValue {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceDef {
     pub is_abstract: bool,
+    /// `individual occurrence def IO2 { ... }` (GH-90.1, `Simple Tests/IndividualTest.sysml:3`).
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,

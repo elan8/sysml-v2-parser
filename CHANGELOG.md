@@ -104,6 +104,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Promoted `Camera Example/Camera.sysml`, `Mass Roll-up Example/MassConstraintExample.sysml`, and
     `Simple Tests/AliasTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
 
+- **Attribute/reference usage modifier gaps (#88).**
+  - `attribute_usage` (`src/parser/attribute.rs`) now accepts `::>` (reference-subsetting) as a
+    name-standing-in prefix, same pattern as the existing `:>>` (redefines) handling (new
+    `AttributeUsageHead::PrefixReferences`) -- `attribute ::> m = ms.totalMass;` (`Simple Tests/
+    CalculationTest.sysml:14`).
+  - `attribute_usage`'s `RefPrefix` handling now accepts the full BNF-legal modifier stack:
+    `derived`? (`abstract`|`variation`)? `constant`? `ref`? (previously only `derived`/`constant`
+    were recognized; `abstract`/`variation`/`ref` were incorrectly assumed illegal on an
+    attribute usage) -- new `AttributeUsage.usage_prefix`/`.is_reference` fields. `derived
+    constant ref attribute y :> x;` (`Simple Tests/PartTest.sysml:9`), `abstract attribute
+    minMass :> ISQ::mass;` (`Mass Roll-up Example/MassRollup.sysml:21`).
+  - `part_ref_usage` (`src/parser/part/usage.rs`) now accepts a leading `in`/`out`/`inout`
+    direction prefix (new `RefDecl.direction` field) -- the comma-separated multi-target type
+    list already worked via `optional_typings`. `private in ref y: A, B;` (`Simple Tests/
+    ItemTest.sysml:15`).
+  - `attribute_usage` now accepts a bare `:>` (subsets, no name) as a name-standing-in prefix,
+    same pattern as `::>`/`:>>` above (new `AttributeUsageHead::PrefixSubsets`) -- `attribute :>
+    differencesOf[1] { ... }` (`Geometry Examples/CarWithShapeAndCSG.sysml:84`, also
+    `SimpleQuadcopter.sysml`).
+  - `PARSE_AST_VERSION` bumped 76 -> 77 for the AST shape changes above
+    (stacks on #91's 75 -> 76 bump).
+
+- **Standalone `locale` package member and quoted `calc` usage name/type (#91).**
+  - `doc_comment`/`comment_annotation` (`src/parser/requirement.rs`) now peek for a leading
+    `locale` keyword before attempting `identification` -- previously `identification` greedily
+    consumed the bare word `locale` itself as the doc/comment's own name whenever no real
+    identification was present, leaving nothing for the subsequent `locale` keyword check to
+    match. Fixes `doc locale "en_US" /* ... */` with no identification (`Simple Tests/
+    CommentTest.sysml:32`).
+  - New `bare_locale_comment` parser (reusing `CommentAnnotation`, since KerML `Comment`'s
+    `('comment' Identification?)?` prefix is entirely optional) dispatches a standalone `locale
+    "en_US" /* ... */` package member with no `comment` keyword at all -- previously not
+    dispatched anywhere. `Simple Tests/CommentTest.sysml:25`.
+  - `calc_usage` is now dispatched inside `part_usage_body_element` (new
+    `PartUsageBodyElement::CalcUsage` variant) -- previously only `calc_def_required` (`CalcDef`)
+    was, so a calc *usage* nested in a part usage body had no dispatch path at all.
+    `calc_usage` itself already fully supported quoted names. `Analysis Examples/Turbojet Stage
+    Analysis.sysml:88`.
+  - `PARSE_AST_VERSION` bumped 75 -> 76 for the `PartUsageBodyElement::CalcUsage` addition
+    (stacks on #90's 74 -> 75 bump).
+  - Promoted `Simple Tests/CommentTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
+
+- **`individual` prefix and `timeslice`/`snapshot` usage gaps (#90).**
+  - `DefinitionPrefixOptions`/`parse_definition_prefix` (`src/parser/definition_prefix.rs`) gained
+    a shared, opt-in `individual` prefix (BNF `OccurrenceDefinitionPrefix`'s
+    `(isIndividual ?= 'individual')?`, following `abstract`), wired into `occurrence_def`,
+    `item_def`/`item_def_required`, `action_def`, and `analysis_case_def` (new `is_individual`
+    fields on `OccurrenceDef`/`ItemDef`/`ActionDef`/`AnalysisCaseDef`) -- e.g. `individual
+    analysis def FuelEconomyAnalysis_1 :> FuelEconomyAnalysis;` / `individual action def
+    FuelConsumption_1 :> FuelConsumption;` (`Individuals Examples/
+    AnalysisIndividualExample.sysml:76-77`), `individual occurrence def IO2 { ... }`
+    (`Simple Tests/IndividualTest.sysml:3`), `individual item def John :> Person { ... }`
+    (`Individuals Examples/JohnIndividualExample.sysml:19`).
+  - The same `individual` prefix (BNF `OccurrenceUsagePrefix`) is now also accepted on
+    `action_usage`, `item_usage`, and `analysis_case_usage` (new `is_individual` fields), and
+    `ATTRIBUTE_OPAQUE_STARTERS` gained `individual` so `individual item ii : II1;` /
+    `individual item :>> i : II2;` opaquely capture the same way the un-prefixed `item` starter
+    already does -- adjacent gaps in the same real fixture (`Simple Tests/IndividualTest.sysml`)
+    exposed once the def-level cascade above was cleared, plus `individual analysis
+    fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 { ... }` (`Individuals Examples/
+    AnalysisIndividualExample.sysml:79`).
+  - `timeslice_usage`/`snapshot_usage` are now dispatched inside `attribute_body_element` (shared
+    by `item def`/`item` usage bodies) -- both already fully parsed (used elsewhere, e.g. part def
+    bodies), just weren't reachable here -- e.g. `timeslice asPresident : Person [0..*] { ... }`
+    (`Individuals Examples/JohnIndividualExample.sysml:11`).
+  - `PARSE_AST_VERSION` bumped 74 -> 75 for the `is_individual` field additions above.
+
 - **Literal `redefines` keyword edge cases and unnamed typed succession statement (#92).**
   - `attribute_feature_binding`/`redefinition_feature_binding` (`src/parser/attribute.rs`) now
     accept the literal `redefines` keyword, not just the symbolic `:>>` operator (both are
@@ -125,8 +192,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     variant) -- previously only `ConnectionDefBodyElement`/`OccurrenceBodyElement` had it, so a
     succession usage nested in a part usage body had no dispatch path regardless of naming.
     `Vehicle Example/VehicleIndividuals.sysml:49`.
-  - `PARSE_AST_VERSION` bumped 74 -> 75 for the `SuccessionUsage.type_name` field and
-    `PartUsageBodyElement::SuccessionUsage` variant.
+  - `PARSE_AST_VERSION` bumped 77 -> 78 for the `SuccessionUsage.type_name` field and
+    `PartUsageBodyElement::SuccessionUsage` variant (stacks on #88's 76 -> 77 bump).
   - Promoted `Mass Roll-up Example/Vehicles.sysml` and `Vehicle Example/VehicleIndividuals.sysml`
     into `EXAMPLES_ROUNDTRIP_PASS`.
 
