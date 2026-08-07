@@ -36,7 +36,8 @@ use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws1, ws_and_
 use crate::parser::node_from_to;
 use crate::parser::occurrence_body::occurrence_usage;
 use crate::parser::usage::{
-    multiplicity_node, redefinition, reference_subsetting, single_target_typing, subsetting,
+    cross_subsetting, multiplicity_node, redefinition, reference_subsetting, single_target_typing,
+    subsetting,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -60,8 +61,9 @@ fn derived_end_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     ))
 }
 
-/// End declaration: `end` multiplicity? (`part`|`port`|`ref`)? name multiplicity? (`:` (`~`)?
-/// type | (`::>`|`references`) target | nested `occurrence`/`item` usage) multiplicity? `;`.
+/// End declaration: `end` `#tag`? multiplicity? (`part`|`port`|`ref`|`item`)? name multiplicity?
+/// (`:` (`~`)? type (`crosses` target)? | (`::>`|`references`) target | nested `occurrence`/`item`
+/// usage) multiplicity? `;`.
 ///
 /// `allow_derived_name` gates the `#name` form above -- `true` for `connection.rs` (tested real
 /// usage), `false` for `interface.rs` (no matching evidence; preserves existing behavior exactly).
@@ -73,6 +75,21 @@ pub(crate) fn end_decl(
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"end"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    // GH-85: a `#tag` metadata-prefix annotation may precede the rest of the end declaration,
+    // e.g. `end #cause cause1 : Causer1;` (OMG spec Annex `Cause and Effect Examples/
+    // CauseAndEffectExample.sysml`), `end #original r1 : Req1;` (`Requirements Examples/
+    // RequirementDerivationExample.sysml`). Distinct from `allow_derived_name`'s `#name` form
+    // below (`end #original ::> OriginalReq;`, `tests/derivation_connections.rs`): there the
+    // `#name` *is* the end's own name, immediately followed by an operator (`::>`/`:`/`;`/mult);
+    // here `#tag` is a separate prefix and a real name still follows. The trailing
+    // `peek(name)` requires that a name actually follows before committing to the prefix
+    // reading, so `#original ::> ...` still falls through to the derived-name path below intact.
+    // Discarded like the kind keywords below -- `EndDecl` doesn't model metadata annotations.
+    let (input, _) = opt(preceded(
+        ws_and_comments,
+        (tag(&b"#"[..]), name, ws1, nom::combinator::peek(name)),
+    ))
+    .parse(input)?;
     // GH-51: a leading multiplicity may precede the kind keyword/name (BNF `ConnectorEnd`'s
     // `OwnedCrossMultiplicityMember` position), e.g. `end [1] part bead : TireBead;` (Systems
     // Library training `09. Connections/Connections Example.sysml`), `end [*] ref cause:
@@ -83,12 +100,15 @@ pub(crate) fn end_decl(
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     // Optional structural kind keyword (BNF `InterfaceOccurrenceUsageElement`/
     // `StructureUsageElement`, e.g. `end part hub : Hub;`, `end port p1 : P;`, `end [*] ref
-    // cause: Situation;`). Also KerML/SysML library forms `end feature source: …` (Transfers.kerml)
-    // and `end occurrence source: …` (Flows.sysml). Not retained as a separate field: none of these
-    // keywords change this end's own grammar (name + type/reference), and `EndDecl` doesn't model
-    // usage-kind distinctions (GH-19/GH-20/GH-51; #73 library regression).
-    // Nested `end name [*] occurrence nestedName …` (GH-53) is unaffected: `occurrence` appears
-    // *after* the end's own name there, so it is not consumed by this optional kind.
+    // cause: Situation;`, `end [0..1] item cart: ShoppingCart[1];` (OMG spec Annex `Association
+    // Examples/ProductSelection_N_ary.sysml`, GH-85)). Also KerML/SysML library forms `end
+    // feature source: …` (Transfers.kerml) and `end occurrence source: …` (Flows.sysml). Not
+    // retained as a separate field: none of these keywords change this end's own grammar (name +
+    // type/reference), and `EndDecl` doesn't model usage-kind distinctions (GH-19/GH-20/GH-51;
+    // #73 library regression).
+    // Nested `end name [*] occurrence/item nestedName …` (GH-53) is unaffected: that kind keyword
+    // appears *after* the end's own name there, so it is not consumed by this leading-position
+    // optional kind (this alt only fires before a name has been parsed at all).
     let (input, _) = opt(preceded(
         ws_and_comments,
         alt((
@@ -97,6 +117,7 @@ pub(crate) fn end_decl(
             (tag(&b"ref"[..]), ws1),
             (tag(&b"feature"[..]), ws1),
             (tag(&b"occurrence"[..]), ws1),
+            (tag(&b"item"[..]), ws1),
         )),
     ))
     .parse(input)?;
@@ -138,6 +159,7 @@ pub(crate) fn end_decl(
                     references: Some(references),
                     multiplicity: trailing_multiplicity.or(leading_multiplicity),
                     redefines: None,
+                    crosses: None,
                     nested_usage: None,
                     name_span: Some(name_span),
                     type_ref_span: Some(type_ref_span),
@@ -167,6 +189,7 @@ pub(crate) fn end_decl(
                     references: None,
                     multiplicity: leading_multiplicity,
                     redefines: None,
+                    crosses: None,
                     nested_usage: Some(Box::new(EndNestedUsage::Occurrence(Box::new(nested)))),
                     name_span: Some(name_span),
                     type_ref_span: None,
@@ -188,6 +211,7 @@ pub(crate) fn end_decl(
                     references: None,
                     multiplicity: leading_multiplicity,
                     redefines: None,
+                    crosses: None,
                     nested_usage: Some(Box::new(EndNestedUsage::Item(Box::new(nested)))),
                     name_span: Some(name_span),
                     type_ref_span: None,
@@ -213,6 +237,18 @@ pub(crate) fn end_decl(
     // BinaryLinkObject::source;` (Systems Library `Connections.sysml`) -- distinct from the
     // `::>`/`references` form used *instead* of `:` typing above.
     let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+    // GH-85: `::>`/`references` reference-subsetting may *also* trail the typed form, in addition
+    // to (not instead of) the `:` type -- e.g. `end port p3: P ::> p.p1;` (`Simple Tests/
+    // ConjugationTest.sysml`, mirrored from Systems Library `Interfaces.sysml`'s `ref port :>>
+    // participant : Port ...` shape). Distinct from the `::>`-instead-of-typing branch above
+    // (`uses_derived_syntax: true`): here typing *was* written, so `uses_derived_syntax` stays
+    // `false` and this only populates the structured `references` field.
+    let (input, trailing_references) =
+        opt(preceded(ws_and_comments, reference_subsetting)).parse(input)?;
+    // GH-85: `crosses` cross-subsetting may also trail the typed form, e.g. `end item cart:
+    // ShoppingCart[1] crosses selectedProduct.inCart;` (OMG spec Annex `Association Examples/
+    // ProductSelection_UnownedEnds.sysml`).
+    let (input, crosses) = opt(preceded(ws_and_comments, cross_subsetting)).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -223,9 +259,10 @@ pub(crate) fn end_decl(
                 name: name_str,
                 type_name,
                 uses_derived_syntax: false,
-                references: None,
+                references: trailing_references,
                 multiplicity: trailing_multiplicity.or(leading_multiplicity),
                 redefines,
+                crosses,
                 nested_usage: None,
                 name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),

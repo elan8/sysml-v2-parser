@@ -44,6 +44,12 @@ fn interface_def_body_element(
         map(item_usage, InterfaceDefBodyElement::ItemUsage),
         map(port_def_required, InterfaceDefBodyElement::PortDef),
         map(port_usage, InterfaceDefBodyElement::PortUsage),
+        // GH-85: bare `flow <a> to <b>;` connecting two of this interface's own ends (OMG spec
+        // Annex `Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml`).
+        map(
+            crate::parser::flow::flow_usage_member,
+            InterfaceDefBodyElement::FlowUsage,
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

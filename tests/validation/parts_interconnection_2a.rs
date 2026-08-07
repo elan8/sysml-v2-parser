@@ -634,6 +634,7 @@ fn interface_def_engine_to_transmission() -> PackageBodyElement {
                     references: None,
                     multiplicity: None,
                     redefines: None,
+                    crosses: None,
                     nested_usage: None,
                     name_span: None,
                     type_ref_span: None,
@@ -645,6 +646,7 @@ fn interface_def_engine_to_transmission() -> PackageBodyElement {
                     references: None,
                     multiplicity: None,
                     redefines: None,
+                    crosses: None,
                     nested_usage: None,
                     name_span: None,
                     type_ref_span: None,
@@ -668,6 +670,7 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                     references: None,
                     multiplicity: None,
                     redefines: None,
+                    crosses: None,
                     nested_usage: None,
                     name_span: None,
                     type_ref_span: None,
@@ -679,6 +682,7 @@ fn interface_def_driveshaft() -> PackageBodyElement {
                     references: None,
                     multiplicity: None,
                     redefines: None,
+                    crosses: None,
                     nested_usage: None,
                     name_span: None,
                     type_ref_span: None,
@@ -779,6 +783,7 @@ fn part_vehicle1_c1() -> PartUsage {
                 })))),
                 n(PartUsageBodyElement::InterfaceUsage(n(
                     InterfaceUsage::TypedConnect {
+                        name: None,
                         interface_type: Some("EngineToTransmissionInterface".to_string()),
                         from: expr_path("engine.drivePwrPort"),
                         to: expr_path("transmission.clutchPort"),
@@ -830,6 +835,7 @@ fn part_vehicle1_c1() -> PartUsage {
                 })))),
                 n(PartUsageBodyElement::InterfaceUsage(n(
                     InterfaceUsage::TypedConnect {
+                        name: None,
                         interface_type: Some("DriveshaftInterface".to_string()),
                         from: expr_path("transmission.shaftPort_a"),
                         to: expr_path("rearAxleAssembly.shaftPort_d"),

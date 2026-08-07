@@ -1013,6 +1013,10 @@ pub enum InterfaceDefBodyElement {
     /// `port def`, using `port_def_required`. See `AttributeDef`.
     PortDef(Node<PortDef>),
     PortUsage(Node<PortUsage>),
+    /// GH-85: bare `flow <a> to <b>;` shorthand connecting two of this interface's own ends, e.g.
+    /// `flow p1.torque to p2.torque;` (OMG spec Annex `Vehicle Example/SysML v2 Spec Annex A
+    /// SimpleVehicleModel.sysml`). Previously unmodeled -- this body had no flow arm at all.
+    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
 }
 
 /// GH-53: the nested-usage kinds confirmed by real usage as an [`EndDecl`]'s target (see
@@ -1039,8 +1043,10 @@ pub struct EndDecl {
     pub uses_derived_syntax: bool,
     /// Structured reference-subsetting relationship for the `::>`/`references` form (GH-19):
     /// `end name ::> target;` / `end name references target;` names a reference, not a type, so
-    /// it must not be modeled as typing (`endType`) downstream. `None` for the `end name : Type;`
-    /// typing form.
+    /// it must not be modeled as typing (`endType`) downstream. Also populated (with
+    /// `uses_derived_syntax: false`) when `::>` *trails* an explicit `: Type` instead of
+    /// replacing it, e.g. `end port p3: P ::> p.p1;` (GH-85, `Simple Tests/
+    /// ConjugationTest.sysml`). `None` when no reference-subsetting clause was written at all.
     pub references: Option<Node<SubsettingRelationship>>,
     /// Optional multiplicity after the type/reference target, e.g. `[1]` in `end hub ::>
     /// mainSwitch[1];` (BNF `DefaultInterfaceEnd`'s `Usage` production carries the same optional
@@ -1051,6 +1057,10 @@ pub struct EndDecl {
     /// `end source: Anything :>> BinaryLinkObject::source;` (Systems Library `Connections.sysml`).
     /// `None` when absent or when this end used the `::>`/`references` form instead.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// GH-85: `crosses` cross-subsetting clause trailing the `: Type` typed form, e.g. `end item
+    /// cart: ShoppingCart[1] crosses selectedProduct.inCart;` (OMG spec Annex `Association
+    /// Examples/ProductSelection_UnownedEnds.sysml`). `None` when absent.
+    pub crosses: Option<Node<SubsettingRelationship>>,
     /// GH-53: an alternative end-declaration form where the target is itself a complete, nested
     /// kind-prefixed usage rather than a bare type/reference, e.g. `end theCauses [*] occurrence
     /// theCause :> causes :>> source { ... }` (Systems Library `Domain Libraries/Cause and
@@ -1073,6 +1083,7 @@ impl PartialEq for EndDecl {
             && self.references == other.references
             && self.multiplicity == other.multiplicity
             && self.redefines == other.redefines
+            && self.crosses == other.crosses
             && self.nested_usage == other.nested_usage
     }
 }
@@ -1489,8 +1500,13 @@ pub struct Bind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceUsage {
-    /// `interface` `:Type`? `connect` from `to` to body; optional body with ref redefs.
+    /// `interface` name? `:Type`? `connect` from `to` to body; optional body with ref redefs.
+    /// GH-85: `name` was added for the named-but-untyped form (`interface userToFlashlight
+    /// connect a to b { ... }`, OMG spec Annex `Flashlight Example/Flashlight Example.sysml`) --
+    /// previously only the typed (`interface name: Type connect ...`) and fully anonymous
+    /// (`Connection` variant) forms were reachable.
     TypedConnect {
+        name: Option<String>,
         interface_type: Option<String>,
         from: Node<Expression>,
         to: Node<Expression>,
@@ -1529,6 +1545,11 @@ pub enum InterfaceUsageBodyElement {
         body: RefBody,
     },
     Doc(Node<DocComment>),
+    /// GH-85: `end` member inside a typed, non-`connect` interface usage's body, e.g. `interface
+    /// i: I { end port p3: P ::> p.p1; end port p4: ~P ::> p.p2; }` (`Simple Tests/
+    /// ConjugationTest.sysml`), parallel to the already-supported `connection a: A { end port
+    /// p3: ...; }` form. Boxed: `EndDecl` is much larger than `RefRedef`, the other variant here.
+    EndDecl(Box<Node<EndDecl>>),
 }
 
 /// Connect at part usage level: `connect` from `to` to body.

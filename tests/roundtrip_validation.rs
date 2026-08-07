@@ -120,6 +120,7 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Packet Example/Packets.sysml",
     "Requirements Examples/HSUVRequirements.sysml",
     "Room Model/RoomModel.sysml",
+    "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/DefaultValueTest.sysml",
     "Simple Tests/DependencyTest.sysml",
     "Simple Tests/FeaturePathTest.sysml",
@@ -128,6 +129,7 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Simple Tests/ParameterTest.sysml",
     "Simple Tests/RootPackageTest.sysml",
     "Simple Tests/TradeStudyTest.sysml",
+    "Vehicle Example/VehicleDefinitions.sysml",
 ];
 
 fn release_root() -> PathBuf {

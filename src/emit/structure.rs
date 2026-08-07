@@ -753,6 +753,9 @@ fn emit_interface_def_body_element(
         InterfaceDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         InterfaceDefBodyElement::PortDef(p) => emit_port_def(w, path, &p.value),
         InterfaceDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        InterfaceDefBodyElement::FlowUsage(f) => {
+            super::behavior::emit_flow_usage(w, path, &f.value)
+        }
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -776,17 +779,25 @@ pub(crate) fn emit_end_decl(
                 .collect::<String>(),
         );
     }
-    if let Some(references) = &end.references {
-        emit_subsetting_clause(w, &references.value)?;
-    } else if !end.type_name.is_empty() {
+    // GH-85: `references` may trail an explicit `: Type` instead of replacing it
+    // (`uses_derived_syntax: false`) -- only skip the `: Type` when `references` *is* the whole
+    // target (the original GH-19 `uses_derived_syntax: true` case, where `type_name` holds a
+    // display-only copy of the same target and would otherwise duplicate it).
+    if !end.uses_derived_syntax && !end.type_name.is_empty() {
         w.push_str(" : ");
         w.push_str(&format_qualified_name(&end.type_name));
+    }
+    if let Some(references) = &end.references {
+        emit_subsetting_clause(w, &references.value)?;
     }
     if let Some(mult) = &end.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
     if let Some(redefines) = &end.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(crosses) = &end.crosses {
+        emit_subsetting_clause(w, &crosses.value)?;
     }
     w.push_char(';');
     Ok(())
@@ -876,6 +887,7 @@ pub(crate) fn emit_interface_usage(
 ) -> Result<(), EmitError> {
     match usage {
         InterfaceUsage::TypedConnect {
+            name,
             interface_type,
             from,
             to,
@@ -883,6 +895,10 @@ pub(crate) fn emit_interface_usage(
             body_elements,
         } => {
             w.push_str("interface ");
+            if let Some(n) = name {
+                w.push_str(&format_name(n));
+                w.push_char(' ');
+            }
             if let Some(ty) = interface_type {
                 w.push_str(": ");
                 w.push_str(&format_qualified_name(ty));
@@ -978,6 +994,7 @@ fn emit_interface_usage_body_element(
             emit_expression(w, &value.value)?;
             emit_ref_body(w, path, body)
         }
+        InterfaceUsageBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
     }
 }
 
