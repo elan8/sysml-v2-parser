@@ -1270,6 +1270,9 @@ pub(crate) fn emit_item_def(
     def: &crate::ast::ItemDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("item def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {

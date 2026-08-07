@@ -62,6 +62,7 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
         input,
         DefinitionPrefixOptions::new(b"analysis")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = loose_use_case_body(input)?;
@@ -74,6 +75,7 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 is_abstract: prefix.is_abstract,
+                is_individual: prefix.is_individual,
                 body,
                 membership: crate::ast::Membership::owning(
                     prefix.visibility,
@@ -89,6 +91,10 @@ pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<A
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, abstract_kw) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1), e.g. `individual
+    // analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 { ... }` (Individuals Examples/
+    // AnalysisIndividualExample.sysml:79).
+    let (input, individual_kw) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"analysis"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, usage) = case_like_usage_body(
@@ -105,6 +111,7 @@ pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<A
                 name: usage.name,
                 type_name: usage.type_name,
                 is_abstract: usage.is_abstract,
+                is_individual: individual_kw.is_some(),
                 body: usage.body,
                 membership: usage.membership,
             },

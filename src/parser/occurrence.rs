@@ -17,6 +17,7 @@ pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
         input,
         DefinitionPrefixOptions::new(b"occurrence")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = occurrence_def_definition_body(input)?;
@@ -27,6 +28,7 @@ pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
             input,
             OccurrenceDef {
                 is_abstract: prefix.is_abstract,
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,

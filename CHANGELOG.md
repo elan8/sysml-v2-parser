@@ -120,8 +120,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     was, so a calc *usage* nested in a part usage body had no dispatch path at all.
     `calc_usage` itself already fully supported quoted names. `Analysis Examples/Turbojet Stage
     Analysis.sysml:88`.
-  - `PARSE_AST_VERSION` bumped 74 -> 75 for the `PartUsageBodyElement::CalcUsage` addition.
+  - `PARSE_AST_VERSION` bumped 75 -> 76 for the `PartUsageBodyElement::CalcUsage` addition
+    (stacks on #90's 74 -> 75 bump).
   - Promoted `Simple Tests/CommentTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
+
+- **`individual` prefix and `timeslice`/`snapshot` usage gaps (#90).**
+  - `DefinitionPrefixOptions`/`parse_definition_prefix` (`src/parser/definition_prefix.rs`) gained
+    a shared, opt-in `individual` prefix (BNF `OccurrenceDefinitionPrefix`'s
+    `(isIndividual ?= 'individual')?`, following `abstract`), wired into `occurrence_def`,
+    `item_def`/`item_def_required`, `action_def`, and `analysis_case_def` (new `is_individual`
+    fields on `OccurrenceDef`/`ItemDef`/`ActionDef`/`AnalysisCaseDef`) -- e.g. `individual
+    analysis def FuelEconomyAnalysis_1 :> FuelEconomyAnalysis;` / `individual action def
+    FuelConsumption_1 :> FuelConsumption;` (`Individuals Examples/
+    AnalysisIndividualExample.sysml:76-77`), `individual occurrence def IO2 { ... }`
+    (`Simple Tests/IndividualTest.sysml:3`), `individual item def John :> Person { ... }`
+    (`Individuals Examples/JohnIndividualExample.sysml:19`).
+  - The same `individual` prefix (BNF `OccurrenceUsagePrefix`) is now also accepted on
+    `action_usage`, `item_usage`, and `analysis_case_usage` (new `is_individual` fields), and
+    `ATTRIBUTE_OPAQUE_STARTERS` gained `individual` so `individual item ii : II1;` /
+    `individual item :>> i : II2;` opaquely capture the same way the un-prefixed `item` starter
+    already does -- adjacent gaps in the same real fixture (`Simple Tests/IndividualTest.sysml`)
+    exposed once the def-level cascade above was cleared, plus `individual analysis
+    fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 { ... }` (`Individuals Examples/
+    AnalysisIndividualExample.sysml:79`).
+  - `timeslice_usage`/`snapshot_usage` are now dispatched inside `attribute_body_element` (shared
+    by `item def`/`item` usage bodies) -- both already fully parsed (used elsewhere, e.g. part def
+    bodies), just weren't reachable here -- e.g. `timeslice asPresident : Person [0..*] { ... }`
+    (`Individuals Examples/JohnIndividualExample.sysml:11`).
+  - `PARSE_AST_VERSION` bumped 74 -> 75 for the `is_individual` field additions above.
 
 ## [0.54.0] - 2026-08-07
 

@@ -463,6 +463,9 @@ pub(crate) fn emit_item_usage(
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
     }
+    if usage.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("item ");
     if let Some(short) = &usage.short_name {
         w.push_char('<');
@@ -550,6 +553,9 @@ pub(crate) fn emit_analysis_case_def(
     if def.is_abstract {
         w.push_str("abstract ");
     }
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("analysis def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -566,6 +572,9 @@ pub(crate) fn emit_analysis_case_usage(
     emit_visibility(w, usage.membership.visibility);
     if usage.is_abstract {
         w.push_str("abstract ");
+    }
+    if usage.is_individual {
+        w.push_str("individual ");
     }
     w.push_str("analysis ");
     w.push_str(&format_name(&usage.name));
