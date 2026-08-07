@@ -111,6 +111,11 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"render"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
+    // BNF `ViewRenderingUsage`'s second alternative: `('rendering' | UsageExtensionKeyword+)
+    // Usage` -- explicit typed usage declaration, vs. the first alternative's bare reference-
+    // subsetting shorthand (`render r;`). Real usage: `render rendering r1: R[0..1];` (Simple
+    // Tests/ViewTest.sysml:32).
+    let (input, _) = opt(preceded(tag(&b"rendering"[..]), ws1)).parse(input)?;
     let (input, name_str) = name(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
     let (input, body) = rendering_usage_body(input)?;

@@ -631,7 +631,11 @@ pub(crate) fn assert_constraint_member(
     let (input, is_negated) = opt(preceded(tag(&b"not"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
-    let (input, _) = tag(&b"constraint"[..]).parse(input)?;
+    // GH-89: the `constraint` keyword itself is optional -- `assert <name> { ... }`, referencing
+    // a previously-declared standalone `constraint` by name and rebinding its `in` parameters, is
+    // real usage (`assert massAnalysis3 { in totalMass = mass; ... }`, Simple Tests/
+    // ConstraintTest.sysml:78), richer than the already-supported `assert constraint ...` form.
+    let (input, _) = opt(preceded(tag(&b"constraint"[..]), ws_and_comments)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, name) = if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";")
     {

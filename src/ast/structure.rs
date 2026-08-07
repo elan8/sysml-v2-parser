@@ -182,6 +182,10 @@ pub enum PartDefBodyElement {
     /// even though `ConnectionTest.sysml` uses it directly inside a `part def`, same dispatch-gap
     /// class as `FirstStmt`/GH-40 above).
     Bind(Node<Bind>),
+    /// `alias <name> for <target>;` nested inside a part definition body (GH-89), e.g. `part def
+    /// P1 { port porig1; alias po1 for porig1; }` (Simple Tests/AliasTest.sysml:7). Previously
+    /// only reachable at package-body scope.
+    AliasDef(Node<AliasDef>),
 }
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.
@@ -606,6 +610,23 @@ pub enum PartUsageBodyElement {
     /// `analysis <name> : Type { ... }` usage inside a part usage body. Real usage: OMG Annex
     /// `10c-Fuel Economy Analysis.sysml`.
     AnalysisCaseUsage(Node<crate::ast::requirement::AnalysisCaseUsage>),
+    /// `alias <name> for <target>;` nested inside a part usage body (GH-89), e.g. `part p2 : P1 {
+    /// port pdest; alias pd1 for pdest; }` (Simple Tests/AliasTest.sysml:16). Previously only
+    /// reachable at package-body scope.
+    AliasDef(Node<AliasDef>),
+    /// `include <usecase>;` member inside a part usage body (GH-89), e.g. `part system : System {
+    /// include uc2; }` (Simple Tests/UseCaseTest.sysml:33). Previously only reachable inside a
+    /// use case definition body.
+    IncludeUseCase(Node<crate::ast::requirement::IncludeUseCase>),
+    /// `use case <name> : Type { ... }` usage nested inside a part usage body (found alongside
+    /// `IncludeUseCase` above, same real fixture -- already dispatched in `PartDefBodyElement`,
+    /// just not here).
+    UseCaseUsage(Node<crate::ast::requirement::UseCaseUsage>),
+    /// `verification <name> : Type { ... }` usage nested inside a plain part usage body (GH-89),
+    /// e.g. `part verificationContext { verification verificationPlan : VerificationPlan { ... }
+    /// }` (Simple Tests/VerificationTest.sysml:35). Already dispatched in `PartDefBodyElement`,
+    /// just not here.
+    VerificationCaseUsage(Node<crate::ast::requirement::VerificationCaseUsage>),
 }
 
 /// Variant member inside a variation part usage/def body: either an untyped reference to a
@@ -618,8 +639,13 @@ pub struct VariantUsage {
     /// nested usage's own name for the typed form.
     pub name: String,
     /// Present when declared with a kind keyword (`variant part ...;`); `None` for the untyped
-    /// reference form (`variant name;`).
+    /// reference form (`variant name;` / `variant name { ... }`).
     pub typed: Option<VariantTypedUsage>,
+    /// Optional nested body on the untyped reference form, e.g. `variant q { attribute b : B
+    /// :>> a; }` (`Simple Tests/VariabilityTest.sysml:16`) or a quoted name `variant '6cylEngine'
+    /// { ... }` (`Variability Examples/VehicleVariabilityModel.sysml:78`). Always `None` when
+    /// `typed` is `Some` (the nested typed usage owns its own body).
+    pub body: Option<PartUsageBody>,
     /// Ownership/visibility/kind wrapper (parser work item 4b final sweep), `kind` always
     /// [`crate::ast::MembershipKind::VariantMembership`] -- confirmed against
     /// `SysML-textual-bnf.kebnf`'s `VariantUsageMember : VariantMembership = MemberPrefix
@@ -654,8 +680,15 @@ pub struct Perform {
     pub action_name: String,
     /// Type after `:` in "perform action name : Type" form.
     pub type_name: Option<String>,
+    /// Multiplicity after the name (GH-89), e.g. `[*]` in `perform action takePicture[*] :>
+    /// PictureTaking::takePicture;` (Camera Example/Camera.sysml:4).
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Redefinition target after `:>>`, e.g. `doXorY` in `perform action :>> doXorY = doX;`.
     pub redefines: Option<String>,
+    /// Subsetting target after `:>` (GH-89), e.g. `PictureTaking::takePicture` in `perform action
+    /// takePicture[*] :> PictureTaking::takePicture;` (Camera Example/Camera.sysml:4). Mutually
+    /// exclusive with `redefines` (whichever specialization keyword is present).
+    pub subsets: Option<String>,
     /// Bound value after `=`, e.g. `doX` in `perform action :>> doXorY = doX;`.
     pub value: Option<Node<FeatureValue>>,
     pub body: PerformBody,
@@ -1255,6 +1288,9 @@ pub enum ConnectionDefBodyElement {
     /// `succession` usage (real usage: `CausationConnections.sysml`'s `private succession
     /// causalOrdering first [nCauses] causes.startShot then [nEffects] effects { ... }`).
     SuccessionUsage(Node<SuccessionUsage>),
+    /// Bare `part <name>;` member inside a connection def/usage body (GH-89), e.g. `abstract
+    /// connection def C { part p; end end1; ... }` (Simple Tests/ConnectionTest.sysml:31).
+    PartUsage(Box<Node<PartUsage>>),
 }
 
 // ---------------------------------------------------------------------------

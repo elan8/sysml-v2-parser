@@ -320,6 +320,7 @@ fn emit_part_def_body_element(
         PartDefBodyElement::AnalysisCaseUsage(a) => {
             super::requirement::emit_analysis_case_usage(w, path, &a.value)
         }
+        PartDefBodyElement::AliasDef(a) => emit_alias_def(w, path, &a.value),
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -425,6 +426,16 @@ fn emit_part_usage_body_element(
         }
         PartUsageBodyElement::AnalysisCaseUsage(a) => {
             super::requirement::emit_analysis_case_usage(w, path, &a.value)
+        }
+        PartUsageBodyElement::AliasDef(a) => emit_alias_def(w, path, &a.value),
+        PartUsageBodyElement::IncludeUseCase(i) => {
+            super::requirement::emit_include_use_case(w, path, &i.value)
+        }
+        PartUsageBodyElement::UseCaseUsage(u) => {
+            super::requirement::emit_use_case_usage(w, path, &u.value)
+        }
+        PartUsageBodyElement::VerificationCaseUsage(v) => {
+            super::requirement::emit_verification_case_usage(w, path, &v.value)
         }
         other => w.unsupported(
             path,
@@ -1386,8 +1397,13 @@ pub(crate) fn emit_variant_usage(
     match &variant.typed {
         None => {
             w.push_str(&format_name(&variant.name));
-            w.push_char(';');
-            Ok(())
+            match &variant.body {
+                Some(body) => emit_part_usage_body(w, path, body),
+                None => {
+                    w.push_char(';');
+                    Ok(())
+                }
+            }
         }
         Some(crate::ast::VariantTypedUsage::Part(p)) => emit_part_usage(w, path, &p.value),
         Some(crate::ast::VariantTypedUsage::Attribute(a)) => {
@@ -1554,6 +1570,7 @@ fn emit_connection_def_body_element(
         crate::ast::ConnectionDefBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }
+        crate::ast::ConnectionDefBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),

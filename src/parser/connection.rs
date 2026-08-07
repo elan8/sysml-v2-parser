@@ -12,6 +12,7 @@ use crate::parser::node_from_to;
 use crate::parser::occurrence_body::{
     assert_constraint_member, occurrence_usage, succession_usage,
 };
+use crate::parser::part::part_usage;
 use crate::parser::port::{port_def_required, port_usage};
 use crate::parser::requirement::doc_comment;
 use crate::parser::Input;
@@ -54,6 +55,11 @@ fn connection_def_body_element(
             ConnectionDefBodyElement::OccurrenceUsage(Box::new(n))
         }),
         map(succession_usage, ConnectionDefBodyElement::SuccessionUsage),
+        // GH-89: bare `part p;` member, e.g. `abstract connection def C { part p; end end1; }`
+        // (Simple Tests/ConnectionTest.sysml:31).
+        map(part_usage, |p| {
+            ConnectionDefBodyElement::PartUsage(Box::new(p))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

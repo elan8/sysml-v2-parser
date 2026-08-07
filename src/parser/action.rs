@@ -1162,6 +1162,13 @@ pub(crate) fn action_usage_body_element(
                     ActionUsageBodyElement::OccurrenceUsage(Box::new(n))
                 }),
             )),
+            // GH-89.7: `variant name;` referencing a sibling variation action's variant, e.g.
+            // `variant generateTorque4Cyl;` (Variability Examples/VehicleVariabilityModel.sysml:128).
+            // Before the keyword-less fallback below since `variant` is a real keyword.
+            map(
+                crate::parser::part::variant_usage,
+                ActionUsageBodyElement::VariantUsage,
+            ),
             // §6 G26: last, so every keyword-led member above keeps priority over the
             // keyword-less `name = expr;` binding.
             map(

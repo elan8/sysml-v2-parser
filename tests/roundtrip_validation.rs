@@ -107,6 +107,7 @@ const ROUNDTRIP_PASS: &[&str] = &[
 /// and tracked as backlog, not a regression.
 const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Arrowhead Framework Example/AHFProfileLib.sysml",
+    "Camera Example/Camera.sysml",
     "Camera Example/PictureTaking.sysml",
     "Comment Examples/Comments.sysml",
     "Geometry Examples/CarWithEnvelopingShape.sysml",
@@ -115,11 +116,13 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Import Tests/PrivateImportTest.sysml",
     "Import Tests/QualifiedNameImportTest.sysml",
     "Interaction Sequencing Examples/ServerSequenceModel.sysml",
+    "Mass Roll-up Example/MassConstraintExample.sysml",
     "Metadata Examples/IssueMetadataExample.sysml",
     "Packet Example/PacketUsage.sysml",
     "Packet Example/Packets.sysml",
     "Requirements Examples/HSUVRequirements.sysml",
     "Room Model/RoomModel.sysml",
+    "Simple Tests/AliasTest.sysml",
     "Simple Tests/AnalysisTest.sysml",
     "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/DefaultValueTest.sysml",

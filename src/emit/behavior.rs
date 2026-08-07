@@ -353,6 +353,7 @@ pub(crate) fn emit_action_usage_body_element(
             }
             Ok(())
         }
+        ActionUsageBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
         other => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -434,13 +435,20 @@ pub(crate) fn emit_perform(
             w.push_str(&format_name(&perform.action_name));
         }
     }
-    if let Some(ty) = &perform.type_name {
-        w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+    if let Some(mult) = &perform.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
     }
     if let Some(redef) = &perform.redefines {
         w.push_str(" :>> ");
         w.push_str(&format_qualified_name(redef));
+    }
+    if let Some(subsets) = &perform.subsets {
+        w.push_str(" :> ");
+        w.push_str(&format_qualified_name(subsets));
+    }
+    if let Some(ty) = &perform.type_name {
+        w.push_str(" : ");
+        w.push_str(&format_qualified_name(ty));
     }
     if let Some(value) = &perform.value {
         emit_feature_value(w, value)?;

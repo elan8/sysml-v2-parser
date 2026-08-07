@@ -15,10 +15,10 @@ use super::requirement::{
     UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
 };
 use super::structure::{
-    AliasDef, AttributeDef, AttributeUsage, Connect, ConnectionDef, ConnectionUsageMember,
-    DefaultReferenceUsage, EnumDef, IndividualDef, InterfaceDef, InterfaceUsage, ItemDef,
-    MetadataDef, MetadataKeywordUsage, MetadataUsage, OccurrenceDef, OccurrenceUsage, PartDef,
-    PartUsage, PortDef, PortUsage, RefDecl,
+    AliasDef, AssertConstraintMember, AttributeDef, AttributeUsage, Connect, ConnectionDef,
+    ConnectionUsageMember, DefaultReferenceUsage, EnumDef, IndividualDef, InterfaceDef,
+    InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage, MetadataUsage, OccurrenceDef,
+    OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
     CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
@@ -148,4 +148,9 @@ pub enum PackageBodyElement {
     /// e.g. `pressure = force / length^2;` (v1 Spec Examples/8.4.1 Wheel Hub Assembly/Wheel
     /// Package.sysml:9). Previously only reachable inside part/attribute/action bodies.
     DefaultReferenceUsage(Node<DefaultReferenceUsage>),
+    /// `assert (not)? (constraint)? <name>? (: Type)? { ... }` at package scope (GH-89), e.g.
+    /// `assert not massLimitation { :>> mass = vehicle3.mass; ... }` (Simple Tests/
+    /// ConstraintTest.sysml:89). Previously dispatched in six other body contexts (action, part
+    /// def/usage, connection def, occurrence, attribute) but not at package scope.
+    AssertConstraint(Node<AssertConstraintMember>),
 }

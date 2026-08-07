@@ -646,7 +646,23 @@ pub(crate) fn emit_case_usage(
     emit_use_case_body(w, path, &usage.body)
 }
 
-fn emit_use_case_body(
+/// Shared by `UseCaseDefBodyElement::IncludeUseCase` and `PartUsageBodyElement::IncludeUseCase`
+/// (GH-89, `part system : System { include uc2; }`, Simple Tests/UseCaseTest.sysml:33) -- same
+/// `IncludeUseCase` shape in both positions.
+pub(crate) fn emit_include_use_case(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    include: &crate::ast::IncludeUseCase,
+) -> Result<(), EmitError> {
+    w.push_str("include ");
+    w.push_str(&format_name(&include.name));
+    if let Some(mult) = &include.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
+    emit_use_case_body(w, path, &include.body)
+}
+
+pub(crate) fn emit_use_case_body(
     w: &mut EmitWriter<'_>,
     path: &str,
     body: &UseCaseDefBody,
@@ -715,14 +731,7 @@ fn emit_use_case_body_element(
             w.push_str("then done;");
             Ok(())
         }
-        UseCaseDefBodyElement::IncludeUseCase(i) => {
-            w.push_str("include ");
-            w.push_str(&format_name(&i.value.name));
-            if let Some(mult) = &i.value.multiplicity {
-                emit_multiplicity(w, &mult.value)?;
-            }
-            emit_use_case_body(w, path, &i.value.body)
-        }
+        UseCaseDefBodyElement::IncludeUseCase(i) => emit_include_use_case(w, path, &i.value),
         UseCaseDefBodyElement::ThenIncludeUseCase(t) => {
             w.push_str("then include ");
             w.push_str(&format_name(&t.value.include.value.name));
