@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-08-07
+
 ### Fixed
 
 - **Connector-end / interface / flow shorthand gaps (#85).**
@@ -233,6 +235,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`reject_header_keyword`/`reject_plain_typed_header_without_def`) in `definition_prefix.rs`
   itself as a known, not-yet-unified pattern — no third case has appeared yet to justify
   unifying them, per the issue's acceptance criteria.
+
+`PARSE_AST_VERSION` bumped 70 → 71: this release's AST changes are additive (new struct fields,
+new enum variants) but still shape-breaking for exhaustive matches/cached parses -- `InOutDecl`
+gained `is_redefinition`; `CalcDefBodyElement` gained `CalcDef`; `InterfaceDefBodyElement` gained
+`FlowUsage`; `InterfaceUsageBodyElement` gained `EndDecl`; `InterfaceUsage::TypedConnect` gained
+`name`; `EndDecl` gained `crosses`.
 
 ## [0.53.0] - 2026-08-03
 
