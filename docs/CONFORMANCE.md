@@ -52,6 +52,20 @@ Emitter coverage for the validation set is largely in place; remaining known gap
 
 Debug AST snapshots under `tests/validation/snapshots/` remain **regression canaries** only (they detect that parser output changed). They are not a correctness oracle: regenerating them locks in whatever the parser currently produces. New validation coverage should prefer roundtrip over growing Debug snapshots.
 
+## Robustness tracker (`examples/`, not a conformance gate)
+
+The pinned `sysml/src/validation/` tree above is a curated conformance target, not a general
+robustness benchmark -- passing 100% of it proves conformance to that specific corpus, not that
+the parser handles arbitrary valid SysML v2 source. The release also ships `sysml/src/examples/`
+(95 files across 22 folders): a much wider, less curated sample of real-world models. GH-83 tracks
+this with the same roundtrip pipeline via `EXAMPLES_ROUNDTRIP_PASS` / `examples_roundtrip_scan`
+in `tests/roundtrip_validation.rs` -- currently 22/95 roundtrip. Unlike the `validation/` gate,
+this one does **not** require 100%: it only fails on a regression (something in
+`EXAMPLES_ROUNDTRIP_PASS` stops roundtripping) or an unpromoted pass (something outside the list
+starts roundtripping and should be added). Run `ROUNDTRIP_DIAG=1 cargo test --test
+roundtrip_validation examples_roundtrip_scan -- --include-ignored --nocapture` for the per-file
+gap list.
+
 ## Scorecard (CI artifact)
 
 ```bash

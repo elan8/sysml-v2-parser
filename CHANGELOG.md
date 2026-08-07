@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`examples/` robustness tracker (#83, part 1).**
+  - Added `EXAMPLES_ROUNDTRIP_PASS` / `examples_roundtrip_scan` in `tests/roundtrip_validation.rs`,
+    running the same parse → opacity-clean → emit → reparse → AST-eq pipeline as the pinned
+    `ROUNDTRIP_PASS` gate against the release's much wider, uncurated `sysml/src/examples/` tree
+    (95 files) instead. Unlike the conformance gate, this doesn't require 100% — it only fails on
+    a regression or an unpromoted pass, tracking general parser robustness against real-world
+    SysML v2 source rather than just the curated validation corpus.
+  - Baseline: 22/95 roundtrip clean. Documented in `docs/CONFORMANCE.md`'s new "Robustness
+    tracker" section.
+
 ### Fixed
 
 - **`parse()` / `parse_for_editor()` equivalence on clean input (#70).**
