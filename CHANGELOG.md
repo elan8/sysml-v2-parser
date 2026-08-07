@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`parse()` / `parse_for_editor()` equivalence on clean input (#70).**
+  - Documented the invariant (crate docs in `src/lib.rs`, `docs/CONFORMANCE.md`'s new "Entry
+    points" section): on input where `parse()` succeeds, `parse_for_editor()` must report zero
+    diagnostics and build the identical AST.
+  - Added `tests/validation/parse_entry_point_equivalence.rs` (handwritten cases plus `1a`/`2a`
+    validation fixtures) so a future change to either entry point's root-level loop can't
+    silently regress this without failing a test.
+  - While writing that regression coverage, found and fixed a real gap it was meant to guard
+    against: a bare (no `private`/`abstract` prefix) nested `calc def` inside a `calc` body was
+    never dispatched to `CalcDef` — `starts_with_keyword(.., b"calc")` alone can't distinguish it
+    from the `def`-less `calc` usage form, so it silently fell through as an unrecovered `calc`
+    usage parse failure.
+
   - Promoted remaining analysis fixtures into `ROUNDTRIP_PASS` (`10b`/`10c`/`10d`): directed
     `in calc`/`in requirement`/`in part`/`in attribute`, nested calc rollups, `return :>>` /
     `return part|attribute` (incl. `:>`/`:=`), analysis `for` loops, and keyword-less `:>>`

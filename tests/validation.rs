@@ -149,3 +149,6 @@ mod action_ast_shapes;
 
 #[path = "validation/vehicle_annex_a_example.rs"]
 mod vehicle_annex_a_example;
+
+#[path = "validation/parse_entry_point_equivalence.rs"]
+mod parse_entry_point_equivalence;
