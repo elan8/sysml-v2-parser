@@ -398,6 +398,7 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::ConnectionDef(c) => emit_connection_def(w, path, &c.value),
         PartUsageBodyElement::Connection(c) => emit_connection_usage(w, path, &c.value),
         PartUsageBodyElement::CalcDef(c) => super::view::emit_calc_def(w, path, &c.value),
+        PartUsageBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
         PartUsageBodyElement::MetadataDef(m) => emit_metadata_def(w, path, &m.value),
         PartUsageBodyElement::MetadataUsage(m) => emit_metadata_usage(w, path, &m.value),
         PartUsageBodyElement::EnumDef(e) => emit_enum_def(w, path, &e.value),
@@ -1276,6 +1277,9 @@ pub(crate) fn emit_item_def(
     def: &crate::ast::ItemDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("item def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {

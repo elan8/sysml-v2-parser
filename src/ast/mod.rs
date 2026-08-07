@@ -918,6 +918,9 @@ fn normalize_part_usage_body_element_node(
         PartUsageBodyElement::ConstraintUsage(n) => {
             PartUsageBodyElement::ConstraintUsage(dummy_node(n, n.value.clone()))
         }
+        PartUsageBodyElement::CalcUsage(n) => {
+            PartUsageBodyElement::CalcUsage(dummy_node(n, n.value.clone()))
+        }
         PartUsageBodyElement::Import(n) => {
             PartUsageBodyElement::Import(dummy_node(n, normalize_import(&n.value)))
         }
@@ -1163,6 +1166,7 @@ fn normalize_enum_def(e: &EnumDef) -> EnumDef {
 fn normalize_occurrence_def(o: &OccurrenceDef) -> OccurrenceDef {
     OccurrenceDef {
         is_abstract: o.is_abstract,
+        is_individual: o.is_individual,
         identification: o.identification.clone(),
         specializes: o.specializes.clone(),
         body: o.body.clone(),
@@ -1259,6 +1263,7 @@ fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
 
 fn normalize_action_def(a: &ActionDef) -> ActionDef {
     ActionDef {
+        is_individual: a.is_individual,
         identification: a.identification.clone(),
         specializes: a.specializes.clone(),
         body: normalize_action_def_body(&a.body),
@@ -1404,6 +1409,7 @@ fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
         is_abstract: a.is_abstract,
         is_variation: a.is_variation,
         is_reference: a.is_reference,
+        is_individual: a.is_individual,
         name: a.name.clone(),
         type_name: a.type_name.clone(),
         typing: a.typing.clone(),

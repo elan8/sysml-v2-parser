@@ -45,6 +45,9 @@ pub(crate) fn emit_action_def(
     def: &ActionDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("action def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -67,6 +70,9 @@ pub(crate) fn emit_action_usage(
     }
     if usage.is_reference {
         w.push_str("ref ");
+    }
+    if usage.is_individual {
+        w.push_str("individual ");
     }
     // Standalone control nodes (`accept name : Type;`, `send new Publish(x, y) via p;`) are
     // stored as ActionUsage with `name == "accept"|"send"` plus a payload — do not emit
@@ -1061,6 +1067,9 @@ pub(crate) fn emit_occurrence_def(
     emit_visibility(w, def.membership.visibility);
     if def.is_abstract {
         w.push_str("abstract ");
+    }
+    if def.is_individual {
+        w.push_str("individual ");
     }
     w.push_str("occurrence def ");
     emit_identification(w, &def.identification);

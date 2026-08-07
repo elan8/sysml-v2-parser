@@ -26,7 +26,9 @@ pub(crate) fn item_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<Ite
 
 fn parse_item_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<ItemDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"item").with_captured_visibility();
+    let mut options = DefinitionPrefixOptions::new(b"item")
+        .individual_allowed()
+        .with_captured_visibility();
     if require_def {
         options = options.def_required();
     }
@@ -38,6 +40,7 @@ fn parse_item_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             start,
             input,
             ItemDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -56,6 +59,9 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1), e.g. `individual
+    // item ii : II1;` (Simple Tests/IndividualTest.sysml:4).
+    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"item"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2) -- see
@@ -95,6 +101,7 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
                 value,
                 body,
                 direction: None,
+                is_individual: is_individual.is_some(),
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
         ),

@@ -51,6 +51,11 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
     b"item",
+    // GH-90.1: `individual item ii : II1;` / `individual item :>> i : II2;` inside `item def`
+    // bodies (Simple Tests/IndividualTest.sysml:4,15) -- opaquely captured like the un-prefixed
+    // `item` starter above, matching this body's existing "not fully modeled, but accepted"
+    // convention for item/part usages.
+    b"individual",
     b"constraint",
     b"private",
     b"derived",
@@ -193,6 +198,16 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         // occurrence members. Placed after the bindings so a member merely *named* `occurrence`
         // still reaches them first.
         map(crate::parser::occurrence_body::occurrence_usage, |n| {
+            AttributeBodyElement::OccurrenceUsage(Box::new(n))
+        }),
+        // GH-90.2: `timeslice`/`snapshot` portion usages inside attribute/item bodies, e.g.
+        // `timeslice asPresident : Person [0..*] { ... }` (Individuals Examples/
+        // JohnIndividualExample.sysml:11). Both already fully parse via `timeslice_usage`/
+        // `snapshot_usage` (used elsewhere, e.g. part def bodies) -- just not dispatched here.
+        map(crate::parser::occurrence_body::timeslice_usage, |n| {
+            AttributeBodyElement::OccurrenceUsage(Box::new(n))
+        }),
+        map(crate::parser::occurrence_body::snapshot_usage, |n| {
             AttributeBodyElement::OccurrenceUsage(Box::new(n))
         }),
         // This body is also shared with `item def`/`item` usage bodies, which legally own

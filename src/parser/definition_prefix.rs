@@ -81,6 +81,15 @@ pub struct DefinitionPrefixOptions {
     pub second_keyword: Option<&'static [u8]>,
     pub def: DefKeywordMode,
     pub abstract_allowed: bool,
+    /// When set, accept an optional `individual` prefix after `abstract` (BNF
+    /// `OccurrenceDefinitionPrefix`'s `(isIndividual ?= 'individual' ...)?`), captured into
+    /// [`DefinitionPrefixResult::is_individual`]. Every definition kind whose BNF production
+    /// derives from `OccurrenceDefinitionPrefix` legally accepts this (occurrence, item, action,
+    /// case/analysis/verification, part, connection, interface, allocation, flow, state, calc,
+    /// constraint, requirement, concern, ...) -- opt-in per caller rather than defaulted on, since
+    /// several definition kinds (`attribute def`, `enum def`, `metadata def`, ...) do not derive
+    /// from it and must keep rejecting a leading `individual` as usual.
+    pub individual_allowed: bool,
     pub visibility: VisibilityPrefix,
     pub annotation: AnnotationMode,
     /// When set, fail this definition parse if the plain `: Type` header scan swallows this
@@ -101,6 +110,7 @@ impl DefinitionPrefixOptions {
             second_keyword: None,
             def: DefKeywordMode::Optional,
             abstract_allowed: true,
+            individual_allowed: false,
             visibility: VisibilityPrefix::None,
             annotation: AnnotationMode::None,
             reject_header_keyword: None,
@@ -120,6 +130,12 @@ impl DefinitionPrefixOptions {
 
     pub const fn no_abstract(mut self) -> Self {
         self.abstract_allowed = false;
+        self
+    }
+
+    /// See [`DefinitionPrefixOptions::individual_allowed`].
+    pub const fn individual_allowed(mut self) -> Self {
+        self.individual_allowed = true;
         self
     }
 
@@ -173,6 +189,9 @@ pub struct DefinitionPrefixResult {
     pub specializes: Option<Node<TypingRelationship>>,
     pub annotation: Option<String>,
     pub is_abstract: bool,
+    /// `individual` prefix, captured only when
+    /// [`DefinitionPrefixOptions::individual_allowed`] was set; `false` otherwise.
+    pub is_individual: bool,
     /// `private`/`protected`/`public` prefix, captured only when
     /// [`DefinitionPrefixOptions::with_captured_visibility`] was set; `None` for every other
     /// caller's `VisibilityPrefix` mode (matching this crate's "record only what was explicitly
@@ -214,6 +233,14 @@ pub(crate) fn parse_definition_prefix(
 
     let (input, is_abstract) = if options.abstract_allowed {
         let (input, found) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+        (input, found.is_some())
+    } else {
+        (input, false)
+    };
+
+    // BNF `OccurrenceDefinitionPrefix`: `individual` follows `abstract`, before the keyword.
+    let (input, is_individual) = if options.individual_allowed {
+        let (input, found) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
         (input, found.is_some())
     } else {
         (input, false)
@@ -276,6 +303,7 @@ pub(crate) fn parse_definition_prefix(
             specializes,
             annotation,
             is_abstract,
+            is_individual,
             visibility,
             visibility_span,
         },

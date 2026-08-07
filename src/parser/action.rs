@@ -694,6 +694,7 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
         input,
         DefinitionPrefixOptions::new(b"action")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = action_def_body(input)?;
@@ -703,6 +704,7 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
             start,
             input,
             ActionDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -1294,6 +1296,10 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     };
     let (input, is_reference) =
         nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
+    // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` after the basic usage prefix
+    // (GH-90.1), e.g. `individual action a : AP1;` (Simple Tests/IndividualTest.sysml:30).
+    let (input, is_individual) =
+        nom::combinator::opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     // SysML allows anonymous action usages: `action: Runner;` (Identification may be empty).
     let (after_gap, _) = ws_and_comments(input)?;
@@ -1422,6 +1428,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 is_abstract,
                 is_variation,
                 is_reference: is_reference.is_some(),
+                is_individual: is_individual.is_some(),
                 name: name_str,
                 type_name,
                 typing,

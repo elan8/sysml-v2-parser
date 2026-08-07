@@ -355,6 +355,9 @@ pub enum AttributeBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemDef {
+    /// `individual item def John :> Person { ... }` (GH-90.1, `Individuals Examples/
+    /// JohnIndividualExample.sysml:19`).
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
@@ -587,6 +590,11 @@ pub enum PartUsageBodyElement {
     /// `constraint <name>[: Type] { ... }` usage inside a part usage body (§6 G4). See
     /// `PartDefBodyElement::ConstraintUsage`.
     ConstraintUsage(Node<ConstraintUsage>),
+    /// `calc <name>[: Type] { ... }` usage inside a part usage body (GH-91.2), e.g. `calc 'Solve
+    /// for Pressure1' : 'Ideal Gas Law';` (`Analysis Examples/Turbojet Stage
+    /// Analysis.sysml:88`). `calc_usage` itself already fully supports quoted names -- only
+    /// `calc_def_required` (`CalcDef` above) was dispatched here.
+    CalcUsage(Node<crate::ast::view::CalcUsage>),
     /// `(private|public|protected)? import <qualified-name>;` inside a part usage body (§6 G16).
     /// Imports are namespace members, and a part usage body is a namespace; real usage is
     /// OMG spec Annex `8-Requirements.sysml`.
@@ -1369,6 +1377,8 @@ pub struct EnumeratedValue {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceDef {
     pub is_abstract: bool,
+    /// `individual occurrence def IO2 { ... }` (GH-90.1, `Simple Tests/IndividualTest.sysml:3`).
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,
