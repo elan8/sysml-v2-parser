@@ -16,10 +16,35 @@ pub(crate) fn part_usage_redefines_only<'a>(
     input: Input<'a>,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, (_, redefines_qname)) = prefix_redefinition_target(input)?;
+    // GH-92.2: an explicit `: Type` clause may follow the redefines target, e.g. `part redefines
+    // rb : LightRollBar[0..1];` (`v1 Spec Examples/8.4.5 Constraining Decomposition/Vehicle
+    // Decomposition - Updated.sysml:43`) -- previously only the type-less bare (`part redefines
+    // lb;`) and braced-body (`part redefines engine { ... }`) forms were accepted.
+    let (input, type_result) = optional_typings(input)?;
+    let has_type = type_result.is_some();
+    let (type_ref_span, type_name, typing) =
+        crate::parser::usage::typing_fields_from_result(type_result);
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let (input, ordered) = usage_ordered_modifier(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
+    // When an explicit type follows the redefines target, the display name is derived from the
+    // target (matching the pre-existing behavior this shape previously reached via
+    // `part_usage_named`'s own `:>>`-prefixed fallback, e.g. `ref part :>> elements: SparePart;`
+    // in release validation `15_11-Variable Length Collection Types.sysml`). The type-less bare/
+    // braced-body forms (`part redefines lb;` / `part redefines engine { ... }`) keep the name
+    // empty -- `emit_part_usage`'s `redefines_only` special case (multiplicity placement) and
+    // `tests/parser/structure.rs::test_part_usage_redefines_only_keyword` both depend on that.
+    let name = if has_type {
+        redefines_qname
+            .value
+            .first_target()
+            .and_then(|t| t.local_name())
+            .unwrap_or_default()
+            .to_string()
+    } else {
+        String::new()
+    };
     Ok((
         input,
         node_from_to(
@@ -32,10 +57,10 @@ pub(crate) fn part_usage_redefines_only<'a>(
                 direction: None,
                 is_derived: false,
                 is_constant: false,
-                name: String::new(),
+                name,
                 short_name: None,
-                type_name: String::new(),
-                typing: None,
+                type_name,
+                typing,
                 multiplicity: multiplicity_opt,
                 ordered,
                 subsets: None,
@@ -43,7 +68,7 @@ pub(crate) fn part_usage_redefines_only<'a>(
                 value,
                 body,
                 name_span: None,
-                type_ref_span: None,
+                type_ref_span,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
         ),
@@ -1245,6 +1270,12 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             map(state_usage, PartUsageBodyElement::StateUsage),
             map(perform_action_decl, PartUsageBodyElement::Perform),
             map(perform_usage, PartUsageBodyElement::Perform),
+            // GH-92.3: `succession ... first ... then ...;`, already modeled/parsed for
+            // `ConnectionDefBodyElement`/`OccurrenceBodyElement`; just not dispatched here.
+            map(
+                crate::parser::occurrence_body::succession_usage,
+                PartUsageBodyElement::SuccessionUsage,
+            ),
             map(allocate_, PartUsageBodyElement::Allocate),
             map(variant_usage, PartUsageBodyElement::VariantUsage),
             map(attribute_usage, PartUsageBodyElement::AttributeUsage),

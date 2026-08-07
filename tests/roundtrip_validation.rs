@@ -117,6 +117,7 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Import Tests/QualifiedNameImportTest.sysml",
     "Interaction Sequencing Examples/ServerSequenceModel.sysml",
     "Mass Roll-up Example/MassConstraintExample.sysml",
+    "Mass Roll-up Example/Vehicles.sysml",
     "Metadata Examples/IssueMetadataExample.sysml",
     "Packet Example/PacketUsage.sysml",
     "Packet Example/Packets.sysml",
@@ -134,6 +135,7 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Simple Tests/RootPackageTest.sysml",
     "Simple Tests/TradeStudyTest.sysml",
     "Vehicle Example/VehicleDefinitions.sysml",
+    "Vehicle Example/VehicleIndividuals.sysml",
 ];
 
 fn release_root() -> PathBuf {

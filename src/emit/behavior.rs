@@ -1241,7 +1241,7 @@ fn emit_occurrence_exhibit(
     emit_state_def_body(w, path, &usage.body)
 }
 
-fn emit_succession_usage(
+pub(crate) fn emit_succession_usage(
     w: &mut EmitWriter<'_>,
     succ: &crate::ast::SuccessionUsage,
 ) -> Result<(), EmitError> {
@@ -1253,6 +1253,11 @@ fn emit_succession_usage(
     }
     if let Some(name) = &succ.name {
         w.push_str(&format_name(name));
+        w.push_char(' ');
+    }
+    if let Some(type_name) = &succ.type_name {
+        w.push_str(": ");
+        w.push_str(&format_qualified_name(type_name));
         w.push_char(' ');
     }
     w.push_str("first ");

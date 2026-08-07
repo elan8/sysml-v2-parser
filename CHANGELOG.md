@@ -104,6 +104,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Promoted `Camera Example/Camera.sysml`, `Mass Roll-up Example/MassConstraintExample.sysml`, and
     `Simple Tests/AliasTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
 
+- **Literal `redefines` keyword edge cases and unnamed typed succession statement (#92).**
+  - `attribute_feature_binding`/`redefinition_feature_binding` (`src/parser/attribute.rs`) now
+    accept the literal `redefines` keyword, not just the symbolic `:>>` operator (both are
+    documented synonyms via `redefine_operator`, already used elsewhere e.g. `part_usage`) -- a
+    bare `redefines <target> = <value>;` standalone body member with no `attribute`/`part`
+    keyword at all now parses. `Mass Roll-up Example/Vehicles.sysml:26`.
+  - `part_usage_redefines_only` (`src/parser/part/usage.rs`) now accepts an explicit `: Type`
+    clause after the redefines target (new typing-clause parsing; when present, the display name
+    is now derived from the target, matching the pre-existing `ref part :>> elements:
+    SparePart;` convention this shape previously reached via a different fallback path) --
+    previously only the type-less bare/braced-body forms were accepted. `v1 Spec Examples/
+    8.4.5 Constraining Decomposition/Vehicle Decomposition - Updated.sysml:43`.
+  - `succession_usage` (`src/parser/occurrence_body.rs`) now recognizes a bare `:` (type clause,
+    no name) as the name-less case, and now parses an optional `: Type` clause on the succession
+    itself (new `SuccessionUsage.type_name` field, mirroring `FirstStmt::succession_type`'s
+    identical field for the sibling action-body form) -- previously a leading `:` fell through to
+    the name parser and failed outright, and no type-clause parsing existed at all. Also newly
+    dispatched inside `part_usage_body_element` (new `PartUsageBodyElement::SuccessionUsage`
+    variant) -- previously only `ConnectionDefBodyElement`/`OccurrenceBodyElement` had it, so a
+    succession usage nested in a part usage body had no dispatch path regardless of naming.
+    `Vehicle Example/VehicleIndividuals.sysml:49`.
+  - `PARSE_AST_VERSION` bumped 74 -> 75 for the `SuccessionUsage.type_name` field and
+    `PartUsageBodyElement::SuccessionUsage` variant.
+  - Promoted `Mass Roll-up Example/Vehicles.sysml` and `Vehicle Example/VehicleIndividuals.sysml`
+    into `EXAMPLES_ROUNDTRIP_PASS`.
+
 ## [0.54.0] - 2026-08-07
 
 ### Fixed

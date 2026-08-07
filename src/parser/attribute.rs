@@ -254,9 +254,13 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, prefix) = nom::combinator::opt(alt((
-        map(preceded(ws_and_comments, tag(&b":>>"[..])), |_| {
-            MetadataBindingPrefix::Redefines
-        }),
+        // GH-92.1: accept the literal `redefines` keyword too, not just `:>>` -- both are
+        // synonyms per `redefine_operator` (already used elsewhere, e.g. `part_usage`), e.g.
+        // `redefines mass = 1000 [kg];` (`Mass Roll-up Example/Vehicles.sysml:26`).
+        map(
+            preceded(ws_and_comments, crate::parser::lex::redefine_operator),
+            |_| MetadataBindingPrefix::Redefines,
+        ),
         map(preceded(ws_and_comments, subset_operator), |_| {
             MetadataBindingPrefix::Subsets
         }),
@@ -467,7 +471,10 @@ pub(crate) fn redefinition_feature_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AttributeUsage>> {
     let (peek, _) = ws_and_comments(input)?;
-    if !peek.fragment().starts_with(b":>") {
+    // GH-92.1: bare `redefines <target> = <value>;` (the literal keyword, not just the `:>>`
+    // symbol) with no `attribute`/`part` keyword at all, e.g. `redefines mass = 1000 [kg];`
+    // (`Mass Roll-up Example/Vehicles.sysml:26`).
+    if !peek.fragment().starts_with(b":>") && !starts_with_keyword(peek.fragment(), b"redefines") {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,

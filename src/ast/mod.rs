@@ -916,6 +916,9 @@ fn normalize_part_usage_body_element_node(
         PartUsageBodyElement::ConstraintUsage(n) => {
             PartUsageBodyElement::ConstraintUsage(dummy_node(n, n.value.clone()))
         }
+        PartUsageBodyElement::SuccessionUsage(n) => {
+            PartUsageBodyElement::SuccessionUsage(dummy_node(n, n.value.clone()))
+        }
         PartUsageBodyElement::Import(n) => {
             PartUsageBodyElement::Import(dummy_node(n, normalize_import(&n.value)))
         }
