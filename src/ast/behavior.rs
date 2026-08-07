@@ -15,6 +15,9 @@ use crate::ast::core::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionDef {
+    /// `individual action def FuelConsumption_1 :> FuelConsumption;` (GH-90.1, `Individuals
+    /// Examples/AnalysisIndividualExample.sysml:77`).
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ActionDefBody,
@@ -270,6 +273,9 @@ pub struct ActionUsage {
     /// Leading `ref` keyword — reference feature usage rather than composite
     /// (`ref action …` inside a part body).
     pub is_reference: bool,
+    /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual
+    /// action a : AP1;` (`Simple Tests/IndividualTest.sysml:30`).
+    pub is_individual: bool,
     pub name: String,
     pub type_name: String,
     /// Structured typing clause (multi-target capable), mirroring `PartUsage.typing`.
@@ -310,6 +316,7 @@ impl PartialEq for ActionUsage {
         self.is_abstract == other.is_abstract
             && self.is_variation == other.is_variation
             && self.is_reference == other.is_reference
+            && self.is_individual == other.is_individual
             && self.name == other.name
             && self.type_name == other.type_name
             && self.typing == other.typing

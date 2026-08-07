@@ -355,6 +355,9 @@ pub enum AttributeBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemDef {
+    /// `individual item def John :> Person { ... }` (GH-90.1, `Individuals Examples/
+    /// JohnIndividualExample.sysml:19`).
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
@@ -1358,6 +1361,8 @@ pub struct EnumeratedValue {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceDef {
     pub is_abstract: bool,
+    /// `individual occurrence def IO2 { ... }` (GH-90.1, `Simple Tests/IndividualTest.sysml:3`).
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,

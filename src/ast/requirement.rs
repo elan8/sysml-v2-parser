@@ -259,6 +259,9 @@ pub struct ItemUsage {
     pub body: AttributeBody,
     /// Set when parsed as `in`/`out`/`inout item` in port def bodies.
     pub direction: Option<InOut>,
+    /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual
+    /// item ii : II1;` (`Simple Tests/IndividualTest.sysml:4`).
+    pub is_individual: bool,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
     /// [`crate::ast::MembershipKind::FeatureMembership`]. See
     /// [`crate::ast::PortDef::membership`] for the same "genuine new grammar coverage, not just
@@ -356,6 +359,9 @@ pub struct AnalysisCaseDef {
     pub specializes: Option<Node<TypingRelationship>>,
     /// True for `abstract analysis def ...`.
     pub is_abstract: bool,
+    /// `individual analysis def FuelEconomyAnalysis_1 :> FuelEconomyAnalysis;` (GH-90.1,
+    /// `Individuals Examples/AnalysisIndividualExample.sysml:76`).
+    pub is_individual: bool,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `analysis_case_def`.
     pub membership: Membership,
@@ -369,6 +375,10 @@ pub struct AnalysisCaseUsage {
     pub type_name: Option<String>,
     /// True for `abstract analysis ...`.
     pub is_abstract: bool,
+    /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual
+    /// analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 { ... }` (`Individuals Examples/
+    /// AnalysisIndividualExample.sysml:79`).
+    pub is_individual: bool,
     pub body: UseCaseDefBody,
     /// See [`RequirementUsage::membership`]; `analysis_case_usage` captures real visibility,
     /// `kind` always [`crate::ast::MembershipKind::FeatureMembership`].
