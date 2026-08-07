@@ -1021,6 +1021,17 @@ pub(crate) fn package_body_element(
             }
         }
     }
+    // GH-89: `assert (not)? (constraint)? <name>? (: Type)? { ... }` at package scope, previously
+    // dispatched in six other body contexts but not here, e.g. `assert not massLimitation { :>>
+    // mass = vehicle3.mass; :>> massLimit = vehicle4.mass; }` (Simple Tests/ConstraintTest.sysml:89).
+    if let Ok((input, elem)) = map(
+        crate::parser::occurrence_body::assert_constraint_member,
+        PackageBodyElement::AssertConstraint,
+    )
+    .parse(input)
+    {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
     // GH-87: keyword-less `name = expr;` binding (§6 G26), previously only reachable inside
     // part/attribute/action bodies, even though official OMG spec-derived examples use it at
     // package scope: `pressure = force / length^2;` (v1 Spec Examples/8.4.1 Wheel Hub Assembly/

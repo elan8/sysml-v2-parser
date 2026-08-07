@@ -317,6 +317,15 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(metadata_def, PartDefBodyElement::MetadataDef),
             map(dependency, PartDefBodyElement::Dependency),
             map(item_def_required, PartDefBodyElement::ItemDef),
+            // GH-89.9: directed `in`/`out` item usage, e.g. `out item pwrCmd:PwrCmd;` (Timeslice
+            // and Snapshot Examples/TimeVaryingAttribute.sysml:14). Already supported in action
+            // bodies via `action_def_body_element`'s equivalent `directed_item_usage` arm; part
+            // def bodies had no such path. Tried before the plain `item_usage` arm since that one
+            // has no direction-prefix handling of its own.
+            map(
+                crate::parser::item::directed_item_usage,
+                PartDefBodyElement::ItemUsage,
+            ),
             map(item_usage, PartDefBodyElement::ItemUsage),
             map(
                 crate::parser::occurrence_body::assert_constraint_member,
@@ -363,6 +372,13 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         // `ActionNodeMember` is reachable only from `ActionBodyItem`, not the generic
         // `DefinitionBodyItem` a part def body uses -- no real usage exercises them here either.
         map(part_def_succession_stmt, PartDefBodyElement::FirstStmt),
+        // GH-89: `alias <name> for <target>;` nested inside a part definition body, previously
+        // only reachable at package-body scope even though `Simple Tests/AliasTest.sysml:7` uses
+        // it directly inside a `part def`.
+        map(
+            crate::parser::alias::alias_def,
+            PartDefBodyElement::AliasDef,
+        ),
         // GH-87: keyword-less `name;` / `name = expr;` feature binding (§6 G26), previously only
         // reachable inside action bodies even though `part def V { m; }` is real usage (Simple
         // Tests/AnalysisTest.sysml:4). Tried absolute last, after `attribute_usage_shorthand`

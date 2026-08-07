@@ -501,7 +501,9 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
                 usage_prefix,
                 action_name,
                 type_name: None,
+                multiplicity: None,
                 redefines,
+                subsets: None,
                 value,
                 body,
             },
@@ -529,11 +531,25 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
     } else {
         name(input)?
     };
+    // GH-89: multiplicity after the name, e.g. `takePicture[*] :> PictureTaking::takePicture;`
+    // (Camera Example/Camera.sysml:4).
+    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    // GH-89: `:>` subsets clause, tried only when `:>>` redefines didn't match -- the two are
+    // mutually exclusive specialization keywords at this position.
+    let (input, subsets) = if redefines.is_none() {
+        opt(preceded(
+            preceded(ws_and_comments, tag(&b":>"[..])),
+            preceded(ws_and_comments, qualified_name),
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, typing_colon),
         preceded(ws_and_comments, qualified_name),
@@ -550,7 +566,9 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
                 usage_prefix,
                 action_name,
                 type_name,
+                multiplicity,
                 redefines,
+                subsets,
                 value,
                 body,
             },
@@ -1094,6 +1112,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
                 VariantUsage {
                     name,
                     typed: Some(VariantTypedUsage::Part(Box::new(usage))),
+                    body: None,
                     membership,
                 },
             ),
@@ -1109,6 +1128,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
                 VariantUsage {
                     name,
                     typed: Some(VariantTypedUsage::Attribute(Box::new(usage))),
+                    body: None,
                     membership,
                 },
             ),
@@ -1124,6 +1144,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
                 VariantUsage {
                     name,
                     typed: Some(VariantTypedUsage::Item(Box::new(usage))),
+                    body: None,
                     membership,
                 },
             ),
@@ -1139,6 +1160,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
                 VariantUsage {
                     name,
                     typed: Some(VariantTypedUsage::Port(Box::new(usage))),
+                    body: None,
                     membership,
                 },
             ),
@@ -1156,14 +1178,24 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
                 VariantUsage {
                     name,
                     typed: Some(VariantTypedUsage::Perform(Box::new(usage))),
+                    body: None,
                     membership,
                 },
             ),
         ));
     }
 
+    // Untyped reference form: `variant name;` or `variant name { ... }` / `variant 'quoted' {
+    // ... }`, referencing an already-declared feature by name rather than declaring a fresh typed
+    // usage. Real usage: `Simple Tests/VariabilityTest.sysml:16` (`variant q { attribute b : B
+    // :>> a; }`, `q` referring to the sibling `part q : Q;`) and
+    // `Variability Examples/VehicleVariabilityModel.sysml:78` (`variant '6cylEngine' { ... }`).
     let (input, name) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (input, body) = preceded(ws_and_comments, part_usage_body).parse(input)?;
+    let body = match body {
+        PartUsageBody::Semicolon => None,
+        brace @ PartUsageBody::Brace { .. } => Some(brace),
+    };
     Ok((
         input,
         node_from_to(
@@ -1172,6 +1204,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
             VariantUsage {
                 name,
                 typed: None,
+                body,
                 membership,
             },
         ),
@@ -1303,6 +1336,33 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             // recovery surfaced them as diagnostics in OMG Annex `10c-Fuel Economy Analysis.sysml`.
             map(analysis_case_def, PartUsageBodyElement::AnalysisCaseDef),
             map(analysis_case_usage, PartUsageBodyElement::AnalysisCaseUsage),
+            // GH-89: `alias <name> for <target>;` nested inside a part usage body, previously
+            // only reachable at package-body scope even though `Simple Tests/AliasTest.sysml:16`
+            // uses it directly inside a `part <name> : Type { ... }` usage.
+            map(
+                crate::parser::alias::alias_def,
+                PartUsageBodyElement::AliasDef,
+            ),
+            // GH-89: `include <usecase>;` and `use case <name> : Type { ... }` nested inside a
+            // part usage body, previously only reachable inside a use case definition body (or,
+            // for `use case` usages, a part *definition* body) even though `Simple Tests/
+            // UseCaseTest.sysml:33-35` uses both directly inside a `part <name> : Type { ... }`
+            // usage.
+            map(
+                crate::parser::usecase::include_use_case,
+                PartUsageBodyElement::IncludeUseCase,
+            ),
+            map(
+                crate::parser::usecase::use_case_usage,
+                PartUsageBodyElement::UseCaseUsage,
+            ),
+            // GH-89: `verification <name> : Type { ... }` usage nested inside a plain part usage
+            // body, previously only reachable from part *definition* bodies (Simple Tests/
+            // VerificationTest.sysml:35).
+            map(
+                crate::parser::case::verification_case_usage,
+                PartUsageBodyElement::VerificationCaseUsage,
+            ),
         )),
     ))
     .parse(input)?;

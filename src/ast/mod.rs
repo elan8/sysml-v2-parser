@@ -298,6 +298,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::DefaultReferenceUsage(n) => PackageBodyElement::DefaultReferenceUsage(
             dummy_node(n, normalize_default_reference_usage(&n.value)),
         ),
+        PackageBodyElement::AssertConstraint(n) => {
+            PackageBodyElement::AssertConstraint(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::InterfaceUsage(n) => {
             PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
         }
@@ -545,6 +548,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
             PartDefBodyElement::FirstStmt(dummy_node(n, n.value.clone()))
         }
         PartDefBodyElement::Bind(n) => PartDefBodyElement::Bind(dummy_node(n, n.value.clone())),
+        PartDefBodyElement::AliasDef(n) => {
+            PartDefBodyElement::AliasDef(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }
@@ -640,7 +646,9 @@ fn normalize_perform(p: &Perform) -> Perform {
         usage_prefix: p.usage_prefix.clone(),
         action_name: p.action_name.clone(),
         type_name: p.type_name.clone(),
+        multiplicity: p.multiplicity.clone(),
         redefines: p.redefines.clone(),
+        subsets: p.subsets.clone(),
         value: p.value.clone(),
         body: normalize_perform_body(&p.body),
     }
@@ -929,6 +937,18 @@ fn normalize_part_usage_body_element_node(
         PartUsageBodyElement::AnalysisCaseUsage(n) => {
             PartUsageBodyElement::AnalysisCaseUsage(dummy_node(n, n.value.clone()))
         }
+        PartUsageBodyElement::AliasDef(n) => {
+            PartUsageBodyElement::AliasDef(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::IncludeUseCase(n) => {
+            PartUsageBodyElement::IncludeUseCase(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::UseCaseUsage(n) => {
+            PartUsageBodyElement::UseCaseUsage(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::VerificationCaseUsage(n) => {
+            PartUsageBodyElement::VerificationCaseUsage(dummy_node(n, n.value.clone()))
+        }
     };
     dummy_node(el, value)
 }
@@ -1112,6 +1132,9 @@ fn normalize_connection_def_body_element_node(
         ConnectionDefBodyElement::SuccessionUsage(n) => {
             ConnectionDefBodyElement::SuccessionUsage(dummy_node(n, n.value.clone()))
         }
+        ConnectionDefBodyElement::PartUsage(n) => ConnectionDefBodyElement::PartUsage(Box::new(
+            dummy_node(n, normalize_part_usage(&n.value)),
+        )),
     };
     dummy_node(el, value)
 }
@@ -1524,6 +1547,9 @@ fn normalize_action_usage_body_element_node(
                 n,
                 normalize_default_reference_usage(&n.value),
             ))
+        }
+        ActionUsageBodyElement::VariantUsage(n) => {
+            ActionUsageBodyElement::VariantUsage(dummy_node(n, n.value.clone()))
         }
     };
     dummy_node(el, value)

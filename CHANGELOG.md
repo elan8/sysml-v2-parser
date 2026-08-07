@@ -65,6 +65,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `OccurrenceBodyElement` shape changes above.
   - Promoted `Simple Tests/AnalysisTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
 
+- **Usage-kind body-member dispatch gaps (#89).** A grab-bag of usage-kind body members that were
+  each supported *somewhere* in the grammar but not dispatched in the specific body context real
+  examples use them in.
+  - Bare `part <name>;` is now dispatched inside `connection def` bodies (new
+    `ConnectionDefBodyElement::PartUsage` variant) -- `Simple Tests/ConnectionTest.sysml:31`.
+  - `perform action <name>[mult] :> <target>;` -- `perform_action_decl` now accepts an optional
+    multiplicity after the name and a `:>` subsets clause (mutually exclusive with `:>>`
+    redefines), not just `:>>`/`:`/`=` (new `Perform.multiplicity`/`.subsets` fields) --
+    `Camera Example/Camera.sysml:4`.
+  - `alias <name> for <target>;` is now dispatched inside `part def`/`part` usage bodies (new
+    `PartDefBodyElement::AliasDef`/`PartUsageBodyElement::AliasDef` variants), previously only
+    reachable at package scope -- `Simple Tests/AliasTest.sysml:7,16`.
+  - `include <usecase>;` and `use case <name> : Type { ... }` are now dispatched inside part usage
+    bodies (new `PartUsageBodyElement::IncludeUseCase`/`::UseCaseUsage` variants) --
+    `Simple Tests/UseCaseTest.sysml:33-35`.
+  - Named `assert <name> { ... }` (referencing a previously-declared `constraint` by name and
+    rebinding its `in` parameters) no longer requires the `constraint` keyword
+    (`assert_constraint_member`'s `constraint` tag is now optional), and is now also dispatched at
+    package-body scope (new `PackageBodyElement::AssertConstraint` variant) --
+    `Simple Tests/ConstraintTest.sysml:78`.
+  - `verification <name> : Type { ... }` is now dispatched inside a plain part-usage body, not
+    just nested case/requirement contexts (new `PartUsageBodyElement::VerificationCaseUsage`
+    variant) -- `Simple Tests/VerificationTest.sysml:35`.
+  - `variant <name> { ... }` / `variant '<name>' { ... }` -- the untyped `variant` reference form
+    now accepts an optional nested body (new `VariantUsage.body` field), not just a bare `;` --
+    `Simple Tests/VariabilityTest.sysml:16`, `Variability Examples/VehicleVariabilityModel.sysml:78`.
+    The untyped, bare-`;` reference form is also now dispatched inside action usage bodies (new
+    `ActionUsageBodyElement::VariantUsage` variant) -- `VehicleVariabilityModel.sysml:128-134`.
+  - `render rendering <name> : Type[mult];` inside `view def` bodies -- `view_rendering_usage` now
+    accepts an optional `rendering` keyword before the name (BNF `ViewRenderingUsage`'s second
+    alternative), which was previously consumed as the usage's own name -- `Simple Tests/
+    ViewTest.sysml:32`.
+  - Directed (`in`/`out`) `item` usage is now dispatched inside `part def` bodies (new
+    `directed_item_usage` dispatch arm, mirroring the existing action-body one) --
+    `Timeslice and Snapshot Examples/TimeVaryingAttribute.sysml:14`.
+  - `PARSE_AST_VERSION` bumped 73 -> 74 for the AST shape changes above.
+  - Promoted `Camera Example/Camera.sysml`, `Mass Roll-up Example/MassConstraintExample.sysml`, and
+    `Simple Tests/AliasTest.sysml` into `EXAMPLES_ROUNDTRIP_PASS`.
+
 ## [0.54.0] - 2026-08-07
 
 ### Fixed

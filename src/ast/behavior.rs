@@ -385,6 +385,11 @@ pub enum ActionUsageBodyElement {
     /// Keyword-less `name = expr;` feature binding (§6 G26), e.g. `measurement =
     /// testVehicle.mass;` in the OMG spec Annex `9-Verification-simplified.sysml`.
     DefaultReferenceUsage(Node<crate::ast::DefaultReferenceUsage>),
+    /// `variant name;` referencing a sibling variation action's variant (GH-89.7), e.g. `variant
+    /// generateTorque4Cyl;` inside `action providePowerFamily : ProvidePower { variation action
+    /// generateTorque : GenerateTorque { variant generateTorque4Cyl; ... } ... }`
+    /// (`Variability Examples/VehicleVariabilityModel.sysml:128`).
+    VariantUsage(Node<crate::ast::VariantUsage>),
 }
 
 /// A minimally-modeled declaration inside an action/behavior body (e.g. `attribute ...;`, `calc ...;`).

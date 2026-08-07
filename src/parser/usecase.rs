@@ -62,7 +62,7 @@ fn then_done(input: Input<'_>) -> IResult<Input<'_>, Node<ThenDone>> {
     Ok((input, node_from_to(start, input, ThenDone {})))
 }
 
-fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
+pub(crate) fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"include"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
