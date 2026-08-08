@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`AttributeUsage` emit duplicated the name for `::>`/`:>`/`:>>`-name-standing-in-prefix
+  forms (#113).** `emit_attribute_usage` unconditionally emitted `usage.name` *and* the
+  subsets/redefines/references clause for the three anonymous "target stands in for name"
+  forms (`attribute :>> target;`, `attribute ::> target;`, `attribute :> target;`,
+  `AttributeUsageHead::PrefixRedefines`/`PrefixReferences`/`PrefixSubsets` in
+  `src/parser/attribute.rs`) -- re-emitting `attribute :>> differencesOf[1];` as `attribute
+  differencesOf[1] :>> differencesOf;`, a structurally different, self-referential construct.
+  Fixed by gating the name (and any trailing typing/multiplicity/`ordered`/`nonunique`, which
+  parse *after* the target reference for these forms, not after a name) on `name_span.is_some()`
+  -- `name_span` is already `None` only for these three derived-name forms, so no new AST field
+  was needed. Mirrors `emit_part_usage`'s `redefines_only` handling, keyed off "derived" rather
+  than "empty" since `AttributeUsage`'s convention (unlike `PartUsage`/`ItemUsage`) is to derive
+  a display name from the target rather than leave it empty. Confirmed against real usage in
+  `Simple Tests/CalculationTest.sysml` (`::>`) and `Geometry Examples/
+  CarWithShapeAndCSG.sysml` (`:>`); also fixes the pre-existing `:>>` form, caught via the
+  `examples/` roundtrip scan (#83) regressing on `Mass Roll-up Example/
+  MassConstraintExample.sysml`'s `attribute :>> m : MassValue;` while developing the fix (typing
+  trailing the redefines target, not the name, needed the same reordering). New regression tests
+  in `tests/gh113_attribute_prefix_name_emit.rs`. Promotes `Simple Tests/CalculationTest.sysml`
+  into `EXAMPLES_ROUNDTRIP_PASS`. No `PARSE_AST_VERSION` bump -- emit-only fix, no AST shape
+  change.
 - **Action-body control-flow gaps (#86).**
   - `in_out_decl`'s `:>>` redefinition branch (`src/parser/action.rs`) accepts an optional
     trailing `: Type` clause between the redefinition target and the `= value`

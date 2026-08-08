@@ -173,18 +173,37 @@ pub(crate) fn emit_attribute_usage(
         w.push_str(&format_name(short));
         w.push_str("> ");
     }
-    w.push_str(&format_name(&usage.name));
-    if let Some(typing) = &usage.typing {
-        emit_typing_clause(w, &typing.value)?;
+    // `name_span` is `None` only for the `PrefixRedefines`/`PrefixReferences`/`PrefixSubsets`
+    // "name-standing-in-prefix" forms (`attribute :>> target : Type[1];` etc.,
+    // src/parser/attribute.rs) -- `usage.name` there is *derived* from the subsets/redefines/
+    // references target for display purposes (matching an established test's expectation), not a
+    // written name, and any typing/multiplicity/`ordered`/`nonunique` were parsed *after* the
+    // target reference (they trail the clause in source, e.g. `Mass Roll-up Example/
+    // MassConstraintExample.sysml:18`'s `attribute :>> m : MassValue;`), not after a name.
+    // Emitting the name here would duplicate the target (GH-113: `attribute target :>> target;`
+    // instead of the original anonymous `attribute :>> target;`); emitting the trailing modifiers
+    // here too would strand them before any name at all (`attribute : Type :>> target;`, which
+    // reparses as the *unrelated* anonymous-colon-typed form instead of a redefines clause).
+    // Mirrors `emit_part_usage`'s `redefines_only` handling, keyed off "derived" rather than
+    // "empty" since `AttributeUsage`'s convention is to derive a display name rather than leave
+    // it empty.
+    let derived_name = usage.name_span.is_none();
+    if !derived_name {
+        w.push_str(&format_name(&usage.name));
     }
-    if let Some(mult) = &usage.multiplicity {
-        emit_multiplicity(w, &mult.value)?;
-    }
-    if usage.ordered {
-        w.push_str(" ordered");
-    }
-    if usage.nonunique {
-        w.push_str(" nonunique");
+    if !derived_name {
+        if let Some(typing) = &usage.typing {
+            emit_typing_clause(w, &typing.value)?;
+        }
+        if let Some(mult) = &usage.multiplicity {
+            emit_multiplicity(w, &mult.value)?;
+        }
+        if usage.ordered {
+            w.push_str(" ordered");
+        }
+        if usage.nonunique {
+            w.push_str(" nonunique");
+        }
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -194,6 +213,20 @@ pub(crate) fn emit_attribute_usage(
     }
     if let Some(references) = &usage.references {
         emit_subsetting_clause(w, &references.value)?;
+    }
+    if derived_name {
+        if let Some(typing) = &usage.typing {
+            emit_typing_clause(w, &typing.value)?;
+        }
+        if let Some(mult) = &usage.multiplicity {
+            emit_multiplicity(w, &mult.value)?;
+        }
+        if usage.ordered {
+            w.push_str(" ordered");
+        }
+        if usage.nonunique {
+            w.push_str(" nonunique");
+        }
     }
     if let Some(crosses) = &usage.crosses {
         emit_subsetting_clause(w, &crosses.value)?;

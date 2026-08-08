@@ -125,6 +125,9 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Room Model/RoomModel.sysml",
     "Simple Tests/AliasTest.sysml",
     "Simple Tests/AnalysisTest.sysml",
+    // Promoted by #113: AttributeUsage no longer duplicates the target name for
+    // `attribute ::> m = ms.m;`'s name-standing-in-prefix form.
+    "Simple Tests/CalculationTest.sysml",
     "Simple Tests/CommentTest.sysml",
     "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/DefaultValueTest.sysml",
