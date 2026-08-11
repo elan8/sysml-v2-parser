@@ -165,26 +165,29 @@ where
                 let next = match skip_mode {
                     BraceMemberSkip::StatementOrBlock => {
                         let Ok((next, _)) = skip_statement_or_block(input) else {
-                            let (input, _) = advance_to_closing_brace(input)?;
+                            let (closing, _) = advance_to_closing_brace(input)?;
+                            elements.push(map_recovery(start_unknown, closing));
                             let (input, _) =
-                                preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                                preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
                             return Ok((input, elements));
                         };
                         next
                     }
                     BraceMemberSkip::BodyElementRecover => {
                         let Ok((next, _)) = recover_body_element(input, starters) else {
-                            let (input, _) = advance_to_closing_brace(input)?;
+                            let (closing, _) = advance_to_closing_brace(input)?;
+                            elements.push(map_recovery(start_unknown, closing));
                             let (input, _) =
-                                preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                                preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
                             return Ok((input, elements));
                         };
                         next
                     }
                 };
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                    let (closing, _) = advance_to_closing_brace(input)?;
+                    elements.push(map_recovery(start_unknown, closing));
+                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
                     return Ok((input, elements));
                 }
                 let (next, _) = ws_and_comments(next)?;
@@ -248,10 +251,9 @@ pub(crate) fn semicolon_or_opaque_brace_body(
 mod tests {
     use super::*;
     use crate::ast::DefinitionBodyElement;
-    use nom_locate::LocatedSpan;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]

@@ -11,12 +11,12 @@
 //!   mid-edit.
 //!
 //! **Invariant:** for any input where [`parse`] succeeds, [`parse_for_editor`] on the same input
-//! reports zero diagnostics and builds the identical AST (once spans are normalized out -- see
-//! [`ast::RootNamespace::normalize_for_test_comparison`]). Don't mix the two entry points for the
-//! same document within one caller (e.g. parsing once with each and comparing/reparsing across
-//! them) -- that was the GH-66/GH-69 bug class, where an apparent AST mismatch was really just
-//! the two entry points disagreeing, not a real emit/parser bug. Covered by
-//! `tests/validation/parse_entry_point_equivalence.rs` (GH-70).
+//! reports zero diagnostics and builds the identical document-local reference arena and AST (once
+//! spans are normalized out -- see [`ast::RootNamespace::normalize_for_test_comparison`]). Don't
+//! mix the two entry points for the same document within one caller (e.g. parsing once with each
+//! and comparing/reparsing across them) -- that was the GH-66/GH-69 bug class, where an apparent
+//! AST mismatch was really just the two entry points disagreeing, not a real emit/parser bug.
+//! Covered by `tests/validation/parse_entry_point_equivalence.rs` (GH-70).
 #![cfg_attr(
     not(test),
     deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
@@ -33,36 +33,38 @@ pub use ast::{
     AnalysisCaseUsage, Annotation, Argument, AstNode, AttributeBody, AttributeDef, AttributeUsage,
     Bind, CaseDef, CaseUsage, CollectionOperator, CommentAnnotation, Connect, ConnectBody,
     ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, DocComment, EndDecl,
-    Expression, FeatureChain, FilterMember, FilterPackageMember, FirstMergeBody, FirstStmt,
-    FlowDef, FlowUsage, FlowUsageKind, Identification, Import, InOut, InOutDecl, InterfaceDef,
-    InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement,
-    ItemUsage, LoopStmt, MergeStmt, NamespaceDecl, Node, OccurrenceBodyElement, OccurrenceUsage,
-    OccurrenceUsageBody, Package, PackageBody, PackageBodyElement, ParseErrorNode, PartDef,
-    PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
-    PayloadFeature, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, PortBody,
-    PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefBodyElement,
-    RefDecl, RelationshipBodyElement, RequireConstraint, RequireConstraintBody, RequirementDef,
-    RequirementDefBody, RequirementDefBodyElement, RequirementUsage, RootElement, RootNamespace,
-    Span, TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind, VerificationCaseDef,
-    VerificationCaseUsage, Visibility,
+    Expression, FilterMember, FilterPackageMember, FirstMergeBody, FirstStmt, FlowDef, FlowUsage,
+    FlowUsageKind, Identification, Import, InOut, InOutDecl, InterfaceDef, InterfaceDefBody,
+    InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, ItemUsage, LoopStmt,
+    MergeStmt, NamespaceDecl, Node, OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody,
+    Package, PackageBody, PackageBodyElement, ParseErrorNode, ParsedDocument, PartDef, PartDefBody,
+    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PayloadFeature, Perform,
+    PerformBody, PerformBodyElement, PerformInOutBinding, PortBody, PortBodyElement, PortDef,
+    PortDefBody, PortDefBodyElement, PortUsage, QualifiedReferenceArena, QualifiedReferenceId,
+    QualifiedReferenceMetadata, QualifiedReferenceValidationError, QualifiedReferenceView, RefBody,
+    RefBodyElement, RefDecl, ReferenceSegment, ReferenceSeparator, RelationshipBodyElement,
+    RequireConstraint, RequireConstraintBody, RequirementDef, RequirementDefBody,
+    RequirementDefBodyElement, RequirementUsage, RootElement, RootNamespace, SegmentRange,
+    SourceStorage, Span, TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind,
+    VerificationCaseDef, VerificationCaseUsage, Visibility,
 };
 pub use emit::{
-    emit_sysml, emit_sysml_with_options, opacity_report, EmitError, EmitOptions, OpacityHit,
-    OpacityKind, OpacityReport,
+    emit_recovered_sysml, emit_sysml, emit_sysml_with_options, opacity_report, EmitError,
+    EmitOptions, OpacityHit, OpacityKind, OpacityReport,
 };
 pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 78;
+pub const PARSE_AST_VERSION: u32 = 79;
 pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
 
-/// Parse a SysML v2 textual input into a root namespace AST.
+/// Parse a SysML v2 textual input into an atomic source/arena/AST document.
 ///
 /// Returns an error if the input is not valid SysML or if not all input is consumed. See the
 /// crate-level "Entry points" section for how this relates to [`parse_for_editor`].
 #[allow(clippy::result_large_err)]
-pub fn parse(input: &str) -> Result<RootNamespace, ParseError> {
+pub fn parse(input: &str) -> Result<ParsedDocument, ParseError> {
     parse_root(input)
 }
 

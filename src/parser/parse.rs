@@ -10,9 +10,12 @@ use super::diagnostics::{
 };
 use super::lex;
 use super::package;
-use crate::ast::RootNamespace;
+use super::span::{node_from_to, ParseContext};
+use crate::ast::{
+    Node, PackageBodyElement, ParseErrorNode, ParsedDocument, RootElement, RootNamespace,
+    SourceStorage, Span,
+};
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
-use nom_locate::LocatedSpan;
 
 /// Maximum structural brace nesting accepted by the recursive-descent parser.
 ///
@@ -143,8 +146,8 @@ fn nesting_limit_error(input: &[u8]) -> Option<ParseError> {
 /// Result of parsing with error recovery: a (possibly partial) AST and zero or more diagnostics.
 #[derive(Debug, Clone)]
 pub struct ParseResult {
-    /// Root namespace; contains all successfully parsed top-level elements (partial when errors occurred).
-    pub root: RootNamespace,
+    /// Source, reference arena, and root AST. The AST is partial when errors occurred.
+    pub document: ParsedDocument,
     /// All parse errors encountered (multiple when recovery is used).
     pub errors: Vec<ParseError>,
 }
@@ -161,17 +164,26 @@ impl ParseResult {
 /// match (surfaced as an embedded recovery diagnostic, the same ones [`parse_with_diagnostics`]
 /// reports) so both entry points agree on whether a document is valid.
 #[allow(clippy::result_large_err)]
-pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
+pub fn parse_root(input: &str) -> Result<ParsedDocument, ParseError> {
     with_parse_stack(|| parse_root_inner(input))
 }
 
 #[allow(clippy::result_large_err)]
-fn parse_root_inner(input: &str) -> Result<RootNamespace, ParseError> {
-    let bytes = input
-        .strip_prefix('\u{FEFF}')
-        .map(str::as_bytes)
-        .unwrap_or_else(|| input.as_bytes());
-    let located = LocatedSpan::new(bytes);
+fn parse_root_inner(input: &str) -> Result<ParsedDocument, ParseError> {
+    let source = SourceStorage::new(input.to_owned());
+    let context = ParseContext::new();
+    let root = parse_root_namespace(source.as_str(), &context)?;
+    Ok(ParsedDocument {
+        source,
+        qualified_references: context.finish(),
+        root,
+    })
+}
+
+#[allow(clippy::result_large_err)]
+fn parse_root_namespace(source: &str, context: &ParseContext) -> Result<RootNamespace, ParseError> {
+    let bytes = source.as_bytes();
+    let located = context.input(bytes);
     if let Some(error) = nesting_limit_error(bytes) {
         return Err(error);
     }
@@ -250,17 +262,28 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
 }
 
 fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
-    let bytes = input
-        .strip_prefix('\u{FEFF}')
-        .map(str::as_bytes)
-        .unwrap_or_else(|| input.as_bytes());
-    let located = LocatedSpan::new(bytes);
-    if let Some(error) = nesting_limit_error(bytes) {
-        return ParseResult {
-            root: RootNamespace { elements: vec![] },
-            errors: vec![error],
-        };
+    let source = SourceStorage::new(input.to_owned());
+    let context = ParseContext::new();
+    let (root, errors) = parse_with_diagnostics_document(source.as_str(), &context);
+    ParseResult {
+        document: ParsedDocument {
+            source,
+            qualified_references: context.finish(),
+            root,
+        },
+        errors,
     }
+}
+
+fn parse_with_diagnostics_document(
+    source: &str,
+    context: &ParseContext,
+) -> (RootNamespace, Vec<ParseError>) {
+    let bytes = source.as_bytes();
+    if let Some(error) = nesting_limit_error(bytes) {
+        return (RootNamespace { elements: vec![] }, vec![error]);
+    }
+    let located = context.input(bytes);
 
     let mut elements = Vec::new();
     let mut errors = Vec::new();
@@ -268,12 +291,12 @@ fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
     let (mut input, _) = match lex::ws_and_comments(located) {
         Ok(x) => x,
         Err(_) => {
-            return ParseResult {
-                root: RootNamespace { elements: vec![] },
-                errors: vec![ParseError::new("invalid input")
+            return (
+                RootNamespace { elements: vec![] },
+                vec![ParseError::new("invalid input")
                     .with_code("invalid_input")
                     .with_category(DiagnosticCategory::ParseError)],
-            };
+            );
         }
     };
 
@@ -307,7 +330,34 @@ fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
                         || lex::starts_with_keyword(trimmed.fragment(), b"library")
                         || lex::starts_with_keyword(trimmed.fragment(), b"standard"))
                 {
-                    errors.push(missing_closing_brace_error_at_eof(bytes));
+                    let pe = missing_closing_brace_error_at_eof(bytes);
+                    errors.push(pe.clone());
+                    // Keep the entire unterminated root declaration as one explicit recovery
+                    // node. Returning an empty root here loses the user's source and prevents the
+                    // editor emitter from reproducing it while the closing brace is being typed.
+                    if let Ok((rest, _)) = lex::skip_to_next_balanced_sync_point(input) {
+                        if rest.location_offset() > input.location_offset() {
+                            let recovery = ParseErrorNode {
+                                message: pe.message,
+                                code: pe
+                                    .code
+                                    .unwrap_or_else(|| "missing_closing_brace".to_owned()),
+                                expected: pe.expected,
+                                found: pe.found,
+                                suggestion: pe.suggestion,
+                                category: pe.category,
+                            };
+                            let error =
+                                PackageBodyElement::Error(Node::new(Span::dummy(), recovery));
+                            let member = node_from_to(input, rest, error);
+                            elements.push(node_from_to(
+                                input,
+                                rest,
+                                RootElement::Member(Box::new(member)),
+                            ));
+                            input = rest;
+                        }
+                    }
                     break;
                 }
                 if let Some(scope) = root_body_scope(input.fragment()) {
@@ -332,11 +382,32 @@ fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
                         Some("package-body element at root (package, namespace, import, definition, or usage)"),
                     )
                 });
-                errors.push(pe);
-                let skip_result = lex::skip_to_next_sync_point(e.input);
+                let recovery_start = input;
+                errors.push(pe.clone());
+                let skip_result = lex::skip_to_next_balanced_sync_point(recovery_start);
                 match skip_result {
-                    Ok((rest, _)) => input = rest,
+                    Ok((rest, _)) if rest.location_offset() > recovery_start.location_offset() => {
+                        let recovery = ParseErrorNode {
+                            message: pe.message,
+                            code: pe
+                                .code
+                                .unwrap_or_else(|| "recovered_root_element".to_owned()),
+                            expected: pe.expected,
+                            found: pe.found,
+                            suggestion: pe.suggestion,
+                            category: pe.category,
+                        };
+                        let error = PackageBodyElement::Error(Node::new(Span::dummy(), recovery));
+                        let member = node_from_to(recovery_start, rest, error);
+                        elements.push(node_from_to(
+                            recovery_start,
+                            rest,
+                            RootElement::Member(Box::new(member)),
+                        ));
+                        input = rest;
+                    }
                     Err(_) => break,
+                    _ => break,
                 }
             }
             Err(nom::Err::Incomplete(_)) => {
@@ -407,10 +478,7 @@ fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
     errors = dedup_errors(errors);
     errors = suppress_diagnostic_cascades(errors);
 
-    ParseResult {
-        root: RootNamespace { elements },
-        errors,
-    }
+    (RootNamespace { elements }, errors)
 }
 
 #[cfg(test)]
@@ -443,7 +511,7 @@ mod tests {
         source.push_str("}\n");
 
         let parsed = parse_root(&source).expect("large flat model");
-        assert_eq!(parsed.elements.len(), 1);
+        assert_eq!(parsed.root.elements.len(), 1);
     }
 
     #[test]
@@ -504,9 +572,20 @@ mod tests {
     #[test]
     fn still_accepts_clean_input() {
         let source = "package P { part def A { attribute x : Real; } }";
-        let root = parse_root(source).expect("well-formed input should still parse");
-        assert_eq!(root.elements.len(), 1);
+        let document = parse_root(source).expect("well-formed input should still parse");
+        assert_eq!(document.root.elements.len(), 1);
         let editor = parse_with_diagnostics(source);
         assert!(editor.is_ok());
+    }
+
+    #[test]
+    fn parsed_documents_retain_the_bom_stripped_source() {
+        let source = "\u{FEFF}package P;";
+        let strict = parse_root(source).expect("well-formed input should parse");
+        assert_eq!(strict.source.as_str(), "package P;");
+
+        let editor = parse_with_diagnostics(source);
+        assert!(editor.is_ok());
+        assert_eq!(editor.document.source.as_str(), "package P;");
     }
 }

@@ -13,7 +13,7 @@
 //! -- the latter would touch every body enum across the whole crate (the largest possible blast
 //! radius) for uniformity that most consumers don't need; direct fields let each struct family be
 //! migrated independently, matching this backlog's established "start narrow, extend as needed"
-//! discipline (see `RelationshipTarget`'s doc comment for the precedent).
+//! discipline.
 //!
 //! This item explicitly does **not** attempt a full sweep of every def/usage struct in one pass;
 //! see `CHANGELOG.md`'s "Item 4b" entry for the exact list of struct families that got a

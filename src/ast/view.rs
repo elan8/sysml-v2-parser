@@ -1,12 +1,13 @@
 use super::behavior::InOutDecl;
-use super::common::FilterMember;
 use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
+use super::common::{FilterMember, ImportTarget};
 use super::membership::Membership;
 use super::requirement::RequirementDefBody;
 use super::structure::MetadataAnnotation;
 use crate::ast::core::{
     Expression, Multiplicity, Node, SubsettingRelationship, TypingRelationship,
 };
+use crate::ast::QualifiedReferenceId;
 
 /// Constraint definition: `constraint def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,7 +29,7 @@ pub struct ConstraintDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConstraintUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     pub body: ConstraintDefBody,
     pub membership: Membership,
 }
@@ -83,9 +84,9 @@ pub struct CalcDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcUsage {
     pub identification: Identification,
-    pub type_name: Option<String>,
-    /// Redefinition target for `calc :>> name { … }` (validation `10b`).
-    pub redefines: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
+    /// Redefinition targets for `calc :>> name { … }` and multi-target trailing clauses.
+    pub redefines: Option<Vec<QualifiedReferenceId>>,
     /// `= expr` / `:= expr` binding (`in calc scenario = cityScenario;`, validation `10c`).
     pub value: Option<Node<crate::ast::FeatureValue>>,
     /// Set when parsed as `in`/`out`/`inout calc` (validation `10c`).
@@ -129,7 +130,7 @@ pub enum CalcDefBodyElement {
 pub struct ReturnDecl {
     /// Empty for anonymous `return : Type [= expr];` (validation `10c`, `10d`).
     pub name: String,
-    pub type_name: String,
+    pub type_name: QualifiedReferenceId,
     /// True for `return :>> name : Type = …` (validation `10b`).
     pub is_redefine: bool,
     /// True when the type is introduced with `:>` rather than `:` (validation `10b` rollups).
@@ -177,7 +178,7 @@ pub enum ViewDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewRenderingUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     pub body: RenderingUsageBody,
     pub membership: Membership,
 }
@@ -258,7 +259,7 @@ pub enum RenderingDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     /// Redefines target, e.g. `columnView` in `view :>> columnView[1] { ... }`. `None` for the
     /// ordinary named form.
     pub redefines: Option<Node<SubsettingRelationship>>,
@@ -294,17 +295,7 @@ pub enum ViewBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExposeMember {
-    /// Full target path (e.g. vehicle, vehicle::*, vehicle::*::**, SystemModel::vehicle::**).
-    pub target: String,
-    /// Whether this is a namespace import (`X::*`) rather than a membership import (`X`) --
-    /// mirrors [`crate::ast::Import::is_import_all`]. `expose` is normatively an Import per this
-    /// struct's own BNF doc comment; the parser already distinguished the four suffix forms
-    /// (`::*::**` / `::**` / `::*` / plain) to build `target`, but previously discarded which one
-    /// matched into the concatenated string instead of retaining it structurally.
-    pub is_import_all: bool,
-    /// Whether the import is recursive (`::**` suffix) -- mirrors
-    /// [`crate::ast::Import::is_recursive`].
-    pub is_recursive: bool,
+    pub target: ImportTarget,
     pub body: ConnectBody,
 }
 
@@ -312,7 +303,7 @@ pub struct ExposeMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SatisfyViewMember {
-    pub viewpoint_ref: String,
+    pub viewpoint_ref: QualifiedReferenceId,
     pub body: ConnectBody,
 }
 
@@ -321,7 +312,7 @@ pub struct SatisfyViewMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewpointUsage {
     pub name: String,
-    pub type_name: String,
+    pub type_name: Option<QualifiedReferenceId>,
     pub body: RequirementDefBody,
     pub membership: Membership,
 }
@@ -331,7 +322,7 @@ pub struct ViewpointUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderingUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     pub body: RenderingUsageBody,
     pub membership: Membership,
 }

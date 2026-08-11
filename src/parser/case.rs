@@ -192,7 +192,7 @@ fn case_like_usage_body(
         input,
         CaseUsage {
             name,
-            type_name: header.type_name,
+            type_name: header.type_reference,
             is_abstract,
             body,
             membership,
@@ -207,10 +207,9 @@ fn loose_use_case_body(input: Input<'_>) -> IResult<Input<'_>, crate::ast::UseCa
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on Case/AnalysisCase/VerificationCase families ---

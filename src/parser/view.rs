@@ -1,17 +1,18 @@
 //! View, viewpoint, and rendering parsing (SysML v2 Clause 8.2.2.26).
 
 use crate::ast::{
-    ExposeMember, FilterMember, Membership, Node, ParseErrorNode, RenderingDef, RenderingDefBody,
-    RenderingDefBodyElement, RenderingUsage, RenderingUsageBody, RenderingUsageBodyElement,
-    SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody, ViewDefBodyElement,
-    ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
+    ExposeMember, FilterMember, ImportTarget, Membership, Node, ParseErrorNode, RenderingDef,
+    RenderingDefBody, RenderingDefBodyElement, RenderingUsage, RenderingUsageBody,
+    RenderingUsageBodyElement, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody,
+    ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
 use crate::parser::connector::connect_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+use crate::parser::import::import_shape;
 use crate::parser::lex::{
-    capture_opaque_member, name, qualified_name, starts_with_any_keyword, visibility_prefix, ws1,
-    ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    capture_opaque_member, name, qualified_reference, reference_path, starts_with_any_keyword,
+    visibility_prefix, ws1, ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::usage::{multiplicity_node, prefix_redefinition_target};
@@ -19,7 +20,7 @@ use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, opt, success};
+use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
@@ -126,7 +127,7 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
             input,
             ViewRenderingUsage {
                 name: name_str,
-                type_name: header.type_name,
+                type_name: header.type_reference,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -307,25 +308,6 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
     Ok((input, node_from_to(start, input, elem)))
 }
 
-/// Append zero or more `.` + qualified-name feature-chain segments (SysML §7.6.6).
-fn parse_expose_feature_chain_suffix(
-    mut input: Input<'_>,
-    mut target: String,
-) -> IResult<Input<'_>, String> {
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        if next.fragment().first() != Some(&b'.') {
-            return Ok((next, target));
-        }
-        let (next, _) = tag(&b"."[..]).parse(next)?;
-        let (next, _) = ws_and_comments(next)?;
-        let (next, segment) = qualified_name.parse(next)?;
-        target.push('.');
-        target.push_str(&segment);
-        input = next;
-    }
-}
-
 /// expose (MembershipImport | NamespaceImport) RelationshipBody
 /// MembershipImport = QualifiedName (::**)?
 /// NamespaceImport = QualifiedName :: * (::**)?
@@ -333,46 +315,8 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"expose"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, first) = qualified_name.parse(input)?;
-    let (input, (target, is_import_all, is_recursive)) = alt((
-        // ::*::** (try before ::* since * would consume first char of **)
-        map(
-            (
-                preceded(ws_and_comments, tag(&b"::"[..])),
-                preceded(ws_and_comments, tag(&b"*"[..])),
-                preceded(ws_and_comments, tag(&b"::"[..])),
-                preceded(ws_and_comments, tag(&b"**"[..])),
-            ),
-            |_| (format!("{}::*::**", first), true, true),
-        ),
-        // ::** (try before ::*)
-        map(
-            (
-                preceded(ws_and_comments, tag(&b"::"[..])),
-                preceded(ws_and_comments, tag(&b"**"[..])),
-            ),
-            |_| (format!("{}::**", first), false, true),
-        ),
-        // ::*
-        map(
-            (
-                preceded(ws_and_comments, tag(&b"::"[..])),
-                preceded(ws_and_comments, tag(&b"*"[..])),
-            ),
-            |_| (format!("{}::*", first), true, false),
-        ),
-        // plain
-        map(success(()), |_| (first.clone(), false, false)),
-    ))
-    .parse(input)?;
-    let (input, target) = parse_expose_feature_chain_suffix(input, target)?;
-    // Optional filter [ expr ] - skip content to reach body
-    let (input, _) = nom::combinator::opt(nom::sequence::delimited(
-        preceded(ws_and_comments, tag(&b"["[..])),
-        nom::bytes::complete::take_until(&b"]"[..]),
-        preceded(ws_and_comments, tag(&b"]"[..])),
-    ))
-    .parse(input)?;
+    let (input, reference) = reference_path(input)?;
+    let (input, shape) = import_shape(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -380,9 +324,7 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
             start,
             input,
             ExposeMember {
-                target,
-                is_import_all,
-                is_recursive,
+                target: ImportTarget { reference, shape },
                 body,
             },
         ),
@@ -394,7 +336,7 @@ fn satisfy_view_member(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewM
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"satisfy"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, viewpoint_ref) = qualified_name.parse(input)?;
+    let (input, viewpoint_ref) = qualified_reference.parse(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -474,7 +416,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
             input,
             ViewUsage {
                 name: name_str,
-                type_name: header.type_name,
+                type_name: header.type_reference,
                 redefines: header.redefines,
                 multiplicity: None,
                 body,
@@ -529,7 +471,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
             input,
             ViewpointUsage {
                 name: name_str,
-                type_name: header.type_name.unwrap_or_default(),
+                type_name: header.type_reference,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -554,7 +496,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
             input,
             RenderingUsage {
                 name: name_str,
-                type_name: header.type_name,
+                type_name: header.type_reference,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -565,50 +507,13 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
 #[cfg(test)]
 mod expose_diagnostic_tests {
     use crate::ast::{
-        ExposeMember, PackageBody, PackageBodyElement, RootElement, ViewBody, ViewBodyElement,
+        ExposeMember, ImportShape, PackageBody, PackageBodyElement, ParsedDocument, RootElement,
+        ViewBody, ViewBodyElement,
     };
     use crate::parse_with_diagnostics;
 
-    #[test]
-    fn expose_feature_chain_is_parsed_without_separator_diagnostic() {
-        let input = "package Views { view structure: GeneralView { expose SurveillanceDrone.SurveillanceQuadrotorDrone; } }";
-        let result = parse_with_diagnostics(input);
-        assert!(
-            result.is_ok(),
-            "expected feature-chain expose to parse, got {:?}",
-            result.errors
-        );
-        let root = result.root;
-        let pkg = match &root.elements[0].value {
-            RootElement::Package(p) => p,
-            other => panic!("expected package, got {other:?}"),
-        };
-        let view_usage = match &pkg.value.body {
-            PackageBody::Brace { elements } => match &elements[0].value {
-                PackageBodyElement::ViewUsage(v) => v,
-                other => panic!("expected view usage, got {other:?}"),
-            },
-            other => panic!("expected brace body, got {other:?}"),
-        };
-        let expose = match &view_usage.value.body {
-            ViewBody::Brace { elements } => match &elements[0].value {
-                ViewBodyElement::Expose(e) => e,
-                other => panic!("expected expose member, got {other:?}"),
-            },
-            other => panic!("expected view body, got {other:?}"),
-        };
-        assert_eq!(
-            expose.value.target, "SurveillanceDrone.SurveillanceQuadrotorDrone",
-            "feature-chain segments should be preserved in expose target"
-        );
-        assert!(!expose.value.is_import_all, "no wildcard suffix present");
-        assert!(!expose.value.is_recursive, "no `::**` suffix present");
-    }
-
-    fn expose_of(input: &str) -> ExposeMember {
-        let result = parse_with_diagnostics(input);
-        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
-        let root = result.root;
+    fn expose_of(document: &ParsedDocument) -> &ExposeMember {
+        let root = &document.root;
         let pkg = match &root.elements[0].value {
             RootElement::Package(p) => p,
             other => panic!("expected package, got {other:?}"),
@@ -622,7 +527,7 @@ mod expose_diagnostic_tests {
         };
         match &view_usage.value.body {
             ViewBody::Brace { elements } => match &elements[0].value {
-                ViewBodyElement::Expose(e) => e.value.clone(),
+                ViewBodyElement::Expose(e) => &e.value,
                 other => panic!("expected expose member, got {other:?}"),
             },
             other => panic!("expected view body, got {other:?}"),
@@ -630,45 +535,144 @@ mod expose_diagnostic_tests {
     }
 
     #[test]
+    fn expose_feature_chain_is_parsed_without_separator_diagnostic() {
+        let input = "package Views { view structure: GeneralView { expose SurveillanceDrone.SurveillanceQuadrotorDrone; } }";
+        let result = parse_with_diagnostics(input);
+        assert!(
+            result.is_ok(),
+            "expected feature-chain expose to parse, got {:?}",
+            result.errors
+        );
+        let expose = expose_of(&result.document);
+        let reference = result
+            .document
+            .qualified_reference(expose.target.reference)
+            .expect("expose reference");
+        assert_eq!(
+            reference.authored_text(),
+            "SurveillanceDrone.SurveillanceQuadrotorDrone",
+            "feature-chain segments should be preserved in expose target"
+        );
+        assert_eq!(
+            expose.target.shape,
+            ImportShape::Membership { recursive: false }
+        );
+    }
+
+    #[test]
     fn expose_plain_target_is_a_membership_import() {
-        let expose = expose_of("package Views { view v : GeneralView { expose vehicle; } }");
-        assert_eq!(expose.target, "vehicle");
-        assert!(!expose.is_import_all);
-        assert!(!expose.is_recursive);
+        let result =
+            parse_with_diagnostics("package Views { view v : GeneralView { expose vehicle; } }");
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        assert_eq!(
+            expose_of(&result.document).target.shape,
+            ImportShape::Membership { recursive: false }
+        );
     }
 
     #[test]
     fn expose_wildcard_target_is_a_namespace_import() {
-        let expose = expose_of("package Views { view v : GeneralView { expose vehicle::*; } }");
-        assert_eq!(expose.target, "vehicle::*");
-        assert!(expose.is_import_all);
-        assert!(!expose.is_recursive);
+        let result =
+            parse_with_diagnostics("package Views { view v : GeneralView { expose vehicle::*; } }");
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        assert_eq!(
+            expose_of(&result.document).target.shape,
+            ImportShape::Namespace { recursive: false }
+        );
     }
 
     #[test]
     fn expose_recursive_membership_import() {
-        let expose = expose_of("package Views { view v : GeneralView { expose vehicle::**; } }");
-        assert_eq!(expose.target, "vehicle::**");
-        assert!(!expose.is_import_all);
-        assert!(expose.is_recursive);
+        let result = parse_with_diagnostics(
+            "package Views { view v : GeneralView { expose vehicle::**; } }",
+        );
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        assert_eq!(
+            expose_of(&result.document).target.shape,
+            ImportShape::Membership { recursive: true }
+        );
     }
 
     #[test]
     fn expose_recursive_namespace_import() {
-        let expose = expose_of("package Views { view v : GeneralView { expose vehicle::*::**; } }");
-        assert_eq!(expose.target, "vehicle::*::**");
-        assert!(expose.is_import_all);
-        assert!(expose.is_recursive);
+        let result = parse_with_diagnostics(
+            "package Views { view v : GeneralView { expose vehicle::*::**; } }",
+        );
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        assert_eq!(
+            expose_of(&result.document).target.shape,
+            ImportShape::Namespace { recursive: true }
+        );
+    }
+
+    #[test]
+    fn expose_filter_retains_typed_expressions_and_brace_body() {
+        let result = parse_with_diagnostics(
+            "package Views { view v : GeneralView { expose vehicle[x][y] {} } }",
+        );
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        let expose = expose_of(&result.document);
+        match &expose.target.shape {
+            ImportShape::Filter { recursive, members } => {
+                assert!(!recursive);
+                assert_eq!(members.len(), 2);
+            }
+            other => panic!("expected filter shape, got {other:?}"),
+        }
+        assert_eq!(expose.body, crate::ast::ConnectBody::Brace);
+    }
+
+    #[test]
+    fn view_type_and_satisfy_target_are_source_backed_references() {
+        let result = parse_with_diagnostics(
+            "package Views { view v : $::Views::General { satisfy Viewpoints::VP; } }",
+        );
+        assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
+        let package = match &result.document.root.elements[0].value {
+            RootElement::Package(package) => &package.value,
+            other => panic!("expected package, got {other:?}"),
+        };
+        let view = match &package.body {
+            PackageBody::Brace { elements } => match &elements[0].value {
+                PackageBodyElement::ViewUsage(view) => &view.value,
+                other => panic!("expected view usage, got {other:?}"),
+            },
+            other => panic!("expected package body, got {other:?}"),
+        };
+        let view_type = result
+            .document
+            .qualified_reference(view.type_name.expect("view type"))
+            .expect("source-backed view type");
+        assert_eq!(view_type.authored_text(), "$::Views::General");
+        assert!(view_type.metadata.is_absolute);
+        let satisfy = match &view.body {
+            ViewBody::Brace { elements } => match &elements[0].value {
+                ViewBodyElement::Satisfy(satisfy) => &satisfy.value,
+                other => panic!("expected satisfy member, got {other:?}"),
+            },
+            other => panic!("expected view body, got {other:?}"),
+        };
+        let target = result
+            .document
+            .qualified_reference(satisfy.viewpoint_ref)
+            .expect("source-backed viewpoint target");
+        assert_eq!(target.authored_text(), "Viewpoints::VP");
+        assert_eq!(target.segments.len(), 2);
+        assert_eq!(
+            target.segments[1].separator_before,
+            Some(crate::ast::ReferenceSeparator::ColonColon)
+        );
     }
 }
 
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+    use crate::parser::span::ParseContext;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        let context = Box::leak(Box::new(ParseContext::new()));
+        context.input(text.as_bytes())
     }
 
     // --- parser work item 4b (final sweep): Membership on the view family (7 structs) ---
@@ -787,10 +791,11 @@ mod membership_tests {
 #[cfg(test)]
 mod column_view_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+    use crate::parser::span::ParseContext;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        let context = Box::leak(Box::new(ParseContext::new()));
+        context.input(text.as_bytes())
     }
 
     // Real usage confirmed in sysml-v2-release/sysml/src/training/42. Views/Views Example.sysml

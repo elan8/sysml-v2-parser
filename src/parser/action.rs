@@ -11,13 +11,13 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::lex::{
-    name, qualified_name, starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
-    ws_and_comments,
+    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
+    ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
-use crate::parser::usage::{multiplicity_node, redefinition, targets_display_string};
+use crate::parser::usage::{multiplicity_node, redefinition};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -99,7 +99,8 @@ fn optional_multiplicity_brackets(input: Input<'_>) -> IResult<Input<'_>, ()> {
 fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
     use crate::parser::expr::expression;
     use crate::parser::usage::{
-        optional_typings, single_target_redefines, single_target_typing, typing_fields_from_result,
+        optional_typings, single_target_redefines, single_target_typing,
+        typing_reference_fields_from_result,
     };
 
     let start = input;
@@ -125,16 +126,16 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
     // Optional `:>>` redefines clause: `ref NAME :>> TARGET`.
     let (input, redefines_target) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, with_span(qualified_name)),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
     let redefines = redefines_target.map(|(span, target)| single_target_redefines(span, target));
 
-    let (input, type_ref_span, type_name, typing) = if redefines.is_some() {
+    let (input, type_ref_span, typing) = if redefines.is_some() {
         // After `:>> target`, an optional `:` typing clause (possibly multi-target) may follow.
         let (input, typing_result) = optional_typings(input)?;
-        let (type_ref_span, type_name, typing) = typing_fields_from_result(typing_result);
-        (input, type_ref_span, type_name, typing)
+        let (type_ref_span, _, typing) = typing_reference_fields_from_result(typing_result);
+        (input, type_ref_span, typing)
     } else {
         // No `:>>` redefines clause seen: bare `:` (multi-target aware) or legacy `:>`
         // (single-target only; kept for backward compatibility -- no confirmed real usage of
@@ -143,13 +144,13 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
         if peek.fragment().starts_with(b":>") && !peek.fragment().starts_with(b":>>") {
             let (input, _) = preceded(ws_and_comments, tag(&b":>"[..])).parse(input)?;
             let (input, (span, target)) =
-                preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
-            let typing = Some(single_target_typing(span.clone(), target.clone()));
-            (input, Some(span), target, typing)
+                preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
+            let typing = Some(single_target_typing(span.clone(), target));
+            (input, Some(span), typing)
         } else {
             let (input, typing_result) = optional_typings(input)?;
-            let (type_ref_span, type_name, typing) = typing_fields_from_result(typing_result);
-            (input, type_ref_span, type_name, typing)
+            let (type_ref_span, _, typing) = typing_reference_fields_from_result(typing_result);
+            (input, type_ref_span, typing)
         }
     };
 
@@ -212,7 +213,6 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
             crate::ast::RefDecl {
                 direction: None,
                 name: name_str,
-                type_name,
                 typing,
                 redefines,
                 subsets: None,
@@ -265,13 +265,12 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
     let (peek_redef, _) = ws_and_comments(input)?;
     if peek_redef.fragment().starts_with(b":>>") {
         let (input, redefines) = redefinition(input)?;
-        let param_name = targets_display_string(&redefines.value.target);
         // Optional trailing `: Type` between the redefinition target and the value, e.g.
         // `out attribute :>> a_out : AccelerationValue = Acceleration(dt, tm, tp);`
         // (Systems Library-adjacent Analysis Examples/Dynamics.sysml:64, GH-86).
         let (input, type_name) = opt(preceded(
             preceded(ws_and_comments, tag(&b":"[..])),
-            preceded(ws_and_comments, qualified_name),
+            preceded(ws_and_comments, qualified_reference),
         ))
         .parse(input)?;
         let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
@@ -288,9 +287,9 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                 input,
                 InOutDecl {
                     direction,
-                    name: param_name,
-                    type_name: type_name.unwrap_or_default(),
-                    is_redefinition: true,
+                    name: String::new(),
+                    type_name,
+                    redefines: Some(redefines),
                     value,
                 },
             ),
@@ -308,23 +307,20 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
             map(
                 (
                     preceded(ws_and_comments, tag(&b":>"[..])),
-                    preceded(ws_and_comments, qualified_name),
+                    preceded(ws_and_comments, qualified_reference),
                 ),
                 |(_, tn)| tn,
             ),
             map(
                 (
                     preceded(ws_and_comments, tag(&b":"[..])),
-                    preceded(ws_and_comments, qualified_name),
+                    preceded(ws_and_comments, qualified_reference),
                 ),
                 |(_, tn)| tn,
             ),
         )))
         .parse(input)?;
-        let mut type_name = type_name.unwrap_or_default();
-        if action_typed_name.is_some() && type_name.is_empty() {
-            type_name = "action".to_string();
-        }
+        let _ = action_typed_name;
 
         // Optional `= expr` default value (e.g. `in a : Real = 0.0;`).
         let (input, value) = opt(preceded(
@@ -353,31 +349,9 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
         .parse(input)?;
         Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (param_name, type_name, value)))
     })();
-    let (input, (param_name, type_name, value)) = match parsed {
-        Ok(v) => v,
-        Err(_) => {
-            // Best-effort fallback: consume to `;` or start of a braced body.
-            let (input, raw_text) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
-            let raw_text = raw_text.trim().to_string();
-            let name_guess = raw_text
-                .split(|c: char| c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == ';')
-                .find(|s| !s.is_empty() && *s != ":>>")
-                .unwrap_or("param")
-                .to_string();
-            // Accept `;` or a braced body after the unstructured prefix.
-            let (input, _) = preceded(
-                ws_and_comments,
-                alt((
-                    map(tag(&b";"[..]), |_| ()),
-                    map(consume_action_structured_brace, |_| ()),
-                )),
-            )
-            .parse(input)?;
-            // If we can't parse a structured `: Type`, keep the raw text as a best-effort
-            // stand-in so downstream tools still have something to display.
-            (input, (name_guess, raw_text, None))
-        }
-    };
+    // Malformed declarations must fall through to the enclosing body's explicit recovery node;
+    // do not guess a declaration name from opaque text and silently turn it into valid syntax.
+    let (input, (param_name, type_name, value)) = parsed?;
     Ok((
         input,
         node_from_to(
@@ -387,7 +361,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                 direction,
                 name: param_name,
                 type_name,
-                is_redefinition: false,
+                redefines: None,
                 value,
             },
         ),
@@ -490,7 +464,7 @@ pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
                 node_from_to(
                     input,
                     next,
-                    crate::ast::Expression::FeatureRef(raw.trim().to_string()),
+                    crate::ast::Expression::Opaque(raw.trim().to_string()),
                 ),
             )
         }
@@ -727,7 +701,11 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
 /// `sysml/src/examples/Simple Tests/ConnectionTest.sysml`'s `succession s first a then b;` /
 /// `succession s1 : AB first a then b;` (name, and name + type).
 /// `(name, type, multiplicity)` of a parsed `succession` prefix, all `None` when absent.
-type SuccessionPrefix = (Option<String>, Option<String>, Option<Node<Multiplicity>>);
+type SuccessionPrefix = (
+    Option<String>,
+    Option<crate::ast::QualifiedReferenceId>,
+    Option<Node<Multiplicity>>,
+);
 
 fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     let (input, _) = tag(&b"succession"[..]).parse(input)?;
@@ -751,7 +729,7 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     let (input, succession_type) =
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, Some(type_name))
         } else {
             (input, None)
@@ -1346,7 +1324,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
     let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
     let (type_ref_span, type_name, typing) =
-        crate::parser::usage::typing_fields_from_result(type_result);
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
     let subsets = trailing
         .subsets
         .clone()
@@ -1457,10 +1435,9 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
 #[cfg(test)]
 mod control_node_gap_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     /// PARSER_BACKLOG_ROADMAP.md §6, G13: `first <name>;` with no `then` clause marks an initial
@@ -1526,13 +1503,19 @@ mod control_node_gap_tests {
     /// `ConnectionTest.sysml`).
     #[test]
     fn action_body_accepts_named_and_typed_succession_prefix() {
-        let (rest, node) = action_def_body_element(input("succession s1 : AB first a then b;"))
-            .expect("named + typed succession stmt");
+        let source = input("succession s1 : AB first a then b;");
+        let (rest, node) = action_def_body_element(source).expect("named + typed succession stmt");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::FirstStmt(f) => {
                 assert_eq!(f.value.succession_name.as_deref(), Some("s1"));
-                assert_eq!(f.value.succession_type.as_deref(), Some("AB"));
+                assert_eq!(
+                    f.value
+                        .succession_type
+                        .and_then(|id| crate::parser::usage::reference_text(source, id))
+                        .as_deref(),
+                    Some("AB")
+                );
             }
             other => panic!("expected FirstStmt, got {other:?}"),
         }
@@ -1638,10 +1621,20 @@ mod control_node_gap_tests {
 
     #[test]
     fn then_succession_accepts_perform_target() {
-        let (rest, node) = then_action(input("then perform body;")).expect("then perform");
+        let source = input("then perform body;");
+        let (rest, node) = then_action(source).expect("then perform");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value.target {
-            ThenTarget::Perform(p) => assert_eq!(p.value.action_name, "body"),
+            ThenTarget::Perform(p) => {
+                assert!(p.value.action_name.is_empty());
+                assert_eq!(
+                    p.value
+                        .action_reference
+                        .and_then(|id| crate::parser::usage::reference_text(source, id))
+                        .as_deref(),
+                    Some("body")
+                );
+            }
             other => panic!("expected Perform target, got {other:?}"),
         }
     }
@@ -1797,10 +1790,10 @@ mod control_node_gap_tests {
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+    use crate::ast::Expression;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on ActionDef/ActionUsage ---
@@ -1849,31 +1842,41 @@ mod membership_tests {
     fn abstract_ref_action_with_multiplicity_and_subsets_is_structured() {
         let src =
             "abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances;";
-        let (rest, node) = action_usage(input(src)).expect("ref action usage");
+        let source = input(src);
+        let (rest, node) = action_usage(source).expect("ref action usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_abstract);
         assert!(node.value.is_reference);
         assert_eq!(node.value.name, "performedActions");
-        assert_eq!(node.value.type_name, "Action");
-        assert!(node.value.typing.is_some());
         assert_eq!(
             node.value
-                .multiplicity
-                .as_ref()
-                .map(|m| m.value.to_bracket_string()),
-            Some("[0..*]".to_string())
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("Action")
         );
-        let subsets = node
+        assert!(node.value.typing.is_some());
+        let multiplicity = &node
             .value
-            .subsets
+            .multiplicity
             .as_ref()
-            .expect("subsets clause")
-            .value
-            .target
-            .iter()
-            .map(|t| t.value.to_display_string())
-            .collect::<Vec<_>>()
-            .join(", ");
+            .expect("multiplicity")
+            .value;
+        assert!(matches!(
+            multiplicity.lower.as_deref().map(|bound| &bound.value),
+            Some(Expression::LiteralInteger(0))
+        ));
+        assert!(multiplicity.upper.is_none());
+        let subsets = crate::parser::usage::reference_list_text(
+            source,
+            &node
+                .value
+                .subsets
+                .as_ref()
+                .expect("subsets clause")
+                .value
+                .target,
+        );
         assert_eq!(subsets, "actions, enactedPerformances");
     }
 }

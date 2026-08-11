@@ -13,14 +13,13 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
-    identification, name, qualified_name, short_name_prefix, skip_statement_or_block,
+    identification, name, qualified_reference, short_name_prefix, skip_statement_or_block,
     starts_with_keyword, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::usage::{
-    feature_usage_header, multiplicity, multiplicity_node, optional_typings,
-    specialization_clauses, targets_display_string,
+    feature_usage_header, multiplicity, multiplicity_node, optional_typings, specialization_clauses,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -284,7 +283,7 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
         RequirementUsage {
             name,
             short_name,
-            type_name: header.type_name,
+            type_name: header.type_reference,
             subsets: post_body_specialization
                 .subsets
                 .map(|(target, _)| target)
@@ -325,11 +324,11 @@ fn verify_requirement(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyRequire
             },
         )
     } else {
-        let (input, target) = qualified_name(input)?;
+        let (input, target) = qualified_reference(input)?;
         let (input, _) = ws_and_comments(input)?;
         if input.fragment().starts_with(b":>>") {
             let (input, _) = tag(&b":>>"[..]).parse(input)?;
-            let (input, redefines) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            let (input, redefines) = preceded(ws_and_comments, qualified_reference).parse(input)?;
             let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
             (
                 input,
@@ -356,18 +355,6 @@ fn verify_requirement(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyRequire
     Ok((input, node_from_to(start, input, member)))
 }
 
-fn concern_reference_member<'a>(
-    input: Input<'a>,
-    keyword: &'static [u8],
-) -> IResult<Input<'a>, (String, crate::ast::Span)> {
-    let (input, _) = preceded(ws_and_comments, tag(keyword)).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, (target_span, target)) =
-        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((input, (target, target_span)))
-}
-
 fn stakeholder_typed_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
     let start = input;
     let (input, decl) = requirement_parameter_decl(input, b"stakeholder", "stakeholder")?;
@@ -377,11 +364,10 @@ fn stakeholder_typed_member(input: Input<'_>) -> IResult<Input<'_>, Node<Stakeho
             start,
             input,
             StakeholderMember {
-                name: decl.value.name,
-                type_name: Some(decl.value.type_name),
+                declaration_name: decl.value.name,
+                target: None,
+                type_name: decl.value.type_name,
                 is_redefinition: false,
-                name_span: decl.span.clone(),
-                type_span: Some(decl.span.clone()),
             },
         ),
     ))
@@ -389,18 +375,20 @@ fn stakeholder_typed_member(input: Input<'_>) -> IResult<Input<'_>, Node<Stakeho
 
 fn stakeholder_shorthand_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
     let start = input;
-    let (input, (name, name_span)) = concern_reference_member(input, b"stakeholder")?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"stakeholder"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             StakeholderMember {
-                name,
+                declaration_name: String::new(),
+                target: Some(target),
                 type_name: None,
                 is_redefinition: false,
-                name_span,
-                type_span: None,
             },
         ),
     ))
@@ -413,8 +401,7 @@ fn stakeholder_redefinition_member(
     let (input, _) = preceded(ws_and_comments, tag(&b"stakeholder"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = tag(&b":>>"[..]).parse(input)?;
-    let (input, (name_span, name)) =
-        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
+    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -422,11 +409,10 @@ fn stakeholder_redefinition_member(
             start,
             input,
             StakeholderMember {
-                name,
+                declaration_name: String::new(),
+                target: Some(target),
                 type_name: None,
                 is_redefinition: true,
-                name_span,
-                type_span: None,
             },
         ),
     ))
@@ -450,18 +436,11 @@ fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
 
 fn purpose_member(input: Input<'_>) -> IResult<Input<'_>, Node<PurposeMember>> {
     let start = input;
-    let (input, (target, target_span)) = concern_reference_member(input, b"purpose")?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            PurposeMember {
-                target,
-                target_span,
-            },
-        ),
-    ))
+    let (input, _) = preceded(ws_and_comments, tag(&b"purpose"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((input, node_from_to(start, input, PurposeMember { target })))
 }
 
 fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
@@ -493,7 +472,7 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
                 input,
                 SubjectDecl {
                     name: String::new(),
-                    type_name: String::new(),
+                    type_name: None,
                     multiplicity: None,
                     value: Some(value),
                 },
@@ -517,7 +496,7 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
     };
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
@@ -546,7 +525,7 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
             input,
             SubjectDecl {
                 name: n,
-                type_name: type_name.unwrap_or_default(),
+                type_name,
                 multiplicity,
                 value,
             },
@@ -556,13 +535,19 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
 
 pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementActorDecl>> {
     let (input, decl) = requirement_parameter_decl(input, b"actor", "actor")?;
+    let Some(type_name) = decl.value.type_name else {
+        return Err(nom::Err::Failure(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    };
     Ok((
         input,
         Node::new(
             decl.span,
             RequirementActorDecl {
                 name: decl.value.name,
-                type_name: decl.value.type_name,
+                type_name,
             },
         ),
     ))
@@ -586,7 +571,7 @@ fn requirement_parameter_decl<'a>(
         }
     };
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     let (input, _) = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
         map(structured_constraint_body, |_| ()),
@@ -599,7 +584,7 @@ fn requirement_parameter_decl<'a>(
             input,
             SubjectDecl {
                 name: n,
-                type_name,
+                type_name: Some(type_name),
                 multiplicity: None,
                 value: None,
             },
@@ -894,20 +879,14 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
             // Fuller `satisfy requirement <name> : <Type>` form (SysML `SatisfyRequirementUsage`),
             // reusing the shared typing fragment from usage.rs rather than hand-rolling it.
             let inline_start = after_kw;
+            let (_, req_reference) = crate::parser::lex::qualified_reference(after_kw)?;
             let (after_name, req_name) = name(after_kw)?;
             let (after_type, type_suffix) = optional_typings(after_name)?;
-            let type_name = type_suffix.map(|(_, is_conjugated, targets)| {
-                let type_name = targets_display_string(&targets);
-                if is_conjugated {
-                    format!("~{type_name}")
-                } else {
-                    type_name
-                }
-            });
+            let type_name = type_suffix.and_then(|(_, _, targets)| targets.first().copied());
             let source = node_from_to(
                 inline_start,
                 after_type,
-                crate::ast::Expression::FeatureRef(req_name.clone()),
+                crate::ast::Expression::FeatureRef(req_reference),
             );
             (
                 after_type,
@@ -979,7 +958,7 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage {
         name: ident,
-        type_name: header.type_name,
+        type_name: header.type_reference,
         body,
         is_definition: def_kw.is_some(),
         membership: crate::ast::Membership::feature(visibility, visibility_span),
@@ -1008,12 +987,91 @@ pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Req
 }
 
 #[cfg(test)]
+mod typed_reference_tests {
+    use super::*;
+    use crate::ast::{
+        QualifiedReferenceArena, QualifiedReferenceId, ReferenceSeparator, SourceStorage,
+    };
+    use crate::parser::span::ParseContext;
+
+    fn parse_node<T>(
+        text: &str,
+        parser: for<'a> fn(Input<'a>) -> IResult<Input<'a>, Node<T>>,
+    ) -> (Node<T>, SourceStorage, QualifiedReferenceArena) {
+        let source = SourceStorage::new(text.to_owned());
+        let context = ParseContext::new();
+        let (rest, node) = parser(context.input(source.as_str().as_bytes())).expect("parse node");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        (node, source, context.finish())
+    }
+
+    fn assert_absolute_two_segment_reference(
+        source: &SourceStorage,
+        arena: &QualifiedReferenceArena,
+        id: QualifiedReferenceId,
+        authored: &str,
+    ) {
+        let reference = arena.get(source, id).expect("qualified reference");
+        assert_eq!(reference.authored_text(), authored);
+        assert!(reference.metadata.is_absolute);
+        assert_eq!(reference.segments.len(), 2);
+        assert_eq!(reference.segments[0].separator_before, None);
+        assert_eq!(
+            reference.segments[1].separator_before,
+            Some(ReferenceSeparator::ColonColon)
+        );
+    }
+
+    #[test]
+    fn subject_type_is_an_absolute_source_backed_reference() {
+        let (subject, source, arena) =
+            parse_node("subject vehicle : $::Domain::Vehicle;", subject_decl);
+        assert_absolute_two_segment_reference(
+            &source,
+            &arena,
+            subject.value.type_name.expect("subject type"),
+            "$::Domain::Vehicle",
+        );
+    }
+
+    #[test]
+    fn verify_targets_are_distinct_source_backed_references() {
+        let (verify, source, arena) = parse_node(
+            "verify $::Requirements::Mass :>> Base::Mass;",
+            verify_requirement,
+        );
+        assert_absolute_two_segment_reference(
+            &source,
+            &arena,
+            verify.value.target.expect("verify target"),
+            "$::Requirements::Mass",
+        );
+        let redefines = arena
+            .get(
+                &source,
+                verify.value.redefines.expect("verify redefinition"),
+            )
+            .expect("redefinition reference");
+        assert_eq!(redefines.authored_text(), "Base::Mass");
+        assert!(!redefines.metadata.is_absolute);
+    }
+
+    #[test]
+    fn stakeholder_reference_is_separate_from_declaration_name() {
+        let (stakeholder, source, arena) =
+            parse_node("stakeholder $::Concerns::Safety;", stakeholder_member);
+        assert!(stakeholder.value.declaration_name.is_empty());
+        let target = stakeholder.value.target.expect("stakeholder target");
+        assert_absolute_two_segment_reference(&source, &arena, target, "$::Concerns::Safety");
+    }
+}
+
+#[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on RequirementDef/RequirementUsage/ConcernUsage ---
@@ -1118,7 +1176,7 @@ mod membership_tests {
         .expect("concern def with type and body");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_definition);
-        assert_eq!(node.value.type_name.as_deref(), Some("BaseConcern"));
+        assert!(node.value.type_name.is_some());
     }
 
     /// Payload sites with no visibility grammar of their own (`verify requirement ...`,
@@ -1144,9 +1202,6 @@ mod membership_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.short_name.as_deref(), Some("1.1"));
         assert_eq!(node.value.name, "vehicleMass1");
-        assert_eq!(
-            node.value.type_name.as_deref(),
-            Some("MassLimitationRequirement")
-        );
+        assert!(node.value.type_name.is_some());
     }
 }

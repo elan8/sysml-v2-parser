@@ -1,13 +1,13 @@
 //! Import and relationship body parsing.
 
 use crate::ast::{
-    FilterPackageMember, Import, Membership, MembershipKind, Node, RelationshipBodyElement,
+    FilterPackageMember, Import, ImportShape, ImportTarget, Membership, MembershipKind, Node,
+    RelationshipBodyElement,
 };
 use crate::parser::body::relationship_body_annotations;
 use crate::parser::expr::expression;
-use crate::parser::lex::{qualified_name, ws1, ws_and_comments};
+use crate::parser::lex::{qualified_reference, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::span::with_span;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -23,6 +23,76 @@ pub(crate) fn relationship_body(
     relationship_body_annotations(input)
 }
 
+fn filter_package_members(input: Input<'_>) -> IResult<Input<'_>, Vec<Node<FilterPackageMember>>> {
+    let (input, members) = many1(delimited(
+        preceded(ws_and_comments, tag(&b"["[..])),
+        preceded(ws_and_comments, expression),
+        preceded(ws_and_comments, tag(&b"]"[..])),
+    ))
+    .parse(input)?;
+    Ok((
+        input,
+        members
+            .into_iter()
+            .map(|expression| {
+                Node::new(expression.span.clone(), FilterPackageMember { expression })
+            })
+            .collect(),
+    ))
+}
+
+/// Parse the typed suffix shared by import and expose targets.
+pub(crate) fn import_shape(input: Input<'_>) -> IResult<Input<'_>, ImportShape> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b"::") {
+        let (input, _) = tag(&b"::"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        if input.fragment().starts_with(b"**") {
+            let (input, _) = tag(&b"**"[..]).parse(input)?;
+            let (input, members) = opt(filter_package_members).parse(input)?;
+            return Ok((
+                input,
+                match members {
+                    Some(members) => ImportShape::Filter {
+                        recursive: true,
+                        members,
+                    },
+                    None => ImportShape::Membership { recursive: true },
+                },
+            ));
+        }
+        if input.fragment().starts_with(b"*") {
+            let (input, _) = tag(&b"*"[..]).parse(input)?;
+            let (input, recursive) = opt((
+                preceded(ws_and_comments, tag(&b"::"[..])),
+                preceded(ws_and_comments, tag(&b"**"[..])),
+            ))
+            .parse(input)?;
+            return Ok((
+                input,
+                ImportShape::Namespace {
+                    recursive: recursive.is_some(),
+                },
+            ));
+        }
+        return Err(nom::Err::Error(nom::error::make_error(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    if input.fragment().starts_with(b"[") {
+        let (input, members) = filter_package_members(input)?;
+        return Ok((
+            input,
+            ImportShape::Filter {
+                recursive: false,
+                members,
+            },
+        ));
+    }
+    Ok((input, ImportShape::Membership { recursive: false }))
+}
+
 /// Import: visibility? 'import' isImportAll? (QualifiedName | QualifiedName '::' '*') RelationshipBody
 pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let start = input;
@@ -31,71 +101,8 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let (input, _) = tag(&b"import"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
-    let (input, (qname_span, qname)) = with_span(qualified_name).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    // KerML: NamespaceImport = QualifiedName '::' '*' (::**)? | FilterPackage; MembershipImport = QualifiedName (::**)?
-    let (input, target, is_import_all, is_recursive, filter_members) =
-        if input.fragment().starts_with(b"::") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"::"[..])).parse(input)?;
-            let (input, _) = ws_and_comments(input)?;
-            if input.fragment().starts_with(b"*")
-                && input.fragment().get(1).is_none_or(|c| *c != b'*')
-            {
-                let (input, _) = preceded(ws_and_comments, tag(&b"*"[..])).parse(input)?;
-                let (input, rec_opt) = opt((
-                    preceded(ws_and_comments, tag(&b"::"[..])),
-                    preceded(ws_and_comments, tag(&b"**"[..])),
-                ))
-                .parse(input)?;
-                (
-                    input,
-                    format!("{}::*", qname),
-                    true,
-                    rec_opt.is_some(),
-                    None,
-                )
-            } else if input.fragment().starts_with(b"**") {
-                let (input, _) = preceded(ws_and_comments, tag(&b"**"[..])).parse(input)?;
-                let (input, filter_opt) = opt(many1(delimited(
-                    preceded(ws_and_comments, tag(&b"["[..])),
-                    preceded(ws_and_comments, expression),
-                    preceded(ws_and_comments, tag(&b"]"[..])),
-                )))
-                .parse(input)?;
-                let filter_members = filter_opt.map(|members| {
-                    members
-                        .into_iter()
-                        .map(|e| Node::new(e.span.clone(), FilterPackageMember { expression: e }))
-                        .collect()
-                });
-                (input, qname, false, true, filter_members)
-            } else {
-                return Err(nom::Err::Error(nom::error::make_error(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )));
-            }
-        } else if input.fragment().starts_with(b"[") {
-            // FilterPackage form: QualifiedName [ expr ] [ expr ]+
-            let (input, members) = many1(delimited(
-                preceded(ws_and_comments, tag(&b"["[..])),
-                preceded(ws_and_comments, expression),
-                preceded(ws_and_comments, tag(&b"]"[..])),
-            ))
-            .parse(input)?;
-            let filter_members: Vec<Node<FilterPackageMember>> = members
-                .into_iter()
-                .map(|e| Node::new(e.span.clone(), FilterPackageMember { expression: e }))
-                .collect();
-            (input, qname, true, false, Some(filter_members))
-        } else {
-            let (input, rec_opt) = opt((
-                preceded(ws_and_comments, tag(&b"::"[..])),
-                preceded(ws_and_comments, tag(&b"**"[..])),
-            ))
-            .parse(input)?;
-            (input, qname, false, rec_opt.is_some(), None)
-        };
+    let (input, reference) = qualified_reference(input)?;
+    let (input, shape) = import_shape(input)?;
     let (input, body_elements) = relationship_body(input)?;
     Ok((
         input,
@@ -104,11 +111,7 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
             input,
             Import {
                 membership: Membership::new(MembershipKind::Import, visibility, visibility_span),
-                is_import_all,
-                target,
-                target_span: qname_span,
-                is_recursive,
-                filter_members,
+                target: ImportTarget { reference, shape },
                 body_elements,
             },
         ),
@@ -118,10 +121,11 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+    use crate::parser::span::ParseContext;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        let context = Box::leak(Box::new(ParseContext::new()));
+        context.input(text.as_bytes())
     }
 
     // --- parser work item 4b (continuation): `Import.visibility` replaced by `Import.membership` ---
@@ -147,5 +151,37 @@ mod membership_tests {
             node.value.membership.kind,
             crate::ast::MembershipKind::Import
         );
+    }
+
+    #[test]
+    fn import_suffixes_are_typed_and_reference_excludes_wildcards() {
+        let context = ParseContext::new();
+        let source = crate::ast::SourceStorage::from("import $::A::B::*::**;");
+        let (rest, node) = import_(context.input(source.as_str().as_bytes())).expect("import");
+        assert!(rest.fragment().is_empty());
+        assert_eq!(
+            node.value.target.shape,
+            ImportShape::Namespace { recursive: true }
+        );
+        let arena = context.finish();
+        let view = arena
+            .get(&source, node.value.target.reference)
+            .expect("reference");
+        assert_eq!(view.authored_text(), "$::A::B");
+        assert!(view.metadata.is_absolute);
+    }
+
+    #[test]
+    fn filter_import_retains_typed_expression_members() {
+        let context = ParseContext::new();
+        let (rest, node) = import_(context.input(b"import A[x][y];")).expect("import");
+        assert!(rest.fragment().is_empty());
+        match node.value.target.shape {
+            ImportShape::Filter { recursive, members } => {
+                assert!(!recursive);
+                assert_eq!(members.len(), 2);
+            }
+            other => panic!("expected filter shape, got {other:?}"),
+        }
     }
 }

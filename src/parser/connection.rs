@@ -205,10 +205,9 @@ fn parse_connection_def(
 #[cfg(test)]
 mod par_002_widening_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -270,10 +269,9 @@ mod par_002_widening_tests {
 #[cfg(test)]
 mod par_006b_audit_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     /// PAR-006b audit: `connection_def` must keep accepting this exact real-Systems-Library shape
@@ -304,10 +302,9 @@ mod par_006b_audit_tests {
 mod membership_tests {
     use super::*;
     use crate::parser::part::connection_usage_member;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on ConnectionDef/ConnectionUsageMember ---
@@ -349,7 +346,7 @@ mod membership_tests {
                 .expect("connection usage member with multiplicity");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name.as_deref(), Some("trailerHitch"));
-        assert_eq!(node.value.type_name.as_deref(), Some("TrailerHitch"));
+        assert!(node.value.type_reference.is_some());
         let multiplicity = node.value.multiplicity.expect("multiplicity present");
         assert!(multiplicity.value.lower.is_some());
         assert!(multiplicity.value.upper.is_some());

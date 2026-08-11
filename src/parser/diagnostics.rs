@@ -821,8 +821,7 @@ pub(crate) fn missing_closing_brace_error(bytes: &[u8], input: Input<'_>) -> Opt
         return None;
     }
     let consumed = &bytes[..input.location_offset().min(bytes.len())];
-    let opens = consumed.iter().filter(|&&b| b == b'{').count();
-    let closes = consumed.iter().filter(|&&b| b == b'}').count();
+    let (opens, closes) = lex::brace_balance_outside_comments(consumed);
     if opens <= closes {
         return None;
     }
@@ -845,37 +844,68 @@ pub(crate) fn extra_closing_brace_at_eof(bytes: &[u8]) -> Option<ParseError> {
     if closes <= opens {
         return None;
     }
-    let mut last_brace: Option<(usize, u32, usize)> = None;
-    let mut line = 1u32;
-    let mut column = 1usize;
+    let mut last_brace = None;
     let mut pos = 0usize;
+    let mut block_comment_depth = 0usize;
+    let mut line_comment = false;
+    let mut quote = None;
+    let mut escaped = false;
     while pos < bytes.len() {
-        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"/*") {
-            if let Some(rel) = lex::find_subslice(&bytes[pos..], b"*/") {
-                pos += rel + 2;
-                continue;
+        let byte = bytes[pos];
+        let next = bytes.get(pos + 1).copied();
+        if line_comment {
+            pos += 1;
+            if matches!(byte, b'\n' | b'\r') {
+                line_comment = false;
             }
-            break;
+            continue;
         }
-        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"//") {
-            while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
+        if block_comment_depth > 0 {
+            if byte == b'/' && next == Some(b'*') {
+                block_comment_depth += 1;
+                pos += 2;
+            } else if byte == b'*' && next == Some(b'/') {
+                block_comment_depth -= 1;
+                pos += 2;
+            } else {
                 pos += 1;
             }
             continue;
         }
-        let b = bytes[pos];
-        if b == b'}' {
-            last_brace = Some((pos, line, column));
+        if let Some(delimiter) = quote {
+            pos += 1;
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == delimiter {
+                quote = None;
+            }
+            continue;
         }
-        if b == b'\n' {
-            line += 1;
-            column = 1;
-        } else {
-            column += 1;
+
+        match (byte, next) {
+            (b'/', Some(b'/')) => {
+                line_comment = true;
+                pos += 2;
+            }
+            (b'/', Some(b'*')) => {
+                block_comment_depth = 1;
+                pos += 2;
+            }
+            (b'\'' | b'"', _) => {
+                quote = Some(byte);
+                pos += 1;
+            }
+            (b'}', _) => {
+                last_brace = Some(pos);
+                pos += 1;
+            }
+            _ => pos += 1,
         }
-        pos += 1;
     }
-    let (offset, line, column) = last_brace?;
+    let offset = last_brace?;
+    let (line, column) = eof_line_column(&bytes[..offset]);
     Some(
         ParseError::new("unexpected closing '}' at end of file")
             .with_location(offset, line, column)

@@ -313,11 +313,17 @@ pub(crate) fn parse_definition_prefix(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::usage::targets_display_string;
-    use nom_locate::LocatedSpan;
+    use crate::ast::QualifiedReferenceId;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    fn target_texts(source: Input<'_>, targets: &[QualifiedReferenceId]) -> Vec<String> {
+        targets
+            .iter()
+            .map(|id| crate::parser::usage::reference_text(source, *id).expect("reference text"))
+            .collect()
     }
 
     #[test]
@@ -331,8 +337,8 @@ mod tests {
             prefix
                 .specializes
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("Base".to_string())
+                .map(|n| target_texts(input, &n.value.target)),
+            Some(vec!["Base".to_string()])
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
     }
@@ -350,8 +356,8 @@ mod tests {
             prefix
                 .specializes
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("linkObjects, parts".to_string())
+                .map(|n| target_texts(input, &n.value.target)),
+            Some(vec!["linkObjects".to_string(), "parts".to_string()])
         );
         assert!(rest.fragment().starts_with(b"{"));
     }
@@ -370,8 +376,8 @@ mod tests {
             prefix
                 .specializes
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("Base".to_string())
+                .map(|n| target_texts(input, &n.value.target)),
+            Some(vec!["Base".to_string()])
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
@@ -406,8 +412,8 @@ mod tests {
             prefix
                 .specializes
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("Y".to_string())
+                .map(|n| target_texts(input, &n.value.target)),
+            Some(vec!["Y".to_string()])
         );
     }
 }

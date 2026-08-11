@@ -1,5 +1,6 @@
 use crate::ast::core::{Expression, Node, Span};
 use crate::ast::membership::Membership;
+use crate::ast::QualifiedReferenceId;
 
 /// KerML ElementFilterMember: MemberPrefix? 'filter' condition ';'
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,8 +48,31 @@ pub struct FilterPackageMember {
     pub expression: Node<Expression>,
 }
 
+/// Typed suffix form of an import or expose target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ImportShape {
+    /// A single membership, optionally including recursively imported memberships (`::**`).
+    Membership { recursive: bool },
+    /// All memberships of a namespace (`::*`), optionally recursively (`::*::**`).
+    Namespace { recursive: bool },
+    /// A filter package, with its filter expressions retained as typed AST nodes.
+    Filter {
+        recursive: bool,
+        members: Vec<Node<FilterPackageMember>>,
+    },
+}
+
+/// Source-backed reference plus the import/expose suffix that applies to it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ImportTarget {
+    pub reference: QualifiedReferenceId,
+    pub shape: ImportShape,
+}
+
 /// Import: `private`? `import` `all`? QualifiedName (`::` `*`)? or FilterPackage form.
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Import {
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006 continuation), `kind`
@@ -66,31 +90,10 @@ pub struct Import {
     /// confusing field with no compatibility benefit. This is a breaking `PARSE_AST_VERSION` change
     /// either way, matching every other struct this rollout has touched.
     pub membership: Membership,
-    /// Whether this is a namespace import (QualifiedName::* or FilterPackage) or membership import (single QualifiedName).
-    pub is_import_all: bool,
-    /// Import target, e.g. "SI::kg" or "Definitions::*".
-    pub target: String,
-    /// Source span of the qualified name in `target` (excludes `::*` / `::**` suffix).
-    /// Used by semantic-token providers to highlight only the name portion.
-    pub target_span: Span,
-    /// KerML: optional recursive import after :: (e.g. QualifiedName::** or QualifiedName::*::**).
-    pub is_recursive: bool,
-    /// KerML FilterPackage form: one or more `[ expr ]` members. When present, this is a namespace import of a filter package.
-    pub filter_members: Option<Vec<Node<FilterPackageMember>>>,
+    pub target: ImportTarget,
     /// Real annotation content from a braced body (BNF `RelationshipBody`: doc/comment/metadata
     /// only). `None` when the body is a semicolon terminator.
     pub body_elements: Option<Vec<Node<crate::ast::structure::RelationshipBodyElement>>>,
-}
-
-impl PartialEq for Import {
-    fn eq(&self, other: &Self) -> bool {
-        self.membership == other.membership
-            && self.is_import_all == other.is_import_all
-            && self.target == other.target
-            && self.is_recursive == other.is_recursive
-            && self.filter_members == other.filter_members
-            && self.body_elements == other.body_elements
-    }
 }
 /// KerML Documentation: 'doc' Identification? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 #[derive(Debug, Clone, PartialEq, Eq)]

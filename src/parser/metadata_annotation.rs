@@ -1,10 +1,12 @@
 //! Metadata/annotation parsing helpers.
 
-use crate::ast::{Annotation, AttributeBody, MetadataAnnotation, MetadataKeywordUsage, Node};
+use crate::ast::{
+    Annotation, AnnotationHead, AttributeBody, MetadataAnnotation, MetadataKeywordUsage, Node,
+};
 use crate::parser::attribute::metadata_body;
 use crate::parser::connector::connect_body;
 use crate::parser::lex::{
-    name, qualified_name, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
+    name, qualified_reference, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::with_span;
@@ -17,7 +19,9 @@ use nom::IResult;
 use nom::Parser;
 
 /// Optional `about` qualifiedName (, qualifiedName)* clause (SysML §7.27.2).
-pub(crate) fn parse_about_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<String>> {
+pub(crate) fn parse_about_targets(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<crate::ast::QualifiedReferenceId>> {
     let (input, _) = ws_and_comments(input)?;
     if !starts_with_keyword(input.fragment(), b"about") {
         return Ok((input, Vec::new()));
@@ -26,7 +30,7 @@ pub(crate) fn parse_about_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<St
     let (input, _) = ws1(input)?;
     separated_list1(
         preceded(ws_and_comments, preceded(tag(&b","[..]), ws_and_comments)),
-        qualified_name,
+        qualified_reference,
     )
     .parse(input)
 }
@@ -38,13 +42,13 @@ pub(crate) fn metadata_annotation(
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"@"[..])).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (head_span, name_str)) = with_span(qualified_name).parse(input)?;
+    let (input, (head_span, reference)) = with_span(qualified_reference).parse(input)?;
     let (input, typed) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, with_span(qualified_name)),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
-    let (type_name, type_span) = typed
+    let (type_reference, type_span) = typed
         .map(|(span, ty)| (Some(ty), Some(span)))
         .unwrap_or((None, None));
     let (input, about_targets) = parse_about_targets(input)?;
@@ -55,8 +59,8 @@ pub(crate) fn metadata_annotation(
             start,
             input,
             MetadataAnnotation {
-                name: name_str,
-                type_name,
+                reference,
+                type_reference,
                 about_targets,
                 body,
                 head_span: Some(head_span),
@@ -88,10 +92,10 @@ pub(crate) fn metadata_keyword_usage(
     }
     let (input, typed) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, with_span(qualified_name)),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
-    let (type_name, type_span) = typed
+    let (type_reference, type_span) = typed
         .map(|(span, ty)| (Some(ty), Some(span)))
         .unwrap_or((None, None));
     let (input, about_targets) = parse_about_targets(input)?;
@@ -103,7 +107,7 @@ pub(crate) fn metadata_keyword_usage(
             input,
             MetadataKeywordUsage {
                 keyword,
-                type_name,
+                type_reference,
                 about_targets,
                 body,
                 keyword_span,
@@ -158,7 +162,7 @@ pub(crate) fn metadata_keyword_prefix(
             input,
             MetadataKeywordUsage {
                 keyword,
-                type_name: None,
+                type_reference: None,
                 about_targets: Vec::new(),
                 body: AttributeBody::Semicolon,
                 keyword_span,
@@ -181,8 +185,8 @@ pub(crate) fn hash_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Annot
             input,
             Annotation {
                 sigil: "#".to_string(),
-                head: head.trim().to_string(),
-                type_name: None,
+                head: AnnotationHead::Opaque(head.trim().to_string()),
+                type_reference: None,
                 body,
                 head_span: None,
                 type_span: None,
@@ -200,13 +204,13 @@ pub(crate) fn annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Annotation
     }
     let (input, _) = tag(&b"@"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (head_span, head)) = with_span(qualified_name).parse(input)?;
+    let (input, (head_span, head)) = with_span(qualified_reference).parse(input)?;
     let (input, typed) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, with_span(qualified_name)),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
-    let (type_name, type_span) = typed
+    let (type_reference, type_span) = typed
         .map(|(span, ty)| (Some(ty), Some(span)))
         .unwrap_or((None, None));
     let (input, body) = connect_body(input)?;
@@ -217,12 +221,56 @@ pub(crate) fn annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Annotation
             input,
             Annotation {
                 sigil: "@".to_string(),
-                head,
-                type_name,
+                head: AnnotationHead::Reference(head),
+                type_reference,
                 body,
                 head_span: Some(head_span),
                 type_span,
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::SourceStorage;
+    use crate::parser::span::ParseContext;
+
+    #[test]
+    fn metadata_annotation_keeps_source_backed_reference_fields() {
+        let source_text = "@$::Profile::Tag : Meta::Type about A::B, C;";
+        let context = ParseContext::new();
+        let input = context.input(source_text.as_bytes());
+        let (rest, annotation) = metadata_annotation(input).expect("metadata annotation");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let _ = rest;
+
+        let arena = context.finish();
+        let source = SourceStorage::new(source_text.to_owned());
+        let reference = arena
+            .get(&source, annotation.value.reference)
+            .expect("annotation reference");
+        assert!(reference.metadata.is_absolute);
+        assert_eq!(reference.segments.len(), 2);
+        assert_eq!(
+            reference.segment_decoded_text(0).as_deref(),
+            Some("Profile")
+        );
+        assert_eq!(reference.segment_decoded_text(1).as_deref(), Some("Tag"));
+
+        let type_reference = arena
+            .get(
+                &source,
+                annotation.value.type_reference.expect("annotation type"),
+            )
+            .expect("resolved annotation type");
+        assert_eq!(type_reference.segments.len(), 2);
+        assert_eq!(annotation.value.about_targets.len(), 2);
+        assert!(annotation
+            .value
+            .about_targets
+            .iter()
+            .all(|target| arena.get(&source, *target).is_some()));
+    }
 }

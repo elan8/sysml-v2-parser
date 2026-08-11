@@ -8,12 +8,12 @@ use super::common::{
 };
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
-use super::relationship_target::RelationshipTarget;
 use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
 use super::view::{CalcUsage, ConstraintDef, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
+use crate::ast::QualifiedReferenceId;
 
 /// Part definition: `part def` Identification (`:>` specializes)? Body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,6 +196,10 @@ pub struct OpaqueMemberDecl {
     pub name: String,
     pub text: String,
     pub body: AttributeBody,
+    /// Optional trailing `:>` relationship after the body.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Optional trailing `:>>` relationship after the body.
+    pub redefines: Option<Node<SubsettingRelationship>>,
 }
 
 /// Connection usage member inside part definitions.
@@ -203,7 +207,7 @@ pub struct OpaqueMemberDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionUsageMember {
     pub name: Option<String>,
-    pub type_name: Option<String>,
+    pub type_reference: Option<QualifiedReferenceId>,
     /// Multiplicity after the type, e.g. `[0..1]` in `connection trailerHitch :
     /// TrailerHitch[0..1];` (OMG spec Annex `3c-Function-based Behavior-structure mod.sysml`).
     pub multiplicity: Option<Node<Multiplicity>>,
@@ -245,8 +249,10 @@ pub struct ExhibitState {
     pub is_reference: bool,
     /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).
     pub is_individual: bool,
+    /// Declaration label in the explicit `exhibit state name` form.
     pub name: String,
-    pub type_name: Option<String>,
+    /// Referenced state path in the shorthand `exhibit path` form.
+    pub state_reference: Option<QualifiedReferenceId>,
     /// Structured typing clause when a `:` target was written.
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity after the type, when present.
@@ -266,9 +272,9 @@ pub struct AttributeDef {
     pub name: String,
     /// Short name from `< ... >` when present (e.g. unit symbol `m`, `EUR`).
     pub short_name: Option<String>,
-    /// Type after `:>`, e.g. `Some(TypingRelationship { target: "ISQ::mass", .. })` (PAR-004
-    /// item 1). `typing_span` duplicates the node's own `span` for existing consumers that read
-    /// the span without the node.
+    /// Type after `:>`, represented by a relationship whose target IDs resolve through the
+    /// enclosing [`crate::ast::ParsedDocument`] (PAR-004 item 1). `typing_span` duplicates the
+    /// node's own `span` for existing consumers that read the span without the node.
     pub typing: Option<Node<TypingRelationship>>,
     /// Default or binding after `=` / `:=` / `default =` before the body terminator.
     pub value: Option<Node<FeatureValue>>,
@@ -402,13 +408,8 @@ pub struct PartUsage {
     pub name: String,
     /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
     pub short_name: Option<String>,
-    /// Type after `:`, e.g. "Vehicle", "AxleAssembly". A comma-separated multi-target clause
-    /// (`part vehicle : Vehicle, SpatialItem;`) joins into one display string here; see `typing`
-    /// for the structured, multi-target-capable form (S42-004).
-    pub type_name: String,
     /// Structured typing clause mirroring `AttributeUsage.typing`: every comma-separated target
-    /// from `:`/`defined by`/`typed by`, not just the first (S42-004). `None` when no typing
-    /// clause was written (`type_name` is then empty).
+    /// from `:`/`defined by`/`typed by`, not just the first (S42-004).
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity, e.g. `[2]` parsed into structured lower/upper bounds.
     pub multiplicity: Option<Node<Multiplicity>>,
@@ -441,7 +442,6 @@ impl PartialEq for PartUsage {
             && self.is_constant == other.is_constant
             && self.name == other.name
             && self.short_name == other.short_name
-            && self.type_name == other.type_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
             && self.ordered == other.ordered
@@ -467,9 +467,9 @@ pub enum PartUsageBody {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataAnnotation {
-    pub name: String,
-    pub type_name: Option<String>,
-    pub about_targets: Vec<String>,
+    pub reference: QualifiedReferenceId,
+    pub type_reference: Option<QualifiedReferenceId>,
+    pub about_targets: Vec<QualifiedReferenceId>,
     pub body: AttributeBody,
     pub head_span: Option<Span>,
     pub type_span: Option<Span>,
@@ -477,8 +477,8 @@ pub struct MetadataAnnotation {
 
 impl PartialEq for MetadataAnnotation {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.type_name == other.type_name
+        self.reference == other.reference
+            && self.type_reference == other.type_reference
             && self.about_targets == other.about_targets
             && self.body == other.body
     }
@@ -489,8 +489,8 @@ impl PartialEq for MetadataAnnotation {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataKeywordUsage {
     pub keyword: String,
-    pub type_name: Option<String>,
-    pub about_targets: Vec<String>,
+    pub type_reference: Option<QualifiedReferenceId>,
+    pub about_targets: Vec<QualifiedReferenceId>,
     pub body: AttributeBody,
     pub keyword_span: Span,
     pub type_span: Option<Span>,
@@ -499,7 +499,7 @@ pub struct MetadataKeywordUsage {
 impl PartialEq for MetadataKeywordUsage {
     fn eq(&self, other: &Self) -> bool {
         self.keyword == other.keyword
-            && self.type_name == other.type_name
+            && self.type_reference == other.type_reference
             && self.about_targets == other.about_targets
             && self.body == other.body
     }
@@ -510,8 +510,8 @@ impl PartialEq for MetadataKeywordUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Annotation {
     pub sigil: String,
-    pub head: String,
-    pub type_name: Option<String>,
+    pub head: AnnotationHead,
+    pub type_reference: Option<QualifiedReferenceId>,
     pub body: ConnectBody,
     pub head_span: Option<Span>,
     pub type_span: Option<Span>,
@@ -521,9 +521,17 @@ impl PartialEq for Annotation {
     fn eq(&self, other: &Self) -> bool {
         self.sigil == other.sigil
             && self.head == other.head
-            && self.type_name == other.type_name
+            && self.type_reference == other.type_reference
             && self.body == other.body
     }
+}
+
+/// The semantic target of an `@` annotation, or opaque text for an extension-style `#` form.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum AnnotationHead {
+    Reference(QualifiedReferenceId),
+    Opaque(String),
 }
 
 /// Element inside a part usage body.
@@ -648,9 +656,9 @@ pub enum PartUsageBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VariantUsage {
-    /// The variant's own name — the referenced usage's name for the untyped form, or the
-    /// nested usage's own name for the typed form.
-    pub name: String,
+    /// Referenced usage in the untyped `variant path;` form. Typed variants keep their declared
+    /// name solely on the nested usage instead of duplicating it here.
+    pub reference: Option<QualifiedReferenceId>,
     /// Present when declared with a kind keyword (`variant part ...;`); `None` for the untyped
     /// reference form (`variant name;` / `variant name { ... }`).
     pub typed: Option<VariantTypedUsage>,
@@ -687,21 +695,21 @@ pub struct Perform {
     /// Optional `abstract` / `variation` prefix (§6 G5). `variation perform action doXorY { ... }`
     /// is real usage in the OMG spec Annex `7a1-Variant Configuration - General Concept-a.sysml`.
     pub usage_prefix: Option<DefinitionPrefix>,
-    /// Qualified action name (e.g. "provide power" or "provide power.generate torque"). Empty for
-    /// the anonymous forms (`perform action { ... }`, `perform action :>> target = value;`),
-    /// matching [`PartUsage::name`]'s convention.
+    /// Declaration label in the explicit `perform action name ...` form.
     pub action_name: String,
-    /// Type after `:` in "perform action name : Type" form.
-    pub type_name: Option<String>,
+    /// Referenced action path in the shorthand `perform path` form.
+    pub action_reference: Option<QualifiedReferenceId>,
+    /// Structured type after `:` in `perform action name : Type`.
+    pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity after the name (GH-89), e.g. `[*]` in `perform action takePicture[*] :>
     /// PictureTaking::takePicture;` (Camera Example/Camera.sysml:4).
     pub multiplicity: Option<Node<Multiplicity>>,
     /// Redefinition target after `:>>`, e.g. `doXorY` in `perform action :>> doXorY = doX;`.
-    pub redefines: Option<String>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// Subsetting target after `:>` (GH-89), e.g. `PictureTaking::takePicture` in `perform action
     /// takePicture[*] :> PictureTaking::takePicture;` (Camera Example/Camera.sysml:4). Mutually
     /// exclusive with `redefines` (whichever specialization keyword is present).
-    pub subsets: Option<String>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// Bound value after `=`, e.g. `doX` in `perform action :>> doXorY = doX;`.
     pub value: Option<Node<FeatureValue>>,
     pub body: PerformBody,
@@ -738,12 +746,12 @@ pub enum PerformBodyElement {
     AttributeUsage(Box<Node<AttributeUsage>>),
 }
 
-/// In/out binding inside a perform body: `in` name `=` expr `;` or `out` name `=` expr `;`.
+/// In/out binding inside a perform body: `in` target `=` expr `;` or `out` target `=` expr `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PerformInOutBinding {
     pub direction: InOut,
-    pub name: String,
+    pub target: QualifiedReferenceId,
     pub value: Node<Expression>,
 }
 
@@ -756,8 +764,9 @@ pub struct AttributeUsage {
     /// (confirmed real usage in the OMG Geometry domain library's
     /// `VehicleGeometryAndCoordinateFrames.sysml`). See `AttributeDef::short_name`.
     pub short_name: Option<String>,
-    /// Type after `:` or `:>`, e.g. `Some(TypingRelationship { target: "MassValue", .. })`
-    /// (PAR-004 item 1). `typing_span` duplicates the node's own `span`.
+    /// Type after `:` or `:>`, represented by a relationship whose target IDs resolve through the
+    /// enclosing [`crate::ast::ParsedDocument`] (PAR-004 item 1). `typing_span` duplicates the
+    /// node's own `span`.
     pub typing: Option<Node<TypingRelationship>>,
     /// Subsets target after `:>` / `subsets`.
     pub subsets: Option<Node<SubsettingRelationship>>,
@@ -935,7 +944,8 @@ pub struct PortUsage {
     pub name: String,
     /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
     pub short_name: Option<String>,
-    pub type_name: Option<String>,
+    /// Structured, multi-target typing clause after `:` / `typed by` / `defined by`.
+    pub typing: Option<Node<TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
     /// Subsets feature and optional value expression.
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
@@ -971,7 +981,7 @@ impl PartialEq for PortUsage {
             && self.is_constant == other.is_constant
             && self.name == other.name
             && self.short_name == other.short_name
-            && self.type_name == other.type_name
+            && self.typing == other.typing
             && self.multiplicity == other.multiplicity
             && self.subsets == other.subsets
             && self.redefines == other.redefines
@@ -1096,17 +1106,14 @@ pub enum EndNestedUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
     pub name: String,
-    /// Display string for the type (`:` form) or reference target (`::>`/`references` form).
-    /// Kept for backward compatibility and simple display; see `references` for the structured
-    /// reference-subsetting form (GH-19).
-    pub type_name: String,
-    /// True when this end used `::>`/`references` reference subsetting instead of `:` typing.
-    pub uses_derived_syntax: bool,
+    /// Structured typing for the `: Type` form. A reference-only end has no typing and stores its
+    /// target in `references`.
+    pub typing: Option<Node<TypingRelationship>>,
     /// Structured reference-subsetting relationship for the `::>`/`references` form (GH-19):
     /// `end name ::> target;` / `end name references target;` names a reference, not a type, so
-    /// it must not be modeled as typing (`endType`) downstream. Also populated (with
-    /// `uses_derived_syntax: false`) when `::>` *trails* an explicit `: Type` instead of
-    /// replacing it, e.g. `end port p3: P ::> p.p1;` (GH-85, `Simple Tests/
+    /// it must not be modeled as typing (`endType`) downstream. Also populated when `::>`
+    /// *trails* an explicit `: Type` instead of replacing it, e.g. `end port p3: P ::> p.p1;`
+    /// (GH-85, `Simple Tests/
     /// ConjugationTest.sysml`). `None` when no reference-subsetting clause was written at all.
     pub references: Option<Node<SubsettingRelationship>>,
     /// Optional multiplicity after the type/reference target, e.g. `[1]` in `end hub ::>
@@ -1139,8 +1146,7 @@ pub struct EndDecl {
 impl PartialEq for EndDecl {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
-            && self.type_name == other.type_name
-            && self.uses_derived_syntax == other.uses_derived_syntax
+            && self.typing == other.typing
             && self.references == other.references
             && self.multiplicity == other.multiplicity
             && self.redefines == other.redefines
@@ -1158,12 +1164,8 @@ pub struct RefDecl {
     /// `connector::ref_decl`'s call sites have no confirmed real usage for a leading direction.
     pub direction: Option<InOut>,
     pub name: String,
-    /// Type after `:`, e.g. "Vehicle". A comma-separated multi-target clause joins into one
-    /// display string here; see `typing` for the structured, multi-target-capable form.
-    pub type_name: String,
     /// Structured typing clause mirroring `PartUsage.typing`/`AttributeUsage.typing`: every
-    /// comma-separated target from a `:` clause, not just the first (S42-004). `None` when no
-    /// typing clause was written (`type_name` is then empty).
+    /// comma-separated target from a `:` clause, not just the first (S42-004).
     pub typing: Option<Node<TypingRelationship>>,
     /// Redefines target from an optional leading `:>>` clause, e.g. `ref sentMessage :>>
     /// sentTransfer: MessageTransfer, MessageAction { ... }` (Systems Library `Actions.sysml`).
@@ -1189,7 +1191,6 @@ pub struct RefDecl {
 impl PartialEq for RefDecl {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
-            && self.type_name == other.type_name
             && self.typing == other.typing
             && self.redefines == other.redefines
             && self.subsets == other.subsets
@@ -1337,8 +1338,8 @@ pub struct MetadataDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataUsage {
     pub name: String,
-    pub type_name: Option<String>,
-    pub about_targets: Vec<String>,
+    pub type_reference: Option<QualifiedReferenceId>,
+    pub about_targets: Vec<QualifiedReferenceId>,
     pub body: AttributeBody,
     pub membership: Membership,
 }
@@ -1408,8 +1409,12 @@ pub struct OccurrenceUsage {
     /// Leading `constant` keyword (BNF `RefPrefix`). See `is_abstract`.
     pub is_constant: bool,
     pub portion_kind: Option<String>,
+    /// Declaration label for ordinary occurrence usages.
     pub name: String,
-    pub type_name: Option<String>,
+    /// Existing occurrence referenced by the shorthand `event path` form.
+    pub occurrence_reference: Option<QualifiedReferenceId>,
+    pub type_name: Option<QualifiedReferenceId>,
+    pub type_is_conjugated: bool,
     /// GH-51: `occurrence_usage` previously had no multiplicity support at all, so real usage
     /// like `abstract constant ref occurrence causes[1..*] :>> causes :> participant { ... }`
     /// (Systems Library `Domain Libraries/Cause and Effect/CausationConnections.sysml`) fell
@@ -1437,14 +1442,16 @@ pub enum OccurrenceUsageBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AssertConstraintMember {
-    /// Optional name after `constraint`, e.g. `engineSelectionRational` in
+    /// Optional declared name after `constraint`, e.g. `engineSelectionRational` in
     /// `assert constraint engineSelectionRational { ... }`. `None` for the anonymous form
     /// (`assert constraint { ... }`).
-    pub name: Option<String>,
+    pub declaration_name: Option<String>,
+    /// Referenced constraint in the shorthand `assert path { ... }` form.
+    pub target: Option<QualifiedReferenceId>,
     /// Optional type after `:`, e.g. `DiscBrakeFitConstraint_Alt` in `assert constraint
     /// discBrakeFitConstraint_Alt : DiscBrakeFitConstraint_Alt { ... }` (§6 G22 — the named form
     /// was closed in G3 but the typed one still fell through to opaque recovery).
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     pub body: ConstraintDefBody,
     /// `true` for a negated assert: `assert not constraint ...`.
     pub is_negated: bool,
@@ -1506,7 +1513,7 @@ pub struct SuccessionUsage {
     /// (GH-92.3, `Vehicle Example/VehicleIndividuals.sysml:49`). Mirrors
     /// `FirstStmt::succession_type`'s identical field for the sibling action-body `first`-embedded
     /// form.
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     /// Multiplicity of the succession feature itself, e.g. `[seBeforeNum]`.
     pub multiplicity: Option<Node<Multiplicity>>,
     pub source: Node<Expression>,
@@ -1556,7 +1563,7 @@ pub struct Bind {
     /// prefix (e.g. `binding [1] bind ...`).
     pub binding_name: Option<String>,
     /// Type of the binding connector itself, e.g. `binding ab1 : AB bind a = b;`.
-    pub binding_type: Option<String>,
+    pub binding_type: Option<QualifiedReferenceId>,
     /// Multiplicity of the binding connector feature itself, e.g. `binding [1] bind ...`
     /// (Systems Library `Domain Libraries/Geometry/ShapeItems.sysml`).
     pub binding_multiplicity: Option<Node<Multiplicity>>,
@@ -1587,7 +1594,7 @@ pub enum InterfaceUsage {
     /// (`Connection` variant) forms were reachable.
     TypedConnect {
         name: Option<String>,
-        interface_type: Option<String>,
+        interface_type: Option<QualifiedReferenceId>,
         from: Node<Expression>,
         to: Node<Expression>,
         body: ConnectBody,
@@ -1608,7 +1615,7 @@ pub enum InterfaceUsage {
     /// to` form.
     Declaration {
         name: Option<String>,
-        interface_type: Option<String>,
+        interface_type: Option<QualifiedReferenceId>,
         body: ConnectBody,
         body_elements: Vec<Node<InterfaceUsageBodyElement>>,
     },
@@ -1620,7 +1627,7 @@ pub enum InterfaceUsage {
 pub enum InterfaceUsageBodyElement {
     /// `ref` `:>>` name `=` value body.
     RefRedef {
-        name: String,
+        target: QualifiedReferenceId,
         value: Node<Expression>,
         body: RefBody,
     },
@@ -1639,6 +1646,8 @@ pub struct Connect {
     pub from: Node<ConnectionEnd>,
     pub to: Node<ConnectionEnd>,
     pub body: ConnectBody,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1652,13 +1661,10 @@ pub struct AliasDef {
     pub identification: Identification,
     /// The aliased element's qualified name, e.g. `ISQ::mass` in `alias m for ISQ::mass;`.
     ///
-    /// Structured the same way as [`crate::ast::TypingRelationship::target`]/
-    /// [`crate::ast::SubsettingRelationship::target`] (parser work item 2) rather than a plain
-    /// joined `String`, so `::`-qualified segments stay distinguishable and the target carries
-    /// its own span. Unlike those fields this is a single [`crate::ast::RelationshipTarget`], not
-    /// a `Vec` -- an alias target (`[QualifiedName]` per the grammar) is always exactly one
-    /// qualified name, with no comma-separated multi-target concept (parser work item 4a).
-    pub target: RelationshipTarget,
+    /// This is one document-local arena identity rather than a `Vec`: an alias target
+    /// (`[QualifiedName]` per the grammar) is always exactly one qualified name, with no
+    /// comma-separated multi-target concept.
+    pub target: crate::ast::QualifiedReferenceId,
     pub body: AliasBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006 continuation), `kind`
     /// always [`crate::ast::MembershipKind::Alias`] -- the variant reserved for this struct since

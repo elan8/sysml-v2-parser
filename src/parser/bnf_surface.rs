@@ -49,10 +49,9 @@ pub(crate) fn definition_declaration_surface(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -101,13 +100,13 @@ mod tests {
     #[test]
     fn bnf_lexical_terminals() {
         use crate::parser::lex::{
-            decimal_value_text, qualified_name, string_value, ws_and_comments,
+            decimal_value_text, qualified_reference, string_value, ws_and_comments,
         };
         use crate::parser::usage::{feature_usage_header, multiplicity, typings};
         let _ = name(span_input("foo")).expect("NAME");
         let _ = string_value(span_input("'bar'")).expect("STRING_VALUE");
         let _ = decimal_value_text(span_input("42")).expect("DECIMAL_VALUE");
-        let _ = qualified_name(span_input("A::B")).expect("QualifiedName");
+        let _ = qualified_reference(span_input("A::B")).expect("QualifiedName");
         let _ = ws_and_comments(span_input("  // c\n x")).expect("WHITE_SPACE");
         let _ = multiplicity(span_input("[1..*]")).expect("Multiplicity");
         let _ = typings(span_input(": Type ;")).expect("Typings");

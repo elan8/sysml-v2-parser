@@ -1,7 +1,6 @@
 //! Span, Node, Expression, and shared AST traits.
 
-use super::feature_chain::FeatureChain;
-use super::relationship_target::RelationshipTarget;
+use super::{QualifiedReferenceId, ReferenceSeparator};
 
 /// Source location: byte offset, line, column, and length in the source file.
 /// Line and column are **1-based**. Use [`Span::to_lsp_range`] for 0-based LSP ranges.
@@ -225,10 +224,19 @@ pub enum Expression {
     LiteralReal(String),
     LiteralString(String),
     LiteralBoolean(bool),
+    /// Authored unit token inside brackets. Units may contain operators such as `/` and `^`, so
+    /// they are not qualified references.
+    Unit(String),
+    /// Opaque recovery text retained when a malformed expression cannot be structured.
+    Opaque(String),
     /// Single name or qualified name.
-    FeatureRef(String),
+    FeatureRef(QualifiedReferenceId),
     /// base.member (e.g. engine.fuelCmdPort).
-    MemberAccess(Box<Node<Expression>>, String),
+    MemberAccess {
+        base: Box<Node<Expression>>,
+        member: QualifiedReferenceId,
+        separator: ReferenceSeparator,
+    },
     /// base#(index) e.g. frontWheel#(1).
     Index {
         base: Box<Node<Expression>>,
@@ -261,28 +269,28 @@ pub enum Expression {
     Tuple(Vec<Node<Expression>>),
     /// Metadata classification: `@Metaclass` (e.g. `@SysML::PartUsage`).
     Classification {
-        metaclass: String,
+        metaclass: QualifiedReferenceId,
     },
     /// Reflective meta cast: `expr meta Metaclass` (e.g. `userActions meta SysML::Usage`).
     MetaCast {
         base: Box<Node<Expression>>,
-        metaclass: String,
+        metaclass: QualifiedReferenceId,
     },
     /// Type test: `expr istype Type`, `expr hastype Type`, or `expr as Type`.
     TypeCheck {
         kind: TypeCheckKind,
         operand: Option<Box<Node<Expression>>>,
-        type_name: String,
+        type_name: QualifiedReferenceId,
     },
     /// Select expression: `base.?selector`.
     Select {
         base: Box<Node<Expression>>,
-        selector: String,
+        selector: QualifiedReferenceId,
     },
     /// Collect expression: `base.**selector`.
     Collect {
         base: Box<Node<Expression>>,
-        selector: String,
+        selector: QualifiedReferenceId,
     },
     /// KerML null or empty sequence ().
     Null,
@@ -292,18 +300,18 @@ pub enum Expression {
     /// (carried by the enclosing `Node`) includes them.
     Parenthesized(Box<Node<Expression>>),
     /// Constructor/instantiation expression: `new Type(...)` (KerML `ConstructorExpression`,
-    /// BNF 8.2.5.8.3). `type_name` is the qualified type name (consistent with how
-    /// [`Expression::TypeCheck`]/[`Expression::MetaCast`]/[`Expression::Classification`] already
-    /// represent qualified type references as plain strings rather than [`FeatureChain`] --
-    /// `new Foo::Bar(...)` names a *type*, not a dot-separated feature access path).
+    /// BNF 8.2.5.8.3). `type_name` is an arena-backed qualified type reference, consistent with
+    /// [`Expression::TypeCheck`], [`Expression::MetaCast`], and
+    /// [`Expression::Classification`]. `new Foo::Bar(...)` names a type, not a dotted feature
+    /// access path.
     Constructor {
-        type_name: String,
+        type_name: QualifiedReferenceId,
         args: Vec<Argument>,
     },
-    /// Multi-segment dotted feature-chain reference, e.g. `engine.fuelCmdPort.flowRate`
-    /// (PAR-005 item 3, using the standalone [`FeatureChain`] type built for exactly this by
-    /// PAR-004 item 6). A single, unchained name stays [`Expression::FeatureRef`].
-    FeatureChainRef(FeatureChain),
+    /// Multi-segment dotted feature-chain reference, e.g. `engine.fuelCmdPort.flowRate`.
+    /// The arena view preserves each `.`/`::` separator and segment span; a single, unchained
+    /// name stays [`Expression::FeatureRef`].
+    FeatureChainRef(QualifiedReferenceId),
     /// KerML collection-operator invocation via `->`, e.g. `xs->collect(f)`, `xs->select(p)`,
     /// `xs->size()`, `xs->includes(x)` (PAR-005 item 2). Distinguished from a generic
     /// [`Expression::Invocation`] so the specific operator is recoverable from the AST without
@@ -330,7 +338,7 @@ pub enum Expression {
     },
     /// Extent expression: `all QualifiedName` (KerML; validation `10b`).
     Extent {
-        target: String,
+        target: QualifiedReferenceId,
     },
 }
 
@@ -346,7 +354,7 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
     }
 
     match expr {
-        Expression::MemberAccess(base, _)
+        Expression::MemberAccess { base, .. }
         | Expression::Bracket(base)
         | Expression::Parenthesized(base)
         | Expression::MetadataAccess(base)
@@ -402,6 +410,8 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
         | Expression::LiteralReal(_)
         | Expression::LiteralString(_)
         | Expression::LiteralBoolean(_)
+        | Expression::Unit(_)
+        | Expression::Opaque(_)
         | Expression::FeatureRef(_)
         | Expression::Classification { .. }
         | Expression::Null
@@ -432,9 +442,9 @@ impl Drop for Expression {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Argument {
-    /// `Some(name)` for a named argument (the redefined parameter name to the left of `=`);
-    /// `None` for a positional argument.
-    pub name: Option<String>,
+    /// `Some(parameter)` for a named argument (the redefined parameter reference to the left of
+    /// `=`); `None` for a positional argument.
+    pub parameter: Option<QualifiedReferenceId>,
     pub value: Node<Expression>,
 }
 
@@ -562,16 +572,15 @@ pub enum TypingKind {
 /// ISQ::mass;` (typing) or the `Vehicle` in `part def Car :> Vehicle;` (subclassification)
 /// (PAR-004 item 1, folding in PAR-003's conjugation concept from item 4).
 ///
-/// The target is a list of [`RelationshipTarget`]s (parser work item 2, post-PAR-006) rather than
-/// a single joined `String`: a `:` / `:>` clause can name more than one comma-separated target
-/// (e.g. `:> Base, Other`), and each target's `::`- vs. `.`-separated segments are kept distinct
-/// instead of being collapsed into one opaque string. Almost always has exactly one element --
-/// use [`TypingRelationship::first_target`] for that common case.
+/// The target is a list of document-local [`QualifiedReferenceId`]s rather than a joined string:
+/// a `:` / `:>` clause can name more than one comma-separated target (e.g. `:> Base, Other`), and
+/// the shared arena keeps every target's `::`- vs. `.`-separated segments distinct. Almost always
+/// has exactly one element -- use [`TypingRelationship::first_target`] for that common case.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypingRelationship {
     /// The type/supertype target(s), e.g. `[ISQ::mass]`. Always has at least one element.
-    pub target: Vec<Node<RelationshipTarget>>,
+    pub target: Vec<QualifiedReferenceId>,
     pub kind: TypingKind,
     /// Span of the whole relationship fragment (operator/keyword through target), when known.
     pub span: Span,
@@ -603,19 +612,8 @@ impl TypingRelationship {
     /// The single target for the overwhelmingly common case of a `:`/`:>` clause naming exactly
     /// one type. Returns the first target when a rare comma-separated multi-target clause is
     /// present, and `None` only if `target` is unexpectedly empty.
-    pub fn first_target(&self) -> Option<&RelationshipTarget> {
-        self.target.first().map(|n| &n.value)
-    }
-
-    /// All targets rebuilt into a single `", "`-joined display string (e.g.
-    /// `"Base"` or `"Base, Other"`), for callers that only need the textual form and don't care
-    /// about per-target `::`/`.` segment structure.
-    pub fn target_display(&self) -> String {
-        self.target
-            .iter()
-            .map(|n| n.value.to_display_string())
-            .collect::<Vec<_>>()
-            .join(", ")
+    pub fn first_target(&self) -> Option<QualifiedReferenceId> {
+        self.target.first().copied()
     }
 }
 
@@ -648,7 +646,7 @@ pub struct SubsettingRelationship {
     /// The subsetted/redefined/crossed target(s), e.g. `[rearWheel]`. A clause can name more than
     /// one comma-separated target; almost always has exactly one element -- use
     /// [`SubsettingRelationship::first_target`] for that common case.
-    pub target: Vec<Node<RelationshipTarget>>,
+    pub target: Vec<QualifiedReferenceId>,
     pub kind: SubsettingKind,
     /// Span of the whole relationship fragment (operator/keyword through target).
     pub span: Span,
@@ -670,19 +668,8 @@ impl SubsettingRelationship {
     /// The single target for the overwhelmingly common case of a subsetting-family clause naming
     /// exactly one target. Returns the first target when a rare comma-separated multi-target
     /// clause is present, and `None` only if `target` is unexpectedly empty.
-    pub fn first_target(&self) -> Option<&RelationshipTarget> {
-        self.target.first().map(|n| &n.value)
-    }
-
-    /// All targets rebuilt into a single `", "`-joined display string (e.g.
-    /// `"wheel"` or `"a, b"`), for callers that only need the textual form and don't care about
-    /// per-target `::`/`.` segment structure.
-    pub fn target_display(&self) -> String {
-        self.target
-            .iter()
-            .map(|n| n.value.to_display_string())
-            .collect::<Vec<_>>()
-            .join(", ")
+    pub fn first_target(&self) -> Option<QualifiedReferenceId> {
+        self.target.first().copied()
     }
 }
 
@@ -725,29 +712,6 @@ impl Eq for ConnectionEnd {}
 /// call sites can name "interface end" vs. "connection end" for readability without pretending
 /// they're semantically different today.
 pub type InterfaceEnd = ConnectionEnd;
-
-impl Multiplicity {
-    /// Renders the multiplicity back to canonical bracket text, e.g. `[1]`, `[0..1]`, `[1..*]`.
-    /// Literal integer bounds and the unbounded `*` render exactly; other bound expressions fall
-    /// back to their `Debug` form. Intended for tests/diagnostics, not for round-tripping source.
-    pub fn to_bracket_string(&self) -> String {
-        fn bound_str(bound: &Option<Box<Node<Expression>>>) -> String {
-            match bound {
-                None => "*".to_string(),
-                Some(node) => match &node.value {
-                    Expression::LiteralInteger(i) => i.to_string(),
-                    Expression::FeatureRef(name) => name.clone(),
-                    other => format!("{other:?}"),
-                },
-            }
-        }
-        if self.lower == self.upper {
-            format!("[{}]", bound_str(&self.lower))
-        } else {
-            format!("[{}..{}]", bound_str(&self.lower), bound_str(&self.upper))
-        }
-    }
-}
 
 impl Expression {
     /// Whether this expression node is a literal Boolean.

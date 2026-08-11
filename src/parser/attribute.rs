@@ -7,8 +7,8 @@ use crate::ast::{
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::lex::{
-    capture_opaque_member, identification, name, short_name_prefix, starts_with_keyword,
-    subset_operator, ws1, ws_and_comments,
+    capture_opaque_member, identification, name, qualified_reference, short_name_prefix,
+    starts_with_keyword, subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -282,7 +282,8 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (_, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, target) = qualified_reference(input)?;
     if is_reserved_shorthand_starter(&name_str) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
@@ -293,6 +294,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
     // (before `name_span`) isn't separately tracked here, matching how this ad hoc prefix shape
     // (distinct from `usage::specialization_clauses`) has always worked.
     let prefix_span = crate::parser::span_from_to(start, input);
+    let target_only = prefix.is_some();
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
         .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
@@ -309,7 +311,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
             Some(single_target_subsetting(
                 prefix_span,
                 SubsettingKind::Subsets,
-                name_str.clone(),
+                target,
             )),
             None,
         ),
@@ -318,7 +320,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
             Some(single_target_subsetting(
                 prefix_span,
                 SubsettingKind::Redefines,
-                name_str.clone(),
+                target,
             )),
         ),
         None => (None, None),
@@ -329,7 +331,9 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
             start,
             input,
             AttributeUsage {
-                name: name_str,
+                // A prefix form (`:>> target` / `:> target`) names a semantic target, not a new
+                // declaration. Its spelling lives only in the arena-backed relationship.
+                name: if target_only { String::new() } else { name_str },
                 short_name: None,
                 typing,
                 subsets,
@@ -339,7 +343,7 @@ fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<Attrib
                 intersects: None,
                 value,
                 body,
-                name_span: Some(name_span),
+                name_span: (!target_only).then_some(name_span),
                 typing_span,
                 redefines_span: None,
                 direction: None,
@@ -823,12 +827,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             (
                 input,
                 None,
-                redefines
-                    .value
-                    .first_target()
-                    .and_then(|t| t.local_name())
-                    .unwrap_or_default()
-                    .to_string(),
+                String::new(),
                 typing_span,
                 typing,
                 Some(redefines_span),
@@ -850,12 +849,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             (
                 input,
                 None,
-                references
-                    .value
-                    .first_target()
-                    .and_then(|t| t.local_name())
-                    .unwrap_or_default()
-                    .to_string(),
+                String::new(),
                 typing_span,
                 typing,
                 None,
@@ -880,12 +874,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             (
                 input,
                 None,
-                subsets
-                    .value
-                    .first_target()
-                    .and_then(|t| t.local_name())
-                    .unwrap_or_default()
-                    .to_string(),
+                String::new(),
                 typing_span,
                 typing,
                 None,
@@ -1009,7 +998,8 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (_, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, target) = qualified_reference(input)?;
     if is_reserved_shorthand_starter(&name_str) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
@@ -1033,7 +1023,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
             Some(single_target_subsetting(
                 prefix_span,
                 SubsettingKind::Subsets,
-                name_str.clone(),
+                target,
             )),
             None,
         ),
@@ -1042,7 +1032,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
             Some(single_target_subsetting(
                 prefix_span,
                 SubsettingKind::Redefines,
-                name_str.clone(),
+                target,
             )),
         ),
         None => (None, None),
@@ -1190,25 +1180,31 @@ pub(crate) fn attribute_usage_shorthand(
 #[cfg(test)]
 mod attribute_body_tests {
     use super::*;
-    use crate::parser::usage::targets_display_string;
+    use crate::ast::{Expression, QualifiedReferenceId};
     use crate::parser::Input;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    fn target_texts(source: Input<'_>, targets: &[QualifiedReferenceId]) -> Vec<String> {
+        targets
+            .iter()
+            .map(|id| crate::parser::usage::reference_text(source, *id).expect("reference text"))
+            .collect()
     }
 
     #[test]
     fn attribute_usage_captures_intersects() {
-        let (rest, node) = attribute_usage(input("attribute reading : Weight intersects a, b;"))
-            .expect("attribute usage");
+        let source = input("attribute reading : Weight intersects a, b;");
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value
                 .intersects
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("a, b".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["a".to_string(), "b".to_string()])
         );
     }
 
@@ -1216,21 +1212,22 @@ mod attribute_body_tests {
     fn feature_binding_parses_unit_conversion_prefix_form() {
         let text =
             ":>> unitConversion: ConversionByPrefix { :>> prefix = kilo; :>> referenceUnit = m; }";
-        let (rest, node) = attribute_feature_binding(input(text)).expect("feature binding");
+        let source = input(text);
+        let (rest, node) = attribute_feature_binding(source).expect("feature binding");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value
                 .redefines
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("unitConversion".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["unitConversion".to_string()])
         );
         assert_eq!(
             node.value
                 .typing
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("ConversionByPrefix".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["ConversionByPrefix".to_string()])
         );
         let AttributeBody::Brace { elements } = &node.value.body else {
             panic!("expected brace body");
@@ -1241,15 +1238,16 @@ mod attribute_body_tests {
     #[test]
     fn attribute_usage_accepts_leading_visibility_modifier() {
         let text = "private attribute zeroDegreeCelsiusInKelvin: ThermodynamicTemperatureValue = 273.15 [K];";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "zeroDegreeCelsiusInKelvin");
         assert_eq!(
             node.value
                 .typing
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("ThermodynamicTemperatureValue".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["ThermodynamicTemperatureValue".to_string()])
         );
         assert!(node.value.value.is_some());
     }
@@ -1329,7 +1327,11 @@ mod attribute_body_tests {
         assert!(node.value.ordered);
         assert!(!node.value.nonunique);
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
-        assert_eq!(multiplicity.value.to_bracket_string(), "[0..*]");
+        assert!(matches!(
+            multiplicity.value.lower.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(0))
+        ));
+        assert!(multiplicity.value.upper.is_none());
     }
 
     #[test]
@@ -1339,13 +1341,12 @@ mod attribute_body_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.nonunique);
         assert!(!node.value.ordered);
-        assert_eq!(
-            node.value
-                .multiplicity
-                .as_ref()
-                .map(|m| m.value.to_bracket_string()),
-            Some("[0..*]".to_owned())
-        );
+        let multiplicity = node.value.multiplicity.expect("multiplicity retained");
+        assert!(matches!(
+            multiplicity.value.lower.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(0))
+        ));
+        assert!(multiplicity.value.upper.is_none());
     }
 
     #[test]
@@ -1355,7 +1356,14 @@ mod attribute_body_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.ordered);
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
-        assert_eq!(multiplicity.value.to_bracket_string(), "[0..1]");
+        assert!(matches!(
+            multiplicity.value.lower.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(0))
+        ));
+        assert!(matches!(
+            multiplicity.value.upper.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(1))
+        ));
     }
 
     #[test]
@@ -1433,7 +1441,8 @@ mod attribute_body_tests {
     #[test]
     fn attribute_usage_captures_short_name() {
         let text = "attribute <wcf> wheelCoordinateFrame : CoordinateFrame;";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.short_name.as_deref(), Some("wcf"));
         assert_eq!(node.value.name, "wheelCoordinateFrame");
@@ -1441,15 +1450,16 @@ mod attribute_body_tests {
             node.value
                 .typing
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("CoordinateFrame".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["CoordinateFrame".to_string()])
         );
     }
 
     #[test]
     fn attribute_usage_captures_short_name_with_redefines_and_value() {
         let text = "attribute <lbpr> lugBoltPlacementRadius :>> radius default 60 [mm];";
-        let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
+        let source = input(text);
+        let (rest, node) = attribute_usage(source).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.short_name.as_deref(), Some("lbpr"));
         assert_eq!(node.value.name, "lugBoltPlacementRadius");
@@ -1457,8 +1467,8 @@ mod attribute_body_tests {
             node.value
                 .redefines
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("radius".to_string())
+                .map(|n| target_texts(source, &n.value.target)),
+            Some(vec!["radius".to_string()])
         );
         assert!(node.value.value.is_some());
     }

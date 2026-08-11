@@ -9,7 +9,6 @@ use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_a
 use crate::parser::node_from_to;
 use crate::parser::usage::{
     conjugated_qualified_name, feature_usage_header, multiplicity_node, optional_typings,
-    targets_display_string,
 };
 use crate::parser::Input;
 use nom::branch::alt;
@@ -85,12 +84,7 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
     if let Ok((after_name, feature_name)) = preceded(ws_and_comments, name).parse(input) {
         if let Ok((after_typing, Some((_, is_conjugated, targets)))) = optional_typings(after_name)
         {
-            let base = targets_display_string(&targets);
-            let type_name = Some(if is_conjugated {
-                format!("~{base}")
-            } else {
-                base
-            });
+            let type_name = targets.first().copied();
             let (rest, multiplicity) =
                 nom::combinator::opt(preceded(ws_and_comments, multiplicity_node))
                     .parse(after_typing)?;
@@ -102,6 +96,7 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
                     PayloadFeature {
                         name: Some(feature_name),
                         type_name,
+                        type_is_conjugated: is_conjugated,
                         multiplicity,
                     },
                 ),
@@ -109,10 +104,9 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
         }
     }
     // Bare type reference: no explicit feature name.
-    let (input, (conjugated, target)) =
+    let (input, (is_conjugated, target)) =
         preceded(ws_and_comments, conjugated_qualified_name).parse(input)?;
-    let base = targets_display_string(std::slice::from_ref(&target));
-    let type_name = Some(if conjugated { format!("~{base}") } else { base });
+    let type_name = Some(target);
     let (input, multiplicity) =
         nom::combinator::opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     Ok((
@@ -123,6 +117,7 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
             PayloadFeature {
                 name: None,
                 type_name,
+                type_is_conjugated: is_conjugated,
                 multiplicity,
             },
         ),
@@ -166,7 +161,8 @@ fn flow_usage_named(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
         FlowUsage {
             kind: FlowUsageKind::Flow, // overwritten by caller
             name: Some(name_str),
-            type_name: header.type_name,
+            type_name: header.type_reference,
+            type_is_conjugated: header.type_is_conjugated,
             payload,
             from,
             to,
@@ -188,6 +184,7 @@ fn flow_usage_payload_first(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
             kind: FlowUsageKind::Flow, // overwritten by caller
             name: None,
             type_name: None,
+            type_is_conjugated: false,
             payload,
             from,
             to,
@@ -209,6 +206,7 @@ fn flow_usage_anonymous(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
             kind: FlowUsageKind::Flow,
             name: None,
             type_name: None,
+            type_is_conjugated: false,
             payload: None,
             from: Some(from),
             to: Some(to),
@@ -264,10 +262,9 @@ pub(crate) fn flow_usage(input: Input<'_>) -> IResult<Input<'_>, Node<FlowUsage>
 #[cfg(test)]
 mod payload_first_gap_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     /// PARSER_BACKLOG_ROADMAP.md §6, G12: the payload clause may precede the endpoints, with no
@@ -275,15 +272,22 @@ mod payload_first_gap_tests {
     /// spec Annex `3d-Function-based Behavior-item.sysml`.
     #[test]
     fn flow_usage_accepts_a_payload_before_the_endpoints() {
-        let (rest, node) = flow_usage_member(input(
-            "flow of fuel : Fuel from storageTank.fuelOutPort.fuel to pump.fuelInPort.fuel;",
-        ))
-        .expect("payload-first flow");
+        let source = input(
+            "flow of fuel : $::Payloads::Fuel from storageTank.fuelOutPort.fuel to pump.fuelInPort.fuel;",
+        );
+        let (rest, node) = flow_usage_member(source).expect("payload-first flow");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, None);
         let payload = node.value.payload.expect("payload");
         assert_eq!(payload.value.name.as_deref(), Some("fuel"));
-        assert_eq!(payload.value.type_name.as_deref(), Some("Fuel"));
+        assert_eq!(
+            payload
+                .value
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("$::Payloads::Fuel")
+        );
         assert!(node.value.from.is_some() && node.value.to.is_some());
     }
 
@@ -309,10 +313,9 @@ mod payload_first_gap_tests {
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on FlowDef/FlowUsage ---

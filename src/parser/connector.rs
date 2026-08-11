@@ -32,12 +32,12 @@ use crate::parser::body::{advance_to_closing_brace, relationship_body_annotation
 use crate::parser::expr::path_expression;
 use crate::parser::feature_value::feature_value_part;
 use crate::parser::item::item_usage;
-use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws1, ws_and_comments};
+use crate::parser::lex::{name, qualified_reference, starts_with_keyword, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::occurrence_body::occurrence_usage;
 use crate::parser::usage::{
     cross_subsetting, multiplicity_node, redefinition, reference_subsetting, single_target_typing,
-    subsetting,
+    subsetting, typing_node,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -136,7 +136,7 @@ pub(crate) fn end_decl(
 
     // `::>` / `references` reference subsetting (GH-19): the target is a reference, not a type, so
     // it's modeled via the same structured `SubsettingRelationship` every other reference-
-    // subsetting clause uses -- not folded into `type_name`/typing like the `:` form below.
+    // subsetting clause uses -- not folded into typing like the `:` form below.
     if let Ok((input, references)) = reference_subsetting(input) {
         // Trailing multiplicity on the reference target (e.g. `::> mainSwitch[1]`) is parsed the
         // same way `part_usage_redefines_only`/other subsetting-family callers do: the shared
@@ -146,7 +146,6 @@ pub(crate) fn end_decl(
             opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         let type_ref_span = references.value.span.clone();
-        let type_name = references.value.target_display();
         return Ok((
             input,
             node_from_to(
@@ -154,8 +153,7 @@ pub(crate) fn end_decl(
                 input,
                 EndDecl {
                     name: name_str,
-                    type_name,
-                    uses_derived_syntax: true,
+                    typing: None,
                     references: Some(references),
                     multiplicity: trailing_multiplicity.or(leading_multiplicity),
                     redefines: None,
@@ -184,8 +182,7 @@ pub(crate) fn end_decl(
                 input,
                 EndDecl {
                     name: name_str,
-                    type_name: String::new(),
-                    uses_derived_syntax: false,
+                    typing: None,
                     references: None,
                     multiplicity: leading_multiplicity,
                     redefines: None,
@@ -206,8 +203,7 @@ pub(crate) fn end_decl(
                 input,
                 EndDecl {
                     name: name_str,
-                    type_name: String::new(),
-                    uses_derived_syntax: false,
+                    typing: None,
                     references: None,
                     multiplicity: leading_multiplicity,
                     redefines: None,
@@ -221,16 +217,16 @@ pub(crate) fn end_decl(
     }
 
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, (tilde, (type_ref_span, type_name))) = preceded(
+    let (input, (tilde, (type_ref_span, type_reference))) = preceded(
         ws_and_comments,
-        (opt(tag(&b"~"[..])), with_span(qualified_name)),
+        (opt(tag(&b"~"[..])), with_span(qualified_reference)),
     )
     .parse(input)?;
-    let type_name = if tilde.is_some() {
-        format!("~{type_name}")
-    } else {
-        type_name
-    };
+    let typing = Some(typing_node(
+        type_ref_span.clone(),
+        tilde.is_some(),
+        vec![type_reference],
+    ));
     let (input, trailing_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     // GH-51: `:>>` redefines may trail the typed form, e.g. `end source: Anything :>>
@@ -241,8 +237,8 @@ pub(crate) fn end_decl(
     // to (not instead of) the `:` type -- e.g. `end port p3: P ::> p.p1;` (`Simple Tests/
     // ConjugationTest.sysml`, mirrored from Systems Library `Interfaces.sysml`'s `ref port :>>
     // participant : Port ...` shape). Distinct from the `::>`-instead-of-typing branch above
-    // (`uses_derived_syntax: true`): here typing *was* written, so `uses_derived_syntax` stays
-    // `false` and this only populates the structured `references` field.
+    // (the reference-only branch above): here typing *was* written, so this only additionally
+    // populates the structured `references` field.
     let (input, trailing_references) =
         opt(preceded(ws_and_comments, reference_subsetting)).parse(input)?;
     // GH-85: `crosses` cross-subsetting may also trail the typed form, e.g. `end item cart:
@@ -257,8 +253,7 @@ pub(crate) fn end_decl(
             input,
             EndDecl {
                 name: name_str,
-                type_name,
-                uses_derived_syntax: false,
+                typing,
                 references: trailing_references,
                 multiplicity: trailing_multiplicity.or(leading_multiplicity),
                 redefines,
@@ -343,21 +338,18 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // participant[2] nonunique ordered;` (`Interfaces.sysml`).
     let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
 
-    let (input, type_ref_span, type_name, typing) = {
+    let (input, type_ref_span, typing) = {
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let (input, (type_ref_span, type_name)) = preceded(
                 ws_and_comments,
-                preceded(tag(&b":"[..]), with_span(qualified_name)),
+                preceded(tag(&b":"[..]), with_span(qualified_reference)),
             )
             .parse(input)?;
-            let typing = Some(single_target_typing(
-                type_ref_span.clone(),
-                type_name.clone(),
-            ));
-            (input, Some(type_ref_span), type_name, typing)
+            let typing = Some(single_target_typing(type_ref_span.clone(), type_name));
+            (input, Some(type_ref_span), typing)
         } else {
-            (input, None, String::new(), None)
+            (input, None, None)
         }
     };
     let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
@@ -395,7 +387,6 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             RefDecl {
                 direction: None,
                 name: name_str,
-                type_name,
                 typing,
                 subsets,
                 redefines,
@@ -546,10 +537,9 @@ pub(crate) fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectS
 #[cfg(test)]
 mod end_decl_kind_tests {
     use super::end_decl;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> crate::parser::Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -563,7 +553,13 @@ mod end_decl_kind_tests {
         .expect("end feature");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "source");
-        assert_eq!(node.value.type_name, "Occurrence");
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
         assert!(node.value.redefines.is_some());
     }
 
@@ -576,7 +572,13 @@ mod end_decl_kind_tests {
         .expect("end occurrence");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "source");
-        assert_eq!(node.value.type_name, "Occurrence");
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
         assert!(node.value.redefines.is_some());
         assert!(node.value.nested_usage.is_none());
     }

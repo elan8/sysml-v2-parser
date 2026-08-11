@@ -1,12 +1,12 @@
 //! Shared usage grammar fragments from `UsageDeclaration` / `FeatureSpecializationPart`.
 
 use crate::ast::{
-    Expression, Multiplicity, Node, RelationshipTarget, RelationshipTargetSegment,
-    SegmentSeparator, Span, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
+    Expression, Multiplicity, Node, QualifiedReferenceId, Span, SubsettingKind,
+    SubsettingRelationship, TypingKind, TypingRelationship,
 };
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    crosses_operator, name, qualified_name_segments, redefine_operator, references_operator,
+    crosses_operator, qualified_reference, redefine_operator, reference_path, references_operator,
     starts_with_keyword, subset_operator, typed_by_operator, ws_and_comments,
 };
 use crate::parser::{span_from_to, Input};
@@ -29,7 +29,8 @@ pub(crate) struct SpecializationClauses {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct UsageHeader {
-    pub type_name: Option<String>,
+    pub type_reference: Option<QualifiedReferenceId>,
+    pub type_is_conjugated: bool,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub references: Option<Node<SubsettingRelationship>>,
@@ -146,16 +147,40 @@ pub(crate) fn multiplicity_node(input: Input<'_>) -> IResult<Input<'_>, Node<Mul
 
 /// `(span, is_conjugated, targets)` for a parsed `typings`/`optional_typings` clause -- see
 /// [`typings`] for what each field means.
-pub(crate) type TypingsResult = (Span, bool, Vec<Node<RelationshipTarget>>);
+pub(crate) type TypingsResult = (Span, bool, Vec<QualifiedReferenceId>);
+
+#[cfg(test)]
+fn slice_reference_span(input: Input<'_>, span: Span) -> Option<String> {
+    let relative = span.offset.checked_sub(input.location_offset())?;
+    let end = relative.checked_add(span.len)?;
+    input
+        .fragment()
+        .get(relative..end)
+        .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+}
+
+/// Resolve a parsed reference's exact authored spelling while the originating input is live.
+#[cfg(test)]
+pub(crate) fn reference_text(input: Input<'_>, id: QualifiedReferenceId) -> Option<String> {
+    slice_reference_span(input, input.extra.reference_span(id)?)
+}
+
+/// Preserve legacy display-only fields while semantic relationships store arena IDs.
+#[cfg(test)]
+pub(crate) fn reference_list_text(input: Input<'_>, ids: &[QualifiedReferenceId]) -> String {
+    ids.iter()
+        .filter_map(|id| reference_text(input, *id))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
 
 /// Typings: `:` / `defined by` one or more qualified names, with optional conjugated `~`.
 ///
 /// Returns `(span, is_conjugated, targets)`: `is_conjugated` reflects the first (and, per
-/// SysML v2, realistically only) target's leading `~`; each target in `targets` has any `~`
-/// stripped (callers that have a real `TypingRelationship` node to populate should use
-/// `is_conjugated` directly instead of re-embedding `~` into a target). `targets` almost always
-/// has exactly one element -- a comma-separated multi-target `:`/`defined by` clause is rare but
-/// legal and is no longer collapsed into a single joined string (parser work item 2).
+/// SysML v2, realistically only) target's leading `~`; each arena identity excludes that prefix
+/// (callers that populate a `TypingRelationship` should use `is_conjugated` directly). `targets`
+/// almost always has exactly one element, but a legal comma-separated clause retains one identity
+/// per target.
 pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, TypingsResult> {
     let before = input;
     let (input, _) = preceded(ws_and_comments, typed_by_operator).parse(input)?;
@@ -167,7 +192,9 @@ pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, TypingsResult> {
     ))
     .parse(input)?;
     let mut targets = vec![first];
-    targets.extend(rest.into_iter().map(|(_, target)| target));
+    for (_, target) in rest {
+        targets.push(target);
+    }
     Ok((
         input,
         (span_from_to(before, input), first_conjugated, targets),
@@ -191,86 +218,41 @@ pub(crate) fn optional_typings(input: Input<'_>) -> IResult<Input<'_>, Option<Ty
     Ok((input, None))
 }
 
-/// Join relationship targets into a single `", "`-separated display string, for the plain
-/// `type_name: String` fields several usage structs carry (distinct from
-/// `TypingRelationship`/`SubsettingRelationship.target`, which keep the structured
-/// `Vec<Node<RelationshipTarget>>` -- see `crate::ast::relationship_target` module docs). Matches
-/// this crate's historical joined-string behavior for those display-only fields.
-pub(crate) fn targets_display_string(targets: &[Node<RelationshipTarget>]) -> String {
-    targets
-        .iter()
-        .map(|t| t.value.to_display_string())
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-/// Turn a `typings`/`optional_typings` result into the `(type_ref_span, type_name, typing)`
-/// triple several usage structs carry: a display-string span/name (joined, `~`-conjugated when
-/// applicable) alongside the structured, multi-target-capable `typing` node. Factors out the
-/// pattern `part_usage_named`/`anonymous_part_usage`/`action_ref_decl` each need.
-pub(crate) fn typing_fields_from_result(
+pub(crate) fn typing_reference_fields_from_result(
     result: Option<TypingsResult>,
-) -> (Option<Span>, String, Option<Node<TypingRelationship>>) {
-    let typing = result
-        .clone()
-        .map(|(span, is_conjugated, targets)| typing_node(span, is_conjugated, targets));
-    let (type_ref_span, type_name) = result
-        .map(|(span, is_conjugated, targets)| {
-            let t = targets_display_string(&targets);
-            (Some(span), if is_conjugated { format!("~{t}") } else { t })
-        })
-        .unwrap_or((None, String::new()));
-    (type_ref_span, type_name, typing)
-}
-
-/// Build a `Node<RelationshipTarget>` from segments and the span they cover.
-fn relationship_target_node(
-    segments: Vec<RelationshipTargetSegment>,
-    span: Span,
-) -> Node<RelationshipTarget> {
-    Node::new(span.clone(), RelationshipTarget { segments, span })
+) -> (
+    Option<Span>,
+    Option<QualifiedReferenceId>,
+    Option<Node<TypingRelationship>>,
+) {
+    let type_ref_span = result.as_ref().map(|(span, _, _)| span.clone());
+    let type_reference = result
+        .as_ref()
+        .and_then(|(_, _, targets)| targets.first().copied());
+    let typing =
+        result.map(|(span, is_conjugated, targets)| typing_node(span, is_conjugated, targets));
+    (type_ref_span, type_reference, typing)
 }
 
 /// Parses an optional leading `~` and a qualified name; returns `(was_conjugated, target)` with
 /// the `~` stripped from the target's segments rather than folded into them.
 pub(crate) fn conjugated_qualified_name(
     input: Input<'_>,
-) -> IResult<Input<'_>, (bool, Node<RelationshipTarget>)> {
-    let before = input;
+) -> IResult<Input<'_>, (bool, QualifiedReferenceId)> {
     let (input, conjugated) = opt(tag(&b"~"[..])).parse(input)?;
-    let (input, segments) = qualified_name_segments(input)?;
-    let span = span_from_to(before, input);
-    Ok((
-        input,
-        (
-            conjugated.is_some(),
-            relationship_target_node(segments, span),
-        ),
-    ))
+    let (input, target) = qualified_reference(input)?;
+    Ok((input, (conjugated.is_some(), target)))
 }
 
 /// A single subsetting-family target: a `::`-qualified name optionally continued with
 /// `.`-separated feature-chain segments, e.g. `Vehicle::mass.value`.
-fn specialization_target(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipTarget>> {
-    let before = input;
-    let (input, mut segments) = qualified_name_segments(input)?;
-    let (input, dotted) = many0(preceded(
-        preceded(ws_and_comments, tag(&b"."[..])),
-        preceded(ws_and_comments, name),
-    ))
-    .parse(input)?;
-    segments.extend(dotted.into_iter().map(|name| RelationshipTargetSegment {
-        name,
-        separator: Some(SegmentSeparator::Dot),
-    }));
-    let span = span_from_to(before, input);
-    Ok((input, relationship_target_node(segments, span)))
+fn specialization_target(input: Input<'_>) -> IResult<Input<'_>, QualifiedReferenceId> {
+    reference_path(input)
 }
 
 /// One or more comma-separated [`specialization_target`]s, e.g. the `Base, Other` in
-/// `:> Base, Other`. Previously joined into a single `", "`-separated string, losing the fact
-/// there were multiple distinct targets (parser work item 2).
-fn specialization_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<Node<RelationshipTarget>>> {
+/// `:> Base, Other`. Each target receives its own document-local identity.
+fn specialization_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<QualifiedReferenceId>> {
     let (input, first) = specialization_target(input)?;
     let (input, rest) = many0(preceded(
         preceded(ws_and_comments, tag(&b","[..])),
@@ -286,12 +268,12 @@ fn specialization_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<Node<Relat
 /// `subsetting_relationship_node` below. Shared by every usage-kind parser that wraps a `:`/
 /// `defined by`/`typed by` clause -- moved here (from `attribute.rs`, its original single caller)
 /// so `PartUsage`/`RefDecl` parsers can reuse the exact same multi-target-capable construction
-/// instead of each hand-rolling a `targets_display_string`-only collapse (S42-004).
+/// so every caller preserves the same arena identities and multi-target structure.
 pub(crate) fn typing_relationship_node(
     span: Span,
     kind: TypingKind,
     is_conjugated: bool,
-    target: Vec<Node<RelationshipTarget>>,
+    target: Vec<QualifiedReferenceId>,
 ) -> Node<TypingRelationship> {
     Node::new(
         span.clone(),
@@ -309,27 +291,28 @@ pub(crate) fn typing_relationship_node(
 pub(crate) fn typing_node(
     span: Span,
     is_conjugated: bool,
-    target: Vec<Node<RelationshipTarget>>,
+    target: Vec<QualifiedReferenceId>,
 ) -> Node<TypingRelationship> {
     typing_relationship_node(span, TypingKind::Typing, is_conjugated, target)
 }
 
-/// Build a single-target `TypingRelationship` from an already-parsed plain qualified-name
-/// string and its span, for the ad hoc `ref`-declaration call sites (`connection.rs`,
-/// `interface.rs`, `part_ref_usage`, `state.rs`) that only ever parse one `:` target via
-/// `qualified_name` rather than the comma-aware `typings`/`optional_typings`. Keeps their
-/// `RefDecl.typing` field populated consistently with the multi-target-capable call sites,
-/// without changing their existing single-target parsing behavior.
-pub(crate) fn single_target_typing(span: Span, name: String) -> Node<TypingRelationship> {
-    let target = Node::new(span.clone(), RelationshipTarget::single(name, span.clone()));
+/// Build a single-target `TypingRelationship` from an already-parsed arena identity and the
+/// surrounding relationship span. Used by ad hoc `ref`-declaration call sites that parse one
+/// `:` target rather than the comma-aware `typings`/`optional_typings` production.
+pub(crate) fn single_target_typing(
+    span: Span,
+    target: QualifiedReferenceId,
+) -> Node<TypingRelationship> {
     typing_node(span, false, vec![target])
 }
 
-/// Build a single-target `redefines`/`:>>` `SubsettingRelationship` from an already-parsed
-/// plain qualified-name string and its span, mirroring [`single_target_typing`] for the same
-/// ad hoc `ref`-declaration call sites.
-pub(crate) fn single_target_redefines(span: Span, name: String) -> Node<SubsettingRelationship> {
-    single_target_subsetting(span, SubsettingKind::Redefines, name)
+/// Build a single-target `redefines`/`:>>` relationship from an already-parsed arena identity,
+/// mirroring [`single_target_typing`] for the same ad hoc `ref`-declaration call sites.
+pub(crate) fn single_target_redefines(
+    span: Span,
+    target: QualifiedReferenceId,
+) -> Node<SubsettingRelationship> {
+    single_target_subsetting(span, SubsettingKind::Redefines, target)
 }
 
 /// Single-target convenience over [`subsetting_relationship_node`] for ad hoc `:>`/`:>>`-family
@@ -340,16 +323,15 @@ pub(crate) fn single_target_redefines(span: Span, name: String) -> Node<Subsetti
 pub(crate) fn single_target_subsetting(
     span: Span,
     kind: SubsettingKind,
-    name: String,
+    target: QualifiedReferenceId,
 ) -> Node<SubsettingRelationship> {
-    let target = Node::new(span.clone(), RelationshipTarget::single(name, span.clone()));
     subsetting_relationship_node(vec![target], kind, span)
 }
 
 /// Build a `SubsettingRelationship` node from target(s) and the span of the whole clause
 /// (operator/keyword through target).
 fn subsetting_relationship_node(
-    target: Vec<Node<RelationshipTarget>>,
+    target: Vec<QualifiedReferenceId>,
     kind: SubsettingKind,
     span: Span,
 ) -> Node<SubsettingRelationship> {
@@ -516,7 +498,7 @@ pub(crate) fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_
 fn merge_usage_header(
     leading: SpecializationClauses,
     trailing: SpecializationClauses,
-    type_result: Option<(Span, bool, Vec<Node<RelationshipTarget>>)>,
+    type_result: Option<TypingsResult>,
 ) -> UsageHeader {
     let subsets = trailing
         .subsets
@@ -527,14 +509,12 @@ fn merge_usage_header(
     let crosses = trailing.crosses.or(leading.crosses);
     let intersects = trailing.intersects.or(leading.intersects);
     UsageHeader {
-        type_name: type_result.map(|(_, is_conjugated, targets)| {
-            let name = targets_display_string(&targets);
-            if is_conjugated {
-                format!("~{name}")
-            } else {
-                name
-            }
-        }),
+        type_is_conjugated: type_result
+            .as_ref()
+            .is_some_and(|(_, is_conjugated, _)| *is_conjugated),
+        type_reference: type_result
+            .as_ref()
+            .and_then(|(_, _, targets)| targets.first().copied()),
         subsets,
         redefines,
         references,
@@ -572,10 +552,9 @@ pub(crate) fn usage_header(input: Input<'_>) -> IResult<Input<'_>, UsageHeader> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -587,7 +566,7 @@ mod tests {
             "first target's leading `~` should be captured"
         );
         assert_eq!(
-            targets_display_string(&targets),
+            reference_list_text(input, &targets),
             "Ports::Fuel, Ports::Command"
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -599,15 +578,21 @@ mod tests {
         let (rest, (_, is_conjugated, targets)) = typings(input).expect("typings");
         assert!(is_conjugated);
         assert_eq!(
-            targets_display_string(&targets),
+            reference_list_text(input, &targets),
             "Ports::Fuel, Ports::Command"
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 
     /// Helper for asserting a `Node<SubsettingRelationship>`'s target/kind in one line.
-    fn rel_target_kind(rel: &Node<SubsettingRelationship>) -> (String, SubsettingKind) {
-        (targets_display_string(&rel.value.target), rel.value.kind)
+    fn rel_target_kind(
+        input: Input<'_>,
+        rel: &Node<SubsettingRelationship>,
+    ) -> (String, SubsettingKind) {
+        (
+            reference_list_text(input, &rel.value.target),
+            rel.value.kind,
+        )
     }
 
     #[test]
@@ -615,7 +600,7 @@ mod tests {
         let input = span_input("subsets wheel = rearWheel[1];");
         let (_, (target, value)) = subsetting(input).expect("subsetting");
         assert_eq!(
-            rel_target_kind(&target),
+            rel_target_kind(input, &target),
             ("wheel".to_string(), SubsettingKind::Subsets)
         );
         assert!(!target.value.is_implied);
@@ -630,11 +615,14 @@ mod tests {
             clauses
                 .subsets
                 .as_ref()
-                .map(|(rel, _)| rel_target_kind(rel)),
+                .map(|(rel, _)| rel_target_kind(input, rel)),
             Some(("latest".to_string(), SubsettingKind::Subsets))
         );
         assert_eq!(
-            clauses.redefines.as_ref().map(rel_target_kind),
+            clauses
+                .redefines
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("newest".to_string(), SubsettingKind::Redefines))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -648,11 +636,14 @@ mod tests {
             clauses
                 .subsets
                 .as_ref()
-                .map(|(rel, _)| rel_target_kind(rel)),
+                .map(|(rel, _)| rel_target_kind(input, rel)),
             Some(("electricGrid.outlets".to_string(), SubsettingKind::Subsets))
         );
         assert_eq!(
-            clauses.redefines.as_ref().map(rel_target_kind),
+            clauses
+                .redefines
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("Vehicle::mass.value".to_string(), SubsettingKind::Redefines))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -666,7 +657,7 @@ mod tests {
             clauses
                 .subsets
                 .as_ref()
-                .map(|(rel, _)| rel_target_kind(rel)),
+                .map(|(rel, _)| rel_target_kind(input, rel)),
             Some((
                 "CoordinateTransformation, List".to_string(),
                 SubsettingKind::Subsets
@@ -675,13 +666,12 @@ mod tests {
         assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
     }
 
-    /// Regression (parser work item 2): a comma-separated multi-target `:>` clause used to be
-    /// collapsed into a single `", "`-joined `String`, losing the fact there were two distinct
-    /// targets. `SubsettingRelationship::target` must now hold one `RelationshipTarget` per
-    /// comma-separated name.
+    /// A comma-separated `:>` clause retains two independently resolvable arena identities.
     #[test]
     fn specialization_clauses_multi_target_stays_structured_not_joined() {
-        let input = span_input(":> CoordinateTransformation, List {");
+        let source = ":> CoordinateTransformation, List {";
+        let context = crate::parser::span::ParseContext::new();
+        let input = context.input(source.as_bytes());
         let (_, clauses) = specialization_clauses(input).expect("specialization clauses");
         let (rel, _value) = clauses.subsets.expect("subsets clause");
         assert_eq!(
@@ -689,66 +679,65 @@ mod tests {
             2,
             "expected two distinct targets, not one joined string"
         );
-        assert_eq!(
-            rel.value.target[0].value.segments,
-            vec![RelationshipTargetSegment {
-                name: "CoordinateTransformation".to_string(),
-                separator: None,
-            }]
-        );
-        assert_eq!(
-            rel.value.target[1].value.segments,
-            vec![RelationshipTargetSegment {
-                name: "List".to_string(),
-                separator: None,
-            }]
-        );
-        assert_eq!(
-            rel.value
-                .first_target()
-                .map(RelationshipTarget::to_display_string),
-            Some("CoordinateTransformation".to_string())
-        );
+        let first = rel.value.target[0];
+        let second = rel.value.target[1];
+        let arena = context.finish();
+        let source = crate::ast::SourceStorage::from(source);
+        let first = arena.get(&source, first).expect("first target view");
+        let second = arena.get(&source, second).expect("second target view");
+        assert_eq!(first.authored_text(), "CoordinateTransformation");
+        assert_eq!(second.authored_text(), "List");
+        assert_eq!(first.segments.len(), 1);
+        assert_eq!(second.segments.len(), 1);
     }
 
     /// Regression (parser work item 2): `Vehicle::mass.value`'s `::` and `.` joins must stay
     /// distinguishable in the segment list, not collapse into one opaque string.
     #[test]
     fn specialization_target_distinguishes_colon_colon_from_dot_segments() {
-        let input = span_input(":>> Vehicle::mass.value ;");
+        let source = ":>> Vehicle::mass.value ;";
+        let context = crate::parser::span::ParseContext::new();
+        let input = context.input(source.as_bytes());
         let (_, target) = redefinition(input).expect("redefinition");
         let first = target.value.first_target().expect("one target");
+        let arena = context.finish();
+        let source = crate::ast::SourceStorage::from(source);
+        let view = arena.get(&source, first).expect("reference view");
+        assert_eq!(view.authored_text(), "Vehicle::mass.value");
+        assert_eq!(view.segments[0].separator_before, None);
         assert_eq!(
-            first.segments,
-            vec![
-                RelationshipTargetSegment {
-                    name: "Vehicle".to_string(),
-                    separator: None
-                },
-                RelationshipTargetSegment {
-                    name: "mass".to_string(),
-                    separator: Some(SegmentSeparator::ColonColon),
-                },
-                RelationshipTargetSegment {
-                    name: "value".to_string(),
-                    separator: Some(SegmentSeparator::Dot),
-                },
-            ]
+            view.segments[1].separator_before,
+            Some(crate::ast::ReferenceSeparator::ColonColon)
         );
-        assert_eq!(first.to_display_string(), "Vehicle::mass.value");
+        assert_eq!(
+            view.segments[2].separator_before,
+            Some(crate::ast::ReferenceSeparator::Dot)
+        );
     }
 
     #[test]
     fn usage_header_accepts_typing_then_specialization() {
         let input = span_input(": Engine :> BasePart :>> oldPart ;");
         let (rest, header) = usage_header(input).expect("usage header");
-        assert_eq!(header.type_name.as_deref(), Some("Engine"));
         assert_eq!(
-            header.subsets.as_ref().map(rel_target_kind),
+            header
+                .type_reference
+                .and_then(|id| reference_text(input, id))
+                .as_deref(),
+            Some("Engine")
+        );
+        assert_eq!(
+            header
+                .subsets
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("BasePart".to_string(), SubsettingKind::Subsets))
         );
         assert_eq!(
-            header.redefines.as_ref().map(rel_target_kind),
+            header
+                .redefines
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("oldPart".to_string(), SubsettingKind::Redefines))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -758,9 +747,18 @@ mod tests {
     fn usage_header_accepts_specialization_then_typing() {
         let input = span_input("subsets base : Engine ;");
         let (rest, header) = usage_header(input).expect("usage header");
-        assert_eq!(header.type_name.as_deref(), Some("Engine"));
         assert_eq!(
-            header.subsets.as_ref().map(rel_target_kind),
+            header
+                .type_reference
+                .and_then(|id| reference_text(input, id))
+                .as_deref(),
+            Some("Engine")
+        );
+        assert_eq!(
+            header
+                .subsets
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("base".to_string(), SubsettingKind::Subsets))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -771,7 +769,7 @@ mod tests {
         let input = span_input("references portA ;");
         let (rest, target) = reference_subsetting(input).expect("references");
         assert_eq!(
-            rel_target_kind(&target),
+            rel_target_kind(input, &target),
             ("portA".to_string(), SubsettingKind::References)
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -782,7 +780,7 @@ mod tests {
         let input = span_input("=> other ;");
         let (rest, target) = cross_subsetting(input).expect("crosses");
         assert_eq!(
-            rel_target_kind(&target),
+            rel_target_kind(input, &target),
             ("other".to_string(), SubsettingKind::Crosses)
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -792,13 +790,25 @@ mod tests {
     fn usage_header_preserves_references_and_crosses() {
         let input = span_input(": T references a crosses b ;");
         let (rest, header) = usage_header(input).expect("usage header");
-        assert_eq!(header.type_name.as_deref(), Some("T"));
         assert_eq!(
-            header.references.as_ref().map(rel_target_kind),
+            header
+                .type_reference
+                .and_then(|id| reference_text(input, id))
+                .as_deref(),
+            Some("T")
+        );
+        assert_eq!(
+            header
+                .references
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("a".to_string(), SubsettingKind::References))
         );
         assert_eq!(
-            header.crosses.as_ref().map(rel_target_kind),
+            header
+                .crosses
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("b".to_string(), SubsettingKind::Crosses))
         );
         assert!(header.subsets.is_none());
@@ -810,11 +820,17 @@ mod tests {
         let input = span_input("references a, b crosses c, d ;");
         let (rest, clauses) = specialization_clauses(input).expect("clauses");
         assert_eq!(
-            clauses.references.as_ref().map(rel_target_kind),
+            clauses
+                .references
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("a, b".to_string(), SubsettingKind::References))
         );
         assert_eq!(
-            clauses.crosses.as_ref().map(rel_target_kind),
+            clauses
+                .crosses
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("c, d".to_string(), SubsettingKind::Crosses))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -825,7 +841,7 @@ mod tests {
         let input = span_input("intersects other ;");
         let (rest, target) = intersecting(input).expect("intersects");
         assert_eq!(
-            rel_target_kind(&target),
+            rel_target_kind(input, &target),
             ("other".to_string(), SubsettingKind::Intersects)
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -836,7 +852,7 @@ mod tests {
         let input = span_input("intersects a, b ;");
         let (rest, target) = intersecting(input).expect("intersects");
         assert_eq!(
-            rel_target_kind(&target),
+            rel_target_kind(input, &target),
             ("a, b".to_string(), SubsettingKind::Intersects)
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -847,15 +863,24 @@ mod tests {
         let input = span_input("subsets a crosses b intersects c, d ;");
         let (rest, clauses) = specialization_clauses(input).expect("clauses");
         assert_eq!(
-            clauses.subsets.as_ref().map(|(t, _)| rel_target_kind(t)),
+            clauses
+                .subsets
+                .as_ref()
+                .map(|(target, _)| rel_target_kind(input, target)),
             Some(("a".to_string(), SubsettingKind::Subsets))
         );
         assert_eq!(
-            clauses.crosses.as_ref().map(rel_target_kind),
+            clauses
+                .crosses
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("b".to_string(), SubsettingKind::Crosses))
         );
         assert_eq!(
-            clauses.intersects.as_ref().map(rel_target_kind),
+            clauses
+                .intersects
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("c, d".to_string(), SubsettingKind::Intersects))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -865,9 +890,18 @@ mod tests {
     fn usage_header_preserves_intersects() {
         let input = span_input(": T intersects a ;");
         let (rest, header) = usage_header(input).expect("usage header");
-        assert_eq!(header.type_name.as_deref(), Some("T"));
         assert_eq!(
-            header.intersects.as_ref().map(rel_target_kind),
+            header
+                .type_reference
+                .and_then(|id| reference_text(input, id))
+                .as_deref(),
+            Some("T")
+        );
+        assert_eq!(
+            header
+                .intersects
+                .as_ref()
+                .map(|rel| rel_target_kind(input, rel)),
             Some(("a".to_string(), SubsettingKind::Intersects))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
@@ -877,10 +911,16 @@ mod tests {
 #[cfg(test)]
 mod multiplicity_node_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+
+    fn literal_bound(bound: &Option<Box<Node<Expression>>>) -> Option<i64> {
+        match bound.as_deref().map(|node| &node.value) {
+            Some(Expression::LiteralInteger(value)) => Some(*value),
+            _ => None,
+        }
+    }
 
     fn parse_ok(src: &str) -> (String, Multiplicity) {
-        let input = LocatedSpan::new(src.as_bytes());
+        let input = crate::parser::span::test_input(src);
         let (rest, node) = multiplicity_node(input).expect("multiplicity_node should parse");
         (
             String::from_utf8_lossy(rest.fragment()).into_owned(),
@@ -891,14 +931,15 @@ mod multiplicity_node_tests {
     #[test]
     fn bare_number_sets_lower_and_upper_equal() {
         let (_, m) = parse_ok("[3]");
-        assert_eq!(m.to_bracket_string(), "[3]");
+        assert_eq!(literal_bound(&m.lower), Some(3));
         assert_eq!(m.lower, m.upper);
     }
 
     #[test]
     fn range_with_upper_bound() {
         let (_, m) = parse_ok("[0..1]");
-        assert_eq!(m.to_bracket_string(), "[0..1]");
+        assert_eq!(literal_bound(&m.lower), Some(0));
+        assert_eq!(literal_bound(&m.upper), Some(1));
     }
 
     #[test]
@@ -908,20 +949,31 @@ mod multiplicity_node_tests {
         // to parse as a primary expression — multiplicity_node must not hand the whole bracket
         // content to expression() in one call, or this panics/hard-errors instead of parsing.
         let (rest, m) = parse_ok("[1..*] ordered : RocketEngine;");
-        assert_eq!(m.to_bracket_string(), "[1..*]");
+        assert_eq!(literal_bound(&m.lower), Some(1));
+        assert!(m.upper.is_none());
         assert_eq!(rest.trim_start(), "ordered : RocketEngine;");
     }
 
     #[test]
     fn bare_unbounded_star() {
         let (_, m) = parse_ok("[*]");
-        assert_eq!(m.to_bracket_string(), "[*]");
         assert!(m.lower.is_none() && m.upper.is_none());
     }
 
     #[test]
     fn bare_feature_ref_bound() {
-        let (_, m) = parse_ok("[seBeforeNum]");
-        assert_eq!(m.to_bracket_string(), "[seBeforeNum]");
+        let input = crate::parser::span::test_input("[seBeforeNum]");
+        let (_, node) = multiplicity_node(input).expect("multiplicity_node should parse");
+        let Some(lower) = node.value.lower else {
+            panic!("feature lower bound");
+        };
+        let Expression::FeatureRef(reference) = lower.value else {
+            panic!("feature-reference lower bound");
+        };
+        assert_eq!(
+            reference_text(input, reference).as_deref(),
+            Some("seBeforeNum")
+        );
+        assert_eq!(node.value.upper.as_deref(), Some(lower.as_ref()));
     }
 }

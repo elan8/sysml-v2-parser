@@ -7,25 +7,25 @@ pub use core::*;
 pub use kerml_fallback::*;
 mod behavior;
 mod common;
-mod feature_chain;
 mod feature_value;
 mod membership;
 mod package;
-mod relationship_target;
+mod qualified_reference;
 mod requirement;
 mod root;
+pub mod semantic_format;
 mod structure;
 mod view;
 
 pub use behavior::*;
 pub use common::*;
-pub use feature_chain::*;
 pub use feature_value::*;
 pub use membership::*;
 pub use package::*;
-pub use relationship_target::*;
+pub use qualified_reference::*;
 pub use requirement::*;
 pub use root::*;
+pub use semantic_format::*;
 pub use structure::*;
 pub use view::*;
 
@@ -52,10 +52,7 @@ fn dummy_node<T: Clone>(_n: &Node<T>, value: T) -> Node<T> {
 }
 
 fn normalize_import(imp: &crate::ast::Import) -> crate::ast::Import {
-    crate::ast::Import {
-        target_span: Span::dummy(),
-        ..imp.clone()
-    }
+    imp.clone()
 }
 
 fn normalize_root_element_node(el: &Node<RootElement>) -> Node<RootElement> {
@@ -617,7 +614,6 @@ fn normalize_part_usage(p: &PartUsage) -> PartUsage {
         is_constant: p.is_constant,
         name: p.name.clone(),
         short_name: p.short_name.clone(),
-        type_name: p.type_name.clone(),
         typing: p.typing.clone(),
         multiplicity: p.multiplicity.clone(),
         ordered: p.ordered,
@@ -647,7 +643,8 @@ fn normalize_perform(p: &Perform) -> Perform {
     Perform {
         usage_prefix: p.usage_prefix.clone(),
         action_name: p.action_name.clone(),
-        type_name: p.type_name.clone(),
+        action_reference: p.action_reference,
+        typing: p.typing.clone(),
         multiplicity: p.multiplicity.clone(),
         redefines: p.redefines.clone(),
         subsets: p.subsets.clone(),
@@ -675,7 +672,7 @@ fn normalize_perform_body_element_node(el: &Node<PerformBodyElement>) -> Node<Pe
             n,
             PerformInOutBinding {
                 direction: n.value.direction,
-                name: n.value.name.clone(),
+                target: n.value.target,
                 value: normalize_expression_node(&n.value.value),
             },
         )),
@@ -704,10 +701,18 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
         Expression::LiteralReal(s) => Expression::LiteralReal(s.clone()),
         Expression::LiteralString(s) => Expression::LiteralString(s.clone()),
         Expression::LiteralBoolean(b) => Expression::LiteralBoolean(*b),
+        Expression::Unit(s) => Expression::Unit(s.clone()),
+        Expression::Opaque(s) => Expression::Opaque(s.clone()),
         Expression::FeatureRef(s) => Expression::FeatureRef(s.clone()),
-        Expression::MemberAccess(base, member) => {
-            Expression::MemberAccess(Box::new(normalize_expression_node(base)), member.clone())
-        }
+        Expression::MemberAccess {
+            base,
+            member,
+            separator,
+        } => Expression::MemberAccess {
+            base: Box::new(normalize_expression_node(base)),
+            member: *member,
+            separator: *separator,
+        },
         Expression::Index { base, index } => Expression::Index {
             base: Box::new(normalize_expression_node(base)),
             index: Box::new(normalize_expression_node(index)),
@@ -769,10 +774,7 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
             type_name: type_name.clone(),
             args: args.iter().map(normalize_argument).collect(),
         },
-        Expression::FeatureChainRef(chain) => Expression::FeatureChainRef(FeatureChain {
-            segments: chain.segments.clone(),
-            span: Span::dummy(),
-        }),
+        Expression::FeatureChainRef(reference) => Expression::FeatureChainRef(*reference),
         Expression::CollectionOp {
             op,
             base,
@@ -805,7 +807,7 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
 
 fn normalize_argument(arg: &Argument) -> Argument {
     Argument {
-        name: arg.name.clone(),
+        parameter: arg.parameter,
         value: normalize_expression_node(&arg.value),
     }
 }
@@ -969,7 +971,7 @@ fn normalize_port_usage(p: &PortUsage) -> PortUsage {
         is_constant: p.is_constant,
         name: p.name.clone(),
         short_name: p.short_name.clone(),
-        type_name: p.type_name.clone(),
+        typing: p.typing.clone(),
         multiplicity: p.multiplicity.clone(),
         subsets: p.subsets.clone(),
         redefines: p.redefines.clone(),
@@ -1236,8 +1238,7 @@ fn normalize_interface_def_body_element_node(
 fn normalize_end_decl(e: &EndDecl) -> EndDecl {
     EndDecl {
         name: e.name.clone(),
-        type_name: e.type_name.clone(),
-        uses_derived_syntax: e.uses_derived_syntax,
+        typing: e.typing.clone(),
         references: e.references.clone(),
         multiplicity: e.multiplicity.clone(),
         redefines: e.redefines.clone(),
@@ -1252,7 +1253,6 @@ fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
     RefDecl {
         direction: r.direction,
         name: r.name.clone(),
-        type_name: r.type_name.clone(),
         typing: r.typing.clone(),
         redefines: r.redefines.clone(),
         subsets: r.subsets.clone(),

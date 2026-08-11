@@ -30,7 +30,6 @@ pub mod diagnostic_catalog;
 mod diagnostics;
 mod enumeration;
 mod expr;
-mod feature_chain;
 mod feature_value;
 mod flow;
 mod import;

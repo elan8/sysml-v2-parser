@@ -8,7 +8,7 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_name, starts_with_keyword, take_until_terminator, visibility_prefix, ws1,
+    name, qualified_reference, starts_with_keyword, take_until_terminator, visibility_prefix, ws1,
     ws_and_comments, STATE_BODY_STARTERS,
 };
 
@@ -246,19 +246,18 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         )),
     )
     .parse(input)?;
-    let (input, (type_ref_span, type_name)) = if uses_shift {
-        (input, (crate::ast::Span::dummy(), String::new()))
+    let (input, type_target) = if uses_shift {
+        (input, None)
     } else {
-        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?
+        let (input, target) =
+            preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
+        (input, Some(target))
     };
-    let typing = if type_name.is_empty() {
-        None
-    } else {
-        Some(crate::parser::usage::single_target_typing(
-            type_ref_span.clone(),
-            type_name.clone(),
-        ))
-    };
+    let type_ref_span = type_target
+        .as_ref()
+        .map(|(span, _)| span.clone())
+        .unwrap_or_else(crate::ast::Span::dummy);
+    let typing = type_target.map(|(span, id)| crate::parser::usage::single_target_typing(span, id));
 
     let (input, _) = ws_and_comments(input)?;
     let (mut input, value) = opt(preceded(
@@ -300,7 +299,6 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             RefDecl {
                 direction: None,
                 name: name_str,
-                type_name,
                 typing,
                 redefines: None,
                 subsets: None,
@@ -314,23 +312,16 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     ))
 }
 
-/// Then (initial state): `then` name `;`
+/// Then (initial state): `then` state-path `;`.
 fn then_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ThenStmt>> {
     let start = input;
     let (input, _) = tag(&b"then"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, (name_span, state_name)) = with_span(name).parse(input)?;
+    let (input, state_reference) = crate::parser::lex::reference_path(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            ThenStmt {
-                state_name,
-                name_span: Some(name_span),
-            },
-        ),
+        node_from_to(start, input, ThenStmt { state_reference }),
     ))
 }
 
@@ -458,7 +449,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
     let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
     let (_type_ref_span, type_name, typing) =
-        crate::parser::usage::typing_fields_from_result(type_result);
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
     let subsets = trailing
         .subsets
         .clone()
@@ -485,11 +476,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
                 is_reference: is_reference.is_some(),
                 is_individual: is_individual.is_some(),
                 name: n,
-                type_name: if type_name.is_empty() {
-                    None
-                } else {
-                    Some(type_name)
-                },
+                type_name,
                 typing,
                 multiplicity,
                 subsets,
@@ -516,10 +503,12 @@ fn transition_effect_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
 }
 
 /// Optional `: Type` suffix on an effect payload/declaration.
-fn transition_effect_type_suffix(input: Input<'_>) -> IResult<Input<'_>, Option<String>> {
+fn transition_effect_type_suffix(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<crate::ast::QualifiedReferenceId>> {
     opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)
 }
@@ -721,10 +710,9 @@ fn transition_tail<'a>(
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on StateDef/StateUsage ---
@@ -752,7 +740,8 @@ mod membership_tests {
 
     #[test]
     fn state_usage_visibility_prefix_is_captured_on_membership() {
-        let (_, node) = state_usage(input("protected state s1 : S1;")).expect("state usage");
+        let source = input("protected state s1 : $::Modes::S1;");
+        let (_, node) = state_usage(source).expect("state usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Protected)
@@ -761,12 +750,30 @@ mod membership_tests {
             node.value.membership.kind,
             crate::ast::MembershipKind::FeatureMembership
         );
+        assert_eq!(
+            node.value
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("$::Modes::S1")
+        );
     }
 
     #[test]
     fn state_usage_without_visibility_prefix_has_no_membership_visibility() {
         let (_, node) = state_usage(input("state s1 : S1;")).expect("state usage");
         assert_eq!(node.value.membership.visibility, None);
+    }
+
+    #[test]
+    fn then_state_target_is_an_arena_backed_reference() {
+        let source = input("then Modes::ready;");
+        let (rest, node) = super::then_stmt(source).expect("then state");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            crate::parser::usage::reference_text(source, node.value.state_reference).as_deref(),
+            Some("Modes::ready")
+        );
     }
 
     #[test]

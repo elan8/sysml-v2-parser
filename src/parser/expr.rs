@@ -1,10 +1,13 @@
 //! Expression and path parsing for values and bind/connect.
 
 use crate::ast::{
-    Argument, BinaryOperator, CollectionOperator, Expression, FeatureChain, Node, Span,
+    Argument, BinaryOperator, CollectionOperator, Expression, Node, ReferenceSeparator, Span,
     TypeCheckKind, UnaryOperator,
 };
-use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws_and_comments};
+use crate::parser::lex::{
+    classified_reference_path, name, qualified_reference, reference_path, starts_with_keyword,
+    ws_and_comments, ReferencePathKind,
+};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -149,7 +152,7 @@ fn literal_boolean(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 fn feature_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, n) = qualified_name(input)?;
+    let (input, n) = qualified_reference(input)?;
     Ok((input, node_from_to(start, input, Expression::FeatureRef(n))))
 }
 
@@ -159,7 +162,7 @@ fn metadata_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"@"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, n) = qualified_name(input)?;
+    let (input, n) = qualified_reference(input)?;
     Ok((
         input,
         node_from_to(start, input, Expression::Classification { metaclass: n }),
@@ -265,7 +268,7 @@ fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         unit_name_span.clone(),
         Expression::Bracket(Box::new(Node::new(
             unit_name_span,
-            Expression::FeatureRef(unit_name),
+            Expression::Unit(unit_name),
         ))),
     );
     let expr = Expression::LiteralWithUnit {
@@ -291,7 +294,7 @@ fn select_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, base) = feature_ref_primary(input)?;
     let (input, _) = tag(&b".?"[..]).parse(input)?;
-    let (input, selector) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, selector) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -310,7 +313,7 @@ fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> 
     let start = input;
     let (input, base) = feature_ref_primary(input)?;
     let (input, _) = tag(&b".**"[..]).parse(input)?;
-    let (input, selector) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, selector) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -389,7 +392,7 @@ fn type_check_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> 
     let start = input;
     let (input, kind) = type_check_kind_token(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, type_name) = qualified_name(input)?;
+    let (input, type_name) = qualified_reference(input)?;
     Ok((
         input,
         node_from_to(
@@ -451,7 +454,7 @@ fn conditional_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expressio
 fn extent_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = keyword_token(input, b"all")?;
-    let (input, target) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     Ok((
         input,
         node_from_to(start, input, Expression::Extent { target }),
@@ -735,7 +738,7 @@ struct ItemState<'a> {
     climb: Climb,
     pending_unary: Vec<UnaryOperator>,
     prefix_start: Input<'a>,
-    arg_name: Option<String>,
+    arg_parameter: Option<crate::ast::QualifiedReferenceId>,
 }
 
 impl<'a> ItemState<'a> {
@@ -744,7 +747,7 @@ impl<'a> ItemState<'a> {
             climb: Climb::default(),
             pending_unary: Vec::new(),
             prefix_start: at,
-            arg_name: None,
+            arg_parameter: None,
         }
     }
 }
@@ -763,7 +766,9 @@ enum FrameKind {
         member: String,
     },
     /// Constructor argument list: `new` type_name `(` args `)`.
-    Constructor { type_name: String },
+    Constructor {
+        type_name: crate::ast::QualifiedReferenceId,
+    },
 }
 
 /// A suspended `(`-delimited list, collecting comma-separated items until its closing `)`.
@@ -793,32 +798,37 @@ impl<'a> Frame<'a> {
     }
 }
 
-/// Look ahead for a KerML named-argument prefix (`NAME '=' ...`), used only when starting a fresh
+/// Look ahead for a KerML named-argument prefix (`reference '=' ...`), used only when starting a fresh
 /// item inside a call-style argument list. Only a lone `=` counts -- `==`/`===` must stay ordinary
 /// equality expressions, so e.g. `f(a == b)` is one positional boolean argument, not `a`-named-`=
 /// b`. On no match, returns the input completely unchanged so normal atom parsing proceeds (`a ==
 /// b` as a positional value, or `a` as a positional value followed by `,`/`)`).
-fn named_arg_prefix(input: Input<'_>) -> (Input<'_>, Option<String>) {
+fn named_arg_prefix(input: Input<'_>) -> (Input<'_>, Option<crate::ast::QualifiedReferenceId>) {
+    let checkpoint = input.extra.reference_checkpoint();
     let Ok((ws_input, _)) = ws_and_comments(input) else {
         return (input, None);
     };
-    let Ok((after_name, arg_name)) = name(ws_input) else {
+    let Ok((after_name, parameter)) = reference_path(ws_input) else {
         return (input, None);
     };
     let Ok((after_ws, _)) = ws_and_comments(after_name) else {
+        input.extra.rollback_references(checkpoint);
         return (input, None);
     };
     let frag = after_ws.fragment();
     if frag.first() == Some(&b'=') && frag.get(1) != Some(&b'=') {
         let eq_result: IResult<Input<'_>, Input<'_>> = tag(&b"="[..]).parse(after_ws);
         let Ok((after_eq, _)) = eq_result else {
+            input.extra.rollback_references(checkpoint);
             return (input, None);
         };
         let Ok((after_eq, _)) = ws_and_comments(after_eq) else {
+            input.extra.rollback_references(checkpoint);
             return (input, None);
         };
-        (after_eq, Some(arg_name))
+        (after_eq, Some(parameter))
     } else {
+        input.extra.rollback_references(checkpoint);
         (input, None)
     }
 }
@@ -830,11 +840,13 @@ fn named_arg_prefix(input: Input<'_>) -> (Input<'_>, Option<String>) {
 /// identifier via [`primary_atom`] (`new` is not a reserved word in
 /// [`crate::parser::lex::basic_name`]) -- matching the original recursive parser's `alt` fallthrough
 /// from `constructor_expression` to `feature_ref_primary`.
-fn try_constructor_prefix(after_ws: Input<'_>) -> Option<(Input<'_>, String)> {
+fn try_constructor_prefix(
+    after_ws: Input<'_>,
+) -> Option<(Input<'_>, crate::ast::QualifiedReferenceId)> {
     let kw_result: IResult<Input<'_>, Input<'_>> = keyword_token(after_ws, b"new");
     let (after_kw, _) = kw_result.ok()?;
     let (after_kw, _) = ws_and_comments(after_kw).ok()?;
-    qualified_name(after_kw).ok()
+    qualified_reference(after_kw).ok()
 }
 
 /// Build the final node for a frame once its closing `)` has been consumed.
@@ -974,8 +986,8 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                             ));
                             input = after_paren;
                             let (after_lookahead, maybe_name) = named_arg_prefix(input);
-                            if let Some(arg_name) = maybe_name {
-                                state.arg_name = Some(arg_name);
+                            if let Some(parameter) = maybe_name {
+                                state.arg_parameter = Some(parameter);
                                 input = after_lookahead;
                             }
                             continue 'outer;
@@ -1028,8 +1040,8 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                 ));
                 input = after_paren;
                 let (after_lookahead, maybe_name) = named_arg_prefix(input);
-                if let Some(arg_name) = maybe_name {
-                    state.arg_name = Some(arg_name);
+                if let Some(parameter) = maybe_name {
+                    state.arg_parameter = Some(parameter);
                     input = after_lookahead;
                 }
                 continue 'outer;
@@ -1052,8 +1064,12 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             if next.fragment().starts_with(b"::") {
                 let (next, _) = tag(&b"::"[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
-                let (next, member) = name(next)?;
-                let expr = Expression::MemberAccess(Box::new(atom), member);
+                let (next, member) = qualified_reference(next)?;
+                let expr = Expression::MemberAccess {
+                    base: Box::new(atom),
+                    member,
+                    separator: ReferenceSeparator::ColonColon,
+                };
                 atom = node_from_to(primary_start, next, expr);
                 input = next;
                 continue;
@@ -1061,14 +1077,20 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             if next.fragment().starts_with(b".") {
                 let (next, _) = tag(&b"."[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
-                let (next, member) = name(next)?;
+                let member_input = next;
+                let (next, member_text) = name(next)?;
                 // `expr.metadata` is a dedicated KerML production (MetadataAccessExpression, BNF
                 // 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`), distinct from ordinary
                 // member access.
-                let expr = if member == "metadata" {
+                let expr = if member_text == "metadata" {
                     Expression::MetadataAccess(Box::new(atom))
                 } else {
-                    Expression::MemberAccess(Box::new(atom), member)
+                    let (_, member) = qualified_reference(member_input)?;
+                    Expression::MemberAccess {
+                        base: Box::new(atom),
+                        member,
+                        separator: ReferenceSeparator::Dot,
+                    }
                 };
                 atom = node_from_to(primary_start, next, expr);
                 input = next;
@@ -1077,6 +1099,7 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             if next.fragment().starts_with(b"->") {
                 let (next, _) = tag(&b"->"[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
+                let member_input = next;
                 let (next, member) = name(next)?;
                 let (after_name, _) = ws_and_comments(next)?;
                 // Brace-body form: `collection->forAll { in ref w; expr }`
@@ -1118,20 +1141,25 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                     ));
                     input = after_paren;
                     let (after_lookahead, maybe_name) = named_arg_prefix(input);
-                    if let Some(arg_name) = maybe_name {
-                        state.arg_name = Some(arg_name);
+                    if let Some(parameter) = maybe_name {
+                        state.arg_parameter = Some(parameter);
                         input = after_lookahead;
                     }
                     continue 'outer;
                 }
                 // Bare arrow access with no call (rare) -- fall back to plain member access.
-                let expr = Expression::MemberAccess(Box::new(atom), member);
+                let (_, member_ref) = qualified_reference(member_input)?;
+                let expr = Expression::MemberAccess {
+                    base: Box::new(atom),
+                    member: member_ref,
+                    separator: ReferenceSeparator::Dot,
+                };
                 atom = node_from_to(primary_start, next, expr);
                 input = next;
                 continue;
             }
             if let Ok((after_kind, kind)) = type_check_kind_token(next) {
-                if let Ok((after_type, type_name)) = qualified_name(after_kind) {
+                if let Ok((after_type, type_name)) = qualified_reference(after_kind) {
                     let expr = Expression::TypeCheck {
                         kind,
                         operand: Some(Box::new(atom)),
@@ -1145,7 +1173,7 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             if starts_with_keyword(next.fragment(), b"meta") {
                 let (next, _) = tag(&b"meta"[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
-                let (next, metaclass) = qualified_name(next)?;
+                let (next, metaclass) = qualified_reference(next)?;
                 let expr = Expression::MetaCast {
                     base: Box::new(atom),
                     metaclass,
@@ -1190,9 +1218,9 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
         let Some((frame, _)) = stack.last_mut() else {
             return Ok((input, value));
         };
-        let arg_name = state.arg_name.take();
+        let arg_parameter = state.arg_parameter.take();
         frame.items.push(Argument {
-            name: arg_name,
+            parameter: arg_parameter,
             value,
         });
         let allows_comma = frame.allows_comma();
@@ -1204,8 +1232,8 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             state = ItemState::fresh(next);
             if is_call_style {
                 let (after_lookahead, maybe_name) = named_arg_prefix(input);
-                if let Some(arg_name) = maybe_name {
-                    state.arg_name = Some(arg_name);
+                if let Some(parameter) = maybe_name {
+                    state.arg_parameter = Some(parameter);
                     input = after_lookahead;
                 }
             }
@@ -1240,34 +1268,17 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
 /// Path expression: qualified name and/or member access (for bind/connect).
 /// Supports `A`, `A::B::C`, `A.B.C`, and combinations like `A::B.C`.
 ///
-/// A single segment (no `.` chain) stays [`Expression::FeatureRef`]. A genuine multi-segment
-/// dotted chain (`A.B.C`, or `A::B.C`) is captured as [`Expression::FeatureChainRef`] using the
-/// standalone [`FeatureChain`] type built for exactly this -- the first segment carries the full
-/// leading qualified name (which may itself contain `::`), and each subsequent `.`-separated
-/// segment is a plain feature name.
+/// A single segment (or a purely `::`-qualified name) stays [`Expression::FeatureRef`]. A path
+/// containing `.` becomes [`Expression::FeatureChainRef`]. Both variants carry the same shared
+/// arena identity; its borrowed view preserves the authored segments and separator kinds.
 pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    // `qualified_name` covers `::`-separated chains (common in SysML examples for feature chains).
-    let (input, first) = crate::parser::lex::qualified_name(input)?;
-    let mut segments = vec![first];
-    let mut rest = input;
-    loop {
-        let (next, _) = ws_and_comments(rest)?;
-        if !next.fragment().starts_with(b".") {
-            break;
-        }
-        let (next, _) = tag(&b"."[..]).parse(next)?;
-        let (next, _) = ws_and_comments(next)?;
-        let (next, member) = name(next)?;
-        segments.push(member);
-        rest = next;
-    }
-    let span = crate::parser::span_from_to(start, rest);
-    let expr = if segments.len() == 1 {
-        Expression::FeatureRef(segments.remove(0))
-    } else {
-        Expression::FeatureChainRef(FeatureChain { segments, span })
+    // `reference_path` preserves both `::` and `.` separators in the document arena.
+    let (rest, (reference, path_kind)) = classified_reference_path(input)?;
+    let expr = match path_kind {
+        ReferencePathKind::Qualified => Expression::FeatureRef(reference),
+        ReferencePathKind::Dotted => Expression::FeatureChainRef(reference),
     };
     Ok((rest, node_from_to(start, rest, expr)))
 }
@@ -1275,10 +1286,15 @@ pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expre
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    macro_rules! reference_is {
+        ($input:expr, $id:expr, $expected:expr) => {
+            crate::parser::usage::reference_text($input, *$id).as_deref() == Some($expected)
+        };
     }
 
     #[test]
@@ -1302,7 +1318,7 @@ mod tests {
             });
             assert!(rest.fragment().is_empty(), "did not fully consume {text:?}");
             assert!(
-                matches!(&node.value, Expression::FeatureRef(s) if s == text),
+                matches!(&node.value, Expression::FeatureRef(s) if reference_is!(input, s, text)),
                 "expected FeatureRef({text:?}), got {:?}",
                 node.value
             );
@@ -1318,7 +1334,7 @@ mod tests {
             });
             assert!(rest.fragment().is_empty(), "did not fully consume {text:?}");
             assert!(
-                matches!(&node.value, Expression::FeatureRef(s) if s == text),
+                matches!(&node.value, Expression::FeatureRef(s) if reference_is!(input, s, text)),
                 "expected FeatureRef({text:?}), got {:?}",
                 node.value
             );
@@ -1419,7 +1435,9 @@ mod tests {
                     Expression::BinaryOp { op, .. } => assert_eq!(op, &BinaryOperator::Or),
                     other => panic!("expected or on lhs, got {other:?}"),
                 }
-                assert!(matches!(&right.value, Expression::FeatureRef(s) if s == "c"));
+                assert!(
+                    matches!(&right.value, Expression::FeatureRef(s) if reference_is!(input, s, "c"))
+                );
             }
             other => panic!("expected implies, got {other:?}"),
         }
@@ -1433,7 +1451,9 @@ mod tests {
             Expression::CollectionOp { op, base, args, .. } => {
                 assert_eq!(op, &CollectionOperator::Size);
                 assert!(args.is_empty());
-                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "powerProfile"));
+                assert!(
+                    matches!(&base.value, Expression::FeatureRef(s) if reference_is!(input, s, "powerProfile"))
+                );
             }
             other => panic!("expected CollectionOp, got {other:?}"),
         }
@@ -1452,10 +1472,14 @@ mod tests {
                         assert_eq!(op, &CollectionOperator::Other("c".to_string()));
                         assert!(args.is_empty());
                         match &base.value {
-                            Expression::MemberAccess(inner_base, inner_member) => {
-                                assert_eq!(inner_member, "b");
+                            Expression::MemberAccess {
+                                base: inner_base,
+                                member: inner_member,
+                                ..
+                            } => {
+                                assert!(reference_is!(input, inner_member, "b"));
                                 assert!(
-                                    matches!(&inner_base.value, Expression::FeatureRef(s) if s == "a")
+                                    matches!(&inner_base.value, Expression::FeatureRef(s) if reference_is!(input, s, "a"))
                                 );
                             }
                             other => panic!(
@@ -1476,11 +1500,15 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::Constructor { type_name, args } => {
-                assert_eq!(type_name, "A");
+                assert!(reference_is!(input, type_name, "A"));
                 assert_eq!(args.len(), 2);
-                assert!(args.iter().all(|a| a.name.is_none()));
-                assert!(matches!(&args[0].value.value, Expression::FeatureRef(s) if s == "x"));
-                assert!(matches!(&args[1].value.value, Expression::FeatureRef(s) if s == "y"));
+                assert!(args.iter().all(|a| a.parameter.is_none()));
+                assert!(
+                    matches!(&args[0].value.value, Expression::FeatureRef(s) if reference_is!(input, s, "x"))
+                );
+                assert!(
+                    matches!(&args[1].value.value, Expression::FeatureRef(s) if reference_is!(input, s, "y"))
+                );
             }
             other => panic!("expected Constructor, got {other:?}"),
         }
@@ -1494,11 +1522,13 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::Constructor { type_name, args } => {
-                assert_eq!(type_name, "RiskLevel");
+                assert!(reference_is!(input, type_name, "RiskLevel"));
                 assert_eq!(args.len(), 1);
-                assert_eq!(args[0].name.as_deref(), Some("probability"));
                 assert!(
-                    matches!(&args[0].value.value, Expression::FeatureRef(s) if s == "LevelEnum::low")
+                    matches!(args[0].parameter, Some(parameter) if reference_is!(input, &parameter, "probability"))
+                );
+                assert!(
+                    matches!(&args[0].value.value, Expression::FeatureRef(s) if reference_is!(input, s, "LevelEnum::low"))
                 );
             }
             other => panic!("expected Constructor, got {other:?}"),
@@ -1511,7 +1541,7 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::Constructor { type_name, args } => {
-                assert_eq!(type_name, "A");
+                assert!(reference_is!(input, type_name, "A"));
                 assert!(args.is_empty());
             }
             other => panic!("expected Constructor, got {other:?}"),
@@ -1526,13 +1556,19 @@ mod tests {
         match &node.value {
             Expression::Invocation { args, .. } => {
                 assert_eq!(args.len(), 2);
-                assert_eq!(args[0].name.as_deref(), Some("q"));
+                assert!(
+                    matches!(args[0].parameter, Some(parameter) if reference_is!(input, &parameter, "q"))
+                );
                 assert!(matches!(
                     &args[0].value.value,
                     Expression::LiteralInteger(1)
                 ));
-                assert_eq!(args[1].name.as_deref(), Some("p"));
-                assert!(matches!(&args[1].value.value, Expression::FeatureRef(s) if s == "a"));
+                assert!(
+                    matches!(args[1].parameter, Some(parameter) if reference_is!(input, &parameter, "p"))
+                );
+                assert!(
+                    matches!(&args[1].value.value, Expression::FeatureRef(s) if reference_is!(input, s, "a"))
+                );
             }
             other => panic!("expected Invocation, got {other:?}"),
         }
@@ -1546,7 +1582,7 @@ mod tests {
         match &node.value {
             Expression::Invocation { args, .. } => {
                 assert_eq!(args.len(), 1);
-                assert!(args[0].name.is_none());
+                assert!(args[0].parameter.is_none());
                 assert!(matches!(
                     &args[0].value.value,
                     Expression::BinaryOp {
@@ -1567,7 +1603,9 @@ mod tests {
             Expression::CollectionOp { op, base, args, .. } => {
                 assert_eq!(op, &CollectionOperator::Collect);
                 assert_eq!(args.len(), 1);
-                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "items"));
+                assert!(
+                    matches!(&base.value, Expression::FeatureRef(s) if reference_is!(input, s, "items"))
+                );
             }
             other => panic!("expected CollectionOp, got {other:?}"),
         }
@@ -1577,7 +1615,9 @@ mod tests {
     fn path_expression_single_segment_stays_feature_ref() {
         let input = span_input("engine");
         let (_, node) = path_expression(input).expect("path_expression");
-        assert!(matches!(&node.value, Expression::FeatureRef(s) if s == "engine"));
+        assert!(
+            matches!(&node.value, Expression::FeatureRef(s) if reference_is!(input, s, "engine"))
+        );
     }
 
     #[test]
@@ -1585,16 +1625,11 @@ mod tests {
         let input = span_input("engine.fuelCmdPort.flowRate");
         let (_, node) = path_expression(input).expect("path_expression");
         match &node.value {
-            Expression::FeatureChainRef(chain) => {
-                assert_eq!(
-                    chain.segments,
-                    vec![
-                        "engine".to_string(),
-                        "fuelCmdPort".to_string(),
-                        "flowRate".to_string(),
-                    ]
-                );
-            }
+            Expression::FeatureChainRef(reference) => assert!(reference_is!(
+                input,
+                reference,
+                "engine.fuelCmdPort.flowRate"
+            )),
             other => panic!("expected FeatureChainRef, got {other:?}"),
         }
     }
@@ -1604,11 +1639,8 @@ mod tests {
         let input = span_input("Foo::bar.baz");
         let (_, node) = path_expression(input).expect("path_expression");
         match &node.value {
-            Expression::FeatureChainRef(chain) => {
-                assert_eq!(
-                    chain.segments,
-                    vec!["Foo::bar".to_string(), "baz".to_string()]
-                );
+            Expression::FeatureChainRef(reference) => {
+                assert!(reference_is!(input, reference, "Foo::bar.baz"))
             }
             other => panic!("expected FeatureChainRef, got {other:?}"),
         }
@@ -1620,7 +1652,9 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::MetadataAccess(base) => {
-                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "x"));
+                assert!(
+                    matches!(&base.value, Expression::FeatureRef(s) if reference_is!(input, s, "x"))
+                );
             }
             other => panic!("expected MetadataAccess, got {other:?}"),
         }
@@ -1670,7 +1704,9 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::Index { base, index } => {
-                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "items"));
+                assert!(
+                    matches!(&base.value, Expression::FeatureRef(s) if reference_is!(input, s, "items"))
+                );
                 assert!(matches!(&index.value, Expression::LiteralInteger(0)));
             }
             other => panic!("expected Index, got {other:?}"),
@@ -1720,12 +1756,16 @@ mod tests {
         let mut current = &node;
         loop {
             match &current.value {
-                Expression::MemberAccess(inner, member) => {
-                    assert_eq!(member, "b");
+                Expression::MemberAccess {
+                    base: inner,
+                    member,
+                    ..
+                } => {
+                    assert!(reference_is!(input, member, "b"));
                     depth += 1;
                     current = inner;
                 }
-                Expression::FeatureRef(s) if s == "a" => break,
+                Expression::FeatureRef(s) if reference_is!(input, s, "a") => break,
                 other => panic!("unexpected node at depth {depth}: {other:?}"),
             }
         }
@@ -1751,7 +1791,9 @@ mod tests {
         loop {
             match &current.value {
                 Expression::Invocation { callee, args } => {
-                    assert!(matches!(&callee.value, Expression::FeatureRef(s) if s == "f"));
+                    assert!(
+                        matches!(&callee.value, Expression::FeatureRef(s) if reference_is!(input, s, "f"))
+                    );
                     assert_eq!(args.len(), 1);
                     depth += 1;
                     current = &args[0].value;

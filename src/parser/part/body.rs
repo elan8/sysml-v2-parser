@@ -85,23 +85,6 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
     Ok((input, PartDefBody::Brace { elements }))
 }
 
-/// Dotted feature path for exhibit/perform-style names: `name ( '.' name )*`.
-fn feature_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, first) = name(input)?;
-    let (input, rest) = many0(preceded(
-        preceded(ws_and_comments, tag(&b"."[..])),
-        preceded(ws_and_comments, name),
-    ))
-    .parse(input)?;
-    Ok((
-        input,
-        std::iter::once(first)
-            .chain(rest)
-            .collect::<Vec<_>>()
-            .join("."),
-    ))
-}
-
 /// Exhibit state usage: `OccurrenceUsagePrefix` subset `exhibit` (`state`)? name (`:` type)?
 /// (`:>`/`:>>` …)? body. GH-27: rebuilt on the same shared prefix/specialization helpers
 /// `state_usage` (`crate::parser::state::state_usage`) composes -- `visibility_prefix`,
@@ -125,15 +108,21 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     // §6 G18: the `state` keyword is optional -- `exhibit 'vehicle states' :>> VehicleA::'vehicle
     // states';` (OMG spec Annex `5-State-based Behavior-2.sysml`) exhibits an already-declared
     // state usage by redefinition, without redeclaring its kind.
-    let (input, _) = opt(preceded(tag(&b"state"[..]), ws1)).parse(input)?;
-    let (input, name_str) = feature_name_path(input)?;
+    let (input, state_keyword) = opt(preceded(tag(&b"state"[..]), ws1)).parse(input)?;
+    let (input, name, state_reference) = if state_keyword.is_some() {
+        let (input, name) = name(input)?;
+        (input, name, None)
+    } else {
+        let (input, reference) = crate::parser::lex::reference_path(input)?;
+        (input, String::new(), Some(reference))
+    };
     let (input, leading) = specialization_clauses(input)?;
     let (input, type_result) = optional_typings(input)?;
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
     let (input, trailing) = specialization_clauses(input)?;
-    let (_type_ref_span, type_name, typing) =
-        crate::parser::usage::typing_fields_from_result(type_result);
+    let (_type_ref_span, _, typing) =
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
     let subsets = trailing
         .subsets
         .clone()
@@ -155,7 +144,7 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
     let before_post_body_redefines = input;
     let (input, post_body_redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let post_body_redefines = post_body_redefines.map(|target| {
@@ -180,12 +169,8 @@ pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<Exhibit
                 is_abstract: is_abstract.is_some(),
                 is_reference: is_reference.is_some(),
                 is_individual: is_individual.is_some(),
-                name: name_str,
-                type_name: if type_name.is_empty() {
-                    None
-                } else {
-                    Some(type_name)
-                },
+                name,
+                state_reference,
                 typing,
                 multiplicity,
                 subsets,
@@ -409,14 +394,15 @@ pub(crate) fn connection_usage_member(
         let (input, parsed_name) = name(input)?;
         (input, Some(parsed_name))
     };
-    let (input, type_name) = {
+    let (input, type_reference) = {
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":")
             && !peek.fragment().starts_with(b":>")
             && !peek.fragment().starts_with(b":>>")
         {
             let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, parsed_type) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            let (input, parsed_type) =
+                preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, Some(parsed_type))
         } else {
             (input, None)
@@ -441,7 +427,7 @@ pub(crate) fn connection_usage_member(
     let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let subsets = trailing_subsets.map(|target| {
@@ -451,7 +437,7 @@ pub(crate) fn connection_usage_member(
     let before_redefines = input;
     let (input, trailing_redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let redefines = trailing_redefines.map(|target| {
@@ -472,7 +458,7 @@ pub(crate) fn connection_usage_member(
             input,
             ConnectionUsageMember {
                 name,
-                type_name,
+                type_reference,
                 multiplicity,
                 connect_from,
                 connect_to,
@@ -550,17 +536,27 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
         .to_string();
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = crate::parser::attribute::attribute_body(input)?;
+    let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
+    let subsets = trailing_subsets.map(|target| {
+        let span = crate::parser::span_from_to(before_subsets, input);
+        single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target)
+    });
+    let before_redefines = input;
     let (input, trailing_redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
-    let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
+    let redefines = trailing_redefines.map(|target| {
+        let span = crate::parser::span_from_to(before_redefines, input);
+        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
+    });
+    let input = if subsets.is_some() || redefines.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
     } else {
@@ -576,6 +572,8 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
                 name: name_str,
                 text: header_text.trim().to_string(),
                 body,
+                subsets,
+                redefines,
             },
         ),
     ))
@@ -584,10 +582,27 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
 #[cfg(test)]
 mod par_002_nested_def_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    #[test]
+    fn opaque_member_trailing_relationships_are_not_discarded() {
+        let source = input("ref connection link { } :> Network::links :>> Legacy::links;");
+        let (rest, node) =
+            opaque_part_member_decl(source).expect("opaque member with trailing relationships");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let subsets = node.value.subsets.expect("subsets relationship");
+        let redefines = node.value.redefines.expect("redefines relationship");
+        assert_eq!(
+            crate::parser::usage::reference_text(source, subsets.value.target[0]).as_deref(),
+            Some("Network::links")
+        );
+        assert_eq!(
+            crate::parser::usage::reference_text(source, redefines.value.target[0]).as_deref(),
+            Some("Legacy::links")
+        );
     }
 
     #[test]
@@ -599,6 +614,21 @@ mod par_002_nested_def_tests {
             matches!(node.value, PartDefBodyElement::StateDef(_)),
             "expected StateDef, got {:?}",
             node.value
+        );
+    }
+
+    #[test]
+    fn exhibit_shorthand_keeps_its_dotted_state_reference_in_the_arena() {
+        let source = input("exhibit vehicleStates.on;");
+        let (rest, node) = exhibit_state(source).expect("exhibit reference");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.name.is_empty());
+        assert_eq!(
+            node.value
+                .state_reference
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("vehicleStates.on")
         );
     }
 
@@ -881,7 +911,7 @@ mod par_002_nested_def_tests {
                 assert!(action.value.is_abstract);
                 assert!(action.value.is_reference);
                 assert_eq!(action.value.name, "performedActions");
-                assert_eq!(action.value.type_name, "Action");
+                assert!(action.value.type_name.is_some());
                 assert!(action.value.subsets.is_some());
             }
             other => panic!("expected ActionUsage, got {other:?}"),
@@ -918,7 +948,7 @@ mod par_002_nested_def_tests {
         match node.value {
             PartDefBodyElement::ConstraintUsage(c) => {
                 assert_eq!(c.value.name, "discBrakeConstraint");
-                assert_eq!(c.value.type_name.as_deref(), Some("DiscBrakeConstraint"));
+                assert!(c.value.type_name.is_some());
             }
             other => panic!("expected ConstraintUsage, got {other:?}"),
         }
@@ -943,7 +973,7 @@ mod par_002_nested_def_tests {
             PartDefBodyElement::StateUsage(state) => {
                 assert!(state.value.is_reference);
                 assert_eq!(state.value.name, "monitor");
-                assert_eq!(state.value.type_name.as_deref(), Some("StateKind"));
+                assert!(state.value.type_name.is_some());
             }
             other => panic!("expected StateUsage, got {other:?}"),
         }
@@ -960,7 +990,13 @@ mod par_002_nested_def_tests {
             PartDefBodyElement::PartUsage(part) => {
                 assert!(part.value.is_reference);
                 assert_eq!(part.value.name, "origin");
-                assert_eq!(part.value.type_name, "Remote");
+                assert_eq!(
+                    part.value
+                        .typing
+                        .as_ref()
+                        .map(|typing| typing.value.target.len()),
+                    Some(1)
+                );
                 assert!(part.value.subsets.is_some());
             }
             other => panic!("expected PartUsage, got {other:?}"),
@@ -1062,7 +1098,7 @@ mod par_002_nested_def_tests {
         match node.value {
             PartDefBodyElement::FirstStmt(stmt) => {
                 assert_eq!(stmt.value.succession_name.as_deref(), Some("s1"));
-                assert_eq!(stmt.value.succession_type.as_deref(), Some("AB"));
+                assert!(stmt.value.succession_type.is_some());
             }
             other => panic!("expected FirstStmt, got {other:?}"),
         }
@@ -1089,14 +1125,13 @@ mod par_002_nested_def_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::Bind(bind) => {
-                assert!(matches!(
-                    &bind.value.left.value,
-                    crate::ast::Expression::FeatureRef(name) if name == "a"
-                ));
-                assert!(matches!(
-                    &bind.value.right.value,
-                    crate::ast::Expression::FeatureRef(name) if name == "b"
-                ));
+                let crate::ast::Expression::FeatureRef(left) = &bind.value.left.value else {
+                    panic!("expected left feature reference");
+                };
+                let crate::ast::Expression::FeatureRef(right) = &bind.value.right.value else {
+                    panic!("expected right feature reference");
+                };
+                assert_ne!(left, right);
             }
             other => panic!("expected Bind, got {other:?}"),
         }

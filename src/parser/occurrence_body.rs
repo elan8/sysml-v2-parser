@@ -13,8 +13,8 @@ use crate::parser::constraint::{structured_constraint_body, StructuredConstraint
 use crate::parser::expr::path_expression;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::lex::{
-    capture_opaque_member, name, qualified_name, recover_body_element, starts_with_keyword,
-    visibility_prefix, ws1, ws_and_comments,
+    capture_opaque_member, name, qualified_reference, recover_body_element, reference_path,
+    starts_with_keyword, visibility_prefix, ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -23,7 +23,6 @@ use crate::parser::part::part_usage;
 use crate::parser::requirement::{doc_comment, satisfy};
 use crate::parser::usage::{
     multiplicity_node as multiplicity_parser, optional_typings, specialization_clauses,
-    targets_display_string,
 };
 use crate::parser::Input;
 use nom::branch::alt;
@@ -138,6 +137,7 @@ struct OccurrencePrefix {
     is_individual: bool,
     is_then: bool,
     is_event: bool,
+    is_event_reference: bool,
     is_reference: bool,
     is_abstract: bool,
     is_constant: bool,
@@ -151,6 +151,7 @@ impl Default for OccurrencePrefix {
             is_individual: false,
             is_then: false,
             is_event: false,
+            is_event_reference: false,
             is_reference: false,
             is_abstract: false,
             is_constant: false,
@@ -306,6 +307,7 @@ fn occurrence_usage_with_modifiers(
         OccurrencePrefix {
             is_then: prefix.is_then || then_kw.is_some(),
             is_event: event_kw.is_some(),
+            is_event_reference: event_kw.is_some() && occurrence_kw.is_none(),
             ..prefix
         },
     )
@@ -317,24 +319,23 @@ fn occurrence_usage_tail(
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let start = input;
     // §6 G22: `occurrence :>> causes;` redefines an inherited occurrence without renaming it, so
-    // the name is optional here (OMG spec Annex `14c-Language Extensions.sysml`). The dotted form
-    // (`event publish_message.sourceEvent;`) names a nested feature, so a `.`-joined path is read
-    // as the name, matching how `perform` handles `perform providePower.generateTorque`.
-    let (input, name_str) = if starts_specialization_or_body(input) {
-        (input, String::new())
+    // the declaration name is optional. The keyword-less event form instead references an
+    // existing occurrence and may use a dotted/qualified path.
+    let (input, name, occurrence_reference) = if prefix.is_event_reference {
+        let (input, reference) = reference_path(input)?;
+        (input, String::new(), Some(reference))
+    } else if starts_specialization_or_body(input) {
+        (input, String::new(), None)
     } else {
-        occurrence_name_path(input)?
+        let (input, name) = name(input)?;
+        (input, name, None)
     };
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, type_name) = optional_typings(input)?;
-    let type_name = type_name.map(|(_, is_conjugated, targets)| {
-        let name = targets_display_string(&targets);
-        if is_conjugated {
-            format!("~{name}")
-        } else {
-            name
-        }
-    });
+    let type_is_conjugated = type_name
+        .as_ref()
+        .is_some_and(|(_, is_conjugated, _)| *is_conjugated);
+    let type_name = type_name.and_then(|(_, _, targets)| targets.first().copied());
     // GH-51: real usage carries a multiplicity here (`causes[1..*]`); see `OccurrenceUsage::
     // multiplicity`'s doc comment.
     let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
@@ -384,8 +385,10 @@ fn occurrence_usage_tail(
                 is_abstract: prefix.is_abstract,
                 is_constant: prefix.is_constant,
                 portion_kind: prefix.portion_kind,
-                name: name_str,
+                name,
+                occurrence_reference,
                 type_name,
+                type_is_conjugated,
                 multiplicity,
                 subsets,
                 redefines,
@@ -407,24 +410,6 @@ fn starts_specialization_or_body(input: Input<'_>) -> bool {
     };
     let frag = peek.fragment();
     frag.starts_with(b":") || frag.starts_with(b"{") || frag.starts_with(b";")
-}
-
-/// `name` or `name.nested.feature` -- the occurrence's own name, or a path to the nested feature
-/// being referenced.
-fn occurrence_name_path(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, first) = name(input)?;
-    let (input, rest) = nom::multi::many0(preceded(
-        preceded(ws_and_comments, tag(&b"."[..])),
-        preceded(ws_and_comments, name),
-    ))
-    .parse(input)?;
-    Ok((
-        input,
-        std::iter::once(first)
-            .chain(rest)
-            .collect::<Vec<_>>()
-            .join("."),
-    ))
 }
 
 fn occurrence_usage_body(input: Input<'_>) -> IResult<Input<'_>, OccurrenceUsageBody> {
@@ -467,8 +452,21 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
                 let start_unknown = input;
                 let (next, _) = recover_body_element(input, OCCURRENCE_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = crate::parser::body::advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                    let (closing, _) = crate::parser::body::advance_to_closing_brace(input)?;
+                    let recovery = build_recovery_error_node_from_span(
+                        start_unknown,
+                        closing,
+                        OCCURRENCE_BODY_STARTERS,
+                        "occurrence body",
+                        "recovered_occurrence_body_element",
+                    );
+                    let node: Node<ParseErrorNode> = node_from_to(start_unknown, closing, recovery);
+                    elements.push(node_from_to(
+                        start_unknown,
+                        closing,
+                        OccurrenceBodyElement::Error(node),
+                    ));
+                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
                     return Ok((input, OccurrenceUsageBody::Brace { elements }));
                 }
                 let recovery = build_recovery_error_node_from_span(
@@ -603,7 +601,7 @@ pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Succ
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, Some(type_name))
         } else {
             (input, None)
@@ -655,18 +653,22 @@ pub(crate) fn assert_constraint_member(
     // a previously-declared standalone `constraint` by name and rebinding its `in` parameters, is
     // real usage (`assert massAnalysis3 { in totalMass = mass; ... }`, Simple Tests/
     // ConstraintTest.sysml:78), richer than the already-supported `assert constraint ...` form.
-    let (input, _) = opt(preceded(tag(&b"constraint"[..]), ws_and_comments)).parse(input)?;
+    let (input, constraint_keyword) =
+        opt(preceded(tag(&b"constraint"[..]), ws_and_comments)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, name) = if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";")
-    {
-        (input, None)
-    } else {
-        let (input, parsed_name) = name(input)?;
-        (input, Some(parsed_name))
-    };
+    let (input, declaration_name, target) =
+        if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";") {
+            (input, None, None)
+        } else if constraint_keyword.is_some() {
+            let (input, parsed_name) = name(input)?;
+            (input, Some(parsed_name), None)
+        } else {
+            let (input, target) = reference_path(input)?;
+            (input, None, Some(target))
+        };
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let (input, body) = structured_constraint_body(input)?;
@@ -680,7 +682,8 @@ pub(crate) fn assert_constraint_member(
             start,
             input,
             AssertConstraintMember {
-                name,
+                declaration_name,
+                target,
                 type_name,
                 body,
                 is_negated,
@@ -697,10 +700,9 @@ pub(crate) fn assert_constraint_member(
 #[cfg(test)]
 mod assert_constraint_name_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -709,7 +711,11 @@ mod assert_constraint_name_tests {
             assert_constraint_member(input("assert constraint engineSelectionRational { }"))
                 .expect("named assert constraint");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name.as_deref(), Some("engineSelectionRational"));
+        assert_eq!(
+            node.value.declaration_name.as_deref(),
+            Some("engineSelectionRational")
+        );
+        assert!(node.value.target.is_none());
         assert!(!node.value.is_negated);
     }
 
@@ -718,17 +724,20 @@ mod assert_constraint_name_tests {
     /// Expression and Constraint Definition.sysml`.
     #[test]
     fn assert_constraint_accepts_a_name_and_a_type() {
-        let (rest, node) = assert_constraint_member(input(
+        let source = input(
             "assert constraint discBrakeFitConstraint_Alt: DiscBrakeFitConstraint_Alt { in wheel = WheelAssy::wheel; }",
-        ))
-        .expect("typed assert constraint");
+        );
+        let (rest, node) = assert_constraint_member(source).expect("typed assert constraint");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
-            node.value.name.as_deref(),
+            node.value.declaration_name.as_deref(),
             Some("discBrakeFitConstraint_Alt")
         );
         assert_eq!(
-            node.value.type_name.as_deref(),
+            node.value
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
             Some("DiscBrakeFitConstraint_Alt")
         );
     }
@@ -759,7 +768,8 @@ mod assert_constraint_name_tests {
         let (rest, node) =
             assert_constraint_member(input("assert constraint { }")).expect("anonymous form");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, None);
+        assert_eq!(node.value.declaration_name, None);
+        assert!(node.value.target.is_none());
     }
 
     #[test]
@@ -767,7 +777,7 @@ mod assert_constraint_name_tests {
         let (rest, node) = assert_constraint_member(input("assert not constraint c { }"))
             .expect("negated named form");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name.as_deref(), Some("c"));
+        assert_eq!(node.value.declaration_name.as_deref(), Some("c"));
         assert!(node.value.is_negated);
     }
 }
@@ -775,23 +785,21 @@ mod assert_constraint_name_tests {
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use crate::parser::usage::targets_display_string;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
     fn occurrence_usage_captures_intersects() {
-        let (rest, node) =
-            occurrence_usage(input("occurrence o1 : O1 intersects a;")).expect("occurrence usage");
+        let source = input("occurrence o1 : O1 intersects a;");
+        let (rest, node) = occurrence_usage(source).expect("occurrence usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value
                 .intersects
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
+                .map(|n| crate::parser::usage::reference_list_text(source, &n.value.target)),
             Some("a".to_string())
         );
     }
@@ -814,8 +822,31 @@ mod membership_tests {
 
     #[test]
     fn occurrence_usage_without_visibility_prefix_has_no_membership_visibility() {
-        let (_, node) = occurrence_usage(input("occurrence o1 : O1;")).expect("occurrence usage");
+        let source = input("occurrence o1 : $::Occurrences::O1;");
+        let (_, node) = occurrence_usage(source).expect("occurrence usage");
         assert_eq!(node.value.membership.visibility, None);
+        assert_eq!(
+            node.value
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("$::Occurrences::O1")
+        );
+    }
+
+    #[test]
+    fn event_shorthand_keeps_its_dotted_reference_in_the_arena() {
+        let source = input("event sequence.publishMessage;");
+        let (rest, node) = occurrence_usage(source).expect("event reference");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.name.is_empty());
+        assert_eq!(
+            node.value
+                .occurrence_reference
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("sequence.publishMessage")
+        );
     }
 
     #[test]

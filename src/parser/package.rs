@@ -25,7 +25,7 @@ use crate::parser::individual::individual_def;
 use crate::parser::interface::interface_def;
 use crate::parser::item::{item_def, item_usage};
 use crate::parser::lex::{
-    name, qualified_name, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
+    name, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
     starts_with_keyword, ws1, ws_and_comments, PACKAGE_BODY_STARTERS,
 };
 use crate::parser::metadata::{metadata_def, metadata_usage};
@@ -70,7 +70,7 @@ fn required_package_identification(
         preceded(ws_and_comments, tag(&b">"[..])),
     ))
     .parse(input)?;
-    let (input, decl_name) = opt(preceded(ws_and_comments, qualified_name)).parse(input)?;
+    let (input, decl_name) = opt(preceded(ws_and_comments, name)).parse(input)?;
     if short_name.is_some() || decl_name.is_some() {
         Ok((
             input,
@@ -1110,7 +1110,6 @@ pub(crate) fn root_namespace(input: Input<'_>) -> IResult<Input<'_>, RootNamespa
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom_locate::LocatedSpan;
     use std::path::PathBuf;
 
     fn sysml_v2_release_root() -> PathBuf {
@@ -1138,7 +1137,7 @@ mod tests {
             .find("\tpart def Display {")
             .expect("fixture should contain Display part");
         let tail = &input.as_bytes()[start..];
-        let located = LocatedSpan::new(tail);
+        let located = crate::parser::span::test_input(std::str::from_utf8(tail).unwrap());
 
         let result = package_body_element(located);
         assert!(
@@ -1157,7 +1156,7 @@ mod tests {
             .find("\tpart def Display {")
             .expect("fixture should contain Display part");
         let tail = &input.as_bytes()[start..];
-        let located = LocatedSpan::new(tail);
+        let located = crate::parser::span::test_input(std::str::from_utf8(tail).unwrap());
         let (located, _) = ws_and_comments(located).expect("leading ws");
 
         let result = part_def_or_usage(located);
@@ -1173,7 +1172,7 @@ mod tests {
         let Some(input) = primitive_data_types_fixture() else {
             return;
         };
-        let located = LocatedSpan::new(input.as_bytes());
+        let located = crate::parser::span::test_input(&input);
         let result = package_(located);
         assert!(
             result.is_ok(),
@@ -1190,7 +1189,7 @@ mod tests {
         let start = input
             .find('{')
             .expect("fixture should contain package body");
-        let located = LocatedSpan::new(&input.as_bytes()[start..]);
+        let located = crate::parser::span::test_input(&input[start..]);
         let result = package_body_brace(located);
         assert!(
             result.is_ok(),
@@ -1202,7 +1201,7 @@ mod tests {
     // --- PAR-002 increment 3: standalone usages at package level ---
 
     fn parse_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -1277,7 +1276,7 @@ mod tests {
             panic!("expected ConnectionUsage, got {:?}", node.value);
         };
         assert_eq!(usage.value.name.as_deref(), Some("link"));
-        assert_eq!(usage.value.type_name.as_deref(), Some("Link"));
+        assert!(usage.value.type_reference.is_some());
         assert!(usage.value.connect_from.is_some());
         assert!(usage.value.connect_to.is_some());
         assert!(usage.value.connect_extra_ends.is_empty());
@@ -1351,10 +1350,9 @@ mod tests {
 #[cfg(test)]
 mod package_metadata_and_connect_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]

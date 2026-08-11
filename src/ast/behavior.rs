@@ -10,6 +10,7 @@ use super::structure::{
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
+use crate::ast::QualifiedReferenceId;
 
 /// Action definition: `action def` Identification body (in/out params).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,10 +154,11 @@ pub enum ThenTarget {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InOutDecl {
     pub direction: InOut,
+    /// Declared parameter name. Empty for the leading `:>> target` redefinition form.
     pub name: String,
-    pub type_name: String,
-    /// True for `in :>> name = expr;` / `out :>> name;` redefinition form (validation `08`).
-    pub is_redefinition: bool,
+    pub type_name: Option<QualifiedReferenceId>,
+    /// Arena-backed target for `in :>> target = expr;` / `out :>> target;` (validation `08`).
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// Optional default value: `= expr` initializer on in/out parameters.
     pub value: Option<Node<Expression>>,
 }
@@ -174,7 +176,7 @@ pub enum InOut {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PayloadClause {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     pub name_span: Span,
     pub type_span: Option<Span>,
 }
@@ -237,18 +239,18 @@ pub enum TransitionEffect {
     /// `action` name (`:` type)? — perform an owned/named action.
     Perform {
         name: Option<String>,
-        type_name: Option<String>,
+        type_name: Option<QualifiedReferenceId>,
     },
     /// `accept` payload (`:` type)? (`via` expr)?
     Accept {
         payload: Node<Expression>,
-        type_name: Option<String>,
+        type_name: Option<QualifiedReferenceId>,
         via: Option<Node<Expression>>,
     },
     /// `send` payload (`:` type)? ((`via` expr)? (`to` expr)? | `to` expr)
     Send {
         payload: Node<Expression>,
-        type_name: Option<String>,
+        type_name: Option<QualifiedReferenceId>,
         via: Option<Node<Expression>>,
         to: Option<Node<Expression>>,
     },
@@ -277,7 +279,7 @@ pub struct ActionUsage {
     /// action a : AP1;` (`Simple Tests/IndividualTest.sysml:30`).
     pub is_individual: bool,
     pub name: String,
-    pub type_name: String,
+    pub type_name: Option<QualifiedReferenceId>,
     /// Structured typing clause (multi-target capable), mirroring `PartUsage.typing`.
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity after the type, e.g. `[0..*]`.
@@ -434,7 +436,8 @@ pub enum FlowUsageKind {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PayloadFeature {
     pub name: Option<String>,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
+    pub type_is_conjugated: bool,
     pub multiplicity: Option<Node<Multiplicity>>,
 }
 
@@ -444,7 +447,8 @@ pub struct PayloadFeature {
 pub struct FlowUsage {
     pub kind: FlowUsageKind,
     pub name: Option<String>,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
+    pub type_is_conjugated: bool,
     pub payload: Option<Node<PayloadFeature>>,
     pub from: Option<Node<Expression>>,
     pub to: Option<Node<Expression>>,
@@ -465,7 +469,7 @@ pub struct FirstStmt {
     /// prefix is unnamed.
     pub succession_name: Option<String>,
     /// Type of the succession itself, e.g. `succession s1 : AB first a then b;`.
-    pub succession_type: Option<String>,
+    pub succession_type: Option<QualifiedReferenceId>,
     /// Multiplicity of the succession feature itself, e.g. `succession [seBeforeNum] first ...`.
     pub succession_multiplicity: Option<Node<Multiplicity>>,
     pub first: Node<Expression>,
@@ -580,7 +584,8 @@ pub struct AllocationDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AllocationUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
+    pub type_is_conjugated: bool,
     pub source: Option<Node<Expression>>,
     pub target: Option<Node<Expression>>,
     pub body: DefinitionBody,
@@ -672,18 +677,11 @@ pub struct ExitAction {
     pub body: StateDefBody,
 }
 
-/// Then (initial state): `then` name `;`
-#[derive(Debug, Clone, Eq)]
+/// Then (initial state): `then` state-path `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThenStmt {
-    pub state_name: String,
-    pub name_span: Option<Span>,
-}
-
-impl PartialEq for ThenStmt {
-    fn eq(&self, other: &Self) -> bool {
-        self.state_name == other.state_name
-    }
+    pub state_reference: QualifiedReferenceId,
 }
 
 /// Final state: `final` name `;` or `final state` name `;`
@@ -720,7 +718,7 @@ pub struct StateUsage {
     /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).
     pub is_individual: bool,
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     /// Structured typing clause when a `:` target was written.
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity after the type, when present.

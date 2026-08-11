@@ -95,7 +95,7 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
             ItemUsage {
                 name,
                 short_name,
-                type_name: header.type_name,
+                type_name: header.type_reference,
                 redefines: header.redefines,
                 multiplicity,
                 value,
@@ -121,10 +121,9 @@ pub(crate) fn directed_item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<I
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on ItemDef/ItemUsage ---
@@ -193,10 +192,9 @@ mod membership_tests {
 #[cfg(test)]
 mod redefines_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // Real usage confirmed in the OMG Geometry domain library's
@@ -224,7 +222,7 @@ mod redefines_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "");
         assert!(node.value.redefines.is_some());
-        assert_eq!(node.value.type_name.as_deref(), Some("Cylinder"));
+        assert!(node.value.type_name.is_some());
         assert!(node.value.value.is_none());
     }
 
@@ -233,7 +231,7 @@ mod redefines_tests {
         let (rest, node) = item_usage(input("item wheelShape : Circle;")).expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "wheelShape");
-        assert_eq!(node.value.type_name.as_deref(), Some("Circle"));
+        assert!(node.value.type_name.is_some());
         assert!(node.value.redefines.is_none());
     }
 

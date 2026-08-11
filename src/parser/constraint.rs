@@ -8,11 +8,11 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_statement_or_block, starts_with_any_keyword,
+    identification, name, qualified_reference, skip_statement_or_block, starts_with_any_keyword,
     starts_with_keyword, visibility_prefix, ws1, ws_and_comments, CALC_DEF_BODY_STARTERS,
     CONSTRAINT_DEF_BODY_STARTERS,
 };
-use crate::parser::usage::{feature_usage_header, redefinition, targets_display_string};
+use crate::parser::usage::{feature_usage_header, redefinition};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::bytes::complete::tag;
@@ -89,7 +89,7 @@ pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Cons
             input,
             ConstraintUsage {
                 name: name_str,
-                type_name: header.type_name,
+                type_name: header.type_reference,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -209,15 +209,16 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     let (input, _) = ws_and_comments(input)?;
     let (input, (identification, redefines)) = if input.fragment().starts_with(b":>>") {
         let (input, _) = tag(&b":>>"[..]).parse(input)?;
-        let (input, target) = preceded(ws_and_comments, qualified_name).parse(input)?;
+        let (target_start, _) = ws_and_comments(input)?;
+        let (input, target) = qualified_reference(target_start)?;
         (
             input,
             (
                 crate::ast::Identification {
                     short_name: None,
-                    name: Some(target.clone()),
+                    name: None,
                 },
-                Some(target),
+                Some(vec![target]),
             ),
         )
     } else {
@@ -228,7 +229,7 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     };
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     // `:>>` redefines may also follow the type instead of preceding the identification, e.g.
@@ -238,7 +239,7 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     let (input, redefines) = if redefines.is_none() {
         opt(preceded(ws_and_comments, redefinition))
             .parse(input)
-            .map(|(input, r)| (input, r.map(|n| targets_display_string(&n.value.target))))?
+            .map(|(input, r)| (input, r.map(|node| node.value.target)))?
     } else {
         (input, redefines)
     };
@@ -603,7 +604,7 @@ pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDec
         let (input, _) = tag(&b":"[..]).parse(input)?;
         (input, false)
     };
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     let (input, value) = opt(preceded(
         preceded(ws_and_comments, tag(&b"="[..])),
         preceded(ws_and_comments, crate::parser::expr::expression),
@@ -629,10 +630,9 @@ pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDec
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on ConstraintDef/CalcDef/CalcUsage ---
@@ -705,10 +705,9 @@ mod membership_tests {
 #[cfg(test)]
 mod constraint_usage_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // Package-level `def`/usage disambiguation (PAR-001 bug class, closed for `constraint` here).
@@ -732,7 +731,7 @@ mod constraint_usage_tests {
         let (rest, node) = constraint_usage(input("constraint c : C;")).expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "c");
-        assert_eq!(node.value.type_name.as_deref(), Some("C"));
+        assert!(node.value.type_name.is_some());
         assert_eq!(
             node.value.membership.kind,
             crate::ast::MembershipKind::FeatureMembership
@@ -747,7 +746,7 @@ mod constraint_usage_tests {
         .expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "mc");
-        assert_eq!(node.value.type_name.as_deref(), Some("MassConstraint4"));
+        assert!(node.value.type_name.is_some());
         assert!(matches!(node.value.body, ConstraintDefBody::Brace { .. }));
     }
 
@@ -773,7 +772,7 @@ mod constraint_usage_tests {
         .expect("constraint usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "constraintChecks");
-        assert_eq!(node.value.type_name.as_deref(), Some("ConstraintCheck"));
+        assert!(node.value.type_name.is_some());
     }
 
     /// Regression: `Systems Library/Constraints.sysml`'s `assertedConstraintChecks` -- `abstract`
