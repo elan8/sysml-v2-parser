@@ -51,29 +51,6 @@ fn diff_debug_strings(parsed: &str, expected: &str) -> (usize, String) {
     (pos, snippet)
 }
 
-/// Asserts that parsed and expected ASTs are equal. Normalizes parsed (strips optional
-/// spans) so comparison matches hand-built expected AST. On failure, panics with a short
-/// message (first difference position and snippet) instead of dumping full ASTs.
-pub(crate) fn assert_ast_eq(
-    parsed: &sysml_v2_parser::ast::RootNamespace,
-    expected: &sysml_v2_parser::ast::RootNamespace,
-    msg: &str,
-) {
-    let normalized = parsed.normalize_for_test_comparison();
-    if normalized == *expected {
-        return;
-    }
-    let pa = format!("{normalized:?}");
-    let pe = format!("{expected:?}");
-    let (pos, snippet) = diff_debug_strings(&pa, &pe);
-    panic!(
-        "{msg}: AST mismatch at char {pos} (parsed {} chars, expected {} chars). Snippet: ...{snippet}... \
-         Set RUST_LOG=debug and run with --nocapture for full parser trace.",
-        pa.len(),
-        pe.len(),
-    );
-}
-
 /// Compare parsed AST against a checked-in snapshot under `tests/validation/snapshots/`.
 /// Regenerate with `UPDATE_VALIDATION_AST=1 cargo test --test validation -- --include-ignored`.
 pub(crate) fn assert_ast_snapshot(

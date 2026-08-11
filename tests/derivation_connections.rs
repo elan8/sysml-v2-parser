@@ -13,7 +13,7 @@ fn derivation_connection_parses_without_recovery_diagnostics() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -35,16 +35,24 @@ fn derivation_connection_parses_without_recovery_diagnostics() {
     assert!(elements.iter().any(|element| match &element.value {
         ConnectionDefBodyElement::EndDecl(end) => {
             end.value.name == "#original"
-                && end.value.type_name == "OriginalReq"
-                && end.value.uses_derived_syntax
+                && end.value.typing.is_none()
+                && end
+                    .value
+                    .references
+                    .as_ref()
+                    .is_some_and(|references| references.value.target.len() == 1)
         }
         _ => false,
     }));
     assert!(elements.iter().any(|element| match &element.value {
         ConnectionDefBodyElement::EndDecl(end) => {
             end.value.name == "#derive"
-                && end.value.type_name == "DerivedReq"
-                && end.value.uses_derived_syntax
+                && end.value.typing.is_none()
+                && end
+                    .value
+                    .references
+                    .as_ref()
+                    .is_some_and(|references| references.value.target.len() == 1)
         }
         _ => false,
     }));

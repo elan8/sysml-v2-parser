@@ -19,7 +19,7 @@ fn bench_parse_with_diagnostics(c: &mut Criterion) {
             |b, input| {
                 b.iter(|| {
                     let result = sysml_v2_parser::parse_with_diagnostics(black_box(input));
-                    black_box(result.root.elements.len());
+                    black_box(result.document.root.elements.len());
                     black_box(result.errors.len());
                 })
             },
@@ -60,7 +60,7 @@ fn bench_parse_with_diagnostics(c: &mut Criterion) {
                 |b, input| {
                     b.iter(|| {
                         let result = sysml_v2_parser::parse_with_diagnostics(black_box(input));
-                        black_box(result.root.elements.len());
+                        black_box(result.document.root.elements.len());
                         black_box(result.errors.len());
                     })
                 },

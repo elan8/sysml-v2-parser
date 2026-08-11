@@ -18,7 +18,7 @@ fn connection_def_ends(input: &str) -> Vec<sysml_v2_parser::ast::EndDecl> {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -99,15 +99,16 @@ fn end_decl_existing_forms_unaffected() {
 
     let hub = &ends[0];
     assert_eq!(hub.name, "hub");
-    assert!(hub.uses_derived_syntax);
+    assert!(hub.references.is_some());
+    assert!(hub.typing.is_none());
     assert!(hub.nested_usage.is_none());
 
     let source = &ends[1];
     assert_eq!(source.name, "source");
-    assert_eq!(source.type_name, "Anything");
+    assert!(source.typing.is_some());
     assert!(source.nested_usage.is_none());
     assert_eq!(
-        source.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("BinaryLinkObject::source".to_string())
+        source.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }

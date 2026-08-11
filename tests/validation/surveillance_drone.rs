@@ -119,8 +119,7 @@ fn test_parse_surveillance_drone() {
         })
         .find(|p: &&PartDef| {
             p.identification.name.as_deref() == Some("SurveillanceQuadrotorDroneWithBehavior")
-                && p.specializes.as_ref().map(|n| n.value.target_display())
-                    == Some("SurveillanceQuadrotorDrone".to_string())
+                && p.specializes.as_ref().map(|n| n.value.target.len()) == Some(1)
         });
     let part_def = part_def_specializes_span
         .expect("fixture should contain part def SurveillanceQuadrotorDroneWithBehavior :> SurveillanceQuadrotorDrone");
@@ -252,11 +251,11 @@ fn test_surveillance_drone_errors_reports_all_errors() {
 
     // All four packages are recovered as separate root elements (invalid members are skipped).
     assert_eq!(
-        result.root.elements.len(),
+        result.document.root.elements.len(),
         4,
         "partial AST should contain all four packages"
     );
-    let first = match &result.root.elements[0].value {
+    let first = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!(
             "expected first root element to be a Package, got {:?}",

@@ -5,6 +5,18 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse;
 
+fn targets_text(
+    document: &sysml_v2_parser::ParsedDocument,
+    targets: &[sysml_v2_parser::QualifiedReferenceId],
+) -> String {
+    targets
+        .iter()
+        .filter_map(|id| document.qualified_reference(*id))
+        .map(|reference| reference.authored_text())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn first_package_attribute_def(
     root: &sysml_v2_parser::RootNamespace,
 ) -> &sysml_v2_parser::ast::AttributeDef {
@@ -62,11 +74,14 @@ fn parses_conversion_by_prefix_in_attribute_body() {
         conversion
             .redefines
             .as_ref()
-            .map(|n| n.value.target_display()),
+            .map(|n| targets_text(&root, &n.value.target)),
         Some("unitConversion".to_string())
     );
     assert_eq!(
-        conversion.typing.as_ref().map(|n| n.value.target_display()),
+        conversion
+            .typing
+            .as_ref()
+            .map(|n| targets_text(&root, &n.value.target)),
         Some("ConversionByPrefix".to_string())
     );
     let AttributeBody::Brace { elements } = &conversion.body else {
@@ -106,11 +121,14 @@ fn parses_conversion_by_convention_in_attribute_body() {
         conversion
             .redefines
             .as_ref()
-            .map(|n| n.value.target_display()),
+            .map(|n| targets_text(&root, &n.value.target)),
         Some("unitConversion".to_string())
     );
     assert_eq!(
-        conversion.typing.as_ref().map(|n| n.value.target_display()),
+        conversion
+            .typing
+            .as_ref()
+            .map(|n| targets_text(&root, &n.value.target)),
         Some("ConversionByConvention".to_string())
     );
     let AttributeBody::Brace { elements } = &conversion.body else {

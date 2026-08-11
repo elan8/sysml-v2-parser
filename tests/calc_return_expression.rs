@@ -21,7 +21,7 @@ fn calc_body_parses_return_expression_without_swallowing_siblings() {
         "calc return-expression bodies should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };

@@ -61,7 +61,7 @@ fn apollo_execution_file_preserves_assert_constraints_structurally() {
     let mut structured_assert_count = 0usize;
     let mut degraded_assert_count = 0usize;
 
-    let package = match &parsed.root.elements[0].value {
+    let package = match &parsed.document.root.elements[0].value {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package root, got {other:?}"),
     };

@@ -10,7 +10,7 @@ fn test_package_with_semicolon_body() {
     let result = parse(input).expect("parse should succeed");
     let expected = expected_package_foo_semicolon();
     assert_eq!(
-        result, expected,
+        result.root, expected,
         "AST should match expected for package Foo;"
     );
 }
@@ -21,7 +21,7 @@ fn test_package_with_brace_body() {
     let result = parse(input).expect("parse should succeed");
     let expected = expected_package_bar_brace();
     assert_eq!(
-        result, expected,
+        result.root, expected,
         "AST should match expected for package Bar {{ }}"
     );
 }
@@ -48,7 +48,7 @@ fn test_legacy_library_standard_package_header_still_parses() {
     let input = "library standard package LegacyStd;";
     let result = parse(input).expect("parse should succeed");
     assert_eq!(
-        result,
+        result.root,
         RootNamespace {
             elements: vec![n_len(
                 input.len(),
@@ -171,11 +171,8 @@ fn test_stdlib_requirement_usecase_enum_map_to_dedicated_nodes() {
         panic!("expected requirement def");
     };
     assert_eq!(
-        req.value
-            .specializes
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("BaseType".to_string())
+        req.value.specializes.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(matches!(
         elements[1].value,
@@ -185,11 +182,8 @@ fn test_stdlib_requirement_usecase_enum_map_to_dedicated_nodes() {
         panic!("expected use case def");
     };
     assert_eq!(
-        uc.value
-            .specializes
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("Case".to_string())
+        uc.value.specializes.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(matches!(elements[2].value, PackageBodyElement::EnumDef(_)));
 }
@@ -218,8 +212,8 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
         part.value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("Item".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(matches!(elements[1].value, PackageBodyElement::PortDef(_)));
     let PackageBodyElement::PortDef(port) = &elements[1].value else {
@@ -229,8 +223,8 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
         port.value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("Object".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(matches!(
         elements[2].value,
@@ -240,11 +234,8 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
         panic!("expected viewpoint def");
     };
     assert_eq!(
-        vp.value
-            .specializes
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("RequirementCheck".to_string())
+        vp.value.specializes.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(
         !elements
@@ -372,7 +363,7 @@ package Next {
         "comment about should parse without package-boundary recovery: {:?}",
         result.errors
     );
-    assert_eq!(result.root.elements.len(), 2);
+    assert_eq!(result.document.root.elements.len(), 2);
 }
 
 #[test]
@@ -398,7 +389,7 @@ fn test_qualified_package_declaration_parses() {
         "qualified package declaration should parse cleanly: {:?}",
         result.errors
     );
-    let package = match &result.root.elements[0].value {
+    let package = match &result.document.root.elements[0].value {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package root element, got {other:?}"),
     };

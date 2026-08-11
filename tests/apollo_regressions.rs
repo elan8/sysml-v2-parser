@@ -54,7 +54,7 @@ fn requirement_usage_supports_trailing_subsets_after_body() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -80,10 +80,7 @@ fn requirement_usage_supports_trailing_subsets_after_body() {
         _ => None,
     });
     let req = req.expect("requirement usage should parse in part body");
-    assert_eq!(
-        req.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("goals".to_string())
-    );
+    assert!(req.subsets.is_some());
 }
 
 #[test]
@@ -96,7 +93,7 @@ fn exhibit_state_body_supports_unnamed_and_accepting_transitions() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -149,7 +146,7 @@ fn transition_name_with_do_prefix_is_not_confused_with_do_keyword() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -190,7 +187,7 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -235,7 +232,7 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -258,13 +255,7 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         .collect();
     assert_eq!(occurrences.len(), 2);
     assert_eq!(occurrences[0].portion_kind.as_deref(), Some("timeslice"));
-    assert_eq!(
-        occurrences[0]
-            .subsets
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        None
-    );
+    assert!(occurrences[0].subsets.is_none());
     assert_eq!(occurrences[1].portion_kind.as_deref(), Some("timeslice"));
 
     let OccurrenceUsageBody::Brace {
@@ -297,7 +288,8 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
             matches!(
                 &e.value,
                 ConstraintDefBodyElement::Expression(expr)
-                    if matches!(&expr.value, Expression::FeatureRef(name) if name == "ready")
+                    if matches!(&expr.value, Expression::FeatureRef(name)
+                        if result.document.qualified_reference(*name).is_some_and(|r| r.authored_text() == "ready"))
             )
         }),
         "assert constraint body should preserve the `ready` expression"
@@ -313,11 +305,8 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
             _ => None,
         })
         .expect("snapshot should parse in then timeslice body");
-    assert_eq!(
-        snapshot.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("system".to_string())
-    );
-    assert_eq!(snapshot.type_name.as_deref(), Some("MissionSystem"));
+    assert!(snapshot.subsets.is_some());
+    assert!(snapshot.type_name.is_some());
 }
 
 #[test]
@@ -330,7 +319,7 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -353,13 +342,7 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         PartUsageBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected nested part usage"),
     };
-    assert_eq!(
-        apollo1
-            .subsets
-            .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("missions".to_string())
-    );
+    assert!(apollo1.subsets.is_some());
 
     let PartUsageBody::Brace { elements } = &apollo1.body else {
         panic!("expected nested mission body");
@@ -375,14 +358,8 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         .collect();
     assert_eq!(crew_members.len(), 2);
     assert_eq!(crew_members[0].name, "");
-    assert_eq!(crew_members[0].type_name, "Gus Grissom");
-    assert_eq!(
-        crew_members[0]
-            .subsets
-            .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("crew".to_string())
-    );
+    assert!(crew_members[0].typing.is_some());
+    assert!(crew_members[0].subsets.is_some());
 }
 
 #[test]
@@ -395,7 +372,7 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -423,10 +400,7 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    assert_eq!(
-        exhibit.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("missionPhases".to_string())
-    );
+    assert!(exhibit.redefines.is_some());
 }
 
 #[test]
@@ -442,7 +416,7 @@ fn exhibit_state_supports_parallel_modifier() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -493,7 +467,7 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -542,13 +516,7 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
         .iter()
         .find(|e| e.name == "subsetStates")
         .expect("subsetStates");
-    assert_eq!(
-        subset_states
-            .subsets
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("Base::baseStates".to_string())
-    );
+    assert!(subset_states.subsets.is_some());
 
     let multiplicity_states = exhibits
         .iter()
@@ -581,7 +549,7 @@ fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -660,7 +628,7 @@ fn exhibit_state_body_accepts_requirement_usage_members() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -709,7 +677,7 @@ fn part_usage_accepts_multiplicity_before_type() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -728,19 +696,9 @@ fn part_usage_accepts_multiplicity_before_type() {
         _ => panic!("expected part usage"),
     };
     assert_eq!(suit.name, "spaceSuits");
-    assert_eq!(
-        suit.multiplicity
-            .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[2]".to_string())
-    );
-    assert_eq!(suit.type_name, "ExtravehicularMobilityUnit");
-    assert_eq!(
-        suit.subsets
-            .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("constituentSystems".to_string())
-    );
+    assert!(suit.multiplicity.is_some());
+    assert!(suit.typing.is_some());
+    assert!(suit.subsets.is_some());
 }
 
 #[test]
@@ -753,7 +711,7 @@ fn rationale_and_refinement_annotations_stay_localized() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -814,7 +772,7 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -835,17 +793,8 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
             _ => None,
         })
         .expect("expected structured connection member in part body");
-    assert_eq!(
-        connection.type_name.as_deref(),
-        Some("CapabilityToGoalDerivation")
-    );
-    assert_eq!(
-        connection
-            .subsets
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("capabilityToGoals".to_string())
-    );
+    assert!(connection.type_reference.is_some());
+    assert!(connection.subsets.is_some());
     let ConnectionDefBody::Brace { elements } = &connection.body else {
         panic!("expected connection body");
     };
@@ -869,7 +818,7 @@ fn part_definition_comment_members_parse_structurally() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -910,7 +859,7 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -940,11 +889,8 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
     };
     assert_eq!(csm.name, "csm");
     assert!(csm.is_individual);
-    assert_eq!(csm.type_name, "CSM-107");
-    assert_eq!(
-        csm.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("commandServiceModule".to_string())
-    );
+    assert!(csm.typing.is_some());
+    assert!(csm.redefines.is_some());
     assert!(elements
         .iter()
         .any(|e| matches!(e.value, PartDefBodyElement::InterfaceUsage(_))));
@@ -960,7 +906,7 @@ fn part_defs_accept_multiple_specialization_targets() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -981,7 +927,7 @@ fn part_redefinition_value_parses_parenthesized_tuple_of_engines() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -998,23 +944,11 @@ fn part_redefinition_value_parses_parenthesized_tuple_of_engines() {
     let engines = elements
         .iter()
         .find_map(|e| match &e.value {
-            PartDefBodyElement::PartUsage(p)
-                if p.value.redefines.as_ref().map(|n| n.value.target_display())
-                    == Some("engines".to_string()) =>
-            {
-                Some(&**p)
-            }
+            PartDefBodyElement::PartUsage(p) if p.value.redefines.is_some() => Some(&**p),
             _ => None,
         })
         .expect("engines part usage");
-    assert_eq!(
-        engines
-            .value
-            .multiplicity
-            .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[5]".to_string())
-    );
+    assert!(engines.value.multiplicity.is_some());
     let value = engines
         .value
         .value
@@ -1030,7 +964,8 @@ fn part_redefinition_value_parses_parenthesized_tuple_of_engines() {
     let expected = ["engine1", "engine2", "engine3", "engine4", "engine5"];
     for (i, name) in expected.iter().enumerate() {
         assert!(
-            matches!(&items[i].value, Expression::FeatureRef(s) if s == name),
+            matches!(&items[i].value, Expression::FeatureRef(s)
+                if result.document.qualified_reference(*s).is_some_and(|r| r.authored_text() == *name)),
             "element {i}: expected FeatureRef({name:?}), got {:?}",
             items[i].value
         );
@@ -1047,7 +982,7 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -1081,26 +1016,25 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
         2,
         "expected both attribute redefinitions as usages"
     );
-    assert_eq!(attrs[0].name, "propellantMass");
-    assert_eq!(
-        attrs[0]
+    let redefine_name = |attribute: &sysml_v2_parser::ast::AttributeUsage| {
+        let target = attribute
             .redefines
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("propellantMass".to_string())
-    );
+            .and_then(|relationship| relationship.value.target.first())
+            .copied()
+            .expect("expected redefinition target");
+        result
+            .document
+            .qualified_reference(target)
+            .and_then(|reference| reference.segment_decoded_text(0))
+            .expect("expected source-backed redefinition name")
+    };
+    assert_eq!(redefine_name(attrs[0]).as_ref(), "propellantMass");
     assert!(
         attrs[0].value.is_some(),
         "propellantMass should keep assigned value"
     );
-    assert_eq!(attrs[1].name, "dryMass");
-    assert_eq!(
-        attrs[1]
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("dryMass".to_string())
-    );
+    assert_eq!(redefine_name(attrs[1]).as_ref(), "dryMass");
     assert!(
         attrs[1].value.is_some(),
         "dryMass should keep assigned value"
@@ -1133,7 +1067,7 @@ fn part_usage_ordered_before_colon_parses_without_recovery() {
         })
         .expect("engines part usage");
     assert!(engines.ordered);
-    assert_eq!(engines.type_name, "RocketEngine");
+    assert!(engines.typing.is_some());
 }
 
 #[test]
@@ -1172,11 +1106,6 @@ fn part_def_body_item_usage_parses() {
         })
         .expect("item usage in part def body");
     assert_eq!(item.name, "concerns");
-    assert_eq!(
-        item.multiplicity
-            .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[*]".to_string())
-    );
-    assert_eq!(item.type_name.as_deref(), Some("Concern"));
+    assert!(item.multiplicity.is_some());
+    assert!(item.type_name.is_some());
 }

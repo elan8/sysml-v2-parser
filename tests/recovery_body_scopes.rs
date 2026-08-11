@@ -9,7 +9,7 @@ use sysml_v2_parser::parse_with_diagnostics;
 fn requirement_recovery_keeps_later_members() {
     let input = "package P {\nrequirement def R {\nsubject laptop: ;\nrequire constraint { }\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -44,7 +44,7 @@ fn requirement_recovery_keeps_later_members() {
 fn use_case_recovery_keeps_later_members() {
     let input = "package P {\nuse case def U {\nactor user: ;\nobjective { }\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -80,7 +80,7 @@ fn state_recovery_keeps_later_members() {
     // Named usage with typing started but type missing (anonymous `state: Mode;` is legal).
     let input = "package P {\nstate def Machine {\nstate ready: ;\ntransition t then Ready;\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -130,7 +130,7 @@ fn state_body_bare_identifier_reports_targeted_diagnostic_and_keeps_transition()
         Some("state body member such as `entry`, `transition`, `then`, `state`, or `ref`")
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -159,7 +159,7 @@ fn state_body_bare_identifier_reports_targeted_diagnostic_and_keeps_transition()
 fn part_def_recovery_keeps_later_members() {
     let input = "package P {\npart def Vehicle {\nattribute mass: ;\nport p : Port;\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };

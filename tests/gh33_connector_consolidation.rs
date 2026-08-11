@@ -22,7 +22,7 @@ fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -61,7 +61,9 @@ fn conjugated_end_type_works_in_both_connection_and_interface_defs() {
             _ => None,
         })
         .expect("expected end decl in connection def");
-    assert_eq!(end.type_name, "~PowerPort");
+    assert!(end.typing.as_ref().is_some_and(|typing| {
+        typing.value.is_conjugated && typing.value.first_target().is_some()
+    }));
 
     let interface = elements
         .iter()
@@ -83,7 +85,9 @@ fn conjugated_end_type_works_in_both_connection_and_interface_defs() {
             _ => None,
         })
         .expect("expected end decl in interface def");
-    assert_eq!(end.type_name, "~PowerPort");
+    assert!(end.typing.as_ref().is_some_and(|typing| {
+        typing.value.is_conjugated && typing.value.first_target().is_some()
+    }));
 }
 
 /// Both `connection def` and `interface def` `connect` statements accept per-endpoint

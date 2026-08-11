@@ -12,7 +12,7 @@ fn calc_keeps_library_tolerant_other_nodes_without_new_diagnostics() {
         "accepted calc-library constructs should remain diagnostic-free: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };

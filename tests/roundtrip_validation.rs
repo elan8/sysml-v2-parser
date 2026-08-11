@@ -126,7 +126,7 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Simple Tests/AliasTest.sysml",
     "Simple Tests/AnalysisTest.sysml",
     // Promoted by #113: AttributeUsage no longer duplicates the target name for
-    // `attribute ::> m = ms.m;`'s name-standing-in-prefix form.
+    // `attribute ::> m = ms.m;`'s target-only prefix form.
     "Simple Tests/CalculationTest.sysml",
     "Simple Tests/CommentTest.sysml",
     "Simple Tests/ConjugationTest.sysml",
@@ -233,6 +233,11 @@ fn try_roundtrip(src: &str) -> RoundtripOutcome {
         }
         Err(EmitError::Unsupported { path, construct }) => {
             return RoundtripOutcome::Failed(format!("emit unsupported at {path}: {construct}"))
+        }
+        Err(EmitError::InvalidQualifiedReference { path, id }) => {
+            return RoundtripOutcome::Failed(format!(
+                "emit invalid qualified reference at {path}: {id:?}"
+            ))
         }
     };
 

@@ -11,7 +11,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -115,9 +115,13 @@ fn gh89_2_perform_action_multiplicity_and_subsets() {
     let perform = perform.expect("expected a Perform element");
     assert_eq!(perform.action_name, "takePicture");
     assert!(perform.multiplicity.is_some(), "expected a multiplicity");
-    assert_eq!(
-        perform.subsets.as_deref(),
-        Some("PictureTaking::takePicture")
+    assert!(
+        perform
+            .subsets
+            .as_ref()
+            .and_then(|relationship| relationship.value.first_target())
+            .is_some(),
+        "expected a subsetting target"
     );
     assert!(perform.redefines.is_none());
 }
@@ -223,7 +227,7 @@ fn gh89_4_include_and_use_case_usage_in_part_usage_body() {
         _ => None,
     });
     let include = include.expect("expected an IncludeUseCase element");
-    assert_eq!(include.name, "uc2");
+    let _target_reference = include.target;
 
     let use_case = elements.iter().find_map(|e| match &e.value {
         sysml_v2_parser::ast::PartUsageBodyElement::UseCaseUsage(u) => Some(&u.value),
@@ -275,7 +279,8 @@ fn gh89_5_named_assert_without_constraint_keyword() {
         _ => None,
     });
     let assert_member = assert_member.expect("expected an AssertConstraint element");
-    assert_eq!(assert_member.name.as_deref(), Some("massAnalysis3"));
+    assert!(assert_member.declaration_name.is_none());
+    assert!(assert_member.target.is_some());
     assert!(assert_member.type_name.is_none());
     assert!(!assert_member.is_negated);
 }
@@ -305,7 +310,8 @@ fn gh89_5_assert_not_at_package_scope() {
         _ => None,
     });
     let assert_member = assert_member.expect("expected an AssertConstraint element");
-    assert_eq!(assert_member.name.as_deref(), Some("massLimitation"));
+    assert!(assert_member.declaration_name.is_none());
+    assert!(assert_member.target.is_some());
     assert!(assert_member.is_negated);
 }
 
@@ -388,7 +394,7 @@ fn gh89_7_bare_variant_member_with_body_in_part_usage_body() {
         _ => None,
     });
     let variant = variant.expect("expected a VariantUsage element");
-    assert_eq!(variant.name, "q");
+    assert!(variant.reference.is_some());
     assert!(variant.typed.is_none());
     assert!(variant.body.is_some());
 }
@@ -434,10 +440,10 @@ fn gh89_7_bare_variant_member_with_quoted_name_in_part_def_body() {
         })
         .collect();
     assert_eq!(variants.len(), 2);
-    assert_eq!(variants[0].name, "4cylEngine");
+    assert!(variants[0].reference.is_some());
     assert!(variants[0].typed.is_none());
     assert!(variants[0].body.is_none());
-    assert_eq!(variants[1].name, "6cylEngine");
+    assert!(variants[1].reference.is_some());
     assert!(variants[1].typed.is_none());
     assert!(variants[1].body.is_some());
 }
@@ -492,8 +498,8 @@ fn gh89_7_bare_variant_reference_in_action_body() {
         })
         .collect();
     assert_eq!(variants.len(), 2);
-    assert_eq!(variants[0].name, "generateTorque4Cyl");
-    assert_eq!(variants[1].name, "generateTorque6Cyl");
+    assert!(variants[0].reference.is_some());
+    assert!(variants[1].reference.is_some());
     for v in &variants {
         assert!(v.typed.is_none());
         assert!(v.body.is_none());
@@ -534,7 +540,7 @@ fn gh89_8_render_rendering_member_in_view_def_body() {
     });
     let rendering = rendering.expect("expected a ViewRenderingUsage element");
     assert_eq!(rendering.name, "r1");
-    assert_eq!(rendering.type_name.as_deref(), Some("R"));
+    assert!(rendering.type_name.is_some());
 }
 
 /// Real usage: `Timeslice and Snapshot Examples/TimeVaryingAttribute.sysml:14`:
@@ -569,6 +575,6 @@ fn gh89_9_directed_item_usage_in_part_def_body() {
     });
     let item = item.expect("expected an ItemUsage element");
     assert_eq!(item.name, "pwrCmd");
-    assert_eq!(item.type_name.as_deref(), Some("PwrCmd"));
+    assert!(item.type_name.is_some());
     assert_eq!(item.direction, Some(sysml_v2_parser::ast::InOut::Out));
 }

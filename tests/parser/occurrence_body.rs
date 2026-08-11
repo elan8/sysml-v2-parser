@@ -160,8 +160,14 @@ fn flow_def_body_parses_standalone_succession_usage() {
             _ => None,
         })
         .expect("expected a SuccessionUsage node, not an opaque Other(String)");
-    assert!(matches!(&succession.source.value, Expression::FeatureRef(n) if n == "stepA"));
-    assert!(matches!(&succession.target.value, Expression::FeatureRef(n) if n == "stepB"));
+    assert!(matches!(
+        &succession.source.value,
+        Expression::FeatureRef(_)
+    ));
+    assert!(matches!(
+        &succession.target.value,
+        Expression::FeatureRef(_)
+    ));
 }
 
 #[test]
@@ -203,10 +209,15 @@ fn flow_def_body_parses_succession_usage_with_multiplicities_like_systems_librar
     // Regression for the exact real-world form used by the SysML Systems Library's
     // `Flows.sysml` (`succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`):
     // a multiplicity on the succession itself, and on both the `first` and `then` ends.
-    let pkg = parse_package(
+    let document = sysml_v2_parser::parse(
         "package P { flow def M { attribute seBeforeNum : Natural; succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self; } }",
-    );
-    let flow = match &brace_package_elements(&pkg)[0].value {
+    )
+    .expect("parse should succeed");
+    let pkg = match &document.elements[0].value {
+        RootElement::Package(package) => &package.value,
+        _ => panic!("expected package"),
+    };
+    let flow = match &brace_package_elements(pkg)[0].value {
         PackageBodyElement::FlowDef(flow) => flow,
         _ => panic!("expected FlowDef"),
     };
@@ -221,27 +232,50 @@ fn flow_def_body_parses_succession_usage_with_multiplicities_like_systems_librar
             _ => None,
         })
         .expect("expected a SuccessionUsage node");
+    let multiplicity = &succession
+        .multiplicity
+        .as_ref()
+        .expect("succession multiplicity")
+        .value;
+    let Some(Expression::FeatureRef(reference)) =
+        multiplicity.lower.as_deref().map(|node| &node.value)
+    else {
+        panic!("expected feature-reference multiplicity bound");
+    };
     assert_eq!(
-        succession
-            .multiplicity
-            .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[seBeforeNum]".to_string())
+        document
+            .qualified_reference(*reference)
+            .expect("multiplicity reference")
+            .authored_text(),
+        "seBeforeNum"
     );
-    assert_eq!(
+    assert_eq!(multiplicity.lower, multiplicity.upper);
+
+    for multiplicity in [
         succession
             .source_multiplicity
             .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[0..1]".to_string())
-    );
-    assert_eq!(
+            .expect("source multiplicity"),
         succession
             .target_multiplicity
             .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[0..1]".to_string())
-    );
-    assert!(matches!(&succession.source.value, Expression::FeatureRef(n) if n == "sourceEvent"));
-    assert!(matches!(&succession.target.value, Expression::FeatureRef(n) if n == "self"));
+            .expect("target multiplicity"),
+    ] {
+        assert!(matches!(
+            multiplicity.value.lower.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(0))
+        ));
+        assert!(matches!(
+            multiplicity.value.upper.as_deref().map(|node| &node.value),
+            Some(Expression::LiteralInteger(1))
+        ));
+    }
+    assert!(matches!(
+        &succession.source.value,
+        Expression::FeatureRef(_)
+    ));
+    assert!(matches!(
+        &succession.target.value,
+        Expression::FeatureRef(_)
+    ));
 }

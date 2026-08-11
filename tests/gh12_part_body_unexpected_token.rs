@@ -45,7 +45,7 @@ fn part_def_body_rejects_arbitrary_non_sysml_text() {
     assert_rejects_with_unexpected_token(&input, "part definition body");
 
     let result = parse_with_diagnostics(&input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -78,7 +78,7 @@ fn part_usage_body_rejects_arbitrary_non_sysml_text() {
     assert_rejects_with_unexpected_token(&input, "part usage body");
 
     let result = parse_with_diagnostics(&input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };

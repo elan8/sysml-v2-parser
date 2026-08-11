@@ -8,7 +8,7 @@ use sysml_v2_parser::parse_with_diagnostics;
 fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
     let input = "package P { view def V { filter ; render r : Renderer; } }";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -43,7 +43,7 @@ fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
 fn view_usage_recovery_inserts_error_node_and_keeps_later_satisfy() {
     let input = "package P { view v : V { expose ; satisfy VP; } }";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };

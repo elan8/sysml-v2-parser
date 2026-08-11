@@ -27,7 +27,7 @@ fn package_elements(
 ) {
     let result = parse_with_diagnostics(input);
     let elements = {
-        let pkg = match &result.root.elements[0].value {
+        let pkg = match &result.document.root.elements[0].value {
             RootElement::Package(p) => &p.value,
             _ => panic!("expected package"),
         };
@@ -208,6 +208,7 @@ fn fixture_nested_bad_block_recovers_inside_part_and_keeps_outer_siblings() {
         .iter()
         .any(|e| matches!(e.value, PartDefBodyElement::Ref(_))));
     assert!(result
+        .document
         .root
         .elements
         .iter()
@@ -237,8 +238,9 @@ fn fixture_unmatched_brace_reports_local_eof_error_without_extra_recovery_noise(
         err
     );
     assert!(
-        result.root.elements.is_empty()
+        result.document.root.elements.is_empty()
             || result
+                .document
                 .root
                 .elements
                 .iter()
@@ -274,7 +276,12 @@ fn fixture_expose_feature_chain_parses_without_separator_diagnostic() {
         other => panic!("expected view usage, got {other:?}"),
     };
     assert_eq!(
-        expose_target, "SurveillanceDrone.SurveillanceQuadrotorDrone",
+        result
+            .document
+            .qualified_reference(expose_target.reference)
+            .expect("expose target reference")
+            .authored_text(),
+        "SurveillanceDrone.SurveillanceQuadrotorDrone",
         "feature-chain segments should be preserved in expose target"
     );
 }
@@ -456,10 +463,15 @@ package Later {
         "malformed package body should not cascade as top-level errors: {:?}",
         result.errors
     );
-    assert!(result.root.elements.iter().any(|e| match &e.value {
-        RootElement::Package(pkg) => pkg.value.identification.name.as_deref() == Some("Later"),
-        _ => false,
-    }));
+    assert!(result
+        .document
+        .root
+        .elements
+        .iter()
+        .any(|e| match &e.value {
+            RootElement::Package(pkg) => pkg.value.identification.name.as_deref() == Some("Later"),
+            _ => false,
+        }));
 }
 
 #[test]
@@ -650,7 +662,7 @@ fn fixture_reference_usage_in_part_def_parses_without_bare_feature_diagnostic() 
         "DefaultReferenceUsage `Capacity : Real;` is valid; unexpected errors: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -712,6 +724,7 @@ fn fixture_glued_package_member_parses_without_separator_diagnostic() {
         result.errors
     );
     let packages: Vec<_> = result
+        .document
         .root
         .elements
         .iter()
@@ -736,7 +749,7 @@ fn state_ref_brace_body_recovers_without_aborting_siblings() {
   part def Good;
 }"#;
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -786,7 +799,7 @@ fn part_usage_bind_brace_body_recovers_without_aborting_siblings() {
   }
 }"#;
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };

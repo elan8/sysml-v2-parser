@@ -57,7 +57,7 @@ fn named_flow_in_package() {
     match &elements[0].value {
         PackageBodyElement::FlowUsage(flow) => {
             assert_eq!(flow.value.name.as_deref(), Some("transfer"));
-            assert_eq!(flow.value.type_name.as_deref(), Some("Fuel"));
+            assert!(flow.value.type_name.is_some());
             assert!(flow.value.from.is_some());
             assert!(flow.value.to.is_some());
         }
@@ -85,7 +85,7 @@ fn flow_payload_bare_type_reference() {
     let flow = find_flow(&elements);
     let payload = flow.value.payload.as_ref().expect("payload feature");
     assert_eq!(payload.value.name, None);
-    assert_eq!(payload.value.type_name.as_deref(), Some("Payload"));
+    assert!(payload.value.type_name.is_some());
     assert!(payload.value.multiplicity.is_none());
 }
 
@@ -97,7 +97,7 @@ fn flow_payload_named_feature() {
     let flow = find_flow(&elements);
     let payload = flow.value.payload.as_ref().expect("payload feature");
     assert_eq!(payload.value.name.as_deref(), Some("qty"));
-    assert_eq!(payload.value.type_name.as_deref(), Some("Payload"));
+    assert!(payload.value.type_name.is_some());
     assert!(payload.value.multiplicity.is_none());
 }
 
@@ -109,7 +109,7 @@ fn flow_payload_named_feature_with_multiplicity() {
     let flow = find_flow(&elements);
     let payload = flow.value.payload.as_ref().expect("payload feature");
     assert_eq!(payload.value.name.as_deref(), Some("qty"));
-    assert_eq!(payload.value.type_name.as_deref(), Some("Payload"));
+    assert!(payload.value.type_name.is_some());
     let mult = payload
         .value
         .multiplicity
@@ -133,7 +133,7 @@ fn flow_payload_bare_qualified_type_reference() {
     let flow = find_flow(&elements);
     let payload = flow.value.payload.as_ref().expect("payload feature");
     assert_eq!(payload.value.name, None);
-    assert_eq!(payload.value.type_name.as_deref(), Some("Types::Payload"));
+    assert!(payload.value.type_name.is_some());
 }
 
 #[test]

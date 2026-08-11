@@ -56,7 +56,9 @@ package P {
     let variant_names: Vec<&str> = variant_elements
         .iter()
         .filter_map(|el| match &el.value {
-            PartDefBodyElement::VariantUsage(n) => Some(n.value.name.as_str()),
+            PartDefBodyElement::VariantUsage(n) => result
+                .qualified_reference(n.value.reference?)
+                .map(|reference| reference.authored_text()),
             PartDefBodyElement::Error(err) => {
                 panic!("unexpected recovery error in variation body: {err:?}")
             }
@@ -129,9 +131,12 @@ package P {
         .iter()
         .filter_map(|el| match &el.value {
             PartDefBodyElement::VariantUsage(n) => match &n.value.typed {
-                Some(VariantTypedUsage::Part(part)) => {
-                    Some((n.value.name.as_str(), part.type_name.as_str()))
-                }
+                Some(VariantTypedUsage::Part(part)) => Some((
+                    part.value.name.as_str(),
+                    result
+                        .qualified_reference(part.value.typing.as_ref()?.value.first_target()?)?
+                        .authored_text(),
+                )),
                 _ => None,
             },
             PartDefBodyElement::Error(err) => {

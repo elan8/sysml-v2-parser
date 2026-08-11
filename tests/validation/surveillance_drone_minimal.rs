@@ -2,7 +2,7 @@
 //! See plan: fix_surveillancedrone_test — step 1.
 
 use std::path::Path;
-use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
+use sysml_v2_parser::ast::{ImportShape, PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse;
 
 /// Parses "package SurveillanceDrone { attribute def Real; }" (no doc/comment before first element).
@@ -176,7 +176,12 @@ fn test_perform_body_doc_comment_parsed_as_element() {
     match &perform_body[1].value {
         sysml_v2_parser::ast::PerformBodyElement::InOut(b) => {
             assert_eq!(b.value.direction, sysml_v2_parser::ast::InOut::In);
-            assert_eq!(b.value.name, "x");
+            assert_eq!(
+                root.qualified_reference(b.value.target)
+                    .expect("perform binding target resolves")
+                    .authored_text(),
+                "x"
+            );
         }
         other => panic!("expected second element InOut, got {:?}", other),
     }
@@ -207,10 +212,17 @@ fn test_import_filter_package() {
         PackageBodyElement::Import(i) => &i.value,
         _ => panic!("expected Import"),
     };
-    assert!(imp.filter_members.is_some(), "expected filter_members");
-    let members = imp.filter_members.as_ref().unwrap();
+    let ImportShape::Filter { recursive, members } = &imp.target.shape else {
+        panic!("expected filter import, got {:?}", imp.target.shape);
+    };
+    assert!(!recursive);
     assert_eq!(members.len(), 2, "two filter members [ 1 ] [ 2 + 3 ]");
-    assert_eq!(imp.target, "MyPkg");
+    assert_eq!(
+        root.qualified_reference(imp.target.reference)
+            .expect("import target reference")
+            .authored_text(),
+        "MyPkg"
+    );
 }
 
 /// KerML: top-level namespace declaration (same body as package).

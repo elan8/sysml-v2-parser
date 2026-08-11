@@ -13,7 +13,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };

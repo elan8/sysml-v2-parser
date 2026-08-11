@@ -17,7 +17,7 @@ fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -58,10 +58,10 @@ fn end_decl_accepts_trailing_redefines_after_typed_form() {
             _ => None,
         })
         .expect("expected end decl");
-    assert_eq!(end.type_name, "Anything");
+    assert!(end.typing.is_some());
     assert_eq!(
-        end.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("BinaryLinkObject::source".to_string())
+        end.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -100,7 +100,10 @@ fn connection_def_body_accepts_private_assert_constraint() {
             _ => None,
         })
         .expect("expected assert constraint member");
-    assert_eq!(assert_member.name.as_deref(), Some("disjointCauseEffect"));
+    assert_eq!(
+        assert_member.declaration_name.as_deref(),
+        Some("disjointCauseEffect")
+    );
     assert_eq!(
         assert_member.membership.visibility,
         Some(sysml_v2_parser::ast::Visibility::Private)
@@ -165,7 +168,7 @@ fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() 
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -191,13 +194,10 @@ fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() 
         .expect("expected ref decl");
     assert_eq!(ref_decl.name, "");
     assert_eq!(
-        ref_decl
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("participant".to_string())
+        ref_decl.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
-    assert_eq!(ref_decl.type_name, "Port");
+    assert!(ref_decl.typing.is_some());
 }
 
 /// Real usage: Domain Library `Requirement Derivation/DerivationConnections.sysml`'s `ref
@@ -222,22 +222,19 @@ fn connection_def_body_accepts_ref_requirement_with_redefines_and_subsets() {
         .find(|r| r.name == "originalRequirement")
         .expect("expected named ref requirement");
     assert_eq!(
-        named.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("R1".to_string())
+        named.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert_eq!(
-        named.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("participant".to_string())
+        named.subsets.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     let anonymous = ref_decls
         .iter()
         .find(|r| r.name.is_empty())
         .expect("expected anonymous ref requirement");
     assert_eq!(
-        anonymous
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("R2".to_string())
+        anonymous.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }

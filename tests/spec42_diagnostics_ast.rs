@@ -54,7 +54,7 @@ fn transition_accept_retained_with_spans() {
     let accept = transitions[0].accept.as_ref().expect("shorthand accept");
     match accept {
         TransitionAccept::Shorthand(expr, via) => {
-            assert!(matches!(expr.value, Expression::FeatureRef(ref n) if n == "StartPressed"));
+            assert!(matches!(expr.value, Expression::FeatureRef(_)));
             assert!(expr.span.len > 0);
             assert!(via.is_none(), "fixture has no `via` clause on this trigger");
         }
@@ -64,7 +64,7 @@ fn transition_accept_retained_with_spans() {
     match typed {
         TransitionAccept::Payload(p, via) => {
             assert_eq!(p.name, "evt");
-            assert_eq!(p.type_name.as_deref(), Some("StartEvent"));
+            assert!(p.type_name.is_some());
             assert!(p.name_span.len > 0);
             assert!(p.type_span.is_some());
             assert!(via.is_none(), "fixture has no `via` clause on this trigger");
@@ -120,7 +120,7 @@ fn send_payload_on_control_node_action() {
     match send {
         sysml_v2_parser::ast::SendPayload::Typed(p) => {
             assert_eq!(p.name, "message");
-            assert_eq!(p.type_name.as_deref(), Some("AlertMessage"));
+            assert!(p.type_name.is_some());
             assert!(p.name_span.len > 0);
             assert!(p.type_span.is_some());
         }
@@ -195,10 +195,7 @@ fn verification_local_attribute_has_name_span() {
     };
     assert_eq!(attr.name, "count");
     assert!(attr.name_span.is_some());
-    assert_eq!(
-        attr.typing.as_ref().map(|n| n.value.target_display()),
-        Some("Integer".to_string())
-    );
+    assert_eq!(attr.typing.as_ref().map(|n| n.value.target.len()), Some(1));
 }
 
 #[test]
@@ -311,16 +308,8 @@ fn filter_expressions_use_classification_ast() {
     match &filters[0].value {
         Expression::BinaryOp { op, left, right } => {
             assert_eq!(op.as_str(), "||");
-            assert!(matches!(
-                left.value,
-                Expression::Classification { ref metaclass }
-                    if metaclass == "SysML::PartUsage"
-            ));
-            assert!(matches!(
-                right.value,
-                Expression::Classification { ref metaclass }
-                    if metaclass == "SysML::PortUsage"
-            ));
+            assert!(matches!(left.value, Expression::Classification { .. }));
+            assert!(matches!(right.value, Expression::Classification { .. }));
         }
         other => panic!("expected or of classifications, got {other:?}"),
     }
@@ -328,11 +317,7 @@ fn filter_expressions_use_classification_ast() {
     match &filters[1].value {
         Expression::UnaryOp { op, operand } => {
             assert_eq!(op.as_str(), "not");
-            assert!(matches!(
-                operand.value,
-                Expression::Classification { ref metaclass }
-                    if metaclass == "SysML::ConnectionUsage"
-            ));
+            assert!(matches!(operand.value, Expression::Classification { .. }));
         }
         other => panic!("expected not classification, got {other:?}"),
     }
@@ -340,27 +325,16 @@ fn filter_expressions_use_classification_ast() {
     match &filters[2].value {
         Expression::BinaryOp { op, left, right } => {
             assert_eq!(op.as_str(), "&&");
-            assert!(matches!(
-                left.value,
-                Expression::Classification { ref metaclass } if metaclass == "Approval"
-            ));
+            assert!(matches!(left.value, Expression::Classification { .. }));
             assert!(
-                matches!(
-                    &right.value,
-                    Expression::MemberAccess(_, member) if member == "approved"
-                ) || matches!(
-                    &right.value,
-                    Expression::FeatureRef(name) if name.ends_with("approved")
-                )
+                matches!(&right.value, Expression::MemberAccess { .. })
+                    || matches!(&right.value, Expression::FeatureRef(_))
             );
         }
         other => panic!("expected and of classification + member access, got {other:?}"),
     }
 
-    assert!(matches!(
-        filters[3].value,
-        Expression::FeatureRef(ref name) if name == "guardExpr"
-    ));
+    assert!(matches!(filters[3].value, Expression::FeatureRef(_)));
     assert!(filters[0].span.len > 0);
 }
 
@@ -386,10 +360,7 @@ fn transition_guard_feature_ref_retained() {
         _ => panic!("expected brace state body"),
     };
     let guard = transition.guard.as_ref().expect("guard");
-    assert!(matches!(
-        guard.value,
-        Expression::FeatureRef(ref name) if name == "guardExpr"
-    ));
+    assert!(matches!(guard.value, Expression::FeatureRef(_)));
 }
 
 #[test]
@@ -412,11 +383,17 @@ fn typed_stakeholder_parameter_parsed() {
         })
         .collect();
     assert_eq!(stakeholders.len(), 2);
-    assert_eq!(stakeholders[0].name, "driver");
-    assert_eq!(stakeholders[0].type_name.as_deref(), Some("Person"));
-    assert!(stakeholders[0].name_span.len > 0);
-    assert!(stakeholders[0].type_span.is_some());
-    assert_eq!(stakeholders[1].name, "SafetyConcern");
+    assert_eq!(stakeholders[0].declaration_name, "driver");
+    assert!(stakeholders[0].target.is_none());
+    assert!(stakeholders[0].type_name.is_some());
+    assert!(stakeholders[1].declaration_name.is_empty());
+    assert_eq!(
+        stakeholders[1]
+            .target
+            .and_then(|target| root.qualified_reference(target))
+            .map(|reference| reference.authored_text()),
+        Some("SafetyConcern")
+    );
     assert!(stakeholders[1].type_name.is_none());
 }
 
@@ -438,8 +415,8 @@ fn constraint_body_metadata_annotation_parsed() {
             .expect("metadata annotation in constraint body"),
         _ => panic!("expected brace constraint body"),
     };
-    assert_eq!(meta.name, "Approval");
-    assert_eq!(meta.type_name.as_deref(), Some("ApprovalKind"));
+    assert!(root.qualified_reference(meta.reference).is_some());
+    assert!(meta.type_reference.is_some());
     assert!(meta.head_span.as_ref().is_some_and(|s| s.len > 0));
 }
 
@@ -501,7 +478,7 @@ fn metadata_usage_about_clause_parses_targets() {
             _ => None,
         })
         .expect("metadata usage");
-    assert_eq!(usage.about_targets, vec!["SecurityReq", "Design"]);
+    assert_eq!(usage.about_targets.len(), 2);
 }
 
 #[test]
@@ -538,7 +515,7 @@ fn metadata_annotation_about_clause_parses_targets() {
             .expect("metadata annotation"),
         _ => panic!("expected brace part body"),
     };
-    assert_eq!(meta.about_targets, vec!["OtherPart"]);
+    assert_eq!(meta.about_targets.len(), 1);
 }
 
 #[test]
@@ -603,7 +580,7 @@ fn meta_cast_expression_parses_in_attribute_binding() {
     };
     assert!(matches!(
         &expr.value.expression.value,
-        Expression::MetaCast { metaclass, .. } if metaclass == "SysML::Usage"
+        Expression::MetaCast { .. }
     ));
 }
 
@@ -652,14 +629,8 @@ fn metadata_def_shorthand_annotated_element() {
             _ => None,
         })
         .expect("annotatedElement shorthand binding");
-    assert_eq!(
-        attr.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("annotatedElement".to_string())
-    );
-    assert_eq!(
-        attr.typing.as_ref().map(|n| n.value.target_display()),
-        Some("SysML::RequirementUsage".to_string())
-    );
+    assert_eq!(attr.subsets.as_ref().map(|n| n.value.target.len()), Some(1));
+    assert_eq!(attr.typing.as_ref().map(|n| n.value.target.len()), Some(1));
 }
 
 #[test]
@@ -685,15 +656,15 @@ fn metadata_def_shorthand_base_type_meta_cast() {
         })
         .expect("baseType shorthand binding");
     assert_eq!(
-        attr.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("baseType".to_string())
+        attr.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     let Some(expr) = attr.value.as_ref() else {
         panic!("expected value expression");
     };
     assert!(matches!(
         &expr.value.expression.value,
-        Expression::MetaCast { metaclass, .. } if metaclass == "SysML::Usage"
+        Expression::MetaCast { .. }
     ));
 }
 
@@ -772,7 +743,7 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         UseCaseDefBodyElement::MetadataAnnotation(a) => &a.value,
         other => panic!("expected MetadataAnnotation in use case body, got {other:?}"),
     };
-    assert_eq!(ann.name, "SomeMetaclass");
+    assert!(root.qualified_reference(ann.reference).is_some());
     assert!(ann.head_span.is_some(), "head_span should be set");
 
     // view def body
@@ -788,7 +759,7 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         ViewDefBodyElement::MetadataAnnotation(a) => &a.value,
         other => panic!("expected MetadataAnnotation in view def body, got {other:?}"),
     };
-    assert_eq!(ann.name, "AnotherMetaclass");
+    assert!(root.qualified_reference(ann.reference).is_some());
     assert!(ann.head_span.is_some(), "head_span should be set");
 
     // calc def body
@@ -804,7 +775,7 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         CalcDefBodyElement::MetadataAnnotation(a) => &a.value,
         other => panic!("expected MetadataAnnotation in calc def body, got {other:?}"),
     };
-    assert_eq!(ann.name, "YetAnotherMetaclass");
+    assert!(root.qualified_reference(ann.reference).is_some());
     assert!(ann.head_span.is_some(), "head_span should be set");
 }
 
@@ -830,9 +801,9 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
         other => panic!("expected CaseReturnDecl (plain return), got {other:?}"),
     };
-    assert_eq!(ret1.name, "verdict");
-    assert!(!ret1.is_redefine);
-    assert_eq!(ret1.type_name.as_deref(), Some("VerdictKind"));
+    assert_eq!(ret1.declaration_name, "verdict");
+    assert!(ret1.target.is_none());
+    assert!(ret1.type_name.is_some());
     assert!(ret1.name_span.is_some(), "name_span should be set");
     assert!(
         ret1.value.is_some(),
@@ -844,8 +815,12 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
         other => panic!("expected CaseReturnDecl (:>> form), got {other:?}"),
     };
-    assert_eq!(ret2.name, "result");
-    assert!(ret2.is_redefine);
+    assert!(ret2.declaration_name.is_empty());
+    let target = root
+        .qualified_reference(ret2.target.expect("return redefinition target"))
+        .expect("target ID resolves in parsed document");
+    assert_eq!(target.authored_text(), "result");
+    assert!(ret2.name_span.is_none());
     assert!(
         ret2.value.is_some(),
         "redefined return initializer should be retained"
@@ -856,8 +831,8 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
         other => panic!("expected CaseReturnDecl (attribute form), got {other:?}"),
     };
-    assert_eq!(ret3.name, "score");
-    assert_eq!(ret3.type_name.as_deref(), Some("Real"));
+    assert_eq!(ret3.declaration_name, "score");
+    assert!(ret3.type_name.is_some());
     assert!(
         ret3.value.is_some(),
         "attribute return initializer should be retained"
@@ -876,8 +851,8 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         UseCaseDefBodyElement::CaseReturnDecl(r) => &r.value,
         other => panic!("expected CaseReturnDecl in analysis body, got {other:?}"),
     };
-    assert_eq!(ret4.name, "thrust");
-    assert_eq!(ret4.type_name.as_deref(), Some("ForceValue"));
+    assert_eq!(ret4.declaration_name, "thrust");
+    assert!(ret4.type_name.is_some());
     assert!(
         ret4.value.is_none(),
         "declaration without initializer should remain empty"

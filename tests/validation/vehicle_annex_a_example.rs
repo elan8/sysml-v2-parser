@@ -47,13 +47,13 @@ fn test_parse_vehicle_annex_a_example_does_not_crash() {
     }
 
     assert_eq!(
-        result.root.elements.len(),
+        result.document.root.elements.len(),
         1,
         "expected exactly one top-level package"
     );
     assert!(
         matches!(
-            &result.root.elements[0].value,
+            &result.document.root.elements[0].value,
             RootElement::Package(p) if p.value.identification.name.as_deref() == Some("SimpleVehicleModel")
         ),
         "expected the single top-level element to be the `SimpleVehicleModel` package"
