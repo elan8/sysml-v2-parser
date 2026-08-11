@@ -1,6 +1,6 @@
 //! Expression emission.
 
-use super::writer::{format_feature_path, format_name, format_qualified_name, EmitWriter};
+use super::writer::EmitWriter;
 use super::EmitError;
 use crate::ast::{
     Argument, BinaryOperator, CollectionOperator, Expression, FeatureValue, FeatureValueKind, Node,
@@ -17,19 +17,22 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             w.push_char('"');
         }
         Expression::LiteralBoolean(b) => w.push_str(if *b { "true" } else { "false" }),
-        Expression::FeatureRef(name) => {
-            if name.contains("::") {
-                w.push_str(&format_qualified_name(name));
-            } else if name.contains('.') {
-                w.push_str(&format_feature_path(name));
-            } else {
-                w.push_str(&format_name(name));
-            }
+        Expression::Unit(unit) => w.push_str(unit),
+        Expression::Opaque(text) => w.push_str(text),
+        Expression::FeatureRef(reference) => {
+            w.push_qualified_reference("expression feature", *reference)?
         }
-        Expression::MemberAccess(base, member) => {
+        Expression::MemberAccess {
+            base,
+            member,
+            separator,
+        } => {
             emit_expression(w, &base.value)?;
-            w.push_char('.');
-            w.push_str(&format_name(member));
+            w.push_str(match separator {
+                crate::ast::ReferenceSeparator::ColonColon => "::",
+                crate::ast::ReferenceSeparator::Dot => ".",
+            });
+            w.push_qualified_reference("expression member", *member)?;
         }
         Expression::Index { base, index } => {
             emit_expression(w, &base.value)?;
@@ -85,12 +88,12 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
         }
         Expression::Classification { metaclass } => {
             w.push_char('@');
-            w.push_str(metaclass);
+            w.push_qualified_reference("classification", *metaclass)?;
         }
         Expression::MetaCast { base, metaclass } => {
             emit_expression(w, &base.value)?;
             w.push_str(" meta ");
-            w.push_str(metaclass);
+            w.push_qualified_reference("meta cast", *metaclass)?;
         }
         Expression::TypeCheck {
             kind,
@@ -103,17 +106,17 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             }
             w.push_str(type_check_str(kind));
             w.push_char(' ');
-            w.push_str(&format_qualified_name(type_name));
+            w.push_qualified_reference("type check", *type_name)?;
         }
         Expression::Select { base, selector } => {
             emit_expression(w, &base.value)?;
             w.push_str(".?");
-            w.push_str(selector);
+            w.push_qualified_reference("select", *selector)?;
         }
         Expression::Collect { base, selector } => {
             emit_expression(w, &base.value)?;
             w.push_str(".**");
-            w.push_str(selector);
+            w.push_qualified_reference("collect", *selector)?;
         }
         Expression::Null => w.push_str("null"),
         Expression::Parenthesized(inner) => {
@@ -123,16 +126,11 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
         }
         Expression::Constructor { type_name, args } => {
             w.push_str("new ");
-            w.push_str(&format_qualified_name(type_name));
+            w.push_qualified_reference("constructor", *type_name)?;
             emit_args(w, args)?;
         }
-        Expression::FeatureChainRef(chain) => {
-            for (i, seg) in chain.segments.iter().enumerate() {
-                if i > 0 {
-                    w.push_char('.');
-                }
-                w.push_str(&format_name(seg));
-            }
+        Expression::FeatureChainRef(reference) => {
+            w.push_qualified_reference("feature chain", *reference)?
         }
         Expression::CollectionOp {
             op,
@@ -163,7 +161,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
         }
         Expression::Extent { target } => {
             w.push_str("all ");
-            w.push_str(&format_qualified_name(target));
+            w.push_qualified_reference("extent", *target)?;
         }
         Expression::MetadataAccess(base) => {
             emit_expression(w, &base.value)?;
@@ -203,8 +201,8 @@ fn emit_args(w: &mut EmitWriter<'_>, args: &[Argument]) -> Result<(), EmitError>
         if i > 0 {
             w.push_str(", ");
         }
-        if let Some(name) = &arg.name {
-            w.push_str(name);
+        if let Some(parameter) = arg.parameter {
+            w.push_qualified_reference("argument parameter", parameter)?;
             w.push_str(" = ");
         }
         emit_expression(w, &arg.value.value)?;

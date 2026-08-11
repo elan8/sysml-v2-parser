@@ -1,11 +1,12 @@
 //! Root namespace / package / import emission.
 
-use super::writer::{emit_visibility, format_name, format_qualified_name, EmitWriter};
+use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use super::{behavior, requirement, structure, view};
 use crate::ast::{
-    CommentAnnotation, DocComment, FilterMember, Identification, Import, LibraryPackage, Package,
-    PackageBody, PackageBodyElement, RootElement, RootNamespace, TextualRepresentation,
+    CommentAnnotation, DocComment, FilterMember, Identification, Import, ImportShape, ImportTarget,
+    LibraryPackage, Package, PackageBody, PackageBodyElement, RootElement, RootNamespace,
+    TextualRepresentation,
 };
 
 pub(crate) fn emit_root(w: &mut EmitWriter<'_>, root: &RootNamespace) -> Result<(), EmitError> {
@@ -33,7 +34,7 @@ fn emit_root_element(
             emit_package_body(w, path, &n.value.body)
         }
         RootElement::Import(i) => emit_import(w, &i.value),
-        RootElement::Member(m) => emit_package_body_element(w, path, &m.value),
+        RootElement::Member(m) => emit_package_body_node(w, path, m),
     }
 }
 
@@ -75,7 +76,7 @@ fn emit_package_body(
             w.newline();
             w.indent();
             for (i, el) in elements.iter().enumerate() {
-                emit_package_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                emit_package_body_node(w, &format!("{path}/body[{i}]"), el)?;
                 w.newline();
             }
             w.dedent();
@@ -85,16 +86,24 @@ fn emit_package_body(
     }
 }
 
+fn emit_package_body_node(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    node: &crate::ast::Node<PackageBodyElement>,
+) -> Result<(), EmitError> {
+    if matches!(node.value, PackageBodyElement::Error(_)) {
+        return w.push_recovery_span(path, &node.span);
+    }
+    emit_package_body_element(w, path, &node.value)
+}
+
 pub(crate) fn emit_package_body_element(
     w: &mut EmitWriter<'_>,
     path: &str,
     el: &PackageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        PackageBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        PackageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PackageBodyElement::Doc(d) => emit_doc(w, &d.value),
         PackageBodyElement::Comment(c) => emit_comment(w, &c.value),
         PackageBodyElement::TextualRep(t) => emit_textual_rep(w, &t.value),
@@ -198,18 +207,7 @@ pub(crate) fn emit_package_body_element(
 pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(), EmitError> {
     emit_visibility(w, import.membership.visibility);
     w.push_str("import ");
-    // `target` already includes `::*` when is_import_all; segments are unquoted in the AST.
-    w.push_str(&format_qualified_name(&import.target));
-    if import.is_recursive && !import.target.ends_with("::**") {
-        w.push_str("::**");
-    }
-    if let Some(filters) = &import.filter_members {
-        for f in filters {
-            w.push_str(" [");
-            super::expr::emit_expression(w, &f.value.expression.value)?;
-            w.push_char(']');
-        }
-    }
+    emit_import_target(w, "import/target", &import.target)?;
     // Preserve RelationshipBody shape: `None` → `;`, `Some` → `{ ... }` even when empty
     // (brace bodies with only trivia comments parse as `Some([])`).
     match &import.body_elements {
@@ -230,6 +228,38 @@ pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(),
     Ok(())
 }
 
+pub(crate) fn emit_import_target(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    target: &ImportTarget,
+) -> Result<(), EmitError> {
+    w.push_qualified_reference(path, target.reference)?;
+    match &target.shape {
+        ImportShape::Membership { recursive } => {
+            if *recursive {
+                w.push_str("::**");
+            }
+        }
+        ImportShape::Namespace { recursive } => {
+            w.push_str("::*");
+            if *recursive {
+                w.push_str("::**");
+            }
+        }
+        ImportShape::Filter { recursive, members } => {
+            if *recursive {
+                w.push_str("::**");
+            }
+            for member in members {
+                w.push_str(" [");
+                super::expr::emit_expression(w, &member.value.expression.value)?;
+                w.push_char(']');
+            }
+        }
+    }
+    Ok(())
+}
+
 fn emit_relationship_body_element(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -240,10 +270,7 @@ fn emit_relationship_body_element(
         RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
         RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
         RelationshipBodyElement::TextualRep(r) => emit_textual_rep(w, &r.value),
-        RelationshipBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,

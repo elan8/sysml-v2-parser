@@ -1,20 +1,23 @@
 //! Indenting SysML text writer.
 
 use super::{EmitError, EmitOptions};
+use crate::ast::{ParsedDocument, QualifiedReferenceId, ReferenceSeparator, Span};
 
 pub(crate) struct EmitWriter<'a> {
     buf: String,
     depth: usize,
     opts: &'a EmitOptions,
+    document: &'a ParsedDocument,
     at_line_start: bool,
 }
 
 impl<'a> EmitWriter<'a> {
-    pub(crate) fn new(opts: &'a EmitOptions) -> Self {
+    pub(crate) fn new(document: &'a ParsedDocument, opts: &'a EmitOptions) -> Self {
         Self {
             buf: String::new(),
             depth: 0,
             opts,
+            document,
             at_line_start: true,
         }
     }
@@ -45,6 +48,59 @@ impl<'a> EmitWriter<'a> {
         self.push_str(c.encode_utf8(&mut tmp));
     }
 
+    /// Re-emit the exact source captured by a resilient parser recovery node.
+    pub(crate) fn push_recovery_span(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
+        let text = self
+            .document
+            .source
+            .slice(span)
+            .ok_or_else(|| EmitError::Unsupported {
+                path: path.to_owned(),
+                construct: "recovery node has an invalid source span".to_owned(),
+            })?;
+        self.push_str(text.trim_end());
+        Ok(())
+    }
+
+    /// Emit one arena-backed reference without reconstructing or splitting a display string.
+    pub(crate) fn push_qualified_reference(
+        &mut self,
+        path: &str,
+        id: QualifiedReferenceId,
+    ) -> Result<(), EmitError> {
+        let document = self.document;
+        let reference = document.qualified_reference(id).ok_or_else(|| {
+            EmitError::InvalidQualifiedReference {
+                path: path.to_owned(),
+                id,
+            }
+        })?;
+        if reference.metadata.is_absolute {
+            self.push_str("$::");
+        }
+        for (index, segment) in reference.segments.iter().enumerate() {
+            match segment.separator_before {
+                Some(ReferenceSeparator::ColonColon) => self.push_str("::"),
+                Some(ReferenceSeparator::Dot) => self.push_char('.'),
+                None if index == 0 => {}
+                None => {
+                    return Err(EmitError::InvalidQualifiedReference {
+                        path: path.to_owned(),
+                        id,
+                    });
+                }
+            }
+            let decoded = reference.segment_decoded_text(index).ok_or_else(|| {
+                EmitError::InvalidQualifiedReference {
+                    path: path.to_owned(),
+                    id,
+                }
+            })?;
+            self.push_str(&format_name(decoded.as_ref()));
+        }
+        Ok(())
+    }
+
     pub(crate) fn newline(&mut self) {
         self.buf.push('\n');
         self.at_line_start = true;
@@ -73,52 +129,10 @@ impl<'a> EmitWriter<'a> {
 /// Quote a SysML name when it is not a bare identifier.
 pub(crate) fn format_name(name: &str) -> String {
     if needs_quotes(name) {
-        format!("'{name}'")
+        format!("'{}'", name.replace('\'', "\\'"))
     } else {
         name.to_string()
     }
-}
-
-/// Quote each `::`-separated segment of a qualified name when required.
-///
-/// Import targets store unquoted segment text (e.g. `2a-Parts Interconnection::*`);
-/// wildcards (`*` / `**`) and the KerML root marker (`$`) are left as-is.
-pub(crate) fn format_qualified_name(qname: &str) -> String {
-    qname
-        .split("::")
-        .map(|seg| match seg {
-            "*" | "**" | "$" => seg.to_string(),
-            other => format_name(other),
-        })
-        .collect::<Vec<_>>()
-        .join("::")
-}
-
-/// Quote each `.`-separated segment of a feature path (e.g. `vehicleStates.on`).
-pub(crate) fn format_feature_path(path: &str) -> String {
-    path.split('.')
-        .map(format_name)
-        .collect::<Vec<_>>()
-        .join(".")
-}
-
-/// Quote each segment of a structured relationship target for emission.
-pub(crate) fn format_relationship_target(target: &crate::ast::RelationshipTarget) -> String {
-    use crate::ast::SegmentSeparator;
-    let mut out = String::new();
-    for segment in &target.segments {
-        match segment.separator {
-            Some(SegmentSeparator::ColonColon) => out.push_str("::"),
-            Some(SegmentSeparator::Dot) => out.push('.'),
-            None => {}
-        }
-        if segment.name == "$" {
-            out.push_str(&segment.name);
-        } else {
-            out.push_str(&format_name(&segment.name));
-        }
-    }
-    out
 }
 
 fn needs_quotes(name: &str) -> bool {
@@ -158,61 +172,5 @@ mod tests {
             "'2a-Parts Interconnection'"
         );
         assert_eq!(format_name("_ok"), "_ok");
-    }
-
-    #[test]
-    fn format_qualified_name_quotes_segments_preserves_wildcards() {
-        assert_eq!(format_qualified_name("SI::kg"), "SI::kg");
-        assert_eq!(
-            format_qualified_name("2a-Parts Interconnection::*"),
-            "'2a-Parts Interconnection'::*"
-        );
-        assert_eq!(
-            format_qualified_name("Safety Features::*"),
-            "'Safety Features'::*"
-        );
-        assert_eq!(format_qualified_name("$::ISQ::*"), "$::ISQ::*");
-        assert_eq!(format_qualified_name("Pkg::**"), "Pkg::**");
-    }
-
-    #[test]
-    fn format_feature_path_quotes_segments() {
-        assert_eq!(format_feature_path("vehicleStates.on"), "vehicleStates.on");
-        assert_eq!(
-            format_feature_path("vehicle states.on"),
-            "'vehicle states'.on"
-        );
-    }
-
-    #[test]
-    fn format_relationship_target_quotes_segments() {
-        use crate::ast::{RelationshipTarget, RelationshipTargetSegment, SegmentSeparator, Span};
-
-        let target = RelationshipTarget {
-            segments: vec![RelationshipTargetSegment {
-                name: "Temporal-Spatial Reference".into(),
-                separator: None,
-            }],
-            span: Span::dummy(),
-        };
-        assert_eq!(
-            format_relationship_target(&target),
-            "'Temporal-Spatial Reference'"
-        );
-
-        let chained = RelationshipTarget {
-            segments: vec![
-                RelationshipTargetSegment {
-                    name: "ISQ".into(),
-                    separator: None,
-                },
-                RelationshipTargetSegment {
-                    name: "mass".into(),
-                    separator: Some(SegmentSeparator::ColonColon),
-                },
-            ],
-            span: Span::dummy(),
-        };
-        assert_eq!(format_relationship_target(&chained), "ISQ::mass");
     }
 }

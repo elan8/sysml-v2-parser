@@ -6,9 +6,7 @@ use super::structure::{
     self, emit_definition_prefix, emit_direction, emit_multiplicity, emit_subsetting_clause,
     emit_typing_clause,
 };
-use super::writer::{
-    emit_visibility, format_feature_path, format_name, format_qualified_name, EmitWriter,
-};
+use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
@@ -19,17 +17,24 @@ use crate::ast::{
 
 pub(crate) fn emit_inout_decl(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     decl: &InOutDecl,
 ) -> Result<(), EmitError> {
     emit_direction(w, decl.direction);
-    if decl.is_redefinition {
+    if let Some(redefines) = &decl.redefines {
         w.push_str(":>> ");
+        for (index, target) in redefines.value.target.iter().copied().enumerate() {
+            if index > 0 {
+                w.push_str(", ");
+            }
+            w.push_qualified_reference(&format!("{path}/redefines[{index}]"), target)?;
+        }
+    } else {
+        w.push_str(&format_name(&decl.name));
     }
-    w.push_str(&format_name(&decl.name));
-    if !decl.type_name.is_empty() {
+    if let Some(type_name) = decl.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(&decl.type_name));
+        w.push_qualified_reference(path, type_name)?;
     }
     if let Some(value) = &decl.value {
         w.push_str(" = ");
@@ -89,7 +94,7 @@ pub(crate) fn emit_action_usage(
         w.push_str(kw);
         if let Some(accept) = &usage.accept {
             w.push_char(' ');
-            emit_payload_clause(w, accept);
+            emit_payload_clause(w, path, accept)?;
         }
         if let Some(send) = &usage.send {
             w.push_char(' ');
@@ -111,9 +116,9 @@ pub(crate) fn emit_action_usage(
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
-    } else if !usage.type_name.is_empty() {
+    } else if let Some(type_name) = usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(&usage.type_name));
+        w.push_qualified_reference(path, type_name)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -126,7 +131,7 @@ pub(crate) fn emit_action_usage(
     }
     if let Some(accept) = &usage.accept {
         w.push_str(" accept ");
-        emit_payload_clause(w, accept);
+        emit_payload_clause(w, path, accept)?;
     }
     if let Some(send) = &usage.send {
         w.push_str(" send ");
@@ -143,24 +148,26 @@ pub(crate) fn emit_action_usage(
     emit_action_usage_body(w, path, &usage.body)
 }
 
-fn emit_payload_clause(w: &mut EmitWriter<'_>, payload: &crate::ast::PayloadClause) {
+fn emit_payload_clause(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    payload: &crate::ast::PayloadClause,
+) -> Result<(), EmitError> {
     w.push_str(&format_name(&payload.name));
-    if let Some(ty) = &payload.type_name {
+    if let Some(ty) = payload.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(path, ty)?;
     }
+    Ok(())
 }
 
 fn emit_send_payload(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     payload: &crate::ast::SendPayload,
 ) -> Result<(), EmitError> {
     match payload {
-        crate::ast::SendPayload::Typed(p) => {
-            emit_payload_clause(w, p);
-            Ok(())
-        }
+        crate::ast::SendPayload::Typed(p) => emit_payload_clause(w, path, p),
         crate::ast::SendPayload::Expression(e) => emit_expression(w, &e.value),
     }
 }
@@ -196,10 +203,7 @@ fn emit_action_def_body_element(
     el: &ActionDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        ActionDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        ActionDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         ActionDefBodyElement::Decl(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::ActionBodyDecl,
@@ -301,10 +305,7 @@ pub(crate) fn emit_action_usage_body_element(
     el: &ActionUsageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        ActionUsageBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        ActionUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         ActionUsageBodyElement::Decl(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::ActionBodyDecl,
@@ -409,7 +410,7 @@ pub(crate) fn emit_then_action_pub(
         ThenTarget::Decide(_) => w.unsupported(path, "ThenTarget::Decide"),
         ThenTarget::Accept(a) => {
             w.push_str("accept ");
-            emit_transition_accept(w, &a.value)?;
+            emit_transition_accept(w, path, &a.value)?;
             w.push_char(';');
             Ok(())
         }
@@ -428,16 +429,11 @@ pub(crate) fn emit_perform(
 ) -> Result<(), EmitError> {
     emit_definition_prefix(w, perform.usage_prefix.as_ref());
     w.push_str("perform ");
-    // Part-usage bodies accept `perform action <name>` for simple names, but dotted
-    // feature-path performs must stay bare (`perform providePower.generateTorque :>> …`).
-    // Emitting `perform action a.b` reparse-fails (validation `12b-Allocation-1`).
-    if !perform.action_name.contains('.') {
+    if let Some(action_reference) = perform.action_reference {
+        w.push_qualified_reference(path, action_reference)?;
+    } else {
         w.push_str("action ");
-    }
-    if !perform.action_name.is_empty() {
-        if perform.action_name.contains('.') {
-            w.push_str(&format_feature_path(&perform.action_name));
-        } else {
+        if !perform.action_name.is_empty() {
             w.push_str(&format_name(&perform.action_name));
         }
     }
@@ -445,16 +441,13 @@ pub(crate) fn emit_perform(
         emit_multiplicity(w, &mult.value)?;
     }
     if let Some(redef) = &perform.redefines {
-        w.push_str(" :>> ");
-        w.push_str(&format_qualified_name(redef));
+        emit_subsetting_clause(w, &redef.value)?;
     }
     if let Some(subsets) = &perform.subsets {
-        w.push_str(" :> ");
-        w.push_str(&format_qualified_name(subsets));
+        emit_subsetting_clause(w, &subsets.value)?;
     }
-    if let Some(ty) = &perform.type_name {
-        w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+    if let Some(typing) = &perform.typing {
+        emit_typing_clause(w, &typing.value)?;
     }
     if let Some(value) = &perform.value {
         emit_feature_value(w, value)?;
@@ -494,7 +487,7 @@ fn emit_perform_body_element(
 ) -> Result<(), EmitError> {
     match el {
         PerformBodyElement::Doc(d) => emit_doc(w, &d.value),
-        PerformBodyElement::InOut(b) => emit_perform_inout(w, &b.value),
+        PerformBodyElement::InOut(b) => emit_perform_inout(w, path, &b.value),
         PerformBodyElement::Variant(v) => structure::emit_variant_usage(w, path, &v.value),
         PerformBodyElement::Action(a) => emit_action_usage_body_element(w, path, &a.value),
         PerformBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
@@ -505,10 +498,11 @@ fn emit_perform_body_element(
 
 fn emit_perform_inout(
     w: &mut EmitWriter<'_>,
+    path: &str,
     binding: &PerformInOutBinding,
 ) -> Result<(), EmitError> {
     emit_direction(w, binding.direction);
-    w.push_str(&format_name(&binding.name));
+    w.push_qualified_reference(&format!("{path}/target"), binding.target)?;
     w.push_str(" = ");
     emit_expression(w, &binding.value.value)?;
     w.push_char(';');
@@ -552,13 +546,13 @@ pub(crate) fn emit_state_usage(
     }
     w.push_str("state ");
     if !usage.name.is_empty() {
-        w.push_str(&format_feature_path(&usage.name));
+        w.push_str(&format_name(&usage.name));
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
-    } else if let Some(ty) = &usage.type_name {
+    } else if let Some(ty) = usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(path, ty)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -594,15 +588,14 @@ pub(crate) fn emit_exhibit_state(
         w.push_str("individual ");
     }
     w.push_str("exhibit ");
-    // `state` after `exhibit` is optional (§6 G18); omit so `exhibit vehicleStates.on` roundtrips.
-    if !exhibit.name.is_empty() {
-        w.push_str(&format_feature_path(&exhibit.name));
+    if let Some(reference) = exhibit.state_reference {
+        w.push_qualified_reference(&format!("{path}/state"), reference)?;
+    } else if !exhibit.name.is_empty() {
+        w.push_str("state ");
+        w.push_str(&format_name(&exhibit.name));
     }
     if let Some(typing) = &exhibit.typing {
         emit_typing_clause(w, &typing.value)?;
-    } else if let Some(ty) = &exhibit.type_name {
-        w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
     }
     if let Some(mult) = &exhibit.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -647,10 +640,7 @@ fn emit_state_def_body_element(
     el: &StateDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        StateDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        StateDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         StateDefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -695,7 +685,7 @@ fn emit_state_def_body_element(
         }
         StateDefBodyElement::Then(t) => {
             w.push_str("then ");
-            w.push_str(&format_name(&t.value.state_name));
+            w.push_qualified_reference(&format!("{path}/then/state"), t.value.state_reference)?;
             w.push_char(';');
             Ok(())
         }
@@ -771,9 +761,12 @@ pub(crate) fn emit_allocation_usage(
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }
-    if let Some(ty) = &usage.type_name {
+    if let Some(ty) = usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        if usage.type_is_conjugated {
+            w.push_char('~');
+        }
+        w.push_qualified_reference(path, ty)?;
     }
     if let (Some(source), Some(target)) = (&usage.source, &usage.target) {
         w.push_str(" allocate ");
@@ -798,9 +791,12 @@ pub(crate) fn emit_flow_usage(
     if let Some(name) = &flow.name {
         w.push_str(&format_name(name));
     }
-    if let Some(ty) = &flow.type_name {
+    if let Some(ty) = flow.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        if flow.type_is_conjugated {
+            w.push_char('~');
+        }
+        w.push_qualified_reference(path, ty)?;
     }
     if let Some(payload) = &flow.payload {
         w.push_str(" of ");
@@ -810,8 +806,11 @@ pub(crate) fn emit_flow_usage(
                 w.push_str(" : ");
             }
         }
-        if let Some(ty) = &payload.value.type_name {
-            w.push_str(&format_qualified_name(ty));
+        if let Some(ty) = payload.value.type_name {
+            if payload.value.type_is_conjugated {
+                w.push_char('~');
+            }
+            w.push_qualified_reference(path, ty)?;
         }
         if let Some(mult) = &payload.value.multiplicity {
             emit_multiplicity(w, &mult.value)?;
@@ -853,11 +852,8 @@ fn emit_definition_body(
                 w.indent();
                 for (i, el) in elements.iter().enumerate() {
                     match &el.value {
-                        crate::ast::DefinitionBodyElement::Error(_) => {
-                            return Err(EmitError::Opaque {
-                                path: format!("{path}/body[{i}]"),
-                                kind: super::OpacityKind::ParseError,
-                            });
+                        crate::ast::DefinitionBodyElement::Error(error) => {
+                            w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                         }
                         crate::ast::DefinitionBodyElement::Other(_) => {
                             return Err(EmitError::Opaque {
@@ -888,14 +884,15 @@ fn emit_definition_body(
 /// S;`) -- same `TransitionAccept` shape in both positions.
 fn emit_transition_accept(
     w: &mut EmitWriter<'_>,
+    path: &str,
     accept: &crate::ast::TransitionAccept,
 ) -> Result<(), EmitError> {
     match accept {
         crate::ast::TransitionAccept::Payload(p, via) => {
             w.push_str(&format_name(&p.name));
-            if let Some(ty) = &p.type_name {
+            if let Some(ty) = p.type_name {
                 w.push_str(" : ");
-                w.push_str(&format_qualified_name(ty));
+                w.push_qualified_reference(path, ty)?;
             }
             if let Some(v) = via {
                 w.push_str(" via ");
@@ -940,7 +937,7 @@ fn emit_transition(
     }
     if let Some(accept) = &t.accept {
         w.push_str("accept ");
-        emit_transition_accept(w, accept)?;
+        emit_transition_accept(w, path, accept)?;
         w.push_char(' ');
     }
     if let Some(guard) = &t.guard {
@@ -958,7 +955,7 @@ fn emit_transition(
                 }
                 if let Some(ty) = type_name {
                     w.push_str(" : ");
-                    w.push_str(&format_qualified_name(ty));
+                    w.push_qualified_reference(path, *ty)?;
                 }
             }
             crate::ast::TransitionEffect::Accept {
@@ -970,7 +967,7 @@ fn emit_transition(
                 emit_expression(w, &payload.value)?;
                 if let Some(ty) = type_name {
                     w.push_str(" : ");
-                    w.push_str(&format_qualified_name(ty));
+                    w.push_qualified_reference(path, *ty)?;
                 }
                 if let Some(v) = via {
                     w.push_str(" via ");
@@ -987,7 +984,7 @@ fn emit_transition(
                 emit_expression(w, &payload.value)?;
                 if let Some(ty) = type_name {
                     w.push_str(" : ");
-                    w.push_str(&format_qualified_name(ty));
+                    w.push_qualified_reference(path, *ty)?;
                 }
                 if let Some(v) = via {
                     w.push_str(" via ");
@@ -1032,9 +1029,9 @@ fn emit_first_stmt(w: &mut EmitWriter<'_>, first: &crate::ast::FirstStmt) -> Res
             w.push_str(&format_name(name));
             w.push_char(' ');
         }
-        if let Some(ty) = &first.succession_type {
+        if let Some(ty) = first.succession_type {
             w.push_str(": ");
-            w.push_str(&format_qualified_name(ty));
+            w.push_qualified_reference("first succession type", ty)?;
             w.push_char(' ');
         }
     }
@@ -1107,17 +1104,22 @@ pub(crate) fn emit_occurrence_usage(
         // `snapshot` / `timeslice` usages parse without an `occurrence` keyword.
         w.push_str(portion);
         w.push_char(' ');
-    } else if usage.is_event || !usage.is_individual {
+    } else if usage.occurrence_reference.is_none() && (usage.is_event || !usage.is_individual) {
         // Plain `occurrence …` and `event occurrence …`. Bare `individual <name>` omits
         // the keyword (see `individual_usage` → `occurrence_usage_tail`).
         w.push_str("occurrence ");
     }
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
+    } else if let Some(reference) = usage.occurrence_reference {
+        w.push_qualified_reference(&format!("{path}/occurrence"), reference)?;
     }
-    if let Some(ty) = &usage.type_name {
+    if let Some(ty) = usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        if usage.type_is_conjugated {
+            w.push_char('~');
+        }
+        w.push_qualified_reference(path, ty)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -1163,10 +1165,7 @@ pub(crate) fn emit_occurrence_body_element(
     el: &crate::ast::OccurrenceBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        crate::ast::OccurrenceBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        crate::ast::OccurrenceBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         crate::ast::OccurrenceBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -1230,13 +1229,13 @@ fn emit_occurrence_exhibit(
     }
     w.push_str("exhibit ");
     if !usage.name.is_empty() {
-        w.push_str(&format_feature_path(&usage.name));
+        w.push_str(&format_name(&usage.name));
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
-    } else if let Some(ty) = &usage.type_name {
+    } else if let Some(ty) = usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(path, ty)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -1264,9 +1263,9 @@ pub(crate) fn emit_succession_usage(
         w.push_str(&format_name(name));
         w.push_char(' ');
     }
-    if let Some(type_name) = &succ.type_name {
+    if let Some(type_name) = succ.type_name {
         w.push_str(": ");
-        w.push_str(&format_qualified_name(type_name));
+        w.push_qualified_reference("succession usage type", type_name)?;
         w.push_char(' ');
     }
     w.push_str("first ");

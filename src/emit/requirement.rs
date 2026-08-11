@@ -6,7 +6,7 @@ use super::structure::{
     self, emit_attribute_body, emit_direction, emit_multiplicity, emit_subsetting_clause,
     emit_typing_clause,
 };
-use super::writer::{emit_visibility, format_name, format_qualified_name, EmitWriter};
+use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     ConcernUsage, ConnectBody, Dependency, EnumerationUsage, ItemUsage, RelationshipBodyElement,
@@ -58,7 +58,7 @@ pub(crate) fn emit_requirement_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -111,10 +111,7 @@ fn emit_requirement_body_element(
     el: &RequirementDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        RequirementDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        RequirementDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RequirementDefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -125,18 +122,15 @@ fn emit_requirement_body_element(
             structure::emit_attribute_def(w, path, &a.value)
         }
         RequirementDefBodyElement::AttributeUsage(a) => {
-            // Keyword-less `:>> name = …` bindings store the redefines target as the usage name.
-            // Prefer the original shorthand when that is the only specialization present.
+            // A keyword-less `:>> target = …` binding has no declared usage name; its target is
+            // represented only by the redefinition relationship.
             if a.value.redefines.is_some()
                 && a.value.subsets.is_none()
                 && a.value.references.is_none()
                 && a.value.direction.is_none()
                 && !a.value.is_end
                 && a.value.short_name.is_none()
-                && a.value
-                    .redefines
-                    .as_ref()
-                    .is_some_and(|r| r.value.target_display() == a.value.name)
+                && a.value.name.is_empty()
             {
                 emit_redefinition_attribute_binding(w, path, &a.value)
             } else {
@@ -157,10 +151,8 @@ fn emit_requirement_body_element(
             if !a.value.name.is_empty() {
                 w.push_str(&format_name(&a.value.name));
             }
-            if !a.value.type_name.is_empty() {
-                w.push_str(" : ");
-                w.push_str(&format_qualified_name(&a.value.type_name));
-            }
+            w.push_str(" : ");
+            w.push_qualified_reference(&format!("{path}/actor/type"), a.value.type_name)?;
             w.push_char(';');
             Ok(())
         }
@@ -175,17 +167,21 @@ fn emit_requirement_body_element(
             if s.value.is_redefinition {
                 w.push_str(":>> ");
             }
-            w.push_str(&format_name(&s.value.name));
+            if let Some(target) = s.value.target {
+                w.push_qualified_reference(&format!("{path}/stakeholder/target"), target)?;
+            } else {
+                w.push_str(&format_name(&s.value.declaration_name));
+            }
             if let Some(ty) = &s.value.type_name {
                 w.push_str(" : ");
-                w.push_str(&format_qualified_name(ty));
+                w.push_qualified_reference(&format!("{path}/stakeholder/type"), *ty)?;
             }
             w.push_char(';');
             Ok(())
         }
         RequirementDefBodyElement::Purpose(p) => {
             w.push_str("purpose ");
-            w.push_str(&format_qualified_name(&p.value.target));
+            w.push_qualified_reference(&format!("{path}/purpose/target"), p.value.target)?;
             w.push_char(';');
             Ok(())
         }
@@ -213,10 +209,15 @@ fn emit_requirement_annotation(
     ann: &crate::ast::Annotation,
 ) -> Result<(), EmitError> {
     w.push_str(&ann.sigil);
-    w.push_str(&format_name(&ann.head));
-    if let Some(ty) = &ann.type_name {
+    match &ann.head {
+        crate::ast::AnnotationHead::Reference(reference) => {
+            w.push_qualified_reference("annotation", *reference)?;
+        }
+        crate::ast::AnnotationHead::Opaque(text) => w.push_str(&format_name(text)),
+    }
+    if let Some(ty) = ann.type_reference {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference("annotation type", ty)?;
     }
     match &ann.body {
         ConnectBody::Semicolon => w.push_char(';'),
@@ -250,7 +251,15 @@ pub(crate) fn emit_redefinition_attribute_binding(
     usage: &crate::ast::AttributeUsage,
 ) -> Result<(), EmitError> {
     w.push_str(":>> ");
-    w.push_str(&format_name(&usage.name));
+    let target = usage
+        .redefines
+        .as_ref()
+        .and_then(|relationship| relationship.value.first_target())
+        .ok_or_else(|| EmitError::Unsupported {
+            path: path.to_owned(),
+            construct: "redefinition binding without a target".to_owned(),
+        })?;
+    w.push_qualified_reference(&format!("{path}/redefines[0]"), target)?;
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
     }
@@ -290,7 +299,7 @@ fn emit_verify_requirement(
             }
             if let Some(ty) = &usage.type_name {
                 w.push_str(" : ");
-                w.push_str(&format_qualified_name(ty));
+                w.push_qualified_reference(&format!("{path}/requirement/type"), *ty)?;
             }
             if let Some(subsets) = &usage.subsets {
                 emit_subsetting_clause(w, &subsets.value)?;
@@ -304,11 +313,11 @@ fn emit_verify_requirement(
         return Ok(());
     }
     if let Some(target) = &v.target {
-        w.push_str(&format_qualified_name(target));
+        w.push_qualified_reference(&format!("{path}/target"), *target)?;
     }
     if let Some(redefines) = &v.redefines {
         w.push_str(" :>> ");
-        w.push_str(&format_qualified_name(redefines));
+        w.push_qualified_reference(&format!("{path}/redefines"), *redefines)?;
     }
     w.push_char(';');
     Ok(())
@@ -319,9 +328,9 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
     if !subject.name.is_empty() {
         w.push_str(&format_name(&subject.name));
     }
-    if !subject.type_name.is_empty() {
+    if let Some(type_name) = subject.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(&subject.type_name));
+        w.push_qualified_reference("subject/type", type_name)?;
     }
     if let Some(mult) = &subject.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -388,22 +397,21 @@ pub(crate) fn emit_dependency(
         }
     }
     w.push_str("from ");
-    let clients: Vec<&String> = dep.clients.iter().filter(|c| !c.is_empty()).collect();
-    if clients.is_empty() {
+    if dep.clients.is_empty() {
         return w.unsupported(path, "dependency with empty clients");
     }
-    for (i, c) in clients.iter().enumerate() {
+    for (i, client) in dep.clients.iter().copied().enumerate() {
         if i > 0 {
             w.push_str(", ");
         }
-        w.push_str(&format_name(c));
+        w.push_qualified_reference(&format!("{path}/clients[{i}]"), client)?;
     }
     w.push_str(" to ");
-    for (i, s) in dep.suppliers.iter().enumerate() {
+    for (i, supplier) in dep.suppliers.iter().copied().enumerate() {
         if i > 0 {
             w.push_str(", ");
         }
-        w.push_str(&format_name(s));
+        w.push_qualified_reference(&format!("{path}/suppliers[{i}]"), supplier)?;
     }
     match (&dep.body, &dep.body_elements) {
         (ConnectBody::Semicolon, _) => {
@@ -439,10 +447,7 @@ fn emit_rel_body(
     match el {
         RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
         RelationshipBodyElement::Comment(c) => super::root::emit_comment(w, &c.value),
-        RelationshipBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -480,7 +485,7 @@ pub(crate) fn emit_item_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -504,7 +509,7 @@ pub(crate) fn emit_concern_usage(
     w.push_str(&format_name(&concern.name));
     if let Some(ty) = &concern.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     emit_requirement_body(w, path, &concern.body)
 }
@@ -539,7 +544,7 @@ pub(crate) fn emit_use_case_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     emit_use_case_body(w, path, &usage.body)
 }
@@ -580,7 +585,7 @@ pub(crate) fn emit_analysis_case_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     emit_use_case_body(w, path, &usage.body)
 }
@@ -615,7 +620,7 @@ pub(crate) fn emit_verification_case_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     emit_use_case_body(w, path, &usage.body)
 }
@@ -650,7 +655,7 @@ pub(crate) fn emit_case_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     emit_use_case_body(w, path, &usage.body)
 }
@@ -664,7 +669,7 @@ pub(crate) fn emit_include_use_case(
     include: &crate::ast::IncludeUseCase,
 ) -> Result<(), EmitError> {
     w.push_str("include ");
-    w.push_str(&format_name(&include.name));
+    w.push_qualified_reference(&format!("{path}/target"), include.target)?;
     if let Some(mult) = &include.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
@@ -702,10 +707,7 @@ fn emit_use_case_body_element(
     el: &UseCaseDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        UseCaseDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        UseCaseDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         UseCaseDefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -720,10 +722,8 @@ fn emit_use_case_body_element(
             emit_visibility(w, a.value.membership.visibility);
             w.push_str("actor ");
             w.push_str(&format_name(&a.value.name));
-            if !a.value.type_name.is_empty() {
-                w.push_str(" : ");
-                w.push_str(&format_qualified_name(&a.value.type_name));
-            }
+            w.push_str(" : ");
+            w.push_qualified_reference(&format!("{path}/actor/type"), a.value.type_name)?;
             if let Some(mult) = &a.value.multiplicity {
                 emit_multiplicity(w, &mult.value)?;
             }
@@ -732,7 +732,7 @@ fn emit_use_case_body_element(
         }
         UseCaseDefBodyElement::FirstSuccession(f) => {
             w.push_str("first ");
-            w.push_str(&format_qualified_name(&f.value.target));
+            w.push_qualified_reference(&format!("{path}/first/target"), f.value.target)?;
             w.push_char(';');
             Ok(())
         }
@@ -743,7 +743,10 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::IncludeUseCase(i) => emit_include_use_case(w, path, &i.value),
         UseCaseDefBodyElement::ThenIncludeUseCase(t) => {
             w.push_str("then include ");
-            w.push_str(&format_name(&t.value.include.value.name));
+            w.push_qualified_reference(
+                &format!("{path}/include/target"),
+                t.value.include.value.target,
+            )?;
             if let Some(mult) = &t.value.include.value.multiplicity {
                 emit_multiplicity(w, &mult.value)?;
             }
@@ -767,7 +770,7 @@ fn emit_use_case_body_element(
             }
             if let Some(ty) = &req.type_name {
                 w.push_str(": ");
-                w.push_str(&format_qualified_name(ty));
+                w.push_qualified_reference(&format!("{path}/objective/type"), *ty)?;
                 w.push_char(' ');
             }
             if let Some(subsets) = &req.subsets {
@@ -812,7 +815,7 @@ fn emit_use_case_body_element(
         }),
         UseCaseDefBodyElement::ActorRedefinitionAssignment(a) => {
             w.push_str("actor :>> ");
-            w.push_str(&format_name(&a.value.name));
+            w.push_qualified_reference(&format!("{path}/target"), a.value.target)?;
             w.push_str(" = ");
             w.push_str(a.value.rhs.trim());
             w.push_char(';');
@@ -820,7 +823,7 @@ fn emit_use_case_body_element(
         }
         UseCaseDefBodyElement::RefRedefinition(r) => {
             w.push_str("ref :>> ");
-            w.push_str(&format_name(&r.value.name));
+            w.push_qualified_reference(&format!("{path}/target"), r.value.target)?;
             w.push_char(' ');
             w.push_str(r.value.body.trim());
             Ok(())
@@ -855,21 +858,24 @@ fn emit_case_return_decl(
             crate::ast::CaseReturnFeatureKind::Attribute => w.push_str("attribute "),
         }
     }
-    if decl.is_redefine {
+    if let Some(target) = decl.target {
         w.push_str(":>> ");
-    }
-    if !decl.name.is_empty() {
-        w.push_str(&format_name(&decl.name));
+        w.push_qualified_reference("case-return/target", target)?;
+    } else if !decl.declaration_name.is_empty() {
+        w.push_str(&format_name(&decl.declaration_name));
     }
     if let Some(ty) = &decl.type_name {
-        if decl.is_subsetting {
-            w.push_str(":>");
-        } else if decl.name.is_empty() {
-            w.push_str(": ");
-        } else {
+        let has_head = decl.target.is_some() || !decl.declaration_name.is_empty();
+        if decl.is_subsetting && has_head {
+            w.push_str(" :> ");
+        } else if decl.is_subsetting {
+            w.push_str(":> ");
+        } else if has_head {
             w.push_str(" : ");
+        } else {
+            w.push_str(": ");
         }
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference("case-return/type", *ty)?;
     }
     if let Some(mult) = &decl.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -894,7 +900,7 @@ pub(crate) fn emit_enumeration_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -904,7 +910,7 @@ pub(crate) fn emit_enumeration_usage(
 
 pub(crate) fn emit_satisfy(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     satisfy: &Satisfy,
 ) -> Result<(), EmitError> {
     if satisfy.is_negated {
@@ -916,7 +922,7 @@ pub(crate) fn emit_satisfy(
         w.push_str(&format_name(&inline.name));
         if let Some(ty) = &inline.type_name {
             w.push_str(" : ");
-            w.push_str(&format_qualified_name(ty));
+            w.push_qualified_reference(&format!("{path}/inline-requirement/type"), *ty)?;
         }
         w.push_str(" by ");
         emit_expression(w, &satisfy.target.value)?;

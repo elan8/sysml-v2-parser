@@ -4,7 +4,7 @@ use super::behavior::emit_inout_decl;
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_doc, emit_identification};
 use super::structure::emit_typing_clause;
-use super::writer::{emit_visibility, format_name, format_qualified_name, EmitWriter};
+use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     AssertConstraintMember, CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef,
@@ -37,7 +37,7 @@ pub(crate) fn emit_constraint_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     emit_constraint_body(w, path, &usage.body)
 }
@@ -73,10 +73,7 @@ pub(crate) fn emit_constraint_body_element(
     el: &ConstraintDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        ConstraintDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        ConstraintDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         ConstraintDefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -90,17 +87,14 @@ pub(crate) fn emit_constraint_body_element(
         }
         ConstraintDefBodyElement::Constraint(c) => emit_constraint_usage(w, path, &c.value),
         ConstraintDefBodyElement::AttributeUsage(a) => {
-            // Keyword-less `:>> name = …` inside `require name { … }` (validation `10c`).
+            // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).
             if a.value.redefines.is_some()
                 && a.value.subsets.is_none()
                 && a.value.references.is_none()
                 && a.value.direction.is_none()
                 && !a.value.is_end
                 && a.value.short_name.is_none()
-                && a.value
-                    .redefines
-                    .as_ref()
-                    .is_some_and(|r| r.value.target_display() == a.value.name)
+                && a.value.name.is_empty()
             {
                 super::requirement::emit_redefinition_attribute_binding(w, path, &a.value)
             } else {
@@ -134,15 +128,32 @@ pub(crate) fn emit_calc_usage(
         super::structure::emit_direction(w, dir);
     }
     w.push_str("calc ");
-    if let Some(redefines) = &usage.redefines {
+    let leading_target = usage.redefines.as_ref().and_then(|targets| {
+        (targets.len() == 1
+            && usage.identification.name.is_none()
+            && usage.identification.short_name.is_none())
+        .then_some(targets[0])
+    });
+    if let Some(target) = leading_target {
         w.push_str(":>> ");
-        w.push_str(&format_qualified_name(redefines));
+        w.push_qualified_reference(&format!("{path}/redefines[0]"), target)?;
     } else {
         emit_identification(w, &usage.identification);
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if leading_target.is_none() {
+        if let Some(redefines) = &usage.redefines {
+            w.push_str(" :>> ");
+            for (index, target) in redefines.iter().copied().enumerate() {
+                if index > 0 {
+                    w.push_str(", ");
+                }
+                w.push_qualified_reference(&format!("{path}/redefines[{index}]"), target)?;
+            }
+        }
     }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
@@ -177,10 +188,7 @@ fn emit_calc_body_element(
     el: &CalcDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        CalcDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        CalcDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         CalcDefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -215,7 +223,7 @@ fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), Emit
     } else {
         w.push_str(" : ");
     }
-    w.push_str(&format_qualified_name(&ret.type_name));
+    w.push_qualified_reference("calc-return/type", ret.type_name)?;
     if let Some(value) = &ret.value {
         w.push_str(" = ");
         emit_expression(w, &value.value)?;
@@ -234,13 +242,17 @@ pub(crate) fn emit_assert_constraint(
     if assert.is_negated {
         w.push_str("not ");
     }
-    w.push_str("constraint ");
-    if let Some(name) = &assert.name {
+    if let Some(target) = assert.target {
+        w.push_qualified_reference(&format!("{path}/target"), target)?;
+    } else {
+        w.push_str("constraint ");
+    }
+    if let Some(name) = &assert.declaration_name {
         w.push_str(&format_name(name));
     }
-    if let Some(ty) = &assert.type_name {
+    if let Some(ty) = assert.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(path, ty)?;
     }
     emit_constraint_body(w, path, &assert.body)
 }
@@ -267,11 +279,8 @@ pub(crate) fn emit_view_def(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::ViewDefBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::ViewDefBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
                     crate::ast::ViewDefBodyElement::Other(_) => {
                         return Err(EmitError::Opaque {
@@ -314,7 +323,7 @@ pub(crate) fn emit_view_usage(
     }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     if let Some(mult) = &usage.multiplicity {
         super::structure::emit_multiplicity(w, &mult.value)?;
@@ -330,11 +339,8 @@ pub(crate) fn emit_view_usage(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::ViewBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::ViewBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
                     crate::ast::ViewBodyElement::Other(_) => {
                         return Err(EmitError::Opaque {
@@ -351,12 +357,22 @@ pub(crate) fn emit_view_usage(
                     }
                     crate::ast::ViewBodyElement::Expose(e) => {
                         w.push_str("expose ");
-                        w.push_str(&format_qualified_name(&e.value.target));
-                        w.push_char(';');
+                        super::root::emit_import_target(
+                            w,
+                            &format!("{path}/body[{i}]/expose/target"),
+                            &e.value.target,
+                        )?;
+                        match e.value.body {
+                            crate::ast::ConnectBody::Semicolon => w.push_char(';'),
+                            crate::ast::ConnectBody::Brace => w.push_str(" {}"),
+                        }
                     }
                     crate::ast::ViewBodyElement::Satisfy(s) => {
                         w.push_str("satisfy ");
-                        w.push_str(&format_qualified_name(&s.value.viewpoint_ref));
+                        w.push_qualified_reference(
+                            &format!("{path}/body[{i}]/satisfy/viewpoint"),
+                            s.value.viewpoint_ref,
+                        )?;
                         match &s.value.body {
                             crate::ast::ConnectBody::Semicolon => w.push_char(';'),
                             crate::ast::ConnectBody::Brace => w.push_str(" {}"),
@@ -388,7 +404,7 @@ fn emit_view_rendering(
     w.push_str(&format_name(&r.name));
     if let Some(ty) = &r.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/render/type"), *ty)?;
     }
     match &r.body {
         crate::ast::RenderingUsageBody::Semicolon => {
@@ -405,11 +421,8 @@ fn emit_view_rendering(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::RenderingUsageBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/render[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::RenderingUsageBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/render[{i}]"), &error.span)?
                     }
                     crate::ast::RenderingUsageBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::RenderingUsageBodyElement::ViewUsage(v) => {
@@ -447,9 +460,9 @@ pub(crate) fn emit_viewpoint_usage(
     emit_visibility(w, usage.membership.visibility);
     w.push_str("viewpoint ");
     w.push_str(&format_name(&usage.name));
-    if !usage.type_name.is_empty() {
+    if let Some(type_name) = usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(&usage.type_name));
+        w.push_qualified_reference(&format!("{path}/type"), type_name)?;
     }
     super::requirement::emit_requirement_body_pub(w, path, &usage.body)
 }
@@ -476,11 +489,8 @@ pub(crate) fn emit_rendering_def(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::RenderingDefBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::RenderingDefBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
                     crate::ast::RenderingDefBodyElement::Other(_) => {
                         return Err(EmitError::Opaque {
@@ -515,7 +525,7 @@ pub(crate) fn emit_rendering_usage(
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
     match &usage.body {
         crate::ast::RenderingUsageBody::Semicolon => {
@@ -528,11 +538,8 @@ pub(crate) fn emit_rendering_usage(
             w.indent();
             for (i, el) in elements.iter().enumerate() {
                 match &el.value {
-                    crate::ast::RenderingUsageBodyElement::Error(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::ParseError,
-                        });
+                    crate::ast::RenderingUsageBodyElement::Error(error) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
                     crate::ast::RenderingUsageBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::RenderingUsageBodyElement::ViewUsage(v) => {

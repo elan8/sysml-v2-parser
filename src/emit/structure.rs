@@ -2,9 +2,7 @@
 
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_comment, emit_doc, emit_identification, emit_import};
-use super::writer::{
-    emit_visibility, format_name, format_qualified_name, format_relationship_target, EmitWriter,
-};
+use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectBody,
@@ -64,18 +62,18 @@ pub(crate) fn emit_part_usage(
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }
+    let target_only = usage.name.is_empty() && usage.redefines.is_some();
+    if target_only {
+        emit_subsetting_clause(w, &usage.redefines.as_ref().expect("checked above").value)?;
+    }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
-    } else if !usage.type_name.is_empty() {
-        w.push_str(" : ");
-        w.push_str(&format_qualified_name(&usage.type_name));
     }
     // Redefines-only form (`part :>> target[0..1];`) attaches multiplicity after `:>> target`
     // (BNF / `part_usage_redefines_only`), not before the clause.
     let redefines_only = usage.name.is_empty()
         && usage.redefines.is_some()
         && usage.typing.is_none()
-        && usage.type_name.is_empty()
         && usage.subsets.is_none();
     if !redefines_only {
         if let Some(mult) = &usage.multiplicity {
@@ -92,8 +90,10 @@ pub(crate) fn emit_part_usage(
             emit_expression(w, &expr.value)?;
         }
     }
-    if let Some(redefines) = &usage.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
+    if !target_only {
+        if let Some(redefines) = &usage.redefines {
+            emit_subsetting_clause(w, &redefines.value)?;
+        }
     }
     if redefines_only {
         if let Some(mult) = &usage.multiplicity {
@@ -174,24 +174,21 @@ pub(crate) fn emit_attribute_usage(
         w.push_str("> ");
     }
     // `name_span` is `None` only for the `PrefixRedefines`/`PrefixReferences`/`PrefixSubsets`
-    // "name-standing-in-prefix" forms (`attribute :>> target : Type[1];` etc.,
-    // src/parser/attribute.rs) -- `usage.name` there is *derived* from the subsets/redefines/
-    // references target for display purposes (matching an established test's expectation), not a
-    // written name, and any typing/multiplicity/`ordered`/`nonunique` were parsed *after* the
-    // target reference (they trail the clause in source, e.g. `Mass Roll-up Example/
+    // target-only forms (`attribute :>> target : Type[1];` etc., src/parser/attribute.rs).
+    // `usage.name` stays empty because no declaration name was written; the target spelling lives
+    // only in its arena-backed relationship. Any typing/multiplicity/`ordered`/`nonunique` were
+    // parsed *after* the target reference (they trail the clause in source, e.g. `Mass Roll-up Example/
     // MassConstraintExample.sysml:18`'s `attribute :>> m : MassValue;`), not after a name.
     // Emitting the name here would duplicate the target (GH-113: `attribute target :>> target;`
     // instead of the original anonymous `attribute :>> target;`); emitting the trailing modifiers
     // here too would strand them before any name at all (`attribute : Type :>> target;`, which
     // reparses as the *unrelated* anonymous-colon-typed form instead of a redefines clause).
-    // Mirrors `emit_part_usage`'s `redefines_only` handling, keyed off "derived" rather than
-    // "empty" since `AttributeUsage`'s convention is to derive a display name rather than leave
-    // it empty.
-    let derived_name = usage.name_span.is_none();
-    if !derived_name {
+    // Mirrors `emit_part_usage`'s `redefines_only` handling.
+    let target_only = usage.name_span.is_none();
+    if !target_only {
         w.push_str(&format_name(&usage.name));
     }
-    if !derived_name {
+    if !target_only {
         if let Some(typing) = &usage.typing {
             emit_typing_clause(w, &typing.value)?;
         }
@@ -214,7 +211,7 @@ pub(crate) fn emit_attribute_usage(
     if let Some(references) = &usage.references {
         emit_subsetting_clause(w, &references.value)?;
     }
-    if derived_name {
+    if target_only {
         if let Some(typing) = &usage.typing {
             emit_typing_clause(w, &typing.value)?;
         }
@@ -271,10 +268,7 @@ fn emit_part_def_body_element(
     el: &PartDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        PartDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        PartDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PartDefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -396,10 +390,7 @@ fn emit_part_usage_body_element(
     el: &PartUsageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        PartUsageBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        PartUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PartUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
         PartUsageBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PartUsageBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
@@ -516,10 +507,7 @@ fn emit_attribute_body_element(
     el: &AttributeBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        AttributeBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        AttributeBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         AttributeBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -583,9 +571,12 @@ pub(crate) fn emit_port_usage(
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+    let target_only = usage.name.is_empty() && usage.redefines.is_some();
+    if target_only {
+        emit_subsetting_clause(w, &usage.redefines.as_ref().expect("checked above").value)?;
+    }
+    if let Some(typing) = &usage.typing {
+        emit_typing_clause(w, &typing.value)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -597,8 +588,10 @@ pub(crate) fn emit_port_usage(
             emit_expression(w, &expr.value)?;
         }
     }
-    if let Some(redefines) = &usage.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
+    if !target_only {
+        if let Some(redefines) = &usage.redefines {
+            emit_subsetting_clause(w, &redefines.value)?;
+        }
     }
     if let Some(references) = &usage.references {
         emit_subsetting_clause(w, &references.value)?;
@@ -653,10 +646,7 @@ fn emit_port_def_body_element(
     el: &PortDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        PortDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        PortDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PortDefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -706,10 +696,7 @@ fn emit_port_body_element(
     el: &PortBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        PortBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        PortBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PortBodyElement::Doc(d) => emit_doc(w, &d.value),
         PortBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
         PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
@@ -731,13 +718,24 @@ pub(crate) fn emit_connect(
     match &connect.body {
         ConnectBody::Semicolon => {
             w.push_char(';');
-            Ok(())
         }
-        ConnectBody::Brace => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::OpaqueConnectBrace,
-        }),
+        ConnectBody::Brace => {
+            return Err(EmitError::Opaque {
+                path: path.to_string(),
+                kind: super::OpacityKind::OpaqueConnectBrace,
+            });
+        }
     }
+    if let Some(subsets) = &connect.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &connect.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if connect.subsets.is_some() || connect.redefines.is_some() {
+        w.push_char(';');
+    }
+    Ok(())
 }
 
 fn emit_connection_end(w: &mut EmitWriter<'_>, end: &ConnectionEnd) -> Result<(), EmitError> {
@@ -793,10 +791,7 @@ fn emit_interface_def_body_element(
     el: &InterfaceDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        InterfaceDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        InterfaceDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         InterfaceDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         InterfaceDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         InterfaceDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
@@ -831,13 +826,8 @@ pub(crate) fn emit_end_decl(
                 .collect::<String>(),
         );
     }
-    // GH-85: `references` may trail an explicit `: Type` instead of replacing it
-    // (`uses_derived_syntax: false`) -- only skip the `: Type` when `references` *is* the whole
-    // target (the original GH-19 `uses_derived_syntax: true` case, where `type_name` holds a
-    // display-only copy of the same target and would otherwise duplicate it).
-    if !end.uses_derived_syntax && !end.type_name.is_empty() {
-        w.push_str(" : ");
-        w.push_str(&format_qualified_name(&end.type_name));
+    if let Some(typing) = &end.typing {
+        emit_typing_clause(w, &typing.value)?;
     }
     if let Some(references) = &end.references {
         emit_subsetting_clause(w, &references.value)?;
@@ -917,10 +907,7 @@ fn emit_relationship_body_element_local(
     match el {
         RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
         RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
-        RelationshipBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -953,7 +940,7 @@ pub(crate) fn emit_interface_usage(
             }
             if let Some(ty) = interface_type {
                 w.push_str(": ");
-                w.push_str(&format_qualified_name(ty));
+                w.push_qualified_reference("interface type", *ty)?;
                 w.push_char(' ');
             }
             w.push_str("connect ");
@@ -989,7 +976,7 @@ pub(crate) fn emit_interface_usage(
                 } else {
                     w.push_str(": ");
                 }
-                w.push_str(&format_qualified_name(ty));
+                w.push_qualified_reference("interface type", *ty)?;
             }
             emit_interface_usage_body(w, path, body, body_elements)
         }
@@ -1039,9 +1026,13 @@ fn emit_interface_usage_body_element(
 ) -> Result<(), EmitError> {
     match el {
         InterfaceUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
-        InterfaceUsageBodyElement::RefRedef { name, value, body } => {
+        InterfaceUsageBodyElement::RefRedef {
+            target,
+            value,
+            body,
+        } => {
             w.push_str("ref :>> ");
-            w.push_str(&format_name(name));
+            w.push_qualified_reference("interface ref redefinition", *target)?;
             w.push_str(" = ");
             emit_expression(w, &value.value)?;
             emit_ref_body(w, path, body)
@@ -1069,9 +1060,6 @@ pub(crate) fn emit_ref_decl(
     }
     if let Some(typing) = &decl.typing {
         emit_typing_clause(w, &typing.value)?;
-    } else if !decl.type_name.is_empty() {
-        w.push_str(" : ");
-        w.push_str(&format_qualified_name(&decl.type_name));
     }
     if let Some(value) = &decl.value {
         emit_feature_value(w, value)?;
@@ -1114,10 +1102,7 @@ fn emit_ref_body_element(
     match el {
         RefBodyElement::Doc(d) => emit_doc(w, &d.value),
         RefBodyElement::Comment(c) => emit_comment(w, &c.value),
-        RefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        RefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -1145,7 +1130,7 @@ pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, _path: &str, bind: &Bind) -> Res
         }
         if let Some(ty) = &bind.binding_type {
             w.push_str(" : ");
-            w.push_str(&format_qualified_name(ty));
+            w.push_qualified_reference("binding type", *ty)?;
         }
         w.push_char(' ');
     }
@@ -1208,13 +1193,12 @@ pub(crate) fn emit_typing_clause(
     if typing.is_conjugated {
         w.push_char('~');
     }
-    let formatted = typing
-        .target
-        .iter()
-        .map(|n| format_relationship_target(&n.value))
-        .collect::<Vec<_>>()
-        .join(", ");
-    w.push_str(&formatted);
+    for (index, target) in typing.target.iter().enumerate() {
+        if index > 0 {
+            w.push_str(", ");
+        }
+        w.push_qualified_reference("typing relationship", *target)?;
+    }
     Ok(())
 }
 
@@ -1229,13 +1213,12 @@ pub(crate) fn emit_subsetting_clause(
         SubsettingKind::Crosses => w.push_str(" => "),
         SubsettingKind::Intersects => w.push_str(" intersects "),
     }
-    let formatted = rel
-        .target
-        .iter()
-        .map(|n| format_relationship_target(&n.value))
-        .collect::<Vec<_>>()
-        .join(", ");
-    w.push_str(&formatted);
+    for (index, target) in rel.target.iter().enumerate() {
+        if index > 0 {
+            w.push_str(", ");
+        }
+        w.push_qualified_reference("subsetting relationship", *target)?;
+    }
     Ok(())
 }
 
@@ -1277,7 +1260,7 @@ pub(crate) fn emit_alias_def(
     w.push_str("alias ");
     emit_identification(w, &alias.identification);
     w.push_str(" for ");
-    w.push_str(&format_relationship_target(&alias.target));
+    w.push_qualified_reference("alias target", alias.target)?;
     match &alias.body {
         crate::ast::AliasBody::Semicolon => {
             w.push_char(';');
@@ -1386,17 +1369,17 @@ pub(crate) fn emit_metadata_usage(
     emit_visibility(w, usage.membership.visibility);
     w.push_str("metadata ");
     w.push_str(&format_name(&usage.name));
-    if let Some(ty) = &usage.type_name {
+    if let Some(ty) = usage.type_reference {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference("metadata type", ty)?;
     }
     if !usage.about_targets.is_empty() {
         w.push_str(" about ");
-        for (i, t) in usage.about_targets.iter().enumerate() {
+        for (i, target) in usage.about_targets.iter().enumerate() {
             if i > 0 {
                 w.push_str(", ");
             }
-            w.push_str(t);
+            w.push_qualified_reference("metadata about target", *target)?;
         }
     }
     emit_attribute_body(w, path, &usage.body)
@@ -1443,7 +1426,11 @@ pub(crate) fn emit_variant_usage(
     w.push_str("variant ");
     match &variant.typed {
         None => {
-            w.push_str(&format_name(&variant.name));
+            let reference = variant.reference.ok_or_else(|| EmitError::Unsupported {
+                path: path.to_owned(),
+                construct: "untyped variant without a reference".to_owned(),
+            })?;
+            w.push_qualified_reference(&format!("{path}/reference"), reference)?;
             match &variant.body {
                 Some(body) => emit_part_usage_body(w, path, body),
                 None => {
@@ -1472,18 +1459,18 @@ pub(crate) fn emit_metadata_annotation(
     ann: &crate::ast::MetadataAnnotation,
 ) -> Result<(), EmitError> {
     w.push_char('@');
-    w.push_str(&format_name(&ann.name));
-    if let Some(ty) = &ann.type_name {
+    w.push_qualified_reference("metadata annotation", ann.reference)?;
+    if let Some(ty) = ann.type_reference {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference("metadata annotation type", ty)?;
     }
     if !ann.about_targets.is_empty() {
         w.push_str(" about ");
-        for (i, t) in ann.about_targets.iter().enumerate() {
+        for (i, target) in ann.about_targets.iter().enumerate() {
             if i > 0 {
                 w.push_str(", ");
             }
-            w.push_str(t);
+            w.push_qualified_reference("metadata annotation about target", *target)?;
         }
     }
     emit_attribute_body(w, path, &ann.body)
@@ -1496,17 +1483,17 @@ pub(crate) fn emit_metadata_keyword_usage(
 ) -> Result<(), EmitError> {
     w.push_char('#');
     w.push_str(&usage.keyword);
-    if let Some(ty) = &usage.type_name {
+    if let Some(ty) = usage.type_reference {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference("metadata keyword type", ty)?;
     }
     if !usage.about_targets.is_empty() {
         w.push_str(" about ");
-        for (i, t) in usage.about_targets.iter().enumerate() {
+        for (i, target) in usage.about_targets.iter().enumerate() {
             if i > 0 {
                 w.push_str(", ");
             }
-            w.push_str(t);
+            w.push_qualified_reference("metadata keyword about target", *target)?;
         }
     }
     emit_attribute_body(w, path, &usage.body)
@@ -1536,9 +1523,9 @@ pub(crate) fn emit_connection_usage(
     if let Some(name) = &usage.name {
         w.push_str(&format_name(name));
     }
-    if let Some(ty) = &usage.type_name {
+    if let Some(ty) = usage.type_reference {
         w.push_str(" : ");
-        w.push_str(&format_qualified_name(ty));
+        w.push_qualified_reference("connection type", ty)?;
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
@@ -1592,10 +1579,9 @@ fn emit_connection_def_body_element(
     el: &crate::ast::ConnectionDefBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        crate::ast::ConnectionDefBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        crate::ast::ConnectionDefBodyElement::Error(error) => {
+            w.push_recovery_span(path, &error.span)
+        }
         crate::ast::ConnectionDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         crate::ast::ConnectionDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         crate::ast::ConnectionDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
