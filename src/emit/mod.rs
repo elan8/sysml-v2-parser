@@ -107,13 +107,21 @@ pub fn emit_sysml_with_options(
 mod tests {
     use super::*;
     use crate::ast::{
-        Identification, Membership, MembershipKind, Node, Package, PackageBody, PackageBodyElement,
-        ParsedDocument, PartDef, PartDefBody, PartDefBodyElement, QualifiedReferenceArena,
-        RootElement, RootNamespace, SourceStorage, Span, Visibility,
+        DeclarationName, Identification, Membership, MembershipKind, Node, Package, PackageBody,
+        PackageBodyElement, ParsedDocument, PartDef, PartDefBody, PartDefBodyElement,
+        QualifiedIdentification, QualifiedReferenceArena, RootElement, RootNamespace,
+        SourceStorage, Span, Visibility,
     };
 
     fn owning() -> Membership {
         Membership::owning(None, Span::dummy())
+    }
+
+    fn package_identification(name: &str) -> QualifiedIdentification {
+        QualifiedIdentification {
+            short_name: None,
+            name: Some(DeclarationName::Simple(name.to_owned())),
+        }
     }
 
     fn document(root: RootNamespace) -> ParsedDocument {
@@ -132,10 +140,7 @@ mod tests {
                 RootElement::Package(Node::new(
                     Span::dummy(),
                     Package {
-                        identification: Identification {
-                            short_name: None,
-                            name: Some("P".into()),
-                        },
+                        identification: package_identification("P"),
                         body: PackageBody::Brace {
                             elements: vec![Node::new(
                                 Span::dummy(),
@@ -171,10 +176,7 @@ mod tests {
                 RootElement::Package(Node::new(
                     Span::dummy(),
                     Package {
-                        identification: Identification {
-                            short_name: None,
-                            name: Some("P".into()),
-                        },
+                        identification: package_identification("P"),
                         body: PackageBody::Brace {
                             elements: vec![Node::new(
                                 Span::dummy(),
@@ -243,10 +245,7 @@ action def A {
                 RootElement::Package(Node::new(
                     Span::dummy(),
                     Package {
-                        identification: Identification {
-                            short_name: None,
-                            name: Some("P".into()),
-                        },
+                        identification: package_identification("P"),
                         body: PackageBody::Brace {
                             elements: vec![Node::new(
                                 Span::dummy(),

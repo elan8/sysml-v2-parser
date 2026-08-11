@@ -1,7 +1,8 @@
 //! Lexer and skip helpers: whitespace, comments, names, qualified names, and body-skip utilities.
 
 use crate::ast::{
-    Identification, QualifiedReferenceId, ReferenceSegment, ReferenceSeparator, Span,
+    Identification, QualifiedDeclarationName, QualifiedReferenceId, ReferenceSegment,
+    ReferenceSeparator, Span,
 };
 use crate::parser::{span_from_to, Input};
 use nom::branch::alt;
@@ -937,6 +938,7 @@ pub(crate) enum ReferencePathKind {
 fn source_backed_reference(
     input: Input<'_>,
     allow_dot: bool,
+    require_qualification: bool,
 ) -> IResult<Input<'_>, (QualifiedReferenceId, ReferencePathKind)> {
     let (input, _) = ws_and_comments(input)?;
     let reference_start = input;
@@ -952,6 +954,7 @@ fn source_backed_reference(
     let (next, _) = reference_name_span(rest)?;
     rest = next;
     let mut path_kind = ReferencePathKind::Qualified;
+    let mut is_qualified = absolute;
 
     loop {
         let (after_ws, _) = ws_and_comments(rest)?;
@@ -976,8 +979,19 @@ fn source_backed_reference(
         if separator_before == ReferenceSeparator::Dot {
             path_kind = ReferencePathKind::Dotted;
         }
+        is_qualified = true;
         let _ = (source_span, separator_before);
         rest = after_name;
+    }
+
+    // Declaration labels use ordinary `String` storage unless their authored grammar is actually
+    // qualified. Reject before arena mutation so the simple-name alternative can parse without a
+    // speculative orphan entry.
+    if require_qualification && !is_qualified {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            reference_start,
+            nom::error::ErrorKind::Tag,
+        )));
     }
 
     let span = span_from_to(reference_start, rest);
@@ -1032,13 +1046,22 @@ fn source_backed_reference(
 
 /// Parse a source-backed `::`-qualified semantic reference into the document arena.
 pub(crate) fn qualified_reference(input: Input<'_>) -> IResult<Input<'_>, QualifiedReferenceId> {
-    let (input, (reference, _)) = source_backed_reference(input, false)?;
+    let (input, (reference, _)) = source_backed_reference(input, false, false)?;
     Ok((input, reference))
+}
+
+/// Parse a genuinely qualified declaration identity (`A::B` or `$::A`) into arena-backed storage.
+/// A simple `A` is rejected before allocation so the declaration parser can retain it as a label.
+pub(crate) fn qualified_declaration_name(
+    input: Input<'_>,
+) -> IResult<Input<'_>, QualifiedDeclarationName> {
+    let (input, (reference, _)) = source_backed_reference(input, false, true)?;
+    Ok((input, QualifiedDeclarationName::new(reference)))
 }
 
 /// Parse a source-backed semantic path with authored `::` and `.` separators.
 pub(crate) fn reference_path(input: Input<'_>) -> IResult<Input<'_>, QualifiedReferenceId> {
-    let (input, (reference, _)) = source_backed_reference(input, true)?;
+    let (input, (reference, _)) = source_backed_reference(input, true, false)?;
     Ok((input, reference))
 }
 
@@ -1047,7 +1070,7 @@ pub(crate) fn reference_path(input: Input<'_>) -> IResult<Input<'_>, QualifiedRe
 pub(crate) fn classified_reference_path(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (QualifiedReferenceId, ReferencePathKind)> {
-    source_backed_reference(input, true)
+    source_backed_reference(input, true, false)
 }
 
 /// Skip any content until we see `}` at the same brace level.
@@ -1537,6 +1560,30 @@ mod lexical_bnf_tests {
                 .expect("reference view")
                 .authored_text(),
             source_text
+        );
+    }
+
+    #[test]
+    fn qualified_declaration_name_requires_qualification_before_allocating() {
+        let simple_context = ParseContext::new();
+        assert!(qualified_declaration_name(simple_context.input(b"Simple")).is_err());
+        assert!(simple_context.finish().is_empty());
+
+        let source_text = "AstronomyReference::Domain";
+        let context = ParseContext::new();
+        let (rest, declaration) = qualified_declaration_name(context.input(source_text.as_bytes()))
+            .expect("qualified declaration name");
+        assert!(rest.fragment().is_empty());
+        let arena = context.finish();
+        let source = SourceStorage::from(source_text);
+        let view = arena
+            .get(&source, declaration.storage_id())
+            .expect("qualified declaration view");
+        assert_eq!(view.authored_text(), source_text);
+        assert_eq!(view.segments.len(), 2);
+        assert_eq!(
+            view.segments[1].separator_before,
+            Some(ReferenceSeparator::ColonColon)
         );
     }
 

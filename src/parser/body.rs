@@ -144,9 +144,11 @@ where
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
             return Ok((input, elements));
         }
+        let reference_checkpoint = input.extra.reference_checkpoint();
         match parse_element(input) {
             Ok((next, element)) => {
                 if next.location_offset() == input.location_offset() {
+                    input.extra.rollback_references(reference_checkpoint);
                     return Err(nom::Err::Error(nom::error::Error::new(
                         input,
                         nom::error::ErrorKind::Many0,
@@ -156,6 +158,7 @@ where
                 input = next;
             }
             Err(_) => {
+                input.extra.rollback_references(reference_checkpoint);
                 let start_unknown = input;
                 let (after_ws, _) = ws_and_comments(input)?;
                 if after_ws.fragment().starts_with(b"}") {

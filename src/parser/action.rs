@@ -97,6 +97,10 @@ fn optional_multiplicity_brackets(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// typing clause (S42-004). We also accept `= expr` bindings; anything still unrecognized before
 /// the terminator is skipped as before.
 fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
+    crate::parser::span::reference_transaction(input, action_ref_decl_inner)
+}
+
+fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
     use crate::parser::expr::expression;
     use crate::parser::usage::{
         optional_typings, single_target_redefines, single_target_typing,
@@ -238,6 +242,10 @@ fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
 
 /// In/out decl: `in` name `:` type `;` or `out` name `:` type `;`
 pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
+    crate::parser::span::reference_transaction(input, in_out_decl_inner)
+}
+
+fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = alt((

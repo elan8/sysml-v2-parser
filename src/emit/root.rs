@@ -4,9 +4,9 @@ use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use super::{behavior, requirement, structure, view};
 use crate::ast::{
-    CommentAnnotation, DocComment, FilterMember, Identification, Import, ImportShape, ImportTarget,
-    LibraryPackage, Package, PackageBody, PackageBodyElement, RootElement, RootNamespace,
-    TextualRepresentation,
+    CommentAnnotation, DeclarationName, DocComment, FilterMember, Identification, Import,
+    ImportShape, ImportTarget, LibraryPackage, Package, PackageBody, PackageBodyElement,
+    QualifiedIdentification, RootElement, RootNamespace, TextualRepresentation,
 };
 
 pub(crate) fn emit_root(w: &mut EmitWriter<'_>, root: &RootNamespace) -> Result<(), EmitError> {
@@ -30,7 +30,7 @@ fn emit_root_element(
         RootElement::LibraryPackage(p) => emit_library_package(w, path, &p.value),
         RootElement::Namespace(n) => {
             w.push_str("namespace ");
-            emit_identification(w, &n.value.identification);
+            emit_qualified_identification(w, path, &n.value.identification)?;
             emit_package_body(w, path, &n.value.body)
         }
         RootElement::Import(i) => emit_import(w, &i.value),
@@ -44,7 +44,7 @@ pub(crate) fn emit_package(
     pkg: &Package,
 ) -> Result<(), EmitError> {
     w.push_str("package ");
-    emit_identification(w, &pkg.identification);
+    emit_qualified_identification(w, path, &pkg.identification)?;
     emit_package_body(w, path, &pkg.body)
 }
 
@@ -57,7 +57,7 @@ fn emit_library_package(
         w.push_str("standard ");
     }
     w.push_str("library package ");
-    emit_identification(w, &pkg.identification);
+    emit_qualified_identification(w, path, &pkg.identification)?;
     emit_package_body(w, path, &pkg.body)
 }
 
@@ -235,19 +235,26 @@ pub(crate) fn emit_import_target(
 ) -> Result<(), EmitError> {
     w.push_qualified_reference(path, target.reference)?;
     match &target.shape {
-        ImportShape::Membership { recursive } => {
-            if *recursive {
+        ImportShape::Membership { recursive_suffix } => {
+            if recursive_suffix.is_some() {
                 w.push_str("::**");
             }
         }
-        ImportShape::Namespace { recursive } => {
+        ImportShape::Namespace {
+            wildcard_suffix: _,
+            recursive_suffix,
+            combined_recursive_suffix_span: _,
+        } => {
             w.push_str("::*");
-            if *recursive {
+            if recursive_suffix.is_some() {
                 w.push_str("::**");
             }
         }
-        ImportShape::Filter { recursive, members } => {
-            if *recursive {
+        ImportShape::Filter {
+            recursive_suffix,
+            members,
+        } => {
+            if recursive_suffix.is_some() {
                 w.push_str("::**");
             }
             for member in members {
@@ -291,6 +298,26 @@ pub(crate) fn emit_identification(w: &mut EmitWriter<'_>, id: &Identification) {
     if let Some(name) = &id.name {
         w.push_str(&format_name(name));
     }
+}
+
+fn emit_qualified_identification(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    id: &QualifiedIdentification,
+) -> Result<(), EmitError> {
+    if let Some(short) = &id.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short));
+        w.push_str("> ");
+    }
+    match &id.name {
+        Some(DeclarationName::Simple(name)) => w.push_str(&format_name(name)),
+        Some(DeclarationName::Qualified(name)) => {
+            w.push_qualified_reference(&format!("{path}/declaration-name"), name.storage_id())?
+        }
+        None => {}
+    }
+    Ok(())
 }
 
 pub(crate) fn emit_doc(w: &mut EmitWriter<'_>, doc: &DocComment) -> Result<(), EmitError> {

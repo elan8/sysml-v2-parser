@@ -916,6 +916,10 @@ fn build_frame_node<'a>(frame: Frame<'a>, end: Input<'a>) -> Node<Expression> {
 /// Full expression with precedence-aware binary parsing. See the module-level comment above for
 /// why this is an explicit-stack loop rather than recursive descent.
 pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    crate::parser::span::reference_transaction(input, expression_inner)
+}
+
+fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let mut stack: Vec<(Frame<'_>, ItemState<'_>)> = Vec::new();
     let mut state = ItemState::fresh(input);
     let mut input = input;

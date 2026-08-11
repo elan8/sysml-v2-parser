@@ -307,6 +307,10 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
 }
 
 fn verify_requirement(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyRequirementMember>> {
+    crate::parser::span::reference_transaction(input, verify_requirement_inner)
+}
+
+fn verify_requirement_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyRequirementMember>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"verify"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -374,6 +378,12 @@ fn stakeholder_typed_member(input: Input<'_>) -> IResult<Input<'_>, Node<Stakeho
 }
 
 fn stakeholder_shorthand_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
+    crate::parser::span::reference_transaction(input, stakeholder_shorthand_member_inner)
+}
+
+fn stakeholder_shorthand_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<StakeholderMember>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"stakeholder"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -395,6 +405,12 @@ fn stakeholder_shorthand_member(input: Input<'_>) -> IResult<Input<'_>, Node<Sta
 }
 
 fn stakeholder_redefinition_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<StakeholderMember>> {
+    crate::parser::span::reference_transaction(input, stakeholder_redefinition_member_inner)
+}
+
+fn stakeholder_redefinition_member_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<StakeholderMember>> {
     let start = input;
@@ -435,6 +451,10 @@ fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
 }
 
 fn purpose_member(input: Input<'_>) -> IResult<Input<'_>, Node<PurposeMember>> {
+    crate::parser::span::reference_transaction(input, purpose_member_inner)
+}
+
+fn purpose_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PurposeMember>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"purpose"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -456,6 +476,10 @@ fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
 }
 
 pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>> {
+    crate::parser::span::reference_transaction(input, subject_decl_inner)
+}
+
+fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -866,6 +890,10 @@ pub(crate) fn textual_representation(
 }
 
 pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
+    crate::parser::span::reference_transaction(input, satisfy_inner)
+}
+
+fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt(preceded(tag(&b"assert"[..]), ws1)).parse(input)?;

@@ -4,6 +4,7 @@ use crate::ast::{AliasBody, AliasDef, Node};
 use crate::parser::body::relationship_body_annotations;
 use crate::parser::lex::{identification, qualified_reference, ws1, ws_and_comments};
 use crate::parser::node_from_to;
+use crate::parser::span::reference_transaction;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::sequence::preceded;
@@ -22,6 +23,10 @@ fn alias_body(input: Input<'_>) -> IResult<Input<'_>, AliasBody> {
 
 /// Alias definition: `alias` Identification `for` qualified_name body
 pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> {
+    reference_transaction(input, alias_def_inner)
+}
+
+fn alias_def_inner(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;

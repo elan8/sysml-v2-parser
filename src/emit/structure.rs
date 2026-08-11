@@ -6,11 +6,12 @@ use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
     AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectBody,
-    ConnectStmt, ConnectionEnd, DefinitionPrefix, EndDecl, InOut, InterfaceDef, InterfaceDefBody,
-    InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node,
-    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
-    PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody,
-    RefDecl, SubsettingKind, SubsettingRelationship, TypingKind, TypingRelationship,
+    ConnectStmt, ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole,
+    EndDecl, EndIdentity, InOut, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
+    InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node, PartDef, PartDefBody,
+    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement,
+    PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind,
+    SubsettingRelationship, TypingKind, TypingRelationship,
 };
 
 pub(crate) fn emit_part_def(
@@ -816,7 +817,13 @@ pub(crate) fn emit_end_decl(
     end: &EndDecl,
 ) -> Result<(), EmitError> {
     w.push_str("end ");
-    w.push_str(&format_name(&end.name));
+    match &end.identity {
+        EndIdentity::Declaration(name) => w.push_str(&format_name(&name.value)),
+        EndIdentity::Derivation(role) => match role.value {
+            DerivationEndRole::Original => w.push_str("#original"),
+            DerivationEndRole::Derive => w.push_str("#derive"),
+        },
+    }
     if let Some(nested) = &end.nested_usage {
         return w.unsupported(
             path,
@@ -1504,6 +1511,11 @@ pub(crate) fn emit_connection_def(
     path: &str,
     def: &crate::ast::ConnectionDef,
 ) -> Result<(), EmitError> {
+    if let Some(role) = &def.derivation_role {
+        match role.value {
+            DerivationConnectionRole::Derivation => w.push_str("#derivation "),
+        }
+    }
     emit_visibility(w, def.membership.visibility);
     w.push_str("connection def ");
     emit_identification(w, &def.identification);

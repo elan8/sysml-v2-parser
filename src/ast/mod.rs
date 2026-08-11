@@ -1076,7 +1076,10 @@ fn normalize_interface_def(i: &InterfaceDef) -> InterfaceDef {
 
 fn normalize_connection_def(c: &ConnectionDef) -> ConnectionDef {
     ConnectionDef {
-        annotation: c.annotation.clone(),
+        derivation_role: c
+            .derivation_role
+            .as_ref()
+            .map(|role| dummy_node(role, role.value)),
         identification: c.identification.clone(),
         specializes: c.specializes.clone(),
         body: normalize_connection_def_body(&c.body),
@@ -1237,14 +1240,18 @@ fn normalize_interface_def_body_element_node(
 
 fn normalize_end_decl(e: &EndDecl) -> EndDecl {
     EndDecl {
-        name: e.name.clone(),
+        identity: match &e.identity {
+            EndIdentity::Declaration(name) => {
+                EndIdentity::Declaration(dummy_node(name, name.value.clone()))
+            }
+            EndIdentity::Derivation(role) => EndIdentity::Derivation(dummy_node(role, role.value)),
+        },
         typing: e.typing.clone(),
         references: e.references.clone(),
         multiplicity: e.multiplicity.clone(),
         redefines: e.redefines.clone(),
         crosses: e.crosses.clone(),
         nested_usage: e.nested_usage.clone(),
-        name_span: None,
         type_ref_span: None,
     }
 }

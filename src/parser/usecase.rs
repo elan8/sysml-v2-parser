@@ -42,6 +42,10 @@ fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
 }
 
 fn first_succession(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession>> {
+    crate::parser::span::reference_transaction(input, first_succession_inner)
+}
+
+fn first_succession_inner(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -63,6 +67,10 @@ fn then_done(input: Input<'_>) -> IResult<Input<'_>, Node<ThenDone>> {
 }
 
 pub(crate) fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
+    crate::parser::span::reference_transaction(input, include_use_case_inner)
+}
+
+fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"include"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -148,6 +156,12 @@ fn then_use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ThenUseCaseU
 fn actor_redefinition_assignment(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
+    crate::parser::span::reference_transaction(input, actor_redefinition_assignment_inner)
+}
+
+fn actor_redefinition_assignment_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"actor"[..])).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -164,6 +178,10 @@ fn actor_redefinition_assignment(
 }
 
 fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition>> {
+    crate::parser::span::reference_transaction(input, ref_redefinition_inner)
+}
+
+fn ref_redefinition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"ref"[..])).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -191,6 +209,10 @@ fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition
 /// the output parameter (e.g. `return verdict : VerdictKind = ...`).
 /// This is tried before `return_ref` so that `return ref` forms still reach `return_ref`.
 fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>> {
+    crate::parser::span::reference_transaction(input, case_return_decl_inner)
+}
+
+fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -643,6 +665,10 @@ fn directed_requirement_usage(
 }
 
 pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
+    crate::parser::span::reference_transaction(input, actor_usage_inner)
+}
+
+fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;

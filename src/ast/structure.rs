@@ -1105,7 +1105,9 @@ pub enum EndNestedUsage {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
-    pub name: String,
+    /// A normal declared name or a fixed derivation-end role. `#original`/`#derive` are grammar
+    /// roles, not declaration labels.
+    pub identity: EndIdentity,
     /// Structured typing for the `: Type` form. A reference-only end has no typing and stores its
     /// target in `references`.
     pub typing: Option<Node<TypingRelationship>>,
@@ -1134,18 +1136,36 @@ pub struct EndDecl {
     /// theCause :> causes :>> source { ... }` (Systems Library `Domain Libraries/Cause and
     /// Effect/CausationConnections.sysml`) / `end touchesToo [0..*] item touchedItemToo :>>
     /// separateSpaceToo, thisOccurrence;` (`Items.sysml`). `theCauses`/`touchesToo` is still this
-    /// `EndDecl`'s own `name`; the nested usage supplies this end's typing/structure instead of a
+    /// `EndDecl`'s declaration identity; the nested usage supplies this end's typing/structure instead of a
     /// `:`/`::>` clause. `None` for the ordinary forms above.
     pub nested_usage: Option<Box<EndNestedUsage>>,
-    /// Span of the name (for semantic tokens).
-    pub name_span: Option<Span>,
     /// Span of the type/reference target after `:`/`::>`/`references` (for semantic tokens).
     pub type_ref_span: Option<Span>,
 }
 
+/// Identity position of a connector end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum EndIdentity {
+    /// Ordinary declaration label with its authored token span.
+    Declaration(Node<String>),
+    /// Fixed derivation role with its authored `#...` token span.
+    Derivation(Node<DerivationEndRole>),
+}
+
+/// Fixed roles inside a `#derivation connection` body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum DerivationEndRole {
+    /// The `#original` end.
+    Original,
+    /// The `#derive` end.
+    Derive,
+}
+
 impl PartialEq for EndDecl {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+        self.identity == other.identity
             && self.typing == other.typing
             && self.references == other.references
             && self.multiplicity == other.multiplicity
@@ -1259,10 +1279,18 @@ pub enum RelationshipBodyElement {
 // ---------------------------------------------------------------------------
 
 /// Connection definition: `connection def` Identification body (BNF ConnectionDefinition).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum DerivationConnectionRole {
+    /// The fixed `#derivation` grammar marker.
+    Derivation,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionDef {
-    pub annotation: Option<String>,
+    /// Fixed derivation role and exact marker span. Ordinary connections have no role.
+    pub derivation_role: Option<Node<DerivationConnectionRole>>,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConnectionDefBody,

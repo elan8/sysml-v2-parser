@@ -1,5 +1,8 @@
-use super::common::{Identification, Import};
-use super::package::{LibraryPackage, Package, PackageBody, PackageBodyElement};
+use super::common::Import;
+use super::package::{
+    LibraryPackage, Package, PackageBody, PackageBodyElement, QualifiedDeclarationName,
+    QualifiedIdentification,
+};
 use super::qualified_reference::{
     QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceView, SourceStorage,
 };
@@ -25,7 +28,7 @@ pub enum RootElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NamespaceDecl {
-    pub identification: Identification,
+    pub identification: QualifiedIdentification,
     pub body: PackageBody,
 }
 
@@ -59,6 +62,15 @@ impl ParsedDocument {
         id: QualifiedReferenceId,
     ) -> Option<QualifiedReferenceView<'_>> {
         self.qualified_references.get(&self.source, id)
+    }
+
+    /// Resolve a qualified declaration name without erasing its declaration role in the AST.
+    pub fn qualified_declaration_name(
+        &self,
+        name: QualifiedDeclarationName,
+    ) -> Option<QualifiedReferenceView<'_>> {
+        self.qualified_references
+            .get(&self.source, name.storage_id())
     }
 }
 
@@ -139,6 +151,7 @@ fn validate_serialized_document(document: &ParsedDocument) -> Result<(), String>
         .qualified_references
         .validate(&document.source)
         .map_err(|error| error.to_string())?;
+    validate_import_target_provenance(document)?;
     serde::Serialize::serialize(
         &document.root,
         QualifiedReferenceIdValidator {
@@ -146,6 +159,255 @@ fn validate_serialized_document(document: &ParsedDocument) -> Result<(), String>
         },
     )
     .map_err(|error| error.to_string())
+}
+
+#[cfg(feature = "serde")]
+fn validate_import_target_provenance(document: &ParsedDocument) -> Result<(), String> {
+    fn target(document: &ParsedDocument, target: &super::ImportTarget) -> Result<(), String> {
+        target
+            .validate_provenance(&document.source, &document.qualified_references)
+            .map_err(|error| error.to_string())
+    }
+
+    fn package_body(document: &ParsedDocument, body: &PackageBody) -> Result<(), String> {
+        let PackageBody::Brace { elements } = body else {
+            return Ok(());
+        };
+        for element in elements {
+            package_element(document, &element.value)?;
+        }
+        Ok(())
+    }
+
+    fn package_element(
+        document: &ParsedDocument,
+        element: &PackageBodyElement,
+    ) -> Result<(), String> {
+        match element {
+            PackageBodyElement::Package(package) => package_body(document, &package.value.body),
+            PackageBodyElement::LibraryPackage(package) => {
+                package_body(document, &package.value.body)
+            }
+            PackageBodyElement::Import(import) => target(document, &import.value.target),
+            PackageBodyElement::PartDef(definition) => {
+                part_def_body(document, &definition.value.body)
+            }
+            PackageBodyElement::PartUsage(usage) => part_usage_body(document, &usage.value.body),
+            PackageBodyElement::RequirementDef(definition) => {
+                requirement_body(document, &definition.value.body)
+            }
+            PackageBodyElement::RequirementUsage(usage) => {
+                requirement_body(document, &usage.value.body)
+            }
+            PackageBodyElement::ConcernUsage(usage) => {
+                requirement_body(document, &usage.value.body)
+            }
+            PackageBodyElement::ViewpointDef(definition) => {
+                requirement_body(document, &definition.value.body)
+            }
+            PackageBodyElement::ViewpointUsage(usage) => {
+                requirement_body(document, &usage.value.body)
+            }
+            PackageBodyElement::ViewUsage(usage) => view_body(document, &usage.value.body),
+            PackageBodyElement::RenderingUsage(usage) => {
+                rendering_body(document, &usage.value.body)
+            }
+            PackageBodyElement::AttributeDef(definition) => {
+                attribute_body(document, &definition.value.body)
+            }
+            PackageBodyElement::AttributeUsage(usage) => {
+                attribute_body(document, &usage.value.body)
+            }
+            PackageBodyElement::ItemDef(definition) => {
+                attribute_body(document, &definition.value.body)
+            }
+            PackageBodyElement::ItemUsage(usage) => attribute_body(document, &usage.value.body),
+            PackageBodyElement::IndividualDef(definition) => {
+                attribute_body(document, &definition.value.body)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn part_def_body(document: &ParsedDocument, body: &super::PartDefBody) -> Result<(), String> {
+        let super::PartDefBody::Brace { elements } = body else {
+            return Ok(());
+        };
+        for element in elements {
+            match &element.value {
+                super::PartDefBodyElement::Import(import) => {
+                    target(document, &import.value.target)?
+                }
+                super::PartDefBodyElement::PartDef(definition) => {
+                    part_def_body(document, &definition.value.body)?
+                }
+                super::PartDefBodyElement::PartUsage(usage) => {
+                    part_usage_body(document, &usage.value.body)?
+                }
+                super::PartDefBodyElement::RequirementDef(definition) => {
+                    requirement_body(document, &definition.value.body)?
+                }
+                super::PartDefBodyElement::RequirementUsage(usage) => {
+                    requirement_body(document, &usage.value.body)?
+                }
+                super::PartDefBodyElement::ViewUsage(usage) => {
+                    view_body(document, &usage.value.body)?
+                }
+                super::PartDefBodyElement::ViewpointDef(definition) => {
+                    requirement_body(document, &definition.value.body)?
+                }
+                super::PartDefBodyElement::ViewpointUsage(usage) => {
+                    requirement_body(document, &usage.value.body)?
+                }
+                super::PartDefBodyElement::AttributeDef(definition) => {
+                    attribute_body(document, &definition.value.body)?
+                }
+                super::PartDefBodyElement::AttributeUsage(usage) => {
+                    attribute_body(document, &usage.value.body)?
+                }
+                super::PartDefBodyElement::ItemDef(definition) => {
+                    attribute_body(document, &definition.value.body)?
+                }
+                super::PartDefBodyElement::ItemUsage(usage) => {
+                    attribute_body(document, &usage.value.body)?
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn part_usage_body(
+        document: &ParsedDocument,
+        body: &super::PartUsageBody,
+    ) -> Result<(), String> {
+        let super::PartUsageBody::Brace { elements } = body else {
+            return Ok(());
+        };
+        for element in elements {
+            match &element.value {
+                super::PartUsageBodyElement::Import(import) => {
+                    target(document, &import.value.target)?
+                }
+                super::PartUsageBodyElement::PartUsage(usage) => {
+                    part_usage_body(document, &usage.value.body)?
+                }
+                super::PartUsageBodyElement::RequirementDef(definition) => {
+                    requirement_body(document, &definition.value.body)?
+                }
+                super::PartUsageBodyElement::RequirementUsage(usage) => {
+                    requirement_body(document, &usage.value.body)?
+                }
+                super::PartUsageBodyElement::AttributeUsage(usage) => {
+                    attribute_body(document, &usage.value.body)?
+                }
+                super::PartUsageBodyElement::ItemDef(definition) => {
+                    attribute_body(document, &definition.value.body)?
+                }
+                super::PartUsageBodyElement::ItemUsage(usage) => {
+                    attribute_body(document, &usage.value.body)?
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn attribute_body(
+        document: &ParsedDocument,
+        body: &super::AttributeBody,
+    ) -> Result<(), String> {
+        let super::AttributeBody::Brace { elements } = body else {
+            return Ok(());
+        };
+        for element in elements {
+            match &element.value {
+                super::AttributeBodyElement::AttributeDef(definition) => {
+                    attribute_body(document, &definition.value.body)?
+                }
+                super::AttributeBodyElement::AttributeUsage(usage) => {
+                    attribute_body(document, &usage.value.body)?
+                }
+                super::AttributeBodyElement::PartUsage(usage) => {
+                    part_usage_body(document, &usage.value.body)?
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn requirement_body(
+        document: &ParsedDocument,
+        body: &super::RequirementDefBody,
+    ) -> Result<(), String> {
+        let super::RequirementDefBody::Brace { elements } = body else {
+            return Ok(());
+        };
+        for element in elements {
+            match &element.value {
+                super::RequirementDefBodyElement::Import(import) => {
+                    target(document, &import.value.target)?
+                }
+                super::RequirementDefBodyElement::RequirementUsage(usage) => {
+                    requirement_body(document, &usage.value.body)?
+                }
+                super::RequirementDefBodyElement::Frame(frame) => {
+                    requirement_body(document, &frame.value.body)?
+                }
+                super::RequirementDefBodyElement::AttributeDef(definition) => {
+                    attribute_body(document, &definition.value.body)?
+                }
+                super::RequirementDefBodyElement::AttributeUsage(usage) => {
+                    attribute_body(document, &usage.value.body)?
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn view_body(document: &ParsedDocument, body: &super::ViewBody) -> Result<(), String> {
+        let super::ViewBody::Brace { elements } = body else {
+            return Ok(());
+        };
+        for element in elements {
+            if let super::ViewBodyElement::Expose(expose) = &element.value {
+                target(document, &expose.value.target)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn rendering_body(
+        document: &ParsedDocument,
+        body: &super::RenderingUsageBody,
+    ) -> Result<(), String> {
+        let super::RenderingUsageBody::Brace { elements } = body else {
+            return Ok(());
+        };
+        for element in elements {
+            match &element.value {
+                super::RenderingUsageBodyElement::ViewUsage(usage) => {
+                    view_body(document, &usage.value.body)?
+                }
+                super::RenderingUsageBodyElement::Error(_)
+                | super::RenderingUsageBodyElement::Doc(_) => {}
+            }
+        }
+        Ok(())
+    }
+
+    for element in &document.root.elements {
+        match &element.value {
+            RootElement::Package(package) => package_body(document, &package.value.body)?,
+            RootElement::LibraryPackage(package) => package_body(document, &package.value.body)?,
+            RootElement::Namespace(namespace) => package_body(document, &namespace.value.body)?,
+            RootElement::Import(import) => target(document, &import.value.target)?,
+            RootElement::Member(member) => package_element(document, &member.value)?,
+        }
+    }
+    Ok(())
 }
 
 /// A no-output serde traversal that validates every `QualifiedReferenceId` anywhere in the AST.
@@ -769,6 +1031,46 @@ mod serde_tests {
     }
 
     #[test]
+    fn parsed_document_rejects_tampered_import_suffix_token_provenance() {
+        let document = crate::parse("import A:: /* wildcard */ *;").expect("parse import");
+        let mut encoded = serde_json::to_value(document).expect("serialize document");
+        let marker = find_field_mut(&mut encoded, "marker_span").expect("marker span");
+        marker["len"] = serde_json::json!(2);
+
+        let error = serde_json::from_value::<ParsedDocument>(encoded)
+            .expect_err("tampered marker token must be rejected");
+        assert!(error.to_string().contains("suffix marker"));
+    }
+
+    #[test]
+    fn parsed_document_rejects_tampered_combined_suffix_provenance() {
+        let document = crate::parse("import A::* /* gap */ ::**;").expect("parse import");
+        let mut encoded = serde_json::to_value(document).expect("serialize document");
+        let combined = find_field_mut(&mut encoded, "combined_recursive_suffix_span")
+            .expect("combined suffix span");
+        combined["len"] = serde_json::json!(1);
+
+        let error = serde_json::from_value::<ParsedDocument>(encoded)
+            .expect_err("tampered combined suffix must be rejected");
+        assert!(error.to_string().contains("combined recursive suffix"));
+    }
+
+    #[test]
+    fn parsed_document_rejects_tampered_expose_filter_delimiter_provenance() {
+        let document = crate::parse(
+            "package P { view v : V { expose Filtered [ /* gap */ Filters::One ]; } }",
+        )
+        .expect("parse expose filter");
+        let mut encoded = serde_json::to_value(document).expect("serialize document");
+        let close = find_field_mut(&mut encoded, "close_bracket_span").expect("close bracket span");
+        close["len"] = serde_json::json!(2);
+
+        let error = serde_json::from_value::<ParsedDocument>(encoded)
+            .expect_err("tampered filter delimiter must be rejected");
+        assert!(error.to_string().contains("filter close bracket"));
+    }
+
+    #[test]
     fn a_partial_root_is_not_a_complete_serialized_document() {
         let document = document_with_reference();
         let root_only = serde_json::to_value(&document.root).expect("serialize root component");
@@ -796,6 +1098,26 @@ mod serde_tests {
                     .any(|value| replace_variant_number(value, variant, replacement))
             }
             _ => false,
+        }
+    }
+
+    fn find_field_mut<'a>(
+        value: &'a mut serde_json::Value,
+        field: &str,
+    ) -> Option<&'a mut serde_json::Value> {
+        match value {
+            serde_json::Value::Array(values) => values
+                .iter_mut()
+                .find_map(|value| find_field_mut(value, field)),
+            serde_json::Value::Object(fields) => {
+                if fields.contains_key(field) {
+                    return fields.get_mut(field);
+                }
+                fields
+                    .values_mut()
+                    .find_map(|value| find_field_mut(value, field))
+            }
+            _ => None,
         }
     }
 }

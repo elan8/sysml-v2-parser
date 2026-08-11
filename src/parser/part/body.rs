@@ -16,12 +16,13 @@ pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody>
 }
 
 fn try_part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
-    match part_def_body_element(input) {
+    match crate::parser::span::reference_transaction(input, part_def_body_element) {
         Err(e)
             if starts_with_any_keyword(input.fragment(), PART_BODY_STARTERS)
                 && starts_with_keyword(input.fragment(), b"part") =>
         {
-            if let Ok((next, usage)) = part_usage(input) {
+            if let Ok((next, usage)) = crate::parser::span::reference_transaction(input, part_usage)
+            {
                 if next.location_offset() > input.location_offset() {
                     return Ok((
                         next,
@@ -94,6 +95,10 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
 /// both in lockstep; `constant` and portion kind remain unsupported on both, see
 /// `state_usage`'s doc comment for why.
 pub(crate) fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
+    crate::parser::span::reference_transaction(input, exhibit_state_inner)
+}
+
+fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
@@ -380,6 +385,12 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
 pub(crate) fn connection_usage_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
+    crate::parser::span::reference_transaction(input, connection_usage_member_inner)
+}
+
+fn connection_usage_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
@@ -476,6 +487,10 @@ pub(crate) fn connection_usage_member(
 /// Kinded `ref action` / `ref state` / bare `action` / `state` are handled by dedicated parsers
 /// above; this catch-all remains for residual forms such as unmodeled `ref connection` headers.
 fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMemberDecl>> {
+    crate::parser::span::reference_transaction(input, opaque_part_member_decl_inner)
+}
+
+fn opaque_part_member_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMemberDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;

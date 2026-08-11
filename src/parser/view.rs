@@ -312,6 +312,10 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
 /// MembershipImport = QualifiedName (::**)?
 /// NamespaceImport = QualifiedName :: * (::**)?
 fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
+    crate::parser::span::reference_transaction(input, expose_member_inner)
+}
+
+fn expose_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"expose"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -333,6 +337,10 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
 
 /// satisfy QualifiedName RelationshipBody (simplified form in view body)
 fn satisfy_view_member(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewMember>> {
+    crate::parser::span::reference_transaction(input, satisfy_view_member_inner)
+}
+
+fn satisfy_view_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewMember>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"satisfy"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -553,10 +561,12 @@ mod expose_diagnostic_tests {
             "SurveillanceDrone.SurveillanceQuadrotorDrone",
             "feature-chain segments should be preserved in expose target"
         );
-        assert_eq!(
+        assert!(matches!(
             expose.target.shape,
-            ImportShape::Membership { recursive: false }
-        );
+            ImportShape::Membership {
+                recursive_suffix: None
+            }
+        ));
     }
 
     #[test]
@@ -564,10 +574,12 @@ mod expose_diagnostic_tests {
         let result =
             parse_with_diagnostics("package Views { view v : GeneralView { expose vehicle; } }");
         assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
-        assert_eq!(
+        assert!(matches!(
             expose_of(&result.document).target.shape,
-            ImportShape::Membership { recursive: false }
-        );
+            ImportShape::Membership {
+                recursive_suffix: None
+            }
+        ));
     }
 
     #[test]
@@ -575,10 +587,14 @@ mod expose_diagnostic_tests {
         let result =
             parse_with_diagnostics("package Views { view v : GeneralView { expose vehicle::*; } }");
         assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
-        assert_eq!(
+        assert!(matches!(
             expose_of(&result.document).target.shape,
-            ImportShape::Namespace { recursive: false }
-        );
+            ImportShape::Namespace {
+                recursive_suffix: None,
+                combined_recursive_suffix_span: None,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -587,10 +603,12 @@ mod expose_diagnostic_tests {
             "package Views { view v : GeneralView { expose vehicle::**; } }",
         );
         assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
-        assert_eq!(
+        assert!(matches!(
             expose_of(&result.document).target.shape,
-            ImportShape::Membership { recursive: true }
-        );
+            ImportShape::Membership {
+                recursive_suffix: Some(_)
+            }
+        ));
     }
 
     #[test]
@@ -599,10 +617,14 @@ mod expose_diagnostic_tests {
             "package Views { view v : GeneralView { expose vehicle::*::**; } }",
         );
         assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
-        assert_eq!(
+        assert!(matches!(
             expose_of(&result.document).target.shape,
-            ImportShape::Namespace { recursive: true }
-        );
+            ImportShape::Namespace {
+                recursive_suffix: Some(_),
+                combined_recursive_suffix_span: Some(_),
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -613,8 +635,11 @@ mod expose_diagnostic_tests {
         assert!(result.is_ok(), "expected parse, got {:?}", result.errors);
         let expose = expose_of(&result.document);
         match &expose.target.shape {
-            ImportShape::Filter { recursive, members } => {
-                assert!(!recursive);
+            ImportShape::Filter {
+                recursive_suffix,
+                members,
+            } => {
+                assert!(recursive_suffix.is_none());
                 assert_eq!(members.len(), 2);
             }
             other => panic!("expected filter shape, got {other:?}"),

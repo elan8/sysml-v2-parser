@@ -16,17 +16,18 @@
 //! - `interface.rs`'s `connect_ends` never accepted the §6 G24 per-endpoint multiplicity
 //!   (`connect [0..1] a to [1] b;`) that `connection.rs`'s did -- same reasoning, no BNF basis for
 //!   restricting it to connections only.
-//! - `connection.rs`'s end name accepts the `#name` derived-end-name form (tested in
+//! - `connection.rs`'s end identity accepts fixed `#original`/`#derive` derivation roles (tested in
 //!   `tests/derivation_connections.rs`, e.g. `end #original ::> OriginalReq;`); `interface.rs`
 //!   never did. Unlike the two gaps above, this one has no matching real-usage evidence on the
-//!   interface side, so it stays parameterized (`allow_derived_name`) rather than blindly widened.
+//!   interface side, so it stays parameterized (`allow_derivation_role`) rather than blindly
+//!   widened.
 //!
 //! Consolidating here fixes the first two gaps for both callers at once and makes the third an
 //! explicit, visible choice at each call site instead of an accidental omission.
 
 use crate::ast::{
-    ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, EndNestedUsage, Node, RefBody,
-    RefBodyElement, RefDecl,
+    ConnectBody, ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndIdentity,
+    EndNestedUsage, Node, RefBody, RefBodyElement, RefDecl,
 };
 use crate::parser::body::{advance_to_closing_brace, relationship_body_annotations};
 use crate::parser::expr::path_expression;
@@ -42,34 +43,41 @@ use crate::parser::usage::{
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_while1};
+use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// `#name` derived-end-name form, e.g. `end #original ::> OriginalReq;` (real usage:
-/// `tests/derivation_connections.rs`, KerML `Derivation`-style connections). Only reachable when
-/// [`end_decl`] is called with `allow_derived_name: true`.
-fn derived_end_name(input: Input<'_>) -> IResult<Input<'_>, String> {
+/// Fixed derivation-end role, with its exact authored `#...` marker span.
+fn derivation_end_role(input: Input<'_>) -> IResult<Input<'_>, Node<DerivationEndRole>> {
+    let start = input;
     let (input, _) = tag(&b"#"[..]).parse(input)?;
-    let (input, value) =
-        take_while1(|c: u8| c.is_ascii_alphanumeric() || c == b'_').parse(input)?;
-    Ok((
-        input,
-        format!("#{}", String::from_utf8_lossy(value.fragment())),
-    ))
+    let (input, role) = if starts_with_keyword(input.fragment(), b"original") {
+        let (input, _) = tag(&b"original"[..]).parse(input)?;
+        (input, DerivationEndRole::Original)
+    } else if starts_with_keyword(input.fragment(), b"derive") {
+        let (input, _) = tag(&b"derive"[..]).parse(input)?;
+        (input, DerivationEndRole::Derive)
+    } else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    };
+    Ok((input, node_from_to(start, input, role)))
 }
 
 /// End declaration: `end` `#tag`? multiplicity? (`part`|`port`|`ref`|`item`)? name multiplicity?
 /// (`:` (`~`)? type (`crosses` target)? | (`::>`|`references`) target | nested `occurrence`/`item`
 /// usage) multiplicity? `;`.
 ///
-/// `allow_derived_name` gates the `#name` form above -- `true` for `connection.rs` (tested real
-/// usage), `false` for `interface.rs` (no matching evidence; preserves existing behavior exactly).
+/// `allow_derivation_role` gates the fixed derivation-role form above -- `true` for
+/// `connection.rs` (tested real usage), `false` for `interface.rs` (no matching evidence;
+/// preserves existing behavior exactly).
 pub(crate) fn end_decl(
     input: Input<'_>,
-    allow_derived_name: bool,
+    allow_derivation_role: bool,
 ) -> IResult<Input<'_>, Node<EndDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -78,12 +86,13 @@ pub(crate) fn end_decl(
     // GH-85: a `#tag` metadata-prefix annotation may precede the rest of the end declaration,
     // e.g. `end #cause cause1 : Causer1;` (OMG spec Annex `Cause and Effect Examples/
     // CauseAndEffectExample.sysml`), `end #original r1 : Req1;` (`Requirements Examples/
-    // RequirementDerivationExample.sysml`). Distinct from `allow_derived_name`'s `#name` form
+    // RequirementDerivationExample.sysml`). Distinct from `allow_derivation_role`'s fixed-role form
     // below (`end #original ::> OriginalReq;`, `tests/derivation_connections.rs`): there the
-    // `#name` *is* the end's own name, immediately followed by an operator (`::>`/`:`/`;`/mult);
-    // here `#tag` is a separate prefix and a real name still follows. The trailing
+    // fixed marker is a derivation role, immediately followed by an operator
+    // (`::>`/`:`/`;`/multiplicity); here `#tag` is a separate prefix and a declaration name still
+    // follows. The trailing
     // `peek(name)` requires that a name actually follows before committing to the prefix
-    // reading, so `#original ::> ...` still falls through to the derived-name path below intact.
+    // reading, so `#original ::> ...` still falls through to the derivation-role path intact.
     // Discarded like the kind keywords below -- `EndDecl` doesn't model metadata annotations.
     let (input, _) = opt(preceded(
         ws_and_comments,
@@ -122,10 +131,15 @@ pub(crate) fn end_decl(
     ))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = if allow_derived_name {
-        with_span(|input| alt((derived_end_name, name)).parse(input)).parse(input)?
+    let (input, identity) = if allow_derivation_role && input.fragment().starts_with(b"#") {
+        let (input, role) = derivation_end_role(input)?;
+        (input, EndIdentity::Derivation(role))
     } else {
-        with_span(name).parse(input)?
+        let (input, (span, declaration_name)) = with_span(name).parse(input)?;
+        (
+            input,
+            EndIdentity::Declaration(Node::new(span, declaration_name)),
+        )
     };
     // GH-53: a multiplicity may also appear right after the name, before the target -- the most
     // common position for most usage kinds (e.g. `end touchesToo [0..*] item ...` in
@@ -152,14 +166,13 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
-                    name: name_str,
+                    identity,
                     typing: None,
                     references: Some(references),
                     multiplicity: trailing_multiplicity.or(leading_multiplicity),
                     redefines: None,
                     crosses: None,
                     nested_usage: None,
-                    name_span: Some(name_span),
                     type_ref_span: Some(type_ref_span),
                 },
             ),
@@ -181,14 +194,13 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
-                    name: name_str,
+                    identity,
                     typing: None,
                     references: None,
                     multiplicity: leading_multiplicity,
                     redefines: None,
                     crosses: None,
                     nested_usage: Some(Box::new(EndNestedUsage::Occurrence(Box::new(nested)))),
-                    name_span: Some(name_span),
                     type_ref_span: None,
                 },
             ),
@@ -202,14 +214,13 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
-                    name: name_str,
+                    identity,
                     typing: None,
                     references: None,
                     multiplicity: leading_multiplicity,
                     redefines: None,
                     crosses: None,
                     nested_usage: Some(Box::new(EndNestedUsage::Item(Box::new(nested)))),
-                    name_span: Some(name_span),
                     type_ref_span: None,
                 },
             ),
@@ -252,14 +263,13 @@ pub(crate) fn end_decl(
             start,
             input,
             EndDecl {
-                name: name_str,
+                identity,
                 typing,
                 references: trailing_references,
                 multiplicity: trailing_multiplicity.or(leading_multiplicity),
                 redefines,
                 crosses,
                 nested_usage: None,
-                name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
             },
         ),
@@ -537,6 +547,7 @@ pub(crate) fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectS
 #[cfg(test)]
 mod end_decl_kind_tests {
     use super::end_decl;
+    use crate::ast::EndIdentity;
 
     fn input(text: &str) -> crate::parser::Input<'_> {
         crate::parser::span::test_input(text)
@@ -552,7 +563,10 @@ mod end_decl_kind_tests {
         )
         .expect("end feature");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "source");
+        assert!(matches!(
+            &node.value.identity,
+            EndIdentity::Declaration(name) if name.value == "source"
+        ));
         assert_eq!(
             node.value
                 .typing
@@ -571,7 +585,10 @@ mod end_decl_kind_tests {
         )
         .expect("end occurrence");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "source");
+        assert!(matches!(
+            &node.value.identity,
+            EndIdentity::Declaration(name) if name.value == "source"
+        ));
         assert_eq!(
             node.value
                 .typing

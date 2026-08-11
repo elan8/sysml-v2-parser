@@ -1,9 +1,9 @@
 //! Package and root namespace parsing.
 
 use crate::ast::{
-    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, FilterMember, KermlFeatureDecl,
-    KermlSemanticDecl, LibraryPackage, NamespaceDecl, Node, Package, PackageBody,
-    PackageBodyElement, RootElement, RootNamespace, Visibility,
+    ClassifierDecl, DeclarationName, ExtendedLibraryDecl, FeatureDecl, FilterMember,
+    KermlFeatureDecl, KermlSemanticDecl, LibraryPackage, NamespaceDecl, Node, Package, PackageBody,
+    PackageBodyElement, QualifiedIdentification, RootElement, RootNamespace, Visibility,
 };
 use crate::parser::action::{action_def, action_usage};
 use crate::parser::alias::alias_def;
@@ -25,8 +25,8 @@ use crate::parser::individual::individual_def;
 use crate::parser::interface::interface_def;
 use crate::parser::item::{item_def, item_usage};
 use crate::parser::lex::{
-    name, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
-    starts_with_keyword, ws1, ws_and_comments, PACKAGE_BODY_STARTERS,
+    name, qualified_declaration_name, recover_body_element, skip_statement_or_block,
+    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments, PACKAGE_BODY_STARTERS,
 };
 use crate::parser::metadata::{metadata_def, metadata_usage};
 use crate::parser::node_from_to;
@@ -63,18 +63,25 @@ fn keyword_package(input: Input<'_>) -> IResult<Input<'_>, ()> {
 
 fn required_package_identification(
     input: Input<'_>,
-) -> IResult<Input<'_>, crate::ast::Identification> {
+) -> IResult<Input<'_>, QualifiedIdentification> {
     let (input, short_name) = opt(delimited(
         preceded(ws_and_comments, tag(&b"<"[..])),
         preceded(ws_and_comments, name),
         preceded(ws_and_comments, tag(&b">"[..])),
     ))
     .parse(input)?;
-    let (input, decl_name) = opt(preceded(ws_and_comments, name)).parse(input)?;
+    let (input, decl_name) = opt(preceded(
+        ws_and_comments,
+        alt((
+            map(qualified_declaration_name, DeclarationName::Qualified),
+            map(name, DeclarationName::Simple),
+        )),
+    ))
+    .parse(input)?;
     if short_name.is_some() || decl_name.is_some() {
         Ok((
             input,
-            crate::ast::Identification {
+            QualifiedIdentification {
                 short_name,
                 name: decl_name,
             },
@@ -89,6 +96,10 @@ fn required_package_identification(
 
 /// [standard] library package Identification PackageBody (BNF LibraryPackage)
 fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>> {
+    crate::parser::span::reference_transaction(input, library_package_inner)
+}
+
+fn library_package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     // Accept both `standard library package` (current SysML v2 stdlib)
@@ -126,6 +137,10 @@ fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>
 
 /// package Identification PackageBody
 fn package_(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
+    crate::parser::span::reference_transaction(input, package_inner)
+}
+
+fn package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
     let start = input;
     let (input, _) = keyword_package(input)?;
     let (input, identification) = required_package_identification(input)?;
@@ -145,6 +160,10 @@ fn package_(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
 
 /// KerML namespace Identification NamespaceBody
 fn namespace_decl(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDecl>> {
+    crate::parser::span::reference_transaction(input, namespace_decl_inner)
+}
+
+fn namespace_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDecl>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"namespace"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -170,16 +189,24 @@ fn namespace_decl(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDecl>> {
 pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
-    if let Ok((next, elem)) = map(import_, RootElement::Import).parse(input) {
+    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(import_, RootElement::Import).parse(input)
+    }) {
         return Ok((next, node_from_to(start, next, elem)));
     }
-    if let Ok((next, elem)) = map(namespace_decl, RootElement::Namespace).parse(input) {
+    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(namespace_decl, RootElement::Namespace).parse(input)
+    }) {
         return Ok((next, node_from_to(start, next, elem)));
     }
-    if let Ok((next, elem)) = map(library_package_, RootElement::LibraryPackage).parse(input) {
+    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(library_package_, RootElement::LibraryPackage).parse(input)
+    }) {
         return Ok((next, node_from_to(start, next, elem)));
     }
-    if let Ok((next, elem)) = map(package_, RootElement::Package).parse(input) {
+    if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(package_, RootElement::Package).parse(input)
+    }) {
         return Ok((next, node_from_to(start, next, elem)));
     }
     let (input, boxed) = package_body_element(input)?;
@@ -205,6 +232,12 @@ pub(crate) fn package_body(input: Input<'_>) -> IResult<Input<'_>, PackageBody> 
 }
 
 fn package_body_element_fallback(input: Input<'_>) -> IResult<Input<'_>, Node<PackageBodyElement>> {
+    crate::parser::span::reference_transaction(input, package_body_element_fallback_inner)
+}
+
+fn package_body_element_fallback_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<PackageBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let frag = input.fragment();
 
@@ -601,11 +634,16 @@ pub(crate) fn filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterM
 }
 
 macro_rules! try_package_body_dispatch {
-    ($input:expr, $start:expr, $parser:expr, $wrap:expr) => {
-        if let Ok((input, elem)) = map($parser, $wrap).parse($input) {
-            return Ok((input, Box::new(node_from_to($start, input, elem))));
+    ($input:expr, $start:expr, $parser:expr, $wrap:expr) => {{
+        let transaction_input = $input;
+        let checkpoint = transaction_input.extra.reference_checkpoint();
+        match map($parser, $wrap).parse(transaction_input) {
+            Ok((input, elem)) => {
+                return Ok((input, Box::new(node_from_to($start, input, elem))));
+            }
+            Err(_) => transaction_input.extra.rollback_references(checkpoint),
         }
-    };
+    }};
 }
 
 fn try_package_body_annotations<'a>(
@@ -983,27 +1021,29 @@ pub(crate) fn package_body_element(
     }
     // `#keyword` metadata tag -- package bodies previously had no `#`/`@` annotation support at
     // all. Tried only after every other dispatcher above: some definitions (e.g. `connection_def`
-    // via `DefinitionPrefixOptions::with_hash_annotation()`) already capture a leading `#<name>`
+    // via `DefinitionPrefixOptions::with_derivation_role()`) already capture `#derivation`
     // as their *own* annotation field, and must get first refusal so `#derivation connection {
     // ... }` still becomes one `ConnectionDef` node, not a stray metadata tag followed by a
     // separate (and here invalid, since it'd be missing its own annotation-aware header)
     // `connection` parse. Bare/typed/`about`/body form tried first, then the
     // `PrefixMetadataMember`-style form that prefixes the next member (e.g. `#fmeaspec
     // requirement req1 { ... }`, OMG spec Annex `14c-Language Extensions.sysml`).
-    if let Ok((input, elem)) = map(
-        crate::parser::metadata_annotation::metadata_keyword_usage,
-        PackageBodyElement::MetadataKeywordUsage,
-    )
-    .parse(input)
-    {
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_usage,
+            PackageBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
         return Ok((input, Box::new(node_from_to(start, input, elem))));
     }
-    if let Ok((input, elem)) = map(
-        crate::parser::metadata_annotation::metadata_keyword_prefix,
-        PackageBodyElement::MetadataKeywordUsage,
-    )
-    .parse(input)
-    {
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_prefix,
+            PackageBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
         return Ok((input, Box::new(node_from_to(start, input, elem))));
     }
     if starts_with_keyword(input.fragment(), b"occurrence") {
@@ -1385,18 +1425,21 @@ mod package_metadata_and_connect_tests {
         assert!(matches!(node.value, PackageBodyElement::Connect(_)));
     }
 
-    /// Regression guard: `connection_def`'s own generic hash-annotation prefix
-    /// (`DefinitionPrefixOptions::with_hash_annotation()`) must still win over the new bare
+    /// Regression guard: `connection_def`'s fixed derivation-role prefix must still win over the
+    /// new bare
     /// metadata-tag dispatch, or `#derivation connection { ... }` misparses into a stray tag
     /// followed by an unannotated (and here invalid) `connection` declaration.
     #[test]
-    fn package_body_still_prefers_connection_defs_own_hash_annotation() {
+    fn package_body_prefers_typed_derivation_connection_role() {
         let (rest, node) = package_body_element(input("#derivation connection { end a; end b; }"))
             .expect("connection def with hash annotation");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let PackageBodyElement::ConnectionDef(conn) = node.value else {
             panic!("expected ConnectionDef, got {:?}", node.value);
         };
-        assert_eq!(conn.value.annotation.as_deref(), Some("derivation"));
+        assert!(matches!(
+            conn.value.derivation_role.as_ref().map(|role| role.value),
+            Some(crate::ast::DerivationConnectionRole::Derivation)
+        ));
     }
 }

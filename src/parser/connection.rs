@@ -28,7 +28,7 @@ fn connection_def_body_element(
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     let (input, elem) = alt((
-        // GH-33: connections allow the `#name` derived-end-name form (tested real usage, see
+        // GH-33: connections allow the fixed `#original`/`#derive` end-role form (tested real usage; see
         // `connector::end_decl`'s doc comment); interfaces don't.
         map(|i| end_decl(i, true), ConnectionDefBodyElement::EndDecl),
         map(ref_decl, ConnectionDefBodyElement::RefDecl),
@@ -147,7 +147,7 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
     parse_connection_def(
         input,
         DefinitionPrefixOptions::new(b"connection")
-            .with_hash_annotation()
+            .with_derivation_role()
             .with_captured_visibility()
             .reject_header_keyword(b"connect")
             // GH-20: a `def`-less, non-`abstract` `connection name : Type { ... }` with no
@@ -164,7 +164,7 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
 /// definition body) where a bare `connection` usage form (`connection_usage_member`) is already
 /// dispatched separately -- requiring `def` here prevents a `def`-less connection usage from
 /// being misclassified as a definition, the same bug class as PAR-001 in `attribute_def`. Does
-/// not support the hash-annotation def-less form ([`connection_def`] does); nothing in the
+/// does not support the `#derivation` def-less form ([`connection_def`] does); nothing in the
 /// nested-part-body grammar currently needs that combination.
 pub(crate) fn connection_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
     parse_connection_def(
@@ -189,7 +189,7 @@ fn parse_connection_def(
             start,
             input,
             ConnectionDef {
-                annotation: prefix.annotation,
+                derivation_role: prefix.derivation_role,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,

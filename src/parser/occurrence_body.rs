@@ -437,9 +437,11 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
             return Ok((input, OccurrenceUsageBody::Brace { elements }));
         }
+        let reference_checkpoint = input.extra.reference_checkpoint();
         match occurrence_body_element(input) {
             Ok((next, element)) => {
                 if next.location_offset() == input.location_offset() {
+                    input.extra.rollback_references(reference_checkpoint);
                     return Err(nom::Err::Error(nom::error::Error::new(
                         input,
                         nom::error::ErrorKind::Many0,
@@ -449,6 +451,7 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
                 input = next;
             }
             Err(_) => {
+                input.extra.rollback_references(reference_checkpoint);
                 let start_unknown = input;
                 let (next, _) = recover_body_element(input, OCCURRENCE_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
@@ -563,6 +566,10 @@ pub(crate) fn occurrence_body_element(
 /// only valid inside an action body). Real usage from the SysML Systems Library
 /// (`Flows.sysml`): `succession [seBeforeNum] first [0..1] sourceEvent then [0..1] self;`.
 pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
+    crate::parser::span::reference_transaction(input, succession_usage_inner)
+}
+
+fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SuccessionUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
@@ -639,6 +646,12 @@ pub(crate) fn succession_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Succ
 }
 
 pub(crate) fn assert_constraint_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
+    crate::parser::span::reference_transaction(input, assert_constraint_member_inner)
+}
+
+fn assert_constraint_member_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<AssertConstraintMember>> {
     let start = input;

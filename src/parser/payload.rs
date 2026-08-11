@@ -49,6 +49,10 @@ fn trigger_kind(input: Input<'_>) -> IResult<Input<'_>, TriggerKind> {
 /// After `accept` keyword: `name : Type` or shorthand expression, with an optional trailing
 /// `via <port>` clause (e.g. `accept TurnOn via commPort`).
 pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
+    crate::parser::span::reference_transaction(input, transition_accept_inner)
+}
+
+fn transition_accept_inner(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
     let (input, _) = preceded(ws_and_comments, tag(&b"accept"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     // §6 G8: a `TriggerKind` keyword replaces the payload entirely. Checked before `expression`,

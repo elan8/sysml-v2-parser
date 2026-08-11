@@ -44,6 +44,17 @@ impl SourceStorage {
         self.0.get(span.offset..end)
     }
 
+    #[cfg(feature = "serde")]
+    pub(crate) fn validates_span(&self, span: &Span) -> bool {
+        self.slice(span).is_some()
+            && self.location_at(span.offset) == Some((span.line, span.column))
+    }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn trivia_between(&self, start: usize, end: usize) -> bool {
+        start <= end && self.0.get(start..end).is_some_and(trivia_only)
+    }
+
     fn location_at(&self, offset: usize) -> Option<(u32, usize)> {
         let prefix = self.0.get(..offset)?;
         let line_count = prefix.bytes().filter(|byte| *byte == b'\n').count();
@@ -566,7 +577,6 @@ impl QualifiedReferenceArenaBuilder {
         self.arena.segments.truncate(checkpoint.segments);
     }
 
-    #[cfg(test)]
     #[cfg(test)]
     pub(crate) fn reference_span(&self, id: QualifiedReferenceId) -> Option<Span> {
         self.arena

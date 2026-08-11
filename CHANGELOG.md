@@ -16,11 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   consumers resolve them through `ParsedDocument::qualified_reference()` to borrow exact authored
   text, aggregate/segment spans, absolute-scope metadata, and typed `::`/`.` separators without
   splitting or reparsing display strings. Import/expose wildcard, recursive, and filter forms use
-  the typed `ImportShape` representation, including distinct `::*`, `::**`, and `::*::**` shapes.
+  the typed `ImportShape` representation, including distinct `::*`, `::**`, and `::*::**` shapes;
+  their aggregate suffix, exact `::`/`*`/`**` token, combined-recursive, and filter-delimiter spans
+  retain precise authored provenance without downstream source scanning. Qualified package,
+  library-package, and namespace declaration names use a distinct `QualifiedDeclarationName`
+  role wrapper over the same packed storage, preserving their scope, segments, separators, and
+  spans without misclassifying simple declaration labels as references.
   The former `RelationshipTarget` and `FeatureChain` representations and legacy string/display
   accessors were removed rather than retained as compatibility layers. Serde now operates on the
   atomic parsed-document envelope and validates arena ranges and every AST identity when reading
-  or writing. `PARSE_AST_VERSION` is now 79 for this breaking schema/API migration.
+  or writing. `PARSE_AST_VERSION` is now 80 for this breaking schema/API migration.
 
 ### Fixed
 

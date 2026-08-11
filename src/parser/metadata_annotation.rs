@@ -39,6 +39,10 @@ pub(crate) fn parse_about_targets(
 pub(crate) fn metadata_annotation(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataAnnotation>> {
+    crate::parser::span::reference_transaction(input, metadata_annotation_inner)
+}
+
+fn metadata_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataAnnotation>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"@"[..])).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -72,6 +76,12 @@ pub(crate) fn metadata_annotation(
 
 /// User-defined metadata keyword: `#keyword` (`:` Type)? (`about` targets)? body.
 pub(crate) fn metadata_keyword_usage(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
+    crate::parser::span::reference_transaction(input, metadata_keyword_usage_inner)
+}
+
+fn metadata_keyword_usage_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
     let start = input;
@@ -197,6 +207,10 @@ pub(crate) fn hash_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Annot
 
 /// Generic `@` annotation usage (non-metadata-typed); `#` uses [`metadata_keyword_usage`].
 pub(crate) fn annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Annotation>> {
+    crate::parser::span::reference_transaction(input, annotation_inner)
+}
+
+fn annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Annotation>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"#") {

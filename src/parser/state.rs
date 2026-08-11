@@ -314,6 +314,10 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
 
 /// Then (initial state): `then` state-path `;`.
 fn then_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ThenStmt>> {
+    crate::parser::span::reference_transaction(input, then_stmt_inner)
+}
+
+fn then_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ThenStmt>> {
     let start = input;
     let (input, _) = tag(&b"then"[..]).parse(input)?;
     let (input, _) = ws1(input)?;

@@ -361,6 +361,10 @@ fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, crate::ast::Quali
 
 /// In/out binding inside a perform body: `in` target `=` expr `;` or `out` target `=` expr `;`.
 fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
+    crate::parser::span::reference_transaction(input, perform_in_out_binding_inner)
+}
+
+fn perform_in_out_binding_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = alt((
@@ -707,6 +711,10 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
 
 /// Connect (part usage level): `connect` path `to` path body
 pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
+    crate::parser::span::reference_transaction(input, connect_inner)
+}
+
+fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"connect"[..]).parse(input)?;
@@ -1107,6 +1115,10 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
 /// `variant port ...`), or an untyped reference to a separately-declared usage
 /// (`variant name;`).
 pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
+    crate::parser::span::reference_transaction(input, variant_usage_inner)
+}
+
+fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let membership = Membership::variant(visibility, visibility_span);

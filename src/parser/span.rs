@@ -83,6 +83,27 @@ impl ParseContextRef<'_> {
 /// Parser input: source bytes with location tracking and a document-local arena context.
 pub type Input<'a> = LocatedSpan<&'a [u8], ParseContextRef<'a>>;
 
+/// Run one complete parser production as an arena transaction.
+///
+/// Reference lexers allocate only after accepting a complete path, but a containing production
+/// can still fail after that point (for example, an import target followed by a malformed body).
+/// `nom` may then try another alternative or editor recovery. Rolling back here prevents IDs from
+/// failed productions from becoming observable in the finished document arena.
+pub(crate) fn reference_transaction<'a, O, E, F>(
+    input: Input<'a>,
+    parser: F,
+) -> nom::IResult<Input<'a>, O, E>
+where
+    F: FnOnce(Input<'a>) -> nom::IResult<Input<'a>, O, E>,
+{
+    let checkpoint = input.extra.reference_checkpoint();
+    let result = parser(input);
+    if result.is_err() {
+        input.extra.rollback_references(checkpoint);
+    }
+    result
+}
+
 /// Test-only convenience for the many focused parser unit tests that need an arena context.
 #[cfg(test)]
 pub(crate) fn test_input(text: &str) -> Input<'_> {

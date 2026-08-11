@@ -3,9 +3,7 @@ use super::behavior::{
     StateUsage,
 };
 use super::common::FilterMember;
-use super::common::{
-    CommentAnnotation, DocComment, Identification, Import, ParseErrorNode, TextualRepresentation,
-};
+use super::common::{CommentAnnotation, DocComment, Import, ParseErrorNode, TextualRepresentation};
 use super::kerml_fallback::{
     ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlFeatureDecl, KermlSemanticDecl,
 };
@@ -25,12 +23,68 @@ use super::view::{
     ViewpointDef, ViewpointUsage,
 };
 use crate::ast::core::Node;
+use crate::ast::QualifiedReferenceId;
+
+/// A qualified declaration name stored in the document's packed qualified-name arena.
+///
+/// This wrapper deliberately distinguishes a namespace declaration's identity from a semantic
+/// reference, even though both reuse the same source-backed storage primitive. Consumers resolve
+/// it through [`crate::ast::ParsedDocument::qualified_declaration_name`] rather than treating the
+/// underlying arena identity as a reference role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct QualifiedDeclarationName {
+    reference: QualifiedReferenceId,
+}
+
+impl QualifiedDeclarationName {
+    pub(crate) const fn new(reference: QualifiedReferenceId) -> Self {
+        Self { reference }
+    }
+
+    pub(crate) const fn storage_id(self) -> QualifiedReferenceId {
+        self.reference
+    }
+}
+
+/// The authored main name of a package, library package, or namespace declaration.
+///
+/// Simple declaration labels are not references. Qualified declaration paths need packed segment,
+/// separator, scope, and span provenance, so they use a distinct declaration-role wrapper around
+/// the shared source-backed arena storage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum DeclarationName {
+    Simple(String),
+    Qualified(QualifiedDeclarationName),
+}
+
+/// Identification used by namespace-owning declarations.
+///
+/// Unlike the general [`Identification`] grammar node, its main name may be a qualified path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct QualifiedIdentification {
+    pub short_name: Option<String>,
+    pub name: Option<DeclarationName>,
+}
+
+impl QualifiedIdentification {
+    /// Return the declaration label only when the authored name is the simple-name alternative.
+    /// Qualified declarations remain arena-backed and must be resolved through their document.
+    pub fn simple_name(&self) -> Option<&str> {
+        match self.name.as_ref()? {
+            DeclarationName::Simple(name) => Some(name),
+            DeclarationName::Qualified(_) => None,
+        }
+    }
+}
 
 /// A package declaration: `package` Identification PackageBody
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Package {
-    pub identification: Identification,
+    pub identification: QualifiedIdentification,
     pub body: PackageBody,
 }
 /// Package body: either `;` or `{` PackageBodyElement* `}`
@@ -49,7 +103,7 @@ pub enum PackageBody {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LibraryPackage {
     pub is_standard: bool,
-    pub identification: Identification,
+    pub identification: QualifiedIdentification,
     pub body: PackageBody,
 }
 /// Top-level element inside a namespace or package body.

@@ -9,13 +9,14 @@ use std::collections::HashMap;
 use std::io;
 
 use super::{
-    Argument, CaseReturnFeatureKind, CollectionOperator, ConnectBody, Expression, FeatureValue,
-    FeatureValueKind, ImportShape, ImportTarget, InOut, Node, PackageBody, PackageBodyElement,
-    ParsedDocument, PartDefBody, PartDefBodyElement, PerformBody, PerformBodyElement,
-    QualifiedReferenceId, ReferenceSeparator, RequirementDefBody, RequirementDefBodyElement,
-    RootElement, Span, StateDefBody, StateDefBodyElement, SubsettingKind, SubsettingRelationship,
-    TypeCheckKind, TypingKind, TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
-    ViewBodyElement,
+    Argument, CaseReturnFeatureKind, CollectionOperator, ConnectBody, ConnectionDefBody,
+    ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole, EndIdentity, Expression,
+    FeatureValue, FeatureValueKind, ImportShape, ImportSuffixSpans, ImportTarget, InOut, Node,
+    PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement, PerformBody,
+    PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId, ReferenceSeparator,
+    RequirementDefBody, RequirementDefBodyElement, RootElement, Span, StateDefBody,
+    StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind, TypingKind,
+    TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
 };
 
 /// Stream a semantic AST projection to an [`io::Write`] sink.
@@ -350,22 +351,72 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.write_reference(target.reference)?;
         self.writer.write_str(" (shape ")?;
         match &target.shape {
-            ImportShape::Membership { recursive } => {
-                write!(self.writer, "(membership (recursive {recursive}))")?;
+            ImportShape::Membership { recursive_suffix } => {
+                self.writer.write_str("(membership ")?;
+                self.write_optional_import_suffix("recursive-suffix", recursive_suffix.as_ref())?;
+                self.writer.write_char(')')?;
             }
-            ImportShape::Namespace { recursive } => {
-                write!(self.writer, "(namespace (recursive {recursive}))")?;
+            ImportShape::Namespace {
+                wildcard_suffix,
+                recursive_suffix,
+                combined_recursive_suffix_span,
+            } => {
+                self.writer.write_str("(namespace ")?;
+                self.write_import_suffix("wildcard-suffix", wildcard_suffix)?;
+                self.writer.write_char(' ')?;
+                self.write_optional_import_suffix("recursive-suffix", recursive_suffix.as_ref())?;
+                self.writer.write_str(" (combined-recursive-suffix-span ")?;
+                if let Some(span) = combined_recursive_suffix_span {
+                    write_span(self.writer, span)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str("))")?;
             }
-            ImportShape::Filter { recursive, members } => {
-                write!(self.writer, "(filter (recursive {recursive}) (members")?;
+            ImportShape::Filter {
+                recursive_suffix,
+                members,
+            } => {
+                self.writer.write_str("(filter ")?;
+                self.write_optional_import_suffix("recursive-suffix", recursive_suffix.as_ref())?;
+                self.writer.write_str(" (members")?;
                 for member in members {
-                    self.writer.write_char(' ')?;
+                    self.writer.write_str(" (filter-member (span ")?;
+                    write_span(self.writer, &member.span)?;
+                    self.writer.write_str(") (open ")?;
+                    write_span(self.writer, &member.value.open_bracket_span)?;
+                    self.writer.write_str(") (expression ")?;
                     self.write_expression(&member.value.expression)?;
+                    self.writer.write_str(") (close ")?;
+                    write_span(self.writer, &member.value.close_bracket_span)?;
+                    self.writer.write_str("))")?;
                 }
                 self.writer.write_str("))")?;
             }
         }
         self.writer.write_str("))")
+    }
+
+    fn write_import_suffix(&mut self, role: &str, suffix: &ImportSuffixSpans) -> io::Result<()> {
+        write!(self.writer, "({role} (span ")?;
+        write_span(self.writer, &suffix.span)?;
+        self.writer.write_str(") (separator ")?;
+        write_span(self.writer, &suffix.separator_span)?;
+        self.writer.write_str(") (marker ")?;
+        write_span(self.writer, &suffix.marker_span)?;
+        self.writer.write_str("))")
+    }
+
+    fn write_optional_import_suffix(
+        &mut self,
+        role: &str,
+        suffix: Option<&ImportSuffixSpans>,
+    ) -> io::Result<()> {
+        if let Some(suffix) = suffix {
+            self.write_import_suffix(role, suffix)
+        } else {
+            write!(self.writer, "({role} none)")
+        }
     }
 
     fn write_malformed(&mut self, error: &super::ParseErrorNode, span: &Span) -> io::Result<()> {
@@ -783,8 +834,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::AttributeDef(_definition) => {
                             self.write_marker(&mut first, "attribute-def")?;
                         }
-                        PartDefBodyElement::AttributeUsage(_usage) => {
-                            self.write_marker(&mut first, "attribute-usage")?;
+                        PartDefBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
                         }
                         PartDefBodyElement::DefaultReferenceUsage(_usage) => {
                             self.write_marker(&mut first, "default-reference-usage")?;
@@ -801,8 +853,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::Ref(_reference) => {
                             self.write_marker(&mut first, "ref")?;
                         }
-                        PartDefBodyElement::PortUsage(_usage) => {
-                            self.write_marker(&mut first, "port-usage")?;
+                        PartDefBodyElement::PortUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_usage(&usage.value)?;
                         }
                         PartDefBodyElement::PartUsage(_usage) => {
                             self.write_marker(&mut first, "part-usage")?;
@@ -926,8 +979,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::OccurrenceDef(_definition) => {
                             self.write_marker(&mut first, "occurrence-def")?;
                         }
-                        PartDefBodyElement::ConnectionDef(_definition) => {
-                            self.write_marker(&mut first, "connection-def")?;
+                        PartDefBodyElement::ConnectionDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_connection_definition(&definition.value)?;
                         }
                         PartDefBodyElement::PortDef(_definition) => {
                             self.write_marker(&mut first, "port-def")?;
@@ -994,8 +1048,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::Bind(_bind) => {
                             self.write_marker(&mut first, "bind")?;
                         }
-                        PartDefBodyElement::AliasDef(_alias) => {
-                            self.write_marker(&mut first, "alias-def")?;
+                        PartDefBodyElement::AliasDef(alias) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_alias_definition(&alias.value)?;
                         }
                     }
                 }
@@ -1016,6 +1071,145 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             self.write_reference(*reference)?;
         }
         self.writer.write_str("))")
+    }
+
+    fn write_alias_definition(&mut self, definition: &super::AliasDef) -> io::Result<()> {
+        self.writer.write_str("(alias (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") (target ")?;
+        self.write_reference(definition.target)?;
+        self.writer.write_str(") (body ")?;
+        match &definition.body {
+            super::AliasBody::Semicolon => self.writer.write_str("semicolon")?,
+            super::AliasBody::Brace { elements } => {
+                write!(self.writer, "brace (element-count {})", elements.len())?;
+            }
+        }
+        self.writer.write_str("))")
+    }
+
+    fn write_connection_definition(&mut self, definition: &super::ConnectionDef) -> io::Result<()> {
+        self.writer.write_str("(connection-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") (role ")?;
+        if let Some(role) = &definition.derivation_role {
+            match role.value {
+                DerivationConnectionRole::Derivation => {
+                    self.writer.write_str("(derivation ")?;
+                    write_span(self.writer, &role.span)?;
+                    self.writer.write_char(')')?;
+                }
+            }
+        } else {
+            self.writer.write_str("ordinary")?;
+        }
+        self.writer.write_str(") (specializes ")?;
+        if let Some(specializes) = &definition.specializes {
+            self.write_typing(&specializes.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_connection_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_connection_body(&mut self, body: &ConnectionDefBody) -> io::Result<()> {
+        match body {
+            ConnectionDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
+            ConnectionDefBody::Brace { elements } => {
+                self.writer.write_str("(body ")?;
+                let mut first = true;
+                for element in elements {
+                    match &element.value {
+                        ConnectionDefBodyElement::EndDecl(end) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_end(&end.value)?;
+                        }
+                        ConnectionDefBodyElement::RefDecl(_reference) => {
+                            self.write_marker(&mut first, "ref")?;
+                        }
+                        ConnectionDefBodyElement::ConnectStmt(_connect) => {
+                            self.write_marker(&mut first, "connect")?;
+                        }
+                        ConnectionDefBodyElement::Doc(_doc) => {
+                            self.write_marker(&mut first, "doc")?;
+                        }
+                        ConnectionDefBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        ConnectionDefBodyElement::AttributeDef(_definition) => {
+                            self.write_marker(&mut first, "attribute-def")?;
+                        }
+                        ConnectionDefBodyElement::AttributeUsage(_usage) => {
+                            self.write_marker(&mut first, "attribute-usage")?;
+                        }
+                        ConnectionDefBodyElement::ItemDef(_definition) => {
+                            self.write_marker(&mut first, "item-def")?;
+                        }
+                        ConnectionDefBodyElement::ItemUsage(_usage) => {
+                            self.write_marker(&mut first, "item-usage")?;
+                        }
+                        ConnectionDefBodyElement::PortDef(_definition) => {
+                            self.write_marker(&mut first, "port-def")?;
+                        }
+                        ConnectionDefBodyElement::PortUsage(_usage) => {
+                            self.write_marker(&mut first, "port-usage")?;
+                        }
+                        ConnectionDefBodyElement::AssertConstraint(_constraint) => {
+                            self.write_marker(&mut first, "assert-constraint")?;
+                        }
+                        ConnectionDefBodyElement::OccurrenceUsage(_usage) => {
+                            self.write_marker(&mut first, "occurrence-usage")?;
+                        }
+                        ConnectionDefBodyElement::SuccessionUsage(_usage) => {
+                            self.write_marker(&mut first, "succession-usage")?;
+                        }
+                        ConnectionDefBodyElement::PartUsage(_usage) => {
+                            self.write_marker(&mut first, "part-usage")?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_end(&mut self, end: &super::EndDecl) -> io::Result<()> {
+        self.writer.write_str("(end (identity ")?;
+        match &end.identity {
+            EndIdentity::Declaration(name) => {
+                self.writer.write_str("(declaration (name ")?;
+                write_quoted(self.writer, &name.value)?;
+                self.writer.write_str(") ")?;
+                write_span(self.writer, &name.span)?;
+                self.writer.write_char(')')?;
+            }
+            EndIdentity::Derivation(role) => {
+                self.writer.write_str("(derivation-role (kind ")?;
+                match role.value {
+                    DerivationEndRole::Original => self.writer.write_str("original")?,
+                    DerivationEndRole::Derive => self.writer.write_str("derive")?,
+                }
+                self.writer.write_str(") ")?;
+                write_span(self.writer, &role.span)?;
+                self.writer.write_char(')')?;
+            }
+        }
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &end.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("references", end.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", end.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", end.crosses.as_ref())?;
+        self.writer.write_char(')')
     }
 
     fn write_case_return(&mut self, declaration: &super::CaseReturnDecl) -> io::Result<()> {
@@ -1263,9 +1457,175 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_usage_declaration_name(&mut self, name: &str) -> io::Result<()> {
+        if name.is_empty() {
+            self.writer.write_str("none")
+        } else {
+            write_quoted(self.writer, name)
+        }
+    }
+
+    fn write_direction(&mut self, direction: Option<InOut>) -> io::Result<()> {
+        match direction {
+            Some(InOut::In) => self.writer.write_str("in"),
+            Some(InOut::Out) => self.writer.write_str("out"),
+            Some(InOut::InOut) => self.writer.write_str("inout"),
+            None => self.writer.write_str("none"),
+        }
+    }
+
+    fn write_attribute_usage(&mut self, usage: &super::AttributeUsage) -> io::Result<()> {
+        self.writer
+            .write_str("(attribute-usage (declaration-name ")?;
+        self.write_usage_declaration_name(&usage.name)?;
+        self.writer.write_str(") (direction ")?;
+        self.write_direction(usage.direction)?;
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", usage.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", usage.crosses.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("intersects", usage.intersects.as_ref())?;
+        self.writer.write_str(" (value ")?;
+        if let Some(value) = &usage.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (body ")?;
+        match &usage.body {
+            super::AttributeBody::Semicolon => self.writer.write_str("semicolon")?,
+            super::AttributeBody::Brace { elements } => {
+                write!(self.writer, "brace (element-count {})", elements.len())?;
+            }
+        }
+        self.writer.write_str("))")
+    }
+
+    fn write_port_usage(&mut self, usage: &super::PortUsage) -> io::Result<()> {
+        self.writer.write_str("(port-usage (declaration-name ")?;
+        self.write_usage_declaration_name(&usage.name)?;
+        self.writer.write_str(") (direction ")?;
+        self.write_direction(usage.direction)?;
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (subsets ")?;
+        if let Some((subsets, value)) = &usage.subsets {
+            self.writer.write_str("(clause ")?;
+            self.write_subsetting(&subsets.value)?;
+            self.writer.write_str(" (value ")?;
+            if let Some(value) = value {
+                self.write_expression(value)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str("))")?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", usage.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", usage.crosses.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("intersects", usage.intersects.as_ref())?;
+        self.writer.write_str(" (value ")?;
+        if let Some(value) = &usage.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (body ")?;
+        match &usage.body {
+            super::PortBody::Semicolon => self.writer.write_str("semicolon")?,
+            super::PortBody::Brace { elements } => {
+                write!(self.writer, "brace (element-count {})", elements.len())?;
+            }
+        }
+        self.writer.write_str("))")
+    }
+
+    fn write_port_definition(&mut self, definition: &super::PortDef) -> io::Result<()> {
+        self.writer.write_str("(port-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") (specializes ")?;
+        if let Some(specializes) = &definition.specializes {
+            self.write_typing(&specializes.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_port_definition_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_port_definition_body(&mut self, body: &PortDefBody) -> io::Result<()> {
+        match body {
+            PortDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
+            PortDefBody::Brace { elements } => {
+                self.writer.write_str("(body ")?;
+                let mut first = true;
+                for element in elements {
+                    match &element.value {
+                        PortDefBodyElement::InOutDecl(_declaration) => {
+                            self.write_marker(&mut first, "in-out-declaration")?;
+                        }
+                        PortDefBodyElement::Doc(_doc) => {
+                            self.write_marker(&mut first, "doc")?;
+                        }
+                        PortDefBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        PortDefBodyElement::AttributeDef(_definition) => {
+                            self.write_marker(&mut first, "attribute-def")?;
+                        }
+                        PortDefBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        PortDefBodyElement::ItemDef(_definition) => {
+                            self.write_marker(&mut first, "item-def")?;
+                        }
+                        PortDefBodyElement::ItemUsage(_usage) => {
+                            self.write_marker(&mut first, "item-usage")?;
+                        }
+                        PortDefBodyElement::EnumerationUsage(_usage) => {
+                            self.write_marker(&mut first, "enumeration-usage")?;
+                        }
+                        PortDefBodyElement::PortUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_usage(&usage.value)?;
+                        }
+                        PortDefBodyElement::Other(text) => {
+                            self.write_opaque(&mut first, "other", text)?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
     fn write_library_package(&mut self, package: &super::LibraryPackage) -> io::Result<()> {
         self.writer.write_str("(library-package (name ")?;
-        write_optional_quoted(self.writer, package.identification.name.as_deref())?;
+        self.write_qualified_identification_name(&package.identification)?;
         write!(self.writer, ") (standard {}) ", package.is_standard)?;
         self.write_package_body(&package.body)?;
         self.writer.write_char(')')
@@ -1273,10 +1633,25 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_package(&mut self, package: &super::Package) -> io::Result<()> {
         self.writer.write_str("(package (name ")?;
-        write_optional_quoted(self.writer, package.identification.name.as_deref())?;
+        self.write_qualified_identification_name(&package.identification)?;
         self.writer.write_str(") ")?;
         self.write_package_body(&package.body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_qualified_identification_name(
+        &mut self,
+        identification: &super::QualifiedIdentification,
+    ) -> io::Result<()> {
+        match &identification.name {
+            Some(super::DeclarationName::Simple(name)) => write_quoted(self.writer, name),
+            Some(super::DeclarationName::Qualified(name)) => {
+                self.writer.write_str("(qualified-declaration ")?;
+                self.write_reference(name.storage_id())?;
+                self.writer.write_char(')')
+            }
+            None => self.writer.write_str("none"),
+        }
     }
 
     fn write_package_element(
@@ -1314,11 +1689,17 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 self.write_part_definition(&definition.value)
             }
             PackageBodyElement::PartUsage(_usage) => self.write_marker(first, "part-usage"),
-            PackageBodyElement::PortDef(_definition) => self.write_marker(first, "port-def"),
+            PackageBodyElement::PortDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_port_definition(&definition.value)
+            }
             PackageBodyElement::InterfaceDef(_definition) => {
                 self.write_marker(first, "interface-def")
             }
-            PackageBodyElement::AliasDef(_definition) => self.write_marker(first, "alias-def"),
+            PackageBodyElement::AliasDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_alias_definition(&definition.value)
+            }
             PackageBodyElement::AttributeDef(_definition) => {
                 self.write_marker(first, "attribute-def")
             }
@@ -1370,8 +1751,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::RenderingUsage(_usage) => {
                 self.write_marker(first, "rendering-usage")
             }
-            PackageBodyElement::ConnectionDef(_definition) => {
-                self.write_marker(first, "connection-def")
+            PackageBodyElement::ConnectionDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_connection_definition(&definition.value)
             }
             PackageBodyElement::MetadataDef(_definition) => {
                 self.write_marker(first, "metadata-def")
@@ -1489,10 +1871,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 RootElement::Namespace(namespace) => {
                     self.write_item_prefix(&mut first)?;
                     self.writer.write_str("(namespace (name ")?;
-                    write_optional_quoted(
-                        self.writer,
-                        namespace.value.identification.name.as_deref(),
-                    )?;
+                    self.write_qualified_identification_name(&namespace.value.identification)?;
                     self.writer.write_str(") ")?;
                     self.write_package_body(&namespace.value.body)?;
                     self.writer.write_char(')')?;
