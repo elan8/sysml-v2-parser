@@ -55,7 +55,7 @@ fn test_parse_surveillance_drone() {
         other => panic!("expected root to be a Package, got {:?}", other),
     };
     assert_eq!(
-        package.identification.name.as_deref(),
+        package.identification.simple_name(),
         Some("SurveillanceDrone"),
         "root package should be named SurveillanceDrone"
     );
@@ -263,7 +263,7 @@ fn test_surveillance_drone_errors_reports_all_errors() {
         ),
     };
     assert_eq!(
-        first.identification.name.as_deref(),
+        first.identification.simple_name(),
         Some("SurveillanceDroneFirst"),
         "first package should be SurveillanceDroneFirst"
     );

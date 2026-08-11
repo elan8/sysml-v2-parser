@@ -29,7 +29,7 @@ fn test_parse_kitchen_timer() {
     );
     match &result.document.root.elements[0].value {
         RootElement::Package(pkg) => {
-            assert_eq!(pkg.identification.name.as_deref(), Some("KitchenTimer"));
+            assert_eq!(pkg.identification.simple_name(), Some("KitchenTimer"));
         }
         other => panic!("expected root element to be package, got {:?}", other),
     }

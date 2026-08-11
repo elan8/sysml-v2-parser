@@ -212,10 +212,14 @@ fn test_import_filter_package() {
         PackageBodyElement::Import(i) => &i.value,
         _ => panic!("expected Import"),
     };
-    let ImportShape::Filter { recursive, members } = &imp.target.shape else {
+    let ImportShape::Filter {
+        recursive_suffix,
+        members,
+    } = &imp.target.shape
+    else {
         panic!("expected filter import, got {:?}", imp.target.shape);
     };
-    assert!(!recursive);
+    assert!(recursive_suffix.is_none());
     assert_eq!(members.len(), 2, "two filter members [ 1 ] [ 2 + 3 ]");
     assert_eq!(
         root.qualified_reference(imp.target.reference)
@@ -241,7 +245,7 @@ fn test_namespace_declaration() {
         RootElement::Namespace(n) => &n.value,
         _ => panic!("expected Namespace"),
     };
-    assert_eq!(ns.identification.name.as_deref(), Some("N"));
+    assert_eq!(ns.identification.simple_name(), Some("N"));
     let body = match &ns.body {
         PackageBody::Brace { elements } => elements,
         _ => panic!("expected brace body"),

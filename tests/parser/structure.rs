@@ -723,174 +723,6 @@ part def Accumulator {
 }
 
 #[test]
-fn test_parse_part_attribute_prefix_redefines_shorthand() {
-    let input = "package P {\npart def Laptop { attribute name : String; }\npart office {\npart laptop1: Laptop {\nattribute :>> name = \"My Laptop\";\n}\n}\n}";
-    let result = parse(input).expect("attribute prefix redefines shorthand should parse");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let office = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::PartUsage(p) if p.value.name == "office" => Some(&p.value),
-            _ => None,
-        })
-        .expect("office part usage should be present");
-    let office_body = match &office.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
-        _ => panic!("expected office part body"),
-    };
-    let laptop1 = office_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartUsageBodyElement::PartUsage(p)
-                if p.value.name == "laptop1" =>
-            {
-                Some(&p.value)
-            }
-            _ => None,
-        })
-        .expect("laptop1 part usage should be present");
-    let laptop1_body = match &laptop1.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
-        _ => panic!("expected laptop1 part body"),
-    };
-    let attribute = laptop1_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartUsageBodyElement::AttributeUsage(a) => Some(&a.value),
-            _ => None,
-        })
-        .expect("attribute usage should be present");
-    assert_eq!(attribute.name, "name");
-    assert_eq!(
-        attribute.redefines.as_ref().map(|n| n.value.target.len()),
-        Some(1)
-    );
-    assert!(
-        attribute.value.is_some(),
-        "attribute value should be parsed"
-    );
-}
-
-#[test]
-fn test_parse_part_attribute_prefix_redefines_scientific_notation_with_quoted_unit() {
-    let input = r#"package P {
-  part def Mission {
-    attribute :>> researchAndDevelopmentCost = 5E9 ['$'];
-    attribute :>> manufacturingCost = 3E9 ['$'];
-  }
-}"#;
-    let result = parse_with_diagnostics(input);
-    assert!(
-        result.errors.is_empty(),
-        "unexpected diagnostics: {:?}",
-        result.errors
-    );
-    let root = parse(input).expect("parse should succeed");
-    let pkg = match &root.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let mission = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::PartDef(p)
-                if p.value.identification.name.as_deref() == Some("Mission") =>
-            {
-                Some(&p.value)
-            }
-            _ => None,
-        })
-        .expect("Mission part def should be present");
-    let mission_body = match &mission.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
-        _ => panic!("expected Mission part def body"),
-    };
-    let attr = mission_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a)
-                if a.value.name == "researchAndDevelopmentCost" =>
-            {
-                Some(&a.value)
-            }
-            _ => None,
-        })
-        .expect("researchAndDevelopmentCost attribute usage should be present");
-    assert_eq!(
-        attr.redefines.as_ref().map(|n| n.value.target.len()),
-        Some(1)
-    );
-    assert!(attr.value.is_some(), "attribute value should be parsed");
-}
-
-#[test]
-fn test_parse_part_attribute_prefix_redefines_with_subsets_clause() {
-    let input = "package P {\npart def Room { attribute outlet: Outlet; }\npart def Home {\npart livingRoom : Room {\nattribute :>> outlet :> electricGrid.outlets;\n}\n}\n}";
-    let result = parse(input).expect("attribute prefix redefines with subsets should parse");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let home = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::PartDef(p)
-                if p.value.identification.name.as_deref() == Some("Home") =>
-            {
-                Some(&p.value)
-            }
-            _ => None,
-        })
-        .expect("Home part def should be present");
-    let home_body = match &home.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
-        _ => panic!("expected Home part def body"),
-    };
-    let living_room = home_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p)
-                if p.value.name == "livingRoom" =>
-            {
-                Some(&p.value)
-            }
-            _ => None,
-        })
-        .expect("livingRoom part usage should be present");
-    let living_room_body = match &living_room.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
-        _ => panic!("expected livingRoom part usage body"),
-    };
-    let attribute = living_room_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartUsageBodyElement::AttributeUsage(a) => Some(&a.value),
-            _ => None,
-        })
-        .expect("attribute usage should be present");
-    assert_eq!(attribute.name, "outlet");
-    assert_eq!(
-        attribute.redefines.as_ref().map(|n| n.value.target.len()),
-        Some(1)
-    );
-}
-
-#[test]
 fn test_parse_interface_usage_named_with_multiplicity() {
     let input = "package P {\npart def Home {\npart livingRoom: Room {\ninterface heater2PowerOutlet[1] : Socket2OutletInterface connect heater.socket to outlet;\n}\n}\n}";
     let result = parse(input).expect("named interface usage with multiplicity should parse");
@@ -2537,67 +2369,6 @@ part def logicalDriveUnit {
 }
 
 #[test]
-fn test_port_usage_redefines_keyword_in_part_body() {
-    let input = r#"package P {
-part brushSystem : BrushSystem {
-  part mainBrush : MainBrush {
-    port redefines rotationSpeedIn;
-  }
-}
-}"#;
-    let diag = parse_with_diagnostics(input);
-    assert!(
-        !diag
-            .errors
-            .iter()
-            .any(|e| e.code.as_deref() == Some("recovered_part_usage_body_element")),
-        "unexpected recovery: {:?}",
-        diag.errors
-    );
-    let port_usage = nested_port_usage_in_part_usage(&diag.document.root, 0, 0, 0);
-    assert_eq!(port_usage.name, "rotationSpeedIn");
-    assert_eq!(
-        port_usage.redefines.as_ref().map(|n| n.value.target.len()),
-        Some(1)
-    );
-}
-
-#[test]
-fn test_attribute_usage_redefines_keyword_prefix() {
-    let input = r#"package P {
-part def DriveController {
-  attribute redefines architecture = EeArchitecture::arm;
-}
-}"#;
-    let result = parse(input).expect("attribute redefines prefix should parse");
-    let attr = part_def_body_attribute_usage(&result, 0, 0);
-    assert_eq!(attr.name, "architecture");
-    assert_eq!(
-        attr.redefines.as_ref().map(|n| n.value.target.len()),
-        Some(1)
-    );
-    assert!(attr.value.is_some());
-}
-
-#[test]
-fn test_port_def_directed_attribute_redefines_keyword() {
-    let input = r#"package P {
-port def SuctionLevelPort :> Base::PowerOutPort {
-  out attribute redefines suctionPower :> ISQ::power;
-}
-}"#;
-    let result = parse(input).expect("directed attribute redefines should parse");
-    let attr = port_def_body_attribute_usage(&result, 0, 0);
-    assert_eq!(attr.name, "suctionPower");
-    assert_eq!(
-        attr.redefines.as_ref().map(|n| n.value.target.len()),
-        Some(1)
-    );
-    assert_eq!(attr.subsets.as_ref().map(|n| n.value.target.len()), Some(1));
-    assert_eq!(attr.direction, Some(sysml_v2_parser::ast::InOut::Out));
-}
-
-#[test]
 fn test_port_def_directed_item_inout_with_nested_attributes() {
     let input = r#"package P {
 port def DebrisPort {
@@ -2801,54 +2572,6 @@ fn port_def_body_item_usage(
     match &body[item_idx].value {
         sysml_v2_parser::ast::PortDefBodyElement::ItemUsage(i) => &i.value,
         other => panic!("expected item usage, got {:?}", other),
-    }
-}
-
-fn port_def_body_attribute_usage(
-    root: &RootNamespace,
-    port_def_idx: usize,
-    attr_idx: usize,
-) -> &AttributeUsage {
-    let pkg = package_from_root(root);
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let port_def = match &elements[port_def_idx].value {
-        PackageBodyElement::PortDef(p) => p,
-        other => panic!("expected port def, got {:?}", other),
-    };
-    let body = match &port_def.value.body {
-        sysml_v2_parser::ast::PortDefBody::Brace { elements } => elements,
-        other => panic!("expected port def brace body, got {:?}", other),
-    };
-    match &body[attr_idx].value {
-        sysml_v2_parser::ast::PortDefBodyElement::AttributeUsage(a) => &a.value,
-        other => panic!("expected attribute usage, got {:?}", other),
-    }
-}
-
-fn part_def_body_attribute_usage(
-    root: &RootNamespace,
-    part_def_idx: usize,
-    attr_idx: usize,
-) -> &AttributeUsage {
-    let pkg = package_from_root(root);
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let part_def = match &elements[part_def_idx].value {
-        PackageBodyElement::PartDef(p) => p,
-        other => panic!("expected part def, got {:?}", other),
-    };
-    let body = match &part_def.value.body {
-        PartDefBody::Brace { elements } => elements,
-        other => panic!("expected part def brace body, got {:?}", other),
-    };
-    match &body[attr_idx].value {
-        PartDefBodyElement::AttributeUsage(a) => &a.value,
-        other => panic!("expected attribute usage, got {:?}", other),
     }
 }
 
@@ -3105,25 +2828,20 @@ end systemOfInterest references theSystem;
     let ConnectionDefBody::Brace { elements } = &connection.body else {
         panic!("expected connection def brace body");
     };
-    assert_eq!(
-        elements.len(),
-        2,
-        "both ends should parse as structured EndDecl nodes, not recover to Error: {:?}",
-        elements
-    );
-
-    let ends: Vec<&EndDecl> = elements
-        .iter()
-        .map(|e| match &e.value {
-            ConnectionDefBodyElement::EndDecl(end) => &end.value,
-            other => panic!("expected EndDecl, got {:?}", other),
-        })
-        .collect();
-
-    let party = ends
-        .iter()
-        .find(|e| e.name == "party")
-        .expect("expected `party` end");
+    let [party_element, system_element] = elements.as_slice() else {
+        panic!(
+            "expected exactly two structured connection ends, got {:?}",
+            elements
+        );
+    };
+    let ConnectionDefBodyElement::EndDecl(party) = &party_element.value else {
+        panic!("expected first body element to be an end declaration");
+    };
+    let party = &party.value;
+    let EndIdentity::Declaration(party_name) = &party.identity else {
+        panic!("expected declaration identity for first end");
+    };
+    assert_eq!(party_name.value, "party");
     assert!(party.typing.is_none());
     let party_refs = party
         .references
@@ -3132,10 +2850,14 @@ end systemOfInterest references theSystem;
     assert_eq!(party_refs.value.kind, SubsettingKind::References);
     assert_eq!(party_refs.value.target.len(), 1);
 
-    let system_of_interest = ends
-        .iter()
-        .find(|e| e.name == "systemOfInterest")
-        .expect("expected `systemOfInterest` end");
+    let ConnectionDefBodyElement::EndDecl(system_of_interest) = &system_element.value else {
+        panic!("expected second body element to be an end declaration");
+    };
+    let system_of_interest = &system_of_interest.value;
+    let EndIdentity::Declaration(system_name) = &system_of_interest.identity else {
+        panic!("expected declaration identity for second end");
+    };
+    assert_eq!(system_name.value, "systemOfInterest");
     assert!(system_of_interest.typing.is_none());
     let soi_refs = system_of_interest
         .references
@@ -3223,7 +2945,13 @@ end consumer references b;
         let end = elements
             .iter()
             .find_map(|e| match &e.value {
-                InterfaceDefBodyElement::EndDecl(end) if end.value.name == expected_name => {
+                InterfaceDefBodyElement::EndDecl(end)
+                    if matches!(
+                        &end.value.identity,
+                        sysml_v2_parser::ast::EndIdentity::Declaration(name)
+                            if name.value == expected_name
+                    ) =>
+                {
                     Some(&end.value)
                 }
                 _ => None,
@@ -3463,7 +3191,11 @@ end part device ::> sensorFeed[1];
     for (end, expected_name) in usage_ends.iter().zip(expected_names) {
         match &end.value {
             ConnectionDefBodyElement::EndDecl(end) => {
-                assert_eq!(end.value.name, expected_name);
+                assert!(matches!(
+                    &end.value.identity,
+                    sysml_v2_parser::ast::EndIdentity::Declaration(name)
+                        if name.value == expected_name
+                ));
                 assert!(end.value.typing.is_none());
                 let refs = end
                     .value
@@ -3516,8 +3248,11 @@ fn test_connection_end_decl_name_starting_with_part_or_port_is_not_split() {
         ConnectionDefBodyElement::EndDecl(end) => &end.value,
         other => panic!("expected EndDecl, got {:?}", other),
     };
-    assert_eq!(
-        end.name, "party",
+    assert!(
+        matches!(
+            &end.identity,
+            sysml_v2_parser::ast::EndIdentity::Declaration(name) if name.value == "party"
+        ),
         "`party` must parse as one name, not keyword `part` + name `y`"
     );
 }

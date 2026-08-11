@@ -24,7 +24,7 @@ fn test_parse_with_diagnostics_partial_ast_and_multiple_errors() {
         .iter()
         .filter_map(|n| {
             if let RootElement::Package(p) = &n.value {
-                p.value.identification.name.as_deref()
+                p.value.identification.simple_name()
             } else {
                 None
             }

@@ -6,8 +6,8 @@
 //! motivated it, plus confirmation that the pre-existing `end` forms still work unaffected.
 
 use sysml_v2_parser::ast::{
-    ConnectionDefBody, ConnectionDefBodyElement, EndNestedUsage, PackageBody, PackageBodyElement,
-    RootElement,
+    ConnectionDefBody, ConnectionDefBodyElement, EndIdentity, EndNestedUsage, PackageBody,
+    PackageBodyElement, RootElement,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
@@ -44,6 +44,13 @@ fn connection_def_ends(input: &str) -> Vec<sysml_v2_parser::ast::EndDecl> {
         .collect()
 }
 
+fn assert_declaration_name(end: &sysml_v2_parser::ast::EndDecl, expected: &str) {
+    assert!(matches!(
+        &end.identity,
+        EndIdentity::Declaration(name) if name.value == expected
+    ));
+}
+
 /// Real usage: Systems Library `Domain Libraries/Cause and Effect/CausationConnections.sysml`'s
 /// `end theCauses [*] occurrence theCause :> causes :>> source { ... }` -- the target is a nested
 /// `occurrence` usage, not a bare type/reference, with a multiplicity between the end's own name
@@ -55,7 +62,7 @@ fn end_decl_accepts_nested_occurrence_usage_with_middle_multiplicity() {
     assert_eq!(ends.len(), 2);
 
     let the_causes = &ends[0];
-    assert_eq!(the_causes.name, "theCauses");
+    assert_declaration_name(the_causes, "theCauses");
     assert!(the_causes.multiplicity.is_some());
     let nested = the_causes
         .nested_usage
@@ -76,7 +83,7 @@ fn end_decl_accepts_nested_item_usage_with_middle_multiplicity() {
     assert_eq!(ends.len(), 2);
 
     let touches_too = &ends[0];
-    assert_eq!(touches_too.name, "touchesToo");
+    assert_declaration_name(touches_too, "touchesToo");
     assert!(touches_too.multiplicity.is_some());
     let nested = touches_too
         .nested_usage
@@ -98,13 +105,13 @@ fn end_decl_existing_forms_unaffected() {
     assert_eq!(ends.len(), 2);
 
     let hub = &ends[0];
-    assert_eq!(hub.name, "hub");
+    assert_declaration_name(hub, "hub");
     assert!(hub.references.is_some());
     assert!(hub.typing.is_none());
     assert!(hub.nested_usage.is_none());
 
     let source = &ends[1];
-    assert_eq!(source.name, "source");
+    assert_declaration_name(source, "source");
     assert!(source.typing.is_some());
     assert!(source.nested_usage.is_none());
     assert_eq!(

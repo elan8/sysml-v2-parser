@@ -3,13 +3,14 @@
 use std::path::PathBuf;
 
 use sysml_v2_parser::ast::{
-    Identification, Node, Package, PackageBody, RootElement, RootNamespace, Span,
+    DeclarationName, Node, Package, PackageBody, QualifiedIdentification, RootElement,
+    RootNamespace, Span,
 };
 
-pub(crate) fn id(name: &str) -> Identification {
-    Identification {
+pub(crate) fn package_id(name: &str) -> QualifiedIdentification {
+    QualifiedIdentification {
         short_name: None,
-        name: Some(name.to_string()),
+        name: Some(DeclarationName::Simple(name.to_string())),
     }
 }
 
@@ -50,7 +51,7 @@ pub(crate) fn expected_package_foo_semicolon() -> RootNamespace {
             RootElement::Package(n_len(
                 12,
                 Package {
-                    identification: id("Foo"),
+                    identification: package_id("Foo"),
                     body: PackageBody::Semicolon,
                 },
             )),
@@ -66,7 +67,7 @@ pub(crate) fn expected_package_bar_brace() -> RootNamespace {
             RootElement::Package(n_len(
                 15,
                 Package {
-                    identification: id("Bar"),
+                    identification: package_id("Bar"),
                     body: PackageBody::Brace { elements: vec![] },
                 },
             )),

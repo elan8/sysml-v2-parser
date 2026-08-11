@@ -1,3 +1,7 @@
+# META
+~~~sexpr
+(snapshot (type malformed) (description "Verifies an entirely malformed document produces explicit recovery nodes, diagnostics, and deterministic recovered formatting."))
+~~~
 # SOURCE
 ~~~sysml
 not valid

@@ -65,13 +65,23 @@ cargo test --test vacuuming_types_parse -- --include-ignored
 When changing AST fields or body-element shapes, refresh checked-in snapshots in the same PR — see [`tests/validation/README.md`](tests/validation/README.md).
 
 The driver in `tools/snapshot_tool` manages qualified-reference snapshots under
-`tests/snapshots/qualified_references`. They use four canonical
-Markdown sections: authored `SOURCE` plus runner-owned `DIAGNOSTICS`, `FORMAT`, and semantic
-S-expression `AST`. The AST nests reference uses at their language-level roles and separately
+`tests/snapshots/qualified_references`. They use five canonical Markdown sections: human-authored
+`META` and `SOURCE`, followed by runner-owned `DIAGNOSTICS`, `FORMAT`, and semantic S-expression
+`AST`. `META` has the required shape
+`(snapshot (type <type>) (description "..."))`; `<type>` is one of `semantic`, `provenance`,
+`recovery`, or `malformed`, and the description must state the fixture's non-empty testing intent.
+The driver validates and preserves META but never generates its description. The AST nests
+reference uses at their language-level roles and separately
 records each reference's scope and ordered identifier tokens, decoded names, separators, and
 spans—without an aggregate path string. Recovery nodes retain their exact
-source span, so malformed fixtures still produce all four sections and preserve valid siblings in
+source span, so malformed fixtures still produce all five sections and preserve valid siblings in
 the formatted output.
+
+`FORMAT` is always derived from `SOURCE`. When its canonical payload is byte-identical to the
+authored source payload, the section uses the compact `~~~sexpr` sentinel
+`(stable-idempotent)`. When formatting changes any byte, `FORMAT` instead contains the complete
+emitted document in a `~~~sysml` fence. The driver recomputes this choice from `SOURCE`; it never
+uses the sentinel as source text or as cached formatter output.
 
 The driver delegates its AST section to the library's `ast::WriteSemanticAst` boundary, which
 streams bytes to any `std::io::Write` destination (for example a file or `Vec<u8>`). Its exhaustive

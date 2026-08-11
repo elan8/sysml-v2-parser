@@ -127,9 +127,11 @@ not precedent: do not copy or extend them, and do not disguise them with compati
 - The repository snapshot driver is the primary end-to-end parser contract. Keep the driver under
   `tools/` and fixtures under `tests/snapshots/`; support deterministic `check` and explicit `update`
   workflows suitable for local development and CI.
-- Parser snapshots contain only parser-owned sections: authored `SOURCE`, structured `DIAGNOSTICS`,
-  deterministic `FORMAT`, and semantic `AST`. Do not copy downstream compiler sections whose facts
-  the parser does not own.
+- Parser snapshots contain five parser-relevant sections: human-authored `META` and `SOURCE`, then
+  structured `DIAGNOSTICS`, deterministic `FORMAT`, and semantic `AST`. `META` has a validated
+  snapshot-type enum and non-empty intent description; update preserves it and never authors or
+  rewrites the description. Do not copy downstream compiler sections whose facts the parser does
+  not own.
 - Snapshot AST output is a nested semantic S-expression. References appear at their language-level
   role, while their arena definitions expose scope, ordered segments, typed separators, and spans.
   Never encode Rust field access as path strings or stringify structured qualified names.

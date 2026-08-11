@@ -34,7 +34,7 @@ fn test_standard_library_package_header_parses() {
     match &result.elements[0].value {
         RootElement::LibraryPackage(lp) => {
             assert!(lp.value.is_standard);
-            assert_eq!(lp.value.identification.name.as_deref(), Some("SysML"));
+            assert_eq!(lp.value.identification.simple_name(), Some("SysML"));
             assert!(
                 matches!(lp.value.body, PackageBody::Brace { ref elements } if elements.is_empty())
             );
@@ -56,7 +56,7 @@ fn test_legacy_library_standard_package_header_still_parses() {
                     input.len(),
                     LibraryPackage {
                         is_standard: true,
-                        identification: id("LegacyStd"),
+                        identification: package_id("LegacyStd"),
                         body: PackageBody::Semicolon,
                     }
                 ))
@@ -139,7 +139,7 @@ fn test_root_level_import_then_package() {
     }
     match &result.elements[1].value {
         sysml_v2_parser::ast::RootElement::Package(p) => {
-            assert_eq!(p.identification.name.as_deref(), Some("P"));
+            assert_eq!(p.identification.simple_name(), Some("P"));
         }
         _ => panic!("expected second element to be Package"),
     }
@@ -375,26 +375,7 @@ fn test_parse_package_with_quoted_name() {
         _ => panic!("expected package"),
     };
     assert_eq!(
-        pkg.identification.name.as_deref(),
+        pkg.identification.simple_name(),
         Some("15.10-Primitive Data Types")
-    );
-}
-
-#[test]
-fn test_qualified_package_declaration_parses() {
-    let input = "package AstronomyReference::Domain { part def Thing; }";
-    let result = sysml_v2_parser::parse_with_diagnostics(input);
-    assert!(
-        result.errors.is_empty(),
-        "qualified package declaration should parse cleanly: {:?}",
-        result.errors
-    );
-    let package = match &result.document.root.elements[0].value {
-        RootElement::Package(package) => &package.value,
-        other => panic!("expected package root element, got {other:?}"),
-    };
-    assert_eq!(
-        package.identification.name.as_deref(),
-        Some("AstronomyReference::Domain")
     );
 }

@@ -469,7 +469,7 @@ package Later {
         .elements
         .iter()
         .any(|e| match &e.value {
-            RootElement::Package(pkg) => pkg.value.identification.name.as_deref() == Some("Later"),
+            RootElement::Package(pkg) => pkg.value.identification.simple_name() == Some("Later"),
             _ => false,
         }));
 }
@@ -729,7 +729,7 @@ fn fixture_glued_package_member_parses_without_separator_diagnostic() {
         .elements
         .iter()
         .filter_map(|e| match &e.value {
-            RootElement::Package(p) => Some(p.value.identification.name.as_deref()),
+            RootElement::Package(p) => Some(p.value.identification.simple_name()),
             _ => None,
         })
         .collect();

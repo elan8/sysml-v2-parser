@@ -24,7 +24,7 @@ fn test_parse_2a_parts_interconnection() {
         roots => panic!("expected one package root, got {}", roots.len()),
     };
     assert_eq!(
-        package.identification.name.as_deref(),
+        package.identification.simple_name(),
         Some("2a-Parts Interconnection")
     );
 
@@ -41,7 +41,11 @@ fn test_parse_2a_parts_interconnection() {
     assert_eq!(imports.len(), 2);
     assert!(imports.iter().all(|import| matches!(
         import.target.shape,
-        ImportShape::Namespace { recursive: false }
+        ImportShape::Namespace {
+            recursive_suffix: None,
+            combined_recursive_suffix_span: None,
+            ..
+        }
     )));
     assert!(imports.iter().all(|import| document
         .qualified_reference(import.target.reference)
