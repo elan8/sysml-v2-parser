@@ -20,13 +20,23 @@ Release notes: [`CHANGELOG.md`](CHANGELOG.md).
 use sysml_v2_parser::parse;
 
 fn main() {
-    let model = parse("package Demo;").expect("valid SysML");
-    assert_eq!(model.elements.len(), 1);
+    let document = parse("package Demo;").expect("valid SysML");
+    assert_eq!(document.root.elements.len(), 1);
 }
 ```
 
-- `parse(input)` — strict parse; returns `Result<RootNamespace, ParseError>`
-- `parse_for_editor(input)` — partial AST + diagnostics for editors and language servers
+- `parse(input)` — strict parse; returns an atomic `ParsedDocument` containing the BOM-stripped
+  source, document-local qualified-reference arena, and root AST
+- `parse_for_editor(input)` — partial `ParsedDocument` + diagnostics for editors and language
+  servers
+
+Semantic references in the AST are opaque, document-local identities. Resolve them through
+`ParsedDocument::qualified_reference` to borrow their authored segments, separator kinds, and
+source spans without splitting or reparsing display strings.
+
+With the optional `serde` feature, serialize and deserialize `ParsedDocument` as the atomic cache
+unit. Its wire envelope includes `PARSE_AST_VERSION` and rejects version mismatches, invalid arena
+ranges, and dangling AST reference identities during deserialization.
 
 ## Development
 
@@ -53,6 +63,29 @@ cargo test --test vacuuming_types_parse -- --include-ignored
 ```
 
 When changing AST fields or body-element shapes, refresh checked-in snapshots in the same PR — see [`tests/validation/README.md`](tests/validation/README.md).
+
+The driver in `tools/snapshot_tool` manages qualified-reference snapshots under
+`tests/snapshots/qualified_references`. They use four canonical
+Markdown sections: authored `SOURCE` plus runner-owned `DIAGNOSTICS`, `FORMAT`, and semantic
+S-expression `AST`. The AST nests reference uses at their language-level roles and separately
+records each reference's scope and ordered identifier tokens, decoded names, separators, and
+spans—without an aggregate path string. Recovery nodes retain their exact
+source span, so malformed fixtures still produce all four sections and preserve valid siblings in
+the formatted output.
+
+The driver delegates its AST section to the library's `ast::WriteSemanticAst` boundary, which
+streams bytes to any `std::io::Write` destination (for example a file or `Vec<u8>`). Its exhaustive
+enum matches make newly added AST variants a compile-time formatting decision.
+
+```bash
+cargo run --bin snapshot_tool -- check
+cargo run --bin snapshot_tool -- update
+cargo run --bin snapshot_tool -- check --fixture semantic_references.md
+cargo run --bin snapshot_tool -- check --root path/to/snapshots
+```
+
+The driver processes fixtures sequentially in sorted path order. `check` fails on stale derived
+sections; `update` rewrites them for normal `git diff` review.
 
 ## Documentation
 
