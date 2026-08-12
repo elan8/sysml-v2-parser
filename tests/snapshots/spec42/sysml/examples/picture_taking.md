@@ -47,7 +47,9 @@ package PictureTaking {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 76) (line 4) (column 31) (len 8)) (segments (segment 0 (token "Exposure") (name "Exposure") (separator none) (span (offset 76) (line 4) (column 31) (len 8)))))
+    (reference r1 (scope relative) (span (offset 116) (line 5) (column 29) (len 8)) (segments (segment 0 (token "Exposure") (name "Exposure") (separator none) (span (offset 116) (line 5) (column 29) (len 8)))))
   )
-  (root (package (name "PictureTaking") (body (part-def (name "Exposure") (body semicolon)) (action-def) (action-def) (action-usage))))
+  (root (package (name "PictureTaking") (body (part-def (name "Exposure") (body semicolon)) (action-def (name "Focus") (specializes none) (body (in-out (direction out) (declaration "xrsl") (type (ref r0)) (redefines none) (value none) (span (offset 66) (line 4) (column 21) (len 19))))) (action-def (name "Shoot") (specializes none) (body (in-out (direction in) (declaration "xsf") (type (ref r1)) (redefines none) (value none) (span (offset 108) (line 5) (column 21) (len 17))))) (action-usage))))
 )
 ~~~

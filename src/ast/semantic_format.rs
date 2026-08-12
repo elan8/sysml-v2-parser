@@ -9,15 +9,16 @@ use std::collections::HashMap;
 use std::io;
 
 use super::{
-    Argument, CaseReturnFeatureKind, CollectionOperator, ConnectBody, ConnectionDefBody,
-    ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole, EndIdentity, Expression,
-    FeatureValue, FeatureValueKind, FirstMergeBody, ImportShape, ImportSuffixSpans, ImportTarget,
-    InOut, InterfaceDefBody, InterfaceDefBodyElement, Node, PackageBody, PackageBodyElement,
-    ParsedDocument, PartDefBody, PartDefBodyElement, PerformBody, PerformBodyElement, PortDefBody,
-    PortDefBodyElement, QualifiedReferenceId, ReferenceSeparator, RequirementDefBody,
-    RequirementDefBodyElement, RootElement, Span, StateDefBody, StateDefBodyElement,
-    SubsettingKind, SubsettingRelationship, TypeCheckKind, TypingKind, TypingRelationship,
-    UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
+    ActionDefBodyElement, Argument, CaseReturnFeatureKind, CollectionOperator, ConnectBody,
+    ConnectionDefBody, ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole,
+    EndIdentity, Expression, FeatureValue, FeatureValueKind, FirstMergeBody, FirstMergeBodyElement,
+    ImportShape, ImportSuffixSpans, ImportTarget, InOut, InterfaceDefBody, InterfaceDefBodyElement,
+    Node, PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement,
+    PerformBody, PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId,
+    ReferenceSeparator, RequirementDefBody, RequirementDefBodyElement, RootElement, Span,
+    StateDefBody, StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind,
+    TypingKind, TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
+    ViewBodyElement,
 };
 
 /// Stream a semantic AST projection to an [`io::Write`] sink.
@@ -163,11 +164,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             Expression::LiteralBoolean(value) => write!(self.writer, "(boolean {value})"),
             Expression::Unit(value) => {
                 self.writer.write_str("(unit ")?;
-                write_quoted(self.writer, value)?;
-                self.writer.write_char(')')
-            }
-            Expression::Opaque(value) => {
-                self.writer.write_str("(opaque ")?;
                 write_quoted(self.writer, value)?;
                 self.writer.write_char(')')
             }
@@ -519,6 +515,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             super::UnsupportedProduction::ConnectionUsageInPartDefinition => {
                 "connection-usage-in-part-definition"
             }
+            super::UnsupportedProduction::ActionBodyMember => "action-body-member",
         })?;
         self.writer.write_str(") (code ")?;
         write_quoted(self.writer, &unsupported.diagnostic.code)?;
@@ -838,8 +835,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::Assign(_assign) => {
                             self.write_marker(&mut first, "assign")?;
                         }
-                        UseCaseDefBodyElement::ForLoop(_loop) => {
-                            self.write_marker(&mut first, "for-loop")?;
+                        UseCaseDefBodyElement::ForLoop(for_loop) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_for_loop(&for_loop.value)?;
                         }
                         UseCaseDefBodyElement::ThenAction(_action) => {
                             self.write_marker(&mut first, "then-action")?;
@@ -1107,8 +1105,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::ActionUsage(_usage) => {
                             self.write_marker(&mut first, "action-usage")?;
                         }
-                        PartDefBodyElement::ActionDef(_definition) => {
-                            self.write_marker(&mut first, "action-def")?;
+                        PartDefBodyElement::ActionDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_action_definition(&definition.value)?;
                         }
                         PartDefBodyElement::StateUsage(_usage) => {
                             self.write_marker(&mut first, "state-usage")?;
@@ -1254,6 +1253,44 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_for_loop(&mut self, for_loop: &super::ForLoop) -> io::Result<()> {
+        self.writer.write_str("(for-loop (variable ")?;
+        write_quoted(self.writer, &for_loop.var)?;
+        self.writer.write_str(") (range ")?;
+        self.write_expression(&for_loop.range)?;
+        self.writer.write_str(") ")?;
+        self.write_action_body(&for_loop.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_action_definition(&mut self, definition: &super::ActionDef) -> io::Result<()> {
+        self.writer.write_str("(action-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") (specializes ")?;
+        if let Some(specializes) = &definition.specializes {
+            self.write_typing(&specializes.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_action_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_action_body(&mut self, body: &super::ActionDefBody) -> io::Result<()> {
+        match body {
+            super::ActionDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
+            super::ActionDefBody::Brace { elements } => {
+                self.writer.write_str("(body")?;
+                for element in elements {
+                    self.writer.write_char(' ')?;
+                    self.write_first_merge_member(&element.value, &element.span)?;
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
     fn write_first_merge_body(&mut self, body: &FirstMergeBody) -> io::Result<()> {
         match body {
             FirstMergeBody::Semicolon => self.writer.write_str("(body semicolon)"),
@@ -1262,9 +1299,115 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 write_span(self.writer, &body.span)?;
                 self.writer.write_str(") (open-brace ")?;
                 write_span(self.writer, &body.value.open_brace_span)?;
+                self.writer.write_str(") (members")?;
+                for element in &body.value.elements {
+                    self.writer.write_char(' ')?;
+                    match &element.value {
+                        FirstMergeBodyElement::Member(member) => {
+                            self.write_first_merge_member(&member.value, &member.span)?;
+                        }
+                        FirstMergeBodyElement::Unsupported(unsupported) => {
+                            self.write_unsupported(&unsupported.value, &unsupported.span)?;
+                        }
+                        FirstMergeBodyElement::Error(error) => {
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                    }
+                }
                 self.writer.write_str(") (close-brace ")?;
                 write_span(self.writer, &body.value.close_brace_span)?;
                 self.writer.write_str("))")
+            }
+        }
+    }
+
+    fn write_first_merge_member(
+        &mut self,
+        member: &ActionDefBodyElement,
+        span: &Span,
+    ) -> io::Result<()> {
+        match member {
+            ActionDefBodyElement::Error(error) => self.write_malformed(&error.value, span),
+            ActionDefBodyElement::InOutDecl(declaration) => {
+                self.writer.write_str("(in-out (direction ")?;
+                match declaration.value.direction {
+                    InOut::In => self.writer.write_str("in")?,
+                    InOut::Out => self.writer.write_str("out")?,
+                    InOut::InOut => self.writer.write_str("inout")?,
+                }
+                self.writer.write_str(") (declaration ")?;
+                self.write_usage_declaration_name(&declaration.value.name)?;
+                self.writer.write_str(") (type ")?;
+                if let Some(reference) = declaration.value.type_name {
+                    self.write_reference(reference)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") ")?;
+                self.write_optional_subsetting("redefines", declaration.value.redefines.as_ref())?;
+                self.writer.write_str(" (value ")?;
+                if let Some(value) = &declaration.value.value {
+                    self.write_expression(value)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") ")?;
+                write_span(self.writer, span)?;
+                self.writer.write_char(')')
+            }
+            ActionDefBodyElement::Doc(_doc) => self.writer.write_str("(doc)"),
+            ActionDefBodyElement::Annotation(_annotation) => self.writer.write_str("(annotation)"),
+            ActionDefBodyElement::MetadataAnnotation(_annotation) => {
+                self.writer.write_str("(metadata-annotation)")
+            }
+            ActionDefBodyElement::MetadataKeywordUsage(_usage) => {
+                self.writer.write_str("(metadata-keyword-usage)")
+            }
+            ActionDefBodyElement::MetadataUsage(_usage) => {
+                self.writer.write_str("(metadata-usage)")
+            }
+            ActionDefBodyElement::TextualRep(_text) => {
+                self.writer.write_str("(textual-representation)")
+            }
+            ActionDefBodyElement::RefDecl(_reference) => self.writer.write_str("(ref)"),
+            ActionDefBodyElement::Perform(perform) => self.write_perform(&perform.value),
+            ActionDefBodyElement::Bind(_bind) => self.writer.write_str("(bind)"),
+            ActionDefBodyElement::FlowUsage(_flow) => self.writer.write_str("(flow-usage)"),
+            ActionDefBodyElement::FirstStmt(first) => self.write_first_statement(&first.value),
+            ActionDefBodyElement::MergeStmt(_merge) => self.writer.write_str("(merge)"),
+            ActionDefBodyElement::DecisionStmt(_decision) => self.writer.write_str("(decision)"),
+            ActionDefBodyElement::JoinStmt(_join) => self.writer.write_str("(join)"),
+            ActionDefBodyElement::ForkStmt(_fork) => self.writer.write_str("(fork)"),
+            ActionDefBodyElement::TerminateStmt(_terminate) => self.writer.write_str("(terminate)"),
+            ActionDefBodyElement::WhileStmt(_while) => self.writer.write_str("(while)"),
+            ActionDefBodyElement::LoopStmt(_loop) => self.writer.write_str("(loop)"),
+            ActionDefBodyElement::IfStmt(_if) => self.writer.write_str("(if)"),
+            ActionDefBodyElement::StateUsage(_state) => self.writer.write_str("(state-usage)"),
+            ActionDefBodyElement::ActionUsage(usage) => {
+                self.writer.write_str("(action-usage (declaration ")?;
+                self.write_usage_declaration_name(&usage.value.name)?;
+                self.writer.write_str(") (type ")?;
+                if let Some(reference) = usage.value.type_name {
+                    self.write_reference(reference)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str("))")
+            }
+            ActionDefBodyElement::PartUsage(_part) => self.writer.write_str("(part-usage)"),
+            ActionDefBodyElement::ItemUsage(_item) => self.writer.write_str("(item-usage)"),
+            ActionDefBodyElement::AssertConstraint(_constraint) => {
+                self.writer.write_str("(assert-constraint)")
+            }
+            ActionDefBodyElement::OccurrenceUsage(_occurrence) => {
+                self.writer.write_str("(occurrence-usage)")
+            }
+            ActionDefBodyElement::Assign(_assign) => self.writer.write_str("(assign)"),
+            ActionDefBodyElement::ForLoop(for_loop) => self.write_for_loop(&for_loop.value),
+            ActionDefBodyElement::ThenAction(_then) => self.writer.write_str("(then-action)"),
+            ActionDefBodyElement::Decl(_declaration) => self.writer.write_str("(declaration)"),
+            ActionDefBodyElement::DefaultReferenceUsage(_usage) => {
+                self.writer.write_str("(default-reference-usage)")
             }
         }
     }
@@ -1980,7 +2123,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::AttributeDef(_definition) => {
                 self.write_marker(first, "attribute-def")
             }
-            PackageBodyElement::ActionDef(_definition) => self.write_marker(first, "action-def"),
+            PackageBodyElement::ActionDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_action_definition(&definition.value)
+            }
             PackageBodyElement::ActionUsage(_usage) => self.write_marker(first, "action-usage"),
             PackageBodyElement::RequirementDef(definition) => {
                 self.write_item_prefix(first)?;

@@ -227,8 +227,6 @@ pub enum Expression {
     /// Authored unit token inside brackets. Units may contain operators such as `/` and `^`, so
     /// they are not qualified references.
     Unit(String),
-    /// Opaque recovery text retained when a malformed expression cannot be structured.
-    Opaque(String),
     /// Single name or qualified name.
     FeatureRef(QualifiedReferenceId),
     /// base.member (e.g. engine.fuelCmdPort).
@@ -458,7 +456,6 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
         | Expression::LiteralString(_)
         | Expression::LiteralBoolean(_)
         | Expression::Unit(_)
-        | Expression::Opaque(_)
         | Expression::FeatureRef(_)
         | Expression::Classification { .. }
         | Expression::Null

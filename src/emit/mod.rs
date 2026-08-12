@@ -296,12 +296,17 @@ action def A {
     }
 
     #[test]
-    fn first_merge_brace_body_preserves_authored_source() {
+    fn first_merge_brace_body_emits_typed_members_and_roundtrips() {
         let source = "package P { action def A { fork choice {\n  in left;\n  out right;\n} } }";
-        let document = crate::parse(source).expect("parse source-backed fork body");
+        let document = crate::parse(source).expect("parse typed fork body");
         assert!(opacity_report(&document.root).is_clean());
 
-        let emitted = emit_sysml(&document).expect("emit source-backed fork body");
-        assert!(emitted.contains("fork choice {\n  in left;\n  out right;\n}"));
+        let emitted = emit_sysml(&document).expect("emit typed fork body");
+        assert!(emitted.contains("fork choice {"));
+        assert!(emitted.contains("in left;"));
+        assert!(emitted.contains("out right;"));
+
+        let reparsed = crate::parse(&emitted).expect("reparse emitted fork body");
+        assert!(opacity_report(&reparsed.root).is_clean());
     }
 }

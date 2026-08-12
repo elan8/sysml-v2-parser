@@ -549,7 +549,7 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
             PartDefBodyElement::EnumDef(dummy_node(n, normalize_enum_def(&n.value)))
         }
         PartDefBodyElement::FirstStmt(n) => {
-            PartDefBodyElement::FirstStmt(dummy_node(n, n.value.clone()))
+            PartDefBodyElement::FirstStmt(dummy_node(n, normalize_first_stmt(&n.value)))
         }
         PartDefBodyElement::Bind(n) => PartDefBodyElement::Bind(dummy_node(n, n.value.clone())),
         PartDefBodyElement::AliasDef(n) => {
@@ -709,7 +709,6 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
         Expression::LiteralString(s) => Expression::LiteralString(s.clone()),
         Expression::LiteralBoolean(b) => Expression::LiteralBoolean(*b),
         Expression::Unit(s) => Expression::Unit(s.clone()),
-        Expression::Opaque(s) => Expression::Opaque(s.clone()),
         Expression::FeatureRef(s) => Expression::FeatureRef(*s),
         Expression::MemberAccess {
             base,
@@ -1378,20 +1377,36 @@ fn normalize_action_def_body_element_node(
             ActionDefBodyElement::FlowUsage(dummy_node(n, n.value.clone()))
         }
         ActionDefBodyElement::FirstStmt(n) => {
-            ActionDefBodyElement::FirstStmt(dummy_node(n, n.value.clone()))
+            ActionDefBodyElement::FirstStmt(dummy_node(n, normalize_first_stmt(&n.value)))
         }
-        ActionDefBodyElement::MergeStmt(n) => {
-            ActionDefBodyElement::MergeStmt(dummy_node(n, n.value.clone()))
-        }
-        ActionDefBodyElement::DecisionStmt(n) => {
-            ActionDefBodyElement::DecisionStmt(dummy_node(n, n.value.clone()))
-        }
-        ActionDefBodyElement::JoinStmt(n) => {
-            ActionDefBodyElement::JoinStmt(dummy_node(n, n.value.clone()))
-        }
-        ActionDefBodyElement::ForkStmt(n) => {
-            ActionDefBodyElement::ForkStmt(dummy_node(n, n.value.clone()))
-        }
+        ActionDefBodyElement::MergeStmt(n) => ActionDefBodyElement::MergeStmt(dummy_node(
+            n,
+            MergeStmt {
+                merge: n.value.merge.clone(),
+                body: normalize_first_merge_body(&n.value.body),
+            },
+        )),
+        ActionDefBodyElement::DecisionStmt(n) => ActionDefBodyElement::DecisionStmt(dummy_node(
+            n,
+            DecisionStmt {
+                decide: n.value.decide.clone(),
+                body: normalize_first_merge_body(&n.value.body),
+            },
+        )),
+        ActionDefBodyElement::JoinStmt(n) => ActionDefBodyElement::JoinStmt(dummy_node(
+            n,
+            JoinStmt {
+                join: n.value.join.clone(),
+                body: normalize_first_merge_body(&n.value.body),
+            },
+        )),
+        ActionDefBodyElement::ForkStmt(n) => ActionDefBodyElement::ForkStmt(dummy_node(
+            n,
+            ForkStmt {
+                fork: n.value.fork.clone(),
+                body: normalize_first_merge_body(&n.value.body),
+            },
+        )),
         ActionDefBodyElement::TerminateStmt(n) => {
             ActionDefBodyElement::TerminateStmt(dummy_node(n, n.value.clone()))
         }
@@ -1440,6 +1455,61 @@ fn normalize_action_def_body_element_node(
         }
     };
     dummy_node(el, value)
+}
+
+fn normalize_first_stmt(statement: &FirstStmt) -> FirstStmt {
+    FirstStmt {
+        succession_name: statement.succession_name.clone(),
+        succession_type: statement.succession_type,
+        succession_multiplicity: statement.succession_multiplicity.clone(),
+        first: statement.first.clone(),
+        first_multiplicity: statement.first_multiplicity.clone(),
+        then: statement.then.clone(),
+        then_multiplicity: statement.then_multiplicity.clone(),
+        body: normalize_first_merge_body(&statement.body),
+    }
+}
+
+fn normalize_first_merge_body(body: &FirstMergeBody) -> FirstMergeBody {
+    match body {
+        FirstMergeBody::Semicolon => FirstMergeBody::Semicolon,
+        FirstMergeBody::Brace(body) => FirstMergeBody::Brace(dummy_node(
+            body,
+            FirstMergeBraceBody {
+                open_brace_span: Span::dummy(),
+                elements: body
+                    .value
+                    .elements
+                    .iter()
+                    .map(|element| {
+                        dummy_node(
+                            element,
+                            match &element.value {
+                                FirstMergeBodyElement::Member(member) => {
+                                    FirstMergeBodyElement::Member(Box::new(
+                                        normalize_action_def_body_element_node(member),
+                                    ))
+                                }
+                                FirstMergeBodyElement::Unsupported(unsupported) => {
+                                    FirstMergeBodyElement::Unsupported(dummy_node(
+                                        unsupported,
+                                        unsupported.value.clone(),
+                                    ))
+                                }
+                                FirstMergeBodyElement::Error(error) => {
+                                    FirstMergeBodyElement::Error(dummy_node(
+                                        error,
+                                        error.value.clone(),
+                                    ))
+                                }
+                            },
+                        )
+                    })
+                    .collect(),
+                close_brace_span: Span::dummy(),
+            },
+        )),
+    }
 }
 
 fn normalize_payload_clause(p: &PayloadClause) -> PayloadClause {
@@ -1643,20 +1713,38 @@ fn normalize_action_usage_body_element_node(
             ActionUsageBodyElement::FlowUsage(dummy_node(n, n.value.clone()))
         }
         ActionUsageBodyElement::FirstStmt(n) => {
-            ActionUsageBodyElement::FirstStmt(dummy_node(n, n.value.clone()))
+            ActionUsageBodyElement::FirstStmt(dummy_node(n, normalize_first_stmt(&n.value)))
         }
-        ActionUsageBodyElement::MergeStmt(n) => {
-            ActionUsageBodyElement::MergeStmt(dummy_node(n, n.value.clone()))
-        }
+        ActionUsageBodyElement::MergeStmt(n) => ActionUsageBodyElement::MergeStmt(dummy_node(
+            n,
+            MergeStmt {
+                merge: n.value.merge.clone(),
+                body: normalize_first_merge_body(&n.value.body),
+            },
+        )),
         ActionUsageBodyElement::DecisionStmt(n) => {
-            ActionUsageBodyElement::DecisionStmt(dummy_node(n, n.value.clone()))
+            ActionUsageBodyElement::DecisionStmt(dummy_node(
+                n,
+                DecisionStmt {
+                    decide: n.value.decide.clone(),
+                    body: normalize_first_merge_body(&n.value.body),
+                },
+            ))
         }
-        ActionUsageBodyElement::JoinStmt(n) => {
-            ActionUsageBodyElement::JoinStmt(dummy_node(n, n.value.clone()))
-        }
-        ActionUsageBodyElement::ForkStmt(n) => {
-            ActionUsageBodyElement::ForkStmt(dummy_node(n, n.value.clone()))
-        }
+        ActionUsageBodyElement::JoinStmt(n) => ActionUsageBodyElement::JoinStmt(dummy_node(
+            n,
+            JoinStmt {
+                join: n.value.join.clone(),
+                body: normalize_first_merge_body(&n.value.body),
+            },
+        )),
+        ActionUsageBodyElement::ForkStmt(n) => ActionUsageBodyElement::ForkStmt(dummy_node(
+            n,
+            ForkStmt {
+                fork: n.value.fork.clone(),
+                body: normalize_first_merge_body(&n.value.body),
+            },
+        )),
         ActionUsageBodyElement::TerminateStmt(n) => {
             ActionUsageBodyElement::TerminateStmt(dummy_node(n, n.value.clone()))
         }

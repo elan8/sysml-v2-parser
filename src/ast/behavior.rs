@@ -515,7 +515,7 @@ pub struct ForkStmt {
     pub body: FirstMergeBody,
 }
 
-/// Body of first/merge: `;` or a source-backed `{` ... `}` body.
+/// Body of first/merge: `;` or a typed, source-backed `{` ... `}` body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FirstMergeBody {
@@ -526,14 +526,114 @@ pub enum FirstMergeBody {
 /// Exact delimiter provenance for a `first`/`merge`/`decide`/`join`/`fork` brace body.
 ///
 /// The enclosing [`Node`] span covers the complete authored body, including both delimiters and
-/// all retained source between them. The body contents remain source-backed because this grammar
-/// position accepts control-node pins that are not yet represented as typed members; emitters can
-/// therefore preserve the exact authored slice without copying or fabricating an empty body.
+/// all retained members between them. Recognized members remain semantic nodes, while unsupported
+/// and malformed members remain explicit source-backed nodes at their original ordered position.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FirstMergeBraceBody {
     pub open_brace_span: Span,
+    pub elements: Vec<Node<FirstMergeBodyElement>>,
     pub close_brace_span: Span,
+}
+
+#[cfg(feature = "serde")]
+impl FirstMergeBraceBody {
+    pub(crate) fn validate_provenance(
+        &self,
+        body_span: &Span,
+        source: &crate::ast::SourceStorage,
+    ) -> Result<(), String> {
+        fn span_end(span: &Span, role: &str) -> Result<usize, String> {
+            span.offset
+                .checked_add(span.len)
+                .ok_or_else(|| format!("{role} span overflows"))
+        }
+
+        fn validate_span(
+            source: &crate::ast::SourceStorage,
+            span: &Span,
+            role: &str,
+        ) -> Result<(), String> {
+            if source.validates_span(span) {
+                Ok(())
+            } else {
+                Err(format!("invalid first/merge {role} span"))
+            }
+        }
+
+        validate_span(source, body_span, "body")?;
+        validate_span(source, &self.open_brace_span, "open brace")?;
+        validate_span(source, &self.close_brace_span, "close brace")?;
+        if source.slice(&self.open_brace_span) != Some("{") {
+            return Err("first/merge open brace span does not contain \"{\"".to_owned());
+        }
+        if source.slice(&self.close_brace_span) != Some("}") {
+            return Err("first/merge close brace span does not contain \"}\"".to_owned());
+        }
+
+        let body_end = span_end(body_span, "first/merge body")?;
+        let open_end = span_end(&self.open_brace_span, "first/merge open brace")?;
+        let close_end = span_end(&self.close_brace_span, "first/merge close brace")?;
+        if body_span.offset != self.open_brace_span.offset || body_end != close_end {
+            return Err(
+                "first/merge body span must exactly enclose its brace delimiter spans".to_owned(),
+            );
+        }
+        if open_end > self.close_brace_span.offset {
+            return Err("first/merge brace delimiter spans overlap".to_owned());
+        }
+
+        let mut previous_end = open_end;
+        for element in &self.elements {
+            validate_span(source, &element.span, "body element")?;
+            if element.span.len == 0 {
+                return Err("first/merge body elements must have non-empty spans".to_owned());
+            }
+            let element_end = span_end(&element.span, "first/merge body element")?;
+            if previous_end > element.span.offset || element_end > self.close_brace_span.offset {
+                return Err(
+                    "first/merge body elements must be ordered within the brace delimiters"
+                        .to_owned(),
+                );
+            }
+            if !source.trivia_between(previous_end, element.span.offset) {
+                return Err(
+                    "unmodeled non-trivia source occurs before a first/merge body element"
+                        .to_owned(),
+                );
+            }
+            let retained_span = match &element.value {
+                FirstMergeBodyElement::Member(member) => &member.span,
+                FirstMergeBodyElement::Unsupported(unsupported) => &unsupported.span,
+                FirstMergeBodyElement::Error(error) => &error.span,
+            };
+            if retained_span != &element.span {
+                return Err(
+                    "first/merge body element and retained member spans must match".to_owned(),
+                );
+            }
+            previous_end = element_end;
+        }
+        if !source.trivia_between(previous_end, self.close_brace_span.offset) {
+            return Err(
+                "unmodeled non-trivia source occurs after the last first/merge body element"
+                    .to_owned(),
+            );
+        }
+        Ok(())
+    }
+}
+
+/// Ordered semantic members retained inside a [`FirstMergeBody::Brace`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum FirstMergeBodyElement {
+    /// A member recognized by the shared action-body grammar.
+    Member(Box<Node<ActionDefBodyElement>>),
+    /// Spec-valid action-body syntax that this AST does not model yet.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
+    /// Malformed syntax retained by the structured recovery parser.
+    Error(Node<ParseErrorNode>),
 }
 
 /// Terminate control node: `terminate;` or `terminate target;`.

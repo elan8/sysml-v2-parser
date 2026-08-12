@@ -103,6 +103,6 @@ package 'Merge Example' {
 (parsed-document
   (references
   )
-  (root (package (name "Merge Example") (body (part-def (name "Scene") (body semicolon)) (part-def (name "Image") (body semicolon)) (part-def (name "Picture") (body semicolon)) (action-def) (action-def) (action-def) (action-def) (action-usage))))
+  (root (package (name "Merge Example") (body (part-def (name "Scene") (body semicolon)) (part-def (name "Image") (body semicolon)) (part-def (name "Picture") (body semicolon)) (action-def (name "Focus") (specializes none) (body (item-usage) (item-usage))) (action-def (name "Shoot") (specializes none) (body (item-usage) (item-usage))) (action-def (name "Display") (specializes none) (body (item-usage))) (action-def (name "TakePicture") (specializes none) (body semicolon)) (action-usage))))
 )
 ~~~

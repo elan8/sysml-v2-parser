@@ -1,24 +1,93 @@
-//! Exhaustive traversal of the AST positions that can own import-like targets.
+//! Exhaustive traversal of AST positions that own source-provenance contracts.
 //!
 //! This is intentionally typed rather than serialization-driven. Each containing enum is
 //! matched without a wildcard so adding a new nesting route becomes a compile error here.
 
 use super::*;
 
-pub(super) fn validate_import_target_provenance(document: &ParsedDocument) -> Result<(), String> {
-    let mut visitor = ImportTargetValidator { document };
+pub(super) fn validate_ast_provenance(document: &ParsedDocument) -> Result<(), String> {
+    let mut visitor = ProvenanceValidator { document };
     visitor.root(&document.root)
 }
 
-struct ImportTargetValidator<'a> {
+struct ProvenanceValidator<'a> {
     document: &'a ParsedDocument,
 }
 
-impl ImportTargetValidator<'_> {
+impl ProvenanceValidator<'_> {
     fn target(&mut self, target: &ImportTarget) -> Result<(), String> {
         target
             .validate_provenance(&self.document.source, &self.document.qualified_references)
             .map_err(|error| error.to_string())
+    }
+
+    fn first_merge_body(&mut self, body: &FirstMergeBody) -> Result<(), String> {
+        match body {
+            FirstMergeBody::Semicolon => Ok(()),
+            FirstMergeBody::Brace(body) => {
+                body.value
+                    .validate_provenance(&body.span, &self.document.source)?;
+                for element in &body.value.elements {
+                    match &element.value {
+                        FirstMergeBodyElement::Member(member) => {
+                            self.action_def_element(&member.value)?
+                        }
+                        FirstMergeBodyElement::Unsupported(_) | FirstMergeBodyElement::Error(_) => {
+                        }
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn first_statement(&mut self, statement: &FirstStmt) -> Result<(), String> {
+        self.first_merge_body(&statement.body)
+    }
+
+    fn then_action(&mut self, action: &ThenAction) -> Result<(), String> {
+        match &action.target {
+            ThenTarget::Action(action) => self.action_usage_body(&action.value.body),
+            ThenTarget::Perform(perform) => self.perform_body(&perform.value.body),
+            ThenTarget::Merge(merge) => self.first_merge_body(&merge.value.body),
+            ThenTarget::Fork(fork) => self.first_merge_body(&fork.value.body),
+            ThenTarget::Decide(decision) => self.first_merge_body(&decision.value.body),
+            ThenTarget::Accept(_) | ThenTarget::Feature(_) => Ok(()),
+        }
+    }
+
+    fn perform_body(&mut self, body: &PerformBody) -> Result<(), String> {
+        let PerformBody::Brace { elements } = body else {
+            return Ok(());
+        };
+        for element in elements {
+            match &element.value {
+                PerformBodyElement::Action(action) => self.action_usage_element(&action.value)?,
+                PerformBodyElement::PartUsage(part) => self.part_usage_body(&part.value.body)?,
+                PerformBodyElement::Variant(variant) => self.variant_usage(&variant.value)?,
+                PerformBodyElement::Doc(_)
+                | PerformBodyElement::InOut(_)
+                | PerformBodyElement::ItemUsage(_)
+                | PerformBodyElement::AttributeUsage(_) => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn variant_usage(&mut self, variant: &VariantUsage) -> Result<(), String> {
+        if let Some(body) = &variant.body {
+            self.part_usage_body(body)?;
+        }
+        if let Some(typed) = &variant.typed {
+            match typed {
+                VariantTypedUsage::Part(part) => self.part_usage_body(&part.value.body)?,
+                VariantTypedUsage::Perform(perform) => self.perform_body(&perform.value.body)?,
+                VariantTypedUsage::Attribute(_)
+                | VariantTypedUsage::Item(_)
+                | VariantTypedUsage::Port(_) => {}
+            }
+        }
+        Ok(())
     }
 
     fn root(&mut self, root: &RootNamespace) -> Result<(), String> {
@@ -132,6 +201,7 @@ impl ImportTargetValidator<'_> {
                     self.requirement_body(&n.value.body)?
                 }
                 RequirementDefBodyElement::Frame(n) => self.requirement_body(&n.value.body)?,
+                RequirementDefBodyElement::VariantUsage(n) => self.variant_usage(&n.value)?,
                 RequirementDefBodyElement::Error(_)
                 | RequirementDefBodyElement::Other(_)
                 | RequirementDefBodyElement::Annotation(_)
@@ -144,7 +214,6 @@ impl ImportTargetValidator<'_> {
                 | RequirementDefBodyElement::Purpose(_)
                 | RequirementDefBodyElement::AttributeDef(_)
                 | RequirementDefBodyElement::AttributeUsage(_)
-                | RequirementDefBodyElement::VariantUsage(_)
                 | RequirementDefBodyElement::VerifyRequirement(_)
                 | RequirementDefBodyElement::RequireConstraint(_)
                 | RequirementDefBodyElement::Constraint(_)
@@ -188,6 +257,8 @@ impl ImportTargetValidator<'_> {
                 UseCaseDefBodyElement::RefRedefinition(n) => {
                     self.use_case_body(&n.value.body.value)?
                 }
+                UseCaseDefBodyElement::ForLoop(n) => self.action_def_body(&n.value.body)?,
+                UseCaseDefBodyElement::ThenAction(n) => self.then_action(&n.value)?,
                 UseCaseDefBodyElement::Error(_)
                 | UseCaseDefBodyElement::Other(_)
                 | UseCaseDefBodyElement::Annotation(_)
@@ -209,8 +280,6 @@ impl ImportTargetValidator<'_> {
                 | UseCaseDefBodyElement::ReturnRef(_)
                 | UseCaseDefBodyElement::CaseReturnDecl(_)
                 | UseCaseDefBodyElement::Assign(_)
-                | UseCaseDefBodyElement::ForLoop(_)
-                | UseCaseDefBodyElement::ThenAction(_)
                 | UseCaseDefBodyElement::CalcUsage(_)
                 | UseCaseDefBodyElement::AttributeUsage(_)
                 | UseCaseDefBodyElement::Expression(_)
@@ -244,6 +313,13 @@ impl ImportTargetValidator<'_> {
                 }
                 Ok(())
             }
+            ActionDefBodyElement::FirstStmt(n) => self.first_statement(&n.value),
+            ActionDefBodyElement::MergeStmt(n) => self.first_merge_body(&n.value.body),
+            ActionDefBodyElement::DecisionStmt(n) => self.first_merge_body(&n.value.body),
+            ActionDefBodyElement::JoinStmt(n) => self.first_merge_body(&n.value.body),
+            ActionDefBodyElement::ForkStmt(n) => self.first_merge_body(&n.value.body),
+            ActionDefBodyElement::Perform(n) => self.perform_body(&n.value.body),
+            ActionDefBodyElement::ThenAction(n) => self.then_action(&n.value),
             ActionDefBodyElement::Error(_)
             | ActionDefBodyElement::InOutDecl(_)
             | ActionDefBodyElement::Doc(_)
@@ -253,21 +329,14 @@ impl ImportTargetValidator<'_> {
             | ActionDefBodyElement::MetadataUsage(_)
             | ActionDefBodyElement::TextualRep(_)
             | ActionDefBodyElement::RefDecl(_)
-            | ActionDefBodyElement::Perform(_)
             | ActionDefBodyElement::Bind(_)
             | ActionDefBodyElement::FlowUsage(_)
-            | ActionDefBodyElement::FirstStmt(_)
-            | ActionDefBodyElement::MergeStmt(_)
-            | ActionDefBodyElement::DecisionStmt(_)
-            | ActionDefBodyElement::JoinStmt(_)
-            | ActionDefBodyElement::ForkStmt(_)
             | ActionDefBodyElement::TerminateStmt(_)
             | ActionDefBodyElement::StateUsage(_)
             | ActionDefBodyElement::ItemUsage(_)
             | ActionDefBodyElement::AssertConstraint(_)
             | ActionDefBodyElement::OccurrenceUsage(_)
             | ActionDefBodyElement::Assign(_)
-            | ActionDefBodyElement::ThenAction(_)
             | ActionDefBodyElement::Decl(_)
             | ActionDefBodyElement::DefaultReferenceUsage(_) => Ok(()),
         }
@@ -278,47 +347,52 @@ impl ImportTargetValidator<'_> {
             return Ok(());
         };
         for element in elements {
-            match &element.value {
-                ActionUsageBodyElement::PartUsage(n) => self.part_usage_body(&n.value.body)?,
-                ActionUsageBodyElement::ActionUsage(n) => self.action_usage_body(&n.value.body)?,
-                ActionUsageBodyElement::ForLoop(n) => self.action_def_body(&n.value.body)?,
-                ActionUsageBodyElement::WhileStmt(n) => self.action_def_body(&n.value.body)?,
-                ActionUsageBodyElement::LoopStmt(n) => self.action_def_body(&n.value.body)?,
-                ActionUsageBodyElement::IfStmt(n) => {
-                    self.action_def_body(&n.value.then_body)?;
-                    if let Some(body) = &n.value.else_body {
-                        self.action_def_body(body)?;
-                    }
-                }
-                ActionUsageBodyElement::Error(_)
-                | ActionUsageBodyElement::Doc(_)
-                | ActionUsageBodyElement::Annotation(_)
-                | ActionUsageBodyElement::MetadataAnnotation(_)
-                | ActionUsageBodyElement::MetadataKeywordUsage(_)
-                | ActionUsageBodyElement::MetadataUsage(_)
-                | ActionUsageBodyElement::TextualRep(_)
-                | ActionUsageBodyElement::InOutDecl(_)
-                | ActionUsageBodyElement::RefDecl(_)
-                | ActionUsageBodyElement::Bind(_)
-                | ActionUsageBodyElement::FlowUsage(_)
-                | ActionUsageBodyElement::FirstStmt(_)
-                | ActionUsageBodyElement::MergeStmt(_)
-                | ActionUsageBodyElement::DecisionStmt(_)
-                | ActionUsageBodyElement::JoinStmt(_)
-                | ActionUsageBodyElement::ForkStmt(_)
-                | ActionUsageBodyElement::TerminateStmt(_)
-                | ActionUsageBodyElement::StateUsage(_)
-                | ActionUsageBodyElement::ItemUsage(_)
-                | ActionUsageBodyElement::AssertConstraint(_)
-                | ActionUsageBodyElement::OccurrenceUsage(_)
-                | ActionUsageBodyElement::Assign(_)
-                | ActionUsageBodyElement::ThenAction(_)
-                | ActionUsageBodyElement::Decl(_)
-                | ActionUsageBodyElement::DefaultReferenceUsage(_)
-                | ActionUsageBodyElement::VariantUsage(_) => {}
-            }
+            self.action_usage_element(&element.value)?;
         }
         Ok(())
+    }
+
+    fn action_usage_element(&mut self, element: &ActionUsageBodyElement) -> Result<(), String> {
+        match element {
+            ActionUsageBodyElement::PartUsage(n) => self.part_usage_body(&n.value.body),
+            ActionUsageBodyElement::ActionUsage(n) => self.action_usage_body(&n.value.body),
+            ActionUsageBodyElement::ForLoop(n) => self.action_def_body(&n.value.body),
+            ActionUsageBodyElement::WhileStmt(n) => self.action_def_body(&n.value.body),
+            ActionUsageBodyElement::LoopStmt(n) => self.action_def_body(&n.value.body),
+            ActionUsageBodyElement::IfStmt(n) => {
+                self.action_def_body(&n.value.then_body)?;
+                if let Some(body) = &n.value.else_body {
+                    self.action_def_body(body)?;
+                }
+                Ok(())
+            }
+            ActionUsageBodyElement::FirstStmt(n) => self.first_statement(&n.value),
+            ActionUsageBodyElement::MergeStmt(n) => self.first_merge_body(&n.value.body),
+            ActionUsageBodyElement::DecisionStmt(n) => self.first_merge_body(&n.value.body),
+            ActionUsageBodyElement::JoinStmt(n) => self.first_merge_body(&n.value.body),
+            ActionUsageBodyElement::ForkStmt(n) => self.first_merge_body(&n.value.body),
+            ActionUsageBodyElement::ThenAction(n) => self.then_action(&n.value),
+            ActionUsageBodyElement::VariantUsage(n) => self.variant_usage(&n.value),
+            ActionUsageBodyElement::Error(_)
+            | ActionUsageBodyElement::Doc(_)
+            | ActionUsageBodyElement::Annotation(_)
+            | ActionUsageBodyElement::MetadataAnnotation(_)
+            | ActionUsageBodyElement::MetadataKeywordUsage(_)
+            | ActionUsageBodyElement::MetadataUsage(_)
+            | ActionUsageBodyElement::TextualRep(_)
+            | ActionUsageBodyElement::InOutDecl(_)
+            | ActionUsageBodyElement::RefDecl(_)
+            | ActionUsageBodyElement::Bind(_)
+            | ActionUsageBodyElement::FlowUsage(_)
+            | ActionUsageBodyElement::TerminateStmt(_)
+            | ActionUsageBodyElement::StateUsage(_)
+            | ActionUsageBodyElement::ItemUsage(_)
+            | ActionUsageBodyElement::AssertConstraint(_)
+            | ActionUsageBodyElement::OccurrenceUsage(_)
+            | ActionUsageBodyElement::Assign(_)
+            | ActionUsageBodyElement::Decl(_)
+            | ActionUsageBodyElement::DefaultReferenceUsage(_) => Ok(()),
+        }
     }
 
     fn part_def_body(&mut self, body: &PartDefBody) -> Result<(), String> {
@@ -347,6 +421,9 @@ impl ImportTargetValidator<'_> {
                 PartDefBodyElement::VerificationCaseUsage(n) => {
                     self.use_case_body(&n.value.body)?
                 }
+                PartDefBodyElement::Perform(n) => self.perform_body(&n.value.body)?,
+                PartDefBodyElement::FirstStmt(n) => self.first_statement(&n.value)?,
+                PartDefBodyElement::VariantUsage(n) => self.variant_usage(&n.value)?,
                 PartDefBodyElement::Error(_)
                 | PartDefBodyElement::Doc(_)
                 | PartDefBodyElement::Comment(_)
@@ -368,7 +445,6 @@ impl ImportTargetValidator<'_> {
                 | PartDefBodyElement::Connect(_)
                 | PartDefBodyElement::FlowUsage(_)
                 | PartDefBodyElement::Connection(_)
-                | PartDefBodyElement::Perform(_)
                 | PartDefBodyElement::Allocate(_)
                 | PartDefBodyElement::UnsupportedMember(_)
                 | PartDefBodyElement::ExhibitState(_)
@@ -379,7 +455,6 @@ impl ImportTargetValidator<'_> {
                 | PartDefBodyElement::EnumerationUsage(_)
                 | PartDefBodyElement::AssertConstraint(_)
                 | PartDefBodyElement::Satisfy(_)
-                | PartDefBodyElement::VariantUsage(_)
                 | PartDefBodyElement::StateDef(_)
                 | PartDefBodyElement::MetadataDef(_)
                 | PartDefBodyElement::MetadataUsage(_)
@@ -394,7 +469,6 @@ impl ImportTargetValidator<'_> {
                 | PartDefBodyElement::ViewDef(_)
                 | PartDefBodyElement::RenderingDef(_)
                 | PartDefBodyElement::RenderingUsage(_)
-                | PartDefBodyElement::FirstStmt(_)
                 | PartDefBodyElement::Bind(_)
                 | PartDefBodyElement::AliasDef(_) => {}
             }
@@ -421,6 +495,8 @@ impl ImportTargetValidator<'_> {
                 PartUsageBodyElement::VerificationCaseUsage(n) => {
                     self.use_case_body(&n.value.body)?
                 }
+                PartUsageBodyElement::Perform(n) => self.perform_body(&n.value.body)?,
+                PartUsageBodyElement::VariantUsage(n) => self.variant_usage(&n.value)?,
                 PartUsageBodyElement::Error(_)
                 | PartUsageBodyElement::Doc(_)
                 | PartUsageBodyElement::Annotation(_)
@@ -434,14 +510,12 @@ impl ImportTargetValidator<'_> {
                 | PartUsageBodyElement::InterfaceUsage(_)
                 | PartUsageBodyElement::Connect(_)
                 | PartUsageBodyElement::FlowUsage(_)
-                | PartUsageBodyElement::Perform(_)
                 | PartUsageBodyElement::SuccessionUsage(_)
                 | PartUsageBodyElement::Allocate(_)
                 | PartUsageBodyElement::Satisfy(_)
                 | PartUsageBodyElement::StateUsage(_)
                 | PartUsageBodyElement::MetadataAnnotation(_)
                 | PartUsageBodyElement::MetadataKeywordUsage(_)
-                | PartUsageBodyElement::VariantUsage(_)
                 | PartUsageBodyElement::StateDef(_)
                 | PartUsageBodyElement::MetadataDef(_)
                 | PartUsageBodyElement::FlowDef(_)

@@ -74,7 +74,12 @@ package 'Action Shorthand Example' {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 123) (line 6) (column 32) (len 5)) (segments (segment 0 (token "Scene") (name "Scene") (separator none) (span (offset 123) (line 6) (column 32) (len 5)))))
+    (reference r1 (scope relative) (span (offset 142) (line 6) (column 51) (len 5)) (segments (segment 0 (token "Image") (name "Image") (separator none) (span (offset 142) (line 6) (column 51) (len 5)))))
+    (reference r2 (scope relative) (span (offset 181) (line 7) (column 31) (len 5)) (segments (segment 0 (token "Image") (name "Image") (separator none) (span (offset 181) (line 7) (column 31) (len 5)))))
+    (reference r3 (scope relative) (span (offset 202) (line 7) (column 52) (len 7)) (segments (segment 0 (token "Picture") (name "Picture") (separator none) (span (offset 202) (line 7) (column 52) (len 7)))))
+    (reference r4 (scope relative) (span (offset 319) (line 13) (column 17) (len 5)) (segments (segment 0 (token "Focus") (name "Focus") (separator none) (span (offset 319) (line 13) (column 17) (len 5)))))
   )
-  (root (package (name "Action Shorthand Example") (body (item-def) (item-def) (item-def) (action-def) (action-def) (action-def))))
+  (root (package (name "Action Shorthand Example") (body (item-def) (item-def) (item-def) (action-def (name "Focus") (specializes none) (body (in-out (direction in) (declaration "scene") (type (ref r0)) (redefines none) (value none) (span (offset 112) (line 6) (column 21) (len 17))) (in-out (direction out) (declaration "image") (type (ref r1)) (redefines none) (value none) (span (offset 130) (line 6) (column 39) (len 18))))) (action-def (name "Shoot") (specializes none) (body (in-out (direction in) (declaration "image") (type (ref r2)) (redefines none) (value none) (span (offset 171) (line 7) (column 21) (len 16))) (in-out (direction out) (declaration "picture") (type (ref r3)) (redefines none) (value none) (span (offset 188) (line 7) (column 38) (len 22))))) (action-def (name "TakePicture") (specializes none) (body (item-usage) (item-usage) (action-usage (declaration "focus") (type (ref r4))) (flow-usage) (then-action))))))
 )
 ~~~

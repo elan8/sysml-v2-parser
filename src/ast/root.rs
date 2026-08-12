@@ -1,6 +1,6 @@
 use super::common::Import;
 #[cfg(feature = "serde")]
-use super::import_visit::validate_import_target_provenance;
+use super::import_visit::validate_ast_provenance;
 use super::package::{
     LibraryPackage, Package, PackageBody, PackageBodyElement, QualifiedDeclarationName,
     QualifiedIdentification,
@@ -153,7 +153,7 @@ fn validate_serialized_document(document: &ParsedDocument) -> Result<(), String>
         .qualified_references
         .validate(&document.source)
         .map_err(|error| error.to_string())?;
-    validate_import_target_provenance(document)?;
+    validate_ast_provenance(document)?;
     serde::Serialize::serialize(
         &document.root,
         QualifiedReferenceIdValidator {
@@ -821,6 +821,21 @@ mod serde_tests {
         let error = serde_json::from_value::<ParsedDocument>(encoded)
             .expect_err("tampered filter delimiter must be rejected");
         assert!(error.to_string().contains("filter close bracket"));
+    }
+
+    #[test]
+    fn parsed_document_rejects_tampered_first_merge_delimiter_provenance() {
+        let document = crate::parse(
+            "package P { action def A { first Actions::start then Actions::finish { out pin; } } }",
+        )
+        .expect("parse first/merge body");
+        let mut encoded = serde_json::to_value(document).expect("serialize document");
+        let open = find_field_mut(&mut encoded, "open_brace_span").expect("open brace span");
+        open["len"] = serde_json::json!(2);
+
+        let error = serde_json::from_value::<ParsedDocument>(encoded)
+            .expect_err("tampered first/merge delimiter must be rejected");
+        assert!(error.to_string().contains("first/merge open brace"));
     }
 
     #[test]

@@ -120,3 +120,66 @@ fn failed_package_binding_lookahead_does_not_publish_an_orphan_reference() {
     assert!(!projection.contains("(token \"Live\")"));
     assert!(!projection.contains("(token \"Target\")"));
 }
+
+#[test]
+fn malformed_for_range_rolls_back_references_and_keeps_later_action() {
+    let source = r#"package P {
+action def Iterate {
+    for item in Domain::fleet.activeMembers { action visit; }
+    for orphan in Ghost::leaked + { action swallowed; }
+    action later : Later::Type;
+}
+}"#;
+    let result = parse_with_diagnostics(source);
+    assert!(
+        !result.errors.is_empty(),
+        "malformed loop range should recover"
+    );
+    let package = match &result.document.root.elements[0].value {
+        RootElement::Package(package) => &package.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let action = match &package.body {
+        sysml_v2_parser::ast::PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBodyElement::ActionDef(action) => &action.value,
+            other => panic!("expected action def, got {other:?}"),
+        },
+        other => panic!("expected package body, got {other:?}"),
+    };
+    let elements = match &action.body {
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => elements,
+        other => panic!("expected action body, got {other:?}"),
+    };
+    assert_eq!(elements.len(), 3, "recovery must keep both valid siblings");
+    let range = match &elements[0].value {
+        sysml_v2_parser::ast::ActionDefBodyElement::ForLoop(for_loop) => &for_loop.value.range,
+        other => panic!("expected valid for-loop, got {other:?}"),
+    };
+    let (base, member) = match &range.value {
+        sysml_v2_parser::ast::Expression::MemberAccess { base, member, .. } => {
+            let sysml_v2_parser::ast::Expression::FeatureRef(base) = base.value else {
+                panic!("expected feature-ref base")
+            };
+            (base, *member)
+        }
+        other => panic!("expected member-access range, got {other:?}"),
+    };
+    assert_eq!(resolved(&result.document, base), "Domain::fleet");
+    assert_eq!(resolved(&result.document, member), "activeMembers");
+    assert!(matches!(
+        elements[1].value,
+        sysml_v2_parser::ast::ActionDefBodyElement::Error(_)
+    ));
+    let later_type = match &elements[2].value {
+        sysml_v2_parser::ast::ActionDefBodyElement::ActionUsage(action) => {
+            action.value.type_name.expect("later action type")
+        }
+        other => panic!("expected later action sibling, got {other:?}"),
+    };
+    assert_eq!(resolved(&result.document, later_type), "Later::Type");
+    assert_eq!(
+        result.document.qualified_references.len(),
+        3,
+        "the failed Ghost::leaked range must publish no arena identities"
+    );
+}

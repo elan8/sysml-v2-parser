@@ -9,10 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`PARSE_AST_VERSION` is now 85.** `FirstMergeBody` brace forms retain an aggregate source span
-  plus exact opening- and closing-brace spans. Formatting `first`, `merge`, `decide`, `join`, and
-  `fork` control nodes now streams the authored brace body instead of replacing its contents with
-  `{}`; semantic snapshots expose the retained delimiter provenance.
+- **`PARSE_AST_VERSION` is now 86.** `FirstMergeBody` brace forms retain an aggregate source span,
+  exact opening- and closing-brace spans, and ordered typed action-body members. Valid output pins
+  and other recognized members remain semantic syntax; unsupported and malformed members are
+  explicit nodes that preserve diagnostics and recovery continuation. Formatting `first`, `merge`,
+  `decide`, `join`, and `fork` bodies consumes those typed members instead of fabricating `{}` or
+  treating a source slice as successful syntax.
+- **For-loop ranges are always typed expressions.** The parser no longer publishes
+  `Expression::Opaque(String)` when range parsing fails. Malformed ranges recover as explicit error
+  nodes, roll back speculative qualified-reference identities, and preserve later siblings.
 - **`PARSE_AST_VERSION` is now 84.** Return-reference bodies now contain typed documentation,
   result-expression, and recovery elements; calculation/constraint returns and return references
   roll back speculative arena identities on failure; occurrence portions use the

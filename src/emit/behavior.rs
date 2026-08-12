@@ -1064,8 +1064,27 @@ fn emit_first_merge_body(
             Ok(())
         }
         crate::ast::FirstMergeBody::Brace(body) => {
-            w.push_char(' ');
-            w.push_source_span(path, &body.span)
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (index, element) in body.value.elements.iter().enumerate() {
+                let element_path = format!("{path}/body[{index}]");
+                match &element.value {
+                    crate::ast::FirstMergeBodyElement::Member(member) => {
+                        emit_action_def_body_element(w, &element_path, &member.value)?;
+                    }
+                    crate::ast::FirstMergeBodyElement::Unsupported(unsupported) => {
+                        w.push_recovery_span(&element_path, &unsupported.span)?;
+                    }
+                    crate::ast::FirstMergeBodyElement::Error(error) => {
+                        w.push_recovery_span(&element_path, &error.span)?;
+                    }
+                }
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
         }
     }
 }

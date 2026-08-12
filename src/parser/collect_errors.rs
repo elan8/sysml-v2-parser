@@ -5,13 +5,14 @@ use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AliasBody,
     AttributeBody, AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
     ConnectionDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, DefinitionBody,
-    DefinitionBodyElement, InterfaceDefBody, InterfaceDefBodyElement, OccurrenceBodyElement,
-    OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
-    PartUsageBody, PartUsageBodyElement, PortDefBody, PortDefBodyElement, RefBody, RefBodyElement,
-    RelationshipBodyElement, RenderingDefBody, RenderingDefBodyElement, RequirementDefBody,
-    RequirementDefBodyElement, ReturnRefBody, ReturnRefBodyElement, RootNamespace, StateDefBody,
-    StateDefBodyElement, TextualRepresentation, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
-    ViewBodyElement, ViewDefBody, ViewDefBodyElement,
+    DefinitionBodyElement, FirstMergeBody, FirstMergeBodyElement, InterfaceDefBody,
+    InterfaceDefBodyElement, OccurrenceBodyElement, OccurrenceUsageBody, PackageBody,
+    PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement,
+    PortDefBody, PortDefBodyElement, RefBody, RefBodyElement, RelationshipBodyElement,
+    RenderingDefBody, RenderingDefBodyElement, RequirementDefBody, RequirementDefBodyElement,
+    ReturnRefBody, ReturnRefBodyElement, RootNamespace, StateDefBody, StateDefBodyElement,
+    TextualRepresentation, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
+    ViewDefBody, ViewDefBodyElement,
 };
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
@@ -131,6 +132,30 @@ fn collect_action_def_body_errors(body: &ActionDefBody, errors: &mut Vec<ParseEr
     }
 }
 
+fn collect_first_merge_body_errors(body: &FirstMergeBody, errors: &mut Vec<ParseError>) {
+    match body {
+        FirstMergeBody::Semicolon => {}
+        FirstMergeBody::Brace(body) => {
+            for element in &body.value.elements {
+                match &element.value {
+                    FirstMergeBodyElement::Member(member) => {
+                        collect_action_def_body_element_errors(member, errors)
+                    }
+                    FirstMergeBodyElement::Unsupported(unsupported) => {
+                        errors.push(parse_error_from_recovery_node(
+                            &element.span,
+                            &unsupported.value.diagnostic,
+                        ));
+                    }
+                    FirstMergeBodyElement::Error(error) => {
+                        errors.push(parse_error_from_recovery_node(&element.span, &error.value));
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn collect_action_def_body_element_errors(
     element: &crate::ast::Node<ActionDefBodyElement>,
     errors: &mut Vec<ParseError>,
@@ -174,14 +199,20 @@ fn collect_action_def_body_element_errors(
         }
         ActionDefBodyElement::ForLoop(n) => collect_action_def_body_errors(&n.value.body, errors),
         ActionDefBodyElement::ThenAction(n) => collect_then_action_errors(&n.value, errors),
+        ActionDefBodyElement::FirstStmt(n) => {
+            collect_first_merge_body_errors(&n.value.body, errors)
+        }
+        ActionDefBodyElement::MergeStmt(n) => {
+            collect_first_merge_body_errors(&n.value.body, errors)
+        }
+        ActionDefBodyElement::DecisionStmt(n) => {
+            collect_first_merge_body_errors(&n.value.body, errors)
+        }
+        ActionDefBodyElement::JoinStmt(n) => collect_first_merge_body_errors(&n.value.body, errors),
+        ActionDefBodyElement::ForkStmt(n) => collect_first_merge_body_errors(&n.value.body, errors),
         ActionDefBodyElement::InOutDecl(_)
         | ActionDefBodyElement::Doc(_)
         | ActionDefBodyElement::Annotation(_)
-        | ActionDefBodyElement::FirstStmt(_)
-        | ActionDefBodyElement::MergeStmt(_)
-        | ActionDefBodyElement::DecisionStmt(_)
-        | ActionDefBodyElement::JoinStmt(_)
-        | ActionDefBodyElement::ForkStmt(_)
         | ActionDefBodyElement::TerminateStmt(_)
         | ActionDefBodyElement::Assign(_)
         | ActionDefBodyElement::Decl(_)
@@ -339,14 +370,24 @@ fn collect_action_usage_body_element_errors(
         ActionUsageBodyElement::ForLoop(n) => collect_action_def_body_errors(&n.value.body, errors),
         ActionUsageBodyElement::ThenAction(n) => collect_then_action_errors(&n.value, errors),
         ActionUsageBodyElement::VariantUsage(n) => collect_variant_usage_errors(&n.value, errors),
+        ActionUsageBodyElement::FirstStmt(n) => {
+            collect_first_merge_body_errors(&n.value.body, errors)
+        }
+        ActionUsageBodyElement::MergeStmt(n) => {
+            collect_first_merge_body_errors(&n.value.body, errors)
+        }
+        ActionUsageBodyElement::DecisionStmt(n) => {
+            collect_first_merge_body_errors(&n.value.body, errors)
+        }
+        ActionUsageBodyElement::JoinStmt(n) => {
+            collect_first_merge_body_errors(&n.value.body, errors)
+        }
+        ActionUsageBodyElement::ForkStmt(n) => {
+            collect_first_merge_body_errors(&n.value.body, errors)
+        }
         ActionUsageBodyElement::Doc(_)
         | ActionUsageBodyElement::Annotation(_)
         | ActionUsageBodyElement::InOutDecl(_)
-        | ActionUsageBodyElement::FirstStmt(_)
-        | ActionUsageBodyElement::MergeStmt(_)
-        | ActionUsageBodyElement::DecisionStmt(_)
-        | ActionUsageBodyElement::JoinStmt(_)
-        | ActionUsageBodyElement::ForkStmt(_)
         | ActionUsageBodyElement::TerminateStmt(_)
         | ActionUsageBodyElement::Assign(_)
         | ActionUsageBodyElement::Decl(_)
@@ -941,8 +982,10 @@ fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>
                     | PartDefBodyElement::DefaultReferenceUsage(_)
                     | PartDefBodyElement::Connect(_)
                     | PartDefBodyElement::Allocate(_)
-                    | PartDefBodyElement::EnumDef(_)
-                    | PartDefBodyElement::FirstStmt(_) => {}
+                    | PartDefBodyElement::EnumDef(_) => {}
+                    PartDefBodyElement::FirstStmt(n) => {
+                        collect_first_merge_body_errors(&n.value.body, errors)
+                    }
                 }
             }
         }
@@ -1211,11 +1254,10 @@ fn collect_then_action_errors(action: &crate::ast::ThenAction, errors: &mut Vec<
             collect_action_usage_body_errors(&n.value.body, errors)
         }
         crate::ast::ThenTarget::Perform(n) => collect_perform_body_errors(&n.value.body, errors),
-        crate::ast::ThenTarget::Merge(_)
-        | crate::ast::ThenTarget::Fork(_)
-        | crate::ast::ThenTarget::Decide(_)
-        | crate::ast::ThenTarget::Accept(_)
-        | crate::ast::ThenTarget::Feature(_) => {}
+        crate::ast::ThenTarget::Merge(n) => collect_first_merge_body_errors(&n.value.body, errors),
+        crate::ast::ThenTarget::Fork(n) => collect_first_merge_body_errors(&n.value.body, errors),
+        crate::ast::ThenTarget::Decide(n) => collect_first_merge_body_errors(&n.value.body, errors),
+        crate::ast::ThenTarget::Accept(_) | crate::ast::ThenTarget::Feature(_) => {}
     }
 }
 

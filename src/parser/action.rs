@@ -2,9 +2,10 @@
 
 use crate::ast::{
     ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstMergeBraceBody,
-    FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt,
-    Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget, WhileStmt,
+    ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstMergeBodyElement,
+    FirstMergeBraceBody, FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt,
+    LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget,
+    WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -242,7 +243,24 @@ fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
 
 fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
     let start = input;
-    let (input, ()) = consume_action_structured_brace(input)?;
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        ACTION_BODY_STARTERS,
+        "first/merge body",
+        "recovered_first_merge_body_element",
+        first_merge_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                ACTION_BODY_STARTERS,
+                "first/merge body",
+                "recovered_first_merge_body_element",
+            );
+            let node = node_from_to(start, end, recovery);
+            node_from_to(start, end, FirstMergeBodyElement::Error(node))
+        },
+    )?;
     let consumed_len = start.fragment().len() - input.fragment().len();
     debug_assert!(consumed_len >= 2);
     let (after_open, _) = start.take_split(1);
@@ -254,10 +272,81 @@ fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody
             input,
             FirstMergeBraceBody {
                 open_brace_span: span_from_to(start, after_open),
+                elements,
                 close_brace_span: span_from_to(close_start, input),
             },
         )),
     ))
+}
+
+fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMergeBodyElement>> {
+    let start = input;
+    let checkpoint = input.extra.reference_checkpoint();
+    let (input, member) = action_def_body_element(input)?;
+    let span = member.span.clone();
+    let value = match member.value {
+        ActionDefBodyElement::Decl(_) => {
+            // The declaration's interior may itself contain references. Because this member is
+            // retained as unsupported source rather than typed syntax, those identities must not
+            // leak into the finished document arena.
+            start.extra.rollback_references(checkpoint);
+            let consumed_len = start.fragment().len() - input.fragment().len();
+            let found = String::from_utf8_lossy(&start.fragment()[..consumed_len]).into_owned();
+            let diagnostic = ParseErrorNode {
+                message: "spec-valid action-body member is not modeled in first/merge bodies"
+                    .to_owned(),
+                code: "unsupported_grammar_form".to_owned(),
+                expected: Some("a structured action-body member".to_owned()),
+                found: Some(found),
+                suggestion: Some(
+                    "Keep this syntax; parser support is incomplete rather than the model being malformed."
+                        .to_owned(),
+                ),
+                category: Some(crate::error::DiagnosticCategory::UnsupportedGrammarForm),
+            };
+            FirstMergeBodyElement::Unsupported(Node::new(
+                span.clone(),
+                crate::ast::UnsupportedGrammarNode {
+                    production: crate::ast::UnsupportedProduction::ActionBodyMember,
+                    diagnostic,
+                },
+            ))
+        }
+        value @ (ActionDefBodyElement::Error(_)
+        | ActionDefBodyElement::InOutDecl(_)
+        | ActionDefBodyElement::Doc(_)
+        | ActionDefBodyElement::Annotation(_)
+        | ActionDefBodyElement::MetadataAnnotation(_)
+        | ActionDefBodyElement::MetadataKeywordUsage(_)
+        | ActionDefBodyElement::MetadataUsage(_)
+        | ActionDefBodyElement::TextualRep(_)
+        | ActionDefBodyElement::RefDecl(_)
+        | ActionDefBodyElement::Perform(_)
+        | ActionDefBodyElement::Bind(_)
+        | ActionDefBodyElement::FlowUsage(_)
+        | ActionDefBodyElement::FirstStmt(_)
+        | ActionDefBodyElement::MergeStmt(_)
+        | ActionDefBodyElement::DecisionStmt(_)
+        | ActionDefBodyElement::JoinStmt(_)
+        | ActionDefBodyElement::ForkStmt(_)
+        | ActionDefBodyElement::TerminateStmt(_)
+        | ActionDefBodyElement::WhileStmt(_)
+        | ActionDefBodyElement::LoopStmt(_)
+        | ActionDefBodyElement::IfStmt(_)
+        | ActionDefBodyElement::StateUsage(_)
+        | ActionDefBodyElement::ActionUsage(_)
+        | ActionDefBodyElement::PartUsage(_)
+        | ActionDefBodyElement::ItemUsage(_)
+        | ActionDefBodyElement::AssertConstraint(_)
+        | ActionDefBodyElement::OccurrenceUsage(_)
+        | ActionDefBodyElement::Assign(_)
+        | ActionDefBodyElement::ForLoop(_)
+        | ActionDefBodyElement::ThenAction(_)
+        | ActionDefBodyElement::DefaultReferenceUsage(_)) => {
+            FirstMergeBodyElement::Member(Box::new(Node::new(span.clone(), value)))
+        }
+    };
+    Ok((input, Node::new(span, value)))
 }
 
 /// In/out decl: `in` name `:` type `;` or `out` name `:` type `;`
@@ -473,6 +562,10 @@ pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStm
 }
 
 pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
+    crate::parser::span::reference_transaction(input, for_loop_inner)
+}
+
+fn for_loop_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"for"[..]).parse(input)?;
@@ -480,23 +573,10 @@ pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
     let (input, var) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"in"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    // Prefer a structured expression (e.g. `1..10`, `someCollection`, `x->size()`); fall back
-    // to raw text only for range forms the expression grammar still doesn't cover, kept as a
-    // defensive net rather than removed (arrow-invocation was the last known common gap here).
-    let (input, range) = match expression(input) {
-        Ok(ok) => ok,
-        Err(_) => {
-            let (next, raw) = take_until_terminator(input, b"{")?;
-            (
-                next,
-                node_from_to(
-                    input,
-                    next,
-                    crate::ast::Expression::Opaque(raw.trim().to_string()),
-                ),
-            )
-        }
-    };
+    // A successfully parsed loop always owns a typed expression. If the range is malformed, the
+    // complete production fails so the containing editor body inserts an explicit recovery node;
+    // `reference_transaction` also discards any references allocated before that failure.
+    let (input, range) = expression(input)?;
     let (input, body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
     Ok((
         input,
@@ -773,6 +853,10 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
 
 /// First stmt: (`succession` prefix)? `first` `[mult]`? path (`then` `[mult]`? path)? body
 pub(crate) fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
+    crate::parser::span::reference_transaction(input, first_stmt_inner)
+}
+
+fn first_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, succession) = opt(succession_prefix).parse(input)?;
@@ -820,6 +904,10 @@ pub(crate) fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>
 
 /// Merge stmt: `merge` path body
 fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
+    crate::parser::span::reference_transaction(input, merge_stmt_inner)
+}
+
+fn merge_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"merge"[..]).parse(input)?;
@@ -841,6 +929,10 @@ fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
 
 /// Decision node: `decide` path body
 fn decision_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
+    crate::parser::span::reference_transaction(input, decision_stmt_inner)
+}
+
+fn decision_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"decide"[..]).parse(input)?;
@@ -862,6 +954,10 @@ fn decision_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
 
 /// Join node: `join` path body
 fn join_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
+    crate::parser::span::reference_transaction(input, join_stmt_inner)
+}
+
+fn join_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"join"[..]).parse(input)?;
@@ -883,6 +979,10 @@ fn join_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
 
 /// Fork node: `fork` path body
 fn fork_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
+    crate::parser::span::reference_transaction(input, fork_stmt_inner)
+}
+
+fn fork_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"fork"[..]).parse(input)?;
@@ -1593,6 +1693,12 @@ mod control_node_gap_tests {
                 );
                 assert_eq!(body.value.open_brace_span.offset, body.span.offset);
                 assert_eq!(body.value.open_brace_span.len, 1);
+                assert_eq!(body.value.elements.len(), 1);
+                assert!(matches!(
+                    &body.value.elements[0].value,
+                    FirstMergeBodyElement::Member(member)
+                        if matches!(member.value, ActionDefBodyElement::InOutDecl(_))
+                ));
                 assert_eq!(
                     body.value.close_brace_span.offset,
                     body.span.offset + body.span.len - 1
@@ -1601,6 +1707,33 @@ mod control_node_gap_tests {
             }
             other => panic!("expected FirstStmt, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn first_merge_body_keeps_unsupported_and_malformed_members_then_resumes() {
+        let source = "first start then finish { calc opaque; bogus ???; in resumed; }";
+        let (rest, node) = action_def_body_element(input(source)).expect("first/merge body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let ActionDefBodyElement::FirstStmt(first) = node.value else {
+            panic!("expected FirstStmt");
+        };
+        let FirstMergeBody::Brace(body) = first.value.body else {
+            panic!("expected brace body");
+        };
+        assert_eq!(body.value.elements.len(), 3);
+        assert!(matches!(
+            body.value.elements[0].value,
+            FirstMergeBodyElement::Unsupported(_)
+        ));
+        assert!(matches!(
+            body.value.elements[1].value,
+            FirstMergeBodyElement::Error(_)
+        ));
+        assert!(matches!(
+            &body.value.elements[2].value,
+            FirstMergeBodyElement::Member(member)
+                if matches!(member.value, ActionDefBodyElement::InOutDecl(_))
+        ));
     }
 
     /// §6 G14: `loop { ... }` is a `while` with no condition. The §5 audit wired

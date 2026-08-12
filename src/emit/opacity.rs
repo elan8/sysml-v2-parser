@@ -1310,9 +1310,28 @@ fn walk_then_target(report: &mut OpacityReport, path: &str, target: &ThenTarget)
 
 fn walk_first_merge_body(report: &mut OpacityReport, path: &str, body: &FirstMergeBody) {
     match body {
-        FirstMergeBody::Semicolon | FirstMergeBody::Brace(_) => {}
+        FirstMergeBody::Semicolon => {}
+        FirstMergeBody::Brace(body) => {
+            for (index, element) in body.value.elements.iter().enumerate() {
+                let element_path = format!("{path}/body[{index}]");
+                match &element.value {
+                    crate::ast::FirstMergeBodyElement::Member(member) => {
+                        walk_action_def_body_elements(
+                            report,
+                            &element_path,
+                            std::slice::from_ref(member.as_ref()),
+                        );
+                    }
+                    crate::ast::FirstMergeBodyElement::Unsupported(_) => {
+                        hit(report, &element_path, OpacityKind::UnsupportedGrammar)
+                    }
+                    crate::ast::FirstMergeBodyElement::Error(_) => {
+                        hit(report, &element_path, OpacityKind::ParseError)
+                    }
+                }
+            }
+        }
     }
-    let _ = (report, path);
 }
 
 fn walk_connect_body(report: &mut OpacityReport, path: &str, body: &ConnectBody) {

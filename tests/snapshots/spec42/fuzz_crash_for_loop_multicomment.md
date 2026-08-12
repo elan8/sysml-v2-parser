@@ -42,6 +42,6 @@ perform action doS : Dff {     for y // ndent g {
 (parsed-document
   (references
   )
-  (root (package (name "P") (body (action-def))))
+  (root (package (name "P") (body (action-def (name "A") (specializes none) (body (malformed (code "recovered_action_body_element") (found "for") (span (offset 31) (line 3) (column 5) (len 105))))))))
 )
 ~~~

@@ -201,19 +201,9 @@ package '3a-Function-based Behavior-1' {
             bind wheelTorque1 = 'distribute torque'.wheelTorque1;
             bind wheelTorque2 = 'distribute torque'.wheelTorque2;
             first start then continue {
-				/*
-				 * A first is an assertion that one thing must occur
-				 * before another, acting like a "control flow". 'start' is
-				 * the start snapshot of the action, which acts like an
-				 * "initial node".
-				 */
-			}
+            }
             merge continue {
-				/*
-				 * A merge node is necessary to prevent a loop of successions
-				 * from being unsatisfiable.
-				 */
-			}
+            }
             first continue then engineStarted;
             action engineStarted accept engineStart : EngineStart {
             }
@@ -239,7 +229,19 @@ package '3a-Function-based Behavior-1' {
     (reference r0 (scope relative) (span (offset 56) (line 2) (column 16) (len 11)) (segments (segment 0 (token "Definitions") (name "Definitions") (separator none) (span (offset 56) (line 2) (column 16) (len 11)))))
     (reference r1 (scope relative) (span (offset 87) (line 3) (column 16) (len 6)) (segments (segment 0 (token "Usages") (name "Usages") (separator none) (span (offset 87) (line 3) (column 16) (len 6)))))
     (reference r2 (scope relative) (span (offset 141) (line 6) (column 20) (len 16)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 141) (line 6) (column 20) (len 3))) (segment 1 (token "TorqueValue") (name "TorqueValue") (separator colon-colon) (span (offset 146) (line 6) (column 25) (len 11)))))
+    (reference r3 (scope relative) (span (offset 612) (line 26) (column 46) (len 7)) (segments (segment 0 (token "FuelCmd") (name "FuelCmd") (separator none) (span (offset 612) (line 26) (column 46) (len 7)))))
+    (reference r4 (scope relative) (span (offset 639) (line 26) (column 73) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 639) (line 26) (column 73) (len 6)))))
+    (reference r5 (scope relative) (span (offset 698) (line 27) (column 50) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 698) (line 27) (column 50) (len 6)))))
+    (reference r6 (scope relative) (span (offset 730) (line 27) (column 82) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 730) (line 27) (column 82) (len 6)))))
+    (reference r7 (scope relative) (span (offset 796) (line 28) (column 57) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 796) (line 28) (column 57) (len 6)))))
+    (reference r8 (scope relative) (span (offset 826) (line 28) (column 87) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 826) (line 28) (column 87) (len 6)))))
+    (reference r9 (scope relative) (span (offset 892) (line 29) (column 57) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 892) (line 29) (column 57) (len 6)))))
+    (reference r10 (scope relative) (span (offset 918) (line 29) (column 83) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 918) (line 29) (column 83) (len 6)))))
+    (reference r11 (scope relative) (span (offset 944) (line 29) (column 109) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 944) (line 29) (column 109) (len 6)))))
+    (reference r12 (scope relative) (span (offset 1000) (line 31) (column 44) (len 7)) (segments (segment 0 (token "FuelCmd") (name "FuelCmd") (separator none) (span (offset 1000) (line 31) (column 44) (len 7)))))
+    (reference r13 (scope relative) (span (offset 1027) (line 31) (column 71) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 1027) (line 31) (column 71) (len 6)))))
+    (reference r14 (scope relative) (span (offset 1053) (line 31) (column 97) (len 6)) (segments (segment 0 (token "Torque") (name "Torque") (separator none) (span (offset 1053) (line 31) (column 97) (len 6)))))
   )
-  (root (package (name "3a-Function-based Behavior-1") (body (import (target (span (span (offset 56) (line 2) (column 16) (len 14))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 67) (line 2) (column 27) (len 3))) (separator (span (offset 67) (line 2) (column 27) (len 2))) (marker (span (offset 69) (line 2) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 87) (line 3) (column 16) (len 9))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 93) (line 3) (column 22) (len 3))) (separator (span (offset 93) (line 3) (column 22) (len 2))) (marker (span (offset 95) (line 3) (column 24) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "Definitions") (body (alias (name "Torque") (target (ref r2)) (body brace (element-count 0))) (attribute-def) (attribute-def) (attribute-def) (action-def) (action-def) (action-def) (action-def) (action-def))) (package (name "Usages") (body (action-usage))))))
+  (root (package (name "3a-Function-based Behavior-1") (body (import (target (span (span (offset 56) (line 2) (column 16) (len 14))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 67) (line 2) (column 27) (len 3))) (separator (span (offset 67) (line 2) (column 27) (len 2))) (marker (span (offset 69) (line 2) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 87) (line 3) (column 16) (len 9))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 93) (line 3) (column 22) (len 3))) (separator (span (offset 93) (line 3) (column 22) (len 2))) (marker (span (offset 95) (line 3) (column 24) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "Definitions") (body (alias (name "Torque") (target (ref r2)) (body brace (element-count 0))) (attribute-def) (attribute-def) (attribute-def) (action-def (name "Generate Torque") (specializes none) (body (in-out (direction in) (declaration "fuelCmd") (type (ref r3)) (redefines none) (value none) (span (offset 600) (line 26) (column 34) (len 20))) (in-out (direction out) (declaration "engineTorque") (type (ref r4)) (redefines none) (value none) (span (offset 621) (line 26) (column 55) (len 25))))) (action-def (name "Amplify Torque") (specializes none) (body (in-out (direction in) (declaration "engineTorque") (type (ref r5)) (redefines none) (value none) (span (offset 681) (line 27) (column 33) (len 24))) (in-out (direction out) (declaration "transmissionTorque") (type (ref r6)) (redefines none) (value none) (span (offset 706) (line 27) (column 58) (len 31))))) (action-def (name "Transfer Torque") (specializes none) (body (in-out (direction in) (declaration "transmissionTorque") (type (ref r7)) (redefines none) (value none) (span (offset 773) (line 28) (column 34) (len 30))) (in-out (direction out) (declaration "driveshaftTorque") (type (ref r8)) (redefines none) (value none) (span (offset 804) (line 28) (column 65) (len 29))))) (action-def (name "Distribute Torque") (specializes none) (body (in-out (direction in) (declaration "driveShaftTorque") (type (ref r9)) (redefines none) (value none) (span (offset 871) (line 29) (column 36) (len 28))) (in-out (direction out) (declaration "wheelTorque1") (type (ref r10)) (redefines none) (value none) (span (offset 900) (line 29) (column 65) (len 25))) (in-out (direction out) (declaration "wheelTorque2") (type (ref r11)) (redefines none) (value none) (span (offset 926) (line 29) (column 91) (len 25))))) (action-def (name "Provide Power") (specializes none) (body (in-out (direction in) (declaration "fuelCmd") (type (ref r12)) (redefines none) (value none) (span (offset 988) (line 31) (column 32) (len 20))) (in-out (direction out) (declaration "wheelTorque1") (type (ref r13)) (redefines none) (value none) (span (offset 1009) (line 31) (column 53) (len 25))) (in-out (direction out) (declaration "wheelTorque2") (type (ref r14)) (redefines none) (value none) (span (offset 1035) (line 31) (column 79) (len 25))))))) (package (name "Usages") (body (action-usage))))))
 )
 ~~~

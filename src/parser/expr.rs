@@ -292,6 +292,10 @@ fn null_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 
 /// SelectExpression: base `.?` selector
 fn select_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    crate::parser::span::reference_transaction(input, select_expression_inner)
+}
+
+fn select_expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, base) = feature_ref_primary(input)?;
     let (input, _) = tag(&b".?"[..]).parse(input)?;
@@ -311,6 +315,10 @@ fn select_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 
 /// CollectExpression: base `.**` selector
 fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    crate::parser::span::reference_transaction(input, collect_expression_inner)
+}
+
+fn collect_expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, base) = feature_ref_primary(input)?;
     let (input, _) = tag(&b".**"[..]).parse(input)?;

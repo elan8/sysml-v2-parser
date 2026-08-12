@@ -263,11 +263,9 @@ action def Compute {
 }
 
 #[test]
-fn test_for_loop_range_uses_structured_arrow_invocation_not_raw_text_fallback() {
-    // Regression: `for_loop()` falls back to a raw-text `Expression::FeatureRef` when
-    // `expression()` can't parse the range. Arrow-invocation (`->`) used to be the common
-    // case that hit this fallback; now that expr.rs supports `->`, the range should parse
-    // as a structured Invocation, not the raw fallback text.
+fn test_for_loop_range_uses_structured_collection_operator() {
+    // A successful for-loop always owns a typed expression. Arrow invocation is represented by
+    // the dedicated collection-operator form rather than copied range text.
     let input = r#"package P {
 action def Iterate {
   in powerProfile;
@@ -306,10 +304,7 @@ action def Iterate {
         Expression::CollectionOp { op, .. } => {
             assert_eq!(op, &sysml_v2_parser::ast::CollectionOperator::Size);
         }
-        other => panic!(
-            "expected structured CollectionOp range (not the raw-text FeatureRef fallback), got {:?}",
-            other
-        ),
+        other => panic!("expected structured CollectionOp range, got {:?}", other),
     }
 }
 
