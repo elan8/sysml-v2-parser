@@ -20,13 +20,16 @@ use crate::parser::dependency::dependency;
 use crate::parser::enumeration::{enum_def, enum_usage};
 use crate::parser::expr::expression;
 use crate::parser::flow::{flow_def, flow_usage};
+use crate::parser::grammar_scope::{
+    package_body_starter, PackageProduction, PACKAGE_BODY_STARTERS,
+};
 use crate::parser::import::import_;
 use crate::parser::individual::individual_def;
 use crate::parser::interface::interface_def;
 use crate::parser::item::{item_def, item_usage};
 use crate::parser::lex::{
     name, qualified_declaration_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments, PACKAGE_BODY_STARTERS,
+    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
 };
 use crate::parser::metadata::{metadata_def, metadata_usage};
 use crate::parser::node_from_to;
@@ -326,6 +329,107 @@ fn is_modeled_decl_start(fragment: &[u8], starters: &[&[u8]]) -> bool {
     starts_with_any_keyword(frag, starters)
 }
 
+fn unsupported_package_element(
+    input: Input<'_>,
+    recovery_end: Input<'_>,
+) -> Option<Node<PackageBodyElement>> {
+    let (trimmed, _) = ws_and_comments(input).ok()?;
+    let stripped = strip_common_decl_prefixes(trimmed.fragment());
+    let starter = package_body_starter(stripped)?;
+    let unsupported_production = match starter.production {
+        PackageProduction::BindingConnectorAsUsage => {
+            crate::ast::UnsupportedProduction::BindingConnectorAsUsage
+        }
+        PackageProduction::Message => crate::ast::UnsupportedProduction::Message,
+        PackageProduction::Succession => crate::ast::UnsupportedProduction::SuccessionAsUsage,
+        PackageProduction::PerformActionUsage => {
+            crate::ast::UnsupportedProduction::PerformActionUsage
+        }
+        PackageProduction::ExhibitStateUsage => {
+            crate::ast::UnsupportedProduction::ExhibitStateUsage
+        }
+        PackageProduction::IncludeUseCaseUsage => {
+            crate::ast::UnsupportedProduction::IncludeUseCaseUsage
+        }
+        PackageProduction::PrefixMetadataMember
+        | PackageProduction::DefinitionElement
+        | PackageProduction::Action
+        | PackageProduction::ActorUsage
+        | PackageProduction::AliasMember
+        | PackageProduction::Allocation
+        | PackageProduction::AnalysisCase
+        | PackageProduction::AssertConstraintUsage
+        | PackageProduction::Constraint
+        | PackageProduction::Attribute
+        | PackageProduction::Calculation
+        | PackageProduction::Case
+        | PackageProduction::Comment
+        | PackageProduction::Concern
+        | PackageProduction::Connection
+        | PackageProduction::Dependency
+        | PackageProduction::Documentation
+        | PackageProduction::Enumeration
+        | PackageProduction::Expose
+        | PackageProduction::ElementFilterMember
+        | PackageProduction::Flow
+        | PackageProduction::RequirementBodyItem
+        | PackageProduction::Import
+        | PackageProduction::Individual
+        | PackageProduction::Interface
+        | PackageProduction::Item
+        | PackageProduction::LibraryPackage
+        | PackageProduction::Metadata
+        | PackageProduction::Namespace
+        | PackageProduction::Occurrence
+        | PackageProduction::Package
+        | PackageProduction::Part
+        | PackageProduction::Port
+        | PackageProduction::MemberPrefix
+        | PackageProduction::ViewRenderingUsage
+        | PackageProduction::Rendering
+        | PackageProduction::TextualRepresentation
+        | PackageProduction::Requirement
+        | PackageProduction::SatisfyRequirementUsage
+        | PackageProduction::UseCase
+        | PackageProduction::VerificationCase
+        | PackageProduction::View
+        | PackageProduction::Viewpoint
+        | PackageProduction::FeaturePrefix
+        | PackageProduction::UsagePrefix
+        | PackageProduction::Connector
+        | PackageProduction::TextualRepresentationLanguage => return None,
+    };
+    let found = crate::parser::recovery::recovery_found_snippet_from_span(input, recovery_end);
+    let recovery = crate::ast::ParseErrorNode {
+        message: format!(
+            "the spec-valid {} production is not implemented in package bodies",
+            starter.production.bnf_name()
+        ),
+        code: "unsupported_grammar_form".to_owned(),
+        expected: Some(format!(
+            "implemented package-body form for {}",
+            starter.production.bnf_name()
+        )),
+        found,
+        suggestion: Some(
+            "Keep this syntax; parser support is incomplete rather than the authored model being malformed."
+                .to_owned(),
+        ),
+        category: Some(crate::error::DiagnosticCategory::UnsupportedGrammarForm),
+    };
+    Some(node_from_to(
+        input,
+        recovery_end,
+        PackageBodyElement::Unsupported(Node::new(
+            crate::ast::Span::dummy(),
+            crate::ast::UnsupportedGrammarNode {
+                production: unsupported_production,
+                diagnostic: recovery,
+            },
+        )),
+    ))
+}
+
 fn parse_modeled_decl<'a>(
     input: Input<'a>,
     starters: &'a [&'a [u8]],
@@ -525,6 +629,11 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                         nom::error::ErrorKind::Many0,
                     )));
                 }
+                if let Some(unsupported) = unsupported_package_element(input, next) {
+                    elements.push(unsupported);
+                    input = next;
+                    continue;
+                }
                 let recovery = build_recovery_error_node_from_span(
                     input,
                     next,
@@ -589,6 +698,11 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                         input,
                         nom::error::ErrorKind::Many0,
                     )));
+                }
+                if let Some(unsupported) = unsupported_package_element(input, next) {
+                    elements.push(unsupported);
+                    input = next;
+                    continue;
                 }
                 let recovery = build_recovery_error_node_from_span(
                     input,

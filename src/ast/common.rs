@@ -25,6 +25,26 @@ pub struct ParseErrorNode {
     pub suggestion: Option<String>,
     pub category: Option<crate::error::DiagnosticCategory>,
 }
+
+/// A spec-valid grammar production that is not implemented in the containing parser scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum UnsupportedProduction {
+    BindingConnectorAsUsage,
+    Message,
+    SuccessionAsUsage,
+    PerformActionUsage,
+    ExhibitStateUsage,
+    IncludeUseCaseUsage,
+}
+
+/// Explicit AST state for valid grammar that this parser cannot yet model in the current scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct UnsupportedGrammarNode {
+    pub production: UnsupportedProduction,
+    pub diagnostic: ParseErrorNode,
+}
 /// Identification: optional short name in `< >`, optional name.
 /// BNF: ( '<' declaredShortName = NAME '>' )? ( declaredName = NAME )?
 #[derive(Debug, Clone, PartialEq, Eq)]

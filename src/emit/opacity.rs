@@ -25,6 +25,7 @@ pub enum OpacityKind {
     RawBodyString,
     OpaqueConnectBrace,
     ParseError,
+    UnsupportedGrammar,
 }
 
 /// One opaque hit with a path for diagnostics.
@@ -89,6 +90,7 @@ fn walk_package_body(report: &mut OpacityReport, path: &str, body: &PackageBody)
 fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &PackageBodyElement) {
     match el {
         PackageBodyElement::Error(_) => hit(report, path, OpacityKind::ParseError),
+        PackageBodyElement::Unsupported(_) => hit(report, path, OpacityKind::UnsupportedGrammar),
         PackageBodyElement::FeatureDecl(_) => hit(report, path, OpacityKind::FeatureDecl),
         PackageBodyElement::ClassifierDecl(_) => hit(report, path, OpacityKind::ClassifierDecl),
         PackageBodyElement::KermlSemanticDecl(_) => {

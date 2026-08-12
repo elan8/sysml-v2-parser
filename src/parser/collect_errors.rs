@@ -514,6 +514,12 @@ fn collect_package_body_element_errors(
         PackageBodyElement::Error(n) => {
             errors.push(parse_error_from_recovery_node(&element.span, &n.value));
         }
+        PackageBodyElement::Unsupported(n) => {
+            errors.push(parse_error_from_recovery_node(
+                &element.span,
+                &n.value.diagnostic,
+            ));
+        }
         PackageBodyElement::Package(n) => collect_package_body_errors(&n.value.body, errors),
         PackageBodyElement::LibraryPackage(n) => collect_package_body_errors(&n.value.body, errors),
         PackageBodyElement::PartDef(n) => collect_part_def_body_errors(&n.value.body, errors),

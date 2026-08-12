@@ -64,6 +64,8 @@ cargo test --test vacuuming_types_parse -- --include-ignored
 
 When changing AST fields or body-element shapes, refresh checked-in snapshots in the same PR — see [`tests/validation/README.md`](tests/validation/README.md).
 
+The library exposes [`SUPPORTED_GRAMMAR`](https://docs.rs/sysml-v2-parser/latest/sysml_v2_parser/constant.SUPPORTED_GRAMMAR.html), containing the pinned SysML release tag, repository, and combined textual-BNF content hash. Build-time validation derives it from `docs/conformance-target` and rejects a checked-out grammar whose bytes do not match the pin.
+
 The driver in `tools/snapshot_tool` manages every snapshot under `tests/snapshots`:
 hand-authored qualified-reference fixtures in `qualified_references`, and the imported spec42
 corpus in `spec42`, whose fixtures cover the SysML and KerML libraries, spec examples, training

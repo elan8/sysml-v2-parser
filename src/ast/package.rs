@@ -3,7 +3,10 @@ use super::behavior::{
     StateUsage,
 };
 use super::common::FilterMember;
-use super::common::{CommentAnnotation, DocComment, Import, ParseErrorNode, TextualRepresentation};
+use super::common::{
+    CommentAnnotation, DocComment, Import, ParseErrorNode, TextualRepresentation,
+    UnsupportedGrammarNode,
+};
 use super::kerml_fallback::{
     ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlFeatureDecl, KermlSemanticDecl,
 };
@@ -111,6 +114,8 @@ pub struct LibraryPackage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PackageBodyElement {
     Error(Node<ParseErrorNode>),
+    /// Spec-valid package member whose grammar production is not implemented in this scope.
+    Unsupported(Node<UnsupportedGrammarNode>),
     Doc(Node<DocComment>),
     Comment(Node<CommentAnnotation>),
     TextualRep(Node<TextualRepresentation>),

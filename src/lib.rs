@@ -59,7 +59,23 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 81;
+pub const PARSE_AST_VERSION: u32 = 82;
+
+/// The pinned grammar release understood by this build of the parser.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SupportedGrammar {
+    pub release_tag: &'static str,
+    pub release_repository: &'static str,
+    /// Hash over the pinned SysML and KerML textual BNF filenames and bytes.
+    pub content_hash: &'static str,
+}
+
+/// Authoritative SysML/KerML grammar pin, generated from `docs/conformance-target` at build time.
+pub const SUPPORTED_GRAMMAR: SupportedGrammar = SupportedGrammar {
+    release_tag: env!("SYSML_PARSER_RELEASE_TAG"),
+    release_repository: env!("SYSML_PARSER_RELEASE_REPO"),
+    content_hash: env!("SYSML_PARSER_GRAMMAR_CONTENT_HASH"),
+};
 pub use parser::{
     parse_root, parse_root_owned, parse_with_diagnostics, parse_with_diagnostics_owned, ParseResult,
 };

@@ -33,6 +33,7 @@ mod enumeration;
 mod expr;
 mod feature_value;
 mod flow;
+mod grammar_scope;
 mod import;
 mod individual;
 mod interface;

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Grammar conformance is now machine-readable and scope checked.** The public
+  `SUPPORTED_GRAMMAR` constant exposes the release tag, repository, and deterministic content hash
+  derived from the single `docs/conformance-target` pin; builds with the BNF checkout present reject
+  mismatched grammar bytes. Package-body recovery starters now come from one typed production table
+  whose spec entries are linted against a nullable-aware `FIRST(PackageBodyElement)` derivation.
+  Spec-valid package forms that reach an unimplemented dispatch branch produce typed
+  `UnsupportedGrammarForm` nodes instead of blaming authored input with malformed nodes.
+  `PARSE_AST_VERSION` is now 82.
 - **Semantic references are now typed, source-backed, and document-local (#119).** `parse()` and
   editor parsing return a `ParsedDocument` that atomically owns the BOM-normalized source,
   `QualifiedReferenceArena`, and root AST. Imports, exposes, expressions, requirement references,

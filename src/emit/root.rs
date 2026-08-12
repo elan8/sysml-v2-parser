@@ -91,7 +91,10 @@ fn emit_package_body_node(
     path: &str,
     node: &crate::ast::Node<PackageBodyElement>,
 ) -> Result<(), EmitError> {
-    if matches!(node.value, PackageBodyElement::Error(_)) {
+    if matches!(
+        node.value,
+        PackageBodyElement::Error(_) | PackageBodyElement::Unsupported(_)
+    ) {
         return w.push_recovery_span(path, &node.span);
     }
     emit_package_body_element(w, path, &node.value)
@@ -104,6 +107,9 @@ pub(crate) fn emit_package_body_element(
 ) -> Result<(), EmitError> {
     match el {
         PackageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        PackageBodyElement::Unsupported(unsupported) => {
+            w.push_recovery_span(path, &unsupported.span)
+        }
         PackageBodyElement::Doc(d) => emit_doc(w, &d.value),
         PackageBodyElement::Comment(c) => emit_comment(w, &c.value),
         PackageBodyElement::TextualRep(t) => emit_textual_rep(w, &t.value),

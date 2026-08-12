@@ -441,6 +441,29 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_unsupported(
+        &mut self,
+        unsupported: &super::UnsupportedGrammarNode,
+        span: &Span,
+    ) -> io::Result<()> {
+        self.writer.write_str("(unsupported (production ")?;
+        self.writer.write_str(match unsupported.production {
+            super::UnsupportedProduction::BindingConnectorAsUsage => "binding-connector-as-usage",
+            super::UnsupportedProduction::Message => "message",
+            super::UnsupportedProduction::SuccessionAsUsage => "succession-as-usage",
+            super::UnsupportedProduction::PerformActionUsage => "perform-action-usage",
+            super::UnsupportedProduction::ExhibitStateUsage => "exhibit-state-usage",
+            super::UnsupportedProduction::IncludeUseCaseUsage => "include-use-case-usage",
+        })?;
+        self.writer.write_str(") (code ")?;
+        write_quoted(self.writer, &unsupported.diagnostic.code)?;
+        self.writer.write_str(") (found ")?;
+        write_optional_quoted(self.writer, unsupported.diagnostic.found.as_deref())?;
+        self.writer.write_str(") ")?;
+        write_span(self.writer, span)?;
+        self.writer.write_char(')')
+    }
+
     fn write_requirement_body(&mut self, body: &RequirementDefBody) -> io::Result<()> {
         match body {
             RequirementDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
@@ -1675,6 +1698,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::Error(error) => {
                 self.write_item_prefix(first)?;
                 self.write_malformed(&error.value, &element.span)
+            }
+            PackageBodyElement::Unsupported(unsupported) => {
+                self.write_item_prefix(first)?;
+                self.write_unsupported(&unsupported.value, &element.span)
             }
             PackageBodyElement::Doc(_doc) => self.write_marker(first, "doc"),
             PackageBodyElement::Comment(_comment) => self.write_marker(first, "comment"),

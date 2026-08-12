@@ -13,7 +13,7 @@ package P {
 (fixture-diagnostics
   (document "fuzz_binding_name_before_mult.md"
     (diagnostics
-      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 16) (line 2) (column 5) (len 24)) (message "unexpected keyword `binding` in package body"))
+      (diagnostic (code "unsupported_grammar_form") (severity error) (category unsupportedgrammarform) (span (offset 16) (line 2) (column 5) (len 24)) (message "the spec-valid BindingConnectorAsUsage production is not implemented in package bodies"))
     )
   )
 )
@@ -27,6 +27,6 @@ package P {
 (parsed-document
   (references
   )
-  (root (package (name "P") (body (malformed (code "unexpected_keyword_in_scope") (found "binding b [5] of a = c;") (span (offset 16) (line 2) (column 5) (len 24))))))
+  (root (package (name "P") (body (unsupported (production binding-connector-as-usage) (code "unsupported_grammar_form") (found "binding b [5] of a = c;") (span (offset 16) (line 2) (column 5) (len 24))))))
 )
 ~~~

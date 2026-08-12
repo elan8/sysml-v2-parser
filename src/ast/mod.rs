@@ -113,6 +113,9 @@ fn normalize_package_body(b: &PackageBody) -> PackageBody {
 fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<PackageBodyElement> {
     let value = match &el.value {
         PackageBodyElement::Error(n) => PackageBodyElement::Error(dummy_node(n, n.value.clone())),
+        PackageBodyElement::Unsupported(n) => {
+            PackageBodyElement::Unsupported(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::Doc(n) => PackageBodyElement::Doc(dummy_node(n, n.value.clone())),
         PackageBodyElement::Comment(n) => {
             PackageBodyElement::Comment(dummy_node(n, n.value.clone()))

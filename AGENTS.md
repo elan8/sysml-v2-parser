@@ -75,6 +75,9 @@ not precedent: do not copy or extend them, and do not disguise them with compati
 
 ## Typed grammar and exhaustive evolution
 
+- Grammar identity and support claims flow from one authoritative conformance pin. Expose its
+  release and content hash to callers, derive scope-level FIRST sets from the pinned grammar, and
+  fail loudly when parser dispatch/recovery tables drift; never duplicate or hand-update the claim.
 - Model grammar alternatives with enums and structured fields. Booleans are appropriate only for
   genuinely independent binary properties, not as a compressed encoding of mutually exclusive
   syntax shapes.
