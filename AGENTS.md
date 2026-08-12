@@ -157,9 +157,11 @@ not precedent: do not copy or extend them, and do not disguise them with compati
 - For a behavior change, test the narrow rule and its end-to-end projection. Include both sides where
   relevant: absolute/relative, `::`/`.`, quoted/unquoted, valid/malformed, strict/editor,
   serialize/deserialize, and parse/format/reparse.
-- Allocation-sensitive work includes evidence appropriate to its claim: structural tests for borrowed
-  views and packed ranges, plus benchmarks or profiles for performance assertions. Avoid proxy claims
-  based only on code shape.
+- Performance work is data-driven. Establish a reproducible baseline on representative checked-in
+  parser inputs before optimizing; use repeated measurements or profiles, report regressions as well
+  as wins, and retain the benchmark that supports the claim. Allocation-sensitive work also includes
+  owning-layer evidence for borrowed views and packed ranges. Never infer performance from code shape
+  or optimize solely for a synthetic input that omits recovery and real grammar diversity.
 - Run focused checks while iterating, then formatting, all-feature compilation, snapshot check, serde
   validation, and the broader test suite appropriate to the change. Do not weaken assertions or skip
   tests merely to make a migration compile.

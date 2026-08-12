@@ -97,6 +97,23 @@ cargo run --bin snapshot_tool -- check --root path/to/snapshots
 The driver processes fixtures sequentially in sorted path order. `check` fails on stale derived
 sections; `update` rewrites them for normal `git diff` review.
 
+### Parser benchmarks
+
+The maintained Criterion benchmark extracts the authored `SOURCE` section from every parser
+snapshot. This keeps timing and profiling inputs aligned with the same semantic, provenance,
+recovery, and malformed cases used by the end-to-end contract instead of relying on a developer's
+local checkout or a synthetic model.
+
+```bash
+cargo bench --bench parser_bench
+cargo bench --bench parser_bench -- --save-baseline before
+cargo bench --bench parser_bench -- --baseline before
+cargo bench --bench parser_bench -- --profile-time 10
+```
+
+It reports each fixture separately and the complete corpus as one workload. Keep benchmark changes
+and their source snapshots reviewable together, and report unfavorable movements alongside wins.
+
 ## Documentation
 
 | Topic | Doc |
