@@ -121,6 +121,32 @@ pub(crate) fn parse_structured_brace_members_with_skip<'a, E, F, G>(
     starters: &[&[u8]],
     _scope_label: &str,
     _recovery_code: &str,
+    parse_element: F,
+    map_recovery: G,
+    skip_mode: BraceMemberSkip,
+) -> IResult<Input<'a>, Vec<Node<E>>>
+where
+    F: FnMut(Input<'a>) -> IResult<Input<'a>, Node<E>>,
+    G: FnMut(Input<'a>, Input<'a>) -> Node<E>,
+{
+    crate::parser::stack::with_nested_body_stack(move || {
+        parse_structured_brace_members_inner(
+            input,
+            starters,
+            _scope_label,
+            _recovery_code,
+            parse_element,
+            map_recovery,
+            skip_mode,
+        )
+    })
+}
+
+fn parse_structured_brace_members_inner<'a, E, F, G>(
+    input: Input<'a>,
+    starters: &[&[u8]],
+    _scope_label: &str,
+    _recovery_code: &str,
     mut parse_element: F,
     mut map_recovery: G,
     skip_mode: BraceMemberSkip,

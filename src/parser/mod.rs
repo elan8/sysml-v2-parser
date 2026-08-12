@@ -51,6 +51,7 @@ mod recovery;
 mod requirement;
 mod span;
 mod specialization;
+mod stack;
 mod state;
 mod usage;
 mod usecase;

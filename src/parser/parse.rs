@@ -24,37 +24,6 @@ use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 /// pathological nesting before descent keeps parser stack usage bounded on every host.
 pub const MAX_SYNTAX_NESTING: usize = 32;
 
-/// Minimum stack headroom the parser requires from the *caller's* stack before it's safe to
-/// recurse on it as-is.
-///
-/// `stacker::maybe_grow` only samples remaining stack once, at this single outermost call --
-/// the recursive-descent grammar itself never re-checks -- so this has to be an upper bound on
-/// total stack the parser could use in the worst case (`MAX_SYNTAX_NESTING`-deep nesting in an
-/// unoptimized/debug build), not a small per-frame "red zone" like typical `maybe_grow` usage.
-/// Measured worst case is ~4 MiB; 16 MiB leaves generous margin. Most callers (default Windows
-/// main-thread stacks are ~1 MiB) will be below this and pay one one-time fiber/segment switch;
-/// callers that already provide a large stack skip it entirely.
-const PARSE_STACK_RED_ZONE: usize = 16 * 1024 * 1024;
-
-/// Size of the stack segment allocated when [`PARSE_STACK_RED_ZONE`] isn't already available.
-///
-/// The recursive-descent grammar walks the call stack once per structural nesting level (see
-/// `MAX_SYNTAX_NESTING`), and unoptimized (debug) builds spend far more stack per frame than
-/// release builds do -- large enough real-world models (e.g. the SysML v2 spec's own Annex A
-/// vehicle example) could exceed a thread's default stack purely from legitimate, bounded
-/// nesting and abort the process with `STATUS_STACK_OVERFLOW` instead of returning a
-/// [`ParseError`]. 64 MiB comfortably covers `MAX_SYNTAX_NESTING`-deep nesting in debug builds
-/// with headroom to spare.
-const PARSE_STACK_GROWTH: usize = 64 * 1024 * 1024;
-
-/// Runs `f` with extra stack headroom if the caller's stack doesn't already meet
-/// [`PARSE_STACK_RED_ZONE`].
-///
-/// See [`PARSE_STACK_GROWTH`] for why the recursive-descent parser needs this.
-fn with_parse_stack<R>(f: impl FnOnce() -> R) -> R {
-    stacker::maybe_grow(PARSE_STACK_RED_ZONE, PARSE_STACK_GROWTH, f)
-}
-
 /// Build the `nesting_too_deep` diagnostic for the offending `{` recorded by the prescan.
 fn nesting_limit_error(input: &[u8], delimiters: &DelimiterScan) -> Option<ParseError> {
     let offset = delimiters.nesting_overflow()?;
@@ -100,7 +69,7 @@ impl ParseResult {
 /// reports) so both entry points agree on whether a document is valid.
 #[allow(clippy::result_large_err)]
 pub fn parse_root(input: &str) -> Result<ParsedDocument, ParseError> {
-    with_parse_stack(|| parse_root_inner(input))
+    parse_root_inner(input)
 }
 
 #[allow(clippy::result_large_err)]
@@ -194,7 +163,7 @@ const MAX_RECOVERY_ERRORS: usize = 100;
 /// Parse input with error recovery: collects multiple diagnostics and returns a partial AST when errors occur.
 /// Use this for language servers so the user sees all parse errors and features (e.g. hover) can use the partial AST.
 pub fn parse_with_diagnostics(input: &str) -> ParseResult {
-    with_parse_stack(|| parse_with_diagnostics_inner(input))
+    parse_with_diagnostics_inner(input)
 }
 
 fn parse_with_diagnostics_inner(input: &str) -> ParseResult {

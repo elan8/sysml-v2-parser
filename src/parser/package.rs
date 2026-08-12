@@ -470,6 +470,10 @@ fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLi
 }
 
 fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
+    crate::parser::stack::with_nested_body_stack(|| package_body_brace_inner(input))
+}
+
+fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
     let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
     let mut elements = Vec::new();
     loop {
