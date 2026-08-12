@@ -207,6 +207,9 @@ pub(crate) fn emit_package_body_element(
 pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(), EmitError> {
     emit_visibility(w, import.membership.visibility);
     w.push_str("import ");
+    if import.target.all_span.is_some() {
+        w.push_str("all ");
+    }
     emit_import_target(w, "import/target", &import.target)?;
     // Preserve RelationshipBody shape: `None` → `;`, `Some` → `{ ... }` even when empty
     // (brace bodies with only trivia comments parse as `Some([])`).

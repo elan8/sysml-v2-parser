@@ -72,9 +72,19 @@ pub fn parse_root(input: &str) -> Result<ParsedDocument, ParseError> {
     parse_root_inner(input)
 }
 
+/// Parse an owned source buffer without cloning the complete document.
+#[allow(clippy::result_large_err)]
+pub fn parse_root_owned(input: String) -> Result<ParsedDocument, ParseError> {
+    parse_root_source(SourceStorage::new(input))
+}
+
 #[allow(clippy::result_large_err)]
 fn parse_root_inner(input: &str) -> Result<ParsedDocument, ParseError> {
-    let source = SourceStorage::new(input.to_owned());
+    parse_root_source(SourceStorage::new(input.to_owned()))
+}
+
+#[allow(clippy::result_large_err)]
+fn parse_root_source(source: SourceStorage) -> Result<ParsedDocument, ParseError> {
     let context = ParseContext::new();
     let root = parse_root_namespace(source.as_str(), &context)?;
     Ok(ParsedDocument {
@@ -166,8 +176,16 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
     parse_with_diagnostics_inner(input)
 }
 
+/// Parse an owned source buffer for editor use without cloning the complete document.
+pub fn parse_with_diagnostics_owned(input: String) -> ParseResult {
+    parse_with_diagnostics_source(SourceStorage::new(input))
+}
+
 fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
-    let source = SourceStorage::new(input.to_owned());
+    parse_with_diagnostics_source(SourceStorage::new(input.to_owned()))
+}
+
+fn parse_with_diagnostics_source(source: SourceStorage) -> ParseResult {
     let context = ParseContext::new();
     let (root, errors) = parse_with_diagnostics_document(source.as_str(), &context);
     ParseResult {

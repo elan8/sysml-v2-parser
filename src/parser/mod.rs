@@ -60,6 +60,8 @@ mod view;
 pub(crate) use feature_value::feature_value_part;
 pub(crate) use span::{node_from_to, span_from_to, with_span, Input};
 
-pub use parse::{parse_root, parse_with_diagnostics, ParseResult};
+pub use parse::{
+    parse_root, parse_root_owned, parse_with_diagnostics, parse_with_diagnostics_owned, ParseResult,
+};
 
 pub(crate) use recovery::{build_recovery_error_node, build_recovery_error_node_from_span};

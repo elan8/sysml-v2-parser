@@ -1,4 +1,6 @@
 use super::common::Import;
+#[cfg(feature = "serde")]
+use super::import_visit::validate_import_target_provenance;
 use super::package::{
     LibraryPackage, Package, PackageBody, PackageBodyElement, QualifiedDeclarationName,
     QualifiedIdentification,
@@ -159,255 +161,6 @@ fn validate_serialized_document(document: &ParsedDocument) -> Result<(), String>
         },
     )
     .map_err(|error| error.to_string())
-}
-
-#[cfg(feature = "serde")]
-fn validate_import_target_provenance(document: &ParsedDocument) -> Result<(), String> {
-    fn target(document: &ParsedDocument, target: &super::ImportTarget) -> Result<(), String> {
-        target
-            .validate_provenance(&document.source, &document.qualified_references)
-            .map_err(|error| error.to_string())
-    }
-
-    fn package_body(document: &ParsedDocument, body: &PackageBody) -> Result<(), String> {
-        let PackageBody::Brace { elements } = body else {
-            return Ok(());
-        };
-        for element in elements {
-            package_element(document, &element.value)?;
-        }
-        Ok(())
-    }
-
-    fn package_element(
-        document: &ParsedDocument,
-        element: &PackageBodyElement,
-    ) -> Result<(), String> {
-        match element {
-            PackageBodyElement::Package(package) => package_body(document, &package.value.body),
-            PackageBodyElement::LibraryPackage(package) => {
-                package_body(document, &package.value.body)
-            }
-            PackageBodyElement::Import(import) => target(document, &import.value.target),
-            PackageBodyElement::PartDef(definition) => {
-                part_def_body(document, &definition.value.body)
-            }
-            PackageBodyElement::PartUsage(usage) => part_usage_body(document, &usage.value.body),
-            PackageBodyElement::RequirementDef(definition) => {
-                requirement_body(document, &definition.value.body)
-            }
-            PackageBodyElement::RequirementUsage(usage) => {
-                requirement_body(document, &usage.value.body)
-            }
-            PackageBodyElement::ConcernUsage(usage) => {
-                requirement_body(document, &usage.value.body)
-            }
-            PackageBodyElement::ViewpointDef(definition) => {
-                requirement_body(document, &definition.value.body)
-            }
-            PackageBodyElement::ViewpointUsage(usage) => {
-                requirement_body(document, &usage.value.body)
-            }
-            PackageBodyElement::ViewUsage(usage) => view_body(document, &usage.value.body),
-            PackageBodyElement::RenderingUsage(usage) => {
-                rendering_body(document, &usage.value.body)
-            }
-            PackageBodyElement::AttributeDef(definition) => {
-                attribute_body(document, &definition.value.body)
-            }
-            PackageBodyElement::AttributeUsage(usage) => {
-                attribute_body(document, &usage.value.body)
-            }
-            PackageBodyElement::ItemDef(definition) => {
-                attribute_body(document, &definition.value.body)
-            }
-            PackageBodyElement::ItemUsage(usage) => attribute_body(document, &usage.value.body),
-            PackageBodyElement::IndividualDef(definition) => {
-                attribute_body(document, &definition.value.body)
-            }
-            _ => Ok(()),
-        }
-    }
-
-    fn part_def_body(document: &ParsedDocument, body: &super::PartDefBody) -> Result<(), String> {
-        let super::PartDefBody::Brace { elements } = body else {
-            return Ok(());
-        };
-        for element in elements {
-            match &element.value {
-                super::PartDefBodyElement::Import(import) => {
-                    target(document, &import.value.target)?
-                }
-                super::PartDefBodyElement::PartDef(definition) => {
-                    part_def_body(document, &definition.value.body)?
-                }
-                super::PartDefBodyElement::PartUsage(usage) => {
-                    part_usage_body(document, &usage.value.body)?
-                }
-                super::PartDefBodyElement::RequirementDef(definition) => {
-                    requirement_body(document, &definition.value.body)?
-                }
-                super::PartDefBodyElement::RequirementUsage(usage) => {
-                    requirement_body(document, &usage.value.body)?
-                }
-                super::PartDefBodyElement::ViewUsage(usage) => {
-                    view_body(document, &usage.value.body)?
-                }
-                super::PartDefBodyElement::ViewpointDef(definition) => {
-                    requirement_body(document, &definition.value.body)?
-                }
-                super::PartDefBodyElement::ViewpointUsage(usage) => {
-                    requirement_body(document, &usage.value.body)?
-                }
-                super::PartDefBodyElement::AttributeDef(definition) => {
-                    attribute_body(document, &definition.value.body)?
-                }
-                super::PartDefBodyElement::AttributeUsage(usage) => {
-                    attribute_body(document, &usage.value.body)?
-                }
-                super::PartDefBodyElement::ItemDef(definition) => {
-                    attribute_body(document, &definition.value.body)?
-                }
-                super::PartDefBodyElement::ItemUsage(usage) => {
-                    attribute_body(document, &usage.value.body)?
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    }
-
-    fn part_usage_body(
-        document: &ParsedDocument,
-        body: &super::PartUsageBody,
-    ) -> Result<(), String> {
-        let super::PartUsageBody::Brace { elements } = body else {
-            return Ok(());
-        };
-        for element in elements {
-            match &element.value {
-                super::PartUsageBodyElement::Import(import) => {
-                    target(document, &import.value.target)?
-                }
-                super::PartUsageBodyElement::PartUsage(usage) => {
-                    part_usage_body(document, &usage.value.body)?
-                }
-                super::PartUsageBodyElement::RequirementDef(definition) => {
-                    requirement_body(document, &definition.value.body)?
-                }
-                super::PartUsageBodyElement::RequirementUsage(usage) => {
-                    requirement_body(document, &usage.value.body)?
-                }
-                super::PartUsageBodyElement::AttributeUsage(usage) => {
-                    attribute_body(document, &usage.value.body)?
-                }
-                super::PartUsageBodyElement::ItemDef(definition) => {
-                    attribute_body(document, &definition.value.body)?
-                }
-                super::PartUsageBodyElement::ItemUsage(usage) => {
-                    attribute_body(document, &usage.value.body)?
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    }
-
-    fn attribute_body(
-        document: &ParsedDocument,
-        body: &super::AttributeBody,
-    ) -> Result<(), String> {
-        let super::AttributeBody::Brace { elements } = body else {
-            return Ok(());
-        };
-        for element in elements {
-            match &element.value {
-                super::AttributeBodyElement::AttributeDef(definition) => {
-                    attribute_body(document, &definition.value.body)?
-                }
-                super::AttributeBodyElement::AttributeUsage(usage) => {
-                    attribute_body(document, &usage.value.body)?
-                }
-                super::AttributeBodyElement::PartUsage(usage) => {
-                    part_usage_body(document, &usage.value.body)?
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    }
-
-    fn requirement_body(
-        document: &ParsedDocument,
-        body: &super::RequirementDefBody,
-    ) -> Result<(), String> {
-        let super::RequirementDefBody::Brace { elements } = body else {
-            return Ok(());
-        };
-        for element in elements {
-            match &element.value {
-                super::RequirementDefBodyElement::Import(import) => {
-                    target(document, &import.value.target)?
-                }
-                super::RequirementDefBodyElement::RequirementUsage(usage) => {
-                    requirement_body(document, &usage.value.body)?
-                }
-                super::RequirementDefBodyElement::Frame(frame) => {
-                    requirement_body(document, &frame.value.body)?
-                }
-                super::RequirementDefBodyElement::AttributeDef(definition) => {
-                    attribute_body(document, &definition.value.body)?
-                }
-                super::RequirementDefBodyElement::AttributeUsage(usage) => {
-                    attribute_body(document, &usage.value.body)?
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    }
-
-    fn view_body(document: &ParsedDocument, body: &super::ViewBody) -> Result<(), String> {
-        let super::ViewBody::Brace { elements } = body else {
-            return Ok(());
-        };
-        for element in elements {
-            if let super::ViewBodyElement::Expose(expose) = &element.value {
-                target(document, &expose.value.target)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn rendering_body(
-        document: &ParsedDocument,
-        body: &super::RenderingUsageBody,
-    ) -> Result<(), String> {
-        let super::RenderingUsageBody::Brace { elements } = body else {
-            return Ok(());
-        };
-        for element in elements {
-            match &element.value {
-                super::RenderingUsageBodyElement::ViewUsage(usage) => {
-                    view_body(document, &usage.value.body)?
-                }
-                super::RenderingUsageBodyElement::Error(_)
-                | super::RenderingUsageBodyElement::Doc(_) => {}
-            }
-        }
-        Ok(())
-    }
-
-    for element in &document.root.elements {
-        match &element.value {
-            RootElement::Package(package) => package_body(document, &package.value.body)?,
-            RootElement::LibraryPackage(package) => package_body(document, &package.value.body)?,
-            RootElement::Namespace(namespace) => package_body(document, &namespace.value.body)?,
-            RootElement::Import(import) => target(document, &import.value.target)?,
-            RootElement::Member(member) => package_element(document, &member.value)?,
-        }
-    }
-    Ok(())
 }
 
 /// A no-output serde traversal that validates every `QualifiedReferenceId` anywhere in the AST.
@@ -1071,6 +824,25 @@ mod serde_tests {
     }
 
     #[test]
+    fn parsed_document_validates_imports_nested_beneath_action_and_use_case_members() {
+        for source in [
+            "action def A { part p { import Nested::ActionTarget::*; } }",
+            "use case def U { part p { import Nested::UseCaseTarget::*; } }",
+        ] {
+            let document = crate::parse(source).expect("nested import");
+            let mut encoded = serde_json::to_value(document).expect("serialize document");
+            let target_span = find_import_target_mut(&mut encoded)
+                .and_then(|target| target.get_mut("span"))
+                .expect("nested import target span");
+            target_span["len"] = serde_json::json!(1);
+
+            let error = serde_json::from_value::<ParsedDocument>(encoded)
+                .expect_err("nested import provenance must be validated");
+            assert!(error.to_string().contains("import target"));
+        }
+    }
+
+    #[test]
     fn a_partial_root_is_not_a_complete_serialized_document() {
         let document = document_with_reference();
         let root_only = serde_json::to_value(&document.root).expect("serialize root component");
@@ -1116,6 +888,25 @@ mod serde_tests {
                 fields
                     .values_mut()
                     .find_map(|value| find_field_mut(value, field))
+            }
+            _ => None,
+        }
+    }
+
+    fn find_import_target_mut(
+        value: &mut serde_json::Value,
+    ) -> Option<&mut serde_json::Map<String, serde_json::Value>> {
+        match value {
+            serde_json::Value::Array(values) => values.iter_mut().find_map(find_import_target_mut),
+            serde_json::Value::Object(fields) => {
+                if fields.contains_key("span")
+                    && fields.contains_key("all_span")
+                    && fields.contains_key("reference")
+                    && fields.contains_key("shape")
+                {
+                    return Some(fields);
+                }
+                fields.values_mut().find_map(find_import_target_mut)
             }
             _ => None,
         }

@@ -13,7 +13,7 @@ use crate::parser::{node_from_to, span_from_to, with_span};
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
 use nom::multi::many1;
-use nom::sequence::preceded;
+use nom::sequence::{preceded, terminated};
 use nom::IResult;
 use nom::Parser;
 
@@ -143,9 +143,12 @@ fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"import"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
+    let target_start = input;
+    let (input, all) = opt(terminated(with_span(tag(&b"all"[..])), ws1)).parse(input)?;
+    let all_span = all.map(|(span, _)| span);
     let (input, reference) = qualified_reference(input)?;
     let (input, shape) = import_shape(input)?;
+    let target_span = span_from_to(target_start, input);
     let (input, body_elements) = relationship_body(input)?;
     Ok((
         input,
@@ -154,7 +157,12 @@ fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
             input,
             Import {
                 membership: Membership::new(MembershipKind::Import, visibility, visibility_span),
-                target: ImportTarget { reference, shape },
+                target: ImportTarget {
+                    span: target_span,
+                    all_span,
+                    reference,
+                    shape,
+                },
                 body_elements,
             },
         ),

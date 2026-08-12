@@ -1097,12 +1097,13 @@ pub(crate) fn package_body_element(
     // `tests/recovery_diagnostics_integration.rs`) that a permissive bare-`name;` arm here would
     // silently swallow before those diagnostics ever ran -- same class of regression already
     // avoided for action bodies, see `feature_value_binding`'s doc comment.
-    if let Ok((input, elem)) = map(
-        crate::parser::attribute::feature_value_binding,
-        PackageBodyElement::DefaultReferenceUsage,
-    )
-    .parse(input)
-    {
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::attribute::feature_value_binding,
+            PackageBodyElement::DefaultReferenceUsage,
+        )
+        .parse(input)
+    }) {
         return Ok((input, Box::new(node_from_to(start, input, elem))));
     }
     if let Ok((input, elem)) =

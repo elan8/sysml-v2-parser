@@ -95,6 +95,10 @@ pub enum ImportShape {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ImportTarget {
+    /// Exact span from the first qualified-name token through the final suffix or filter member.
+    pub span: Span,
+    /// Exact authored `all` token on an import. Always `None` for expose targets.
+    pub all_span: Option<Span>,
     pub reference: QualifiedReferenceId,
     pub shape: ImportShape,
 }
@@ -169,7 +173,28 @@ impl ImportTarget {
             .ok_or(ImportTargetValidationError::DanglingReference { id: self.reference })?;
         let reference_end = span_end(&reference.metadata.span, "reference")?;
 
-        match &self.shape {
+        validate_span(source, &self.span, "import target")?;
+        let expected_start = self
+            .all_span
+            .as_ref()
+            .map_or(reference.metadata.span.offset, |span| span.offset);
+        if self.span.offset != expected_start {
+            return Err(ImportTargetValidationError::ShapeInvariant {
+                message: "import target span must begin with 'all' when present, otherwise with its qualified reference",
+            });
+        }
+        if let Some(all_span) = &self.all_span {
+            validate_token(source, all_span, "all", "import all")?;
+            validate_trivia_order(
+                source,
+                span_end(all_span, "import all")?,
+                reference.metadata.span.offset,
+                "import all",
+                "reference",
+            )?;
+        }
+
+        let target_end = match &self.shape {
             ImportShape::Membership { recursive_suffix } => {
                 if let Some(suffix) = recursive_suffix {
                     validate_suffix(source, suffix, "**", "recursive suffix")?;
@@ -180,6 +205,9 @@ impl ImportTarget {
                         "reference",
                         "recursive suffix",
                     )?;
+                    span_end(&suffix.span, "recursive suffix")?
+                } else {
+                    reference_end
                 }
             }
             ImportShape::Namespace {
@@ -215,8 +243,9 @@ impl ImportTarget {
                                 message: "combined recursive suffix span must cover wildcard and recursive suffixes exactly",
                             });
                         }
+                        recursive_end
                     }
-                    (None, None) => {}
+                    (None, None) => span_end(&wildcard_suffix.span, "wildcard suffix")?,
                     (Some(_), None) | (None, Some(_)) => {
                         return Err(ImportTargetValidationError::ShapeInvariant {
                             message: "combined recursive suffix span must be present exactly when the recursive suffix is present",
@@ -252,7 +281,13 @@ impl ImportTarget {
                     previous_end = span_end(&member.span, "filter member")?;
                     previous_role = "filter member";
                 }
+                previous_end
             }
+        };
+        if span_end(&self.span, "import target")? != target_end {
+            return Err(ImportTargetValidationError::ShapeInvariant {
+                message: "import target span must end with its final suffix or filter member",
+            });
         }
         Ok(())
     }

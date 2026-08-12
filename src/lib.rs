@@ -59,8 +59,10 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 80;
-pub use parser::{parse_root, parse_with_diagnostics, ParseResult};
+pub const PARSE_AST_VERSION: u32 = 81;
+pub use parser::{
+    parse_root, parse_root_owned, parse_with_diagnostics, parse_with_diagnostics_owned, ParseResult,
+};
 
 /// Parse a SysML v2 textual input into an atomic source/arena/AST document.
 ///
@@ -71,6 +73,12 @@ pub fn parse(input: &str) -> Result<ParsedDocument, ParseError> {
     parse_root(input)
 }
 
+/// Parse an owned SysML v2 source buffer without cloning the complete document.
+#[allow(clippy::result_large_err)]
+pub fn parse_owned(input: String) -> Result<ParsedDocument, ParseError> {
+    parse_root_owned(input)
+}
+
 /// Parse for editor/LSP use: returns a partial AST plus diagnostics, never fails.
 ///
 /// Prefer this over [`parse`] when you want IDE features (outline/hover/semantic tokens) to keep
@@ -78,4 +86,28 @@ pub fn parse(input: &str) -> Result<ParsedDocument, ParseError> {
 /// for the equivalence guarantee between the two on clean input.
 pub fn parse_for_editor(input: &str) -> ParseResult {
     parse_with_diagnostics(input)
+}
+
+/// Parse an owned source buffer for editor/LSP use without cloning the complete document.
+pub fn parse_for_editor_owned(input: String) -> ParseResult {
+    parse_with_diagnostics_owned(input)
+}
+
+#[cfg(test)]
+mod owned_source_tests {
+    #[test]
+    fn parse_owned_reuses_the_callers_source_allocation() {
+        let source = String::from("package Owned;");
+        let allocation = source.as_ptr();
+        let document = super::parse_owned(source).expect("owned parse");
+        assert_eq!(document.source.as_str().as_ptr(), allocation);
+    }
+
+    #[test]
+    fn parse_for_editor_owned_reuses_the_callers_source_allocation() {
+        let source = String::from("not valid");
+        let allocation = source.as_ptr();
+        let result = super::parse_for_editor_owned(source);
+        assert_eq!(result.document.source.as_str().as_ptr(), allocation);
+    }
 }

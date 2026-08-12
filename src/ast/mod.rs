@@ -8,6 +8,8 @@ pub use kerml_fallback::*;
 mod behavior;
 mod common;
 mod feature_value;
+#[cfg(feature = "serde")]
+mod import_visit;
 mod membership;
 mod package;
 mod qualified_reference;

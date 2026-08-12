@@ -351,7 +351,15 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_import_target(&mut self, target: &ImportTarget) -> io::Result<()> {
-        self.writer.write_str("(target ")?;
+        self.writer.write_str("(target (span ")?;
+        write_span(self.writer, &target.span)?;
+        self.writer.write_str(") (all ")?;
+        if let Some(span) = &target.all_span {
+            write_span(self.writer, span)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
         self.write_reference(target.reference)?;
         self.writer.write_str(" (shape ")?;
         match &target.shape {

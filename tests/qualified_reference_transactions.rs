@@ -106,3 +106,17 @@ fn malformed_expose_branch_rolls_back_before_the_next_view_member() {
     );
     assert_eq!(result.document.qualified_references.len(), 1);
 }
+
+#[test]
+fn failed_package_binding_lookahead_does_not_publish_an_orphan_reference() {
+    let result = parse_with_diagnostics("candidate :> Live::Target;");
+    assert_eq!(result.document.qualified_references.len(), 0);
+    let mut projection = Vec::new();
+    result
+        .document
+        .write_semantic_ast(&mut projection)
+        .expect("semantic projection");
+    let projection = String::from_utf8(projection).expect("UTF-8 projection");
+    assert!(!projection.contains("(token \"Live\")"));
+    assert!(!projection.contains("(token \"Target\")"));
+}
