@@ -111,10 +111,10 @@ package '15_01-Constants' {
 	     */
         attribute def 'fine structure constant' : DimensionOneValue = 7.2973525693E-3 [one];
         attribute def 'electron to proton mass ratio' : DimensionOneValue = 5.44617021487E-4 [one];
-        attribute def 'speed of light in vacuum' : SpeedValue = 299792458 [m/s];
+        attribute def 'speed of light in vacuum' : SpeedValue = 299792458 ['m/s'];
     }
     package 'Global Context' {
-        attribute def 'nominal earth gravitational acceleration' : AccelerationValue = 9.80665 [m/s²];
+        attribute def 'nominal earth gravitational acceleration' : AccelerationValue = 9.80665 ['m/s²'];
     }
     package 'Model X Context' {
         attribute def 'amplifier gain' : DimensionOneValue = 3.5 [one];

@@ -495,6 +495,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
                 is_reference: is_reference.is_some(),
                 is_individual: is_individual.is_some(),
                 name: n,
+                state_reference: None,
                 type_name,
                 typing,
                 multiplicity,

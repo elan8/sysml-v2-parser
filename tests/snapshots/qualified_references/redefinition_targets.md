@@ -32,7 +32,7 @@ package RedefinitionTargets {
 package RedefinitionTargets {
     part def RedefinitionExamples {
         attribute  :>> name = "My Laptop";
-        attribute  :>> researchAndDevelopmentCost = 5E9 [$];
+        attribute  :>> researchAndDevelopmentCost = 5E9 ['$'];
         attribute  :> electricGrid.outlets :>> outlet;
         attribute  :>> architecture = EeArchitecture::arm;
         port  :>> rotationSpeedIn;

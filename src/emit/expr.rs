@@ -17,7 +17,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             w.push_char('"');
         }
         Expression::LiteralBoolean(b) => w.push_str(if *b { "true" } else { "false" }),
-        Expression::Unit(unit) => w.push_str(unit),
+        Expression::Unit(unit) => w.push_str(&super::writer::format_name(unit)),
         Expression::FeatureRef(reference) => {
             w.push_qualified_reference("expression feature", *reference)?
         }

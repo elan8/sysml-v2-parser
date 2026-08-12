@@ -42,7 +42,6 @@ package 'Constraints Example-1' {
 (fixture-diagnostics
   (document "31_constraints_example_1.md"
     (diagnostics
-      (diagnostic (code "recovered_constraint_body_element") (severity error) (category parseerror) (span (offset 201) (line 10) (column 3) (len 35)) (message "unexpected token in constraint body"))
     )
   )
 )

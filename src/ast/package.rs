@@ -64,7 +64,7 @@ pub enum DeclarationName {
 
 /// Identification used by namespace-owning declarations.
 ///
-/// Unlike the general [`Identification`] grammar node, its main name may be a qualified path.
+/// Unlike the general [`crate::ast::Identification`] grammar node, its main name may be a qualified path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct QualifiedIdentification {

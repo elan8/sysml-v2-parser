@@ -149,7 +149,7 @@ package '15_19a-Materials with Properties' {
             attribute  :>> massFraction = 0.012 [one];
         }
         attribute  :>> fractions = (fraction1, fraction2, fraction3);
-        attribute tensileStrength : TensileStrengthValue = 980 [N/mm²];
+        attribute tensileStrength : TensileStrengthValue = 980 ['N/mm²'];
     }
 }
 ~~~

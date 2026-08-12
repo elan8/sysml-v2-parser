@@ -201,10 +201,10 @@ package '10c-Fuel Economy Analysis' {
             }
         }
         requirement cityFuelEconomyRequirement : FuelEconomyRequirement {
-            :>> requiredFuelEconomy = 25 [mi/gallon];
+            :>> requiredFuelEconomy = 25 ['mi/gallon'];
         }
         requirement highwayFuelEconomyRequirement : FuelEconomyRequirement {
-            :>> requiredFuelEconomy = 30 [mi/gallon];
+            :>> requiredFuelEconomy = 30 ['mi/gallon'];
         }
     }
     package VehicleDesignModel {

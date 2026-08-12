@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 87.** In/out parameters retain their `ref` feature prefix and
+  typed multiplicity, and occurrence-body exhibit usages retain their arena-backed state path.
+  Emission also preserves quoting for compound unit names such as `'N/mm²'`.
 - **`PARSE_AST_VERSION` is now 86.** `FirstMergeBody` brace forms retain an aggregate source span,
   exact opening- and closing-brace spans, and ordered typed action-body members. Valid output pins
   and other recognized members remain semantic syntax; unsupported and malformed members are

@@ -47,8 +47,6 @@ package 'Constraint Assertions-2' {
 (fixture-diagnostics
   (document "31_constraint_assertions_2.md"
     (diagnostics
-      (diagnostic (code "recovered_constraint_body_element") (severity error) (category parseerror) (span (offset 203) (line 10) (column 3) (len 35)) (message "unexpected token in constraint body"))
-      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 203) (line 10) (column 3) (len 35)) (message "suppressed 1 cascading recovered diagnostic after earlier recovery errors"))
     )
   )
 )

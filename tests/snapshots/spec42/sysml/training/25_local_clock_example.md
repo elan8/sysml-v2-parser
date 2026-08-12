@@ -65,7 +65,7 @@ package 'Local Clock Example' {
             transition accept request : Request via requestPort then responding;
             transition accept at new Time::Iso8601DateTime(today + "11:59:00") then off;
             state responding;
-            transition accept after 5 [SI::min] then waiting;
+            transition accept after 5 ['SI::min'] then waiting;
         }
     }
 }

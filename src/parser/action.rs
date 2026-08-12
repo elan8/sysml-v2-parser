@@ -404,8 +404,10 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                 input,
                 InOutDecl {
                     direction,
+                    is_reference: false,
                     name: String::new(),
                     type_name,
+                    multiplicity: None,
                     redefines: Some(redefines),
                     value,
                 },
@@ -415,6 +417,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     let parsed = (|| {
         // Library shorthand: `in action body { ... }` (treat as name `body` typed as `action`)
         let (input, action_typed_name) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
+        let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
         let (input, param_name) = name(input)?;
         // In action usages, pin declarations may omit the type (e.g. `out videoStream;`)
         // to reference the corresponding typed parameter on the referenced action definition.
@@ -437,6 +440,8 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             ),
         )))
         .parse(input)?;
+        let (input, multiplicity) =
+            opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let _ = action_typed_name;
 
         // Optional `= expr` default value (e.g. `in a : Real = 0.0;`).
@@ -464,11 +469,20 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             )),
         )
         .parse(input)?;
-        Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (param_name, type_name, value)))
+        Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((
+            input,
+            (
+                param_name,
+                type_name,
+                multiplicity,
+                value,
+                is_reference.is_some(),
+            ),
+        ))
     })();
     // Malformed declarations must fall through to the enclosing body's explicit recovery node;
     // do not guess a declaration name from opaque text and silently turn it into valid syntax.
-    let (input, (param_name, type_name, value)) = parsed?;
+    let (input, (param_name, type_name, multiplicity, value, is_reference)) = parsed?;
     Ok((
         input,
         node_from_to(
@@ -476,8 +490,10 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             input,
             InOutDecl {
                 direction,
+                is_reference,
                 name: param_name,
                 type_name,
+                multiplicity,
                 redefines: None,
                 value,
             },

@@ -161,7 +161,7 @@ package '15_19-Materials with Properties' {
             ref '' :>> material : Manganese;
             attribute  :>> massFraction = 0.9862 [one];
         }
-        attribute tensileStrength : TensileStrengthValue = 980 [N/mm²];
+        attribute tensileStrength : TensileStrengthValue = 980 ['N/mm²'];
     }
 }
 ~~~

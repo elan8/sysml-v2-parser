@@ -253,7 +253,7 @@ package '6-Individual and Snapshots' {
                     attribute  :>> position = p0;
                     attribute  :>> velocity = v0;
                     attribute  :>> acceleration = a0;
-                    exhibit  {
+                    exhibit vehicleStates.on {
                     }
                 }
                 snapshot road_ID1_t0 : Road_ID1 {
@@ -268,7 +268,7 @@ package '6-Individual and Snapshots' {
                     attribute  :>> position = p1;
                     attribute  :>> velocity = v1;
                     attribute  :>> acceleration = a1;
-                    exhibit ;
+                    exhibit vehicleStates.on;
                 }
                 snapshot road_ID1_t1 : Road_ID1 {
                     attribute  :>> angle = theta1;
@@ -282,7 +282,7 @@ package '6-Individual and Snapshots' {
                     attribute  :>> position = pn;
                     attribute  :>> velocity = vn;
                     attribute  :>> acceleration = an;
-                    exhibit ;
+                    exhibit vehicleStates.off;
                 }
                 snapshot road_ID1_tn : Road_ID1 {
                     attribute  :>> angle = theta1;

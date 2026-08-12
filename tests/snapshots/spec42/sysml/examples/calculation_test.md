@@ -40,7 +40,6 @@ package CalculationExample {
 (fixture-diagnostics
   (document "calculation_test.md"
     (diagnostics
-      (diagnostic (code "recovered_calc_body_element") (severity error) (category parseerror) (span (offset 331) (line 18) (column 3) (len 35)) (message "unexpected token in calc body"))
     )
   )
 )

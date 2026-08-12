@@ -165,7 +165,7 @@ package '9-Verification-simplified' {
             doc
             /* The vehicle mass shall be less than or equal to 2500 kg. */
             :>> massActual = vehicle.mass;
-            :>> massReqd = 2500 [SI::kg];
+            :>> massReqd = 2500 ['SI::kg'];
         }
         part vehicle1_c2 : Vehicle {
         }
@@ -205,12 +205,12 @@ package '9-Verification-simplified' {
         individual testSystem : TestSystem :> massVerificationSystem {
             timeslice test1 {
                 ref individual  : TestVehicle1 :> vehicle1_c2 :>> vehicleUnderTest {
-                    attribute  :>> mass = 2500 [SI::kg];
+                    attribute  :>> mass = 2500 ['SI::kg'];
                 }
             }
             then timeslice test2 {
                 ref individual  : TestVehicle2 :> vehicle1_c2 :>> vehicleUnderTest {
-                    attribute  :>> mass = 2500 [SI::kg];
+                    attribute  :>> mass = 2500 ['SI::kg'];
                 }
             }
         }

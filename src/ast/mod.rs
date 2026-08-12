@@ -1563,6 +1563,7 @@ fn normalize_state_usage(s: &StateUsage) -> StateUsage {
         is_reference: s.is_reference,
         is_individual: s.is_individual,
         name: s.name.clone(),
+        state_reference: s.state_reference,
         type_name: s.type_name,
         typing: s.typing.clone(),
         multiplicity: s.multiplicity.clone(),

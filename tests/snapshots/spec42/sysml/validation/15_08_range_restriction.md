@@ -50,7 +50,7 @@ package '15_08-Range Restriction' {
 			 */
         }
         assert constraint  {
-            angle >= 50 [°] && angle <= 80 [°];
+            angle >= 50 ['°'] && angle <= 80 ['°'];
         }
     }
 }

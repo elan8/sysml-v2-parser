@@ -127,8 +127,6 @@ package MassConstraintExample {
 (fixture-diagnostics
   (document "mass_constraint_example.md"
     (diagnostics
-      (diagnostic (code "recovered_constraint_body_element") (severity error) (category parseerror) (span (offset 717) (line 42) (column 3) (len 39)) (message "unexpected token in constraint body"))
-      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 717) (line 42) (column 3) (len 39)) (message "suppressed 2 cascading recovered diagnostics after earlier recovery errors"))
     )
   )
 )

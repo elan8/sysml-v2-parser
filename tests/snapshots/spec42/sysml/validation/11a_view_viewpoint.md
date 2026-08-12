@@ -81,7 +81,7 @@ package '11a-View-Viewpoint' {
         part def Axle;
         part def Wheel;
         part vehicle : Vehicle {
-            attribute mass :> ISQ::mass = 2500 [SI::kg];
+            attribute mass :> ISQ::mass = 2500 ['SI::kg'];
             part frontAxleAssembly : AxleAssembly[1] {
                 attribute mass :> ISQ::mass = 150 [kg];
                 part frontWheel : Wheel[2];

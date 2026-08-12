@@ -66,8 +66,6 @@ package '15_05-Unification of Expression and Constraint Definition' {
 (fixture-diagnostics
   (document "15_05_unification_of_expression_and_constraint_definition.md"
     (diagnostics
-      (diagnostic (code "recovered_constraint_body_element") (severity error) (category parseerror) (span (offset 222) (line 7) (column 3) (len 34)) (message "unexpected token in constraint body"))
-      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 222) (line 7) (column 3) (len 34)) (message "suppressed 2 cascading recovered diagnostics after earlier recovery errors"))
     )
   )
 )

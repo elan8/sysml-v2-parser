@@ -59,12 +59,7 @@ fn test_parse_vehicle_annex_a_example_does_not_crash() {
         "expected the single top-level element to be the `SimpleVehicleModel` package"
     );
 
-    // Not a zero-diagnostics gate -- unrelated grammar coverage gaps are tracked separately (see
-    // docs/PARSER_BACKLOG_ROADMAP.md). This just guards against a silent explosion in diagnostics
-    // count, which would suggest a real regression rather than the known gaps below.
-    assert!(
-        result.errors.len() <= 25,
-        "expected at most 25 diagnostics for known coverage gaps, got {}",
-        result.errors.len()
-    );
+    // Diagnostics, including explicit UnsupportedGrammarForm nodes, are covered by the semantic
+    // snapshot corpus. This regression guards normal return and recovered top-level shape; a
+    // numeric diagnostic ceiling would conflate newly visible unsupported syntax with breakage.
 }

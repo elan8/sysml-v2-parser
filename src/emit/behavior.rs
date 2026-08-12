@@ -21,6 +21,9 @@ pub(crate) fn emit_inout_decl(
     decl: &InOutDecl,
 ) -> Result<(), EmitError> {
     emit_direction(w, decl.direction);
+    if decl.is_reference {
+        w.push_str("ref ");
+    }
     if let Some(redefines) = &decl.redefines {
         w.push_str(":>> ");
         for (index, target) in redefines.value.target.iter().copied().enumerate() {
@@ -35,6 +38,9 @@ pub(crate) fn emit_inout_decl(
     if let Some(type_name) = decl.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(path, type_name)?;
+    }
+    if let Some(multiplicity) = &decl.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
     }
     if let Some(value) = &decl.value {
         w.push_str(" = ");
@@ -540,7 +546,9 @@ pub(crate) fn emit_state_usage(
         w.push_str("individual ");
     }
     w.push_str("state ");
-    if !usage.name.is_empty() {
+    if let Some(reference) = usage.state_reference {
+        w.push_qualified_reference(&format!("{path}/state"), reference)?;
+    } else if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }
     if let Some(typing) = &usage.typing {
@@ -1304,7 +1312,9 @@ fn emit_occurrence_exhibit(
         w.push_str("individual ");
     }
     w.push_str("exhibit ");
-    if !usage.name.is_empty() {
+    if let Some(reference) = usage.state_reference {
+        w.push_qualified_reference(&format!("{path}/state"), reference)?;
+    } else if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }
     if let Some(typing) = &usage.typing {

@@ -154,9 +154,13 @@ pub enum ThenTarget {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InOutDecl {
     pub direction: InOut,
+    /// Whether the declaration used the `ref` feature prefix (`in ref name : Type`).
+    pub is_reference: bool,
     /// Declared parameter name. Empty for the leading `:>> target` redefinition form.
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Multiplicity following the type, when present.
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Arena-backed target for `in :>> target = expr;` / `out :>> target;` (validation `08`).
     pub redefines: Option<Node<SubsettingRelationship>>,
     /// Optional default value: `= expr` initializer on in/out parameters.
@@ -834,6 +838,8 @@ pub struct StateUsage {
     /// Leading `individual` keyword (after `ref`, per `OccurrenceUsagePrefix` order).
     pub is_individual: bool,
     pub name: String,
+    /// Referenced state path when an `exhibit path` is represented in an occurrence body.
+    pub state_reference: Option<QualifiedReferenceId>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Structured typing clause when a `:` target was written.
     pub typing: Option<Node<TypingRelationship>>,

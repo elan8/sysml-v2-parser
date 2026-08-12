@@ -35,7 +35,7 @@ package 'State Exhibition Example' {
     private import 'Transition Actions'::*;
     part vehicle : Vehicle {
         part vehicleController : VehicleController;
-        state  {
+        state vehicleStates {
             in operatingVehicle = vehicle;
             in controller = vehicleController;
         }

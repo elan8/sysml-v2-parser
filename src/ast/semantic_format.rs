@@ -1335,11 +1335,35 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                     InOut::Out => self.writer.write_str("out")?,
                     InOut::InOut => self.writer.write_str("inout")?,
                 }
+                self.writer.write_str(") (reference ")?;
+                self.writer.write_str(if declaration.value.is_reference {
+                    "true"
+                } else {
+                    "false"
+                })?;
                 self.writer.write_str(") (declaration ")?;
                 self.write_usage_declaration_name(&declaration.value.name)?;
                 self.writer.write_str(") (type ")?;
                 if let Some(reference) = declaration.value.type_name {
                     self.write_reference(reference)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") (multiplicity ")?;
+                if let Some(multiplicity) = &declaration.value.multiplicity {
+                    self.writer.write_str("(lower ")?;
+                    if let Some(lower) = &multiplicity.value.lower {
+                        self.write_expression(lower)?;
+                    } else {
+                        self.writer.write_str("unbounded")?;
+                    }
+                    self.writer.write_str(") (upper ")?;
+                    if let Some(upper) = &multiplicity.value.upper {
+                        self.write_expression(upper)?;
+                    } else {
+                        self.writer.write_str("unbounded")?;
+                    }
+                    self.writer.write_char(')')?;
                 } else {
                     self.writer.write_str("none")?;
                 }

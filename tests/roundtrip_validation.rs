@@ -34,8 +34,8 @@ const ROUNDTRIP_PASS: &[&str] = &[
     // Promoted by #78 follow-up: `part` in item/attribute bodies.
     "03-Function-based Behavior/3e-Function-based Behavior-item.sysml",
     // Promoted by #72 Other-opacity work (state do/out/accept; attribute assert constraint).
-    "05-State-based Behavior/5-State-based Behavior-1.sysml",
-    "05-State-based Behavior/5-State-based Behavior-1a.sysml",
+    // The exhaustive opacity gate now correctly exposes their unmodeled connect brace bodies.
+    // Keep these as known gaps until those members have a typed representation.
     "05-State-based Behavior/5-State-based Behavior-2.sysml",
     // Promoted by import/type quoting (#71) once spaced names reparse cleanly.
     "04-Functional Allocation/4a-Functional Allocation.sysml",
@@ -129,6 +129,7 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     // Promoted by #113: AttributeUsage no longer duplicates the target name for
     // `attribute ::> m = ms.m;`'s target-only prefix form.
     "Simple Tests/CalculationTest.sysml",
+    "Simple Tests/ControlNodeTest.sysml",
     "Simple Tests/CommentTest.sysml",
     "Simple Tests/ConjugationTest.sysml",
     "Simple Tests/DefaultValueTest.sysml",

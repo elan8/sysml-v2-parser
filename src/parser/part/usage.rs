@@ -1406,6 +1406,7 @@ pub(crate) fn exhibit_state_as_state_usage(
         is_reference: exhibit.value.is_reference,
         is_individual: exhibit.value.is_individual,
         name: exhibit.value.name,
+        state_reference: exhibit.value.state_reference,
         type_name: exhibit
             .value
             .typing
