@@ -579,6 +579,16 @@ mod tests {
     }
 
     #[test]
+    fn regeneration_retains_valid_opaque_ast_with_unavailable_format() {
+        let fixture = "# META\n~~~sexpr\n(snapshot (type semantic) (description \"Retains a parsed opaque transition body without claiming canonical emission.\"))\n~~~\n# SOURCE\n~~~sysml\npackage P { state def S { transition t then next { } } }\n~~~\n";
+        let regenerated = regenerate_snapshot(fixture, Path::new("opaque-format.md"))
+            .expect("opaque AST must not abort snapshot regeneration");
+
+        assert!(regenerated.contains("# FORMAT\n~~~sexpr\n(unavailable (reason opaque-ast))\n~~~"));
+        assert!(regenerated.contains("# AST\n~~~sexpr\n"));
+    }
+
+    #[test]
     fn authored_meta_is_preserved_byte_for_byte() {
         let meta = "(snapshot\n  (type provenance)\n  (description \"Preserves authored spacing and intent.\"))";
         let fixture =
