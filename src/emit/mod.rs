@@ -3,6 +3,18 @@
 //! Emits structured AST fields and can reproduce resilient parser recovery nodes from their
 //! document source spans. Other opaque constructs fail closed via [`EmitError::Opaque`] or are
 //! reported by [`opacity_report`].
+//!
+//! # Production formatter limitation
+//!
+//! TODO(comment-note-trivia-provenance): KerML distinguishes semantic `REGULAR_COMMENT` tokens
+//! (`Comment`, `Documentation`, and `TextualRepresentation` bodies) from non-model lexical notes
+//! (`// ...` and `//* ... */`) and whitespace. The parser must model regular comments and apply the
+//! specification's body-normalization rules; a separate source-fidelity syntax/trivia layer must
+//! retain lexical-note and whitespace spans without pretending they are semantic AST elements.
+//! The emitter currently cannot preserve notes or the placement of all semantic comments. Do not
+//! present it as a production source formatter until recovery adjacency is retained and end-to-end
+//! fixtures prove comment/note retention and idempotence:
+//! `format(format(source)) == format(source)`.
 
 mod behavior;
 mod expr;

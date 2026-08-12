@@ -102,6 +102,9 @@ not precedent: do not copy or extend them, and do not disguise them with compati
   at the outer tool boundary.
 - Render structured data from structured fields. Rendering may choose layout and escaping, but it may
   not become a second parser or semantic implementation.
+- Keep semantic syntax separate from lossless lexical provenance. A production source formatter must
+  retain meaningful trivia and recovery adjacency without polluting the semantic AST; claim
+  source-fidelity only with retention snapshots and formatting-idempotence tests.
 - Error propagation is explicit. A dangling ID, invalid span, unsupported opaque node, or failed write
   is not replaced with placeholder text that could be mistaken for complete output.
 - Deterministic output must not depend on hash-map iteration, parser speculation garbage, allocation
