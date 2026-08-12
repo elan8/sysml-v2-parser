@@ -68,22 +68,18 @@ fn run() -> Result<(), String> {
         ));
     }
 
-    // Fixtures are evaluated sequentially in sorted path order. A failure identifies one stable
-    // input and never races another snapshot update.
     let mut stale = Vec::new();
-    for path in paths {
-        let original = fs::read_to_string(&path)
-            .map_err(|error| format!("{}: read failed: {error}", path.display()))?;
-        let updated = support::regenerate_snapshot(&original, &path)?;
-        if updated == original.replace("\r\n", "\n") {
+    for snapshot in support::regenerate_snapshots(&paths)? {
+        if snapshot.rendered == snapshot.original.replace("\r\n", "\n") {
             continue;
         }
         match cli.command {
-            Command::Check => stale.push(path),
+            Command::Check => stale.push(snapshot.path),
             Command::Update => {
-                fs::write(&path, updated)
-                    .map_err(|error| format!("{}: write failed: {error}", path.display()))?;
-                println!("updated {}", path.display());
+                fs::write(&snapshot.path, snapshot.rendered).map_err(|error| {
+                    format!("{}: write failed: {error}", snapshot.path.display())
+                })?;
+                println!("updated {}", snapshot.path.display());
             }
         }
     }

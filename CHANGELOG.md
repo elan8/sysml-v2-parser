@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Spec-valid package forms that reach an unimplemented dispatch branch produce typed
   `UnsupportedGrammarForm` nodes instead of blaming authored input with malformed nodes.
   `PARSE_AST_VERSION` is now 82.
+- **Snapshot regeneration uses available CPU cores.** Both the default `cargo test` snapshot
+  contract and the `snapshot_tool` CLI evaluate independent fixtures concurrently, then restore
+  deterministic path order before comparison, reporting, or updates.
 - **Semantic references are now typed, source-backed, and document-local (#119).** `parse()` and
   editor parsing return a `ParsedDocument` that atomically owns the BOM-normalized source,
   `QualifiedReferenceArena`, and root AST. Imports, exposes, expressions, requirement references,

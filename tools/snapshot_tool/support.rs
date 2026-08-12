@@ -3,6 +3,7 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::thread;
 
 use sysml_v2_parser::ast::WriteSemanticAst;
 use sysml_v2_parser::{
@@ -410,6 +411,62 @@ pub(crate) fn regenerate_snapshot(fixture: &str, path: &Path) -> Result<String, 
         .write_to(&mut rendered)
         .map_err(|error| format!("{}: snapshot write failed: {error}", path.display()))?;
     into_utf8(rendered, "snapshot formatter")
+}
+
+pub(crate) struct RegeneratedSnapshot {
+    pub(crate) path: PathBuf,
+    pub(crate) original: String,
+    pub(crate) rendered: String,
+}
+
+/// Regenerates independent fixtures concurrently while retaining sorted-path result order.
+pub(crate) fn regenerate_snapshots(paths: &[PathBuf]) -> Result<Vec<RegeneratedSnapshot>, String> {
+    if paths.is_empty() {
+        return Ok(Vec::new());
+    }
+    let workers = thread::available_parallelism()
+        .map(usize::from)
+        .unwrap_or(1)
+        .min(paths.len());
+    let chunk_size = paths.len().div_ceil(workers);
+    let mut results = thread::scope(|scope| {
+        let handles = paths
+            .chunks(chunk_size)
+            .enumerate()
+            .map(|(chunk_index, chunk)| {
+                scope.spawn(move || {
+                    chunk
+                        .iter()
+                        .enumerate()
+                        .map(|(item_index, path)| {
+                            let original = fs::read_to_string(path).map_err(|error| {
+                                format!("{}: read failed: {error}", path.display())
+                            })?;
+                            let rendered = regenerate_snapshot(&original, path)?;
+                            Ok((
+                                chunk_index * chunk_size + item_index,
+                                RegeneratedSnapshot {
+                                    path: path.clone(),
+                                    original,
+                                    rendered,
+                                },
+                            ))
+                        })
+                        .collect::<Result<Vec<_>, String>>()
+                })
+            });
+        let mut completed = Vec::with_capacity(paths.len());
+        for handle in handles {
+            completed.extend(
+                handle
+                    .join()
+                    .map_err(|_| "snapshot worker panicked".to_owned())??,
+            );
+        }
+        Ok::<_, String>(completed)
+    })?;
+    results.sort_unstable_by_key(|(index, _)| *index);
+    Ok(results.into_iter().map(|(_, result)| result).collect())
 }
 
 #[cfg(test)]

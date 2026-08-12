@@ -3,7 +3,6 @@
 #[path = "../tools/snapshot_tool/support.rs"]
 mod support;
 
-use std::fs;
 use std::path::Path;
 
 #[test]
@@ -15,16 +14,13 @@ fn qualified_reference_markdown_snapshots() {
         "no snapshots found under {}",
         root.display()
     );
-    for path in paths {
-        let expected = fs::read_to_string(&path)
-            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-        let actual = support::regenerate_snapshot(&expected, &path)
-            .unwrap_or_else(|error| panic!("regenerate {}: {error}", path.display()));
+    let snapshots = support::regenerate_snapshots(&paths).expect("regenerate snapshots");
+    for snapshot in snapshots {
         assert_eq!(
-            expected.replace("\r\n", "\n"),
-            actual,
+            snapshot.original.replace("\r\n", "\n"),
+            snapshot.rendered,
             "qualified-reference snapshot mismatch: {}",
-            path.display()
+            snapshot.path.display()
         );
     }
 }
