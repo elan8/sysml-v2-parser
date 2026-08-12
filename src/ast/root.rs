@@ -6,9 +6,10 @@ use super::package::{
     QualifiedIdentification,
 };
 use super::qualified_reference::{
-    QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceView, SourceStorage,
+    QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceView, SourceRange,
+    SourceStorage,
 };
-use crate::ast::core::Node;
+use crate::ast::core::{Node, Span};
 
 /// KerML top-level element (BNF `RootNamespace = PackageBodyElement*`).
 ///
@@ -58,6 +59,11 @@ pub struct ParsedDocument {
 }
 
 impl ParsedDocument {
+    /// Resolve a parser span through this document's canonical source-position index.
+    pub fn range(&self, span: &Span) -> Option<SourceRange> {
+        self.source.range_of(span)
+    }
+
     /// Resolve a qualified-reference identity to a source-backed borrowed view.
     pub fn qualified_reference(
         &self,

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Canonical document source ranges.** `SourceStorage::position_at`, `SourceStorage::range_of`,
+  and `ParsedDocument::range` resolve byte-backed parser spans through one lazily built,
+  document-owned newline index. Downstream diagnostics and navigation can retain a `Span` and ask
+  the parsed document for its canonical multiline range without rescanning source text.
 - **`PARSE_AST_VERSION` is now 87.** In/out parameters retain their `ref` feature prefix and
   typed multiplicity, and occurrence-body exhibit usages retain their arena-backed state path.
   Emission also preserves quoting for compound unit names such as `'N/mm²'`.

@@ -3,7 +3,8 @@
 use super::{QualifiedReferenceId, ReferenceSeparator};
 
 /// Source location: byte offset, line, column, and length in the source file.
-/// Line and column are **1-based**. Use [`Span::to_lsp_range`] for 0-based LSP ranges.
+/// Line and column are **1-based**. Use [`crate::ast::ParsedDocument::range`] when deriving
+/// navigation or diagnostic ranges; a span alone cannot correctly calculate a multiline end.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Span {
@@ -24,7 +25,9 @@ impl Span {
         }
     }
 
-    /// LSP uses 0-based line and 0-based character. Returns (start_line, start_character, end_line, end_character).
+    /// Legacy single-line projection. Prefer [`crate::ast::ParsedDocument::range`], which uses the
+    /// canonical document-owned source index and handles multiline spans.
+    #[deprecated(note = "use ParsedDocument::range so multiline ranges use canonical source data")]
     pub fn to_lsp_range(&self) -> (u32, u32, u32, u32) {
         let start_line = self.line.saturating_sub(1);
         let start_char = self.column.saturating_sub(1);

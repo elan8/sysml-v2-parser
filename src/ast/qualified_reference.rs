@@ -6,6 +6,7 @@
 //! without allocating.
 
 use std::borrow::Cow;
+use std::sync::OnceLock;
 
 use super::Span;
 
@@ -13,35 +14,110 @@ use super::Span;
 ///
 /// A leading UTF-8 byte-order mark is removed to match the parser's existing offset convention:
 /// all AST spans are relative to the first byte after the BOM.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct SourceStorage(String);
+#[derive(Debug, Default)]
+pub struct SourceStorage {
+    text: String,
+    /// Byte offset of the first byte of every line. Built once, on first positional query.
+    line_starts: OnceLock<Vec<usize>>,
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for SourceStorage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.text)
+    }
+}
+
+/// A canonical source position. `offset` is a UTF-8 byte offset; line and column are 1-based and
+/// columns count bytes, matching parser spans.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourcePosition {
+    pub offset: usize,
+    pub line: u32,
+    pub column: usize,
+}
+
+/// Half-open source range (`start..end`) derived from a parser span.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceRange {
+    pub start: SourcePosition,
+    pub end: SourcePosition,
+}
 
 impl SourceStorage {
     pub fn new(mut source: String) -> Self {
         if source.starts_with('\u{FEFF}') {
             source.drain(..'\u{FEFF}'.len_utf8());
         }
-        Self(source)
+        Self {
+            text: source,
+            line_starts: OnceLock::new(),
+        }
     }
 
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.text
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.text.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.text.is_empty()
     }
 
     /// Borrow the exact source covered by `span`, returning `None` for overflow, out-of-bounds,
     /// or non-UTF-8-boundary offsets.
     pub fn slice(&self, span: &Span) -> Option<&str> {
         let end = span.offset.checked_add(span.len)?;
-        self.0.get(span.offset..end)
+        self.text.get(span.offset..end)
+    }
+
+    /// Convert a UTF-8 byte offset into the parser's canonical 1-based line/byte-column position.
+    ///
+    /// The document owns a lazily initialized line index, so repeated consumers do not rescan the
+    /// source or maintain a competing newline interpretation. Returns `None` for an out-of-bounds
+    /// offset or an offset inside a UTF-8 code point. The one-past-the-end offset is valid.
+    pub fn position_at(&self, offset: usize) -> Option<SourcePosition> {
+        if offset > self.text.len() || !self.text.is_char_boundary(offset) {
+            return None;
+        }
+        let starts = self.line_starts.get_or_init(|| {
+            let mut starts = Vec::new();
+            starts.push(0);
+            starts.extend(
+                self.text
+                    .bytes()
+                    .enumerate()
+                    .filter_map(|(index, byte)| (byte == b'\n').then_some(index + 1)),
+            );
+            starts
+        });
+        let line_index = starts
+            .partition_point(|start| *start <= offset)
+            .checked_sub(1)?;
+        Some(SourcePosition {
+            offset,
+            line: u32::try_from(line_index.checked_add(1)?).ok()?,
+            column: offset
+                .checked_sub(*starts.get(line_index)?)?
+                .checked_add(1)?,
+        })
+    }
+
+    /// Resolve a parser span to a canonical half-open source range.
+    pub fn range_of(&self, span: &Span) -> Option<SourceRange> {
+        let end = span.offset.checked_add(span.len)?;
+        // Requiring a valid slice also rejects either endpoint inside a UTF-8 code point.
+        self.text.get(span.offset..end)?;
+        Some(SourceRange {
+            start: self.position_at(span.offset)?,
+            end: self.position_at(end)?,
+        })
     }
 
     #[cfg(feature = "serde")]
@@ -52,24 +128,28 @@ impl SourceStorage {
 
     #[cfg(feature = "serde")]
     pub(crate) fn trivia_between(&self, start: usize, end: usize) -> bool {
-        start <= end && self.0.get(start..end).is_some_and(trivia_only)
+        start <= end && self.text.get(start..end).is_some_and(trivia_only)
     }
 
     fn location_at(&self, offset: usize) -> Option<(u32, usize)> {
-        let prefix = self.0.get(..offset)?;
-        let line_count = prefix.bytes().filter(|byte| *byte == b'\n').count();
-        let line = u32::try_from(line_count.checked_add(1)?).ok()?;
-        let column = prefix
-            .as_bytes()
-            .iter()
-            .rposition(|byte| *byte == b'\n')
-            .map_or_else(
-                || offset.checked_add(1),
-                |newline| offset.checked_sub(newline),
-            )?;
-        Some((line, column))
+        let position = self.position_at(offset)?;
+        Some((position.line, position.column))
     }
 }
+
+impl Clone for SourceStorage {
+    fn clone(&self) -> Self {
+        Self::new(self.text.clone())
+    }
+}
+
+impl PartialEq for SourceStorage {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text
+    }
+}
+
+impl Eq for SourceStorage {}
 
 impl From<String> for SourceStorage {
     fn from(source: String) -> Self {
@@ -700,6 +780,74 @@ mod tests {
             column,
             len,
         }
+    }
+
+    #[test]
+    fn source_positions_use_one_document_owned_newline_index() {
+        let source = SourceStorage::from("α\r\nbeta\n");
+
+        assert_eq!(
+            source.position_at(0),
+            Some(SourcePosition {
+                offset: 0,
+                line: 1,
+                column: 1,
+            })
+        );
+        assert_eq!(source.position_at(1), None, "inside UTF-8 code point");
+        assert_eq!(
+            source.position_at(4),
+            Some(SourcePosition {
+                offset: 4,
+                line: 2,
+                column: 1,
+            })
+        );
+        assert_eq!(
+            source.position_at(source.len()),
+            Some(SourcePosition {
+                offset: 9,
+                line: 3,
+                column: 1,
+            })
+        );
+        assert!(source.line_starts.get().is_some());
+    }
+
+    #[test]
+    fn source_range_resolves_multiline_span_and_rejects_invalid_boundaries() {
+        let source = SourceStorage::from("one\ntwö\nthree");
+        let range = source
+            .range_of(&Span {
+                offset: 2,
+                line: 1,
+                column: 3,
+                len: 7,
+            })
+            .expect("valid multiline range");
+        assert_eq!(
+            range,
+            SourceRange {
+                start: SourcePosition {
+                    offset: 2,
+                    line: 1,
+                    column: 3,
+                },
+                end: SourcePosition {
+                    offset: 9,
+                    line: 3,
+                    column: 1,
+                },
+            }
+        );
+        assert!(source
+            .range_of(&Span {
+                offset: 6,
+                line: 2,
+                column: 3,
+                len: 1,
+            })
+            .is_none());
     }
 
     #[test]
