@@ -20,8 +20,7 @@ use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, opt, value};
-use nom::multi::many0;
+use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -139,39 +138,49 @@ impl FeatureModifiers {
     }
 }
 
+/// Consume `literal` if the input starts with it, matching `nom`'s `tag` (no word boundary).
+fn consume_literal<'a>(input: Input<'a>, literal: &[u8]) -> Option<Input<'a>> {
+    input
+        .fragment()
+        .starts_with(literal)
+        .then(|| nom::Input::take_from(&input, literal.len()))
+}
+
+/// Parse the multiplicity and ordering/uniqueness modifiers that may follow a feature.
+///
+/// Modifiers accumulate directly into the returned struct. Collecting them into a `Vec` first
+/// would allocate on a path the grammar re-enters speculatively for every attribute declaration,
+/// only to fold the result into these same three fields.
 fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
-    #[derive(Clone)]
-    enum Modifier {
-        Multiplicity(Node<Multiplicity>),
-        Ordered,
-        NonUnique,
-        Unique,
-        NonOrdered,
-    }
-    let (input, mods) = many0(preceded(
-        ws_and_comments,
-        alt((
-            map(multiplicity_node, Modifier::Multiplicity),
-            value(Modifier::NonUnique, tag(&b"nonunique"[..])),
-            value(Modifier::Unique, tag(&b"unique"[..])),
-            value(Modifier::Ordered, tag(&b"ordered"[..])),
-            value(Modifier::NonOrdered, tag(&b"nonordered"[..])),
-        )),
-    ))
-    .parse(input)?;
     let mut result = FeatureModifiers::default();
-    for m in mods {
-        match m {
-            Modifier::Multiplicity(node) if result.multiplicity.is_none() => {
+    let mut input = input;
+    loop {
+        let (after_ws, _) = ws_and_comments(input)?;
+        if let Ok((rest, node)) = multiplicity_node(after_ws) {
+            // The first multiplicity wins; a repeated one is consumed and ignored.
+            if result.multiplicity.is_none() {
                 result.multiplicity = Some(node);
             }
-            Modifier::Multiplicity(_) => {}
-            Modifier::Ordered => result.ordered = true,
-            Modifier::NonUnique => result.nonunique = true,
-            Modifier::Unique | Modifier::NonOrdered => {}
+            input = rest;
+            continue;
+        }
+        // `unique` and `nonordered` are the defaults: recognized and consumed, but not recorded.
+        // These match as bare prefixes, exactly as the `tag` alternatives they replace did.
+        if let Some(rest) = consume_literal(after_ws, b"nonunique") {
+            result.nonunique = true;
+            input = rest;
+        } else if let Some(rest) = consume_literal(after_ws, b"unique") {
+            input = rest;
+        } else if let Some(rest) = consume_literal(after_ws, b"ordered") {
+            result.ordered = true;
+            input = rest;
+        } else if let Some(rest) = consume_literal(after_ws, b"nonordered") {
+            input = rest;
+        } else {
+            // No modifier here: leave the whitespace before it unconsumed, as `preceded` did.
+            return Ok((input, result));
         }
     }
-    Ok((input, result))
 }
 
 enum MetadataBindingPrefix {

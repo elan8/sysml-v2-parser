@@ -11,7 +11,7 @@ use crate::parser::lex::{
 };
 use crate::parser::{span_from_to, Input};
 use nom::bytes::complete::{tag, take_until};
-use nom::combinator::{map, opt};
+use nom::combinator::opt;
 use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::IResult;
@@ -443,56 +443,62 @@ pub(crate) fn intersecting(input: Input<'_>) -> IResult<Input<'_>, Node<Subsetti
     ))
 }
 
-enum SpecializationClause {
-    Subsets((Node<SubsettingRelationship>, Option<Node<Expression>>)),
-    Redefines(Node<SubsettingRelationship>),
-    References(Node<SubsettingRelationship>),
-    Crosses(Node<SubsettingRelationship>),
-    Intersects(Node<SubsettingRelationship>),
-}
-
 /// Parse zero or more subsetting/redefinition clauses in any order.
 ///
 /// When multiple clauses of the same kind are present, the last one wins.
 pub(crate) fn specialization_clauses(
     input: Input<'_>,
 ) -> IResult<Input<'_>, SpecializationClauses> {
-    let (input, clauses) = many0(preceded(
-        ws_and_comments,
-        nom::branch::alt((
-            nom::combinator::map(subsetting, SpecializationClause::Subsets),
-            nom::combinator::map(redefinition, SpecializationClause::Redefines),
-            nom::combinator::map(reference_subsetting, SpecializationClause::References),
-            nom::combinator::map(cross_subsetting, SpecializationClause::Crosses),
-            nom::combinator::map(intersecting, SpecializationClause::Intersects),
-        )),
-    ))
-    .parse(input)?;
+    // Clauses accumulate directly: collecting them first would allocate on a path the grammar
+    // re-enters speculatively for every usage and definition header. A later clause of the same
+    // kind overwrites an earlier one, as the fold it replaces did.
     let mut out = SpecializationClauses::default();
-    let had_any = !clauses.is_empty();
-    for clause in clauses {
-        match clause {
-            SpecializationClause::Subsets(value) => out.subsets = Some(value),
-            SpecializationClause::Redefines(value) => out.redefines = Some(value),
-            SpecializationClause::References(value) => out.references = Some(value),
-            SpecializationClause::Crosses(value) => out.crosses = Some(value),
-            SpecializationClause::Intersects(value) => out.intersects = Some(value),
+    let mut input = input;
+    loop {
+        let (after_ws, _) = ws_and_comments(input)?;
+        if let Ok((rest, value)) = subsetting(after_ws) {
+            out.subsets = Some(value);
+            input = rest;
+        } else if let Ok((rest, value)) = redefinition(after_ws) {
+            out.redefines = Some(value);
+            input = rest;
+        } else if let Ok((rest, value)) = reference_subsetting(after_ws) {
+            out.references = Some(value);
+            input = rest;
+        } else if let Ok((rest, value)) = cross_subsetting(after_ws) {
+            out.crosses = Some(value);
+            input = rest;
+        } else if let Ok((rest, value)) = intersecting(after_ws) {
+            out.intersects = Some(value);
+            input = rest;
+        } else {
+            // Leave the whitespace before a non-clause unconsumed, as `preceded` did.
+            return Ok((input, out));
         }
+        out.had_any = true;
     }
-    out.had_any = had_any;
-    Ok((input, out))
 }
 
 pub(crate) fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = many0(preceded(
-        ws_and_comments,
-        nom::branch::alt((
-            map(tag(&b"ordered"[..]), |_| ()),
-            map(tag(&b"nonunique"[..]), |_| ()),
-        )),
-    ))
-    .parse(input)?;
-    Ok((input, ()))
+    let mut input = input;
+    loop {
+        let (after_ws, _) = ws_and_comments(input)?;
+        match consume_literal(after_ws, b"ordered")
+            .or_else(|| consume_literal(after_ws, b"nonunique"))
+        {
+            // Leave the whitespace before a non-modifier unconsumed, as `preceded` did.
+            None => return Ok((input, ())),
+            Some(rest) => input = rest,
+        }
+    }
+}
+
+/// Consume `literal` if the input starts with it, matching `nom`'s `tag` (no word boundary).
+fn consume_literal<'a>(input: Input<'a>, literal: &[u8]) -> Option<Input<'a>> {
+    input
+        .fragment()
+        .starts_with(literal)
+        .then(|| nom::Input::take_from(&input, literal.len()))
 }
 
 fn merge_usage_header(

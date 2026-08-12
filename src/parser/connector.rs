@@ -380,11 +380,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // participant : Port [2..*] nonunique ordered { ... }`); accepted and discarded, matching
     // `RefDecl`'s existing "don't model every shorthand" scope (see `value`'s doc comment for the
     // same rationale on the binding form).
-    let (input, _) = nom::multi::many0(preceded(
-        ws_and_comments,
-        alt((tag(&b"nonunique"[..]), tag(&b"ordered"[..]))),
-    ))
-    .parse(input)?;
+    let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
     // Optional value/default clause, e.g. `ref item :>> localClock : Clock[1] default
     // Time::universalClock { ... }` (Domain Libraries `SpatialItems.sysml`).
     let (input, value) = opt(preceded(ws_and_comments, feature_value_part)).parse(input)?;
