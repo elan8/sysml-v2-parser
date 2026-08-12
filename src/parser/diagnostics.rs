@@ -23,6 +23,10 @@ pub(crate) fn fragment_to_found_snippet(fragment: &[u8]) -> (String, usize) {
     (s.trim_end().to_string(), len)
 }
 /// Map nom error kind to a human-readable message for language server diagnostics.
+// `ErrorKind` is a foreign, dependency-owned enum. The generic arm intentionally keeps new nom
+// parser error kinds classified as a stable generic diagnostic instead of coupling this API to
+// every nom release; parser-specific kinds above remain explicit.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
     use nom::error::ErrorKind;
     match code {
@@ -46,6 +50,9 @@ fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
 }
 
 /// Map nom error kind to a specific code for LSP/quick fixes.
+// See `nom_error_kind_to_message`: dependency-owned additions deliberately retain the stable
+// `parse_error` fallback, while parser-specific classifications are enumerated above.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn nom_error_kind_to_code(code: &nom::error::ErrorKind) -> &'static str {
     use nom::error::ErrorKind;
     match code {

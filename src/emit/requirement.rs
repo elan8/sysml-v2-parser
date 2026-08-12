@@ -11,8 +11,8 @@ use super::EmitError;
 use crate::ast::{
     ConcernUsage, ConnectBody, Dependency, EnumerationUsage, ItemUsage, RelationshipBodyElement,
     RequireConstraint, RequirementDef, RequirementDefBody, RequirementDefBodyElement,
-    RequirementUsage, Satisfy, SubjectDecl, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement,
-    UseCaseUsage,
+    RequirementUsage, ReturnRef, ReturnRefBody, ReturnRefBodyElement, Satisfy, SubjectDecl,
+    UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage,
 };
 
 pub(crate) fn emit_requirement_def(
@@ -452,7 +452,8 @@ fn emit_rel_body(
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
-        other => w.unsupported(
+        other @ (RelationshipBodyElement::TextualRep(_)
+        | RelationshipBodyElement::MetadataAnnotation(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -809,10 +810,7 @@ fn emit_use_case_body_element(
             Ok(())
         }
         UseCaseDefBodyElement::CaseReturnDecl(c) => emit_case_return_decl(w, &c.value),
-        UseCaseDefBodyElement::ReturnRef(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::RawBodyString,
-        }),
+        UseCaseDefBodyElement::ReturnRef(return_ref) => emit_return_ref(w, path, &return_ref.value),
         UseCaseDefBodyElement::ActorRedefinitionAssignment(a) => {
             w.push_str("actor :>> ");
             w.push_qualified_reference(&format!("{path}/target"), a.value.target)?;
@@ -846,6 +844,48 @@ fn emit_use_case_body_element(
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
     }
+}
+
+fn emit_return_ref(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    return_ref: &ReturnRef,
+) -> Result<(), EmitError> {
+    w.push_str("return ref ");
+    w.push_str(&format_name(&return_ref.name));
+    if let Some(multiplicity) = &return_ref.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    match &return_ref.body.value {
+        ReturnRefBody::Semicolon => {
+            w.push_char(';');
+        }
+        ReturnRefBody::Brace { elements } => {
+            w.push_str(" {");
+            if !elements.is_empty() {
+                w.newline();
+                w.indent();
+                for (index, element) in elements.iter().enumerate() {
+                    match &element.value {
+                        ReturnRefBodyElement::Doc(doc) => emit_doc(w, &doc.value)?,
+                        ReturnRefBodyElement::Result(expression) => {
+                            w.push_str("return ");
+                            emit_expression(w, &expression.value)?;
+                            w.push_char(';');
+                        }
+                        ReturnRefBodyElement::Error(error) => w.push_recovery_span(
+                            &format!("{path}/return-ref-body[{index}]"),
+                            &error.span,
+                        )?,
+                    }
+                    w.newline();
+                }
+                w.dedent();
+            }
+            w.push_char('}');
+        }
+    }
+    Ok(())
 }
 
 fn emit_case_return_decl(

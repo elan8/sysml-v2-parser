@@ -267,9 +267,15 @@ fn test_verification_return_ref_parses_return_expression() {
         })
         .expect("return ref should be present");
     assert_eq!(return_ref.name, "verdictResult");
-    let expr = return_ref
-        .return_expression
-        .as_ref()
+    let ReturnRefBody::Brace { elements } = &return_ref.body.value else {
+        panic!("expected structured return-ref body");
+    };
+    let expr = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            ReturnRefBodyElement::Result(expression) => Some(expression),
+            ReturnRefBodyElement::Doc(_) | ReturnRefBodyElement::Error(_) => None,
+        })
         .expect("return expression should be parsed");
     let token = match &expr.value {
         Expression::MemberAccess { member, .. } => reference_text(&result, *member),

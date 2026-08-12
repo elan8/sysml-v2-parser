@@ -8,7 +8,7 @@ use std::thread;
 use sysml_v2_parser::ast::WriteSemanticAst;
 use sysml_v2_parser::{
     emit_recovered_sysml, emit_sysml, parse, parse_for_editor, DiagnosticCategory,
-    DiagnosticSeverity, ParseError,
+    DiagnosticSeverity, EmitError, ParseError,
 };
 
 pub(crate) const DEFAULT_SNAPSHOT_ROOT: &str = "tests/snapshots";
@@ -26,6 +26,8 @@ enum FormatSection {
     StableIdempotent,
     /// The formatter changed the document, so retain the complete emitted SysML for review.
     Sysml(String),
+    /// The typed tree intentionally retains syntax for which canonical emission is unavailable.
+    UnavailableOpaqueAst,
 }
 
 impl FormatSection {
@@ -34,6 +36,21 @@ impl FormatSection {
             Self::StableIdempotent
         } else {
             Self::Sysml(output)
+        }
+    }
+
+    fn from_emit_result(
+        source: &str,
+        result: Result<String, EmitError>,
+    ) -> Result<Self, EmitError> {
+        match result {
+            Ok(output) => Ok(Self::from_output(
+                source,
+                output.trim_end_matches('\n').to_owned(),
+            )),
+            Err(EmitError::Opaque { .. }) => Ok(Self::UnavailableOpaqueAst),
+            Err(error @ EmitError::Unsupported { .. }) => Err(error),
+            Err(error @ EmitError::InvalidQualifiedReference { .. }) => Err(error),
         }
     }
 
@@ -46,6 +63,9 @@ impl FormatSection {
                 writer.write_all(b"# FORMAT\n~~~sysml\n")?;
                 writer.write_all(output.as_bytes())?;
                 writer.write_all(b"\n~~~\n")
+            }
+            Self::UnavailableOpaqueAst => {
+                writer.write_all(b"# FORMAT\n~~~sexpr\n(unavailable (reason opaque-ast))\n~~~\n")
             }
         }
     }
@@ -375,12 +395,12 @@ fn actual_snapshot(path: &Path, meta: String, source: String) -> Result<Snapshot
             ));
         }
     }
-    let format = if editor.errors.is_empty() {
+    let emitted = if editor.errors.is_empty() {
         emit_sysml(&editor.document)
     } else {
         emit_recovered_sysml(&editor.document)
-    }
-    .map_err(|error| {
+    };
+    let format = FormatSection::from_emit_result(&source, emitted).map_err(|error| {
         format!(
             "{}: parsed document could not be emitted: {error}",
             path.display()
@@ -391,7 +411,6 @@ fn actual_snapshot(path: &Path, meta: String, source: String) -> Result<Snapshot
         .document
         .write_semantic_ast(&mut ast)
         .map_err(|error| format!("{}: semantic AST write failed: {error}", path.display()))?;
-    let format = FormatSection::from_output(&source, format.trim_end_matches('\n').to_owned());
     Ok(Snapshot {
         meta,
         source,
@@ -497,6 +516,40 @@ mod tests {
             render_format(&section),
             "# FORMAT\n~~~sysml\npackage P {\n}\n~~~\n"
         );
+    }
+
+    #[test]
+    fn opaque_ast_format_uses_explicit_unavailable_sentinel() {
+        let section = FormatSection::from_emit_result(
+            "package P;",
+            Err(EmitError::Opaque {
+                path: "root.elements[0]".to_owned(),
+                kind: sysml_v2_parser::OpacityKind::Other,
+            }),
+        )
+        .expect("opacity is a representable FORMAT outcome");
+
+        assert_eq!(
+            render_format(&section),
+            "# FORMAT\n~~~sexpr\n(unavailable (reason opaque-ast))\n~~~\n"
+        );
+    }
+
+    #[test]
+    fn non_opacity_emit_error_still_aborts_regeneration() {
+        let result = FormatSection::from_emit_result(
+            "package P;",
+            Err(EmitError::Unsupported {
+                path: "root.elements[0]".to_owned(),
+                construct: "test construct".to_owned(),
+            }),
+        );
+
+        assert!(matches!(
+            result,
+            Err(EmitError::Unsupported { path, construct })
+                if path == "root.elements[0]" && construct == "test construct"
+        ));
     }
 
     #[test]

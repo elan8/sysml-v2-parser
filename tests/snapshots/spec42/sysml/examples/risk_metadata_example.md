@@ -29,6 +29,7 @@ package RiskMetadataExample {
 (fixture-diagnostics
   (document "risk_metadata_example.md"
     (diagnostics
+      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 272) (line 12) (column 10) (len 94)) (message "unrecognized declaration `totalRisk` in metadata body"))
     )
   )
 )

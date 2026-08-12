@@ -578,6 +578,10 @@ fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement>
 }
 
 pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
+    crate::parser::span::reference_transaction(input, return_decl_inner)
+}
+
+fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     let start = input;
     let (input, _) = tag(&b"return"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -862,5 +866,13 @@ mod constraint_usage_tests {
             node.value,
             crate::ast::PackageBodyElement::ConstraintUsage(_)
         ));
+    }
+
+    #[test]
+    fn failed_return_declaration_rolls_back_type_and_value_references() {
+        let context = crate::parser::span::ParseContext::new();
+        let parsed = return_decl(context.input(b"return value : Ghost::Result = Ghost::value"));
+        assert!(parsed.is_err());
+        assert!(context.finish().is_empty());
     }
 }

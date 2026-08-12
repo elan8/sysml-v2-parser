@@ -253,7 +253,12 @@ fn emit_part_def_body(
             w.newline();
             w.indent();
             for (i, el) in elements.iter().enumerate() {
-                emit_part_def_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                let element_path = format!("{path}/body[{i}]");
+                if matches!(el.value, PartDefBodyElement::UnsupportedMember(_)) {
+                    w.push_recovery_span(&element_path, &el.span)?;
+                } else {
+                    emit_part_def_body_element(w, &element_path, &el.value)?;
+                }
                 w.newline();
             }
             w.dedent();
@@ -274,10 +279,9 @@ fn emit_part_def_body_element(
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
-        PartDefBodyElement::OpaqueMember(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::OpaqueMember,
-        }),
+        PartDefBodyElement::UnsupportedMember(unsupported) => {
+            w.push_recovery_span(path, &unsupported.span)
+        }
         PartDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         PartDefBodyElement::Comment(c) => emit_comment(w, &c.value),
         PartDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
@@ -353,7 +357,24 @@ fn emit_part_def_body_element(
             super::requirement::emit_analysis_case_usage(w, path, &a.value)
         }
         PartDefBodyElement::AliasDef(a) => emit_alias_def(w, path, &a.value),
-        other => w.unsupported(
+        PartDefBodyElement::FirstStmt(first) => {
+            super::behavior::emit_first_stmt(w, path, &first.value)
+        }
+        other @ (PartDefBodyElement::Annotation(_)
+        | PartDefBodyElement::OccurrenceDef(_)
+        | PartDefBodyElement::FlowDef(_)
+        | PartDefBodyElement::ViewDef(_)
+        | PartDefBodyElement::ViewUsage(_)
+        | PartDefBodyElement::ViewpointDef(_)
+        | PartDefBodyElement::ViewpointUsage(_)
+        | PartDefBodyElement::RenderingDef(_)
+        | PartDefBodyElement::RenderingUsage(_)
+        | PartDefBodyElement::CaseDef(_)
+        | PartDefBodyElement::CaseUsage(_)
+        | PartDefBodyElement::UseCaseDef(_)
+        | PartDefBodyElement::UseCaseUsage(_)
+        | PartDefBodyElement::VerificationCaseDef(_)
+        | PartDefBodyElement::VerificationCaseUsage(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -470,7 +491,9 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::VerificationCaseUsage(v) => {
             super::requirement::emit_verification_case_usage(w, path, &v.value)
         }
-        other => w.unsupported(
+        other @ (PartUsageBodyElement::Annotation(_)
+        | PartUsageBodyElement::FlowDef(_)
+        | PartUsageBodyElement::OccurrenceDef(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -804,10 +827,11 @@ fn emit_interface_def_body_element(
         InterfaceDefBodyElement::FlowUsage(f) => {
             super::behavior::emit_flow_usage(w, path, &f.value)
         }
-        other => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        other @ (InterfaceDefBodyElement::ItemDef(_) | InterfaceDefBodyElement::ItemUsage(_)) => w
+            .unsupported(
+                path,
+                format!("{other:?}").chars().take(64).collect::<String>(),
+            ),
     }
 }
 
@@ -919,7 +943,8 @@ fn emit_relationship_body_element_local(
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
-        other => w.unsupported(
+        other @ (RelationshipBodyElement::TextualRep(_)
+        | RelationshipBodyElement::MetadataAnnotation(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -1114,7 +1139,11 @@ fn emit_ref_body_element(
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
-        other => w.unsupported(
+        other @ (RefBodyElement::Action(_)
+        | RefBodyElement::PartUsage(_)
+        | RefBodyElement::State(_)
+        | RefBodyElement::TextualRep(_)
+        | RefBodyElement::MetadataAnnotation(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -1616,7 +1645,8 @@ fn emit_connection_def_body_element(
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         crate::ast::ConnectionDefBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
-        other => w.unsupported(
+        other @ (crate::ast::ConnectionDefBodyElement::OccurrenceUsage(_)
+        | crate::ast::ConnectionDefBodyElement::SuccessionUsage(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),

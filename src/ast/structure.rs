@@ -88,7 +88,7 @@ pub enum PartDefBodyElement {
     Connection(Node<ConnectionUsageMember>),
     Perform(Node<Perform>),
     Allocate(Node<Allocate>),
-    OpaqueMember(Node<OpaqueMemberDecl>),
+    UnsupportedMember(Node<crate::ast::UnsupportedGrammarNode>),
     /// `exhibit state` name `:` type (`;` or body).
     ExhibitState(Node<ExhibitState>),
     /// Calculation usage (`calc` keyword) inside a part definition body.
@@ -104,14 +104,13 @@ pub enum PartDefBodyElement {
     /// (§6 G16). See [`PartUsageBodyElement::Import`].
     Import(Node<crate::ast::Import>),
     /// `action` / `ref action` usage inside a part definition body (Systems Library
-    /// `Parts::performedActions` and similar). Previously fell through to [`OpaqueMemberDecl`].
+    /// `Parts::performedActions` and similar).
     ActionUsage(Box<Node<ActionUsage>>),
     /// `action def` nested inside a part definition body (GH-14: previously only `ActionUsage`
     /// was reachable here, so a nested definition fell through to opaque recovery with a
     /// misleading "expected ';' or '{' after action definition header" diagnostic).
     ActionDef(Node<ActionDef>),
-    /// `state` / `ref state` usage inside a part definition body. Previously fell through to
-    /// [`OpaqueMemberDecl`].
+    /// `state` / `ref state` usage inside a part definition body.
     StateUsage(Node<StateUsage>),
     /// Enumeration usage (`enum` keyword) inside a part definition body.
     EnumerationUsage(Node<EnumerationUsage>),
@@ -186,20 +185,6 @@ pub enum PartDefBodyElement {
     /// P1 { port porig1; alias po1 for porig1; }` (Simple Tests/AliasTest.sysml:7). Previously
     /// only reachable at package-body scope.
     AliasDef(Node<AliasDef>),
-}
-
-/// Library-tolerant part member preserved without forcing it into an unrelated node shape.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OpaqueMemberDecl {
-    pub keyword: String,
-    pub name: String,
-    pub text: String,
-    pub body: AttributeBody,
-    /// Optional trailing `:>` relationship after the body.
-    pub subsets: Option<Node<SubsettingRelationship>>,
-    /// Optional trailing `:>>` relationship after the body.
-    pub redefines: Option<Node<SubsettingRelationship>>,
 }
 
 /// Connection usage member inside part definitions.
@@ -1436,7 +1421,7 @@ pub struct OccurrenceUsage {
     pub is_abstract: bool,
     /// Leading `constant` keyword (BNF `RefPrefix`). See `is_abstract`.
     pub is_constant: bool,
-    pub portion_kind: Option<String>,
+    pub portion_kind: Option<OccurrencePortionKind>,
     /// Declaration label for ordinary occurrence usages.
     pub name: String,
     /// Existing occurrence referenced by the shorthand `event path` form.
@@ -1455,6 +1440,13 @@ pub struct OccurrenceUsage {
     pub intersects: Option<Node<SubsettingRelationship>>,
     pub body: OccurrenceUsageBody,
     pub membership: Membership,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum OccurrencePortionKind {
+    Snapshot,
+    Timeslice,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

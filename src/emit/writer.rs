@@ -62,6 +62,20 @@ impl<'a> EmitWriter<'a> {
         Ok(())
     }
 
+    /// Re-emit an exact authored syntax slice retained by a source-backed AST node.
+    pub(crate) fn push_source_span(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
+        let text = self
+            .document
+            .source
+            .slice(span)
+            .ok_or_else(|| EmitError::Unsupported {
+                path: path.to_owned(),
+                construct: "syntax node has an invalid source span".to_owned(),
+            })?;
+        self.push_str(text);
+        Ok(())
+    }
+
     /// Emit one arena-backed reference without reconstructing or splitting a display string.
     pub(crate) fn push_qualified_reference(
         &mut self,

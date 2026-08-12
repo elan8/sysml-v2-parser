@@ -93,7 +93,13 @@ fn emit_package_body_node(
 ) -> Result<(), EmitError> {
     if matches!(
         node.value,
-        PackageBodyElement::Error(_) | PackageBodyElement::Unsupported(_)
+        PackageBodyElement::Error(_)
+            | PackageBodyElement::Unsupported(_)
+            | PackageBodyElement::FeatureDecl(_)
+            | PackageBodyElement::ClassifierDecl(_)
+            | PackageBodyElement::KermlSemanticDecl(_)
+            | PackageBodyElement::KermlFeatureDecl(_)
+            | PackageBodyElement::ExtendedLibraryDecl(_)
     ) {
         return w.push_recovery_span(path, &node.span);
     }
@@ -203,7 +209,7 @@ pub(crate) fn emit_package_body_element(
             path: path.to_string(),
             kind: super::OpacityKind::ExtendedLibraryDecl,
         }),
-        other => w.unsupported(
+        other @ (PackageBodyElement::Actor(_) | PackageBodyElement::FlowDef(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -291,7 +297,7 @@ fn emit_relationship_body_element(
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
-        other => w.unsupported(
+        other @ RelationshipBodyElement::MetadataAnnotation(_) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),

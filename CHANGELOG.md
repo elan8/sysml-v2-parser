@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 85.** `FirstMergeBody` brace forms retain an aggregate source span
+  plus exact opening- and closing-brace spans. Formatting `first`, `merge`, `decide`, `join`, and
+  `fork` control nodes now streams the authored brace body instead of replacing its contents with
+  `{}`; semantic snapshots expose the retained delimiter provenance.
+- **`PARSE_AST_VERSION` is now 84.** Return-reference bodies now contain typed documentation,
+  result-expression, and recovery elements; calculation/constraint returns and return references
+  roll back speculative arena identities on failure; occurrence portions use the
+  `OccurrencePortionKind` enum. Connection-like part members that are not yet implemented are
+  explicit `UnsupportedGrammarNode`s rather than header-scanned `OpaqueMemberDecl`s. Package-body
+  diagnostic collection is exhaustive and reports every retained KerML/library fallback instead
+  of silently ignoring new or opaque variants.
 - **`PARSE_AST_VERSION` is now 83.** State action targets, requirement redefinition contents,
   collection-operator bodies, and nested use-case assertion members are structured typed syntax
   rather than opaque or copied strings.

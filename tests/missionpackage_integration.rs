@@ -50,11 +50,7 @@ fn missionpackage_structures_connection_and_comment_members() {
             match &member.value {
                 PartDefBodyElement::Connection(_) => structured_connection_count += 1,
                 PartDefBodyElement::Comment(_) => structured_comment_count += 1,
-                PartDefBodyElement::OpaqueMember(opaque)
-                    if opaque.value.keyword == "connection" =>
-                {
-                    opaque_connection_count += 1
-                }
+                PartDefBodyElement::UnsupportedMember(_) => opaque_connection_count += 1,
                 PartDefBodyElement::Other(text) if text.starts_with("comment ") => {
                     fallback_comment_count += 1
                 }

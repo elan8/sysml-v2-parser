@@ -431,8 +431,8 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::Allocate(n) => {
             PartDefBodyElement::Allocate(dummy_node(n, n.value.clone()))
         }
-        PartDefBodyElement::OpaqueMember(n) => {
-            PartDefBodyElement::OpaqueMember(dummy_node(n, n.value.clone()))
+        PartDefBodyElement::UnsupportedMember(n) => {
+            PartDefBodyElement::UnsupportedMember(dummy_node(n, n.value.clone()))
         }
         PartDefBodyElement::ExhibitState(n) => {
             PartDefBodyElement::ExhibitState(dummy_node(n, n.value.clone()))

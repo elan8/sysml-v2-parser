@@ -141,7 +141,7 @@ struct OccurrencePrefix {
     is_reference: bool,
     is_abstract: bool,
     is_constant: bool,
-    portion_kind: Option<String>,
+    portion_kind: Option<crate::ast::OccurrencePortionKind>,
     membership: Membership,
 }
 
@@ -230,7 +230,7 @@ pub(crate) fn snapshot_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
         input,
         OccurrencePrefix {
             is_reference,
-            portion_kind: Some("snapshot".to_string()),
+            portion_kind: Some(crate::ast::OccurrencePortionKind::Snapshot),
             membership: Membership::feature(visibility, visibility_span),
             ..Default::default()
         },
@@ -247,7 +247,7 @@ pub(crate) fn timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Occur
         input,
         OccurrencePrefix {
             is_reference,
-            portion_kind: Some("timeslice".to_string()),
+            portion_kind: Some(crate::ast::OccurrencePortionKind::Timeslice),
             membership: Membership::feature(visibility, visibility_span),
             ..Default::default()
         },
@@ -270,7 +270,7 @@ pub(crate) fn then_timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<
         OccurrencePrefix {
             is_then: true,
             is_reference,
-            portion_kind: Some("timeslice".to_string()),
+            portion_kind: Some(crate::ast::OccurrencePortionKind::Timeslice),
             membership: Membership::feature(None, crate::ast::Span::dummy()),
             ..Default::default()
         },

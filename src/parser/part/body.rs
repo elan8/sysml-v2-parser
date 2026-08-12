@@ -4,6 +4,7 @@ use super::usage::{
     perform_usage, variant_usage,
 };
 use crate::parser::action::first_stmt;
+use crate::parser::lex::skip_statement_or_block;
 
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
 pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
@@ -322,7 +323,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 PartDefBodyElement::AssertConstraint,
             ),
             map(satisfy, PartDefBodyElement::Satisfy),
-            map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
+            map(
+                unsupported_part_member,
+                PartDefBodyElement::UnsupportedMember,
+            ),
         )),
         alt((
             // PAR-002: remaining nested `def`/usage pairs, previously only reachable at package
@@ -405,6 +409,8 @@ fn connection_usage_member_inner(
         let (input, parsed_name) = name(input)?;
         (input, Some(parsed_name))
     };
+    let (input, leading_multiplicity) =
+        opt(crate::parser::usage::multiplicity_node).parse(input)?;
     let (input, type_reference) = {
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":")
@@ -419,7 +425,9 @@ fn connection_usage_member_inner(
             (input, None)
         }
     };
-    let (input, multiplicity) = opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    let (input, trailing_multiplicity) =
+        opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    let multiplicity = leading_multiplicity.or(trailing_multiplicity);
     // PAR-007 widening: an inline `connect from to to (, extra)*` clause between the type and the
     // body, e.g. `connection link : Link connect sensorA.cmd to sensorB.cmd;`. Optional -- a
     // plain `connection link : Link;` declaration with no explicit binding must keep parsing.
@@ -483,14 +491,12 @@ fn connection_usage_member_inner(
     ))
 }
 
-/// Permissive parser for library-style part members not yet modeled with dedicated AST nodes.
-/// Kinded `ref action` / `ref state` / bare `action` / `state` are handled by dedicated parsers
-/// above; this catch-all remains for residual forms such as unmodeled `ref connection` headers.
-fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMemberDecl>> {
-    crate::parser::span::reference_transaction(input, opaque_part_member_decl_inner)
-}
-
-fn opaque_part_member_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMemberDecl>> {
+/// Recognize a spec-valid connection-like member whose semantic production is not implemented in
+/// this scope. The complete source span is retained, but no header text is scanned or guessed into
+/// declaration/reference fields.
+fn unsupported_part_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::UnsupportedGrammarNode>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
@@ -500,11 +506,9 @@ fn opaque_part_member_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Op
             nom::error::ErrorKind::Tag,
         )));
     }
-    // Do not opaque-capture kinded refs that have dedicated parsers.
-    if starts_with_keyword(input.fragment(), b"ref") {
+    let (production, member_start) = if starts_with_keyword(input.fragment(), b"ref") {
         let after_ref = {
-            let (peek, _) = ws_and_comments(input)?;
-            let (peek, _) = tag(&b"ref"[..]).parse(peek)?;
+            let (peek, _) = tag(&b"ref"[..]).parse(input)?;
             let (peek, _) = ws1(peek)?;
             peek
         };
@@ -517,78 +521,48 @@ fn opaque_part_member_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Op
                 nom::error::ErrorKind::Tag,
             )));
         }
-    }
-    let keyword = if starts_with_keyword(input.fragment(), b"ref") {
-        "ref"
+        if !starts_with_keyword(after_ref.fragment(), b"connection") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        (
+            crate::ast::UnsupportedProduction::ReferenceConnectionUsage,
+            input,
+        )
     } else {
-        "connection"
+        (
+            crate::ast::UnsupportedProduction::ConnectionUsageInPartDefinition,
+            input,
+        )
+    };
+    let (mut input, _) = skip_statement_or_block(member_start)?;
+    let (after_ws, _) = ws_and_comments(input)?;
+    if after_ws.fragment().starts_with(b":>") || after_ws.fragment().starts_with(b":>>") {
+        let (after_relationship, _) = skip_statement_or_block(after_ws)?;
+        input = after_relationship;
     }
-    .to_string();
-    let (input, header_text) =
-        crate::parser::lex::take_until_terminator(input, MEMBER_HEADER_UNTIL_BODY)?;
-    let name_str = header_text
-        .split(|c: char| {
-            c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == '(' || c == ')'
-        })
-        .filter(|s| !s.is_empty())
-        .find(|token| {
-            !matches!(
-                *token,
-                "ref"
-                    | "action"
-                    | "state"
-                    | "port"
-                    | "connection"
-                    | "part"
-                    | "def"
-                    | "private"
-                    | "protected"
-                    | "public"
-                    | "abstract"
-            )
-        })
-        .unwrap_or("member")
-        .to_string();
-    let (input, _) = ws_and_comments(input)?;
-    let (input, body) = crate::parser::attribute::attribute_body(input)?;
-    let before_subsets = input;
-    let (input, trailing_subsets) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_reference),
-    ))
-    .parse(input)?;
-    let subsets = trailing_subsets.map(|target| {
-        let span = crate::parser::span_from_to(before_subsets, input);
-        single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target)
-    });
-    let before_redefines = input;
-    let (input, trailing_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_reference),
-    ))
-    .parse(input)?;
-    let redefines = trailing_redefines.map(|target| {
-        let span = crate::parser::span_from_to(before_redefines, input);
-        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
-    });
-    let input = if subsets.is_some() || redefines.is_some() {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        input
-    } else {
-        input
+    let diagnostic = crate::ast::ParseErrorNode {
+        message: "spec-valid connection-like member is not implemented in part definitions"
+            .to_owned(),
+        code: "unsupported_grammar_form".to_owned(),
+        expected: Some("structured connection/reference usage".to_owned()),
+        found: None,
+        suggestion: Some(
+            "Keep this syntax; parser support is incomplete rather than the model being malformed."
+                .to_owned(),
+        ),
+        category: Some(crate::error::DiagnosticCategory::UnsupportedGrammarForm),
     };
     Ok((
         input,
         node_from_to(
             start,
             input,
-            OpaqueMemberDecl {
-                keyword,
-                name: name_str,
-                text: header_text.trim().to_string(),
-                body,
-                subsets,
-                redefines,
+            crate::ast::UnsupportedGrammarNode {
+                production,
+                diagnostic,
             },
         ),
     ))
@@ -600,24 +574,6 @@ mod par_002_nested_def_tests {
 
     fn input(text: &str) -> Input<'_> {
         crate::parser::span::test_input(text)
-    }
-
-    #[test]
-    fn opaque_member_trailing_relationships_are_not_discarded() {
-        let source = input("ref connection link { } :> Network::links :>> Legacy::links;");
-        let (rest, node) =
-            opaque_part_member_decl(source).expect("opaque member with trailing relationships");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let subsets = node.value.subsets.expect("subsets relationship");
-        let redefines = node.value.redefines.expect("redefines relationship");
-        assert_eq!(
-            crate::parser::usage::reference_text(source, subsets.value.target[0]).as_deref(),
-            Some("Network::links")
-        );
-        assert_eq!(
-            crate::parser::usage::reference_text(source, redefines.value.target[0]).as_deref(),
-            Some("Legacy::links")
-        );
     }
 
     #[test]

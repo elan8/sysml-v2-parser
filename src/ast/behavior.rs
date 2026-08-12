@@ -515,12 +515,25 @@ pub struct ForkStmt {
     pub body: FirstMergeBody,
 }
 
-/// Body of first/merge: `;` or `{` ... `}`.
+/// Body of first/merge: `;` or a source-backed `{` ... `}` body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FirstMergeBody {
     Semicolon,
-    Brace,
+    Brace(Node<FirstMergeBraceBody>),
+}
+
+/// Exact delimiter provenance for a `first`/`merge`/`decide`/`join`/`fork` brace body.
+///
+/// The enclosing [`Node`] span covers the complete authored body, including both delimiters and
+/// all retained source between them. The body contents remain source-backed because this grammar
+/// position accepts control-node pins that are not yet represented as typed members; emitters can
+/// therefore preserve the exact authored slice without copying or fabricating an empty body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FirstMergeBraceBody {
+    pub open_brace_span: Span,
+    pub close_brace_span: Span,
 }
 
 /// Terminate control node: `terminate;` or `terminate target;`.

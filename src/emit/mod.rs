@@ -294,4 +294,14 @@ action def A {
         assert!(!report.is_clean());
         assert_eq!(report.hits[0].kind, OpacityKind::Other);
     }
+
+    #[test]
+    fn first_merge_brace_body_preserves_authored_source() {
+        let source = "package P { action def A { fork choice {\n  in left;\n  out right;\n} } }";
+        let document = crate::parse(source).expect("parse source-backed fork body");
+        assert!(opacity_report(&document.root).is_clean());
+
+        let emitted = emit_sysml(&document).expect("emit source-backed fork body");
+        assert!(emitted.contains("fork choice {\n  in left;\n  out right;\n}"));
+    }
 }

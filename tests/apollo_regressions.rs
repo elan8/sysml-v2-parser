@@ -208,7 +208,10 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
             _ => None,
         })
         .expect("timeslice should parse in part body");
-    assert_eq!(timeslice.portion_kind.as_deref(), Some("timeslice"));
+    assert_eq!(
+        timeslice.portion_kind,
+        Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
+    );
     let OccurrenceUsageBody::Brace { elements } = &timeslice.body else {
         panic!("expected timeslice body");
     };
@@ -219,7 +222,10 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
             _ => None,
         })
         .expect("snapshot should parse in timeslice body");
-    assert_eq!(snapshot.portion_kind.as_deref(), Some("snapshot"));
+    assert_eq!(
+        snapshot.portion_kind,
+        Some(sysml_v2_parser::OccurrencePortionKind::Snapshot)
+    );
 }
 
 #[test]
@@ -254,9 +260,15 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         })
         .collect();
     assert_eq!(occurrences.len(), 2);
-    assert_eq!(occurrences[0].portion_kind.as_deref(), Some("timeslice"));
+    assert_eq!(
+        occurrences[0].portion_kind,
+        Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
+    );
     assert!(occurrences[0].subsets.is_none());
-    assert_eq!(occurrences[1].portion_kind.as_deref(), Some("timeslice"));
+    assert_eq!(
+        occurrences[1].portion_kind,
+        Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
+    );
 
     let OccurrenceUsageBody::Brace {
         elements: ingress_elements,

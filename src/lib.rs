@@ -21,6 +21,7 @@
     not(test),
     deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
 )]
+#![cfg_attr(not(test), warn(clippy::wildcard_enum_match_arm))]
 
 pub mod ast;
 pub mod emit;
@@ -35,22 +36,22 @@ pub use ast::{
     CollectionOperatorParameter, CollectionOperatorParameterTyping, CommentAnnotation, Connect,
     ConnectBody, ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement,
     DeclarationName, DerivationConnectionRole, DerivationEndRole, DocComment, EndDecl, EndIdentity,
-    Expression, FilterMember, FilterPackageMember, FirstMergeBody, FirstStmt, FlowDef, FlowUsage,
-    FlowUsageKind, Identification, Import, ImportShape, ImportSuffixSpans, ImportTarget, InOut,
-    InOutDecl, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
-    InterfaceUsageBodyElement, ItemUsage, LoopStmt, MergeStmt, NamespaceDecl, Node,
-    OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, Package, PackageBody,
-    PackageBodyElement, ParseErrorNode, ParsedDocument, PartDef, PartDefBody, PartDefBodyElement,
-    PartUsage, PartUsageBody, PartUsageBodyElement, PayloadFeature, Perform, PerformBody,
-    PerformBodyElement, PerformInOutBinding, PortBody, PortBodyElement, PortDef, PortDefBody,
-    PortDefBodyElement, PortUsage, QualifiedDeclarationName, QualifiedIdentification,
+    Expression, FilterMember, FilterPackageMember, FirstMergeBody, FirstMergeBraceBody, FirstStmt,
+    FlowDef, FlowUsage, FlowUsageKind, Identification, Import, ImportShape, ImportSuffixSpans,
+    ImportTarget, InOut, InOutDecl, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
+    InterfaceUsage, InterfaceUsageBodyElement, ItemUsage, LoopStmt, MergeStmt, NamespaceDecl, Node,
+    OccurrenceBodyElement, OccurrencePortionKind, OccurrenceUsage, OccurrenceUsageBody, Package,
+    PackageBody, PackageBodyElement, ParseErrorNode, ParsedDocument, PartDef, PartDefBody,
+    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PayloadFeature, Perform,
+    PerformBody, PerformBodyElement, PerformInOutBinding, PortBody, PortBodyElement, PortDef,
+    PortDefBody, PortDefBodyElement, PortUsage, QualifiedDeclarationName, QualifiedIdentification,
     QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceMetadata,
     QualifiedReferenceValidationError, QualifiedReferenceView, RefBody, RefBodyElement, RefDecl,
     ReferenceSegment, ReferenceSeparator, RelationshipBodyElement, RequireConstraint,
     RequireConstraintBody, RequirementDef, RequirementDefBody, RequirementDefBodyElement,
-    RequirementUsage, RootElement, RootNamespace, SegmentRange, SourceStorage, Span,
-    TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind, VerificationCaseDef,
-    VerificationCaseUsage, Visibility,
+    RequirementUsage, ReturnRef, ReturnRefBody, ReturnRefBodyElement, RootElement, RootNamespace,
+    SegmentRange, SourceStorage, Span, TextualRepresentation, ThenAction, ThenTarget,
+    TypeCheckKind, VerificationCaseDef, VerificationCaseUsage, Visibility,
 };
 pub use emit::{
     emit_recovered_sysml, emit_sysml, emit_sysml_with_options, opacity_report, EmitError,
@@ -60,7 +61,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 83;
+pub const PARSE_AST_VERSION: u32 = 85;
 
 /// The pinned grammar release understood by this build of the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

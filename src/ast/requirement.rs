@@ -559,10 +559,24 @@ impl PartialEq for CaseReturnDecl {
 pub struct ReturnRef {
     pub name: String,
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// Raw body text (balanced `{ ... }` including nested braces).
-    pub body: String,
-    /// Structured `return <expr>;` inside the body when parsed.
-    pub return_expression: Option<crate::ast::Node<crate::ast::Expression>>,
+    pub body: Node<ReturnRefBody>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ReturnRefBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<ReturnRefBodyElement>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ReturnRefBodyElement {
+    Doc(Node<crate::ast::DocComment>),
+    Result(Node<Expression>),
+    Error(Node<ParseErrorNode>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -370,7 +370,7 @@ impl ImportTargetValidator<'_> {
                 | PartDefBodyElement::Connection(_)
                 | PartDefBodyElement::Perform(_)
                 | PartDefBodyElement::Allocate(_)
-                | PartDefBodyElement::OpaqueMember(_)
+                | PartDefBodyElement::UnsupportedMember(_)
                 | PartDefBodyElement::ExhibitState(_)
                 | PartDefBodyElement::CalcUsage(_)
                 | PartDefBodyElement::ConstraintDef(_)

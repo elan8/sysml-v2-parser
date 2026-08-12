@@ -11,12 +11,13 @@ use std::io;
 use super::{
     Argument, CaseReturnFeatureKind, CollectionOperator, ConnectBody, ConnectionDefBody,
     ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole, EndIdentity, Expression,
-    FeatureValue, FeatureValueKind, ImportShape, ImportSuffixSpans, ImportTarget, InOut, Node,
-    PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement, PerformBody,
-    PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId, ReferenceSeparator,
-    RequirementDefBody, RequirementDefBodyElement, RootElement, Span, StateDefBody,
-    StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind, TypingKind,
-    TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
+    FeatureValue, FeatureValueKind, FirstMergeBody, ImportShape, ImportSuffixSpans, ImportTarget,
+    InOut, InterfaceDefBody, InterfaceDefBodyElement, Node, PackageBody, PackageBodyElement,
+    ParsedDocument, PartDefBody, PartDefBodyElement, PerformBody, PerformBodyElement, PortDefBody,
+    PortDefBodyElement, QualifiedReferenceId, ReferenceSeparator, RequirementDefBody,
+    RequirementDefBodyElement, RootElement, Span, StateDefBody, StateDefBodyElement,
+    SubsettingKind, SubsettingRelationship, TypeCheckKind, TypingKind, TypingRelationship,
+    UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
 };
 
 /// Stream a semantic AST projection to an [`io::Write`] sink.
@@ -514,6 +515,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             super::UnsupportedProduction::PerformActionUsage => "perform-action-usage",
             super::UnsupportedProduction::ExhibitStateUsage => "exhibit-state-usage",
             super::UnsupportedProduction::IncludeUseCaseUsage => "include-use-case-usage",
+            super::UnsupportedProduction::ReferenceConnectionUsage => "reference-connection-usage",
+            super::UnsupportedProduction::ConnectionUsageInPartDefinition => {
+                "connection-usage-in-part-definition"
+            }
         })?;
         self.writer.write_str(") (code ")?;
         write_quoted(self.writer, &unsupported.diagnostic.code)?;
@@ -792,8 +797,39 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::AssertConstraint(_constraint) => {
                             self.write_marker(&mut first, "assert-constraint")?;
                         }
-                        UseCaseDefBodyElement::ReturnRef(_return_ref) => {
-                            self.write_marker(&mut first, "return-ref")?;
+                        UseCaseDefBodyElement::ReturnRef(return_ref) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(return-ref (name ")?;
+                            write_quoted(self.writer, &return_ref.value.name)?;
+                            self.writer.write_str(") (body-span ")?;
+                            write_span(self.writer, &return_ref.value.body.span)?;
+                            self.writer.write_str(") ")?;
+                            match &return_ref.value.body.value {
+                                super::ReturnRefBody::Semicolon => {
+                                    self.writer.write_str("(body semicolon)")?;
+                                }
+                                super::ReturnRefBody::Brace { elements } => {
+                                    self.writer.write_str("(body")?;
+                                    for element in elements {
+                                        self.writer.write_char(' ')?;
+                                        match &element.value {
+                                            super::ReturnRefBodyElement::Doc(_) => {
+                                                self.writer.write_str("(doc)")?;
+                                            }
+                                            super::ReturnRefBodyElement::Result(expression) => {
+                                                self.writer.write_str("(result ")?;
+                                                self.write_expression(expression)?;
+                                                self.writer.write_char(')')?;
+                                            }
+                                            super::ReturnRefBodyElement::Error(error) => {
+                                                self.write_malformed(&error.value, &element.span)?;
+                                            }
+                                        }
+                                    }
+                                    self.writer.write_char(')')?;
+                                }
+                            }
+                            self.writer.write_char(')')?;
                         }
                         UseCaseDefBodyElement::CaseReturnDecl(return_decl) => {
                             self.write_item_prefix(&mut first)?;
@@ -1013,8 +1049,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_occurrence(&occurrence.value)?;
                         }
-                        PartDefBodyElement::InterfaceDef(_definition) => {
-                            self.write_marker(&mut first, "interface-def")?;
+                        PartDefBodyElement::InterfaceDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_interface_definition(&definition.value)?;
                         }
                         PartDefBodyElement::InterfaceUsage(_usage) => {
                             self.write_marker(&mut first, "interface-usage")?;
@@ -1036,25 +1073,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::Allocate(_allocate) => {
                             self.write_marker(&mut first, "allocate")?;
                         }
-                        PartDefBodyElement::OpaqueMember(member) => {
+                        PartDefBodyElement::UnsupportedMember(member) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(opaque-member (keyword ")?;
-                            write_quoted(self.writer, &member.value.keyword)?;
-                            self.writer.write_str(") (name ")?;
-                            write_quoted(self.writer, &member.value.name)?;
-                            self.writer.write_str(") (source ")?;
-                            write_quoted(self.writer, &member.value.text)?;
-                            self.writer.write_str(") ")?;
-                            self.write_optional_subsetting(
-                                "subsets",
-                                member.value.subsets.as_ref(),
-                            )?;
-                            self.writer.write_char(' ')?;
-                            self.write_optional_subsetting(
-                                "redefines",
-                                member.value.redefines.as_ref(),
-                            )?;
-                            self.writer.write_char(')')?;
+                            self.write_unsupported(&member.value, &member.span)?;
                         }
                         PartDefBodyElement::ExhibitState(exhibit) => {
                             self.write_item_prefix(&mut first)?;
@@ -1187,8 +1208,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::VerificationCaseUsage(_usage) => {
                             self.write_marker(&mut first, "verification-case-usage")?;
                         }
-                        PartDefBodyElement::FirstStmt(_first) => {
-                            self.write_marker(&mut first, "first")?;
+                        PartDefBodyElement::FirstStmt(statement) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_first_statement(&statement.value)?;
                         }
                         PartDefBodyElement::Bind(_bind) => {
                             self.write_marker(&mut first, "bind")?;
@@ -1216,6 +1238,35 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             self.write_reference(*reference)?;
         }
         self.writer.write_str("))")
+    }
+
+    fn write_first_statement(&mut self, statement: &super::FirstStmt) -> io::Result<()> {
+        self.writer.write_str("(first (source ")?;
+        self.write_expression(&statement.first)?;
+        self.writer.write_str(") (target ")?;
+        if let Some(target) = &statement.then {
+            self.write_expression(target)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_first_merge_body(&statement.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_first_merge_body(&mut self, body: &FirstMergeBody) -> io::Result<()> {
+        match body {
+            FirstMergeBody::Semicolon => self.writer.write_str("(body semicolon)"),
+            FirstMergeBody::Brace(body) => {
+                self.writer.write_str("(body brace (span ")?;
+                write_span(self.writer, &body.span)?;
+                self.writer.write_str(") (open-brace ")?;
+                write_span(self.writer, &body.value.open_brace_span)?;
+                self.writer.write_str(") (close-brace ")?;
+                write_span(self.writer, &body.value.close_brace_span)?;
+                self.writer.write_str("))")
+            }
+        }
     }
 
     fn write_alias_definition(&mut self, definition: &super::AliasDef) -> io::Result<()> {
@@ -1257,6 +1308,76 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_connection_body(&definition.body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_interface_definition(&mut self, definition: &super::InterfaceDef) -> io::Result<()> {
+        self.writer.write_str("(interface-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") (specializes ")?;
+        if let Some(specializes) = &definition.specializes {
+            self.write_typing(&specializes.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_interface_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_interface_body(&mut self, body: &InterfaceDefBody) -> io::Result<()> {
+        match body {
+            InterfaceDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
+            InterfaceDefBody::Brace { elements } => {
+                self.writer.write_str("(body ")?;
+                let mut first = true;
+                for element in elements {
+                    match &element.value {
+                        InterfaceDefBodyElement::Doc(_doc) => {
+                            self.write_marker(&mut first, "doc")?;
+                        }
+                        InterfaceDefBodyElement::EndDecl(end) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_end(&end.value)?;
+                        }
+                        InterfaceDefBodyElement::RefDecl(_reference) => {
+                            self.write_marker(&mut first, "ref")?;
+                        }
+                        InterfaceDefBodyElement::ConnectStmt(_connect) => {
+                            self.write_marker(&mut first, "connect")?;
+                        }
+                        InterfaceDefBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        InterfaceDefBodyElement::AttributeDef(_definition) => {
+                            self.write_marker(&mut first, "attribute-def")?;
+                        }
+                        InterfaceDefBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        InterfaceDefBodyElement::ItemDef(_definition) => {
+                            self.write_marker(&mut first, "item-def")?;
+                        }
+                        InterfaceDefBodyElement::ItemUsage(_usage) => {
+                            self.write_marker(&mut first, "item-usage")?;
+                        }
+                        InterfaceDefBodyElement::PortDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_definition(&definition.value)?;
+                        }
+                        InterfaceDefBodyElement::PortUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_usage(&usage.value)?;
+                        }
+                        InterfaceDefBodyElement::FlowUsage(_usage) => {
+                            self.write_marker(&mut first, "flow-usage")?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
     }
 
     fn write_connection_body(&mut self, body: &ConnectionDefBody) -> io::Result<()> {
@@ -1542,7 +1663,13 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_occurrence(&mut self, occurrence: &super::OccurrenceUsage) -> io::Result<()> {
-        self.writer.write_str("(occurrence (declaration ")?;
+        self.writer.write_str("(occurrence (portion ")?;
+        match occurrence.portion_kind {
+            Some(super::OccurrencePortionKind::Snapshot) => self.writer.write_str("snapshot")?,
+            Some(super::OccurrencePortionKind::Timeslice) => self.writer.write_str("timeslice")?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (declaration ")?;
         write_quoted(self.writer, &occurrence.name)?;
         self.writer.write_str(") (target ")?;
         if let Some(reference) = occurrence.occurrence_reference {
@@ -1842,8 +1969,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_port_definition(&definition.value)
             }
-            PackageBodyElement::InterfaceDef(_definition) => {
-                self.write_marker(first, "interface-def")
+            PackageBodyElement::InterfaceDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_interface_definition(&definition.value)
             }
             PackageBodyElement::AliasDef(definition) => {
                 self.write_item_prefix(first)?;
@@ -1937,8 +2065,16 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::AnalysisCaseUsage(_usage) => {
                 self.write_marker(first, "analysis-case-usage")
             }
-            PackageBodyElement::VerificationCaseDef(_definition) => {
-                self.write_marker(first, "verification-case-def")
+            PackageBodyElement::VerificationCaseDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(verification-case-def (name ")?;
+                write_optional_quoted(
+                    self.writer,
+                    definition.value.identification.name.as_deref(),
+                )?;
+                self.writer.write_str(") ")?;
+                self.write_use_case_body(&definition.value.body)?;
+                self.writer.write_char(')')
             }
             PackageBodyElement::VerificationCaseUsage(_usage) => {
                 self.write_marker(first, "verification-case-usage")
@@ -2199,7 +2335,6 @@ mod tests {
                         in Inputs::speed = Sensors::speed;
                     }
                     connect Ports::source to Ports::sink; :> Links::base :>> Links::override;
-                    ref connection legacy; :> Links::subset :>> Links::redefined;
                 }
             }"#,
         )

@@ -36,6 +36,7 @@ package 'Action Shorthand Example' {
 (fixture-diagnostics
   (document "14_action_shorthand_example.md"
     (diagnostics
+      (diagnostic (code "recovered_action_body_element") (severity error) (category parseerror) (span (offset 467) (line 21) (column 4) (len 12)) (message "unexpected token in action body"))
     )
   )
 )

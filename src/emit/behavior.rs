@@ -228,16 +228,11 @@ fn emit_action_def_body_element(
             structure::emit_default_reference_usage(w, path, &d.value)
         }
         ActionDefBodyElement::FlowUsage(f) => emit_flow_usage(w, path, &f.value),
-        ActionDefBodyElement::FirstStmt(f) => emit_first_stmt(w, &f.value),
-        ActionDefBodyElement::MergeStmt(m) => {
-            w.push_str("merge ");
-            emit_expression(w, &m.value.merge.value)?;
-            match &m.value.body {
-                crate::ast::FirstMergeBody::Semicolon => w.push_char(';'),
-                crate::ast::FirstMergeBody::Brace => w.push_str(" {}"),
-            }
-            Ok(())
-        }
+        ActionDefBodyElement::FirstStmt(f) => emit_first_stmt(w, path, &f.value),
+        ActionDefBodyElement::MergeStmt(m) => emit_merge_stmt(w, path, &m.value),
+        ActionDefBodyElement::DecisionStmt(d) => emit_decision_stmt(w, path, &d.value),
+        ActionDefBodyElement::JoinStmt(j) => emit_join_stmt(w, path, &j.value),
+        ActionDefBodyElement::ForkStmt(f) => emit_fork_stmt(w, path, &f.value),
         ActionDefBodyElement::LoopStmt(l) => {
             w.push_str("loop ");
             emit_action_def_body(w, path, &l.value.body)
@@ -267,7 +262,13 @@ fn emit_action_def_body_element(
             w.push_char(' ');
             emit_action_def_body(w, path, &f.value.body)
         }
-        other => w.unsupported(
+        other @ (ActionDefBodyElement::Annotation(_)
+        | ActionDefBodyElement::MetadataAnnotation(_)
+        | ActionDefBodyElement::MetadataKeywordUsage(_)
+        | ActionDefBodyElement::MetadataUsage(_)
+        | ActionDefBodyElement::TextualRep(_)
+        | ActionDefBodyElement::TerminateStmt(_)
+        | ActionDefBodyElement::OccurrenceUsage(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -329,16 +330,11 @@ pub(crate) fn emit_action_usage_body_element(
             structure::emit_default_reference_usage(w, path, &d.value)
         }
         ActionUsageBodyElement::FlowUsage(f) => emit_flow_usage(w, path, &f.value),
-        ActionUsageBodyElement::FirstStmt(f) => emit_first_stmt(w, &f.value),
-        ActionUsageBodyElement::MergeStmt(m) => {
-            w.push_str("merge ");
-            emit_expression(w, &m.value.merge.value)?;
-            match &m.value.body {
-                crate::ast::FirstMergeBody::Semicolon => w.push_char(';'),
-                crate::ast::FirstMergeBody::Brace => w.push_str(" {}"),
-            }
-            Ok(())
-        }
+        ActionUsageBodyElement::FirstStmt(f) => emit_first_stmt(w, path, &f.value),
+        ActionUsageBodyElement::MergeStmt(m) => emit_merge_stmt(w, path, &m.value),
+        ActionUsageBodyElement::DecisionStmt(d) => emit_decision_stmt(w, path, &d.value),
+        ActionUsageBodyElement::JoinStmt(j) => emit_join_stmt(w, path, &j.value),
+        ActionUsageBodyElement::ForkStmt(f) => emit_fork_stmt(w, path, &f.value),
         ActionUsageBodyElement::LoopStmt(l) => {
             w.push_str("loop ");
             emit_action_def_body(w, path, &l.value.body)
@@ -361,7 +357,14 @@ pub(crate) fn emit_action_usage_body_element(
             Ok(())
         }
         ActionUsageBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
-        other => w.unsupported(
+        other @ (ActionUsageBodyElement::Annotation(_)
+        | ActionUsageBodyElement::MetadataAnnotation(_)
+        | ActionUsageBodyElement::MetadataKeywordUsage(_)
+        | ActionUsageBodyElement::MetadataUsage(_)
+        | ActionUsageBodyElement::TextualRep(_)
+        | ActionUsageBodyElement::TerminateStmt(_)
+        | ActionUsageBodyElement::OccurrenceUsage(_)
+        | ActionUsageBodyElement::ForLoop(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -397,17 +400,9 @@ pub(crate) fn emit_then_action_pub(
     match &then.target {
         ThenTarget::Action(a) => emit_action_usage(w, path, &a.value),
         ThenTarget::Perform(p) => emit_perform(w, path, &p.value),
-        ThenTarget::Merge(m) => {
-            w.push_str("merge ");
-            emit_expression(w, &m.value.merge.value)?;
-            w.push_char(';');
-            Ok(())
-        }
-        // `FirstMergeBody::Brace` doesn't capture its pin contents (same pre-existing limitation
-        // as standalone `fork F { ... };` -- ForkStmt has no emit arm at all yet, GH-93 territory).
-        ThenTarget::Fork(_) => w.unsupported(path, "ThenTarget::Fork"),
-        // Same `FirstMergeBody::Brace` opacity as Fork; DecisionStmt has no emit arm either.
-        ThenTarget::Decide(_) => w.unsupported(path, "ThenTarget::Decide"),
+        ThenTarget::Merge(m) => emit_merge_stmt(w, path, &m.value),
+        ThenTarget::Fork(f) => emit_fork_stmt(w, path, &f.value),
+        ThenTarget::Decide(d) => emit_decision_stmt(w, path, &d.value),
         ThenTarget::Accept(a) => {
             w.push_str("accept ");
             emit_transition_accept(w, path, &a.value)?;
@@ -701,7 +696,9 @@ fn emit_state_def_body_element(
             super::requirement::emit_requirement_usage(w, path, &r.value)
         }
         StateDefBodyElement::Transition(t) => emit_transition(w, path, &t.value),
-        other => w.unsupported(
+        other @ (StateDefBodyElement::Annotation(_)
+        | StateDefBodyElement::MetadataAnnotation(_)
+        | StateDefBodyElement::MetadataKeywordUsage(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -1015,7 +1012,11 @@ fn emit_transition(
     Ok(())
 }
 
-fn emit_first_stmt(w: &mut EmitWriter<'_>, first: &crate::ast::FirstStmt) -> Result<(), EmitError> {
+pub(crate) fn emit_first_stmt(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    first: &crate::ast::FirstStmt,
+) -> Result<(), EmitError> {
     if first.succession_name.is_some()
         || first.succession_type.is_some()
         || first.succession_multiplicity.is_some()
@@ -1049,11 +1050,64 @@ fn emit_first_stmt(w: &mut EmitWriter<'_>, first: &crate::ast::FirstStmt) -> Res
         }
         emit_expression(w, &then.value)?;
     }
-    match &first.body {
-        crate::ast::FirstMergeBody::Semicolon => w.push_char(';'),
-        crate::ast::FirstMergeBody::Brace => w.push_str(" {}"),
+    emit_first_merge_body(w, path, &first.body)
+}
+
+fn emit_first_merge_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &crate::ast::FirstMergeBody,
+) -> Result<(), EmitError> {
+    match body {
+        crate::ast::FirstMergeBody::Semicolon => {
+            w.push_char(';');
+            Ok(())
+        }
+        crate::ast::FirstMergeBody::Brace(body) => {
+            w.push_char(' ');
+            w.push_source_span(path, &body.span)
+        }
     }
-    Ok(())
+}
+
+fn emit_merge_stmt(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    merge: &crate::ast::MergeStmt,
+) -> Result<(), EmitError> {
+    w.push_str("merge ");
+    emit_expression(w, &merge.merge.value)?;
+    emit_first_merge_body(w, path, &merge.body)
+}
+
+fn emit_decision_stmt(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    decision: &crate::ast::DecisionStmt,
+) -> Result<(), EmitError> {
+    w.push_str("decide ");
+    emit_expression(w, &decision.decide.value)?;
+    emit_first_merge_body(w, path, &decision.body)
+}
+
+fn emit_join_stmt(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    join: &crate::ast::JoinStmt,
+) -> Result<(), EmitError> {
+    w.push_str("join ");
+    emit_expression(w, &join.join.value)?;
+    emit_first_merge_body(w, path, &join.body)
+}
+
+fn emit_fork_stmt(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    fork: &crate::ast::ForkStmt,
+) -> Result<(), EmitError> {
+    w.push_str("fork ");
+    emit_expression(w, &fork.fork.value)?;
+    emit_first_merge_body(w, path, &fork.body)
 }
 
 pub(crate) fn emit_occurrence_def(
@@ -1102,7 +1156,10 @@ pub(crate) fn emit_occurrence_usage(
     }
     if let Some(portion) = &usage.portion_kind {
         // `snapshot` / `timeslice` usages parse without an `occurrence` keyword.
-        w.push_str(portion);
+        w.push_str(match portion {
+            crate::ast::OccurrencePortionKind::Snapshot => "snapshot",
+            crate::ast::OccurrencePortionKind::Timeslice => "timeslice",
+        });
         w.push_char(' ');
     } else if usage.occurrence_reference.is_none() && (usage.is_event || !usage.is_individual) {
         // Plain `occurrence …` and `event occurrence …`. Bare `individual <name>` omits
@@ -1199,7 +1256,7 @@ pub(crate) fn emit_occurrence_body_element(
             emit_occurrence_exhibit(w, path, &s.value)
         }
         crate::ast::OccurrenceBodyElement::SuccessionUsage(s) => emit_succession_usage(w, &s.value),
-        other => w.unsupported(
+        other @ crate::ast::OccurrenceBodyElement::Annotation(_) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),

@@ -1095,6 +1095,20 @@ fn interface_def_body_recovery_works_nested_in_a_part_def() {
 }
 
 #[test]
+fn recovery_inside_metadata_body_reaches_document_diagnostics() {
+    // Metadata bodies use the shared attribute-body grammar. The metadata member itself parses
+    // successfully even when that nested grammar inserts an Error node, so diagnostics traversal
+    // must descend through the metadata wrapper rather than only inspect its containing package.
+    let input = "package P { #audit { attribute broken: ; } part def StillParsedAfterRecovery; }";
+    let result = parse_with_diagnostics(input);
+
+    assert!(
+        !result.errors.is_empty(),
+        "recovery nested in a metadata body must reach document diagnostics"
+    );
+}
+
+#[test]
 fn connection_def_body_recovery_diagnostics_reach_parse_with_diagnostics() {
     // GH-51 (found while fixing the issue, not the issue's own repro): `connection_def_body`
     // already generated a proper `ConnectionDefBodyElement::Error` recovery node via

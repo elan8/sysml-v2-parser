@@ -69,6 +69,7 @@ package JohnIndividualExample {
 (fixture-diagnostics
   (document "john_individual_example.md"
     (diagnostics
+      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 1060) (line 45) (column 7) (len 37)) (message "unexpected keyword `assert` in relationship body"))
       (diagnostic (code "recovered_occurrence_body_element") (severity error) (category parseerror) (span (offset 1170) (line 50) (column 6) (len 258)) (message "unexpected token in occurrence body"))
     )
   )
@@ -133,6 +134,6 @@ package JohnIndividualExample {
 (parsed-document
   (references
   )
-  (root (package (name "JohnIndividualExample") (body (item-def) (item-def) (item-def) (item-def) (occurrence (declaration "UnitedStatesWithJohnAsPresident") (target none)))))
+  (root (package (name "JohnIndividualExample") (body (item-def) (item-def) (item-def) (item-def) (occurrence (portion none) (declaration "UnitedStatesWithJohnAsPresident") (target none)))))
 )
 ~~~

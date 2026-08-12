@@ -1,8 +1,8 @@
 use crate::ast::{
     ActorDecl, ActorRedefinitionAssignment, ActorUsage, CalcUsage, CaseReturnDecl, FirstSuccession,
     IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition, ReturnRef,
-    SubjectRef, ThenDone, ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody,
-    UseCaseDefBodyElement, UseCaseUsage, Visibility,
+    ReturnRefBody, ReturnRefBodyElement, SubjectRef, ThenDone, ThenIncludeUseCase,
+    ThenUseCaseUsage, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
 use crate::parser::body::parse_structured_brace_members;
@@ -22,17 +22,8 @@ use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_sp
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::{IResult, Parser};
-
-fn slice_text(start: Input<'_>, end: Input<'_>) -> String {
-    let delta = end
-        .location_offset()
-        .saturating_sub(start.location_offset());
-    let bytes = start.fragment();
-    let take = delta.min(bytes.len());
-    String::from_utf8_lossy(&bytes[..take]).trim().to_string()
-}
 
 fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
     let start = input;
@@ -300,28 +291,54 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
     ))
 }
 
-fn return_ref_body(
-    input: Input<'_>,
-) -> IResult<Input<'_>, (String, Option<crate::ast::Node<crate::ast::Expression>>)> {
-    let body_start = input;
+fn return_ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRefBodyElement>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b"{") {
-        let (input, return_expression) = delimited(
-            preceded(ws_and_comments, tag(&b"{"[..])),
-            opt(return_expression_stmt),
-            preceded(ws_and_comments, tag(&b"}"[..])),
-        )
-        .parse(input)?;
-        let body = slice_text(body_start, input);
-        Ok((input, (body, return_expression)))
-    } else {
-        let (input, _) = skip_statement_or_block(input)?;
-        let body = slice_text(body_start, input);
-        Ok((input, (body, None)))
+    let (input, element) = alt((
+        map(doc_comment, ReturnRefBodyElement::Doc),
+        map(return_expression_stmt, ReturnRefBodyElement::Result),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, element)))
+}
+
+fn return_ref_body(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRefBody>> {
+    let (input, _) = ws_and_comments(input)?;
+    let start = input;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, node_from_to(start, input, ReturnRefBody::Semicolon)));
     }
+    let starters: &[&[u8]] = &[b"doc", b"return"];
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        starters,
+        "return reference body",
+        "recovered_return_ref_body_element",
+        return_ref_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                starters,
+                "return reference body",
+                "recovered_return_ref_body_element",
+            );
+            let error = node_from_to(start, end, recovery);
+            node_from_to(start, end, ReturnRefBodyElement::Error(error))
+        },
+    )?;
+    Ok((
+        input,
+        node_from_to(start, input, ReturnRefBody::Brace { elements }),
+    ))
 }
 
 fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
+    crate::parser::span::reference_transaction(input, return_ref_inner)
+}
+
+fn return_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -330,7 +347,7 @@ fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
     let (input, n) = name(input)?;
     let (input, mult) = opt(multiplicity_node).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (body, return_expression)) = return_ref_body(input)?;
+    let (input, body) = return_ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -340,7 +357,6 @@ fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
                 name: n,
                 multiplicity: mult,
                 body,
-                return_expression,
             },
         ),
     ))
@@ -804,5 +820,13 @@ mod membership_tests {
         assert_eq!(node.value.name, "passengers");
         let _type_reference = node.value.type_name;
         assert!(node.value.multiplicity.is_some());
+    }
+
+    #[test]
+    fn failed_return_ref_rolls_back_nested_expression_references() {
+        let context = crate::parser::span::ParseContext::new();
+        let parsed = return_ref(context.input(b"return ref result { return Ghost::value;"));
+        assert!(parsed.is_err());
+        assert!(context.finish().is_empty());
     }
 }

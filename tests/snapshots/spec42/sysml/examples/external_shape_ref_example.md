@@ -41,6 +41,7 @@ package ExternalShapeRefExample {
 (fixture-diagnostics
   (document "external_shape_ref_example.md"
     (diagnostics
+      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 390) (line 19) (column 4) (len 140)) (message "unexpected keyword `metadata` in attribute body"))
     )
   )
 )

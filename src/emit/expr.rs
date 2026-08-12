@@ -51,7 +51,33 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             // `unit` is often already `Expression::Bracket(...)`; avoid `[[kg]]`.
             match &unit.value {
                 Expression::Bracket(_) => emit_expression(w, &unit.value)?,
-                other => {
+                other @ (Expression::LiteralInteger(_)
+                | Expression::LiteralReal(_)
+                | Expression::LiteralString(_)
+                | Expression::LiteralBoolean(_)
+                | Expression::Unit(_)
+                | Expression::Opaque(_)
+                | Expression::FeatureRef(_)
+                | Expression::MemberAccess { .. }
+                | Expression::Index { .. }
+                | Expression::LiteralWithUnit { .. }
+                | Expression::BinaryOp { .. }
+                | Expression::UnaryOp { .. }
+                | Expression::Invocation { .. }
+                | Expression::Tuple(_)
+                | Expression::Classification { .. }
+                | Expression::MetaCast { .. }
+                | Expression::TypeCheck { .. }
+                | Expression::Select { .. }
+                | Expression::Collect { .. }
+                | Expression::Null
+                | Expression::Parenthesized(_)
+                | Expression::Constructor { .. }
+                | Expression::FeatureChainRef(_)
+                | Expression::CollectionOp { .. }
+                | Expression::MetadataAccess(_)
+                | Expression::Conditional { .. }
+                | Expression::Extent { .. }) => {
                     w.push_char('[');
                     emit_expression(w, other)?;
                     w.push_char(']');

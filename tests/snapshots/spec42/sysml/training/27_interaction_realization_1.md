@@ -65,8 +65,8 @@ package 'Interaction Realization-1' {
 (fixture-diagnostics
   (document "27_interaction_realization_1.md"
     (diagnostics
-      (diagnostic (code "recovered_occurrence_body_element") (severity error) (category parseerror) (span (offset 1523) (line 51) (column 3) (len 82)) (message "unexpected token in occurrence body"))
-      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 1523) (line 51) (column 3) (len 82)) (message "suppressed 2 cascading recovered diagnostics after earlier recovery errors"))
+      (diagnostic (code "recovered_action_body_element") (severity error) (category parseerror) (span (offset 335) (line 13) (column 28) (len 35)) (message "unexpected token in action body"))
+      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 335) (line 13) (column 28) (len 35)) (message "suppressed 5 cascading recovered diagnostics after earlier recovery errors"))
     )
   )
 )
@@ -131,6 +131,6 @@ package 'Interaction Realization-1' {
   (references
     (reference r0 (scope relative) (span (offset 54) (line 2) (column 17) (len 23)) (segments (segment 0 (token "'Interaction Example-1'") (name "Interaction Example-1") (separator none) (span (offset 54) (line 2) (column 17) (len 23)))))
   )
-  (root (package (name "Interaction Realization-1") (body (import (target (span (span (offset 54) (line 2) (column 17) (len 26))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 77) (line 2) (column 40) (len 3))) (separator (span (offset 77) (line 2) (column 40) (len 2))) (marker (span (offset 79) (line 2) (column 42) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-usage) (part-usage) (occurrence (declaration "cruiseControlInteraction_a") (target none)))))
+  (root (package (name "Interaction Realization-1") (body (import (target (span (span (offset 54) (line 2) (column 17) (len 26))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 77) (line 2) (column 40) (len 3))) (separator (span (offset 77) (line 2) (column 40) (len 2))) (marker (span (offset 79) (line 2) (column 42) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-usage) (part-usage) (occurrence (portion none) (declaration "cruiseControlInteraction_a") (target none)))))
 )
 ~~~

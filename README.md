@@ -84,8 +84,11 @@ the formatted output.
 `FORMAT` is always derived from `SOURCE`. When its canonical payload is byte-identical to the
 authored source payload, the section uses the compact `~~~sexpr` sentinel
 `(stable-idempotent)`. When formatting changes any byte, `FORMAT` instead contains the complete
-emitted document in a `~~~sysml` fence. The driver recomputes this choice from `SOURCE`; it never
-uses the sentinel as source text or as cached formatter output.
+emitted document in a `~~~sysml` fence. A valid parsed tree may intentionally retain opaque or
+not-yet-emittable syntax; in that case the snapshot remains valid and uses the deterministic
+`~~~sexpr` sentinel `(unavailable (reason opaque-ast))`. Other emitter failures still abort
+snapshot generation. The driver recomputes this choice from `SOURCE`; it never uses either
+sentinel as source text or as cached formatter output.
 
 The driver delegates its AST section to the library's `ast::WriteSemanticAst` boundary, which
 streams bytes to any `std::io::Write` destination (for example a file or `Vec<u8>`). Its exhaustive

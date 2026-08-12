@@ -2,9 +2,9 @@
 
 use crate::ast::{
     ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstStmt, ForLoop, ForkStmt,
-    IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode,
-    TerminateStmt, ThenAction, ThenTarget, WhileStmt,
+    ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstMergeBraceBody,
+    FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt,
+    Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget, WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -15,17 +15,17 @@ use crate::parser::lex::{
     ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
-use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::usage::{multiplicity_node, redefinition};
 use crate::parser::with_span;
 use crate::parser::Input;
+use crate::parser::{node_from_to, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded};
-use nom::IResult;
 use nom::Parser;
+use nom::{IResult, Input as _};
 
 const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"in",
@@ -235,9 +235,29 @@ fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| FirstMergeBody::Semicolon),
-        map(consume_action_structured_brace, |_| FirstMergeBody::Brace),
+        first_merge_brace_body,
     ))
     .parse(input)
+}
+
+fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
+    let start = input;
+    let (input, ()) = consume_action_structured_brace(input)?;
+    let consumed_len = start.fragment().len() - input.fragment().len();
+    debug_assert!(consumed_len >= 2);
+    let (after_open, _) = start.take_split(1);
+    let (close_start, _) = start.take_split(consumed_len - 1);
+    Ok((
+        input,
+        FirstMergeBody::Brace(node_from_to(
+            start,
+            input,
+            FirstMergeBraceBody {
+                open_brace_span: span_from_to(start, after_open),
+                close_brace_span: span_from_to(close_start, input),
+            },
+        )),
+    ))
 }
 
 /// In/out decl: `in` name `:` type `;` or `out` name `:` type `;`
@@ -408,7 +428,7 @@ pub(crate) fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Acti
     Ok((input, ActionDefBody::Brace { elements }))
 }
 
-/// Parse `{` action-body members `}` with recovery, discarding elements (opaque ref/first/merge bodies).
+/// Parse a `{` action-body `}` while retaining its exact enclosing span at the caller.
 fn consume_action_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let (input, _elements) = parse_structured_brace_members(
         input,
@@ -1555,17 +1575,29 @@ mod control_node_gap_tests {
     /// end multiplicities and a brace body (real usage: Systems Library `States.sysml`).
     #[test]
     fn action_body_accepts_named_succession_with_end_multiplicities_and_brace_body() {
-        let (rest, node) = action_def_body_element(input(
-            "succession stateSequencing first [0..1] exclusiveStates then [0..1] exclusiveStates { }",
-        ))
-        .expect("named succession with multiplicities + brace body");
+        let source = "succession stateSequencing first [0..1] exclusiveStates then [0..1] exclusiveStates { in pin; }";
+        let (rest, node) = action_def_body_element(input(source))
+            .expect("named succession with multiplicities + brace body");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::FirstStmt(f) => {
                 assert_eq!(f.value.succession_name.as_deref(), Some("stateSequencing"));
                 assert!(f.value.first_multiplicity.is_some());
                 assert!(f.value.then_multiplicity.is_some());
-                assert!(matches!(f.value.body, FirstMergeBody::Brace));
+                let FirstMergeBody::Brace(body) = f.value.body else {
+                    panic!("expected source-backed brace body");
+                };
+                assert_eq!(
+                    &source[body.span.offset..body.span.offset + body.span.len],
+                    "{ in pin; }"
+                );
+                assert_eq!(body.value.open_brace_span.offset, body.span.offset);
+                assert_eq!(body.value.open_brace_span.len, 1);
+                assert_eq!(
+                    body.value.close_brace_span.offset,
+                    body.span.offset + body.span.len - 1
+                );
+                assert_eq!(body.value.close_brace_span.len, 1);
             }
             other => panic!("expected FirstStmt, got {other:?}"),
         }
@@ -1736,7 +1768,10 @@ mod control_node_gap_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::OccurrenceUsage(o) => {
-                assert_eq!(o.value.portion_kind.as_deref(), Some("snapshot"));
+                assert_eq!(
+                    o.value.portion_kind,
+                    Some(crate::ast::OccurrencePortionKind::Snapshot)
+                );
                 assert_eq!(o.value.name, "trued");
             }
             other => panic!("expected OccurrenceUsage, got {other:?}"),

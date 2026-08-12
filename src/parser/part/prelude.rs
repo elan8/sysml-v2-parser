@@ -3,9 +3,9 @@
 pub(crate) use crate::ast::{
     Allocate, Bind, Connect, ConnectBody, ConnectionEnd, ConnectionUsageMember, DefinitionPrefix,
     ExhibitState, Expression, InOut, InterfaceUsage, InterfaceUsageBodyElement, Membership, Node,
-    OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
-    PartUsageBodyElement, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
-    RefBodyElement, RefDecl, VariantTypedUsage, VariantUsage,
+    PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
+    Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody, RefBodyElement,
+    RefDecl, VariantTypedUsage, VariantUsage,
 };
 pub(crate) use crate::parser::action::{action_def, action_usage};
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};
@@ -64,8 +64,6 @@ pub(crate) use nom::multi::many0;
 pub(crate) use nom::sequence::preceded;
 pub(crate) use nom::IResult;
 pub(crate) use nom::Parser;
-
-pub(crate) const MEMBER_HEADER_UNTIL_BODY: &[u8] = b";{";
 
 pub(crate) use super::def::part_def;
 pub(crate) use super::PartDefOrUsage;

@@ -36,6 +36,8 @@ pub enum UnsupportedProduction {
     PerformActionUsage,
     ExhibitStateUsage,
     IncludeUseCaseUsage,
+    ReferenceConnectionUsage,
+    ConnectionUsageInPartDefinition,
 }
 
 /// Explicit AST state for valid grammar that this parser cannot yet model in the current scope.
