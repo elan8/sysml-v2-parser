@@ -13,7 +13,7 @@ use crate::parser::Input;
 use crate::parser::{node_from_to, with_span};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::map;
+use nom::combinator::{map, value};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -569,82 +569,87 @@ fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<Collect
     ))
 }
 
-fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+/// Operator tokens yield the typed operator directly. Spelling a 1-3 byte token as an owned
+/// `String` only to convert it into this enum allocated once per token, on every speculative
+/// attempt as well as every accepted one, and left two representations of the same fact.
+fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         // Symbolic forms first: `&&`/`||` must win over `additive_op_token`'s bare `&`/`|`, which
         // would otherwise greedily match just the first character and misparse `a && b` as `a`
         // followed by a stray, unparseable `& b`.
-        map(tag(&b"&&"[..]), |_| "&&".to_string()),
-        map(tag(&b"||"[..]), |_| "||".to_string()),
-        map(|i| keyword_token(i, b"and"), |_| "&&".to_string()),
-        map(|i| keyword_token(i, b"or"), |_| "||".to_string()),
-        map(|i| keyword_token(i, b"xor"), |_| "xor".to_string()),
+        value(BinaryOperator::And, tag(&b"&&"[..])),
+        value(BinaryOperator::Or, tag(&b"||"[..])),
+        value(BinaryOperator::And, |i| keyword_token(i, b"and")),
+        value(BinaryOperator::Or, |i| keyword_token(i, b"or")),
+        value(BinaryOperator::Xor, |i| keyword_token(i, b"xor")),
     ))
     .parse(input)
 }
 
 /// Implication: lower precedence than `or` / `and` (constraint and filter bodies).
-fn implies_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
-    preceded(ws_and_comments, |i| keyword_token(i, b"implies"))
-        .map(|_| "implies".to_string())
-        .parse(input)
+fn implies_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
+    value(
+        BinaryOperator::Implies,
+        preceded(ws_and_comments, |i| keyword_token(i, b"implies")),
+    )
+    .parse(input)
 }
 
-fn equality_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn equality_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b"==="[..]), |_| "===".to_string()),
-        map(tag(&b"!=="[..]), |_| "!==".to_string()),
-        map(tag(&b"=="[..]), |_| "==".to_string()),
-        map(tag(&b"!="[..]), |_| "!=".to_string()),
+        value(BinaryOperator::StrictEq, tag(&b"==="[..])),
+        value(BinaryOperator::StrictNe, tag(&b"!=="[..])),
+        value(BinaryOperator::Eq, tag(&b"=="[..])),
+        value(BinaryOperator::Ne, tag(&b"!="[..])),
     ))
     .parse(input)
 }
 
-fn comparison_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn comparison_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b">="[..]), |_| ">=".to_string()),
-        map(tag(&b"<="[..]), |_| "<=".to_string()),
-        map(tag(&b">"[..]), |_| ">".to_string()),
-        map(tag(&b"<"[..]), |_| "<".to_string()),
-        map(tag(&b".."[..]), |_| "..".to_string()),
+        value(BinaryOperator::Ge, tag(&b">="[..])),
+        value(BinaryOperator::Le, tag(&b"<="[..])),
+        value(BinaryOperator::Gt, tag(&b">"[..])),
+        value(BinaryOperator::Lt, tag(&b"<"[..])),
+        value(BinaryOperator::Range, tag(&b".."[..])),
     ))
     .parse(input)
 }
 
-fn additive_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn additive_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b"+"[..]), |_| "+".to_string()),
-        map(tag(&b"-"[..]), |_| "-".to_string()),
-        map(tag(&b"|"[..]), |_| "|".to_string()),
-        map(tag(&b"&"[..]), |_| "&".to_string()),
+        value(BinaryOperator::Add, tag(&b"+"[..])),
+        value(BinaryOperator::Sub, tag(&b"-"[..])),
+        value(BinaryOperator::BitOr, tag(&b"|"[..])),
+        value(BinaryOperator::BitAnd, tag(&b"&"[..])),
     ))
     .parse(input)
 }
 
-fn multiplicative_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn multiplicative_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b"**"[..]), |_| "**".to_string()),
-        map(tag(&b"*"[..]), |_| "*".to_string()),
-        map(tag(&b"/"[..]), |_| "/".to_string()),
-        map(tag(&b"%"[..]), |_| "%".to_string()),
-        map(tag(&b"^"[..]), |_| "^".to_string()),
+        value(BinaryOperator::Exp, tag(&b"**"[..])),
+        value(BinaryOperator::Mul, tag(&b"*"[..])),
+        value(BinaryOperator::Div, tag(&b"/"[..])),
+        value(BinaryOperator::Mod, tag(&b"%"[..])),
+        value(BinaryOperator::Pow, tag(&b"^"[..])),
     ))
     .parse(input)
 }
 
 /// Unary operator token: + - ~ not (KerML UnaryOperator).
-fn unary_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn unary_op_token(input: Input<'_>) -> IResult<Input<'_>, UnaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(|i| keyword_token(i, b"not"), |_| "not".to_string()),
-        map(tag(&b"~"[..]), |_| "~".to_string()),
-        map(tag(&b"+"[..]), |_| "+".to_string()),
-        map(tag(&b"-"[..]), |_| "-".to_string()),
+        value(UnaryOperator::Not, |i| keyword_token(i, b"not")),
+        value(UnaryOperator::BitNot, tag(&b"~"[..])),
+        value(UnaryOperator::Plus, tag(&b"+"[..])),
+        value(UnaryOperator::Minus, tag(&b"-"[..])),
     ))
     .parse(input)
 }
@@ -679,26 +684,14 @@ const PREC_MULTIPLICATIVE: u8 = 5;
 /// preserves any token-overlap edge cases (e.g. `&` vs `&&`) exactly as they behaved before.
 fn any_binary_op_token(input: Input<'_>) -> IResult<Input<'_>, (BinaryOperator, u8)> {
     alt((
-        map(multiplicative_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_MULTIPLICATIVE)
-        }),
+        map(multiplicative_op_token, |op| (op, PREC_MULTIPLICATIVE)),
         // `logical_op_token` before `additive_op_token`: its symbolic `&&`/`||` forms must win over
         // `additive_op_token`'s bare `&`/`|` (see the comment in `logical_op_token`).
-        map(logical_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_LOGICAL)
-        }),
-        map(additive_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_ADDITIVE)
-        }),
-        map(comparison_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_COMPARISON)
-        }),
-        map(equality_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_EQUALITY)
-        }),
-        map(implies_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_IMPLIES)
-        }),
+        map(logical_op_token, |op| (op, PREC_LOGICAL)),
+        map(additive_op_token, |op| (op, PREC_ADDITIVE)),
+        map(comparison_op_token, |op| (op, PREC_COMPARISON)),
+        map(equality_op_token, |op| (op, PREC_EQUALITY)),
+        map(implies_op_token, |op| (op, PREC_IMPLIES)),
     ))
     .parse(input)
 }
@@ -982,7 +975,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
             None => {
                 state.prefix_start = input;
                 while let Ok((next, tok)) = unary_op_token(input) {
-                    state.pending_unary.push(UnaryOperator::from_token(&tok));
+                    state.pending_unary.push(tok);
                     input = next;
                 }
                 let (after_ws, _) = ws_and_comments(input)?;
