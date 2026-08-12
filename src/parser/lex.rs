@@ -594,16 +594,23 @@ pub(crate) fn is_reserved_keyword(word: &[u8]) -> bool {
 }
 
 pub(crate) fn starts_with_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
+    // Candidates are tested against the same position in long starter lists (52 entries for a
+    // package body), so the cheap discriminating test comes first: nearly every candidate fails on
+    // its first byte, and only a match pays for classifying the keyword's shape.
+    if !fragment.starts_with(keyword) {
+        return false;
+    }
+    // A punctuation starter such as `:>>` is not identifier-shaped and needs no token boundary
+    // after it; an identifier-shaped keyword must not be the prefix of a longer name.
     if keyword
         .iter()
         .any(|b| !b.is_ascii_alphanumeric() && *b != b'_')
     {
-        return fragment.starts_with(keyword);
+        return true;
     }
-    fragment.starts_with(keyword)
-        && fragment
-            .get(keyword.len())
-            .is_none_or(|b| b.is_ascii_whitespace() || matches!(*b, b'{' | b':' | b';' | b'['))
+    fragment
+        .get(keyword.len())
+        .is_none_or(|b| b.is_ascii_whitespace() || matches!(*b, b'{' | b':' | b';' | b'['))
 }
 
 pub(crate) fn starts_with_any_keyword(fragment: &[u8], keywords: &[&[u8]]) -> bool {
