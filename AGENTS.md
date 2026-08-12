@@ -144,9 +144,11 @@ not precedent: do not copy or extend them, and do not disguise them with compati
 - Generated sections are derived artifacts. Change `SOURCE` or the owning formatter, run the snapshot
   update tool, and review the complete diff. Check mode rejects stale output; tests must not silently
   rewrite fixtures.
-- Snapshots decouple implementation layout from enduring semantics, but do not replace focused owning-
-  layer tests. Arena range validation, separator parsing, recovery synchronization, and diagnostic
-  spans still require narrow regression tests.
+- Express language behavior, provenance, diagnostics, recovery, and formatting in snapshots by
+  default. Do not traverse concrete Rust fields merely to assert an observable parser result; extend
+  the semantic snapshot projection when it cannot yet show the invariant. Reserve focused Rust tests
+  for owning-layer mechanics that have no meaningful document projection, such as arena corruption
+  rejection, transaction rollback, partial writes, and resource limits.
 
 ## Verification and change discipline
 
