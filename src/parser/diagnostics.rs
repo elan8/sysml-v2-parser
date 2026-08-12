@@ -338,7 +338,7 @@ pub(crate) fn invalid_expose_separator_diagnostic(
     ))
 }
 
-fn invalid_requirement_short_name_syntax_diagnostic(
+pub(crate) fn invalid_requirement_short_name_syntax_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
     let fragment = trim_ascii_start(fragment);

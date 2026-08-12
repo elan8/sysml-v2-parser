@@ -1,6 +1,5 @@
 //! Collect ParseError diagnostics from recovery nodes embedded in the AST.
 
-use super::diagnostics::trim_ascii_start;
 use super::recovery::parse_error_from_recovery_node;
 use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AliasBody,
@@ -520,6 +519,28 @@ fn collect_package_body_element_errors(
                 &n.value.diagnostic,
             ));
         }
+        // An extended-library fallback keeps the declaration the grammar could not model. Some of
+        // those declarations are recognizable dialect forms with specific guidance to offer, so
+        // classify the node's own text here: the alternative -- searching the whole document for
+        // the dialect's spelling -- cannot tell a declaration from the same words inside a comment
+        // or a string literal.
+        PackageBodyElement::ExtendedLibraryDecl(n) => {
+            if let Some((code, message, expected, suggestion)) =
+                crate::parser::diagnostics::invalid_requirement_short_name_syntax_diagnostic(
+                    n.value.text.as_bytes(),
+                )
+            {
+                errors.push(
+                    ParseError::new(message)
+                        .with_location(element.span.offset, element.span.line, element.span.column)
+                        .with_length(element.span.len)
+                        .with_code(code)
+                        .with_expected(expected)
+                        .with_suggestion(suggestion)
+                        .with_category(DiagnosticCategory::ParseError),
+                );
+            }
+        }
         PackageBodyElement::Package(n) => collect_package_body_errors(&n.value.body, errors),
         PackageBodyElement::LibraryPackage(n) => collect_package_body_errors(&n.value.body, errors),
         PackageBodyElement::PartDef(n) => collect_part_def_body_errors(&n.value.body, errors),
@@ -625,65 +646,6 @@ fn collect_package_body_element_errors(
         }
         _ => {}
     }
-}
-
-pub(crate) fn collect_requirement_id_dialect_diagnostics(bytes: &[u8]) -> Vec<ParseError> {
-    let pattern = b"requirement def id ";
-    let mut errors = Vec::new();
-    let mut search_from = 0usize;
-    while search_from < bytes.len() {
-        let Some(rel) = bytes[search_from..]
-            .windows(pattern.len())
-            .position(|window| window == pattern)
-        else {
-            break;
-        };
-        let offset = search_from + rel;
-        let after = trim_ascii_start(&bytes[offset + pattern.len()..]);
-        if after.first() != Some(&b'\'') && after.first() != Some(&b'"') {
-            search_from = offset + 1;
-            continue;
-        }
-        let quote = after[0];
-        let Some(close) = after[1..].iter().position(|&b| b == quote) else {
-            search_from = offset + 1;
-            continue;
-        };
-        let req_id = String::from_utf8_lossy(&after[1..1 + close]);
-        let (line, column) = offset_to_line_column(bytes, offset);
-        errors.push(
-            ParseError::new(format!(
-                "requirement definition uses non-standard `id '{req_id}'` syntax; use a short name in angle brackets"
-            ))
-            .with_location(offset, line, column)
-            .with_length(pattern.len().max(1))
-            .with_code("invalid_requirement_short_name_syntax")
-            .with_expected("short name in angle brackets after `requirement def`".to_string())
-            .with_suggestion(format!(
-                "Use `requirement def <'{req_id}'> ...` instead of `requirement def id '{req_id}' ...`."
-            ))
-            .with_category(DiagnosticCategory::ParseError),
-        );
-        search_from = offset + pattern.len();
-    }
-    errors
-}
-
-fn offset_to_line_column(bytes: &[u8], offset: usize) -> (u32, usize) {
-    let mut line = 1u32;
-    let mut column = 1usize;
-    for (idx, &b) in bytes.iter().enumerate() {
-        if idx >= offset {
-            break;
-        }
-        if b == b'\n' {
-            line += 1;
-            column = 1;
-        } else {
-            column += 1;
-        }
-    }
-    (line, column)
 }
 
 pub(crate) fn collect_recovery_errors(root: &RootNamespace) -> Vec<ParseError> {

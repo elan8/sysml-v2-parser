@@ -1,6 +1,6 @@
 //! Public parse entry points.
 
-use super::collect_errors::{collect_recovery_errors, collect_requirement_id_dialect_diagnostics};
+use super::collect_errors::collect_recovery_errors;
 use super::delimiters::DelimiterScan;
 use super::diagnostics::{
     dedup_errors, extra_closing_brace_at_eof, fragment_to_found_snippet,
@@ -397,7 +397,6 @@ fn parse_with_diagnostics_document(
     errors.extend(collect_recovery_errors(&RootNamespace {
         elements: elements.clone(),
     }));
-    errors.extend(collect_requirement_id_dialect_diagnostics(bytes));
     errors = suppress_redundant_closing_brace_errors(errors);
     errors = dedup_errors(errors);
     errors = suppress_diagnostic_cascades(errors);
