@@ -305,7 +305,11 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 self.writer.write_str(") (arguments")?;
                 self.write_arguments(args)?;
                 self.writer.write_str(") (brace-body ")?;
-                write_optional_quoted(self.writer, brace_body.as_deref())?;
+                if let Some(body) = brace_body {
+                    self.write_collection_operator_body(body)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
                 self.writer.write_str("))")
             }
             Expression::MetadataAccess(base) => {
@@ -333,6 +337,62 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             }
         }?;
         self.writer.write_char(')')
+    }
+
+    fn write_collection_operator_body(
+        &mut self,
+        body: &Node<super::CollectionOperatorBody>,
+    ) -> io::Result<()> {
+        self.writer.write_str("(body ")?;
+        write_span(self.writer, &body.span)?;
+        self.writer.write_str(" (open-brace ")?;
+        write_span(self.writer, &body.value.open_brace_span)?;
+        self.writer.write_str(") (parameters")?;
+        for parameter in &body.value.parameters {
+            self.writer.write_str(" (parameter ")?;
+            write_span(self.writer, &parameter.span)?;
+            self.writer.write_str(" (direction ")?;
+            self.writer
+                .write_str(match parameter.value.direction.value {
+                    InOut::In => "in",
+                    InOut::Out => "out",
+                    InOut::InOut => "inout",
+                })?;
+            self.writer.write_char(' ')?;
+            write_span(self.writer, &parameter.value.direction.span)?;
+            self.writer.write_str(") (reference-keyword ")?;
+            if let Some(span) = &parameter.value.reference_keyword_span {
+                write_span(self.writer, span)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") (name ")?;
+            write_quoted(self.writer, &parameter.value.name)?;
+            self.writer.write_char(' ')?;
+            write_span(self.writer, &parameter.value.name_span)?;
+            self.writer.write_str(") (typing ")?;
+            if let Some(typing) = &parameter.value.typing {
+                self.writer.write_str("(typed (separator ")?;
+                write_span(self.writer, &typing.separator_span)?;
+                self.writer.write_str(") (target ")?;
+                self.write_reference(typing.target)?;
+                self.writer.write_str("))")?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str(") (semicolon ")?;
+            write_span(self.writer, &parameter.value.semicolon_span)?;
+            self.writer.write_str("))")?;
+        }
+        self.writer.write_str(") (result ")?;
+        if let Some(result) = &body.value.result {
+            self.write_expression(result)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (close-brace ")?;
+        write_span(self.writer, &body.value.close_brace_span)?;
+        self.writer.write_str("))")
     }
 
     fn write_arguments(&mut self, args: &[Argument]) -> io::Result<()> {
@@ -688,6 +748,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(actor-redefinition (target ")?;
                             self.write_reference(actor.value.target)?;
+                            self.writer.write_str(") (value ")?;
+                            self.write_expression(&actor.value.value)?;
                             self.writer.write_str("))")?;
                         }
                         UseCaseDefBodyElement::Objective(_objective) => {
@@ -721,7 +783,14 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(ref-redefinition (target ")?;
                             self.write_reference(reference.value.target)?;
-                            self.writer.write_str("))")?;
+                            self.writer.write_str(") (body-span ")?;
+                            write_span(self.writer, &reference.value.body.span)?;
+                            self.writer.write_str(") ")?;
+                            self.write_use_case_body(&reference.value.body.value)?;
+                            self.writer.write_char(')')?;
+                        }
+                        UseCaseDefBodyElement::AssertConstraint(_constraint) => {
+                            self.write_marker(&mut first, "assert-constraint")?;
                         }
                         UseCaseDefBodyElement::ReturnRef(_return_ref) => {
                             self.write_marker(&mut first, "return-ref")?;
@@ -799,12 +868,32 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         StateDefBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "inout-declaration")?;
                         }
-                        StateDefBodyElement::Entry(_entry) => {
-                            self.write_marker(&mut first, "entry")?;
+                        StateDefBodyElement::Entry(entry) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_state_behavior_action(
+                                "entry",
+                                entry.value.has_action_keyword,
+                                entry.value.action_reference,
+                                &entry.value.body,
+                            )?;
                         }
-                        StateDefBodyElement::Do(_action) => self.write_marker(&mut first, "do")?,
-                        StateDefBodyElement::Exit(_exit) => {
-                            self.write_marker(&mut first, "exit")?;
+                        StateDefBodyElement::Do(action) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_state_behavior_action(
+                                "do",
+                                action.value.has_action_keyword,
+                                action.value.action_reference,
+                                &action.value.body,
+                            )?;
+                        }
+                        StateDefBodyElement::Exit(exit) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_state_behavior_action(
+                                "exit",
+                                exit.value.has_action_keyword,
+                                exit.value.action_reference,
+                                &exit.value.body,
+                            )?;
                         }
                         StateDefBodyElement::Then(then) => {
                             self.write_item_prefix(&mut first)?;
@@ -832,6 +921,27 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')
             }
         }
+    }
+
+    fn write_state_behavior_action(
+        &mut self,
+        kind: &str,
+        has_action_keyword: bool,
+        action_reference: Option<QualifiedReferenceId>,
+        body: &StateDefBody,
+    ) -> io::Result<()> {
+        write!(
+            self.writer,
+            "({kind} (action-keyword {has_action_keyword}) (target "
+        )?;
+        if let Some(reference) = action_reference {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_state_body(body)?;
+        self.writer.write_char(')')
     }
 
     fn write_part_body(&mut self, body: &PartDefBody) -> io::Result<()> {

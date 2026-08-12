@@ -648,9 +648,10 @@ pub enum StateDefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EntryAction {
-    /// For `entry action name body` / `entry name body`; None for plain `entry` body.
-    pub action_name: Option<String>,
-    /// True when the `action` keyword was written (`entry action name` vs `entry name`).
+    /// Referenced action for `entry action path body` / `entry path body`; absent for a plain
+    /// `entry` body. This is a semantic target, not a declaration label.
+    pub action_reference: Option<QualifiedReferenceId>,
+    /// True when the `action` keyword was written (`entry action path` vs `entry path`).
     pub has_action_keyword: bool,
     pub body: StateDefBody,
 }
@@ -659,9 +660,10 @@ pub struct EntryAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DoAction {
-    /// For `do action name body` / `do name body`; None for plain `do` body.
-    pub action_name: Option<String>,
-    /// True when the `action` keyword was written (`do action name` vs `do name`).
+    /// Referenced action for `do action path body` / `do path body`; absent for a plain `do` body.
+    /// This is a semantic target, not a declaration label.
+    pub action_reference: Option<QualifiedReferenceId>,
+    /// True when the `action` keyword was written (`do action path` vs `do path`).
     pub has_action_keyword: bool,
     pub body: StateDefBody,
 }
@@ -670,9 +672,10 @@ pub struct DoAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExitAction {
-    /// For `exit action name body` / `exit name body`; None for plain `exit` body.
-    pub action_name: Option<String>,
-    /// True when the `action` keyword was written (`exit action name` vs `exit name`).
+    /// Referenced action for `exit action path body` / `exit path body`; absent for a plain `exit`
+    /// body. This is a semantic target, not a declaration label.
+    pub action_reference: Option<QualifiedReferenceId>,
+    /// True when the `action` keyword was written (`exit action path` vs `exit path`).
     pub has_action_keyword: bool,
     pub body: StateDefBody,
 }

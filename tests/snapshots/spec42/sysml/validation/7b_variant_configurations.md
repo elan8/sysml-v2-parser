@@ -253,7 +253,7 @@ package '7b-Variant Configurations' {
                     variant part wideRimWheel : WideRimWheel;
                 }
                 assert constraint 'engine-wheel selection constraint' {
-                    (engineChoice == engineChoice::'4cylEngine' && rearWheelChoice->forAll{in ref w; w == rearWheelChoice::narrowRimWheel}) xor (engineChoice == engineChoice::'6cylEngine' && rearWheelChoice->forAll{in ref w; w == rearWheelChoice::wideRimWheel});
+                    (engineChoice == engineChoice::'4cylEngine' && rearWheelChoice->forAll { in ref w; w == rearWheelChoice::narrowRimWheel }) xor (engineChoice == engineChoice::'6cylEngine' && rearWheelChoice->forAll { in ref w; w == rearWheelChoice::wideRimWheel });
                 }
             }
         }

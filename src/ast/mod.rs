@@ -192,7 +192,7 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         }
         PackageBodyElement::Actor(n) => PackageBodyElement::Actor(dummy_node(n, n.value.clone())),
         PackageBodyElement::StateDef(n) => {
-            PackageBodyElement::StateDef(dummy_node(n, n.value.clone()))
+            PackageBodyElement::StateDef(dummy_node(n, normalize_state_def(&n.value)))
         }
         PackageBodyElement::StateUsage(n) => {
             PackageBodyElement::StateUsage(dummy_node(n, normalize_state_usage(&n.value)))
@@ -471,7 +471,7 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
             PartDefBodyElement::VariantUsage(dummy_node(n, n.value.clone()))
         }
         PartDefBodyElement::StateDef(n) => {
-            PartDefBodyElement::StateDef(dummy_node(n, n.value.clone()))
+            PartDefBodyElement::StateDef(dummy_node(n, normalize_state_def(&n.value)))
         }
         PartDefBodyElement::MetadataDef(n) => {
             PartDefBodyElement::MetadataDef(dummy_node(n, n.value.clone()))
@@ -791,7 +791,50 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
             op: op.clone(),
             base: Box::new(normalize_expression_node(base)),
             args: args.iter().map(normalize_argument).collect(),
-            brace_body: brace_body.clone(),
+            brace_body: brace_body.as_ref().map(|body| {
+                Box::new(dummy_node(
+                    body,
+                    CollectionOperatorBody {
+                        open_brace_span: Span::dummy(),
+                        parameters: body
+                            .value
+                            .parameters
+                            .iter()
+                            .map(|parameter| {
+                                dummy_node(
+                                    parameter,
+                                    CollectionOperatorParameter {
+                                        direction: dummy_node(
+                                            &parameter.value.direction,
+                                            parameter.value.direction.value,
+                                        ),
+                                        reference_keyword_span: parameter
+                                            .value
+                                            .reference_keyword_span
+                                            .as_ref()
+                                            .map(|_| Span::dummy()),
+                                        name: parameter.value.name.clone(),
+                                        name_span: Span::dummy(),
+                                        typing: parameter.value.typing.as_ref().map(|typing| {
+                                            CollectionOperatorParameterTyping {
+                                                separator_span: Span::dummy(),
+                                                target: typing.target,
+                                            }
+                                        }),
+                                        semicolon_span: Span::dummy(),
+                                    },
+                                )
+                            })
+                            .collect(),
+                        result: body
+                            .value
+                            .result
+                            .as_ref()
+                            .map(|result| Box::new(normalize_expression_node(result))),
+                        close_brace_span: Span::dummy(),
+                    },
+                ))
+            }),
         },
         Expression::Conditional {
             test,
@@ -887,7 +930,7 @@ fn normalize_part_usage_body_element_node(
             PartUsageBodyElement::VariantUsage(dummy_node(n, n.value.clone()))
         }
         PartUsageBodyElement::StateDef(n) => {
-            PartUsageBodyElement::StateDef(dummy_node(n, n.value.clone()))
+            PartUsageBodyElement::StateDef(dummy_node(n, normalize_state_def(&n.value)))
         }
         PartUsageBodyElement::MetadataDef(n) => {
             PartUsageBodyElement::MetadataDef(dummy_node(n, n.value.clone()))
@@ -1455,9 +1498,99 @@ fn normalize_state_usage(s: &StateUsage) -> StateUsage {
         multiplicity: s.multiplicity.clone(),
         subsets: s.subsets.clone(),
         redefines: s.redefines.clone(),
-        body: s.body.clone(),
+        body: normalize_state_def_body(&s.body),
         membership: s.membership.clone(),
     }
+}
+
+fn normalize_state_def(state: &StateDef) -> StateDef {
+    StateDef {
+        identification: state.identification.clone(),
+        specializes: state.specializes.clone(),
+        body: normalize_state_def_body(&state.body),
+        membership: state.membership.clone(),
+    }
+}
+
+fn normalize_state_def_body(body: &StateDefBody) -> StateDefBody {
+    match body {
+        StateDefBody::Semicolon => StateDefBody::Semicolon,
+        StateDefBody::Brace { elements } => StateDefBody::Brace {
+            elements: elements
+                .iter()
+                .map(normalize_state_def_body_element_node)
+                .collect(),
+        },
+    }
+}
+
+fn normalize_state_def_body_element_node(
+    element: &Node<StateDefBodyElement>,
+) -> Node<StateDefBodyElement> {
+    let value = match &element.value {
+        StateDefBodyElement::Error(node) => {
+            StateDefBodyElement::Error(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::Doc(node) => {
+            StateDefBodyElement::Doc(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::Annotation(node) => {
+            StateDefBodyElement::Annotation(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::MetadataAnnotation(node) => {
+            StateDefBodyElement::MetadataAnnotation(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::MetadataKeywordUsage(node) => {
+            StateDefBodyElement::MetadataKeywordUsage(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::Other(text) => StateDefBodyElement::Other(text.clone()),
+        StateDefBodyElement::InOutDecl(node) => {
+            StateDefBodyElement::InOutDecl(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::Entry(node) => StateDefBodyElement::Entry(dummy_node(
+            node,
+            EntryAction {
+                action_reference: node.value.action_reference,
+                has_action_keyword: node.value.has_action_keyword,
+                body: normalize_state_def_body(&node.value.body),
+            },
+        )),
+        StateDefBodyElement::Do(node) => StateDefBodyElement::Do(dummy_node(
+            node,
+            DoAction {
+                action_reference: node.value.action_reference,
+                has_action_keyword: node.value.has_action_keyword,
+                body: normalize_state_def_body(&node.value.body),
+            },
+        )),
+        StateDefBodyElement::Exit(node) => StateDefBodyElement::Exit(dummy_node(
+            node,
+            ExitAction {
+                action_reference: node.value.action_reference,
+                has_action_keyword: node.value.has_action_keyword,
+                body: normalize_state_def_body(&node.value.body),
+            },
+        )),
+        StateDefBodyElement::Then(node) => {
+            StateDefBodyElement::Then(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::FinalState(node) => {
+            StateDefBodyElement::FinalState(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::Ref(node) => {
+            StateDefBodyElement::Ref(dummy_node(node, normalize_ref_decl(&node.value)))
+        }
+        StateDefBodyElement::RequirementUsage(node) => {
+            StateDefBodyElement::RequirementUsage(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::StateUsage(node) => {
+            StateDefBodyElement::StateUsage(dummy_node(node, normalize_state_usage(&node.value)))
+        }
+        StateDefBodyElement::Transition(node) => {
+            StateDefBodyElement::Transition(Box::new(dummy_node(node, node.value.clone())))
+        }
+    };
+    dummy_node(element, value)
 }
 
 fn normalize_action_usage_body(b: &ActionUsageBody) -> ActionUsageBody {

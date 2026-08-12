@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 83.** State action targets, requirement redefinition contents,
+  collection-operator bodies, and nested use-case assertion members are structured typed syntax
+  rather than opaque or copied strings.
+- **Collection operator brace bodies are structured syntax.** `Expression::CollectionOp` now
+  retains a typed `CollectionOperatorBody` instead of an opaque copied `String`: ordered
+  `in`/`out`/`inout` parameters, optional `ref` and typing syntax, the semantic result expression,
+  source-backed reference identities, and exact body/declaration token spans remain available to
+  emitters, diagnostics, navigation, serialization, and semantic snapshots. Malformed bodies fail
+  transactionally into the enclosing recovery node without leaking speculative reference IDs.
 - **Grammar conformance is now machine-readable and scope checked.** The public
   `SUPPORTED_GRAMMAR` constant exposes the release tag, repository, and deterministic content hash
   derived from the single `docs/conformance-target` pin; builds with the BNF checkout present reject
@@ -32,7 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retain precise authored provenance without downstream source scanning. Qualified package,
   library-package, and namespace declaration names use a distinct `QualifiedDeclarationName`
   role wrapper over the same packed storage, preserving their scope, segments, separators, and
-  spans without misclassifying simple declaration labels as references.
+  spans without misclassifying simple declaration labels as references. State `entry`, `do`, and
+  `exit` action targets are likewise arena-backed references, including qualified, dotted, quoted,
+  and absolute paths; declaration labels remain a separate identity role. Actor redefinition
+  assignment values are spanned `Expression` nodes, and reference redefinition bodies are nested,
+  spanned `UseCaseDefBody` trees, replacing both former opaque `String` fields.
   The former `RelationshipTarget` and `FeatureChain` representations and legacy string/display
   accessors were removed rather than retained as compatibility layers. Serde now operates on the
   atomic parsed-document envelope and validates arena ranges and every AST identity when reading

@@ -320,8 +320,9 @@ pub enum Expression {
         op: CollectionOperator,
         base: Box<Node<Expression>>,
         args: Vec<Argument>,
-        /// Brace-body form `->forAll { … }` (validation `15_05`, `7b`); paren form leaves this `None`.
-        brace_body: Option<String>,
+        /// Structured BodyExpression form `->forAll { in ref item : T; predicate }`.
+        /// Parenthesized invocation leaves this `None`.
+        brace_body: Option<Box<Node<CollectionOperatorBody>>>,
     },
     /// Metadata-access expression: `expr.metadata` (KerML `MetadataAccessExpression`, BNF
     /// 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`). Distinct from [`Expression::Classification`]
@@ -340,6 +341,42 @@ pub enum Expression {
     Extent {
         target: QualifiedReferenceId,
     },
+}
+
+/// Structured KerML `BodyExpression` supplied to a collection operator.
+///
+/// The enclosing [`Node`] spans the complete `{ ... }` form. Exact delimiter and declaration
+/// token spans are retained for navigation and diagnostics without scanning the source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CollectionOperatorBody {
+    pub open_brace_span: Span,
+    pub parameters: Vec<Node<CollectionOperatorParameter>>,
+    pub result: Option<Box<Node<Expression>>>,
+    pub close_brace_span: Span,
+}
+
+/// One typed parameter declaration in a collection-operator body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CollectionOperatorParameter {
+    /// Direction keyword and its exact authored span.
+    pub direction: Node<super::InOut>,
+    /// Exact `ref` keyword span when the parameter is a reference feature.
+    pub reference_keyword_span: Option<Span>,
+    /// Decoded declaration label; `name_span` preserves its authored spelling.
+    pub name: String,
+    pub name_span: Span,
+    pub typing: Option<CollectionOperatorParameterTyping>,
+    pub semicolon_span: Span,
+}
+
+/// Exact `:` typing syntax plus its source-backed target identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CollectionOperatorParameterTyping {
+    pub separator_span: Span,
+    pub target: QualifiedReferenceId,
 }
 
 /// Move every direct `Node<Expression>` child out of `expr`, replacing each with a cheap
@@ -382,9 +419,19 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
             out.push(take_box(callee));
             out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
         }
-        Expression::CollectionOp { base, args, .. } => {
+        Expression::CollectionOp {
+            base,
+            args,
+            brace_body,
+            ..
+        } => {
             out.push(take_box(base));
             out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
+            if let Some(body) = brace_body {
+                if let Some(result) = body.value.result.take() {
+                    out.push(*result);
+                }
+            }
         }
         Expression::Conditional {
             test,

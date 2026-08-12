@@ -124,11 +124,13 @@ package '18-Use Case' {
 			 */
         }
         ref :>> start {
-			doc /* Mock-up of a pre-condition. */
-			assert constraint {
-				doc /* Vehicle at starting location */
-			}
-		}
+            doc
+            /* Mock-up of a pre-condition. */
+            assert constraint  {
+                doc
+                /* Vehicle at starting location */
+            }
+        }
         first start;
         then include 'enter vehicle' {
             subject;
@@ -146,8 +148,9 @@ package '18-Use Case' {
                 subject;
                 actor :>> fueler = driver;
                 ref :>> start {
-					doc /* Fuel level < 10% max fuel */
-				}
+                    doc
+                    /* Fuel level < 10% max fuel */
+                }
             }
         }
         then include 'exit vehicle' {
@@ -157,11 +160,13 @@ package '18-Use Case' {
         }
         then done;
         ref :>> done {
-			doc /* Mock-up of a post-condition. */
-			assert constraint {
-				doc /* Vehicle at ending location */
-			}
-		}
+            doc
+            /* Mock-up of a post-condition. */
+            assert constraint  {
+                doc
+                /* Vehicle at ending location */
+            }
+        }
     }
     use case 'enter vehicle' {
         subject vehicle : Vehicle;

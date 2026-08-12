@@ -3,8 +3,8 @@
 use super::writer::EmitWriter;
 use super::EmitError;
 use crate::ast::{
-    Argument, BinaryOperator, CollectionOperator, Expression, FeatureValue, FeatureValueKind, Node,
-    TypeCheckKind, UnaryOperator,
+    Argument, BinaryOperator, CollectionOperator, CollectionOperatorBody, Expression, FeatureValue,
+    FeatureValueKind, InOut, Node, TypeCheckKind, UnaryOperator,
 };
 
 pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Result<(), EmitError> {
@@ -142,7 +142,7 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             w.push_str("->");
             w.push_str(collection_op_str(op));
             if let Some(body) = brace_body {
-                w.push_str(body);
+                emit_collection_operator_body(w, &body.value)?;
             } else {
                 emit_args(w, args)?;
             }
@@ -168,6 +168,37 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             w.push_str(".metadata");
         }
     }
+    Ok(())
+}
+
+fn emit_collection_operator_body(
+    w: &mut EmitWriter<'_>,
+    body: &CollectionOperatorBody,
+) -> Result<(), EmitError> {
+    w.push_str(" {");
+    for parameter in &body.parameters {
+        w.push_char(' ');
+        w.push_str(match parameter.value.direction.value {
+            InOut::In => "in",
+            InOut::Out => "out",
+            InOut::InOut => "inout",
+        });
+        if parameter.value.reference_keyword_span.is_some() {
+            w.push_str(" ref");
+        }
+        w.push_char(' ');
+        w.push_str(&parameter.value.name);
+        if let Some(typing) = &parameter.value.typing {
+            w.push_str(" : ");
+            w.push_qualified_reference("collection body parameter type", typing.target)?;
+        }
+        w.push_char(';');
+    }
+    if let Some(result) = &body.result {
+        w.push_char(' ');
+        emit_expression(w, &result.value)?;
+    }
+    w.push_str(" }");
     Ok(())
 }
 

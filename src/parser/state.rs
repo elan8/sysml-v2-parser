@@ -8,8 +8,8 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_reference, starts_with_keyword, take_until_terminator, visibility_prefix, ws1,
-    ws_and_comments, STATE_BODY_STARTERS,
+    name, qualified_reference, reference_path, starts_with_keyword, take_until_terminator,
+    visibility_prefix, ws1, ws_and_comments, STATE_BODY_STARTERS,
 };
 
 const UNTIL_BODY: &[u8] = b";{";
@@ -138,8 +138,11 @@ fn consume_state_structured_brace(
     )
 }
 
-/// Shared `entry`/`do`/`exit` header: optional `action` keyword + optional referenced name.
-fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, (bool, Option<String>)> {
+/// Shared `entry`/`do`/`exit` header: optional `action` keyword plus an optional source-backed
+/// action target.
+fn state_behavior_action_target(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (bool, Option<crate::ast::QualifiedReferenceId>)> {
     let (input, has_action_keyword) = opt(preceded(ws_and_comments, tag(&b"action"[..])))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
@@ -148,7 +151,7 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, (bool, O
         return Ok((input, (has_action_keyword, None)));
     }
     // Bare referenced action usage: `do 'sense temperature' { … }` / `entry initial;`.
-    // When `action` was written, the name is required by the grammar; when not, still try a name
+    // When `action` was written, the target is required by the grammar; when not, still try a path
     // before the body terminator (do not swallow transition effects like `do send …`).
     if !has_action_keyword
         && (starts_with_keyword(input.fragment(), b"send")
@@ -160,15 +163,19 @@ fn state_behavior_action_target(input: Input<'_>) -> IResult<Input<'_>, (bool, O
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, action_name) = name(input)?;
-    Ok((input, (has_action_keyword, Some(action_name))))
+    let (input, action_reference) = reference_path(input)?;
+    Ok((input, (has_action_keyword, Some(action_reference))))
 }
 
-/// Entry action: `entry` (`;` or body)  or  `entry action` name body / `entry` name body
+/// Entry action: `entry` (`;` or body) or `entry action` path body / `entry` path body.
 fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
+    crate::parser::span::reference_transaction(input, entry_action_inner)
+}
+
+fn entry_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     let start = input;
     let (input, _) = tag(&b"entry"[..]).parse(input)?;
-    let (input, (has_action_keyword, action_name)) = state_behavior_action_target(input)?;
+    let (input, (has_action_keyword, action_reference)) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = state_def_body(input)?;
     Ok((
@@ -177,7 +184,7 @@ fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
             start,
             input,
             EntryAction {
-                action_name,
+                action_reference,
                 has_action_keyword,
                 body,
             },
@@ -185,11 +192,15 @@ fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     ))
 }
 
-/// Do action: `do` (`;` or body)  or  `do action` name body / `do` name body
+/// Do action: `do` (`;` or body) or `do action` path body / `do` path body.
 fn do_action(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
+    crate::parser::span::reference_transaction(input, do_action_inner)
+}
+
+fn do_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
     let start = input;
     let (input, _) = tag(&b"do"[..]).parse(input)?;
-    let (input, (has_action_keyword, action_name)) = state_behavior_action_target(input)?;
+    let (input, (has_action_keyword, action_reference)) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = state_def_body(input)?;
     Ok((
@@ -198,7 +209,7 @@ fn do_action(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
             start,
             input,
             DoAction {
-                action_name,
+                action_reference,
                 has_action_keyword,
                 body,
             },
@@ -206,11 +217,15 @@ fn do_action(input: Input<'_>) -> IResult<Input<'_>, Node<DoAction>> {
     ))
 }
 
-/// Exit action: `exit` (`;` or body)  or  `exit action` name body / `exit` name body
+/// Exit action: `exit` (`;` or body) or `exit action` path body / `exit` path body.
 fn exit_action(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
+    crate::parser::span::reference_transaction(input, exit_action_inner)
+}
+
+fn exit_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
     let start = input;
     let (input, _) = tag(&b"exit"[..]).parse(input)?;
-    let (input, (has_action_keyword, action_name)) = state_behavior_action_target(input)?;
+    let (input, (has_action_keyword, action_reference)) = state_behavior_action_target(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = state_def_body(input)?;
     Ok((
@@ -219,7 +234,7 @@ fn exit_action(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
             start,
             input,
             ExitAction {
-                action_name,
+                action_reference,
                 has_action_keyword,
                 body,
             },
@@ -782,10 +797,16 @@ mod membership_tests {
 
     #[test]
     fn do_action_keeps_bare_name_and_out_param() {
-        let (rest, node) = super::do_action(input("do 'sense temperature' { out temp; }"))
-            .expect("do with bare name and out");
+        let source = input("do 'sense temperature' { out temp; }");
+        let (rest, node) = super::do_action(source).expect("do with bare name and out");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.action_name.as_deref(), Some("sense temperature"));
+        assert_eq!(
+            node.value
+                .action_reference
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("'sense temperature'")
+        );
         assert!(!node.value.has_action_keyword);
         match &node.value.body {
             crate::ast::StateDefBody::Brace { elements } => {

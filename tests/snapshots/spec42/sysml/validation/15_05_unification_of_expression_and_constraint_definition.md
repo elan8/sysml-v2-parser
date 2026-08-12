@@ -80,9 +80,7 @@ package '15_05-Unification of Expression and Constraint Definition' {
     private import SI::*;
     constraint def DiscBrakeConstraint {
         in wheelAssy : WheelAssy[4];
-        wheelAssy->forAll{in ref w: WheelAssy; 
-			2 * w.discBrakeAssy.radius < w.wheel.outerDiameter
-		};
+        wheelAssy->forAll { in ref w : WheelAssy; 2 * w.discBrakeAssy.radius < w.wheel.outerDiameter };
     }
     constraint def DiscBrakeFitConstraint_Alt {
         in discBrakeAssy : DiscBrakeAssy[1];

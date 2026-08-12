@@ -649,37 +649,37 @@ fn emit_state_def_body_element(
         StateDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         StateDefBodyElement::Entry(e) => {
             w.push_str("entry");
-            if let Some(name) = &e.value.action_name {
+            if let Some(reference) = e.value.action_reference {
                 if e.value.has_action_keyword {
                     w.push_str(" action ");
                 } else {
                     w.push_char(' ');
                 }
-                w.push_str(&format_name(name));
+                w.push_qualified_reference(&format!("{path}/entry/action"), reference)?;
             }
             emit_state_def_body(w, path, &e.value.body)
         }
         StateDefBodyElement::Do(d) => {
             w.push_str("do");
-            if let Some(name) = &d.value.action_name {
+            if let Some(reference) = d.value.action_reference {
                 if d.value.has_action_keyword {
                     w.push_str(" action ");
                 } else {
                     w.push_char(' ');
                 }
-                w.push_str(&format_name(name));
+                w.push_qualified_reference(&format!("{path}/do/action"), reference)?;
             }
             emit_state_def_body(w, path, &d.value.body)
         }
         StateDefBodyElement::Exit(e) => {
             w.push_str("exit");
-            if let Some(name) = &e.value.action_name {
+            if let Some(reference) = e.value.action_reference {
                 if e.value.has_action_keyword {
                     w.push_str(" action ");
                 } else {
                     w.push_char(' ');
                 }
-                w.push_str(&format_name(name));
+                w.push_qualified_reference(&format!("{path}/exit/action"), reference)?;
             }
             emit_state_def_body(w, path, &e.value.body)
         }

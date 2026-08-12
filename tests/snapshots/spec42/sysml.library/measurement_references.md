@@ -689,8 +689,7 @@ standard library package MeasurementReferences {
             size(basisDirections) == 0 || size(basisDirections) == source.dimensions#(1);
         }
         assert constraint validateBasisDirections {
-            basisDirections->forAll{ in basisDirection : VectorQuantityValue; 
-            basisDirection.dimensions->equals(source.dimensions) };
+            basisDirections->forAll { in basisDirection : VectorQuantityValue; basisDirection.dimensions->equals(source.dimensions) };
         }
     }
     attribute def TranslationOrRotation {

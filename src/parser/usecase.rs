@@ -169,11 +169,11 @@ fn actor_redefinition_assignment_inner(
     let (input, _) = ws_and_comments(input)?;
     let (input, target) = qualified_reference(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
-    let (input, rhs) = take_until_terminator(input, b";")?;
+    let (input, value) = preceded(ws_and_comments, expression).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
-        node_from_to(start, input, ActorRedefinitionAssignment { target, rhs }),
+        node_from_to(start, input, ActorRedefinitionAssignment { target, value }),
     ))
 }
 
@@ -188,17 +188,18 @@ fn ref_redefinition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefi
     let (input, _) = tag(&b":>>"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, target) = qualified_reference(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let body_start = input;
-    let (input, _) = if input.fragment().starts_with(b"{") {
-        consume_use_case_structured_brace(input)
-    } else {
-        skip_statement_or_block(input)
-    }?;
-    let body = slice_text(body_start, input);
+    let (body_start, _) = ws_and_comments(input)?;
+    let (input, body) = use_case_def_body(body_start)?;
     Ok((
         input,
-        node_from_to(start, input, RefRedefinition { target, body }),
+        node_from_to(
+            start,
+            input,
+            RefRedefinition {
+                target,
+                body: node_from_to(body_start, input, body),
+            },
+        ),
     ))
 }
 
@@ -366,18 +367,6 @@ fn map_use_case_body_recovery(start: Input<'_>, end: Input<'_>) -> UseCaseDefBod
         let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
         UseCaseDefBodyElement::Other(preview)
     }
-}
-
-fn consume_use_case_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _elements) = parse_structured_brace_members(
-        input,
-        USE_CASE_BODY_STARTERS,
-        "use case body",
-        "recovered_use_case_body_element",
-        use_case_def_body_element,
-        |start, end| node_from_to(start, end, map_use_case_body_recovery(start, end)),
-    )?;
-    Ok((input, ()))
 }
 
 fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBodyElement> {
@@ -563,6 +552,10 @@ pub(crate) fn use_case_def_body_element(
             map(then_use_case_usage, UseCaseDefBodyElement::ThenUseCaseUsage),
             map(include_use_case, UseCaseDefBodyElement::IncludeUseCase),
             map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
+            map(
+                crate::parser::occurrence_body::assert_constraint_member,
+                UseCaseDefBodyElement::AssertConstraint,
+            ),
             map(case_return_decl, UseCaseDefBodyElement::CaseReturnDecl),
             map(return_ref, UseCaseDefBodyElement::ReturnRef),
             map(

@@ -817,16 +817,17 @@ fn emit_use_case_body_element(
             w.push_str("actor :>> ");
             w.push_qualified_reference(&format!("{path}/target"), a.value.target)?;
             w.push_str(" = ");
-            w.push_str(a.value.rhs.trim());
+            emit_expression(w, &a.value.value.value)?;
             w.push_char(';');
             Ok(())
         }
         UseCaseDefBodyElement::RefRedefinition(r) => {
             w.push_str("ref :>> ");
             w.push_qualified_reference(&format!("{path}/target"), r.value.target)?;
-            w.push_char(' ');
-            w.push_str(r.value.body.trim());
-            Ok(())
+            emit_use_case_body(w, path, &r.value.body.value)
+        }
+        UseCaseDefBodyElement::AssertConstraint(assert) => {
+            crate::emit::view::emit_assert_constraint(w, path, &assert.value)
         }
         UseCaseDefBodyElement::ForLoop(f) => {
             w.push_str("for ");

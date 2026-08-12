@@ -185,6 +185,9 @@ impl ImportTargetValidator<'_> {
                     self.requirement_body(&n.value.body)?
                 }
                 UseCaseDefBodyElement::PartUsage(n) => self.part_usage_body(&n.value.body)?,
+                UseCaseDefBodyElement::RefRedefinition(n) => {
+                    self.use_case_body(&n.value.body.value)?
+                }
                 UseCaseDefBodyElement::Error(_)
                 | UseCaseDefBodyElement::Other(_)
                 | UseCaseDefBodyElement::Annotation(_)
@@ -202,7 +205,7 @@ impl ImportTargetValidator<'_> {
                 | UseCaseDefBodyElement::ThenUseCaseUsage(_)
                 | UseCaseDefBodyElement::ThenDone(_)
                 | UseCaseDefBodyElement::IncludeUseCase(_)
-                | UseCaseDefBodyElement::RefRedefinition(_)
+                | UseCaseDefBodyElement::AssertConstraint(_)
                 | UseCaseDefBodyElement::ReturnRef(_)
                 | UseCaseDefBodyElement::CaseReturnDecl(_)
                 | UseCaseDefBodyElement::Assign(_)

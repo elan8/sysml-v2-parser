@@ -31,10 +31,11 @@ pub use ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
     ActionUsageBodyElement, AliasBody, AliasDef, AllocationDef, AllocationUsage, AnalysisCaseDef,
     AnalysisCaseUsage, Annotation, Argument, AstNode, AttributeBody, AttributeDef, AttributeUsage,
-    Bind, CaseDef, CaseUsage, CollectionOperator, CommentAnnotation, Connect, ConnectBody,
-    ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, DeclarationName,
-    DerivationConnectionRole, DerivationEndRole, DocComment, EndDecl, EndIdentity, Expression,
-    FilterMember, FilterPackageMember, FirstMergeBody, FirstStmt, FlowDef, FlowUsage,
+    Bind, CaseDef, CaseUsage, CollectionOperator, CollectionOperatorBody,
+    CollectionOperatorParameter, CollectionOperatorParameterTyping, CommentAnnotation, Connect,
+    ConnectBody, ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement,
+    DeclarationName, DerivationConnectionRole, DerivationEndRole, DocComment, EndDecl, EndIdentity,
+    Expression, FilterMember, FilterPackageMember, FirstMergeBody, FirstStmt, FlowDef, FlowUsage,
     FlowUsageKind, Identification, Import, ImportShape, ImportSuffixSpans, ImportTarget, InOut,
     InOutDecl, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
     InterfaceUsageBodyElement, ItemUsage, LoopStmt, MergeStmt, NamespaceDecl, Node,
@@ -59,7 +60,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 82;
+pub const PARSE_AST_VERSION: u32 = 83;
 
 /// The pinned grammar release understood by this build of the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

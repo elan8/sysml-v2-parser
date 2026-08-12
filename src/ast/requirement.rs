@@ -500,8 +500,8 @@ pub struct SubjectRef {}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActorRedefinitionAssignment {
     pub target: QualifiedReferenceId,
-    /// Raw RHS expression text up to `;` (we don't model the expression grammar here yet).
-    pub rhs: String,
+    /// Structured assignment value with its exact authored expression span.
+    pub value: Node<Expression>,
 }
 
 /// `ref :>> <name> { ... }` redefinition used in SysML v2 release fixtures.
@@ -509,8 +509,8 @@ pub struct ActorRedefinitionAssignment {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RefRedefinition {
     pub target: QualifiedReferenceId,
-    /// Raw body text for now (balanced `{ ... }` including nested braces).
-    pub body: String,
+    /// Structured nested body with an aggregate span covering its authored terminator or braces.
+    pub body: Node<UseCaseDefBody>,
 }
 
 /// Optional feature-kind keyword on a case return (`return part …` / `return attribute …`).
@@ -591,6 +591,7 @@ pub enum UseCaseDefBodyElement {
     ThenDone(Node<ThenDone>),
     IncludeUseCase(Node<IncludeUseCase>),
     RefRedefinition(Node<RefRedefinition>),
+    AssertConstraint(Node<crate::ast::AssertConstraintMember>),
     ReturnRef(Node<ReturnRef>),
     CaseReturnDecl(Node<CaseReturnDecl>),
     Assign(Node<AssignStmt>),

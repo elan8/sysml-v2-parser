@@ -61,6 +61,6 @@ package 'State Definition Example-2' {
   (references
     (reference r0 (scope relative) (span (offset 185) (line 8) (column 15) (len 3)) (segments (segment 0 (token "off") (name "off") (separator none) (span (offset 185) (line 8) (column 15) (len 3)))))
   )
-  (root (package (name "State Definition Example-2") (body (attribute-def) (attribute-def) (attribute-def) (state-def (name "VehicleStates") (body (entry) (then (state (ref r0))) (state-usage) (transition) (state-usage) (transition) (state-usage) (transition))))))
+  (root (package (name "State Definition Example-2") (body (attribute-def) (attribute-def) (attribute-def) (state-def (name "VehicleStates") (body (entry (action-keyword false) (target none) (body semicolon)) (then (state (ref r0))) (state-usage) (transition) (state-usage) (transition) (state-usage) (transition))))))
 )
 ~~~

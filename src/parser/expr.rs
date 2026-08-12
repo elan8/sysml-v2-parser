@@ -1,15 +1,16 @@
 //! Expression and path parsing for values and bind/connect.
 
 use crate::ast::{
-    Argument, BinaryOperator, CollectionOperator, Expression, Node, ReferenceSeparator, Span,
-    TypeCheckKind, UnaryOperator,
+    Argument, BinaryOperator, CollectionOperator, CollectionOperatorBody,
+    CollectionOperatorParameter, CollectionOperatorParameterTyping, Expression, InOut, Node,
+    ReferenceSeparator, Span, TypeCheckKind, UnaryOperator,
 };
 use crate::parser::lex::{
     classified_reference_path, name, qualified_reference, reference_path, starts_with_keyword,
     ws_and_comments, ReferencePathKind,
 };
-use crate::parser::node_from_to;
 use crate::parser::Input;
+use crate::parser::{node_from_to, with_span};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
@@ -461,64 +462,103 @@ fn extent_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     ))
 }
 
-/// Capture a balanced `{ ... }` including the braces.
-fn take_balanced_braces(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn collection_operator_parameter(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<CollectionOperatorParameter>> {
     let (input, _) = ws_and_comments(input)?;
-    if !input.fragment().starts_with(b"{") {
-        return Err(nom::Err::Error(nom::error::Error::new(
+    let start = input;
+    let (input, (direction_span, direction)) = with_span(|input| {
+        alt((
+            map(|input| keyword_token(input, b"inout"), |_| InOut::InOut),
+            map(|input| keyword_token(input, b"in"), |_| InOut::In),
+            map(|input| keyword_token(input, b"out"), |_| InOut::Out),
+        ))
+        .parse(input)
+    })(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, reference_keyword_span) = if starts_with_keyword(input.fragment(), b"ref") {
+        let (input, (span, _)) = with_span(|input| keyword_token(input, b"ref"))(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        (input, Some(span))
+    } else {
+        (input, None)
+    };
+    let (input, (name_span, parameter_name)) = with_span(name)(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, typing) = if input.fragment().starts_with(b":") {
+        let (input, (separator_span, _)) = with_span(tag(&b":"[..]))(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        let (input, target) = qualified_reference(input)?;
+        (
             input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let frag = input.fragment();
-    let mut depth = 0i32;
-    let mut i = 0usize;
-    while i < frag.len() {
-        match frag[i] {
-            b'{' => depth += 1,
-            b'}' => {
-                depth -= 1;
-                if depth == 0 {
-                    let take = i + 1;
-                    let s = String::from_utf8_lossy(&frag[..take]).to_string();
-                    let (input, _) = nom::bytes::complete::take(take).parse(input)?;
-                    return Ok((input, s));
-                }
-            }
-            b'"' => {
-                i += 1;
-                while i < frag.len() {
-                    if frag[i] == b'\\' && i + 1 < frag.len() {
-                        i += 2;
-                        continue;
-                    }
-                    if frag[i] == b'"' {
-                        break;
-                    }
-                    i += 1;
-                }
-            }
-            b'\'' => {
-                i += 1;
-                while i < frag.len() {
-                    if frag[i] == b'\\' && i + 1 < frag.len() {
-                        i += 2;
-                        continue;
-                    }
-                    if frag[i] == b'\'' {
-                        break;
-                    }
-                    i += 1;
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    Err(nom::Err::Error(nom::error::Error::new(
+            Some(CollectionOperatorParameterTyping {
+                separator_span,
+                target,
+            }),
+        )
+    } else {
+        (input, None)
+    };
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (semicolon_span, _)) = with_span(tag(&b";"[..]))(input)?;
+    Ok((
         input,
-        nom::error::ErrorKind::Tag,
-    )))
+        node_from_to(
+            start,
+            input,
+            CollectionOperatorParameter {
+                direction: Node::new(direction_span, direction),
+                reference_keyword_span,
+                name: parameter_name,
+                name_span,
+                typing,
+                semicolon_span,
+            },
+        ),
+    ))
+}
+
+fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<CollectionOperatorBody>> {
+    let (input, _) = ws_and_comments(input)?;
+    let start = input;
+    let (mut input, (open_brace_span, _)) = with_span(tag(&b"{"[..]))(input)?;
+    let mut parameters = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        if starts_with_keyword(next.fragment(), b"in")
+            || starts_with_keyword(next.fragment(), b"out")
+            || starts_with_keyword(next.fragment(), b"inout")
+        {
+            let (next, parameter) = collection_operator_parameter(next)?;
+            parameters.push(parameter);
+            input = next;
+        } else {
+            input = next;
+            break;
+        }
+    }
+    let (next, _) = ws_and_comments(input)?;
+    let (input, result) = if next.fragment().starts_with(b"}") {
+        (next, None)
+    } else {
+        let (input, result) = expression(next)?;
+        (input, Some(Box::new(result)))
+    };
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (close_brace_span, _)) = with_span(tag(&b"}"[..]))(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            CollectionOperatorBody {
+                open_brace_span,
+                parameters,
+                result,
+                close_brace_span,
+            },
+        ),
+    ))
 }
 
 fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
@@ -1108,12 +1148,12 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 let (after_name, _) = ws_and_comments(next)?;
                 // Brace-body form: `collection->forAll { in ref w; expr }`
                 if after_name.fragment().starts_with(b"{") {
-                    let (after_brace, body) = take_balanced_braces(after_name)?;
+                    let (after_brace, body) = collection_operator_body(after_name)?;
                     let expr = Expression::CollectionOp {
                         op: CollectionOperator::from_name(&member),
                         base: Box::new(atom),
                         args: Vec::new(),
-                        brace_body: Some(body),
+                        brace_body: Some(Box::new(body)),
                     };
                     atom = node_from_to(primary_start, after_brace, expr);
                     input = after_brace;
@@ -1613,6 +1653,72 @@ mod tests {
             }
             other => panic!("expected CollectionOp, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn collection_op_brace_body_retains_parameters_result_and_provenance() {
+        let source_text =
+            "items->forAll { in ref item : Domain::Item; out accepted; item == selected.item }";
+        let source = crate::ast::SourceStorage::from(source_text);
+        let context = crate::parser::span::ParseContext::new();
+        let (rest, node) = expression(context.input(source_text.as_bytes())).expect("expression");
+        assert!(rest.fragment().is_empty());
+        let Expression::CollectionOp {
+            op,
+            args,
+            brace_body: Some(body),
+            ..
+        } = &node.value
+        else {
+            panic!("expected collection operator with body");
+        };
+        assert_eq!(op, &CollectionOperator::ForAll);
+        assert!(args.is_empty());
+        assert_eq!(
+            source.slice(&body.span),
+            Some("{ in ref item : Domain::Item; out accepted; item == selected.item }")
+        );
+        assert_eq!(source.slice(&body.value.open_brace_span), Some("{"));
+        assert_eq!(source.slice(&body.value.close_brace_span), Some("}"));
+        assert_eq!(body.value.parameters.len(), 2);
+        let item = &body.value.parameters[0].value;
+        assert_eq!(item.direction.value, InOut::In);
+        assert_eq!(source.slice(&item.direction.span), Some("in"));
+        assert_eq!(
+            item.reference_keyword_span
+                .as_ref()
+                .and_then(|span| source.slice(span)),
+            Some("ref")
+        );
+        assert_eq!(item.name, "item");
+        assert_eq!(source.slice(&item.name_span), Some("item"));
+        assert_eq!(
+            source.slice(&item.typing.as_ref().expect("typing").separator_span),
+            Some(":")
+        );
+        assert_eq!(source.slice(&item.semicolon_span), Some(";"));
+        assert!(matches!(
+            body.value.result.as_deref().map(|result| &result.value),
+            Some(Expression::BinaryOp {
+                op: BinaryOperator::Eq,
+                ..
+            })
+        ));
+        let arena = context.finish();
+        assert_eq!(
+            arena
+                .get(&source, item.typing.as_ref().expect("typing").target)
+                .expect("type reference")
+                .authored_text(),
+            "Domain::Item"
+        );
+    }
+
+    #[test]
+    fn malformed_collection_op_body_rolls_back_references() {
+        let context = crate::parser::span::ParseContext::new();
+        assert!(expression(context.input(b"items->forAll { in x : Domain::T x == y }")).is_err());
+        assert!(context.finish().is_empty());
     }
 
     #[test]
