@@ -237,15 +237,13 @@ fn fixture_unmatched_brace_reports_local_eof_error_without_extra_recovery_noise(
         "EOF brace diagnostic should stay near the end: {:?}",
         err
     );
-    assert!(
-        result.document.root.elements.is_empty()
-            || result
-                .document
-                .root
-                .elements
-                .iter()
-                .any(|e| matches!(e.value, RootElement::Package(_)))
-    );
+    assert!(result.document.root.elements.iter().any(|element| {
+        matches!(
+            element.value,
+            RootElement::Member(ref member)
+                if matches!(member.value, PackageBodyElement::Error(_))
+        )
+    }));
 }
 
 #[test]

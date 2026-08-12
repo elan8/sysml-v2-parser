@@ -975,6 +975,15 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
 /// Drop `unexpected_closing_brace` on a line that already has a parse error for an
 /// invalid statement block (e.g. `badstmt {} }` â€” the second `}` closes the package).
 pub(crate) fn suppress_redundant_closing_brace_errors(errors: Vec<ParseError>) -> Vec<ParseError> {
+    // Recovery nodes can cover the entire unterminated declaration while the document-level
+    // balance check reports the same condition at EOF. Keep the local EOF diagnostic: it gives the
+    // editor the actionable insertion point and avoids publishing the recovery node's broad span as
+    // a second error for the same missing token.
+    let final_missing_closing_brace = errors
+        .iter()
+        .filter(|error| error.code.as_deref() == Some("missing_closing_brace"))
+        .filter_map(|error| error.offset)
+        .max();
     let lines_with_block_error: std::collections::HashSet<u32> = errors
         .iter()
         .filter(|e| e.code.as_deref() != Some("unexpected_closing_brace"))
@@ -993,6 +1002,9 @@ pub(crate) fn suppress_redundant_closing_brace_errors(errors: Vec<ParseError>) -
     errors
         .into_iter()
         .filter(|e| {
+            if e.code.as_deref() == Some("missing_closing_brace") {
+                return e.offset == final_missing_closing_brace;
+            }
             if e.code.as_deref() != Some("unexpected_closing_brace") {
                 return true;
             }
