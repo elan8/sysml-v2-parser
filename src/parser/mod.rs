@@ -25,6 +25,7 @@ mod connector;
 mod constraint;
 mod definition_header;
 mod definition_prefix;
+mod delimiters;
 mod dependency;
 pub mod diagnostic_catalog;
 mod diagnostics;

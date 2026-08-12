@@ -1,5 +1,6 @@
 //! Diagnostic classification, nom error mapping, and error post-processing.
 
+use super::delimiters::DelimiterScan;
 use super::lex;
 use super::Input;
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
@@ -816,16 +817,16 @@ pub(crate) fn unexpected_closing_brace_parse_error(input: Input<'_>) -> ParseErr
         .with_category(DiagnosticCategory::ParseError)
 }
 
-pub(crate) fn missing_closing_brace_error(bytes: &[u8], input: Input<'_>) -> Option<ParseError> {
-    if !input.fragment().is_empty() {
+/// Report an unterminated body when the parser stopped at end of input with a body still open.
+pub(crate) fn missing_closing_brace_error(
+    bytes: &[u8],
+    input: Input<'_>,
+    delimiters: &DelimiterScan,
+) -> Option<ParseError> {
+    if !input.fragment().is_empty() || !delimiters.has_unclosed_brace() {
         return None;
     }
-    let consumed = &bytes[..input.location_offset().min(bytes.len())];
-    let (opens, closes) = lex::brace_balance_outside_comments(consumed);
-    if opens <= closes {
-        return None;
-    }
-    Some(missing_closing_brace_error_at_eof(consumed))
+    Some(missing_closing_brace_error_at_eof(bytes))
 }
 
 pub(crate) fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
@@ -839,72 +840,16 @@ pub(crate) fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
         .with_category(DiagnosticCategory::ParseError)
 }
 
-pub(crate) fn extra_closing_brace_at_eof(bytes: &[u8]) -> Option<ParseError> {
-    let (opens, closes) = lex::brace_balance_outside_comments(bytes);
+/// Report the trailing `}` of a document that closes more bodies than it opens.
+pub(crate) fn extra_closing_brace_at_eof(
+    bytes: &[u8],
+    delimiters: &DelimiterScan,
+) -> Option<ParseError> {
+    let (opens, closes) = delimiters.balance();
     if closes <= opens {
         return None;
     }
-    let mut last_brace = None;
-    let mut pos = 0usize;
-    let mut block_comment_depth = 0usize;
-    let mut line_comment = false;
-    let mut quote = None;
-    let mut escaped = false;
-    while pos < bytes.len() {
-        let byte = bytes[pos];
-        let next = bytes.get(pos + 1).copied();
-        if line_comment {
-            pos += 1;
-            if matches!(byte, b'\n' | b'\r') {
-                line_comment = false;
-            }
-            continue;
-        }
-        if block_comment_depth > 0 {
-            if byte == b'/' && next == Some(b'*') {
-                block_comment_depth += 1;
-                pos += 2;
-            } else if byte == b'*' && next == Some(b'/') {
-                block_comment_depth -= 1;
-                pos += 2;
-            } else {
-                pos += 1;
-            }
-            continue;
-        }
-        if let Some(delimiter) = quote {
-            pos += 1;
-            if escaped {
-                escaped = false;
-            } else if byte == b'\\' {
-                escaped = true;
-            } else if byte == delimiter {
-                quote = None;
-            }
-            continue;
-        }
-
-        match (byte, next) {
-            (b'/', Some(b'/')) => {
-                line_comment = true;
-                pos += 2;
-            }
-            (b'/', Some(b'*')) => {
-                block_comment_depth = 1;
-                pos += 2;
-            }
-            (b'\'' | b'"', _) => {
-                quote = Some(byte);
-                pos += 1;
-            }
-            (b'}', _) => {
-                last_brace = Some(pos);
-                pos += 1;
-            }
-            _ => pos += 1,
-        }
-    }
-    let offset = last_brace?;
+    let offset = delimiters.last_close()?;
     let (line, column) = eof_line_column(&bytes[..offset]);
     Some(
         ParseError::new("unexpected closing '}' at end of file")
@@ -926,11 +871,6 @@ pub(crate) fn category_from_code(code: &str) -> DiagnosticCategory {
     } else {
         DiagnosticCategory::ParseError
     }
-}
-
-pub(crate) fn has_unclosed_brace(bytes: &[u8]) -> bool {
-    let (opens, closes) = lex::brace_balance_outside_comments(bytes);
-    opens > closes
 }
 
 fn eof_line_column(bytes: &[u8]) -> (u32, usize) {

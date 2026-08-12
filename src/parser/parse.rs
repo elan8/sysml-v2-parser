@@ -1,8 +1,9 @@
 //! Public parse entry points.
 
 use super::collect_errors::{collect_recovery_errors, collect_requirement_id_dialect_diagnostics};
+use super::delimiters::DelimiterScan;
 use super::diagnostics::{
-    dedup_errors, extra_closing_brace_at_eof, fragment_to_found_snippet, has_unclosed_brace,
+    dedup_errors, extra_closing_brace_at_eof, fragment_to_found_snippet,
     missing_closing_brace_error, missing_closing_brace_error_at_eof, nom_err_to_parse_error,
     root_body_recovery_error, root_body_scope, suppress_diagnostic_cascades,
     suppress_redundant_closing_brace_errors, trim_ascii_start,
@@ -54,95 +55,29 @@ fn with_parse_stack<R>(f: impl FnOnce() -> R) -> R {
     stacker::maybe_grow(PARSE_STACK_RED_ZONE, PARSE_STACK_GROWTH, f)
 }
 
-fn nesting_limit_error(input: &[u8]) -> Option<ParseError> {
-    let mut brace_depth = 0usize;
-    let mut block_comment_depth = 0usize;
-    let mut in_line_comment = false;
-    let mut quote = None;
-    let mut escaped = false;
-    let mut index = 0usize;
-
-    while index < input.len() {
-        let byte = input[index];
-        let next = input.get(index + 1).copied();
-
-        if in_line_comment {
-            if byte == b'\n' {
-                in_line_comment = false;
-            }
-            index += 1;
-            continue;
-        }
-        if block_comment_depth > 0 {
-            if byte == b'/' && next == Some(b'*') {
-                block_comment_depth += 1;
-                index += 2;
-            } else if byte == b'*' && next == Some(b'/') {
-                block_comment_depth -= 1;
-                index += 2;
-            } else {
-                index += 1;
-            }
-            continue;
-        }
-        if let Some(delimiter) = quote {
-            if escaped {
-                escaped = false;
-            } else if byte == b'\\' {
-                escaped = true;
-            } else if byte == delimiter {
-                quote = None;
-            }
-            index += 1;
-            continue;
-        }
-
-        match (byte, next) {
-            (b'/', Some(b'/')) => {
-                in_line_comment = true;
-                index += 2;
-            }
-            (b'/', Some(b'*')) => {
-                block_comment_depth = 1;
-                index += 2;
-            }
-            (b'"' | b'\'', _) => {
-                quote = Some(byte);
-                index += 1;
-            }
-            (b'{', _) => {
-                brace_depth += 1;
-                if brace_depth > MAX_SYNTAX_NESTING {
-                    let prefix = &input[..index];
-                    let line = 1 + prefix.iter().filter(|&&b| b == b'\n').count();
-                    let column = prefix
-                        .iter()
-                        .rposition(|&b| b == b'\n')
-                        .map_or(index + 1, |newline| index - newline);
-                    return Some(
-                        ParseError::new(format!(
-                            "model nesting exceeds the supported limit of {MAX_SYNTAX_NESTING}"
-                        ))
-                        .with_location(index, line as u32, column)
-                        .with_length(1)
-                        .with_code("nesting_too_deep")
-                        .with_category(DiagnosticCategory::ParseError)
-                        .with_suggestion(
-                            "Split deeply nested declarations into packages or definitions referenced by name.",
-                        ),
-                    );
-                }
-                index += 1;
-            }
-            (b'}', _) => {
-                brace_depth = brace_depth.saturating_sub(1);
-                index += 1;
-            }
-            _ => index += 1,
-        }
-    }
-    None
+/// Build the `nesting_too_deep` diagnostic for the offending `{` recorded by the prescan.
+fn nesting_limit_error(input: &[u8], delimiters: &DelimiterScan) -> Option<ParseError> {
+    let offset = delimiters.nesting_overflow()?;
+    let prefix = &input[..offset];
+    let line = 1 + prefix.iter().filter(|&&b| b == b'\n').count();
+    let column = prefix
+        .iter()
+        .rposition(|&b| b == b'\n')
+        .map_or(offset + 1, |newline| offset - newline);
+    Some(
+        ParseError::new(format!(
+            "model nesting exceeds the supported limit of {MAX_SYNTAX_NESTING}"
+        ))
+        .with_location(offset, line as u32, column)
+        .with_length(1)
+        .with_code("nesting_too_deep")
+        .with_category(DiagnosticCategory::ParseError)
+        .with_suggestion(
+            "Split deeply nested declarations into packages or definitions referenced by name.",
+        ),
+    )
 }
+
 /// Result of parsing with error recovery: a (possibly partial) AST and zero or more diagnostics.
 #[derive(Debug, Clone)]
 pub struct ParseResult {
@@ -184,12 +119,13 @@ fn parse_root_inner(input: &str) -> Result<ParsedDocument, ParseError> {
 fn parse_root_namespace(source: &str, context: &ParseContext) -> Result<RootNamespace, ParseError> {
     let bytes = source.as_bytes();
     let located = context.input(bytes);
-    if let Some(error) = nesting_limit_error(bytes) {
+    let delimiters = DelimiterScan::new(bytes);
+    if let Some(error) = nesting_limit_error(bytes, &delimiters) {
         return Err(error);
     }
     match package::root_namespace(located) {
         Ok((rest, root)) => {
-            if !rest.fragment().is_empty() && has_unclosed_brace(bytes) {
+            if !rest.fragment().is_empty() && delimiters.has_unclosed_brace() {
                 return Err(missing_closing_brace_error_at_eof(bytes));
             }
             if rest.fragment().is_empty() {
@@ -231,14 +167,14 @@ fn parse_root_namespace(source: &str, context: &ParseContext) -> Result<RootName
                 Err(pe)
             }
         }
-        Err(nom::Err::Error(e)) => Err(missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
+        Err(nom::Err::Error(e)) => Err(missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
             nom_err_to_parse_error(
                 &e,
                 None,
                 Some("package-body element at root (package, namespace, import, definition, or usage)"),
             )
         })),
-        Err(nom::Err::Failure(e)) => Err(missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
+        Err(nom::Err::Failure(e)) => Err(missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
             nom_err_to_parse_error(
                 &e,
                 None,
@@ -280,7 +216,8 @@ fn parse_with_diagnostics_document(
     context: &ParseContext,
 ) -> (RootNamespace, Vec<ParseError>) {
     let bytes = source.as_bytes();
-    if let Some(error) = nesting_limit_error(bytes) {
+    let delimiters = DelimiterScan::new(bytes);
+    if let Some(error) = nesting_limit_error(bytes, &delimiters) {
         return (RootNamespace { elements: vec![] }, vec![error]);
     }
     let located = context.input(bytes);
@@ -324,7 +261,7 @@ fn parse_with_diagnostics_document(
                     continue;
                 }
                 if errors.is_empty()
-                    && has_unclosed_brace(bytes)
+                    && delimiters.has_unclosed_brace()
                     && (lex::starts_with_keyword(trimmed.fragment(), b"package")
                         || lex::starts_with_keyword(trimmed.fragment(), b"namespace")
                         || lex::starts_with_keyword(trimmed.fragment(), b"library")
@@ -375,7 +312,7 @@ fn parse_with_diagnostics_document(
                         }
                     }
                 }
-                let pe = missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
+                let pe = missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
                     nom_err_to_parse_error(
                         &e,
                         None,
@@ -437,9 +374,9 @@ fn parse_with_diagnostics_document(
             )
         })
     {
-        if let Some(err) = extra_closing_brace_at_eof(bytes) {
+        if let Some(err) = extra_closing_brace_at_eof(bytes, &delimiters) {
             errors.push(err);
-        } else if has_unclosed_brace(bytes) {
+        } else if delimiters.has_unclosed_brace() {
             errors.push(missing_closing_brace_error_at_eof(bytes));
         }
     }
@@ -532,7 +469,8 @@ mod tests {
             "{".repeat(MAX_SYNTAX_NESTING + 1),
             "{".repeat(MAX_SYNTAX_NESTING + 1)
         );
-        let error = nesting_limit_error(source.as_bytes());
+        let bytes = source.as_bytes();
+        let error = nesting_limit_error(bytes, &DelimiterScan::new(bytes));
         assert!(error.is_none(), "comments and strings are not model scopes");
     }
 

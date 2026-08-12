@@ -611,76 +611,6 @@ pub(crate) fn contains_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
     })
 }
 
-/// Count `{` / `}` outside comments and quoted values for EOF brace balance checks.
-pub(crate) fn brace_balance_outside_comments(bytes: &[u8]) -> (usize, usize) {
-    let mut opens = 0usize;
-    let mut closes = 0usize;
-    let mut pos = 0usize;
-    let mut block_comment_depth = 0usize;
-    let mut line_comment = false;
-    let mut quote = None;
-    let mut escaped = false;
-    while pos < bytes.len() {
-        let byte = bytes[pos];
-        let next = bytes.get(pos + 1).copied();
-        if line_comment {
-            pos += 1;
-            if matches!(byte, b'\n' | b'\r') {
-                line_comment = false;
-            }
-            continue;
-        }
-        if block_comment_depth > 0 {
-            if byte == b'/' && next == Some(b'*') {
-                block_comment_depth += 1;
-                pos += 2;
-            } else if byte == b'*' && next == Some(b'/') {
-                block_comment_depth -= 1;
-                pos += 2;
-            } else {
-                pos += 1;
-            }
-            continue;
-        }
-        if let Some(delimiter) = quote {
-            pos += 1;
-            if escaped {
-                escaped = false;
-            } else if byte == b'\\' {
-                escaped = true;
-            } else if byte == delimiter {
-                quote = None;
-            }
-            continue;
-        }
-
-        match (byte, next) {
-            (b'/', Some(b'/')) => {
-                line_comment = true;
-                pos += 2;
-            }
-            (b'/', Some(b'*')) => {
-                block_comment_depth = 1;
-                pos += 2;
-            }
-            (b'\'' | b'"', _) => {
-                quote = Some(byte);
-                pos += 1;
-            }
-            (b'{', _) => {
-                opens += 1;
-                pos += 1;
-            }
-            (b'}', _) => {
-                closes += 1;
-                pos += 1;
-            }
-            _ => pos += 1,
-        }
-    }
-    (opens, closes)
-}
-
 fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Option<Input<'a>> {
     let (input, _) = ws_and_comments(input).ok()?;
     let fragment = input.fragment();
@@ -1692,13 +1622,6 @@ mod lexical_bnf_tests {
         let input = span_input("broken 'line one\npart fake'\npart good;");
         let (rest, ()) = recover_body_element(input, &[b"part"]).expect("body recovery");
         assert_eq!(*rest.fragment(), &b"part good;"[..]);
-    }
-
-    #[test]
-    fn brace_diagnostics_ignore_authored_braces_in_quotes_and_comments() {
-        let source = br#"part p { text = "}"; /* { /* } */ } */ // }
-        }"#;
-        assert_eq!(brace_balance_outside_comments(source), (1, 1));
     }
 
     #[test]
