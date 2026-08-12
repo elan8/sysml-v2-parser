@@ -59,6 +59,8 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b":>>",
+    b":>",
     b"doc",
     b"attribute",
     b"port",
@@ -69,7 +71,8 @@ pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"abstract",
 ];
 
-pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[b"doc", b"port", b"in", b"out", b"inout"];
+pub(crate) const PORT_BODY_STARTERS: &[&[u8]] =
+    &[b":>>", b":>", b"doc", b"port", b"in", b"out", b"inout"];
 
 pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"#",

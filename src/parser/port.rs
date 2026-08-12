@@ -4,7 +4,9 @@ use crate::ast::{
     Node, PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage,
 };
 use crate::parser::action::in_out_decl;
-use crate::parser::attribute::{attribute_def, attribute_usage, directed_attribute_usage};
+use crate::parser::attribute::{
+    attribute_def, attribute_feature_binding, attribute_usage, directed_attribute_usage,
+};
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -47,6 +49,10 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
         map(doc_comment, PortBodyElement::Doc),
         // PAR-002 widening: this body previously had no attribute/item coverage at all.
         map(attribute_usage, PortBodyElement::AttributeUsage),
+        // A port body may redefine an inherited feature without repeating its kind keyword, e.g.
+        // `port pwr : DevicePower { :>> maxCurrent = 0.02 [A]; }`. Attribute and item bodies
+        // already accept this prefix-redefinition form; port bodies rejected it.
+        map(attribute_feature_binding, PortBodyElement::AttributeUsage),
         map(item_usage, PortBodyElement::ItemUsage),
     ))
     .parse(input)?;
@@ -218,6 +224,10 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         map(doc_comment, PortDefBodyElement::Doc),
         map(|i| attribute_def(i, true), PortDefBodyElement::AttributeDef),
         map(attribute_usage, PortDefBodyElement::AttributeUsage),
+        map(
+            attribute_feature_binding,
+            PortDefBodyElement::AttributeUsage,
+        ),
         // `item_def_required` must be tried before the existing bare `directed_item_usage`/
         // `item_usage` arms above -- same def-before-usage discipline as the other body enums
         // wired in prior increments.

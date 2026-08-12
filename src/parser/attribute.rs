@@ -274,7 +274,9 @@ fn value_keyword_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeU
 ///
 /// Catalog unit definitions use this shape for `unitConversion` redefinitions, e.g.
 /// `:>> unitConversion: ConversionByPrefix { :>> prefix = kilo; :>> referenceUnit = m; }`.
-fn attribute_feature_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
+pub(crate) fn attribute_feature_binding(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<AttributeUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, prefix) = nom::combinator::opt(alt((
