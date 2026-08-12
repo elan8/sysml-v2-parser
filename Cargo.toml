@@ -33,6 +33,16 @@ serde_json = "1"
 name = "snapshot_tool"
 path = "tools/snapshot_tool/main.rs"
 
+[[bin]]
+name = "parser_profile"
+path = "tools/parser_profile.rs"
+
 [[bench]]
 name = "parser_bench"
 harness = false
+
+[profile.release]
+debug = 1
+
+[profile.bench]
+debug = 1

@@ -114,6 +114,17 @@ cargo bench --bench parser_bench -- --profile-time 10
 It reports each fixture separately and the complete corpus as one workload. Keep benchmark changes
 and their source snapshots reviewable together, and report unfavorable movements alongside wins.
 
+For low-noise sampling, use the standalone release binary. It loads the identical snapshot corpus,
+warms it once, then runs only the parser loop; release and bench profiles retain debug symbols.
+
+```bash
+cargo build --release --bin parser_profile
+samply record target/release/parser_profile 1000
+```
+
+The optional integer is the number of complete corpus iterations and defaults to 1,000. Increase it
+until the profile contains enough steady-state samples for the question being investigated.
+
 ## Documentation
 
 | Topic | Doc |
