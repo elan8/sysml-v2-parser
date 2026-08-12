@@ -8,7 +8,6 @@ use crate::parser::{span_from_to, Input};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_while, take_while1};
 use nom::combinator::{map, opt, rest, value};
-use nom::multi::many0;
 use nom::sequence::{delimited, preceded, terminated};
 use nom::IResult;
 use nom::Parser;
@@ -247,45 +246,67 @@ pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// be parsed explicitly so it appears in the AST. //* ... */ is tried before line_comment so that
 /// "//*" starts a block comment, not a line comment.
 pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let mut input = input;
+    let skipped = trivia_len(input.fragment());
+    Ok((nom::Input::take_from(&input, skipped), ()))
+}
+
+/// Byte length of the trivia run at the start of `bytes`.
+///
+/// This is the parser's hottest lexical routine: it runs before every token and again for every
+/// alternative that backtracks over the same position, so it is written as one explicit scan
+/// rather than composed combinators. The recognized forms and their precedence match the grammar
+/// documented on [`ws_and_comments`]: whitespace, a terminated `/* ... */`, a terminated
+/// `//* ... */`, and `//` to end of line. An unterminated `/*` is not trivia and stops the scan,
+/// leaving it for the caller to report; an unterminated `//*` is an ordinary line comment.
+fn trivia_len(bytes: &[u8]) -> usize {
+    let mut pos = 0usize;
     loop {
-        let start = input.location_offset();
-        let (next, _) =
-            take_while(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r').parse(input)?;
-        input = next;
-        let (next, _) =
-            many0(alt((block_comment, block_comment_slash_star, line_comment))).parse(input)?;
-        input = next;
-        if input.location_offset() == start {
-            return Ok((input, ()));
+        while let Some(&byte) = bytes.get(pos) {
+            if byte == b' ' || byte == b'\t' || byte == b'\n' || byte == b'\r' {
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        let rest = &bytes[pos..];
+        if rest.starts_with(b"/*") {
+            match block_comment_end(rest, 2) {
+                Some(end) => pos += end,
+                None => return pos,
+            }
+        } else if rest.starts_with(b"//") {
+            if rest.starts_with(b"//*") {
+                if let Some(end) = block_comment_end(rest, 3) {
+                    pos += end;
+                    continue;
+                }
+            }
+            pos += line_comment_len(rest);
+        } else {
+            return pos;
         }
     }
 }
 
-/// Block comment: /* ... */
-fn block_comment(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = tag(&b"/*"[..]).parse(input)?;
-    let (input, _) = take_until(&b"*/"[..]).parse(input)?;
-    let (input, _) = tag(&b"*/"[..]).parse(input)?;
-    let (input, _) = ws(input)?;
-    Ok((input, ()))
+/// Length of a block comment whose body starts at `body_start`, or `None` when it is unterminated.
+fn block_comment_end(bytes: &[u8], body_start: usize) -> Option<usize> {
+    let offset = bytes[body_start..]
+        .windows(2)
+        .position(|pair| pair == b"*/")?;
+    Some(body_start + offset + 2)
 }
 
-/// Block comment starting with //* ... */ (e.g. in 4a fixture).
-fn block_comment_slash_star(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = tag(&b"//*"[..]).parse(input)?;
-    let (input, _) = take_until(&b"*/"[..]).parse(input)?;
-    let (input, _) = tag(&b"*/"[..]).parse(input)?;
-    let (input, _) = ws(input)?;
-    Ok((input, ()))
-}
-
-/// Single-line comment: // to EOL (consumes the newline).
-fn line_comment(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = tag(&b"//"[..]).parse(input)?;
-    let (input, _) = take_while(|c: u8| c != b'\n' && c != b'\r').parse(input)?;
-    let (input, _) = take_while(|c: u8| c == b'\n' || c == b'\r').parse(input)?;
-    Ok((input, ()))
+/// Length of a `//` line comment, including the newline run that ends it.
+fn line_comment_len(bytes: &[u8]) -> usize {
+    let mut pos = match bytes[2..].iter().position(|&b| b == b'\n' || b == b'\r') {
+        Some(offset) => 2 + offset,
+        None => return bytes.len(),
+    };
+    while matches!(bytes.get(pos), Some(b'\n') | Some(b'\r')) {
+        pos += 1;
+    }
+    pos
 }
 
 /// Parse one or more whitespace characters (consumes at least one).
@@ -1649,6 +1670,44 @@ mod lexical_bnf_tests {
         let input = span_input("  // line\n  /* block */  part");
         let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
         assert!(rest.fragment().starts_with(b"part"));
+    }
+
+    #[test]
+    fn ws_and_comments_starts_a_block_comment_at_slash_slash_star() {
+        // `//*` is a block comment, so the newline inside it does not end it.
+        let input = span_input("//* still\n comment */ part");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert_eq!(*rest.fragment(), &b"part"[..]);
+    }
+
+    #[test]
+    fn ws_and_comments_treats_unterminated_slash_slash_star_as_a_line_comment() {
+        let input = span_input("//* never closed\npart");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert_eq!(*rest.fragment(), &b"part"[..]);
+    }
+
+    #[test]
+    fn ws_and_comments_leaves_an_unterminated_block_comment_for_the_caller() {
+        // An unterminated `/*` is not trivia: the scan stops in front of it so the caller can
+        // report it rather than silently consuming the rest of the document.
+        let input = span_input("  /* never closed\npart");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert!(rest.fragment().starts_with(b"/* never closed"));
+    }
+
+    #[test]
+    fn ws_and_comments_consumes_runs_of_mixed_trivia() {
+        let input = span_input("\r\n\t // a\r// b\n/* c */\n//* d */\t part");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert_eq!(*rest.fragment(), &b"part"[..]);
+    }
+
+    #[test]
+    fn ws_and_comments_is_a_no_op_on_a_token() {
+        let input = span_input("part p;");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert_eq!(rest.location_offset(), 0);
     }
 
     #[test]
