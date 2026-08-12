@@ -818,6 +818,15 @@ pub(crate) fn filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterM
 }
 
 macro_rules! try_package_body_dispatch {
+    // Guarded form: skip the attempt entirely when the element's leading keyword selects a
+    // different production. `$starter` is `None` when no keyword discriminates here (an
+    // unrecognized or prefix-only starter), in which case every alternative is still tried.
+    ($input:expr, $start:expr, $starter:expr, $production:ident, $parser:expr, $wrap:expr) => {{
+        if !matches!($starter, Some(p) if p != crate::parser::grammar_scope::PackageProduction::$production)
+        {
+            try_package_body_dispatch!($input, $start, $parser, $wrap);
+        }
+    }};
     ($input:expr, $start:expr, $parser:expr, $wrap:expr) => {{
         let transaction_input = $input;
         let checkpoint = transaction_input.extra.reference_checkpoint();
@@ -833,11 +842,21 @@ macro_rules! try_package_body_dispatch {
 fn try_package_body_annotations<'a>(
     input: Input<'a>,
     start: Input<'a>,
+    starter: Option<crate::parser::grammar_scope::PackageProduction>,
 ) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
-    try_package_body_dispatch!(input, start, doc_comment, PackageBodyElement::Doc);
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Documentation,
+        doc_comment,
+        PackageBodyElement::Doc
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Comment,
         comment_annotation,
         PackageBodyElement::Comment
     );
@@ -845,19 +864,32 @@ fn try_package_body_annotations<'a>(
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Comment,
         bare_locale_comment,
         PackageBodyElement::Comment
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        TextualRepresentation,
         textual_representation,
         PackageBodyElement::TextualRep
     );
-    try_package_body_dispatch!(input, start, filter_member, PackageBodyElement::Filter);
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        ElementFilterMember,
+        filter_member,
+        PackageBodyElement::Filter
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Attribute,
         |i| attribute_def(i, false),
         PackageBodyElement::AttributeDef
     );
@@ -869,6 +901,8 @@ fn try_package_body_annotations<'a>(
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Attribute,
         attribute_usage,
         PackageBodyElement::AttributeUsage
     );
@@ -881,15 +915,32 @@ fn try_package_body_annotations<'a>(
 fn try_package_body_packages<'a>(
     input: Input<'a>,
     start: Input<'a>,
+    starter: Option<crate::parser::grammar_scope::PackageProduction>,
 ) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        LibraryPackage,
         library_package_,
         PackageBodyElement::LibraryPackage
     );
-    try_package_body_dispatch!(input, start, package_, PackageBodyElement::Package);
-    try_package_body_dispatch!(input, start, import_, PackageBodyElement::Import);
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Package,
+        package_,
+        PackageBodyElement::Package
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Import,
+        import_,
+        PackageBodyElement::Import
+    );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,
@@ -899,19 +950,43 @@ fn try_package_body_packages<'a>(
 fn try_package_body_structure<'a>(
     input: Input<'a>,
     start: Input<'a>,
+    starter: Option<crate::parser::grammar_scope::PackageProduction>,
 ) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
-    try_package_body_dispatch!(input, start, part_def_or_usage, |p| match p {
-        PartDefOrUsage::Def(n) => PackageBodyElement::PartDef(n),
-        PartDefOrUsage::Usage(n) => PackageBodyElement::PartUsage(n),
-    });
-    try_package_body_dispatch!(input, start, port_def, PackageBodyElement::PortDef);
-    // PAR-002: standalone port usage at package level, tried after `port_def` above (which is
-    // `def`-optional per its own doc comment and already captures the bare def-less form) -- see
-    // `AttributeUsage` above for the same rationale.
-    try_package_body_dispatch!(input, start, port_usage, PackageBodyElement::PortUsage);
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Part,
+        part_def_or_usage,
+        |p| match p {
+            PartDefOrUsage::Def(n) => PackageBodyElement::PartDef(n),
+            PartDefOrUsage::Usage(n) => PackageBodyElement::PartUsage(n),
+        }
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Port,
+        port_def,
+        PackageBodyElement::PortDef
+    );
+    // PAR-002: standalone port usage at package level, tried after `port_def` above (which is
+    // `def`-optional per its own doc comment and already captures the bare def-less form) -- see
+    // `AttributeUsage` above for the same rationale.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Port,
+        port_usage,
+        PackageBodyElement::PortUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Interface,
         interface_def,
         PackageBodyElement::InterfaceDef
     );
@@ -921,12 +996,16 @@ fn try_package_body_structure<'a>(
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Interface,
         interface_usage,
         PackageBodyElement::InterfaceUsage
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Connection,
         connection_def,
         PackageBodyElement::ConnectionDef
     );
@@ -935,6 +1014,8 @@ fn try_package_body_structure<'a>(
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Connection,
         crate::parser::part::connection_usage_member,
         PackageBodyElement::ConnectionUsage
     );
@@ -947,20 +1028,45 @@ fn try_package_body_structure<'a>(
         crate::parser::part::connect_,
         PackageBodyElement::Connect
     );
-    try_package_body_dispatch!(input, start, dependency, PackageBodyElement::Dependency);
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Dependency,
+        dependency,
+        PackageBodyElement::Dependency
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Metadata,
         metadata_usage,
         PackageBodyElement::MetadataUsage
     );
-    try_package_body_dispatch!(input, start, metadata_def, PackageBodyElement::MetadataDef);
-    try_package_body_dispatch!(input, start, enum_def, PackageBodyElement::EnumDef);
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Metadata,
+        metadata_def,
+        PackageBodyElement::MetadataDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Enumeration,
+        enum_def,
+        PackageBodyElement::EnumDef
+    );
     // PAR-002: standalone enumeration usage at package level, tried after `enum_def` above for
     // the same reason as `port_usage`.
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Enumeration,
         enum_usage,
         PackageBodyElement::EnumerationUsage
     );
@@ -1006,23 +1112,43 @@ fn try_package_body_structure<'a>(
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Allocation,
         allocation_def,
         PackageBodyElement::AllocationDef
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Allocation,
         allocation_usage,
         PackageBodyElement::AllocationUsage
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Allocation,
         allocate_usage,
         PackageBodyElement::AllocationUsage
     );
-    try_package_body_dispatch!(input, start, flow_def, PackageBodyElement::FlowDef);
-    try_package_body_dispatch!(input, start, flow_usage, PackageBodyElement::FlowUsage);
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Flow,
+        flow_def,
+        PackageBodyElement::FlowDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Flow,
+        flow_usage,
+        PackageBodyElement::FlowUsage
+    );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,
@@ -1032,35 +1158,84 @@ fn try_package_body_structure<'a>(
 fn try_package_body_behavior<'a>(
     input: Input<'a>,
     start: Input<'a>,
+    starter: Option<crate::parser::grammar_scope::PackageProduction>,
 ) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
-    try_package_body_dispatch!(input, start, alias_def, PackageBodyElement::AliasDef);
-    try_package_body_dispatch!(input, start, action_def, PackageBodyElement::ActionDef);
-    try_package_body_dispatch!(input, start, action_usage, PackageBodyElement::ActionUsage);
-    try_package_body_dispatch!(input, start, state_def, PackageBodyElement::StateDef);
-    try_package_body_dispatch!(input, start, state_usage, PackageBodyElement::StateUsage);
-    try_package_body_dispatch!(input, start, item_def, PackageBodyElement::ItemDef);
-    // PAR-002: standalone item usage at package level, tried after `item_def` above (`def`-
-    // optional per its own dispatch here) for the same reason as `port_usage`/`AttributeUsage`.
-    try_package_body_dispatch!(input, start, item_usage, PackageBodyElement::ItemUsage);
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        AliasMember,
+        alias_def,
+        PackageBodyElement::AliasDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Action,
+        action_def,
+        PackageBodyElement::ActionDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Action,
+        action_usage,
+        PackageBodyElement::ActionUsage
+    );
+    try_package_body_dispatch!(input, start, state_def, PackageBodyElement::StateDef);
+    try_package_body_dispatch!(input, start, state_usage, PackageBodyElement::StateUsage);
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Item,
+        item_def,
+        PackageBodyElement::ItemDef
+    );
+    // PAR-002: standalone item usage at package level, tried after `item_def` above (`def`-
+    // optional per its own dispatch here) for the same reason as `port_usage`/`AttributeUsage`.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Item,
+        item_usage,
+        PackageBodyElement::ItemUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Individual,
         individual_def,
         PackageBodyElement::IndividualDef
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Constraint,
         constraint_def,
         PackageBodyElement::ConstraintDef
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Constraint,
         constraint_usage,
         PackageBodyElement::ConstraintUsage
     );
-    try_package_body_dispatch!(input, start, calc_def, PackageBodyElement::CalcDef);
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Calculation,
+        calc_def,
+        PackageBodyElement::CalcDef
+    );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,
@@ -1070,60 +1245,112 @@ fn try_package_body_behavior<'a>(
 fn try_package_body_requirement<'a>(
     input: Input<'a>,
     start: Input<'a>,
+    starter: Option<crate::parser::grammar_scope::PackageProduction>,
 ) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Requirement,
         requirement_def,
         PackageBodyElement::RequirementDef
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Requirement,
         requirement_usage,
         PackageBodyElement::RequirementUsage
     );
-    try_package_body_dispatch!(input, start, satisfy, PackageBodyElement::Satisfy);
-    try_package_body_dispatch!(input, start, use_case_def, PackageBodyElement::UseCaseDef);
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        SatisfyRequirementUsage,
+        satisfy,
+        PackageBodyElement::Satisfy
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        UseCase,
+        use_case_def,
+        PackageBodyElement::UseCaseDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        UseCase,
         use_case_usage,
         PackageBodyElement::UseCaseUsage
     );
-    try_package_body_dispatch!(input, start, case_def, PackageBodyElement::CaseDef);
-    try_package_body_dispatch!(input, start, case_usage, PackageBodyElement::CaseUsage);
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Case,
+        case_def,
+        PackageBodyElement::CaseDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Case,
+        case_usage,
+        PackageBodyElement::CaseUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        AnalysisCase,
         analysis_case_def,
         PackageBodyElement::AnalysisCaseDef
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        AnalysisCase,
         analysis_case_usage,
         PackageBodyElement::AnalysisCaseUsage
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        VerificationCase,
         verification_case_def,
         PackageBodyElement::VerificationCaseDef
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        VerificationCase,
         verification_case_usage,
         PackageBodyElement::VerificationCaseUsage
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Concern,
         concern_usage,
         PackageBodyElement::ConcernUsage
     );
-    try_package_body_dispatch!(input, start, actor_decl, PackageBodyElement::Actor);
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        ActorUsage,
+        actor_decl,
+        PackageBodyElement::Actor
+    );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,
@@ -1133,30 +1360,53 @@ fn try_package_body_requirement<'a>(
 fn try_package_body_view<'a>(
     input: Input<'a>,
     start: Input<'a>,
+    starter: Option<crate::parser::grammar_scope::PackageProduction>,
 ) -> IResult<Input<'a>, Box<Node<PackageBodyElement>>> {
-    try_package_body_dispatch!(input, start, view_def, PackageBodyElement::ViewDef);
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        View,
+        view_def,
+        PackageBodyElement::ViewDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Viewpoint,
         viewpoint_def,
         PackageBodyElement::ViewpointDef
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Rendering,
         rendering_def,
         PackageBodyElement::RenderingDef
     );
-    try_package_body_dispatch!(input, start, view_usage, PackageBodyElement::ViewUsage);
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        View,
+        view_usage,
+        PackageBodyElement::ViewUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Viewpoint,
         viewpoint_usage,
         PackageBodyElement::ViewpointUsage
     );
     try_package_body_dispatch!(
         input,
         start,
+        starter,
+        Rendering,
         rendering_usage,
         PackageBodyElement::RenderingUsage
     );
@@ -1185,22 +1435,28 @@ pub(crate) fn package_body_element(
 ) -> IResult<Input<'_>, Box<Node<PackageBodyElement>>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
-    if let Ok(r) = try_package_body_annotations(input, start) {
+    // One lookup selects the production this element can be: every alternative belonging to a
+    // different production is then skipped rather than parsed and rolled back. A prefix-only or
+    // unrecognized keyword yields `None`, which keeps the full sequence.
+    let starter = crate::parser::grammar_scope::package_body_starter(input.fragment())
+        .map(|starter| starter.production)
+        .filter(|production| !production.is_prefix());
+    if let Ok(r) = try_package_body_annotations(input, start, starter) {
         return Ok(r);
     }
-    if let Ok(r) = try_package_body_packages(input, start) {
+    if let Ok(r) = try_package_body_packages(input, start, starter) {
         return Ok(r);
     }
-    if let Ok(r) = try_package_body_structure(input, start) {
+    if let Ok(r) = try_package_body_structure(input, start, starter) {
         return Ok(r);
     }
-    if let Ok(r) = try_package_body_behavior(input, start) {
+    if let Ok(r) = try_package_body_behavior(input, start, starter) {
         return Ok(r);
     }
-    if let Ok(r) = try_package_body_requirement(input, start) {
+    if let Ok(r) = try_package_body_requirement(input, start, starter) {
         return Ok(r);
     }
-    if let Ok(r) = try_package_body_view(input, start) {
+    if let Ok(r) = try_package_body_view(input, start, starter) {
         return Ok(r);
     }
     // `#keyword` metadata tag -- package bodies previously had no `#`/`@` annotation support at

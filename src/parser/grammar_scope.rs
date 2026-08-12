@@ -88,6 +88,23 @@ pub(crate) enum PackageProduction {
 }
 
 impl PackageProduction {
+    /// Whether this production only marks what *may* follow, leaving the element's real keyword
+    /// still ahead: a `#` metadata tag, a visibility or feature/usage prefix, the
+    /// `abstract`/`variation` markers that precede any definition, or `individual`, which
+    /// qualifies the occurrence definition or usage that follows it (`individual part def P`).
+    /// A starter of this kind cannot select a production.
+    pub(crate) const fn is_prefix(self) -> bool {
+        matches!(
+            self,
+            Self::PrefixMetadataMember
+                | Self::Individual
+                | Self::MemberPrefix
+                | Self::UsagePrefix
+                | Self::FeaturePrefix
+                | Self::DefinitionElement
+        )
+    }
+
     pub(crate) const fn bnf_name(self) -> &'static str {
         match self {
             Self::PrefixMetadataMember => "PrefixMetadataMember",
