@@ -144,6 +144,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_expression(&mut self, expression: &Node<Expression>) -> io::Result<()> {
+        self.writer.write_str("(expression ")?;
+        write_span(self.writer, &expression.span)?;
+        self.writer.write_char(' ')?;
         match &expression.value {
             Expression::LiteralInteger(value) => write!(self.writer, "(integer {value})"),
             Expression::LiteralReal(value) => {
@@ -328,7 +331,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 self.write_reference(*target)?;
                 self.writer.write_str("))")
             }
-        }
+        }?;
+        self.writer.write_char(')')
     }
 
     fn write_arguments(&mut self, args: &[Argument]) -> io::Result<()> {

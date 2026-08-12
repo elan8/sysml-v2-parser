@@ -1,7 +1,8 @@
-//! Roundtrip validation: parse → opacity gate → emit → parse → AST-eq.
+//! Roundtrip validation: parse → opacity gate → emit → parse → stable emit.
 //!
 //! Debug AST snapshots only catch "output changed". This suite checks that
-//! structured AST can be reconstructed as SysML and reparsed equivalently.
+//! structured AST can be reconstructed as SysML, reparsed, and formatted idempotently. Qualified
+//! reference IDs are document-local, so comparing detached roots from separate parses is invalid.
 //!
 //! Requires `SYSML_V2_RELEASE_DIR` or `./sysml-v2-release`. Run with:
 //! `cargo test --test roundtrip_validation -- --include-ignored`
@@ -251,20 +252,18 @@ fn try_roundtrip(src: &str) -> RoundtripOutcome {
         }
     };
 
-    let na = ast1.normalize_for_test_comparison();
-    let nb = ast2.normalize_for_test_comparison();
-    if na != nb {
-        // Debug includes spans that PartialEq ignores; strip them so the snippet
-        // points at a real semantic mismatch rather than offset noise.
-        let pa = strip_span_noise(&format!("{na:?}"));
-        let pb = strip_span_noise(&format!("{nb:?}"));
-        let (pos, orig_snip, reparse_snip) = diff_debug_both(&pa, &pb);
-        let orig_ch = pa.chars().nth(pos).unwrap_or('∅');
-        let rep_ch = pb.chars().nth(pos).unwrap_or('∅');
+    let reemitted = match emit_sysml(&ast2) {
+        Ok(source) => source,
+        Err(error) => return RoundtripOutcome::Failed(format!("re-emit failed: {error}")),
+    };
+    if emitted != reemitted {
+        let (pos, orig_snip, reparse_snip) = diff_debug_both(&emitted, &reemitted);
+        let orig_ch = emitted.chars().nth(pos).unwrap_or('∅');
+        let rep_ch = reemitted.chars().nth(pos).unwrap_or('∅');
         return RoundtripOutcome::Failed(format!(
-            "AST-eq failed at char {pos} (orig={orig_ch:?} reparse={rep_ch:?}, lens {} vs {});\n  original: ...{orig_snip}...\n  reparse:  ...{reparse_snip}...\n  emitted head:\n{}",
-            pa.len(),
-            pb.len(),
+            "format was not idempotent at char {pos} (first={orig_ch:?} second={rep_ch:?}, lens {} vs {});\n  first: ...{orig_snip}...\n  second: ...{reparse_snip}...\n  emitted head:\n{}",
+            emitted.len(),
+            reemitted.len(),
             emitted.chars().take(600).collect::<String>()
         ));
     }
@@ -280,34 +279,6 @@ fn diff_debug_both(original: &str, reparsed: &str) -> (usize, String, String) {
         .unwrap_or(original.len().min(reparsed.len()));
     let snip = |s: &str| -> String { s.chars().skip(pos.saturating_sub(80)).take(200).collect() };
     (pos, snip(original), snip(reparsed))
-}
-
-/// Remove `Span { ... }` blobs from Debug output used only for mismatch location.
-fn strip_span_noise(s: &str) -> String {
-    let mut s = s.to_string();
-    while let Some(start) = s.find("Span {") {
-        let rest = &s[start + 6..];
-        let mut depth = 1usize;
-        let mut end = None;
-        for (i, ch) in rest.char_indices() {
-            match ch {
-                '{' => depth += 1,
-                '}' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        end = Some(start + 6 + i + 1);
-                        break;
-                    }
-                }
-                _ => {}
-            }
-        }
-        match end {
-            Some(e) => s.replace_range(start..e, "Span(_)"),
-            None => break,
-        }
-    }
-    s
 }
 
 #[test]
