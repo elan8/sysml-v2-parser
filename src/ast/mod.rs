@@ -64,7 +64,9 @@ fn normalize_root_element_node(el: &Node<RootElement>) -> Node<RootElement> {
         RootElement::Namespace(n) => {
             RootElement::Namespace(dummy_node(n, normalize_namespace_decl(&n.value)))
         }
-        RootElement::Import(n) => RootElement::Import(dummy_node(n, normalize_import(&n.value))),
+        RootElement::Import(n) => {
+            RootElement::Import(Box::new(dummy_node(n, normalize_import(&n.value))))
+        }
         RootElement::Member(n) => {
             RootElement::Member(Box::new(normalize_package_body_element_node(n)))
         }
@@ -555,7 +557,7 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
 fn normalize_enumeration_usage(u: &EnumerationUsage) -> EnumerationUsage {
     EnumerationUsage {
         name: u.name.clone(),
-        type_name: u.type_name.clone(),
+        type_name: u.type_name,
         multiplicity: u.multiplicity.clone(),
         body: u.body.clone(),
         is_end: u.is_end,
@@ -703,7 +705,7 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
         Expression::LiteralBoolean(b) => Expression::LiteralBoolean(*b),
         Expression::Unit(s) => Expression::Unit(s.clone()),
         Expression::Opaque(s) => Expression::Opaque(s.clone()),
-        Expression::FeatureRef(s) => Expression::FeatureRef(s.clone()),
+        Expression::FeatureRef(s) => Expression::FeatureRef(*s),
         Expression::MemberAccess {
             base,
             member,
@@ -741,11 +743,11 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
             Expression::Tuple(items.iter().map(normalize_expression_node).collect())
         }
         Expression::Classification { metaclass } => Expression::Classification {
-            metaclass: metaclass.clone(),
+            metaclass: *metaclass,
         },
         Expression::MetaCast { base, metaclass } => Expression::MetaCast {
             base: Box::new(normalize_expression_node(base)),
-            metaclass: metaclass.clone(),
+            metaclass: *metaclass,
         },
         Expression::TypeCheck {
             kind,
@@ -756,22 +758,22 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
             operand: operand
                 .as_ref()
                 .map(|node| Box::new(normalize_expression_node(node))),
-            type_name: type_name.clone(),
+            type_name: *type_name,
         },
         Expression::Select { base, selector } => Expression::Select {
             base: Box::new(normalize_expression_node(base)),
-            selector: selector.clone(),
+            selector: *selector,
         },
         Expression::Collect { base, selector } => Expression::Collect {
             base: Box::new(normalize_expression_node(base)),
-            selector: selector.clone(),
+            selector: *selector,
         },
         Expression::Null => Expression::Null,
         Expression::Parenthesized(inner) => {
             Expression::Parenthesized(Box::new(normalize_expression_node(inner)))
         }
         Expression::Constructor { type_name, args } => Expression::Constructor {
-            type_name: type_name.clone(),
+            type_name: *type_name,
             args: args.iter().map(normalize_argument).collect(),
         },
         Expression::FeatureChainRef(reference) => Expression::FeatureChainRef(*reference),
@@ -795,9 +797,7 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
             then_expr: Box::new(normalize_expression_node(then_expr)),
             else_expr: Box::new(normalize_expression_node(else_expr)),
         },
-        Expression::Extent { target } => Expression::Extent {
-            target: target.clone(),
-        },
+        Expression::Extent { target } => Expression::Extent { target: *target },
         Expression::MetadataAccess(inner) => {
             Expression::MetadataAccess(Box::new(normalize_expression_node(inner)))
         }
@@ -1397,7 +1397,7 @@ fn normalize_action_def_body_element_node(
 fn normalize_payload_clause(p: &PayloadClause) -> PayloadClause {
     PayloadClause {
         name: p.name.clone(),
-        type_name: p.type_name.clone(),
+        type_name: p.type_name,
         name_span: Span::dummy(),
         type_span: p.type_span.as_ref().map(|_| Span::dummy()),
     }
@@ -1421,7 +1421,7 @@ fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
         is_reference: a.is_reference,
         is_individual: a.is_individual,
         name: a.name.clone(),
-        type_name: a.type_name.clone(),
+        type_name: a.type_name,
         typing: a.typing.clone(),
         multiplicity: a.multiplicity.clone(),
         subsets: a.subsets.clone(),
@@ -1445,7 +1445,7 @@ fn normalize_state_usage(s: &StateUsage) -> StateUsage {
         is_reference: s.is_reference,
         is_individual: s.is_individual,
         name: s.name.clone(),
-        type_name: s.type_name.clone(),
+        type_name: s.type_name,
         typing: s.typing.clone(),
         multiplicity: s.multiplicity.clone(),
         subsets: s.subsets.clone(),

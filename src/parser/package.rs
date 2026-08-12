@@ -190,7 +190,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(import_, RootElement::Import).parse(input)
+        map(import_, |import| RootElement::Import(Box::new(import))).parse(input)
     }) {
         return Ok((next, node_from_to(start, next, elem)));
     }
@@ -213,7 +213,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
     let elem = match &boxed.value {
         PackageBodyElement::Package(n) => RootElement::Package(n.clone()),
         PackageBodyElement::LibraryPackage(n) => RootElement::LibraryPackage(n.clone()),
-        PackageBodyElement::Import(n) => RootElement::Import(n.clone()),
+        PackageBodyElement::Import(n) => RootElement::Import(Box::new(n.clone())),
         _ => RootElement::Member(boxed),
     };
     Ok((input, node_from_to(start, input, elem)))

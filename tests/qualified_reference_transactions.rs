@@ -3,10 +3,10 @@ use sysml_v2_parser::ast::{
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
-fn resolved<'a>(
-    document: &'a sysml_v2_parser::ast::ParsedDocument,
+fn resolved(
+    document: &sysml_v2_parser::ast::ParsedDocument,
     id: sysml_v2_parser::ast::QualifiedReferenceId,
-) -> &'a str {
+) -> &str {
     document
         .qualified_reference(id)
         .expect("reachable qualified-reference ID")

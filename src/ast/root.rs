@@ -19,7 +19,7 @@ pub enum RootElement {
     Package(Node<Package>),
     LibraryPackage(Node<LibraryPackage>),
     Namespace(Node<NamespaceDecl>),
-    Import(Node<Import>),
+    Import(Box<Node<Import>>),
     /// Definition or usage (or other package-body member) at root, per SysML `RootNamespace`.
     Member(Box<Node<PackageBodyElement>>),
 }

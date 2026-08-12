@@ -509,11 +509,12 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
             |(span, accept)| ThenTarget::Accept(Node::new(span, accept)),
         ),
         // `perform action …` before bare `perform …`; both before `action_usage`.
-        map(
-            crate::parser::part::perform_action_decl,
-            ThenTarget::Perform,
-        ),
-        map(crate::parser::part::perform_usage, ThenTarget::Perform),
+        map(crate::parser::part::perform_action_decl, |perform| {
+            ThenTarget::Perform(Box::new(perform))
+        }),
+        map(crate::parser::part::perform_usage, |perform| {
+            ThenTarget::Perform(Box::new(perform))
+        }),
         // `action_usage` already accepts visibility / abstract / ref / variation prefixes.
         map(action_usage, |a| ThenTarget::Action(Box::new(a))),
         map(

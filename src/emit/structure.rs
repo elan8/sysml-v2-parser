@@ -64,8 +64,8 @@ pub(crate) fn emit_part_usage(
         w.push_str(&format_name(&usage.name));
     }
     let target_only = usage.name.is_empty() && usage.redefines.is_some();
-    if target_only {
-        emit_subsetting_clause(w, &usage.redefines.as_ref().expect("checked above").value)?;
+    if let (true, Some(redefines)) = (target_only, usage.redefines.as_ref()) {
+        emit_subsetting_clause(w, &redefines.value)?;
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -573,8 +573,8 @@ pub(crate) fn emit_port_usage(
         w.push_str(&format_name(&usage.name));
     }
     let target_only = usage.name.is_empty() && usage.redefines.is_some();
-    if target_only {
-        emit_subsetting_clause(w, &usage.redefines.as_ref().expect("checked above").value)?;
+    if let (true, Some(redefines)) = (target_only, usage.redefines.as_ref()) {
+        emit_subsetting_clause(w, &redefines.value)?;
     }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;

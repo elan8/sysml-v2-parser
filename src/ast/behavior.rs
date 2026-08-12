@@ -133,7 +133,7 @@ pub enum ThenTarget {
     /// `then action <name> accept ...;` — an inline action usage declaration.
     Action(Box<Node<ActionUsage>>),
     /// `then perform body;` — succession to a perform usage (Systems Library `Actions.sysml`).
-    Perform(Node<crate::ast::Perform>),
+    Perform(Box<Node<crate::ast::Perform>>),
     /// `then merge continue;` — an inline merge node.
     Merge(Node<MergeStmt>),
     /// `then fork F { in a; out b1; out b2; }` — an inline fork node (GH-86, Simple Tests/
