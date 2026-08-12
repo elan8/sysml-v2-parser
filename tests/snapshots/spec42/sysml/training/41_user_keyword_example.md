@@ -1,0 +1,94 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "SysML Training 41 (Language Extension): User Keyword Example"))
+~~~
+# SOURCE
+~~~sysml
+package 'User Keyword Example' {
+	private import ScalarValues::Real;
+	private import 'Semantic Metadata Example'::*;
+	private import RiskMetadata::LevelEnum;
+	
+	part def Device {
+		part battery {
+			attribute power : Real;
+		}
+	}
+	
+	#scenario def DeviceFailure {
+		ref device : Device;
+		attribute minPower : Real;
+		
+		#cause 'battery old' {
+			:>> probability = 0.01;			
+		}
+		
+		#causation connect 'battery old' to 'power low';
+		
+		#situation 'power low' {
+			constraint { device.battery.power < minPower }			
+		}
+		
+		#causation connect 'power low' to 'device shutoff';
+		
+		#failure 'device shutoff' {
+			:>> severity = LevelEnum::high;
+		}
+	}
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "41_user_keyword_example.md"
+    (diagnostics
+      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 243) (line 12) (column 12) (len 407)) (message "unexpected keyword `def` in package body"))
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package 'User Keyword Example' {
+    private import ScalarValues::Real;
+    private import 'Semantic Metadata Example'::*;
+    private import RiskMetadata::LevelEnum;
+    part def Device {
+        part battery {
+            attribute power : Real;
+        }
+    }
+    #scenario;
+    def DeviceFailure {
+		ref device : Device;
+		attribute minPower : Real;
+		
+		#cause 'battery old' {
+			:>> probability = 0.01;			
+		}
+		
+		#causation connect 'battery old' to 'power low';
+		
+		#situation 'power low' {
+			constraint { device.battery.power < minPower }			
+		}
+		
+		#causation connect 'power low' to 'device shutoff';
+		
+		#failure 'device shutoff' {
+			:>> severity = LevelEnum::high;
+		}
+	}
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 49) (line 2) (column 17) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 49) (line 2) (column 17) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 63) (line 2) (column 31) (len 4)))))
+    (reference r1 (scope relative) (span (offset 85) (line 3) (column 17) (len 27)) (segments (segment 0 (token "'Semantic Metadata Example'") (name "Semantic Metadata Example") (separator none) (span (offset 85) (line 3) (column 17) (len 27)))))
+    (reference r2 (scope relative) (span (offset 133) (line 4) (column 17) (len 23)) (segments (segment 0 (token "RiskMetadata") (name "RiskMetadata") (separator none) (span (offset 133) (line 4) (column 17) (len 12))) (segment 1 (token "LevelEnum") (name "LevelEnum") (separator colon-colon) (span (offset 147) (line 4) (column 31) (len 9)))))
+  )
+  (root (package (name "User Keyword Example") (body (import (target (span (span (offset 49) (line 2) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 85) (line 3) (column 17) (len 30))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 112) (line 3) (column 44) (len 3))) (separator (span (offset 112) (line 3) (column 44) (len 2))) (marker (span (offset 114) (line 3) (column 46) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 133) (line 4) (column 17) (len 23))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (part-def (name "Device") (body (part-usage))) (metadata-keyword-usage) (malformed (code "unexpected_keyword_in_scope") (found "def DeviceFailure {") (span (offset 243) (line 12) (column 12) (len 407))))))
+)
+~~~

@@ -1,0 +1,41 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "Fuzzer crash: send node with comment-only payload causing semicolon absorption"))
+~~~
+# SOURCE
+~~~sysml
+package P {
+action def A {
+    for
+in send// nd port for HTT3prin  pq  for y  // nd port for HTT3prin items { }
+  send pq   }
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "fuzz_crash_send_comment_payload.md"
+    (diagnostics
+      (diagnostic (code "recovered_action_body_element") (severity error) (category parseerror) (span (offset 31) (line 3) (column 5) (len 83)) (message "unexpected token in action body"))
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package P {
+    action def A {
+        for
+in send// nd port for HTT3prin  pq  for y  // nd port for HTT3prin items { }
+        send pq;
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+  )
+  (root (package (name "P") (body (action-def))))
+)
+~~~

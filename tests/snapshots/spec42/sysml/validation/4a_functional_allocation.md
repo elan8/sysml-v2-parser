@@ -1,0 +1,216 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "SysML Validation (04-Functional Allocation): 4a-Functional Allocation"))
+~~~
+# SOURCE
+~~~sysml
+package '4a-Functional Allocation' {
+	private import '2a-Parts Interconnection'::*;
+	private import '3a-Function-based Behavior-1'::*;
+	private import '3a-Function-based Behavior-1'::'provide power'::*;
+		
+	part vehicle1_c1_functional_allocation :> vehicle1_c1 {
+		// Note: The definitions of the port types in '2a-Parts Interconnection' do not include 
+		// flow properties.
+		port :>> fuelCmdPort {
+			in fuelCmd: FuelCmd;
+		}
+
+		perform 'provide power' {
+		doc
+		/*
+		 * This allocates the action '3a-Function-based Behavior-1'::'provide power' as an enacted 
+		 * performance of 'vehicle_c1_functional_allocation'.
+		 */
+		
+			// This assigns the fuelCmdPort to provide the input to 'provide power'.
+			in fuelCmd = fuelCmdPort.fuelCmd;
+		}
+		
+		//*
+		// The above is semantically equivalent to:
+		
+		ref action 'provide power' (in fuelCmd = fuelCmdPort::fuelCmd) 
+		   :> '3a-Function-based Behavior'::'provide power', performedActions;		
+			
+		// For a composite enacted performance within the vehicle, replace the above with:
+		
+		action 'provide power' (in fuelCmd = fuelCmdPort::fuelCmd) 
+		   :> '3a-Function-based Behavior'::'provide power';
+		*/
+		
+		part :>> engine {
+			port :>> fuelCmdPort {
+				in fuelCmd: FuelCmd;
+			}
+			
+			perform 'provide power'.'generate torque' {
+				/*
+				 *  This allocates one of the sub-steps of 'provide power' to a sub-part of vehicle_c1. 
+				 */
+
+				in fuelCmd = fuelCmdPort.fuelCmd;
+				out engineTorque = drivePwrPort.engineTorque;
+			}
+			
+			port :>> drivePwrPort {
+				out engineTorque: Torque;
+			}
+		}
+		
+		part :>> transmission {
+			port :>> clutchPort {
+				in attribute engineTorque: Torque;
+			}
+			
+			perform 'provide power'.'amplify torque' {
+				in engineTorque = clutchPort.engineTorque; 
+				out transmissionTorque = shaftPort_a.transmissionTorque;
+			}
+
+			port :>> shaftPort_a {
+				out transmissionTorque: Torque;
+			}
+		}
+		
+		part :>> driveshaft {
+			port :>> shaftPort_b {
+				in transmissionTorque: Torque;
+			}
+
+			perform 'provide power'.'transfer torque' {
+				in transmissionTorque = shaftPort_b.transmissionTorque; 
+				out driveshaftTorque = shaftPort_c.driveshaftTorque;
+			}
+
+			port :>> shaftPort_c {
+				out driveshaftTorque: Torque;
+			}			
+		}
+		
+		part :>> rearAxleAssembly {
+			port :>> shaftPort_d {
+				in driveshaftTorque: Torque;
+			}
+				
+			perform 'provide power'.'distribute torque' {
+				in driveshaftTorque = shaftPort_d.driveshaftTorque; 
+				out wheelTorque1 = rearAxle.leftHalfAxle.axleToWheelPort.wheelTorque; 
+				out wheelTorque2 = rearAxle.rightHalfAxle.axleToWheelPort.wheelTorque;
+			}
+			
+			part :>> rearAxle {
+				part :>> leftHalfAxle {
+					port :>> axleToWheelPort {
+						out wheelTorque: Torque;
+					}
+				}
+				part :>> rightHalfAxle {
+					port :>> axleToWheelPort {
+						out wheelTorque: Torque;
+					}
+				}
+			}
+		}
+	}
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "4a_functional_allocation.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package '4a-Functional Allocation' {
+    private import '2a-Parts Interconnection'::*;
+    private import '3a-Function-based Behavior-1'::*;
+    private import '3a-Function-based Behavior-1'::'provide power'::*;
+    part vehicle1_c1_functional_allocation :> vehicle1_c1 {
+        port  :>> fuelCmdPort {
+            in fuelCmd : FuelCmd;
+        }
+        perform 'provide power' {
+            doc
+            /*
+		 * This allocates the action '3a-Function-based Behavior-1'::'provide power' as an enacted 
+		 * performance of 'vehicle_c1_functional_allocation'.
+		 */
+            in fuelCmd = fuelCmdPort.fuelCmd;
+        }
+        part  :>> engine {
+            port  :>> fuelCmdPort {
+                in fuelCmd : FuelCmd;
+            }
+            perform 'provide power'.'generate torque' {
+                in fuelCmd = fuelCmdPort.fuelCmd;
+                out engineTorque = drivePwrPort.engineTorque;
+            }
+            port  :>> drivePwrPort {
+                out engineTorque : Torque;
+            }
+        }
+        part  :>> transmission {
+            port  :>> clutchPort {
+                in engineTorque : Torque;
+            }
+            perform 'provide power'.'amplify torque' {
+                in engineTorque = clutchPort.engineTorque;
+                out transmissionTorque = shaftPort_a.transmissionTorque;
+            }
+            port  :>> shaftPort_a {
+                out transmissionTorque : Torque;
+            }
+        }
+        part  :>> driveshaft {
+            port  :>> shaftPort_b {
+                in transmissionTorque : Torque;
+            }
+            perform 'provide power'.'transfer torque' {
+                in transmissionTorque = shaftPort_b.transmissionTorque;
+                out driveshaftTorque = shaftPort_c.driveshaftTorque;
+            }
+            port  :>> shaftPort_c {
+                out driveshaftTorque : Torque;
+            }
+        }
+        part  :>> rearAxleAssembly {
+            port  :>> shaftPort_d {
+                in driveshaftTorque : Torque;
+            }
+            perform 'provide power'.'distribute torque' {
+                in driveshaftTorque = shaftPort_d.driveshaftTorque;
+                out wheelTorque1 = rearAxle.leftHalfAxle.axleToWheelPort.wheelTorque;
+                out wheelTorque2 = rearAxle.rightHalfAxle.axleToWheelPort.wheelTorque;
+            }
+            part  :>> rearAxle {
+                part  :>> leftHalfAxle {
+                    port  :>> axleToWheelPort {
+                        out wheelTorque : Torque;
+                    }
+                }
+                part  :>> rightHalfAxle {
+                    port  :>> axleToWheelPort {
+                        out wheelTorque : Torque;
+                    }
+                }
+            }
+        }
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 53) (line 2) (column 17) (len 26)) (segments (segment 0 (token "'2a-Parts Interconnection'") (name "2a-Parts Interconnection") (separator none) (span (offset 53) (line 2) (column 17) (len 26)))))
+    (reference r1 (scope relative) (span (offset 100) (line 3) (column 17) (len 30)) (segments (segment 0 (token "'3a-Function-based Behavior-1'") (name "3a-Function-based Behavior-1") (separator none) (span (offset 100) (line 3) (column 17) (len 30)))))
+    (reference r2 (scope relative) (span (offset 151) (line 4) (column 17) (len 47)) (segments (segment 0 (token "'3a-Function-based Behavior-1'") (name "3a-Function-based Behavior-1") (separator none) (span (offset 151) (line 4) (column 17) (len 30))) (segment 1 (token "'provide power'") (name "provide power") (separator colon-colon) (span (offset 183) (line 4) (column 49) (len 15)))))
+  )
+  (root (package (name "4a-Functional Allocation") (body (import (target (span (span (offset 53) (line 2) (column 17) (len 29))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 79) (line 2) (column 43) (len 3))) (separator (span (offset 79) (line 2) (column 43) (len 2))) (marker (span (offset 81) (line 2) (column 45) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 100) (line 3) (column 17) (len 33))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 130) (line 3) (column 47) (len 3))) (separator (span (offset 130) (line 3) (column 47) (len 2))) (marker (span (offset 132) (line 3) (column 49) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 151) (line 4) (column 17) (len 50))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 198) (line 4) (column 64) (len 3))) (separator (span (offset 198) (line 4) (column 64) (len 2))) (marker (span (offset 200) (line 4) (column 66) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-usage))))
+)
+~~~

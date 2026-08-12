@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-const SNAPSHOT_ROOT: &str = "tests/snapshots/qualified_references";
+const SNAPSHOT_ROOT: &str = "tests/snapshots";
 const SOURCE_START: &str = "# SOURCE\n~~~sysml\n";
 const SOURCE_END: &str = "\n~~~\n# DIAGNOSTICS";
 
@@ -13,10 +13,8 @@ pub struct SnapshotSource {
 
 pub fn snapshot_sources() -> io::Result<Vec<SnapshotSource>> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(SNAPSHOT_ROOT);
-    let mut paths: Vec<PathBuf> = fs::read_dir(&root)?
-        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-        .filter(|path| path.extension().is_some_and(|extension| extension == "md"))
-        .collect();
+    let mut paths = Vec::new();
+    collect_snapshots(&root, &mut paths)?;
     paths.sort();
 
     let sources: Vec<_> = paths
@@ -32,8 +30,10 @@ pub fn snapshot_sources() -> io::Result<Vec<SnapshotSource>> {
                 .map(|offset| source_start + offset)
                 .ok_or_else(|| invalid_snapshot(&path, "missing canonical DIAGNOSTICS boundary"))?;
             let name = path
-                .file_stem()
-                .and_then(|name| name.to_str())
+                .strip_prefix(&root)
+                .unwrap_or(&path)
+                .with_extension("")
+                .to_str()
                 .ok_or_else(|| invalid_snapshot(&path, "snapshot filename is not UTF-8"))?
                 .to_owned();
             Ok(SnapshotSource {
@@ -50,6 +50,19 @@ pub fn snapshot_sources() -> io::Result<Vec<SnapshotSource>> {
         ));
     }
     Ok(sources)
+}
+
+/// Collect every fixture under `directory`, including nested corpus subdirectories.
+fn collect_snapshots(directory: &Path, paths: &mut Vec<PathBuf>) -> io::Result<()> {
+    for entry in fs::read_dir(directory)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            collect_snapshots(&path, paths)?;
+        } else if path.extension().is_some_and(|extension| extension == "md") {
+            paths.push(path);
+        }
+    }
+    Ok(())
 }
 
 fn invalid_snapshot(path: &Path, message: &str) -> io::Error {

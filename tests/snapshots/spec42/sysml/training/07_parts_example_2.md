@@ -1,0 +1,76 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "SysML Training 07 (Parts): Parts Example-2"))
+~~~
+# SOURCE
+~~~sysml
+package 'Parts Example-2' {
+	
+	// Definitions
+	
+	part def Vehicle;	
+	part def Engine;	
+	part def Cylinder;
+	
+	// Usages
+	
+	part vehicle : Vehicle {
+		part eng : Engine {
+			part cyl : Cylinder[4..6];
+		}
+	}
+	
+	part smallVehicle :> vehicle {
+		part redefines eng {
+			part redefines cyl[4];
+		}
+	}
+	
+	part bigVehicle :> vehicle {
+		part redefines eng {
+			part redefines cyl[6];
+		}
+	}
+	
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "07_parts_example_2.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sysml
+package 'Parts Example-2' {
+    part def Vehicle;
+    part def Engine;
+    part def Cylinder;
+    part vehicle : Vehicle {
+        part eng : Engine {
+            part cyl : Cylinder[4..6];
+        }
+    }
+    part smallVehicle :> vehicle {
+        part  :>> eng {
+            part  :>> cyl[4];
+        }
+    }
+    part bigVehicle :> vehicle {
+        part  :>> eng {
+            part  :>> cyl[6];
+        }
+    }
+}
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+  )
+  (root (package (name "Parts Example-2") (body (part-def (name "Vehicle") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Cylinder") (body semicolon)) (part-usage) (part-usage) (part-usage))))
+)
+~~~

@@ -64,8 +64,10 @@ cargo test --test vacuuming_types_parse -- --include-ignored
 
 When changing AST fields or body-element shapes, refresh checked-in snapshots in the same PR — see [`tests/validation/README.md`](tests/validation/README.md).
 
-The driver in `tools/snapshot_tool` manages qualified-reference snapshots under
-`tests/snapshots/qualified_references`. They use five canonical Markdown sections: human-authored
+The driver in `tools/snapshot_tool` manages every snapshot under `tests/snapshots`:
+hand-authored qualified-reference fixtures in `qualified_references`, and the imported spec42
+corpus in `spec42`, whose fixtures cover the SysML and KerML libraries, spec examples, training
+models, and recorded fuzz findings. They use five canonical Markdown sections: human-authored
 `META` and `SOURCE`, followed by runner-owned `DIAGNOSTICS`, `FORMAT`, and semantic S-expression
 `AST`. `META` has the required shape
 `(snapshot (type <type>) (description "..."))`; `<type>` is one of `semantic`, `provenance`,
@@ -111,7 +113,8 @@ cargo bench --bench parser_bench -- --baseline before
 cargo bench --bench parser_bench -- --profile-time 10
 ```
 
-It reports each fixture separately and the complete corpus as one workload. Keep benchmark changes
+It reports each fixture separately and the complete corpus as one workload, over every fixture
+under `tests/snapshots`. Keep benchmark changes
 and their source snapshots reviewable together, and report unfavorable movements alongside wins.
 
 For low-noise sampling, use the standalone release binary. It loads the identical snapshot corpus,

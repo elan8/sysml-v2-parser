@@ -10,7 +10,7 @@ use sysml_v2_parser::{
     DiagnosticSeverity, ParseError,
 };
 
-pub(crate) const DEFAULT_SNAPSHOT_ROOT: &str = "tests/snapshots/qualified_references";
+pub(crate) const DEFAULT_SNAPSHOT_ROOT: &str = "tests/snapshots";
 
 struct Snapshot {
     meta: String,
