@@ -115,6 +115,9 @@ pub(crate) fn emit_calc_def(
     emit_visibility(w, def.membership.visibility);
     w.push_str("calc def ");
     emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        super::structure::emit_typing_clause(w, &spec.value)?;
+    }
     emit_calc_body(w, path, &def.body)
 }
 

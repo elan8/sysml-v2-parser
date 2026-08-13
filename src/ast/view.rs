@@ -75,6 +75,9 @@ pub enum ConstraintBody {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcDef {
     pub identification: Identification,
+    /// Supertype(s) after `:>`, e.g. `Some(..)` for `calc def X :> Y { }`. Mirrors
+    /// `PartDef::specializes`/`ActionDef::specializes`.
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: CalcDefBody,
     pub membership: Membership,
 }

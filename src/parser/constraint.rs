@@ -308,6 +308,7 @@ fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             input,
             CalcDef {
                 identification: prefix.identification,
+                specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },

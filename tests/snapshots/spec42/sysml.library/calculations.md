@@ -63,7 +63,7 @@ standard library package Calculations {
     private import Performances::evaluations;
     private import Actions::Action;
     private import Actions::actions;
-    calc def Calculation {
+    calc def Calculation :> Action, Evaluation {
         doc
         /*
 		 * Calculation is the most general class of evaluations of CalculationDefinitions in a
@@ -78,7 +78,7 @@ standard library package Calculations {
 			 */
         }
     }
-    calc def calculations {
+    calc def calculations :> actions, evaluations {
         doc
         /*
 		 * calculations is the base Feature for all CalculationUsages.
