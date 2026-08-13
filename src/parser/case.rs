@@ -110,6 +110,8 @@ pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<A
             AnalysisCaseUsage {
                 name: usage.name,
                 type_name: usage.type_name,
+                subsets: usage.subsets,
+                redefines: usage.redefines,
                 is_abstract: usage.is_abstract,
                 is_individual: individual_kw.is_some(),
                 body: usage.body,
@@ -193,6 +195,8 @@ fn case_like_usage_body(
         CaseUsage {
             name,
             type_name: header.type_reference,
+            subsets: header.subsets,
+            redefines: header.redefines,
             is_abstract,
             body,
             membership,

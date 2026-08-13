@@ -588,6 +588,12 @@ pub(crate) fn emit_analysis_case_usage(
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
+    if let Some(subsets) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
     emit_use_case_body(w, path, &usage.body)
 }
 
@@ -657,6 +663,12 @@ pub(crate) fn emit_case_usage(
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
     }
     emit_use_case_body(w, path, &usage.body)
 }

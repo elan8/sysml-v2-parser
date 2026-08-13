@@ -336,6 +336,8 @@ pub struct CaseDef {
 pub struct CaseUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract case ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -366,6 +368,8 @@ pub struct AnalysisCaseDef {
 pub struct AnalysisCaseUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract analysis ...`.
     pub is_abstract: bool,
     /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual
