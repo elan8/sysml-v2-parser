@@ -283,6 +283,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::Ref(_)
         | PackageBodyElement::EnumerationUsage(_)
         | PackageBodyElement::MetadataKeywordUsage(_)
+        | PackageBodyElement::MetadataAnnotation(_)
         | PackageBodyElement::Connect(_)
         | PackageBodyElement::DefaultReferenceUsage(_)
         | PackageBodyElement::AssertConstraint(_)
@@ -1802,6 +1803,18 @@ pub(crate) fn package_body_element(
         map(
             crate::parser::metadata_annotation::metadata_keyword_prefix,
             PackageBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
+    // `@ Name (: Type)? (about target(, target)*)? body` standalone annotation statement
+    // (KerML `Annotation`/`@`-syntax) -- previously only the `#`-keyword forms above were
+    // dispatched at package scope, e.g. `@ Classified about Annotated;`.
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_annotation,
+            PackageBodyElement::MetadataAnnotation,
         )
         .parse(input)
     }) {

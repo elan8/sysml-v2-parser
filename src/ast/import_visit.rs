@@ -186,6 +186,7 @@ impl ProvenanceValidator<'_> {
             | PackageBodyElement::Ref(_)
             | PackageBodyElement::EnumerationUsage(_)
             | PackageBodyElement::MetadataKeywordUsage(_)
+            | PackageBodyElement::MetadataAnnotation(_)
             | PackageBodyElement::Connect(_)
             | PackageBodyElement::DefaultReferenceUsage(_)
             | PackageBodyElement::AssertConstraint(_)

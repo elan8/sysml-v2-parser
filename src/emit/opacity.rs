@@ -194,6 +194,9 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::MetadataKeywordUsage(m) => {
             walk_attribute_body(report, path, &m.value.body)
         }
+        PackageBodyElement::MetadataAnnotation(m) => {
+            walk_attribute_body(report, path, &m.value.body)
+        }
         PackageBodyElement::AssertConstraint(a) => {
             walk_constraint_def_body(report, path, &a.value.body)
         }
@@ -680,6 +683,9 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
                 walk_attribute_body(report, &p, &n.value.body)
             }
             PortDefBodyElement::PortUsage(n) => walk_port_body(report, &p, &n.value.body),
+            PortDefBodyElement::MetadataKeywordUsage(n) => {
+                walk_attribute_body(report, &p, &n.value.body)
+            }
             PortDefBodyElement::InOutDecl(_) | PortDefBodyElement::Doc(_) => {}
         }
     }

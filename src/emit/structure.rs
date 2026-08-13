@@ -685,6 +685,9 @@ fn emit_port_def_body_element(
         PortDefBodyElement::EnumerationUsage(e) => {
             super::requirement::emit_enumeration_usage(w, path, &e.value)
         }
+        PortDefBodyElement::MetadataKeywordUsage(m) => {
+            emit_metadata_keyword_usage(w, path, &m.value)
+        }
     }
 }
 

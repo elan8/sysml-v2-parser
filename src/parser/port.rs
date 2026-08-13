@@ -217,6 +217,28 @@ const PORT_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `#keyword` metadata tag -- tried first so a stacked/prefixing `#idd port APIS_HTTP { ... }`
+    // (bare form, then `PrefixMetadataMember`-style form prefixing the next port-body member)
+    // dispatches here instead of falling through to the opaque-capture fallback below. Mirrors
+    // `package_body_element`'s identical two-arm `#`-handling.
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_usage,
+            PortDefBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_prefix,
+            PortDefBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
     let (input, elem) = alt((
         map(directed_item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),

@@ -692,6 +692,9 @@ fn collect_port_def_body_errors(body: &PortDefBody, errors: &mut Vec<ParseError>
                     PortDefBodyElement::PortUsage(n) => {
                         collect_port_body_errors(&n.value.body, errors)
                     }
+                    PortDefBodyElement::MetadataKeywordUsage(n) => {
+                        collect_attribute_body_errors(&n.value.body, errors)
+                    }
                     PortDefBodyElement::InOutDecl(_)
                     | PortDefBodyElement::Doc(_)
                     | PortDefBodyElement::Other(_) => {}
@@ -1572,6 +1575,9 @@ fn collect_package_body_element_errors(
         | PackageBodyElement::Connect(_)
         | PackageBodyElement::DefaultReferenceUsage(_) => {}
         PackageBodyElement::MetadataKeywordUsage(n) => {
+            collect_attribute_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::MetadataAnnotation(n) => {
             collect_attribute_body_errors(&n.value.body, errors)
         }
         PackageBodyElement::AttributeUsage(n) => {

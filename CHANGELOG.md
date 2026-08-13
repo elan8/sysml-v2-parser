@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 97.** Package bodies gain `@ Name (: Type)? about target(,
+  ...)?;` standalone metadata-annotation support, accept stacked `#Prefix #Prefix ... member`
+  metadata tags before a member instead of at most one, and port definition bodies dispatch
+  `#Prefix`-tagged nested port declarations through the same shared metadata-keyword parsing other
+  definition bodies already use.
 - **`PARSE_AST_VERSION` is now 96.** `ConstraintUsage` retains its `:>`/`:>>` subsetting and
   redefinition clauses (`ConstraintUsage::subsets`/`redefines`) instead of discarding them after
   parsing, matching sibling usage kinds such as `ConnectionUsageMember`.

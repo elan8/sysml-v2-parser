@@ -19,8 +19,9 @@ use super::requirement::{
 use super::structure::{
     AliasDef, AssertConstraintMember, AttributeDef, AttributeUsage, Connect, ConnectionDef,
     ConnectionUsageMember, DefaultReferenceUsage, EnumDef, ExhibitState, IndividualDef,
-    InterfaceDef, InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage, MetadataUsage,
-    OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage, RefDecl,
+    InterfaceDef, InterfaceUsage, ItemDef, MetadataAnnotation, MetadataDef, MetadataKeywordUsage,
+    MetadataUsage, OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage,
+    RefDecl,
 };
 use super::view::{
     CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
@@ -203,6 +204,11 @@ pub enum PackageBodyElement {
     /// Extensions.sysml`, FMEA library example) -- previously package bodies had no `#`/`@`
     /// annotation support at all, unlike part/item/action/etc. bodies.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// Standalone `@ Name (: Type)? about target(, target)*;` annotation statement at package
+    /// level (KerML `Annotation`/`@`-syntax, distinct from the `#keyword` form above -- e.g.
+    /// `@ Classified about Annotated;`). Previously package bodies had no `@`-annotation support
+    /// at all, unlike part/item/action/etc. bodies -- see `MetadataAnnotation`.
+    MetadataAnnotation(Node<MetadataAnnotation>),
     /// Standalone `connect a to b;` connector usage at package level (e.g. the FMEA library's
     /// `#violation connect 'Glucose Meter in Use' to req2;` in `14c-Language Extensions.sysml`).
     /// See `AttributeUsage` for the general PAR-002 rationale.

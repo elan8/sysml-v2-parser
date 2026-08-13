@@ -934,6 +934,11 @@ pub enum PortDefBodyElement {
     /// Enumeration usage nested inside a port definition body (PAR-002 widening).
     EnumerationUsage(Node<EnumerationUsage>),
     PortUsage(Node<PortUsage>),
+    /// `#keyword` metadata tag nested inside a port definition body, either the bare form or the
+    /// `PrefixMetadataMember`-style form prefixing the next port-body member (e.g. `#idd port
+    /// APIS_HTTP { ... }`) -- previously port definition bodies had no `#`/`@` annotation support
+    /// at all, unlike part/item/action/etc. bodies. See `PackageBodyElement::MetadataKeywordUsage`.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Other(String),
 }
 

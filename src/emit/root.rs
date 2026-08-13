@@ -213,6 +213,9 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
+        PackageBodyElement::MetadataAnnotation(m) => {
+            structure::emit_metadata_annotation(w, path, &m.value)
+        }
         PackageBodyElement::Ref(r) => structure::emit_ref_decl(w, path, &r.value),
         PackageBodyElement::DefaultReferenceUsage(d) => {
             structure::emit_default_reference_usage(w, path, &d.value)

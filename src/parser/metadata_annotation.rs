@@ -146,7 +146,11 @@ fn metadata_keyword_usage_inner(
 /// `metadata def <keyword> ...` short name (that semantic check, plus a package-local short-name
 /// index, is the larger deferred 1.5b item in PARSER_BACKLOG_ROADMAP.md §2.1) -- syntactically,
 /// any bare `#<name>` immediately followed by what looks like the start of another declaration
-/// (an identifier) is accepted.
+/// (an identifier) is accepted. Stacked prefixes (`#Approval #Classified part def X;`) are
+/// accepted the same way -- each `#tag` is a separate `MetadataKeywordUsage` prefix, so a
+/// following `#` (the start of the next stacked tag) must be accepted here too, or the whole
+/// second `#tag` onward is left for `metadata_keyword_usage`/`metadata_keyword_prefix` to retry
+/// on the following body-element dispatch pass.
 pub(crate) fn metadata_keyword_prefix(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
@@ -158,7 +162,7 @@ pub(crate) fn metadata_keyword_prefix(
     let peek = input.fragment();
     if !peek
         .first()
-        .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_')
+        .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_' || *b == b'#')
     {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,

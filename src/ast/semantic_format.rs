@@ -2052,6 +2052,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_port_usage(&usage.value)?;
                         }
+                        PortDefBodyElement::MetadataKeywordUsage(_usage) => {
+                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        }
                         PortDefBodyElement::Other(text) => {
                             self.write_opaque(&mut first, "other", text)?;
                         }
@@ -2308,6 +2311,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::MetadataKeywordUsage(_usage) => {
                 self.write_marker(first, "metadata-keyword-usage")
+            }
+            PackageBodyElement::MetadataAnnotation(_annotation) => {
+                self.write_marker(first, "metadata-annotation")
             }
             PackageBodyElement::Connect(connect) => {
                 self.write_item_prefix(first)?;

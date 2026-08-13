@@ -157,6 +157,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::MetadataKeywordUsage(n) => {
             PackageBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::MetadataAnnotation(n) => {
+            PackageBodyElement::MetadataAnnotation(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::EnumDef(n) => {
             PackageBodyElement::EnumDef(dummy_node(n, normalize_enum_def(&n.value)))
         }
@@ -1111,6 +1114,9 @@ fn normalize_port_def_body_element_node(el: &Node<PortDefBodyElement>) -> Node<P
         }
         PortDefBodyElement::Doc(n) => PortDefBodyElement::Doc(dummy_node(n, n.value.clone())),
         PortDefBodyElement::Error(n) => PortDefBodyElement::Error(dummy_node(n, n.value.clone())),
+        PortDefBodyElement::MetadataKeywordUsage(n) => {
+            PortDefBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
+        }
         PortDefBodyElement::AttributeDef(n) => {
             PortDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
         }
