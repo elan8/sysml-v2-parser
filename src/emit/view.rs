@@ -39,6 +39,12 @@ pub(crate) fn emit_constraint_usage(
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
+    if let Some(subsets) = &usage.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        super::structure::emit_subsetting_clause(w, &redefines.value)?;
+    }
     emit_constraint_body(w, path, &usage.body)
 }
 

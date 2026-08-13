@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 96.** `ConstraintUsage` retains its `:>`/`:>>` subsetting and
+  redefinition clauses (`ConstraintUsage::subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `ConnectionUsageMember`.
 - **Canonical document source ranges.** `SourceStorage::position_at`, `SourceStorage::range_of`,
   and `ParsedDocument::range` resolve byte-backed parser spans through one lazily built,
   document-owned newline index. Downstream diagnostics and navigation can retain a `Span` and ask

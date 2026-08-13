@@ -30,6 +30,12 @@ pub struct ConstraintDef {
 pub struct ConstraintUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Usage-level `:>` subsetting, e.g. `constraint c :> Base;`. Mirrors
+    /// `ConnectionUsageMember::subsets`.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Usage-level `:>>` redefinition, e.g. `constraint c :>> Base;`. Mirrors
+    /// `ConnectionUsageMember::redefines`.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: ConstraintDefBody,
     pub membership: Membership,
 }
