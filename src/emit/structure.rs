@@ -1310,9 +1310,14 @@ pub(crate) fn emit_typing_clause(
     w: &mut EmitWriter<'_>,
     typing: &TypingRelationship,
 ) -> Result<(), EmitError> {
-    match typing.kind {
-        TypingKind::Typing => w.push_str(" : "),
-        TypingKind::Subclassification => w.push_str(" :> "),
+    match typing.spelling {
+        crate::ast::TypingSpelling::Operator => match typing.kind {
+            TypingKind::Typing => w.push_str(" : "),
+            TypingKind::Subclassification => w.push_str(" :> "),
+        },
+        crate::ast::TypingSpelling::Specializes => w.push_str(" specializes "),
+        crate::ast::TypingSpelling::DefinedBy => w.push_str(" defined by "),
+        crate::ast::TypingSpelling::TypedBy => w.push_str(" typed by "),
     }
     if typing.is_conjugated {
         w.push_char('~');

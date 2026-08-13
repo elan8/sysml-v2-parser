@@ -314,7 +314,7 @@ pub(crate) fn attribute_feature_binding(
     let target_only = prefix.is_some();
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+        .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
     let (input, mods1) = feature_modifiers(input)?;
     let (input, value) =
@@ -650,7 +650,7 @@ pub(crate) fn attribute_def(
     let short_name = ident.short_name.clone();
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+        .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
     let (input, mods1) = feature_modifiers(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
@@ -670,6 +670,7 @@ pub(crate) fn attribute_def(
                         TypingKind::Subclassification,
                         false,
                         rel.value.target,
+                        crate::ast::TypingSpelling::Operator,
                     )),
                     value,
                 )
@@ -892,7 +893,9 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .map(|(span, is_conj, s, sp)| {
+                    (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
+                })
                 .unwrap_or((None, None));
             let (input, mods0) = feature_modifiers(input)?;
             let mods0 = pre_typing_mods.merge(mods0);
@@ -914,7 +917,9 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .map(|(span, is_conj, s, sp)| {
+                    (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
+                })
                 .unwrap_or((None, None));
             let (input, mods0) = feature_modifiers(input)?;
             let mods0 = pre_typing_mods.merge(mods0);
@@ -939,7 +944,9 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .map(|(span, is_conj, s, sp)| {
+                    (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
+                })
                 .unwrap_or((None, None));
             let (input, mods0) = feature_modifiers(input)?;
             let mods0 = pre_typing_mods.merge(mods0);
@@ -966,7 +973,9 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (input, pre_typing_mods) = feature_modifiers(input)?;
             let (input, typing_result) = optional_typings(input)?;
             let (typing_span, typing) = typing_result
-                .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+                .map(|(span, is_conj, s, sp)| {
+                    (Some(span.clone()), Some(typing_node(span, is_conj, s, sp)))
+                })
                 .unwrap_or((None, None));
             let (input, mods0) = feature_modifiers(input)?;
             let mods0 = pre_typing_mods.merge(mods0);
@@ -1083,7 +1092,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     let prefix_span = crate::parser::span_from_to(start, input);
     let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, s)| (Some(span.clone()), Some(typing_node(span, is_conj, s))))
+        .map(|(span, is_conj, s, sp)| (Some(span.clone()), Some(typing_node(span, is_conj, s, sp))))
         .unwrap_or((None, None));
     let (input, mods) = feature_modifiers(input)?;
     let (input, value) =
@@ -1219,8 +1228,13 @@ pub(crate) fn attribute_usage_shorthand(
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, (typing_span, is_conjugated, targets)) = typings(input)?;
-    let typing = Some(typing_node(typing_span.clone(), is_conjugated, targets));
+    let (input, (typing_span, is_conjugated, targets, spelling)) = typings(input)?;
+    let typing = Some(typing_node(
+        typing_span.clone(),
+        is_conjugated,
+        targets,
+        spelling,
+    ));
     // Keep shorthand values on the shared expression path so precedence/parentheses are preserved.
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))

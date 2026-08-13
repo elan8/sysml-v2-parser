@@ -852,6 +852,7 @@ fn calc_named_binding_inner(
                         span,
                         is_conjugated: false,
                         is_implied: false,
+                        spelling: crate::ast::TypingSpelling::Operator,
                     },
                 )),
             )
@@ -985,7 +986,7 @@ fn kerml_feature_member_inner(
     ))
     .parse(input)?;
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
-    let typing = type_result.map(|(span, is_conjugated, targets)| {
+    let typing = type_result.map(|(span, is_conjugated, targets, spelling)| {
         crate::ast::Node::new(
             span.clone(),
             crate::ast::TypingRelationship {
@@ -994,6 +995,7 @@ fn kerml_feature_member_inner(
                 span,
                 is_conjugated,
                 is_implied: false,
+                spelling,
             },
         )
     });

@@ -82,7 +82,8 @@ fn optional_payload(input: Input<'_>) -> IResult<Input<'_>, Option<Node<PayloadF
 fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>> {
     let start = input;
     if let Ok((after_name, feature_name)) = preceded(ws_and_comments, name).parse(input) {
-        if let Ok((after_typing, Some((_, is_conjugated, targets)))) = optional_typings(after_name)
+        if let Ok((after_typing, Some((_, is_conjugated, targets, _)))) =
+            optional_typings(after_name)
         {
             let type_name = targets.first().copied();
             let (rest, multiplicity) =

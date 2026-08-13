@@ -237,6 +237,7 @@ pub(crate) fn end_decl(
         type_ref_span.clone(),
         tilde.is_some(),
         vec![type_reference],
+        crate::ast::TypingSpelling::Operator,
     ));
     let (input, trailing_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;

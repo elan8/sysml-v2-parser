@@ -20,6 +20,7 @@ use nom::Parser;
 fn subclassification_node(
     target: Vec<QualifiedReferenceId>,
     span: crate::ast::Span,
+    spelling: crate::ast::TypingSpelling,
 ) -> Node<TypingRelationship> {
     Node::new(
         span.clone(),
@@ -29,6 +30,7 @@ fn subclassification_node(
             span,
             is_conjugated: false,
             is_implied: false,
+            spelling,
         },
     )
 }
@@ -48,7 +50,7 @@ pub(crate) fn parse_optional_definition_specialization(
         preceded(ws_and_comments, qualified_name_target),
     ))
     .parse(input)?;
-    let Some((_, first)) = opt_first else {
+    let Some((spelling, first)) = opt_first else {
         return Ok((input, None));
     };
     let (input, rest) = many0(preceded(
@@ -59,7 +61,7 @@ pub(crate) fn parse_optional_definition_specialization(
     let mut bases = vec![first];
     bases.extend(rest);
     let span = span_from_to(before_specializes, input);
-    Ok((input, Some(subclassification_node(bases, span))))
+    Ok((input, Some(subclassification_node(bases, span, spelling))))
 }
 
 fn starts_with_typing_colon(fragment: &[u8]) -> bool {
@@ -81,6 +83,7 @@ fn typing_node(
             span,
             is_conjugated,
             is_implied: false,
+            spelling: crate::ast::TypingSpelling::Operator,
         },
     )
 }
@@ -162,7 +165,14 @@ pub(crate) fn parse_optional_definition_header_with_raw(
         if let Some(targets) = specializes_from_header_input(&header, before_header) {
             return Ok((
                 input,
-                (Some(subclassification_node(targets, span)), Some(header)),
+                (
+                    Some(subclassification_node(
+                        targets,
+                        span,
+                        crate::ast::TypingSpelling::Operator,
+                    )),
+                    Some(header),
+                ),
             ));
         }
         // No `:>`/`specializes` clause -- the whole header is a plain `: Type` typing clause

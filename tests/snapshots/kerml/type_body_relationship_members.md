@@ -49,7 +49,7 @@ standard library package Occurrences {
 ~~~sysml
 standard library package Occurrences {
     private import SequenceFunctions::*;
-    assoc all Within :> HappensDuring, InsideOf {
+    assoc all Within specializes HappensDuring, InsideOf {
         connector :HappensDuring from [1] self to [1] this;
         connector :Without from [0..*] separateOccurrenceToo references elements.notIntersection to [1] separateOccurrence references intersection;
         binding [1] startShot = [1] endShot;
@@ -63,7 +63,7 @@ standard library package Occurrences {
         portion :>> portionOfLife = (that as Occurrence).portionOfLife;
         private instantNum : Natural[1] = if isInstant ? 1 else 0;
         private thisClock : Clock :>> self;
-        struct StructuredSurface :> StructuredSpaceObject, Surface {
+        struct StructuredSurface specializes StructuredSpaceObject, Surface {
             doc
             /* A nested classifier. */
         }

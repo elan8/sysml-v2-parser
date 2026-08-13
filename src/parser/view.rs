@@ -543,7 +543,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     ))
     .parse(input)?;
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
-    let type_name = type_result.and_then(|(_, _, targets)| targets.first().copied());
+    let type_name = type_result.and_then(|(_, _, targets, _)| targets.first().copied());
     let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
         opt(preceded(
             ws_and_comments,

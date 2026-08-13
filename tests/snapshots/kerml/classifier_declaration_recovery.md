@@ -22,13 +22,8 @@ standard library package Broken {
 )
 ~~~
 # FORMAT
-~~~sysml
-standard library package Broken {
-    metaclass M :> Element {
-        in : ;
-        var feature ok : Element[1];
-    }
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr

@@ -79,9 +79,10 @@ pub(crate) fn part_usage_named<'a>(
     } else {
         optional_typings(input)?
     };
-    let type_ref_span = type_result.as_ref().map(|(span, _, _)| span.clone());
-    let typing =
-        type_result.map(|(span, is_conjugated, targets)| typing_node(span, is_conjugated, targets));
+    let type_ref_span = type_result.as_ref().map(|(span, _, _, _)| span.clone());
+    let typing = type_result.map(|(span, is_conjugated, targets, spelling)| {
+        typing_node(span, is_conjugated, targets, spelling)
+    });
     let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
     let (input, ordered_after_clauses) = usage_ordered_modifier(input)?;
@@ -244,8 +245,13 @@ fn anonymous_part_usage<'a>(
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, multiplicity_before) = opt(multiplicity_node).parse(input)?;
     let (input, ordered_before_type) = usage_ordered_modifier(input)?;
-    let (input, (type_ref_span, is_conjugated, targets)) = typings(input)?;
-    let typing = Some(typing_node(type_ref_span.clone(), is_conjugated, targets));
+    let (input, (type_ref_span, is_conjugated, targets, spelling)) = typings(input)?;
+    let typing = Some(typing_node(
+        type_ref_span.clone(),
+        is_conjugated,
+        targets,
+        spelling,
+    ));
     let (input, multiplicity_after) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_before.or(multiplicity_after);
     let (input, ordered_after_type) = usage_ordered_modifier(input)?;

@@ -910,7 +910,7 @@ fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
             let (_, req_reference) = crate::parser::lex::qualified_reference(after_kw)?;
             let (after_name, req_name) = name(after_kw)?;
             let (after_type, type_suffix) = optional_typings(after_name)?;
-            let type_name = type_suffix.and_then(|(_, _, targets)| targets.first().copied());
+            let type_name = type_suffix.and_then(|(_, _, targets, _)| targets.first().copied());
             let source = node_from_to(
                 inline_start,
                 after_type,

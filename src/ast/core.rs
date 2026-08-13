@@ -656,10 +656,29 @@ pub struct TypingRelationship {
     /// but the field exists so a future implied-relationship producer doesn't need another AST
     /// migration.
     pub is_implied: bool,
+    /// Which spelling the author wrote for the relationship operator. Emission renders this
+    /// spelling instead of canonicalizing `specializes` to `:>` / `defined by` to `:`.
+    pub spelling: TypingSpelling,
 }
 
-/// Equality ignores `span`, matching `Node<T>`'s and `Multiplicity`'s conventions elsewhere in
-/// this crate: hand-built expected ASTs in tests don't need to reproduce real source spans.
+/// The authored spelling of a [`TypingRelationship`]'s operator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TypingSpelling {
+    /// The symbolic operator: `:` for typing, `:>` for subclassification.
+    Operator,
+    /// The `specializes` keyword (subclassification).
+    Specializes,
+    /// The `defined by` keyword pair (typing).
+    DefinedBy,
+    /// The `typed by` keyword pair (typing).
+    TypedBy,
+}
+
+/// Equality ignores `span` and `spelling`, matching `Node<T>`'s and `Multiplicity`'s
+/// span-ignoring conventions elsewhere in this crate: hand-built expected ASTs in tests don't
+/// need to reproduce real source spans, and `specializes B` and `:> B` name the same
+/// relationship (the spelling is provenance, faithfully re-emitted but not identity).
 impl PartialEq for TypingRelationship {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target

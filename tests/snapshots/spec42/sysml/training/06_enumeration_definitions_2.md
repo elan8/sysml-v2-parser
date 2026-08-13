@@ -55,7 +55,7 @@ package 'Enumeration Definitions-2' {
         attribute code : String;
         attribute color : TrafficLightColor;
     }
-    enum def ClassificationKind :> ClassificationLevel {
+    enum def ClassificationKind specializes ClassificationLevel {
         unclassified;
         confidential;
         secret;

@@ -34,12 +34,12 @@ standard library package RealFunctions {
         in x : Real[1];
         return : Real[1] = x;
     }
-    abstract function '+' :> DataFunctions::'+' {
+    abstract function '+' specializes DataFunctions::'+' {
         in x : Real[1];
         in y : Real[0..1];
         return : Real[1];
     }
-    function sum :> ComplexFunctions::sum {
+    function sum specializes ComplexFunctions::sum {
         in collection : Real[0..*];
         return : Real default NumericalFunctions::sum0(collection, 0.0);
     }

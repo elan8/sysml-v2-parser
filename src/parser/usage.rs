@@ -156,7 +156,12 @@ pub(crate) fn multiplicity_node(input: Input<'_>) -> IResult<Input<'_>, Node<Mul
 
 /// `(span, is_conjugated, targets)` for a parsed `typings`/`optional_typings` clause -- see
 /// [`typings`] for what each field means.
-pub(crate) type TypingsResult = (Span, bool, Vec<QualifiedReferenceId>);
+pub(crate) type TypingsResult = (
+    Span,
+    bool,
+    Vec<QualifiedReferenceId>,
+    crate::ast::TypingSpelling,
+);
 
 #[cfg(test)]
 fn slice_reference_span(input: Input<'_>, span: Span) -> Option<String> {
@@ -192,7 +197,7 @@ pub(crate) fn reference_list_text(input: Input<'_>, ids: &[QualifiedReferenceId]
 /// per target.
 pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, TypingsResult> {
     let before = input;
-    let (input, _) = preceded(ws_and_comments, typed_by_operator).parse(input)?;
+    let (input, spelling) = preceded(ws_and_comments, typed_by_operator).parse(input)?;
     let (input, (first_conjugated, first)) =
         preceded(ws_and_comments, conjugated_qualified_name).parse(input)?;
     let (input, rest) = many0(preceded(
@@ -206,7 +211,12 @@ pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, TypingsResult> {
     }
     Ok((
         input,
-        (span_from_to(before, input), first_conjugated, targets),
+        (
+            span_from_to(before, input),
+            first_conjugated,
+            targets,
+            spelling,
+        ),
     ))
 }
 
@@ -234,12 +244,13 @@ pub(crate) fn typing_reference_fields_from_result(
     Option<QualifiedReferenceId>,
     Option<Node<TypingRelationship>>,
 ) {
-    let type_ref_span = result.as_ref().map(|(span, _, _)| span.clone());
+    let type_ref_span = result.as_ref().map(|(span, _, _, _)| span.clone());
     let type_reference = result
         .as_ref()
-        .and_then(|(_, _, targets)| targets.first().copied());
-    let typing =
-        result.map(|(span, is_conjugated, targets)| typing_node(span, is_conjugated, targets));
+        .and_then(|(_, _, targets, _)| targets.first().copied());
+    let typing = result.map(|(span, is_conjugated, targets, spelling)| {
+        typing_node(span, is_conjugated, targets, spelling)
+    });
     (type_ref_span, type_reference, typing)
 }
 
@@ -283,6 +294,7 @@ pub(crate) fn typing_relationship_node(
     kind: TypingKind,
     is_conjugated: bool,
     target: Vec<QualifiedReferenceId>,
+    spelling: crate::ast::TypingSpelling,
 ) -> Node<TypingRelationship> {
     Node::new(
         span.clone(),
@@ -292,27 +304,34 @@ pub(crate) fn typing_relationship_node(
             span,
             is_conjugated,
             is_implied: false,
+            spelling,
         },
     )
 }
 
-/// Shorthand for the common `:` / `typed by` case (`TypingKind::Typing`).
+/// Shorthand for the common `:` / `defined by` / `typed by` case (`TypingKind::Typing`).
 pub(crate) fn typing_node(
     span: Span,
     is_conjugated: bool,
     target: Vec<QualifiedReferenceId>,
+    spelling: crate::ast::TypingSpelling,
 ) -> Node<TypingRelationship> {
-    typing_relationship_node(span, TypingKind::Typing, is_conjugated, target)
+    typing_relationship_node(span, TypingKind::Typing, is_conjugated, target, spelling)
 }
 
 /// Build a single-target `TypingRelationship` from an already-parsed arena identity and the
 /// surrounding relationship span. Used by ad hoc `ref`-declaration call sites that parse one
-/// `:` target rather than the comma-aware `typings`/`optional_typings` production.
+/// symbolic `:` target rather than the comma-aware `typings`/`optional_typings` production.
 pub(crate) fn single_target_typing(
     span: Span,
     target: QualifiedReferenceId,
 ) -> Node<TypingRelationship> {
-    typing_node(span, false, vec![target])
+    typing_node(
+        span,
+        false,
+        vec![target],
+        crate::ast::TypingSpelling::Operator,
+    )
 }
 
 /// Build a single-target `redefines`/`:>>` relationship from an already-parsed arena identity,
@@ -540,10 +559,10 @@ fn merge_usage_header(
     UsageHeader {
         type_is_conjugated: type_result
             .as_ref()
-            .is_some_and(|(_, is_conjugated, _)| *is_conjugated),
+            .is_some_and(|(_, is_conjugated, _, _)| *is_conjugated),
         type_reference: type_result
             .as_ref()
-            .and_then(|(_, _, targets)| targets.first().copied()),
+            .and_then(|(_, _, targets, _)| targets.first().copied()),
         subsets,
         redefines,
         references,
@@ -596,7 +615,7 @@ mod tests {
     #[test]
     fn typings_accepts_defined_by_and_multiple_targets() {
         let input = span_input("defined by ~Ports::Fuel, Ports::Command ;");
-        let (rest, (_, is_conjugated, targets)) = typings(input).expect("typings");
+        let (rest, (_, is_conjugated, targets, _)) = typings(input).expect("typings");
         assert!(
             is_conjugated,
             "first target's leading `~` should be captured"
@@ -611,7 +630,7 @@ mod tests {
     #[test]
     fn typings_accepts_typed_by_keyword_alias() {
         let input = span_input("typed by ~Ports::Fuel, Ports::Command ;");
-        let (rest, (_, is_conjugated, targets)) = typings(input).expect("typings");
+        let (rest, (_, is_conjugated, targets, _)) = typings(input).expect("typings");
         assert!(is_conjugated);
         assert_eq!(
             reference_list_text(input, &targets),

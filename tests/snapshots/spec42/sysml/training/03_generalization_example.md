@@ -37,7 +37,7 @@ package 'Generalization Example' {
 ~~~sysml
 package 'Generalization Example' {
     abstract part def Vehicle;
-    part def HumanDrivenVehicle :> Vehicle {
+    part def HumanDrivenVehicle specializes Vehicle {
         ref part driver : Person;
     }
     part def PoweredVehicle :> Vehicle {

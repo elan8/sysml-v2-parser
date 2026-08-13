@@ -171,7 +171,7 @@ standard library package StandardViewDefinitions {
              * (e.g., ports, parameters).
              */
     }
-    view def <afv> ActionFlowView :> InterconnectionView {
+    view def <afv> ActionFlowView specializes InterconnectionView {
         doc
         /*
              * View definition to present connections between actions.
@@ -191,7 +191,7 @@ standard library package StandardViewDefinitions {
              * - Compartments on actions and parameters
              */
     }
-    view def <stv> StateTransitionView :> InterconnectionView {
+    view def <stv> StateTransitionView specializes InterconnectionView {
         doc
         /*
              * View definition to present states and their transitions.

@@ -44,7 +44,7 @@ standard library package Occurrences {
 # FORMAT
 ~~~sysml
 standard library package Occurrences {
-    metaclass AnnotatingElement :> Element {
+    metaclass AnnotatingElement specializes Element {
         derived var feature annotatedElement : Element[1..*] ordered :>> annotatedElement;
         member feature 'in' : FeatureDirectionKind[1];
     }
@@ -53,18 +53,18 @@ standard library package Occurrences {
             -1.0 <= that & that <= 1.0;
         }
     }
-    assoc all HappensBefore :> HappensLink, Without {
+    assoc all HappensBefore specializes HappensLink, Without {
         end feature source : Occurrence[1] :> participant;
         feature all spaceShotOf : Occurrence[0..*] :> spaceSliceOf inverse of spaceShots;
         inv {
             isClosed == true;
         }
     }
-    assoc struct LinkObject :> Link, Object intersects Link, Object {
+    assoc struct LinkObject specializes Link, Object intersects Link, Object {
         doc
         /* A LinkObject is both a Link and an Object. */
     }
-    abstract class Occurrence :> Anything disjoint from DataValue {
+    abstract class Occurrence specializes Anything disjoint from DataValue {
         portion feature[1] :>> spaceBoundary;
     }
     abstract step performances : Performance[0..*] nonunique :> occurrences {

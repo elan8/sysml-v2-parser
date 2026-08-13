@@ -805,6 +805,7 @@ fn kerml_classifier_structured_inner(
                         span,
                         is_conjugated: false,
                         is_implied: false,
+                        spelling: crate::ast::TypingSpelling::Operator,
                     },
                 )),
             )
@@ -964,10 +965,12 @@ fn feature_usage_member_inner(
     let (input, (name_span, name_str)) = crate::parser::span::with_span(name).parse(input)?;
     let (input, typing_result) = crate::parser::usage::optional_typings(input)?;
     let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, targets)| {
+        .map(|(span, is_conj, targets, spelling)| {
             (
                 Some(span.clone()),
-                Some(crate::parser::usage::typing_node(span, is_conj, targets)),
+                Some(crate::parser::usage::typing_node(
+                    span, is_conj, targets, spelling,
+                )),
             )
         })
         .unwrap_or((None, None));

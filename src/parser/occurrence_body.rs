@@ -374,8 +374,8 @@ fn occurrence_usage_tail(
     let (input, type_name) = optional_typings(input)?;
     let type_is_conjugated = type_name
         .as_ref()
-        .is_some_and(|(_, is_conjugated, _)| *is_conjugated);
-    let type_name = type_name.and_then(|(_, _, targets)| targets.first().copied());
+        .is_some_and(|(_, is_conjugated, _, _)| *is_conjugated);
+    let type_name = type_name.and_then(|(_, _, targets, _)| targets.first().copied());
     // GH-51: real usage carries a multiplicity here (`causes[1..*]`); see `OccurrenceUsage::
     // multiplicity`'s doc comment.
     let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;

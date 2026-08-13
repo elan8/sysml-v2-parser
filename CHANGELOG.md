@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 117.** `TypingRelationship` gains a `spelling:
+  TypingSpelling` field recording whether the author wrote the symbolic operator (`:`/`:>`) or
+  the keyword form (`specializes`, `defined by`, `typed by`), and emission renders the authored
+  spelling instead of canonicalizing everything to the operator — `function abs specializes
+  ComplexFunctions::abs` now round-trips as written. Equality ignores the field (like spans):
+  `specializes B` and `:> B` name the same relationship; the spelling is provenance.
 - **`PARSE_AST_VERSION` is now 116.** Calc/type bodies no longer swallow unmodeled members as
   diagnostic-silent opaque `Other(...)` captures: `CalcDefBodyElement::Other` is removed, every
   unparseable member becomes an explicit recovery node with a `recovered_calc_body_element`
