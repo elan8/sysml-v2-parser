@@ -280,39 +280,15 @@ fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody
 }
 
 fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMergeBodyElement>> {
-    let start = input;
-    let checkpoint = input.extra.reference_checkpoint();
     let (input, member) = action_def_body_element(input)?;
     let span = member.span.clone();
     let value = match member.value {
-        ActionDefBodyElement::Decl(_) => {
-            // The declaration's interior may itself contain references. Because this member is
-            // retained as unsupported source rather than typed syntax, those identities must not
-            // leak into the finished document arena.
-            start.extra.rollback_references(checkpoint);
-            let consumed_len = start.fragment().len() - input.fragment().len();
-            let found = String::from_utf8_lossy(&start.fragment()[..consumed_len]).into_owned();
-            let diagnostic = ParseErrorNode {
-                message: "spec-valid action-body member is not modeled in first/merge bodies"
-                    .to_owned(),
-                code: "unsupported_grammar_form".to_owned(),
-                expected: Some("a structured action-body member".to_owned()),
-                found: Some(found),
-                suggestion: Some(
-                    "Keep this syntax; parser support is incomplete rather than the model being malformed."
-                        .to_owned(),
-                ),
-                category: Some(crate::error::DiagnosticCategory::UnsupportedGrammarForm),
-            };
-            FirstMergeBodyElement::Unsupported(Node::new(
-                span.clone(),
-                crate::ast::UnsupportedGrammarNode {
-                    production: crate::ast::UnsupportedProduction::ActionBodyMember,
-                    diagnostic,
-                },
-            ))
-        }
-        value @ (ActionDefBodyElement::Error(_)
+        // BNF `MergeNode`/`DecisionNode`/`JoinNode`/`ForkNode` (SysML-textual-bnf.kebnf §8.2.2.17.3)
+        // all use the same `ActionBody` production as a plain action definition body, so a
+        // `first`/`merge` brace body legitimately accepts any action-body declaration (e.g. `calc
+        // opaque;`), not just the narrower allow-list this used to downgrade to `Unsupported`.
+        value @ (ActionDefBodyElement::Decl(_)
+        | ActionDefBodyElement::Error(_)
         | ActionDefBodyElement::InOutDecl(_)
         | ActionDefBodyElement::Doc(_)
         | ActionDefBodyElement::Annotation(_)
@@ -1726,7 +1702,11 @@ mod control_node_gap_tests {
     }
 
     #[test]
-    fn first_merge_body_keeps_unsupported_and_malformed_members_then_resumes() {
+    fn first_merge_body_keeps_structured_decl_and_malformed_members_then_resumes() {
+        // BNF `MergeNode`/`DecisionNode`/`JoinNode`/`ForkNode` (SysML-textual-bnf.kebnf
+        // §8.2.2.17.3) all use the same `ActionBody` production as a plain action definition
+        // body, so `calc opaque;` here is a structured `ActionDefBodyElement::Decl` member, not
+        // an unsupported one.
         let source = "first start then finish { calc opaque; bogus ???; in resumed; }";
         let (rest, node) = action_def_body_element(input(source)).expect("first/merge body");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
@@ -1738,8 +1718,9 @@ mod control_node_gap_tests {
         };
         assert_eq!(body.value.elements.len(), 3);
         assert!(matches!(
-            body.value.elements[0].value,
-            FirstMergeBodyElement::Unsupported(_)
+            &body.value.elements[0].value,
+            FirstMergeBodyElement::Member(member)
+                if matches!(member.value, ActionDefBodyElement::Decl(_))
         ));
         assert!(matches!(
             body.value.elements[1].value,

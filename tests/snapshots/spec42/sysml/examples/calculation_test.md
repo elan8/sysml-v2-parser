@@ -62,7 +62,7 @@ package CalculationExample {
         in partMasses : MassValue[0..*];
         return totalMass : MassValue = sum(partMasses);
     }
-    calc def ms {
+    calc def ms : MassSum {
         in partMasses = (vehicle.eng.m, vehicle.trans.m);
         totalMass;
     }

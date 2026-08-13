@@ -9,6 +9,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 107.** `KermlBareDeclaration::keyword` is now an exhaustive
+  `KermlBareDeclarationKeyword` enum instead of an owned `String` (a finite grammar set, with
+  distinct variants for authored synonyms like `assoc`/`association`), and
+  `KermlBareDeclaration`/`BindingConnectorUsage` keep only a `name_span: Option<Span>` for the
+  declared name instead of also copying it into an owned `String` -- the name text is resolved
+  through the document source when needed, matching the "authored spelling lives in source, not
+  per-node strings" contract.
+- **`PARSE_AST_VERSION` is now 106.** New `PackageBodyElement::ExtendedDefinition` node models
+  SysML §8.2.2.27 `ExtendedDefinition`: one or more `#<name>` metadata-keyword tags standing in
+  place of the usual classifier keyword before `def` (`#situation def Failure;`,
+  `#SecurityRelated #situation def Vulnerability;`, `abstract #situation def AbstractFailure;`,
+  `variation #situation def V;`, with optional `:>` specialization and a `{ ... }` body reusing
+  `PackageBody`). Tried before `metadata_keyword_prefix` in package-body dispatch, so `def
+  Failure;` no longer falls through to raw error recovery.
+- **`PARSE_AST_VERSION` is now 105.** `AttributeBodyElement` gains a structured `ItemUsage`
+  variant. A nested `item name : Type;` inside an `attribute def`/`attribute`/`item def`/`item`
+  body now parses as a real item usage (reusing the same `item_usage` parser `part def`/`part`
+  bodies already dispatch to) instead of being swallowed by the opaque-capture fallback into
+  `AttributeBodyElement::Other`.
+- **`PARSE_AST_VERSION` is now 104.** Bare, `;`-terminated `classifier` forward declarations
+  (e.g. `classifier SpatialFrame;`) parse as a structured `KermlBareDeclaration` node with a real
+  `name` field instead of falling through to the opaque `ClassifierDecl` raw-text fallback.
+- **`PARSE_AST_VERSION` is now 103.** `ConcernUsage` (including `concern def`) retains its `:>`
+  subsetting and `:>>` redefinition clauses (`ConcernUsage::subsets`/`ConcernUsage::redefines`)
+  instead of discarding them after parsing, matching sibling usage kinds.
+- **`PARSE_AST_VERSION` is now 102.** `ViewUsage` retains its `:>` subsetting clause
+  (`ViewUsage::subsets`) instead of discarding it after parsing, matching sibling usage kinds such
+  as `OccurrenceUsage`/`StateUsage`/`PortUsage`.
+- **`PARSE_AST_VERSION` is now 101.** `individual item`/`individual occurrence`/`individual port`
+  short usage forms parse correctly instead of being misclassified or falling into a recovery
+  cascade: package-level `item def` now requires the `def` keyword so it no longer shadows
+  `individual item x;`; `individual` occurrence usages accept an optional `occurrence` kind
+  keyword (`OccurrenceUsage::has_occurrence_keyword` preserves whether it was authored); `port`
+  usages accept an `individual` prefix (`PortUsage::is_individual`); and `state def`/`connection
+  def` accept `individual` (`StateDef::is_individual`/`ConnectionDef::is_individual`).
+- **`PARSE_AST_VERSION` is now 100.** `InterfaceUsage` (all three variants) retains its `:>`/`:>>`
+  subsetting and redefinition clauses (`subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `ConnectionUsageMember`.
+- **`PARSE_AST_VERSION` is now 99.** `AnalysisCaseUsage` and `CaseUsage` retain their `:>`/`:>>`
+  subsetting and redefinition clauses (`subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `RequirementUsage`/`PortUsage`/`StateUsage`.
+- **`PARSE_AST_VERSION` is now 97.** Package bodies gain `@ Name (: Type)? about target(,
+  ...)?;` standalone metadata-annotation support, accept stacked `#Prefix #Prefix ... member`
+  metadata tags before a member instead of at most one, and port definition bodies dispatch
+  `#Prefix`-tagged nested port declarations through the same shared metadata-keyword parsing other
+  definition bodies already use.
+- **`PARSE_AST_VERSION` is now 96.** `ConstraintUsage` retains its `:>`/`:>>` subsetting and
+  redefinition clauses (`ConstraintUsage::subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `ConnectionUsageMember`.
 - **Canonical document source ranges.** `SourceStorage::position_at`, `SourceStorage::range_of`,
   and `ParsedDocument::range` resolve byte-backed parser spans through one lazily built,
   document-owned newline index. Downstream diagnostics and navigation can retain a `Span` and ask

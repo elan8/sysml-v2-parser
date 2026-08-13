@@ -14,24 +14,17 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// Item definition: `item def` Identification body
-pub(crate) fn item_def(input: Input<'_>) -> IResult<Input<'_>, Node<ItemDef>> {
-    parse_item_def(input, false)
-}
-
-/// Item definition with required `def` keyword (disambiguates from `item` usages in part bodies).
+/// Item definition: `item def` Identification body. `def` is mandatory here (unlike some sibling
+/// `*_def` parsers) so a bodyless `individual item i1;` short usage form is never misclassified
+/// as an `ItemDef` with `i1` as the definition's identification name -- see the package-level
+/// dispatch site in `package.rs` (gap #7) and `port_def_required`/`connection_def`'s analogous
+/// `_required` naming.
 pub(crate) fn item_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<ItemDef>> {
-    parse_item_def(input, true)
-}
-
-fn parse_item_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<ItemDef>> {
     let start = input;
-    let mut options = DefinitionPrefixOptions::new(b"item")
+    let options = DefinitionPrefixOptions::new(b"item")
         .individual_allowed()
+        .def_required()
         .with_captured_visibility();
-    if require_def {
-        options = options.def_required();
-    }
     let (input, prefix) = parse_definition_prefix(input, options)?;
     let (input, body) = attribute_body(input)?;
     Ok((
@@ -155,7 +148,8 @@ mod membership_tests {
     /// genuine gap as `part_def`/`port_def`).
     #[test]
     fn item_def_visibility_prefix_is_captured_on_membership() {
-        let (rest, node) = item_def(input("protected item def MyItem;")).expect("item def");
+        let (rest, node) =
+            item_def_required(input("protected item def MyItem;")).expect("item def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -169,7 +163,7 @@ mod membership_tests {
 
     #[test]
     fn item_def_public_visibility_prefix_is_captured_on_membership() {
-        let (rest, node) = item_def(input("public item def MyItem;")).expect("item def");
+        let (rest, node) = item_def_required(input("public item def MyItem;")).expect("item def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -179,7 +173,7 @@ mod membership_tests {
 
     #[test]
     fn item_def_without_visibility_prefix_has_no_membership_visibility() {
-        let (rest, node) = item_def(input("item def MyItem;")).expect("item def");
+        let (rest, node) = item_def_required(input("item def MyItem;")).expect("item def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.membership.visibility, None);
         assert_eq!(

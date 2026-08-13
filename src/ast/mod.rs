@@ -157,6 +157,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::MetadataKeywordUsage(n) => {
             PackageBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::MetadataAnnotation(n) => {
+            PackageBodyElement::MetadataAnnotation(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::EnumDef(n) => {
             PackageBodyElement::EnumDef(dummy_node(n, normalize_enum_def(&n.value)))
         }
@@ -278,6 +281,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::KermlSemanticDecl(n) => {
             PackageBodyElement::KermlSemanticDecl(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::KermlBareDeclaration(n) => {
+            PackageBodyElement::KermlBareDeclaration(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::KermlFeatureDecl(n) => {
             PackageBodyElement::KermlFeatureDecl(dummy_node(n, n.value.clone()))
         }
@@ -304,6 +310,27 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         ),
         PackageBodyElement::AssertConstraint(n) => {
             PackageBodyElement::AssertConstraint(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::PerformUsage(n) => {
+            PackageBodyElement::PerformUsage(dummy_node(n, normalize_perform(&n.value)))
+        }
+        PackageBodyElement::BindingConnectorUsage(n) => {
+            PackageBodyElement::BindingConnectorUsage(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::ClassDef(n) => {
+            PackageBodyElement::ClassDef(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::Succession(n) => {
+            PackageBodyElement::Succession(dummy_node(n, normalize_first_stmt(&n.value)))
+        }
+        PackageBodyElement::ExhibitState(n) => {
+            PackageBodyElement::ExhibitState(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::IncludeUseCase(n) => {
+            PackageBodyElement::IncludeUseCase(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::ExtendedDefinition(n) => {
+            PackageBodyElement::ExtendedDefinition(dummy_node(n, n.value.clone()))
         }
         PackageBodyElement::InterfaceUsage(n) => {
             PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
@@ -608,6 +635,8 @@ fn normalize_default_reference_usage(u: &DefaultReferenceUsage) -> DefaultRefere
         name_span: None,
         typing_span: None,
         membership: u.membership.clone(),
+        has_feature_keyword: u.has_feature_keyword,
+        body: u.body.clone(),
     }
 }
 
@@ -1016,6 +1045,7 @@ fn normalize_port_usage(p: &PortUsage) -> PortUsage {
         is_abstract: p.is_abstract,
         is_derived: p.is_derived,
         is_constant: p.is_constant,
+        is_individual: p.is_individual,
         name: p.name.clone(),
         short_name: p.short_name.clone(),
         typing: p.typing.clone(),
@@ -1089,6 +1119,9 @@ fn normalize_port_def_body_element_node(el: &Node<PortDefBodyElement>) -> Node<P
         }
         PortDefBodyElement::Doc(n) => PortDefBodyElement::Doc(dummy_node(n, n.value.clone())),
         PortDefBodyElement::Error(n) => PortDefBodyElement::Error(dummy_node(n, n.value.clone())),
+        PortDefBodyElement::MetadataKeywordUsage(n) => {
+            PortDefBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
+        }
         PortDefBodyElement::AttributeDef(n) => {
             PortDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
         }
@@ -1123,6 +1156,7 @@ fn normalize_interface_def(i: &InterfaceDef) -> InterfaceDef {
 
 fn normalize_connection_def(c: &ConnectionDef) -> ConnectionDef {
     ConnectionDef {
+        is_individual: c.is_individual,
         derivation_role: c
             .derivation_role
             .as_ref()
@@ -1576,6 +1610,7 @@ fn normalize_state_usage(s: &StateUsage) -> StateUsage {
 
 fn normalize_state_def(state: &StateDef) -> StateDef {
     StateDef {
+        is_individual: state.is_individual,
         identification: state.identification.clone(),
         specializes: state.specializes.clone(),
         body: normalize_state_def_body(&state.body),

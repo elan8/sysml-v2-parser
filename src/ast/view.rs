@@ -30,6 +30,12 @@ pub struct ConstraintDef {
 pub struct ConstraintUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Usage-level `:>` subsetting, e.g. `constraint c :> Base;`. Mirrors
+    /// `ConnectionUsageMember::subsets`.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Usage-level `:>>` redefinition, e.g. `constraint c :>> Base;`. Mirrors
+    /// `ConnectionUsageMember::redefines`.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: ConstraintDefBody,
     pub membership: Membership,
 }
@@ -75,6 +81,9 @@ pub enum ConstraintBody {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcDef {
     pub identification: Identification,
+    /// Supertype(s) after `:>`, e.g. `Some(..)` for `calc def X :> Y { }`. Mirrors
+    /// `PartDef::specializes`/`ActionDef::specializes`.
+    pub specializes: Option<Node<TypingRelationship>>,
     pub body: CalcDefBody,
     pub membership: Membership,
 }
@@ -207,7 +216,7 @@ pub enum RenderingUsageBodyElement {
     Doc(Node<DocComment>),
     /// Nested `view` usage member, e.g. a `columnView` redefinition (`view :>> columnView[1] {
     /// render asTextualNotation; }`).
-    ViewUsage(Node<ViewUsage>),
+    ViewUsage(Box<Node<ViewUsage>>),
 }
 
 /// Viewpoint definition: `viewpoint def` Identification RequirementBody.
@@ -260,6 +269,8 @@ pub enum RenderingDefBodyElement {
 pub struct ViewUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Subsets target, e.g. `baseView` in `view v :> baseView { ... }`.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// Redefines target, e.g. `columnView` in `view :>> columnView[1] { ... }`. `None` for the
     /// ordinary named form.
     pub redefines: Option<Node<SubsettingRelationship>>,

@@ -1263,6 +1263,38 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_extended_definition(
+        &mut self,
+        definition: &super::ExtendedDefinition,
+    ) -> io::Result<()> {
+        self.writer.write_str("(extended-def (prefix-keywords (")?;
+        let mut first_keyword = true;
+        for keyword in &definition.prefix_keywords {
+            if !first_keyword {
+                self.writer.write_char(' ')?;
+            }
+            first_keyword = false;
+            write_quoted(self.writer, &keyword.value.keyword)?;
+        }
+        self.writer.write_str(")) (definition-prefix ")?;
+        match definition.definition_prefix {
+            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str("abstract")?,
+            Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") (specializes ")?;
+        if let Some(specializes) = &definition.specializes {
+            self.write_typing(&specializes.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_package_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_action_definition(&mut self, definition: &super::ActionDef) -> io::Result<()> {
         self.writer.write_str("(action-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
@@ -2052,6 +2084,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_port_usage(&usage.value)?;
                         }
+                        PortDefBodyElement::MetadataKeywordUsage(_usage) => {
+                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        }
                         PortDefBodyElement::Other(text) => {
                             self.write_opaque(&mut first, "other", text)?;
                         }
@@ -2259,6 +2294,37 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::KermlSemanticDecl(_declaration) => {
                 self.write_marker(first, "kerml-semantic-declaration")
             }
+            PackageBodyElement::KermlBareDeclaration(declaration) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(kerml-bare-declaration (keyword ")?;
+                write_quoted(self.writer, declaration.value.keyword.as_str())?;
+                self.writer.write_str(") (name ")?;
+                let name = declaration
+                    .value
+                    .name_span
+                    .as_ref()
+                    .and_then(|span| self.document.source.slice(span));
+                write_optional_quoted(self.writer, name)?;
+                self.writer.write_str(") (multiplicity ")?;
+                if let Some(multiplicity) = &declaration.value.multiplicity {
+                    self.writer.write_str("(lower ")?;
+                    if let Some(lower) = &multiplicity.value.lower {
+                        self.write_expression(lower)?;
+                    } else {
+                        self.writer.write_str("unbounded")?;
+                    }
+                    self.writer.write_str(") (upper ")?;
+                    if let Some(upper) = &multiplicity.value.upper {
+                        self.write_expression(upper)?;
+                    } else {
+                        self.writer.write_str("unbounded")?;
+                    }
+                    self.writer.write_char(')')?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str("))")
+            }
             PackageBodyElement::KermlFeatureDecl(_declaration) => {
                 self.write_marker(first, "kerml-feature-declaration")
             }
@@ -2283,6 +2349,13 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::MetadataKeywordUsage(_usage) => {
                 self.write_marker(first, "metadata-keyword-usage")
             }
+            PackageBodyElement::ExtendedDefinition(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_definition(&definition.value)
+            }
+            PackageBodyElement::MetadataAnnotation(_annotation) => {
+                self.write_marker(first, "metadata-annotation")
+            }
             PackageBodyElement::Connect(connect) => {
                 self.write_item_prefix(first)?;
                 self.write_connect(&connect.value)
@@ -2293,7 +2366,41 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::AssertConstraint(_constraint) => {
                 self.write_marker(first, "assert-constraint")
             }
+            PackageBodyElement::PerformUsage(perform) => {
+                self.write_item_prefix(first)?;
+                self.write_perform(&perform.value)
+            }
+            PackageBodyElement::BindingConnectorUsage(_binding) => {
+                self.write_marker(first, "binding-connector-usage")
+            }
+            PackageBodyElement::ClassDef(_definition) => self.write_marker(first, "class-def"),
+            PackageBodyElement::Succession(statement) => {
+                self.write_item_prefix(first)?;
+                self.write_first_statement(&statement.value)
+            }
+            PackageBodyElement::ExhibitState(exhibit) => {
+                self.write_item_prefix(first)?;
+                self.write_exhibit_state(&exhibit.value)
+            }
+            PackageBodyElement::IncludeUseCase(include) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(include (target ")?;
+                self.write_reference(include.value.target)?;
+                self.writer.write_str("))")
+            }
         }
+    }
+
+    fn write_exhibit_state(&mut self, exhibit: &super::ExhibitState) -> io::Result<()> {
+        self.writer.write_str("(exhibit (declaration ")?;
+        write_quoted(self.writer, &exhibit.name)?;
+        self.writer.write_str(") (state ")?;
+        if let Some(reference) = exhibit.state_reference {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str("))")
     }
 
     fn write_package_body(&mut self, body: &PackageBody) -> io::Result<()> {

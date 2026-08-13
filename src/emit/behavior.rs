@@ -516,6 +516,9 @@ pub(crate) fn emit_state_def(
     def: &StateDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("state def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -1188,9 +1191,10 @@ pub(crate) fn emit_occurrence_usage(
             crate::ast::OccurrencePortionKind::Timeslice => "timeslice",
         });
         w.push_char(' ');
-    } else if usage.occurrence_reference.is_none() && (usage.is_event || !usage.is_individual) {
-        // Plain `occurrence …` and `event occurrence …`. Bare `individual <name>` omits
-        // the keyword (see `individual_usage` → `occurrence_usage_tail`).
+    } else if usage.has_occurrence_keyword {
+        // Plain `occurrence …`, `event occurrence …`, and `individual occurrence …` (gap #7) all
+        // authored the literal keyword; bare `individual <name>` did not (see `individual_usage`
+        // → `occurrence_usage_tail`).
         w.push_str("occurrence ");
     }
     if !usage.name.is_empty() {

@@ -32,6 +32,7 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
         input,
         DefinitionPrefixOptions::new(b"state")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = state_def_body(input)?;
@@ -41,6 +42,7 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
             start,
             input,
             StateDef {
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,

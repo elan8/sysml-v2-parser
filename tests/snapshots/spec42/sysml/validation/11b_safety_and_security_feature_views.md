@@ -148,7 +148,7 @@ package '11b-Safety and Security Feaure Views' {
         view vehicleSafetyFeatureView : SafetyFeatureView {
             expose vehicle;
         }
-        view vehicleMandatorySafetyFeatureView {
+        view vehicleMandatorySafetyFeatureView :> vehicleSafetyFeatureView {
             expose vehicle::*::**;
             filter Safety::isMandatory;
         }

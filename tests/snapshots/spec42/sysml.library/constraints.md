@@ -77,21 +77,21 @@ standard library package Constraints {
 		 * type of all ConstraintDefinitions.
 		 */
         ref;
-        constraint self : ConstraintCheck;
+        constraint self : ConstraintCheck :>> BooleanEvaluation::self;
     }
-    constraint constraintChecks : ConstraintCheck {
+    constraint constraintChecks : ConstraintCheck :> booleanEvaluations {
         doc
         /*
 		 * constraintChecks is the base feature of all ConstraintUsages.
 		 */
     }
-    constraint assertedConstraintChecks {
+    constraint assertedConstraintChecks :> constraintChecks, trueEvaluations {
         doc
         /*
 		 * assertedConstraintChecks is the subset of constraintChecks for ConstraintChecks asserted to be true.
 		 */
     }
-    constraint negatedConstraintChecks {
+    constraint negatedConstraintChecks :> constraintChecks, falseEvaluations {
         doc
         /*
 		 * negatedConstraintChecks is the subset of constraintChecks for ConstraintChecks asserted to be false.

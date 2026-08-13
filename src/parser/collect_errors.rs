@@ -653,6 +653,9 @@ fn collect_attribute_body_errors(body: &AttributeBody, errors: &mut Vec<ParseErr
                     AttributeBodyElement::PartUsage(n) => {
                         collect_part_usage_body_errors(&n.value.body, errors)
                     }
+                    AttributeBodyElement::ItemUsage(n) => {
+                        collect_attribute_body_errors(&n.value.body, errors)
+                    }
                     AttributeBodyElement::MetadataKeywordUsage(n) => {
                         collect_attribute_body_errors(&n.value.body, errors)
                     }
@@ -691,6 +694,9 @@ fn collect_port_def_body_errors(body: &PortDefBody, errors: &mut Vec<ParseError>
                     }
                     PortDefBodyElement::PortUsage(n) => {
                         collect_port_body_errors(&n.value.body, errors)
+                    }
+                    PortDefBodyElement::MetadataKeywordUsage(n) => {
+                        collect_attribute_body_errors(&n.value.body, errors)
                     }
                     PortDefBodyElement::InOutDecl(_)
                     | PortDefBodyElement::Doc(_)
@@ -1456,6 +1462,9 @@ fn collect_package_body_element_errors(
             &element.span,
             "KerML feature form",
         )),
+        // Structurally recognized: keyword, optional name, optional multiplicity, `;`. No
+        // diagnostic -- this is not a fallback node.
+        PackageBodyElement::KermlBareDeclaration(_) => {}
         PackageBodyElement::Package(n) => collect_package_body_errors(&n.value.body, errors),
         PackageBodyElement::LibraryPackage(n) => collect_package_body_errors(&n.value.body, errors),
         PackageBodyElement::Import(n) => collect_import_errors(&n.value, errors),
@@ -1571,6 +1580,9 @@ fn collect_package_body_element_errors(
         PackageBodyElement::MetadataKeywordUsage(n) => {
             collect_attribute_body_errors(&n.value.body, errors)
         }
+        PackageBodyElement::MetadataAnnotation(n) => {
+            collect_attribute_body_errors(&n.value.body, errors)
+        }
         PackageBodyElement::AttributeUsage(n) => {
             collect_attribute_body_errors(&n.value.body, errors)
         }
@@ -1586,6 +1598,17 @@ fn collect_package_body_element_errors(
         }
         PackageBodyElement::AssertConstraint(n) => {
             collect_constraint_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::PerformUsage(n) => collect_perform_body_errors(&n.value.body, errors),
+        PackageBodyElement::BindingConnectorUsage(_) => {}
+        PackageBodyElement::ClassDef(n) => collect_attribute_body_errors(&n.value.body, errors),
+        PackageBodyElement::Succession(n) => collect_first_merge_body_errors(&n.value.body, errors),
+        PackageBodyElement::ExhibitState(n) => collect_state_body_errors(&n.value.body, errors),
+        PackageBodyElement::IncludeUseCase(n) => {
+            collect_use_case_body_errors(&n.value.body, errors)
+        }
+        PackageBodyElement::ExtendedDefinition(n) => {
+            collect_package_body_errors(&n.value.body, errors)
         }
     }
 }

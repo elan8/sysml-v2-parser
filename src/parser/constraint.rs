@@ -90,6 +90,8 @@ pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Cons
             ConstraintUsage {
                 name: name_str,
                 type_name: header.type_reference,
+                subsets: header.subsets,
+                redefines: header.redefines,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -308,6 +310,7 @@ fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             input,
             CalcDef {
                 identification: prefix.identification,
+                specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
             },

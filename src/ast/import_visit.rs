@@ -138,6 +138,8 @@ impl ProvenanceValidator<'_> {
             PackageBodyElement::VerificationCaseDef(n) => self.use_case_body(&n.value.body),
             PackageBodyElement::VerificationCaseUsage(n) => self.use_case_body(&n.value.body),
             PackageBodyElement::ViewUsage(n) => self.view_body(&n.value.body),
+            PackageBodyElement::PerformUsage(n) => self.perform_body(&n.value.body),
+            PackageBodyElement::ExtendedDefinition(n) => self.package_body(&n.value.body),
             PackageBodyElement::Error(_)
             | PackageBodyElement::Unsupported(_)
             | PackageBodyElement::Doc(_)
@@ -175,6 +177,7 @@ impl ProvenanceValidator<'_> {
             | PackageBodyElement::ClassifierDecl(_)
             | PackageBodyElement::KermlSemanticDecl(_)
             | PackageBodyElement::KermlFeatureDecl(_)
+            | PackageBodyElement::KermlBareDeclaration(_)
             | PackageBodyElement::ExtendedLibraryDecl(_)
             | PackageBodyElement::AttributeUsage(_)
             | PackageBodyElement::ItemUsage(_)
@@ -184,9 +187,15 @@ impl ProvenanceValidator<'_> {
             | PackageBodyElement::Ref(_)
             | PackageBodyElement::EnumerationUsage(_)
             | PackageBodyElement::MetadataKeywordUsage(_)
+            | PackageBodyElement::MetadataAnnotation(_)
             | PackageBodyElement::Connect(_)
             | PackageBodyElement::DefaultReferenceUsage(_)
-            | PackageBodyElement::AssertConstraint(_) => Ok(()),
+            | PackageBodyElement::AssertConstraint(_)
+            | PackageBodyElement::BindingConnectorUsage(_)
+            | PackageBodyElement::ClassDef(_)
+            | PackageBodyElement::Succession(_)
+            | PackageBodyElement::ExhibitState(_)
+            | PackageBodyElement::IncludeUseCase(_) => Ok(()),
         }
     }
 

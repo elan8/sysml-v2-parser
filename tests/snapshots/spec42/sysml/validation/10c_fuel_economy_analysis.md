@@ -245,8 +245,8 @@ package '10c-Fuel Economy Analysis' {
             in t : TimeValue;
             return : ScenarioState;
         }
-        calc def cityScenario;
-        calc def highwayScenario;
+        calc def cityScenario : NominalScenario;
+        calc def highwayScenario : NominalScenario;
         analysis def FuelEconomyAnalysis {
             subject vehicle : Vehicle;
             in calc scenario : NominalScenario;

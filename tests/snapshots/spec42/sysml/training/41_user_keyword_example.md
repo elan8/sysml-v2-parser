@@ -42,7 +42,9 @@ package 'User Keyword Example' {
 (fixture-diagnostics
   (document "41_user_keyword_example.md"
     (diagnostics
-      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 243) (line 12) (column 12) (len 407)) (message "unexpected keyword `def` in package body"))
+      (diagnostic (code "unsupported_annotation_syntax") (severity warning) (category unsupportedgrammarform) (span (offset 320) (line 16) (column 3) (len 62)) (message "incomplete parser support for annotation syntax in package body"))
+      (diagnostic (code "unsupported_annotation_syntax") (severity warning) (category unsupportedgrammarform) (span (offset 436) (line 22) (column 3) (len 87)) (message "incomplete parser support for annotation syntax in package body"))
+      (diagnostic (code "unsupported_annotation_syntax") (severity warning) (category unsupportedgrammarform) (span (offset 580) (line 28) (column 3) (len 68)) (message "incomplete parser support for annotation syntax in package body"))
     )
   )
 )
@@ -58,27 +60,23 @@ package 'User Keyword Example' {
             attribute power : Real;
         }
     }
-    #scenario;
-    def DeviceFailure {
-		ref device : Device;
-		attribute minPower : Real;
-		
-		#cause 'battery old' {
+    #scenario def DeviceFailure {
+        ref device : Device;
+        attribute def minPower : Real;
+        #cause 'battery old' {
 			:>> probability = 0.01;			
 		}
-		
-		#causation connect 'battery old' to 'power low';
-		
-		#situation 'power low' {
+        #causation;
+        connect 'battery old' to 'power low';
+        #situation 'power low' {
 			constraint { device.battery.power < minPower }			
 		}
-		
-		#causation connect 'power low' to 'device shutoff';
-		
-		#failure 'device shutoff' {
+        #causation;
+        connect 'power low' to 'device shutoff';
+        #failure 'device shutoff' {
 			:>> severity = LevelEnum::high;
 		}
-	}
+    }
 }
 ~~~
 # AST
@@ -88,7 +86,11 @@ package 'User Keyword Example' {
     (reference r0 (scope relative) (span (offset 49) (line 2) (column 17) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 49) (line 2) (column 17) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 63) (line 2) (column 31) (len 4)))))
     (reference r1 (scope relative) (span (offset 85) (line 3) (column 17) (len 27)) (segments (segment 0 (token "'Semantic Metadata Example'") (name "Semantic Metadata Example") (separator none) (span (offset 85) (line 3) (column 17) (len 27)))))
     (reference r2 (scope relative) (span (offset 133) (line 4) (column 17) (len 23)) (segments (segment 0 (token "RiskMetadata") (name "RiskMetadata") (separator none) (span (offset 133) (line 4) (column 17) (len 12))) (segment 1 (token "LevelEnum") (name "LevelEnum") (separator colon-colon) (span (offset 147) (line 4) (column 31) (len 9)))))
+    (reference r3 (scope relative) (span (offset 401) (line 20) (column 22) (len 13)) (segments (segment 0 (token "'battery old'") (name "battery old") (separator none) (span (offset 401) (line 20) (column 22) (len 13)))))
+    (reference r4 (scope relative) (span (offset 418) (line 20) (column 39) (len 11)) (segments (segment 0 (token "'power low'") (name "power low") (separator none) (span (offset 418) (line 20) (column 39) (len 11)))))
+    (reference r5 (scope relative) (span (offset 542) (line 26) (column 22) (len 11)) (segments (segment 0 (token "'power low'") (name "power low") (separator none) (span (offset 542) (line 26) (column 22) (len 11)))))
+    (reference r6 (scope relative) (span (offset 557) (line 26) (column 37) (len 16)) (segments (segment 0 (token "'device shutoff'") (name "device shutoff") (separator none) (span (offset 557) (line 26) (column 37) (len 16)))))
   )
-  (root (package (name "User Keyword Example") (body (import (target (span (span (offset 49) (line 2) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 85) (line 3) (column 17) (len 30))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 112) (line 3) (column 44) (len 3))) (separator (span (offset 112) (line 3) (column 44) (len 2))) (marker (span (offset 114) (line 3) (column 46) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 133) (line 4) (column 17) (len 23))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (part-def (name "Device") (body (part-usage))) (metadata-keyword-usage) (malformed (code "unexpected_keyword_in_scope") (found "def DeviceFailure {") (span (offset 243) (line 12) (column 12) (len 407))))))
+  (root (package (name "User Keyword Example") (body (import (target (span (span (offset 49) (line 2) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 85) (line 3) (column 17) (len 30))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 112) (line 3) (column 44) (len 3))) (separator (span (offset 112) (line 3) (column 44) (len 2))) (marker (span (offset 114) (line 3) (column 46) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 133) (line 4) (column 17) (len 23))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (part-def (name "Device") (body (part-usage))) (extended-def (prefix-keywords ("scenario")) (definition-prefix none) (name "DeviceFailure") (specializes none) (body (ref) (attribute-def) (malformed (code "unsupported_annotation_syntax") (found "#cause 'battery old' {") (span (offset 320) (line 16) (column 3) (len 62))) (metadata-keyword-usage) (connect (from (expression (span (offset 401) (line 20) (column 22) (len 13)) (ref r3))) (to (expression (span (offset 418) (line 20) (column 39) (len 11)) (ref r4))) (body semicolon) (subsets none) (redefines none)) (malformed (code "unsupported_annotation_syntax") (found "#situation 'power low' {") (span (offset 436) (line 22) (column 3) (len 87))) (metadata-keyword-usage) (connect (from (expression (span (offset 542) (line 26) (column 22) (len 11)) (ref r5))) (to (expression (span (offset 557) (line 26) (column 37) (len 16)) (ref r6))) (body semicolon) (subsets none) (redefines none)) (malformed (code "unsupported_annotation_syntax") (found "#failure 'device shutoff' {") (span (offset 580) (line 28) (column 3) (len 68))))))))
 )
 ~~~

@@ -65,7 +65,9 @@ fn rendering_usage_body_element(
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
         map(doc_comment, RenderingUsageBodyElement::Doc),
-        map(view_usage, RenderingUsageBodyElement::ViewUsage),
+        map(view_usage, |n| {
+            RenderingUsageBodyElement::ViewUsage(Box::new(n))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -432,6 +434,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
             ViewUsage {
                 name: name_str,
                 type_name: header.type_reference,
+                subsets: header.subsets,
                 redefines: header.redefines,
                 multiplicity: None,
                 body,
@@ -460,6 +463,7 @@ fn view_usage_redefines_only<'a>(
             ViewUsage {
                 name: String::new(),
                 type_name: None,
+                subsets: None,
                 redefines: Some(redefines_target),
                 multiplicity: multiplicity_opt,
                 body,

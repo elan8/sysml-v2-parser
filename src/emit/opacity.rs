@@ -105,6 +105,9 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
             hit(report, path, OpacityKind::KermlSemanticDecl)
         }
         PackageBodyElement::KermlFeatureDecl(_) => hit(report, path, OpacityKind::KermlFeatureDecl),
+        // Structurally recognized -- keyword, optional name, optional multiplicity, `;` -- not
+        // an opaque/recovery node.
+        PackageBodyElement::KermlBareDeclaration(_) => {}
         PackageBodyElement::ExtendedLibraryDecl(_) => {
             hit(report, path, OpacityKind::ExtendedLibraryDecl)
         }
@@ -191,8 +194,28 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::MetadataKeywordUsage(m) => {
             walk_attribute_body(report, path, &m.value.body)
         }
+        PackageBodyElement::MetadataAnnotation(m) => {
+            walk_attribute_body(report, path, &m.value.body)
+        }
         PackageBodyElement::AssertConstraint(a) => {
             walk_constraint_def_body(report, path, &a.value.body)
+        }
+        PackageBodyElement::PerformUsage(p) => walk_perform_body(report, path, &p.value.body),
+        PackageBodyElement::BindingConnectorUsage(b) => {
+            walk_connect_body(report, path, &b.value.body)
+        }
+        PackageBodyElement::ClassDef(c) => walk_attribute_body(report, path, &c.value.body),
+        PackageBodyElement::Succession(first) => {
+            walk_first_merge_body(report, path, &first.value.body)
+        }
+        PackageBodyElement::ExhibitState(exhibit) => {
+            walk_state_def_body(report, path, &exhibit.value.body)
+        }
+        PackageBodyElement::IncludeUseCase(include) => {
+            walk_use_case_def_body(report, path, &include.value.body)
+        }
+        PackageBodyElement::ExtendedDefinition(definition) => {
+            walk_package_body(report, path, &definition.value.body)
         }
         PackageBodyElement::Satisfy(s) => walk_satisfy(report, path, &s.value),
         PackageBodyElement::Import(i) => {
@@ -641,6 +664,7 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             }
             AttributeBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             AttributeBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
+            AttributeBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::Doc(_) => {}
         }
     }
@@ -663,6 +687,9 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
                 walk_attribute_body(report, &p, &n.value.body)
             }
             PortDefBodyElement::PortUsage(n) => walk_port_body(report, &p, &n.value.body),
+            PortDefBodyElement::MetadataKeywordUsage(n) => {
+                walk_attribute_body(report, &p, &n.value.body)
+            }
             PortDefBodyElement::InOutDecl(_) | PortDefBodyElement::Doc(_) => {}
         }
     }

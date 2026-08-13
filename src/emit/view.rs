@@ -39,6 +39,12 @@ pub(crate) fn emit_constraint_usage(
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
+    if let Some(subsets) = &usage.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        super::structure::emit_subsetting_clause(w, &redefines.value)?;
+    }
     emit_constraint_body(w, path, &usage.body)
 }
 
@@ -115,6 +121,9 @@ pub(crate) fn emit_calc_def(
     emit_visibility(w, def.membership.visibility);
     w.push_str("calc def ");
     emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        super::structure::emit_typing_clause(w, &spec.value)?;
+    }
     emit_calc_body(w, path, &def.body)
 }
 
@@ -208,7 +217,7 @@ fn emit_calc_body_element(
     }
 }
 
-fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {
+pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {
     w.push_str("return ");
     if ret.is_redefine {
         w.push_str(":>> ");
@@ -324,6 +333,9 @@ pub(crate) fn emit_view_usage(
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        emit_typing_clause_as_subset(w, &subsets.value)?;
     }
     if let Some(mult) = &usage.multiplicity {
         super::structure::emit_multiplicity(w, &mult.value)?;

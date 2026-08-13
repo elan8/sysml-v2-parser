@@ -241,6 +241,9 @@ fn try_roundtrip(src: &str) -> RoundtripOutcome {
                 "emit invalid qualified reference at {path}: {id:?}"
             ))
         }
+        Err(EmitError::InvalidSpan { path, span }) => {
+            return RoundtripOutcome::Failed(format!("emit invalid span at {path}: {span:?}"))
+        }
     };
 
     let ast2 = match parse(&emitted) {

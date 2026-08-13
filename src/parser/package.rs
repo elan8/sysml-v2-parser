@@ -15,6 +15,7 @@ use crate::parser::case::{
     verification_case_usage,
 };
 use crate::parser::connection::connection_def;
+use crate::parser::connector::connect_body;
 use crate::parser::constraint::{calc_def, constraint_def, constraint_usage};
 use crate::parser::dependency::dependency;
 use crate::parser::enumeration::{enum_def, enum_usage};
@@ -26,7 +27,7 @@ use crate::parser::grammar_scope::{
 use crate::parser::import::import_;
 use crate::parser::individual::individual_def;
 use crate::parser::interface::interface_def;
-use crate::parser::item::{item_def, item_usage};
+use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
     name, qualified_declaration_name, recover_body_element, skip_statement_or_block,
     starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
@@ -272,6 +273,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)
         | PackageBodyElement::KermlFeatureDecl(_)
+        | PackageBodyElement::KermlBareDeclaration(_)
         | PackageBodyElement::ExtendedLibraryDecl(_)
         | PackageBodyElement::AttributeUsage(_)
         | PackageBodyElement::ItemUsage(_)
@@ -281,9 +283,17 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::Ref(_)
         | PackageBodyElement::EnumerationUsage(_)
         | PackageBodyElement::MetadataKeywordUsage(_)
+        | PackageBodyElement::MetadataAnnotation(_)
         | PackageBodyElement::Connect(_)
         | PackageBodyElement::DefaultReferenceUsage(_)
-        | PackageBodyElement::AssertConstraint(_) => RootElement::Member(boxed),
+        | PackageBodyElement::AssertConstraint(_)
+        | PackageBodyElement::PerformUsage(_)
+        | PackageBodyElement::BindingConnectorUsage(_)
+        | PackageBodyElement::ClassDef(_)
+        | PackageBodyElement::Succession(_)
+        | PackageBodyElement::ExhibitState(_)
+        | PackageBodyElement::IncludeUseCase(_)
+        | PackageBodyElement::ExtendedDefinition(_) => RootElement::Member(boxed),
     };
     Ok((input, node_from_to(start, input, elem)))
 }
@@ -377,6 +387,84 @@ fn strip_common_decl_prefixes(fragment: &[u8]) -> &[u8] {
     frag
 }
 
+/// Package-level `BindingConnectorAsUsage` (BNF §8.2.2.13.2): `binding` (`all`)? name?
+/// multiplicity? (`of`|`bind`)? left `=` right body. See `crate::ast::BindingConnectorUsage`'s
+/// doc comment for the four real shapes this covers.
+fn binding_connector_usage(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::BindingConnectorUsage>> {
+    crate::parser::span::reference_transaction(input, binding_connector_usage_inner)
+}
+
+fn binding_connector_usage_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::BindingConnectorUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"binding"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, all) = opt(preceded(tag(&b"all"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
+    let (peek, _) = ws_and_comments(input)?;
+    let frag = peek.fragment();
+    let (input, name_span) = if all
+        || frag.starts_with(b"[")
+        || starts_with_keyword(frag, b"of")
+        || starts_with_keyword(frag, b"bind")
+    {
+        (input, None)
+    } else {
+        let (input, (span, _text)) = crate::parser::span::with_span(name).parse(input)?;
+        (input, Some(span))
+    };
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, uses_of_keyword) = if starts_with_keyword(peek.fragment(), b"of") {
+        let (input, _) = preceded(ws_and_comments, tag(&b"of"[..])).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (input, true)
+    } else {
+        (input, false)
+    };
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, uses_bind_keyword) =
+        if !uses_of_keyword && starts_with_keyword(peek.fragment(), b"bind") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"bind"[..])).parse(input)?;
+            let (input, _) = ws1(input)?;
+            (input, true)
+        } else {
+            (input, false)
+        };
+    let (input, left) =
+        preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+    let (input, right) =
+        preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+    let (input, body) = connect_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::BindingConnectorUsage {
+                all,
+                name_span,
+                multiplicity,
+                uses_of_keyword,
+                uses_bind_keyword,
+                left,
+                right,
+                body,
+            },
+        ),
+    ))
+}
+
 fn is_modeled_decl_start(fragment: &[u8], starters: &[&[u8]]) -> bool {
     if fragment.starts_with(b"#") {
         return false;
@@ -406,16 +494,8 @@ fn unsupported_package_element(
         PackageProduction::BindingConnectorAsUsage => {
             crate::ast::UnsupportedProduction::BindingConnectorAsUsage
         }
-        PackageProduction::Message => crate::ast::UnsupportedProduction::Message,
-        PackageProduction::Succession => crate::ast::UnsupportedProduction::SuccessionAsUsage,
         PackageProduction::PerformActionUsage => {
             crate::ast::UnsupportedProduction::PerformActionUsage
-        }
-        PackageProduction::ExhibitStateUsage => {
-            crate::ast::UnsupportedProduction::ExhibitStateUsage
-        }
-        PackageProduction::IncludeUseCaseUsage => {
-            crate::ast::UnsupportedProduction::IncludeUseCaseUsage
         }
         PackageProduction::PrefixMetadataMember
         | PackageProduction::DefinitionElement
@@ -438,6 +518,10 @@ fn unsupported_package_element(
         | PackageProduction::Expose
         | PackageProduction::ElementFilterMember
         | PackageProduction::Flow
+        | PackageProduction::Message
+        | PackageProduction::Succession
+        | PackageProduction::ExhibitStateUsage
+        | PackageProduction::IncludeUseCaseUsage
         | PackageProduction::RequirementBodyItem
         | PackageProduction::Import
         | PackageProduction::Individual
@@ -463,7 +547,9 @@ fn unsupported_package_element(
         | PackageProduction::FeaturePrefix
         | PackageProduction::UsagePrefix
         | PackageProduction::Connector
-        | PackageProduction::TextualRepresentationLanguage => return None,
+        | PackageProduction::TextualRepresentationLanguage
+        | PackageProduction::Feature
+        | PackageProduction::Class => return None,
     };
     let found = crate::parser::recovery::recovery_found_snippet_from_span(input, recovery_end);
     let recovery = crate::ast::ParseErrorNode {
@@ -524,6 +610,52 @@ fn parse_modeled_decl<'a>(
     Ok((input, (bnf_production, modeled_decl_text(raw_start, input))))
 }
 
+/// Structurally recognized bare KerML declaration: `kind` `name`? (`[` multiplicity `]`)? `;`.
+/// Covers `datatype DeferredType;`, `multiplicity exactlyOne [1..1];`,
+/// `interaction DeferredInteraction;`, `predicate deferredPredicate;`, `classifier
+/// SpatialFrame;`, and the same shape for every other KerML classifier/feature keyword whose
+/// bare (bodyless) form uses it (`class` is handled by [`class_def`] itself, whose body accepts
+/// a bare `;` -- see `attribute_body`). Tried before the opaque
+/// [`kerml_semantic_decl`]/[`classifier_decl`] fallbacks so this common shape gets a structured
+/// node; a keyword followed by a `{` body or a `:>`/`specializes` clause (a different, larger
+/// production, e.g. [`class_def`]) falls through to those other productions unchanged.
+fn kerml_bare_declaration(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlBareDeclaration>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (keyword_bytes, keyword) = crate::ast::KermlBareDeclarationKeyword::starters()
+        .iter()
+        .find(|(kw, _)| starts_with_keyword(input.fragment(), kw))
+        .ok_or_else(|| {
+            nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+        })?;
+    let (input, _) = nom::bytes::complete::tag(*keyword_bytes).parse(input)?;
+    let keyword = *keyword;
+    let (input, name_span) =
+        opt(preceded(ws1, crate::parser::span::with_span(name))).parse(input)?;
+    let name_span = name_span.map(|(span, _text)| span);
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, _) =
+        preceded(ws_and_comments, nom::bytes::complete::tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlBareDeclaration {
+                keyword,
+                name_span,
+                multiplicity,
+            },
+        ),
+    ))
+}
+
 fn kerml_semantic_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlSemanticDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[
@@ -581,6 +713,36 @@ fn feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureDecl>> {
     ))
 }
 
+/// KerML `class` classifier definition: `class` Identification (`:>`|`specializes`) type? body.
+/// Mirrors `individual_def` exactly (same `def`-optional, `no_abstract`, captured-visibility
+/// shape) -- see `crate::ast::ClassDef`'s doc comment.
+fn class_def(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ClassDef>> {
+    let start = input;
+    let (input, prefix) = crate::parser::definition_prefix::parse_definition_prefix(
+        input,
+        crate::parser::definition_prefix::DefinitionPrefixOptions::new(b"class")
+            .no_abstract()
+            .with_captured_visibility(),
+    )?;
+    let (input, body) = crate::parser::attribute::attribute_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::ClassDef {
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                body,
+                membership: crate::ast::Membership::owning(
+                    prefix.visibility,
+                    prefix.visibility_span,
+                ),
+            },
+        ),
+    ))
+}
+
 fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[
@@ -595,6 +757,160 @@ fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>>
         input,
         node_from_to(start, input, ClassifierDecl { keyword, text }),
     ))
+}
+
+/// KerML bare `feature` usage declaration: `feature` name (`:` type | `:>` target | `:>>`
+/// target)? (`=` value)? `;`. Reuses the same `DefaultReferenceUsage` shape the keyword-less
+/// `name;` / `name = expr;` form already produces (see `feature_value_binding`/
+/// `bare_or_valued_feature_binding` in `attribute.rs`), just with the explicit leading `feature`
+/// keyword consumed first and `:` typing additionally supported (those two helpers only handle
+/// `:>`/`:>>`, never a plain `:` type since the keyword-less form can't tell a type from an
+/// expression there).
+fn feature_usage_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    crate::parser::span::reference_transaction(input, feature_usage_member_inner)
+}
+
+fn feature_usage_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"feature"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, (name_span, name_str)) = crate::parser::span::with_span(name).parse(input)?;
+    let (input, typing_result) = crate::parser::usage::optional_typings(input)?;
+    let (typing_span, typing) = typing_result
+        .map(|(span, is_conj, targets)| {
+            (
+                Some(span.clone()),
+                Some(crate::parser::usage::typing_node(span, is_conj, targets)),
+            )
+        })
+        .unwrap_or((None, None));
+    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
+    let leading_value = spec.subsets.as_ref().and_then(|(_, v)| v.clone());
+    let (input, value) =
+        opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
+    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
+    let (ws_input, _) = ws_and_comments(input)?;
+    let (input, body) = if ws_input.fragment().starts_with(b"{") {
+        let (input, elements) = feature_body_brace(ws_input)?;
+        (input, Some(elements))
+    } else {
+        let (input, _) = tag(&b";"[..]).parse(ws_input)?;
+        (input, None)
+    };
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::DefaultReferenceUsage {
+                name: name_str,
+                typing,
+                subsets: spec.subsets.map(|(target, _value)| target),
+                redefines: spec.redefines,
+                value,
+                name_span: Some(name_span),
+                typing_span,
+                membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
+                has_feature_keyword: true,
+                body,
+            },
+        ),
+    ))
+}
+
+/// `feature NAME { ... }`'s block body: zero or more nested members, currently just a nested
+/// owned `expr NAME { ... }` (the only shape the pinned KerML fixtures exercise, see
+/// `DefaultReferenceUsage::body`'s doc comment). Not registered with `parse_structured_brace_members`
+/// (no recovery-element/starter-list machinery yet needed for this narrow shape) -- add that
+/// machinery if/when a second member kind needs it.
+fn feature_body_brace(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<Node<crate::ast::FeatureBodyElement>>> {
+    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = tag(&b"}"[..]).parse(input)?;
+            return Ok((input, elements));
+        }
+        let (next, element) = feature_body_element(input)?;
+        elements.push(element);
+        input = next;
+    }
+}
+
+fn feature_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::FeatureBodyElement>> {
+    let start = input;
+    let (input, member) = expr_member(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, crate::ast::FeatureBodyElement::Expr(member)),
+    ))
+}
+
+/// Nested owned expression feature: `expr` name `{` (`in`/`out`/`inout` parameter | `return`
+/// declaration)* `}`. Reuses the same parameter-list machinery `calc`/`constraint` bodies already
+/// share (`crate::parser::action::in_out_decl`, `crate::parser::constraint::return_decl`) rather
+/// than reimplementing `in`/`return` parsing for this nested shape.
+fn expr_member(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ExprMember>> {
+    let start = input;
+    let (input, _) = tag(&b"expr"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, (name_span, name_str)) = crate::parser::span::with_span(name).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
+    let mut input = input;
+    let mut members = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = tag(&b"}"[..]).parse(input)?;
+            return Ok((
+                input,
+                node_from_to(
+                    start,
+                    input,
+                    crate::ast::ExprMember {
+                        name: name_str,
+                        name_span: Some(name_span),
+                        body: members,
+                    },
+                ),
+            ));
+        }
+        let (next, member) = expr_member_element(input)?;
+        members.push(member);
+        input = next;
+    }
+}
+
+fn expr_member_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::ExprMemberElement>> {
+    let start = input;
+    let (input, elem) = if starts_with_keyword(input.fragment(), b"return") {
+        map(
+            crate::parser::constraint::return_decl,
+            crate::ast::ExprMemberElement::ReturnDecl,
+        )
+        .parse(input)?
+    } else {
+        map(
+            crate::parser::action::in_out_decl,
+            crate::ast::ExprMemberElement::InOutDecl,
+        )
+        .parse(input)?
+    };
+    Ok((input, node_from_to(start, input, elem)))
 }
 
 fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLibraryDecl>> {
@@ -1028,6 +1344,28 @@ fn try_package_body_structure<'a>(
         crate::parser::part::connect_,
         PackageBodyElement::Connect
     );
+    // `BindingConnectorAsUsage` at package level, e.g. `binding instant[instantNum] of startShot
+    // = endShot;` -- see `binding_connector_usage`'s doc comment for the full grammar this
+    // covers.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        BindingConnectorAsUsage,
+        binding_connector_usage,
+        PackageBodyElement::BindingConnectorUsage
+    );
+    // Package-level `SuccessionAsUsage` (BNF §8.2.2.13.3), e.g. `succession s1 : AB first a then
+    // b;`, `first a then b;` -- reuses `first_stmt`, the identical shape already parsed inside
+    // action bodies (GH-38).
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Succession,
+        crate::parser::action::first_stmt,
+        PackageBodyElement::Succession
+    );
     try_package_body_dispatch!(
         input,
         start,
@@ -1149,6 +1487,14 @@ fn try_package_body_structure<'a>(
         flow_usage,
         PackageBodyElement::FlowUsage
     );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Message,
+        flow_usage,
+        PackageBodyElement::FlowUsage
+    );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,
@@ -1190,12 +1536,32 @@ fn try_package_body_behavior<'a>(
         input,
         start,
         starter,
+        ExhibitStateUsage,
+        crate::parser::part::exhibit_state,
+        PackageBodyElement::ExhibitState
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        IncludeUseCaseUsage,
+        crate::parser::usecase::include_use_case,
+        PackageBodyElement::IncludeUseCase
+    );
+    // GH-90.2 / gap #7: package-level `item_def` requires the `def` keyword (mirroring
+    // `action_def`/`state_def`) so a bodyless `individual item i1;` short usage form isn't
+    // misclassified as an `ItemDef` with `i1` as the definition's identification name. Without
+    // `.def_required()`, `item_def`'s `individual_allowed()` option let it match `individual item
+    // i1;` before `item_usage` (below) was ever tried.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
         Item,
-        item_def,
+        item_def_required,
         PackageBodyElement::ItemDef
     );
-    // PAR-002: standalone item usage at package level, tried after `item_def` above (`def`-
-    // optional per its own dispatch here) for the same reason as `port_usage`/`AttributeUsage`.
+    // PAR-002: standalone item usage at package level, tried after `item_def` above.
     try_package_body_dispatch!(
         input,
         start,
@@ -1211,6 +1577,27 @@ fn try_package_body_behavior<'a>(
         Individual,
         individual_def,
         PackageBodyElement::IndividualDef
+    );
+    // KerML `class` classifier definition (e.g. `class B :> A { }`), previously only reachable
+    // through the opaque `classifier_decl` fallback -- see `class_def`'s doc comment.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Class,
+        class_def,
+        PackageBodyElement::ClassDef
+    );
+    // KerML bare `feature` usage declaration (e.g. `feature x;`, `feature x : Type;`, `feature x
+    // :> Target;`), previously only reachable through the opaque `kerml_feature_decl` fallback --
+    // see `feature_usage_member`'s doc comment.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Feature,
+        feature_usage_member,
+        PackageBodyElement::DefaultReferenceUsage
     );
     try_package_body_dispatch!(
         input,
@@ -1235,6 +1622,18 @@ fn try_package_body_behavior<'a>(
         Calculation,
         calc_def,
         PackageBodyElement::CalcDef
+    );
+    // Standalone `perform <action-path>;` performance usage at package level (e.g. `perform
+    // process;`, OMG spec Annex `4a-Fundamental Activities.sysml`-style shorthand form).
+    // `perform_usage` (shared with part-def/part-usage bodies) already covers the full
+    // `perform` action_path (`:>>` target)? (`=` value)? (`;`|`{ }`) grammar.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        PerformActionUsage,
+        crate::parser::part::perform_usage,
+        PackageBodyElement::PerformUsage
     );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
@@ -1411,6 +1810,15 @@ fn try_package_body_view<'a>(
         PackageBodyElement::RenderingUsage
     );
     try_package_body_dispatch!(input, start, feature_decl, PackageBodyElement::FeatureDecl);
+    // Bare `classifier`/`class` forward declarations (e.g. `classifier SpatialFrame;`, `class
+    // B;`) are tried before the opaque `classifier_decl` fallback so this common shape gets a
+    // structured node -- see `kerml_bare_declaration`'s doc comment.
+    try_package_body_dispatch!(
+        input,
+        start,
+        kerml_bare_declaration,
+        PackageBodyElement::KermlBareDeclaration
+    );
     try_package_body_dispatch!(
         input,
         start,
@@ -1459,6 +1867,22 @@ pub(crate) fn package_body_element(
     if let Ok(r) = try_package_body_view(input, start, starter) {
         return Ok(r);
     }
+    // `ExtendedDefinition` (SysML §8.2.2.27): `#<keyword>+ def <Name> ...`. Must be tried before
+    // `metadata_keyword_usage`/`metadata_keyword_prefix` below get first refusal on a `#<name>`
+    // sequence immediately followed by `def` -- `def Failure;` alone is not an independently
+    // valid production, so leaving it for the next body-element iteration (as
+    // `metadata_keyword_prefix` does for ordinary `PrefixMetadataMember` prefixes) would hit raw
+    // recovery. Speculative: rolls back cleanly (via `reference_transaction`) to the ordinary
+    // `#`-forms below when the `def`/name tail isn't present.
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::extended_definition,
+            PackageBodyElement::ExtendedDefinition,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
     // `#keyword` metadata tag -- package bodies previously had no `#`/`@` annotation support at
     // all. Tried only after every other dispatcher above: some definitions (e.g. `connection_def`
     // via `DefinitionPrefixOptions::with_derivation_role()`) already capture `#derivation`
@@ -1481,6 +1905,18 @@ pub(crate) fn package_body_element(
         map(
             crate::parser::metadata_annotation::metadata_keyword_prefix,
             PackageBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
+    // `@ Name (: Type)? (about target(, target)*)? body` standalone annotation statement
+    // (KerML `Annotation`/`@`-syntax) -- previously only the `#`-keyword forms above were
+    // dispatched at package scope, e.g. `@ Classified about Annotated;`.
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_annotation,
+            PackageBodyElement::MetadataAnnotation,
         )
         .parse(input)
     }) {
@@ -1537,6 +1973,15 @@ pub(crate) fn package_body_element(
         map(
             crate::parser::attribute::feature_value_binding,
             PackageBodyElement::DefaultReferenceUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            kerml_bare_declaration,
+            PackageBodyElement::KermlBareDeclaration,
         )
         .parse(input)
     }) {

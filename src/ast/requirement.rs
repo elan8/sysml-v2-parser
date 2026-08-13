@@ -305,6 +305,8 @@ pub struct FrameMember {
 pub struct ConcernUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: RequirementDefBody,
     /// True for `concern def ...`, false for a bare `concern ...` usage. `concern_usage` handles
     /// both the `concern` and `concern def` textual forms itself rather than through a separate
@@ -336,6 +338,8 @@ pub struct CaseDef {
 pub struct CaseUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract case ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -366,6 +370,8 @@ pub struct AnalysisCaseDef {
 pub struct AnalysisCaseUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract analysis ...`.
     pub is_abstract: bool,
     /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual

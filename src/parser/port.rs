@@ -106,6 +106,11 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1, gap #7), e.g.
+    // `individual port po1;` (`Simple Tests/IndividualTest.sysml`-style short usage form).
+    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
     let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
@@ -193,6 +198,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 is_abstract,
                 is_derived,
                 is_constant,
+                is_individual,
                 name: name_str,
                 short_name,
                 typing,
@@ -217,6 +223,28 @@ const PORT_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `#keyword` metadata tag -- tried first so a stacked/prefixing `#idd port APIS_HTTP { ... }`
+    // (bare form, then `PrefixMetadataMember`-style form prefixing the next port-body member)
+    // dispatches here instead of falling through to the opaque-capture fallback below. Mirrors
+    // `package_body_element`'s identical two-arm `#`-handling.
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_usage,
+            PortDefBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_prefix,
+            PortDefBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
     let (input, elem) = alt((
         map(directed_item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),

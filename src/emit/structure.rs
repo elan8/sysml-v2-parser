@@ -551,6 +551,9 @@ fn emit_attribute_body_element(
         }
         AttributeBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         AttributeBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
+        AttributeBodyElement::ItemUsage(i) => {
+            super::requirement::emit_item_usage(w, path, &i.value)
+        }
     }
 }
 
@@ -576,6 +579,9 @@ pub(crate) fn emit_port_usage(
     emit_visibility(w, usage.membership.visibility);
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
+    }
+    if usage.is_individual {
+        w.push_str("individual ");
     }
     if usage.is_abstract {
         w.push_str("abstract ");
@@ -684,6 +690,9 @@ fn emit_port_def_body_element(
         PortDefBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
         PortDefBodyElement::EnumerationUsage(e) => {
             super::requirement::emit_enumeration_usage(w, path, &e.value)
+        }
+        PortDefBodyElement::MetadataKeywordUsage(m) => {
+            emit_metadata_keyword_usage(w, path, &m.value)
         }
     }
 }
@@ -960,21 +969,29 @@ pub(crate) fn emit_interface_usage(
         InterfaceUsage::TypedConnect {
             name,
             interface_type,
+            subsets,
+            redefines,
             from,
             to,
             body,
             body_elements,
         } => {
-            w.push_str("interface ");
+            w.push_str("interface");
             if let Some(n) = name {
-                w.push_str(&format_name(n));
                 w.push_char(' ');
+                w.push_str(&format_name(n));
             }
             if let Some(ty) = interface_type {
-                w.push_str(": ");
+                w.push_str(" : ");
                 w.push_qualified_reference("interface type", *ty)?;
-                w.push_char(' ');
             }
+            if let Some(subsets) = subsets {
+                emit_subsetting_clause(w, &subsets.value)?;
+            }
+            if let Some(redefines) = redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
+            w.push_char(' ');
             w.push_str("connect ");
             emit_expression(w, &from.value)?;
             w.push_str(" to ");
@@ -982,11 +999,20 @@ pub(crate) fn emit_interface_usage(
             emit_interface_usage_body(w, path, body, body_elements)
         }
         InterfaceUsage::Connection {
+            subsets,
+            redefines,
             from,
             to,
             body_elements,
         } => {
-            w.push_str("interface ");
+            w.push_str("interface");
+            if let Some(subsets) = subsets {
+                emit_subsetting_clause(w, &subsets.value)?;
+            }
+            if let Some(redefines) = redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
+            w.push_char(' ');
             emit_expression(w, &from.value)?;
             w.push_str(" to ");
             emit_expression(w, &to.value)?;
@@ -995,20 +1021,32 @@ pub(crate) fn emit_interface_usage(
         InterfaceUsage::Declaration {
             name,
             interface_type,
+            subsets,
+            redefines,
             body,
             body_elements,
         } => {
-            w.push_str("interface ");
+            w.push_str("interface");
             if let Some(n) = name {
+                w.push_char(' ');
                 w.push_str(&format_name(n));
             }
             if let Some(ty) = interface_type {
-                if name.is_some() {
-                    w.push_str(" : ");
-                } else {
-                    w.push_str(": ");
-                }
+                w.push_str(" : ");
                 w.push_qualified_reference("interface type", *ty)?;
+            }
+            if let Some(subsets) = subsets {
+                emit_subsetting_clause(w, &subsets.value)?;
+            }
+            if let Some(redefines) = redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
+            if name.is_none()
+                && interface_type.is_none()
+                && subsets.is_none()
+                && redefines.is_none()
+            {
+                w.push_char(' ');
             }
             emit_interface_usage_body(w, path, body, body_elements)
         }
@@ -1185,6 +1223,37 @@ pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, _path: &str, bind: &Bind) -> Res
     emit_optional_connect_body(w, bind.body.as_ref())
 }
 
+pub(crate) fn emit_binding_connector_usage(
+    w: &mut EmitWriter<'_>,
+    _path: &str,
+    usage: &crate::ast::BindingConnectorUsage,
+) -> Result<(), EmitError> {
+    w.push_str("binding");
+    if usage.all {
+        w.push_str(" all");
+    }
+    if let Some(name_span) = &usage.name_span {
+        w.push_char(' ');
+        w.push_span_name("binding-connector-usage/name", name_span)?;
+    }
+    if let Some(mult) = &usage.multiplicity {
+        if usage.name_span.is_none() {
+            w.push_char(' ');
+        }
+        emit_multiplicity(w, &mult.value)?;
+    }
+    w.push_char(' ');
+    if usage.uses_of_keyword {
+        w.push_str("of ");
+    } else if usage.uses_bind_keyword {
+        w.push_str("bind ");
+    }
+    w.push_qualified_reference("binding left", usage.left)?;
+    w.push_str(" = ");
+    w.push_qualified_reference("binding right", usage.right)?;
+    emit_optional_connect_body(w, Some(&usage.body))
+}
+
 fn emit_optional_connect_body(
     w: &mut EmitWriter<'_>,
     body: Option<&ConnectBody>,
@@ -1357,12 +1426,29 @@ pub(crate) fn emit_individual_def(
     emit_attribute_body(w, path, &def.body)
 }
 
+pub(crate) fn emit_class_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::ClassDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    w.push_str("class def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    emit_attribute_body(w, path, &def.body)
+}
+
 pub(crate) fn emit_default_reference_usage(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     usage: &crate::ast::DefaultReferenceUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
+    if usage.has_feature_keyword {
+        w.push_str("feature ");
+    }
     w.push_str(&format_name(&usage.name));
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
@@ -1376,8 +1462,66 @@ pub(crate) fn emit_default_reference_usage(
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
     }
-    w.push_char(';');
+    match &usage.body {
+        None => {
+            w.push_char(';');
+            Ok(())
+        }
+        Some(elements) => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                emit_feature_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
+        }
+    }
+}
+
+fn emit_feature_body_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &crate::ast::FeatureBodyElement,
+) -> Result<(), EmitError> {
+    match el {
+        crate::ast::FeatureBodyElement::Expr(e) => emit_expr_member(w, path, &e.value),
+    }
+}
+
+fn emit_expr_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    member: &crate::ast::ExprMember,
+) -> Result<(), EmitError> {
+    w.push_str("expr ");
+    w.push_str(&format_name(&member.name));
+    w.push_str(" {");
+    w.newline();
+    w.indent();
+    for (i, el) in member.body.iter().enumerate() {
+        emit_expr_member_element(w, &format!("{path}/expr-body[{i}]"), &el.value)?;
+        w.newline();
+    }
+    w.dedent();
+    w.push_char('}');
     Ok(())
+}
+
+fn emit_expr_member_element(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    el: &crate::ast::ExprMemberElement,
+) -> Result<(), EmitError> {
+    match el {
+        crate::ast::ExprMemberElement::InOutDecl(d) => {
+            super::behavior::emit_inout_decl(w, path, &d.value)
+        }
+        crate::ast::ExprMemberElement::ReturnDecl(r) => super::view::emit_return_decl(w, &r.value),
+    }
 }
 
 pub(crate) fn emit_metadata_def(
@@ -1546,6 +1690,9 @@ pub(crate) fn emit_connection_def(
         }
     }
     emit_visibility(w, def.membership.visibility);
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("connection def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -1560,6 +1707,9 @@ pub(crate) fn emit_connection_usage(
     usage: &crate::ast::ConnectionUsageMember,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
+    if usage.by_reference {
+        w.push_str("ref ");
+    }
     w.push_str("connection ");
     if let Some(name) = &usage.name {
         w.push_str(&format_name(name));

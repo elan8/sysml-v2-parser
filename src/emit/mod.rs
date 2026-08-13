@@ -27,7 +27,7 @@ mod writer;
 
 pub use opacity::{opacity_report, OpacityHit, OpacityKind, OpacityReport};
 
-use crate::ast::{ParsedDocument, QualifiedReferenceId};
+use crate::ast::{ParsedDocument, QualifiedReferenceId, Span};
 use writer::EmitWriter;
 
 /// Options controlling canonical SysML emission.
@@ -60,6 +60,8 @@ pub enum EmitError {
         path: String,
         id: QualifiedReferenceId,
     },
+    /// A source-backed span could not be resolved against the document's source text.
+    InvalidSpan { path: String, span: Span },
 }
 
 impl std::fmt::Display for EmitError {
@@ -73,6 +75,9 @@ impl std::fmt::Display for EmitError {
             }
             Self::InvalidQualifiedReference { path, id } => {
                 write!(f, "invalid qualified reference {id:?} at {path}")
+            }
+            Self::InvalidSpan { path, span } => {
+                write!(f, "invalid source span {span:?} at {path}")
             }
         }
     }

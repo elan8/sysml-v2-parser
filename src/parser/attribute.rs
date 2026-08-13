@@ -49,11 +49,11 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
-    b"item",
     // GH-90.1: `individual item ii : II1;` / `individual item :>> i : II2;` inside `item def`
-    // bodies (Simple Tests/IndividualTest.sysml:4,15) -- opaquely captured like the un-prefixed
-    // `item` starter above, matching this body's existing "not fully modeled, but accepted"
-    // convention for item/part usages.
+    // bodies (Simple Tests/IndividualTest.sysml:4,15) are structured by `item_usage` itself
+    // (which accepts the optional leading `individual`) via `AttributeBodyElement::ItemUsage`
+    // below; `individual` stays here only to opaquely capture non-`item` individual forms that
+    // reach this body.
     b"individual",
     b"constraint",
     b"private",
@@ -247,6 +247,12 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(crate::parser::part::part_usage, |n| {
             AttributeBodyElement::PartUsage(Box::new(n))
         }),
+        // Nested `item` usage in item / attribute bodies, e.g. `item picture : Picture;` inside
+        // `attribute def Show { ... }`. Before the opaque-capture fallback below so this common
+        // shape gets a structured node -- see `AttributeBodyElement::ItemUsage`'s doc comment.
+        map(crate::parser::item::item_usage, |n| {
+            AttributeBodyElement::ItemUsage(Box::new(n))
+        }),
         map(
             |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
             AttributeBodyElement::Other,
@@ -437,6 +443,8 @@ pub(crate) fn feature_value_binding(
                 name_span: Some(name_span),
                 typing_span: None,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
+                has_feature_keyword: false,
+                body: None,
             },
         ),
     ))
@@ -487,6 +495,8 @@ pub(crate) fn bare_or_valued_feature_binding(
                 name_span: Some(name_span),
                 typing_span: None,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
+                has_feature_keyword: false,
+                body: None,
             },
         ),
     ))
@@ -1183,6 +1193,8 @@ pub(crate) fn attribute_usage_shorthand(
                 typing_span: Some(typing_span),
                 // No visibility prefix on the no-keyword shorthand form.
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
+                has_feature_keyword: false,
+                body: None,
             },
         ),
     ))

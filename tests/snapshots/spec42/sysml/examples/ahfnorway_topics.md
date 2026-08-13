@@ -170,9 +170,6 @@ package AHFNorway {
 (fixture-diagnostics
   (document "ahfnorway_topics.md"
     (diagnostics
-      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 407) (line 11) (column 11) (len 190)) (message "unexpected keyword `def` in package body"))
-      (diagnostic (code "unsupported_annotation_syntax") (severity warning) (category unsupportedgrammarform) (span (offset 721) (line 22) (column 3) (len 146)) (message "incomplete parser support for annotation syntax in port definition body"))
-      (diagnostic (code "unsupported_annotation_syntax") (severity warning) (category unsupportedgrammarform) (span (offset 867) (line 28) (column 3) (len 135)) (message "incomplete parser support for annotation syntax in port definition body"))
       (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 1430) (line 47) (column 11) (len 3512)) (message "unrecognized declaration `AHFNorway_LocalCloudDD` in package body"))
     )
   )
@@ -187,29 +184,28 @@ package AHFNorway {
     private import AHFProfileMetadata::*;
     private import AHFCoreLib::**;
     private import ScalarValues::*;
-    #service;
-    def APISService {
-		doc /* Service design */		
-
-		attribute :>> serviceDefinition = "APISPullService";
-		attribute :>> intrfce_protocol = "{JSON}";
-		attribute :>> serviceURL = "pull";
-	}
+    #service def APISService {
+        doc
+        /* Service design */
+        attribute  :>> serviceDefinition = "APISPullService";
+        attribute  :>> intrfce_protocol = "{JSON}";
+        attribute  :>> serviceURL = "pull";
+    }
     #servicedd;
     port def APIS_DD :> APISService {
         doc
         /* Service design description with nested protocol-specific ports */
-        #idd port APIS_HTTP {
-			// the asynch implementation of synchronous remote calls
-			out cll:CallGiveItems;
-			in retrn:ResultGiveItems;
-		}
-        #idd port APIS_MQTT  {
-			// GetAllItems functionality
-			out pub:Publish;
-			out retall:Return_AllItems;
-			in subscr:Subscribe;
-		}
+        #idd;
+        port APIS_HTTP {
+            out cll : CallGiveItems;
+            in retrn : ResultGiveItems;
+        }
+        #idd;
+        port APIS_MQTT {
+            out pub : Publish;
+            out retall : Return_AllItems;
+            in subscr : Subscribe;
+        }
     }
     attribute def Publish {
         attribute nametopic : String;
@@ -357,6 +353,6 @@ package AHFNorway {
     (reference r3 (scope relative) (span (offset 379) (line 9) (column 17) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 379) (line 9) (column 17) (len 12)))))
     (reference r4 (scope relative) (span (offset 628) (line 19) (column 33) (len 11)) (segments (segment 0 (token "APISService") (name "APISService") (separator none) (span (offset 628) (line 19) (column 33) (len 11)))))
   )
-  (root (package (name "AHFNorway") (body (doc) (import (target (span (span (offset 274) (line 6) (column 17) (len 16))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 287) (line 6) (column 30) (len 3))) (separator (span (offset 287) (line 6) (column 30) (len 2))) (marker (span (offset 289) (line 6) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 308) (line 7) (column 17) (len 21))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 326) (line 7) (column 35) (len 3))) (separator (span (offset 326) (line 7) (column 35) (len 2))) (marker (span (offset 328) (line 7) (column 37) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 347) (line 8) (column 17) (len 14))) (all none) (ref r2) (shape (membership (recursive-suffix (span (span (offset 357) (line 8) (column 27) (len 4))) (separator (span (offset 357) (line 8) (column 27) (len 2))) (marker (span (offset 359) (line 8) (column 29) (len 2)))))))) (import (target (span (span (offset 379) (line 9) (column 17) (len 15))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 391) (line 9) (column 29) (len 3))) (separator (span (offset 391) (line 9) (column 29) (len 2))) (marker (span (offset 393) (line 9) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (metadata-keyword-usage) (malformed (code "unexpected_keyword_in_scope") (found "def APISService {") (span (offset 407) (line 11) (column 11) (len 190))) (metadata-keyword-usage) (port-def (name "APIS_DD") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r4)))) (body (doc) (malformed (code "unsupported_annotation_syntax") (found "#idd port APIS_HTTP {") (span (offset 721) (line 22) (column 3) (len 146))) (malformed (code "unsupported_annotation_syntax") (found "#idd port APIS_MQTT  {") (span (offset 867) (line 28) (column 3) (len 135))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (metadata-keyword-usage) (malformed (code "unrecognized_declaration_in_scope") (found "AHFNorway_LocalCloudDD :> ArrowheadCore {") (span (offset 1430) (line 47) (column 11) (len 3512))))))
+  (root (package (name "AHFNorway") (body (doc) (import (target (span (span (offset 274) (line 6) (column 17) (len 16))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 287) (line 6) (column 30) (len 3))) (separator (span (offset 287) (line 6) (column 30) (len 2))) (marker (span (offset 289) (line 6) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 308) (line 7) (column 17) (len 21))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 326) (line 7) (column 35) (len 3))) (separator (span (offset 326) (line 7) (column 35) (len 2))) (marker (span (offset 328) (line 7) (column 37) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 347) (line 8) (column 17) (len 14))) (all none) (ref r2) (shape (membership (recursive-suffix (span (span (offset 357) (line 8) (column 27) (len 4))) (separator (span (offset 357) (line 8) (column 27) (len 2))) (marker (span (offset 359) (line 8) (column 29) (len 2)))))))) (import (target (span (span (offset 379) (line 9) (column 17) (len 15))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 391) (line 9) (column 29) (len 3))) (separator (span (offset 391) (line 9) (column 29) (len 2))) (marker (span (offset 393) (line 9) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (extended-def (prefix-keywords ("service")) (definition-prefix none) (name "APISService") (specializes none) (body (doc) (attribute-usage) (attribute-usage) (attribute-usage))) (metadata-keyword-usage) (port-def (name "APIS_DD") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r4)))) (body (doc) (metadata-keyword-usage) (port-usage (declaration-name "APIS_HTTP") (direction none) (typing none) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (element-count 2))) (metadata-keyword-usage) (port-usage (declaration-name "APIS_MQTT") (direction none) (typing none) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (element-count 3))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (metadata-keyword-usage) (malformed (code "unrecognized_declaration_in_scope") (found "AHFNorway_LocalCloudDD :> ArrowheadCore {") (span (offset 1430) (line 47) (column 11) (len 3512))))))
 )
 ~~~

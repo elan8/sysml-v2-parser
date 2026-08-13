@@ -61,7 +61,28 @@ fn emit_library_package(
     emit_package_body(w, path, &pkg.body)
 }
 
-fn emit_package_body(
+fn emit_extended_definition(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::ExtendedDefinition,
+) -> Result<(), EmitError> {
+    if let Some(prefix) = &def.definition_prefix {
+        structure::emit_definition_prefix(w, Some(prefix));
+    }
+    for keyword in &def.prefix_keywords {
+        w.push_char('#');
+        w.push_str(&keyword.value.keyword);
+        w.push_char(' ');
+    }
+    w.push_str("def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        structure::emit_typing_clause(w, &spec.value)?;
+    }
+    emit_package_body(w, path, &def.body)
+}
+
+pub(crate) fn emit_package_body(
     w: &mut EmitWriter<'_>,
     path: &str,
     body: &PackageBody,
@@ -104,6 +125,23 @@ fn emit_package_body_node(
         return w.push_recovery_span(path, &node.span);
     }
     emit_package_body_element(w, path, &node.value)
+}
+
+fn emit_kerml_bare_declaration(
+    w: &mut EmitWriter<'_>,
+    declaration: &crate::ast::KermlBareDeclaration,
+) -> Result<(), EmitError> {
+    w.push_str(declaration.keyword.as_str());
+    if let Some(name_span) = &declaration.name_span {
+        w.push_char(' ');
+        w.push_span_name("kerml-bare-declaration/name", name_span)?;
+    }
+    if let Some(multiplicity) = &declaration.multiplicity {
+        w.push_char(' ');
+        structure::emit_multiplicity(w, &multiplicity.value)?;
+    }
+    w.push_char(';');
+    Ok(())
 }
 
 pub(crate) fn emit_package_body_element(
@@ -196,11 +234,25 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
+        PackageBodyElement::MetadataAnnotation(m) => {
+            structure::emit_metadata_annotation(w, path, &m.value)
+        }
         PackageBodyElement::Ref(r) => structure::emit_ref_decl(w, path, &r.value),
         PackageBodyElement::DefaultReferenceUsage(d) => {
             structure::emit_default_reference_usage(w, path, &d.value)
         }
         PackageBodyElement::AssertConstraint(a) => view::emit_assert_constraint(w, path, &a.value),
+        PackageBodyElement::PerformUsage(p) => behavior::emit_perform(w, path, &p.value),
+        PackageBodyElement::BindingConnectorUsage(b) => {
+            structure::emit_binding_connector_usage(w, path, &b.value)
+        }
+        PackageBodyElement::ClassDef(c) => structure::emit_class_def(w, path, &c.value),
+        PackageBodyElement::Succession(f) => behavior::emit_first_stmt(w, path, &f.value),
+        PackageBodyElement::ExhibitState(e) => behavior::emit_exhibit_state(w, path, &e.value),
+        PackageBodyElement::IncludeUseCase(i) => {
+            requirement::emit_include_use_case(w, path, &i.value)
+        }
+        PackageBodyElement::ExtendedDefinition(d) => emit_extended_definition(w, path, &d.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)
@@ -209,6 +261,9 @@ pub(crate) fn emit_package_body_element(
             path: path.to_string(),
             kind: super::OpacityKind::ExtendedLibraryDecl,
         }),
+        PackageBodyElement::KermlBareDeclaration(declaration) => {
+            emit_kerml_bare_declaration(w, &declaration.value)
+        }
         other @ (PackageBodyElement::Actor(_) | PackageBodyElement::FlowDef(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
