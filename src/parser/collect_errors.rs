@@ -156,6 +156,16 @@ fn collect_first_merge_body_errors(body: &FirstMergeBody, errors: &mut Vec<Parse
     }
 }
 
+/// Collect diagnostics from a direction-prefixed parameter declaration's retained `{ ... }`
+/// terminator body, which shares the action-body member grammar.
+fn collect_in_out_decl_errors(decl: &crate::ast::InOutDecl, errors: &mut Vec<ParseError>) {
+    if let Some(elements) = &decl.body {
+        for element in elements {
+            collect_action_def_body_element_errors(element, errors);
+        }
+    }
+}
+
 fn collect_action_def_body_element_errors(
     element: &crate::ast::Node<ActionDefBodyElement>,
     errors: &mut Vec<ParseError>,
@@ -210,8 +220,8 @@ fn collect_action_def_body_element_errors(
         }
         ActionDefBodyElement::JoinStmt(n) => collect_first_merge_body_errors(&n.value.body, errors),
         ActionDefBodyElement::ForkStmt(n) => collect_first_merge_body_errors(&n.value.body, errors),
-        ActionDefBodyElement::InOutDecl(_)
-        | ActionDefBodyElement::Doc(_)
+        ActionDefBodyElement::InOutDecl(n) => collect_in_out_decl_errors(&n.value, errors),
+        ActionDefBodyElement::Doc(_)
         | ActionDefBodyElement::Annotation(_)
         | ActionDefBodyElement::TerminateStmt(_)
         | ActionDefBodyElement::Assign(_)
@@ -274,8 +284,8 @@ fn collect_constraint_body_element_errors(
             ConstraintDefBodyElement::MetadataAnnotation(n) => {
                 collect_attribute_body_errors(&n.value.body, errors)
             }
+            ConstraintDefBodyElement::InOutDecl(n) => collect_in_out_decl_errors(&n.value, errors),
             ConstraintDefBodyElement::Doc(_)
-            | ConstraintDefBodyElement::InOutDecl(_)
             | ConstraintDefBodyElement::Expression(_)
             | ConstraintDefBodyElement::Other(_) => {}
         }
@@ -385,9 +395,9 @@ fn collect_action_usage_body_element_errors(
         ActionUsageBodyElement::ForkStmt(n) => {
             collect_first_merge_body_errors(&n.value.body, errors)
         }
+        ActionUsageBodyElement::InOutDecl(n) => collect_in_out_decl_errors(&n.value, errors),
         ActionUsageBodyElement::Doc(_)
         | ActionUsageBodyElement::Annotation(_)
-        | ActionUsageBodyElement::InOutDecl(_)
         | ActionUsageBodyElement::TerminateStmt(_)
         | ActionUsageBodyElement::Assign(_)
         | ActionUsageBodyElement::Decl(_)
@@ -428,10 +438,10 @@ fn collect_state_body_element_errors(
         StateDefBodyElement::MetadataKeywordUsage(n) => {
             collect_attribute_body_errors(&n.value.body, errors)
         }
+        StateDefBodyElement::InOutDecl(n) => collect_in_out_decl_errors(&n.value, errors),
         StateDefBodyElement::Doc(_)
         | StateDefBodyElement::Annotation(_)
         | StateDefBodyElement::Other(_)
-        | StateDefBodyElement::InOutDecl(_)
         | StateDefBodyElement::Then(_)
         | StateDefBodyElement::FinalState(_)
         | StateDefBodyElement::Transition(_) => {}
@@ -568,8 +578,10 @@ fn collect_calc_body_errors(body: &CalcDefBody, errors: &mut Vec<ParseError>) {
                     CalcDefBodyElement::MetadataAnnotation(n) => {
                         collect_attribute_body_errors(&n.value.body, errors)
                     }
+                    CalcDefBodyElement::InOutDecl(n) => {
+                        collect_in_out_decl_errors(&n.value, errors)
+                    }
                     CalcDefBodyElement::Doc(_)
-                    | CalcDefBodyElement::InOutDecl(_)
                     | CalcDefBodyElement::ReturnDecl(_)
                     | CalcDefBodyElement::Expression(_)
                     | CalcDefBodyElement::Other(_) => {}
@@ -698,9 +710,10 @@ fn collect_port_def_body_errors(body: &PortDefBody, errors: &mut Vec<ParseError>
                     PortDefBodyElement::MetadataKeywordUsage(n) => {
                         collect_attribute_body_errors(&n.value.body, errors)
                     }
-                    PortDefBodyElement::InOutDecl(_)
-                    | PortDefBodyElement::Doc(_)
-                    | PortDefBodyElement::Other(_) => {}
+                    PortDefBodyElement::InOutDecl(n) => {
+                        collect_in_out_decl_errors(&n.value, errors)
+                    }
+                    PortDefBodyElement::Doc(_) | PortDefBodyElement::Other(_) => {}
                 }
             }
         }
@@ -1329,8 +1342,10 @@ fn collect_port_body_errors(body: &crate::ast::PortBody, errors: &mut Vec<ParseE
                     crate::ast::PortBodyElement::ItemUsage(n) => {
                         collect_attribute_body_errors(&n.value.body, errors)
                     }
-                    crate::ast::PortBodyElement::InOutDecl(_)
-                    | crate::ast::PortBodyElement::Doc(_) => {}
+                    crate::ast::PortBodyElement::InOutDecl(n) => {
+                        collect_in_out_decl_errors(&n.value, errors)
+                    }
+                    crate::ast::PortBodyElement::Doc(_) => {}
                 }
             }
         }

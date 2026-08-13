@@ -414,7 +414,7 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
                 nom::error::ErrorKind::Tag,
             )));
         } else {
-            map(in_out_decl, CalcDefBodyElement::InOutDecl).parse(input)?
+            map(in_out_decl, |n| CalcDefBodyElement::InOutDecl(Box::new(n))).parse(input)?
         }
     } else if calc_def_follows_visibility(input) {
         // Nested `(private|protected|public)? calc def Name { ... }` rollup helper (Domain

@@ -950,7 +950,7 @@ pub struct ExprMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExprMemberElement {
-    InOutDecl(Node<InOutDecl>),
+    InOutDecl(Box<Node<InOutDecl>>),
     ReturnDecl(Node<ReturnDecl>),
 }
 
@@ -1511,6 +1511,10 @@ pub struct OccurrenceDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceUsage {
+    /// Leading `in`/`out`/`inout` direction (BNF `RefPrefix`), e.g. `in occurrence
+    /// terminatedOccurrence[1] { ... }` inside an action definition body (Systems Library
+    /// `Actions.sysml`'s `TerminateAction`). Mirrors [`ItemUsage`]'s `direction`.
+    pub direction: Option<InOut>,
     pub is_individual: bool,
     pub is_then: bool,
     /// True for `event occurrence <name>;` (BNF `EventOccurrenceUsage`, §6 G7) — an occurrence
@@ -1547,6 +1551,9 @@ pub struct OccurrenceUsage {
     pub references: Option<Node<SubsettingRelationship>>,
     pub crosses: Option<Node<SubsettingRelationship>>,
     pub intersects: Option<Node<SubsettingRelationship>>,
+    /// Optional value clause (BNF `ValuePart`), e.g. `in occurrence terminatedOccurrence
+    /// default that as Occurrence { ... }` (Systems Library `Actions.sysml`).
+    pub value: Option<Node<FeatureValue>>,
     pub body: OccurrenceUsageBody,
     pub membership: Membership,
 }

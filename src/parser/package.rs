@@ -904,10 +904,9 @@ fn expr_member_element(
         )
         .parse(input)?
     } else {
-        map(
-            crate::parser::action::in_out_decl,
-            crate::ast::ExprMemberElement::InOutDecl,
-        )
+        map(crate::parser::action::in_out_decl, |n| {
+            crate::ast::ExprMemberElement::InOutDecl(Box::new(n))
+        })
         .parse(input)?
     };
     Ok((input, node_from_to(start, input, elem)))

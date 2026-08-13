@@ -24,13 +24,10 @@ pub(crate) fn emit_inout_decl(
     if decl.is_reference {
         w.push_str("ref ");
     }
-    if let Some(redefines) = &decl.redefines {
-        w.push_str(":>> ");
-        for (index, target) in redefines.value.target.iter().copied().enumerate() {
-            if index > 0 {
-                w.push_str(", ");
-            }
-            w.push_qualified_reference(&format!("{path}/redefines[{index}]"), target)?;
+    let leading_redefinition = decl.name.is_empty();
+    if leading_redefinition {
+        if let Some(redefines) = &decl.redefines {
+            emit_inout_redefines(w, path, redefines)?;
         }
     } else {
         w.push_str(&format_name(&decl.name));
@@ -42,11 +39,50 @@ pub(crate) fn emit_inout_decl(
     if let Some(multiplicity) = &decl.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if let Some(value) = &decl.value {
-        w.push_str(" = ");
-        emit_expression(w, &value.value)?;
+    if decl.ordered {
+        w.push_str(" ordered");
     }
-    w.push_char(';');
+    if decl.nonunique {
+        w.push_str(" nonunique");
+    }
+    if !leading_redefinition {
+        if let Some(redefines) = &decl.redefines {
+            w.push_char(' ');
+            emit_inout_redefines(w, path, redefines)?;
+        }
+    }
+    if let Some(value) = &decl.value {
+        emit_feature_value(w, value)?;
+    }
+    match &decl.body {
+        None => w.push_char(';'),
+        Some(elements) => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                emit_action_def_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+        }
+    }
+    Ok(())
+}
+
+fn emit_inout_redefines(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    redefines: &crate::ast::Node<crate::ast::SubsettingRelationship>,
+) -> Result<(), EmitError> {
+    w.push_str(":>> ");
+    for (index, target) in redefines.value.target.iter().copied().enumerate() {
+        if index > 0 {
+            w.push_str(", ");
+        }
+        w.push_qualified_reference(&format!("{path}/redefines[{index}]"), target)?;
+    }
     Ok(())
 }
 
@@ -268,13 +304,13 @@ fn emit_action_def_body_element(
             w.push_char(' ');
             emit_action_def_body(w, path, &f.value.body)
         }
+        ActionDefBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         other @ (ActionDefBodyElement::Annotation(_)
         | ActionDefBodyElement::MetadataAnnotation(_)
         | ActionDefBodyElement::MetadataKeywordUsage(_)
         | ActionDefBodyElement::MetadataUsage(_)
         | ActionDefBodyElement::TextualRep(_)
-        | ActionDefBodyElement::TerminateStmt(_)
-        | ActionDefBodyElement::OccurrenceUsage(_)) => w.unsupported(
+        | ActionDefBodyElement::TerminateStmt(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -363,13 +399,13 @@ pub(crate) fn emit_action_usage_body_element(
             Ok(())
         }
         ActionUsageBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
+        ActionUsageBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         other @ (ActionUsageBodyElement::Annotation(_)
         | ActionUsageBodyElement::MetadataAnnotation(_)
         | ActionUsageBodyElement::MetadataKeywordUsage(_)
         | ActionUsageBodyElement::MetadataUsage(_)
         | ActionUsageBodyElement::TextualRep(_)
         | ActionUsageBodyElement::TerminateStmt(_)
-        | ActionUsageBodyElement::OccurrenceUsage(_)
         | ActionUsageBodyElement::ForLoop(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -1169,6 +1205,9 @@ pub(crate) fn emit_occurrence_usage(
     if usage.is_then {
         w.push_str("then ");
     }
+    if let Some(direction) = usage.direction {
+        emit_direction(w, direction);
+    }
     if usage.is_abstract {
         w.push_str("abstract ");
     }
@@ -1226,6 +1265,9 @@ pub(crate) fn emit_occurrence_usage(
     }
     if let Some(intersects) = &usage.intersects {
         emit_subsetting_clause(w, &intersects.value)?;
+    }
+    if let Some(value) = &usage.value {
+        emit_feature_value(w, value)?;
     }
     match &usage.body {
         crate::ast::OccurrenceUsageBody::Semicolon => {

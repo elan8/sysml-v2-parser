@@ -294,9 +294,8 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             ConstraintDefBodyElement::MetadataAnnotation(metadata) => {
                 walk_attribute_body(report, &p, &metadata.value.body)
             }
-            ConstraintDefBodyElement::Doc(_)
-            | ConstraintDefBodyElement::InOutDecl(_)
-            | ConstraintDefBodyElement::Expression(_) => {}
+            ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
+            ConstraintDefBodyElement::Doc(_) | ConstraintDefBodyElement::Expression(_) => {}
         }
     }
 }
@@ -316,8 +315,8 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             CalcDefBodyElement::MetadataAnnotation(metadata) => {
                 walk_attribute_body(report, &p, &metadata.value.body)
             }
+            CalcDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             CalcDefBodyElement::Doc(_)
-            | CalcDefBodyElement::InOutDecl(_)
             | CalcDefBodyElement::ReturnDecl(_)
             | CalcDefBodyElement::Expression(_) => {}
         }
@@ -690,7 +689,8 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
             PortDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }
-            PortDefBodyElement::InOutDecl(_) | PortDefBodyElement::Doc(_) => {}
+            PortDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
+            PortDefBodyElement::Doc(_) => {}
         }
     }
 }
@@ -706,7 +706,8 @@ fn walk_port_body(report: &mut OpacityReport, path: &str, body: &PortBody) {
             PortBodyElement::PortUsage(n) => walk_port_body(report, &p, &n.value.body),
             PortBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
-            PortBodyElement::InOutDecl(_) | PortBodyElement::Doc(_) => {}
+            PortBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
+            PortBodyElement::Doc(_) => {}
         }
     }
 }
@@ -716,6 +717,14 @@ fn walk_action_def_body(report: &mut OpacityReport, path: &str, body: &ActionDef
         return;
     };
     walk_action_def_body_elements(report, path, elements);
+}
+
+/// Walk a direction-prefixed parameter declaration's retained `{ ... }` terminator body, which
+/// shares the action-body member grammar.
+fn walk_in_out_decl(report: &mut OpacityReport, path: &str, decl: &crate::ast::InOutDecl) {
+    if let Some(elements) = &decl.body {
+        walk_action_def_body_elements(report, path, elements);
+    }
 }
 
 fn walk_action_def_body_elements(
@@ -779,8 +788,8 @@ fn walk_action_def_body_elements(
             ActionDefBodyElement::ForkStmt(fork) => {
                 walk_first_merge_body(report, &p, &fork.value.body)
             }
+            ActionDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             ActionDefBodyElement::Doc(_)
-            | ActionDefBodyElement::InOutDecl(_)
             | ActionDefBodyElement::TextualRep(_)
             | ActionDefBodyElement::TerminateStmt(_)
             | ActionDefBodyElement::Assign(_)
@@ -857,8 +866,8 @@ fn walk_action_usage_body_elements(
             ActionUsageBodyElement::ForkStmt(fork) => {
                 walk_first_merge_body(report, &p, &fork.value.body)
             }
+            ActionUsageBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             ActionUsageBodyElement::Doc(_)
-            | ActionUsageBodyElement::InOutDecl(_)
             | ActionUsageBodyElement::TextualRep(_)
             | ActionUsageBodyElement::TerminateStmt(_)
             | ActionUsageBodyElement::Assign(_)
@@ -1029,8 +1038,8 @@ fn walk_state_def_body_elements(
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
             StateDefBodyElement::Transition(n) => walk_connect_body(report, &p, &n.value.body),
+            StateDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             StateDefBodyElement::Doc(_)
-            | StateDefBodyElement::InOutDecl(_)
             | StateDefBodyElement::Then(_)
             | StateDefBodyElement::FinalState(_) => {}
         }
@@ -1181,9 +1190,8 @@ fn walk_constraint_body_elements(
             ConstraintDefBodyElement::MetadataAnnotation(metadata) => {
                 walk_attribute_body(report, &p, &metadata.value.body)
             }
-            ConstraintDefBodyElement::Doc(_)
-            | ConstraintDefBodyElement::InOutDecl(_)
-            | ConstraintDefBodyElement::Expression(_) => {}
+            ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
+            ConstraintDefBodyElement::Doc(_) | ConstraintDefBodyElement::Expression(_) => {}
         }
     }
 }

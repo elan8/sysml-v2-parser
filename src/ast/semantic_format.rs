@@ -1399,15 +1399,36 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 } else {
                     self.writer.write_str("none")?;
                 }
+                self.writer.write_str(") (ordered ")?;
+                self.writer.write_str(if declaration.value.ordered {
+                    "true"
+                } else {
+                    "false"
+                })?;
+                self.writer.write_str(") (nonunique ")?;
+                self.writer.write_str(if declaration.value.nonunique {
+                    "true"
+                } else {
+                    "false"
+                })?;
                 self.writer.write_str(") ")?;
                 self.write_optional_subsetting("redefines", declaration.value.redefines.as_ref())?;
                 self.writer.write_str(" (value ")?;
                 if let Some(value) = &declaration.value.value {
-                    self.write_expression(value)?;
+                    self.write_feature_value(&value.value)?;
                 } else {
                     self.writer.write_str("none")?;
                 }
-                self.writer.write_str(") ")?;
+                self.writer.write_str(")")?;
+                if let Some(body) = &declaration.value.body {
+                    self.writer.write_str(" (body")?;
+                    for element in body {
+                        self.writer.write_char(' ')?;
+                        self.write_first_merge_member(&element.value, &element.span)?;
+                    }
+                    self.writer.write_char(')')?;
+                }
+                self.writer.write_char(' ')?;
                 write_span(self.writer, span)?;
                 self.writer.write_char(')')
             }
@@ -1455,8 +1476,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::AssertConstraint(_constraint) => {
                 self.writer.write_str("(assert-constraint)")
             }
-            ActionDefBodyElement::OccurrenceUsage(_occurrence) => {
-                self.writer.write_str("(occurrence-usage)")
+            ActionDefBodyElement::OccurrenceUsage(occurrence) => {
+                self.writer.write_str("(occurrence-usage (direction ")?;
+                self.write_direction(occurrence.value.direction)?;
+                self.writer.write_str("))")
             }
             ActionDefBodyElement::Assign(_assign) => self.writer.write_str("(assign)"),
             ActionDefBodyElement::ForLoop(for_loop) => self.write_for_loop(&for_loop.value),

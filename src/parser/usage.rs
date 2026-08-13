@@ -480,15 +480,29 @@ pub(crate) fn specialization_clauses(
 }
 
 pub(crate) fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = usage_feature_modifier_flags(input)?;
+    Ok((input, ()))
+}
+
+/// Parse zero or more `ordered` / `nonunique` multiplicity-property keywords (BNF
+/// `MultiplicityPart`), returning which of the two were written as `(ordered, nonunique)`
+/// flags. Like [`skip_usage_feature_modifiers`], leaves the whitespace before a non-modifier
+/// token unconsumed.
+pub(crate) fn usage_feature_modifier_flags(input: Input<'_>) -> IResult<Input<'_>, (bool, bool)> {
     let mut input = input;
+    let mut ordered = false;
+    let mut nonunique = false;
     loop {
         let (after_ws, _) = ws_and_comments(input)?;
-        match consume_literal(after_ws, b"ordered")
-            .or_else(|| consume_literal(after_ws, b"nonunique"))
-        {
+        if let Some(rest) = consume_literal(after_ws, b"ordered") {
+            ordered = true;
+            input = rest;
+        } else if let Some(rest) = consume_literal(after_ws, b"nonunique") {
+            nonunique = true;
+            input = rest;
+        } else {
             // Leave the whitespace before a non-modifier unconsumed, as `preceded` did.
-            None => return Ok((input, ())),
-            Some(rest) => input = rest,
+            return Ok((input, (ordered, nonunique)));
         }
     }
 }

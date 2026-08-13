@@ -10,6 +10,7 @@ use super::structure::{
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
+use crate::ast::feature_value::FeatureValue;
 use crate::ast::QualifiedReferenceId;
 
 /// Action definition: `action def` Identification body (in/out params).
@@ -149,7 +150,9 @@ pub enum ThenTarget {
     Feature(Node<Expression>),
 }
 
-/// In/out parameter in action def: `in` name `:` type `;` or `out` name `:` type `;`.
+/// Direction-prefixed parameter declaration (BNF `FeatureDirection` + keyword-less `Usage`),
+/// e.g. `in` name `:` type `;`, `inout replacementValues : Anything[0..*] nonunique;`, or
+/// `in transitionLinkSource : Action :>> TransitionPerformance::transitionLinkSource;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InOutDecl {
@@ -159,12 +162,30 @@ pub struct InOutDecl {
     /// Declared parameter name. Empty for the leading `:>> target` redefinition form.
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
-    /// Multiplicity following the type, when present.
+    /// Multiplicity clause (BNF `MultiplicityPart`). May precede the typing (`in
+    /// transitionLinkSource[1]: StateAction :>> ...`, Systems Library `States.sysml`) or follow
+    /// it (`inout replacementValues : Anything[0..*] nonunique;`, `Actions.sysml`); the parser
+    /// accepts one clause in either position.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// Arena-backed target for `in :>> target = expr;` / `out :>> target;` (validation `08`).
+    /// `ordered` keyword from `MultiplicityPart` (`in seq[1..*] nonunique ordered;`,
+    /// Systems Library `Interfaces.sysml`).
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
+    pub nonunique: bool,
+    /// Arena-backed redefinition targets, from either position the grammar allows: the leading
+    /// unnamed form (`in :>> target = expr;`, validation `08`; `name` is empty) or trailing a
+    /// named declaration (`in transitionLinkSource : Action :>> A::x, B::y;`, Systems Library
+    /// `Actions.sysml`/`States.sysml`; `name` is non-empty). Comma-separated multi-target
+    /// clauses keep every target.
     pub redefines: Option<Node<SubsettingRelationship>>,
-    /// Optional default value: `= expr` initializer on in/out parameters.
-    pub value: Option<Node<Expression>>,
+    /// Optional value clause: `= expr`, `:= expr`, or `default (=|:=)? expr` (BNF
+    /// `FeatureValue`), e.g. `in target : Occurrence[1] default that as Occurrence { ... }`
+    /// (Systems Library `Actions.sysml`).
+    pub value: Option<Node<FeatureValue>>,
+    /// Retained `{ ... }` terminator body elements (`in occ ... { doc ... }`); `None` for the
+    /// `;`-terminated form. Parameter bodies share the action-body member grammar, matching the
+    /// parser, which always dispatched brace terminators through the action-body machinery.
+    pub body: Option<Vec<Node<ActionDefBodyElement>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

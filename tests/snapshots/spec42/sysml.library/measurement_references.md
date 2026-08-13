@@ -536,7 +536,6 @@ standard library package MeasurementReferences {
 (fixture-diagnostics
   (document "measurement_references.md"
     (diagnostics
-      (diagnostic (code "recovered_constraint_body_element") (severity error) (category parseerror) (span (offset 21298) (line 523) (column 6) (len 54)) (message "unexpected token in constraint body"))
     )
   )
 )
@@ -1007,7 +1006,7 @@ standard library package MeasurementReferences {
         /*
 		 * Constraint definition to verify that the given unit power factors comply with the required quantity dimension
 		 */
-        in unitPowerFactors: UnitPowerFactor[*] ordered;
+        in unitPowerFactors : UnitPowerFactor[*] ordered;
         in quantityDimension : QuantityDimension[1];
     }
 }

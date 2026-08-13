@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 108.** Direction-prefixed parameter declarations (`InOutDecl`)
+  now cover the full BNF `FeatureSpecializationPart`/`ValuePart` surface the Systems Library
+  uses: the multiplicity clause may precede the typing (`in transitionLinkSource[1]:
+  StateAction :>> ...`), `ordered`/`nonunique` multiplicity properties are retained as typed
+  flags, a `:>>` redefinition (including comma-separated multi-target form) may trail a named
+  declaration, the value clause is a full `FeatureValue` (`= expr` / `:= expr` /
+  `default (=|:=)? expr`) instead of a bare `= expr` expression, and a `{ ... }` terminator
+  body is retained as typed action-body elements instead of being consumed and discarded.
+  `OccurrenceUsage` gains `direction: Option<InOut>` (BNF `RefPrefix`, e.g. `in occurrence
+  terminatedOccurrence[1] { ... }`, dispatched in action bodies like directed `in item`/`in
+  part`) and `value: Option<Node<FeatureValue>>` (`in occurrence terminatedOccurrence default
+  that as Occurrence { ... }`), both from Systems Library `Actions.sysml`. To keep enum sizes
+  bounded, `ExprMemberElement::InOutDecl` and `CalcDefBodyElement::InOutDecl` now box their
+  node (`Box<Node<InOutDecl>>`; serialized form unchanged).
 - **`PARSE_AST_VERSION` is now 107.** `KermlBareDeclaration::keyword` is now an exhaustive
   `KermlBareDeclarationKeyword` enum instead of an owned `String` (a finite grammar set, with
   distinct variants for authored synonyms like `assoc`/`association`), and

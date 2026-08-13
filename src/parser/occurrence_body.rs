@@ -134,6 +134,9 @@ fn occurrence_definition_body_with_labels<'a>(
 /// into one struct so [`occurrence_usage_tail`] keeps a readable signature as the BNF
 /// `OccurrenceUsagePrefix` slots accumulate.
 struct OccurrencePrefix {
+    /// Leading `in`/`out`/`inout` direction (BNF `RefPrefix`) -- see
+    /// `OccurrenceUsage::direction`.
+    direction: Option<crate::ast::InOut>,
     is_individual: bool,
     is_then: bool,
     is_event: bool,
@@ -151,6 +154,7 @@ struct OccurrencePrefix {
 impl Default for OccurrencePrefix {
     fn default() -> Self {
         Self {
+            direction: None,
             is_individual: false,
             is_then: false,
             is_event: false,
@@ -205,6 +209,28 @@ pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Occu
             ..Default::default()
         },
     )
+}
+
+/// `in`/`out`/`inout occurrence` usage member (BNF `RefPrefix` direction on an occurrence
+/// usage), e.g. `in occurrence terminatedOccurrence[1] { ... }` in an action definition body
+/// (Systems Library `Actions.sysml`). Mirrors `item::directed_item_usage`. Requires the
+/// `occurrence` kind keyword so plain `in name : Type;` parameters stay on `in_out_decl`.
+pub(crate) fn directed_occurrence_usage(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    if !crate::parser::lex::starts_with_keyword(peek.fragment(), b"occurrence") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, mut usage) = occurrence_usage(input)?;
+    usage.value.direction = Some(direction);
+    Ok((input, node_from_to(start, input, usage.value)))
 }
 
 pub(crate) fn individual_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
@@ -357,6 +383,9 @@ fn occurrence_usage_tail(
     // multiplicity; without skipping them the usage fails and becomes `KermlFeatureDecl`.
     let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
+    // Optional value clause, e.g. `in occurrence terminatedOccurrence default that as
+    // Occurrence { ... }` (Systems Library `Actions.sysml`).
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = occurrence_usage_body(input)?;
     let (input, post_body_clauses) = specialization_clauses(input)?;
     let subsets = post_body_clauses
@@ -392,6 +421,7 @@ fn occurrence_usage_tail(
             start,
             input,
             OccurrenceUsage {
+                direction: prefix.direction,
                 is_individual: prefix.is_individual,
                 is_then: prefix.is_then,
                 is_event: prefix.is_event,
@@ -410,6 +440,7 @@ fn occurrence_usage_tail(
                 references,
                 crosses,
                 intersects,
+                value,
                 body,
                 membership: prefix.membership,
             },

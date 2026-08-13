@@ -118,7 +118,7 @@ pub enum CalcDefBody {
 pub enum CalcDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
-    InOutDecl(Node<InOutDecl>),
+    InOutDecl(Box<Node<InOutDecl>>),
     ReturnDecl(Node<ReturnDecl>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // formula
