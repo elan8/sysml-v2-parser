@@ -661,6 +661,7 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             }
             AttributeBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             AttributeBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
+            AttributeBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::Doc(_) => {}
         }
     }

@@ -653,6 +653,9 @@ fn collect_attribute_body_errors(body: &AttributeBody, errors: &mut Vec<ParseErr
                     AttributeBodyElement::PartUsage(n) => {
                         collect_part_usage_body_errors(&n.value.body, errors)
                     }
+                    AttributeBodyElement::ItemUsage(n) => {
+                        collect_attribute_body_errors(&n.value.body, errors)
+                    }
                     AttributeBodyElement::MetadataKeywordUsage(n) => {
                         collect_attribute_body_errors(&n.value.body, errors)
                     }

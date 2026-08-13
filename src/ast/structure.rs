@@ -345,6 +345,11 @@ pub enum AttributeBodyElement {
     RefDecl(Node<RefDecl>),
     /// Nested `part` usage inside an item / attribute body (validation `3e`, `14c`).
     PartUsage(Box<Node<PartUsage>>),
+    /// Nested `item` usage inside an item / attribute body, e.g. `item picture : Picture;`
+    /// inside `attribute def Show { ... }` (`tests/snapshots/sysml/training/
+    /// 21_messaging_with_ports.md`). Reuses the same `item_usage` parser `PartDefBodyElement`/
+    /// `PartUsageBodyElement` already dispatch to.
+    ItemUsage(Box<Node<ItemUsage>>),
     Other(String),
 }
 

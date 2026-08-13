@@ -551,6 +551,9 @@ fn emit_attribute_body_element(
         }
         AttributeBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         AttributeBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
+        AttributeBodyElement::ItemUsage(i) => {
+            super::requirement::emit_item_usage(w, path, &i.value)
+        }
     }
 }
 

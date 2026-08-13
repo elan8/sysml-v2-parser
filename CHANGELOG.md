@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 105.** `AttributeBodyElement` gains a structured `ItemUsage`
+  variant. A nested `item name : Type;` inside an `attribute def`/`attribute`/`item def`/`item`
+  body now parses as a real item usage (reusing the same `item_usage` parser `part def`/`part`
+  bodies already dispatch to) instead of being swallowed by the opaque-capture fallback into
+  `AttributeBodyElement::Other`.
 - **`PARSE_AST_VERSION` is now 104.** Bare, `;`-terminated `classifier` forward declarations
   (e.g. `classifier SpatialFrame;`) parse as a structured `KermlBareDeclaration` node with a real
   `name` field instead of falling through to the opaque `ClassifierDecl` raw-text fallback.
