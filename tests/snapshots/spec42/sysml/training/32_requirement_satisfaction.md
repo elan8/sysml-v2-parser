@@ -37,7 +37,6 @@ package 'Requirement Satisfaction' {
 (fixture-diagnostics
   (document "32_requirement_satisfaction.md"
     (diagnostics
-      (diagnostic (code "recovered_part_usage_body_element") (severity error) (category parseerror) (span (offset 415) (line 20) (column 3) (len 38)) (message "unexpected token in part usage body"))
     )
   )
 )

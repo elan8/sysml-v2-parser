@@ -1074,6 +1074,28 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
     let (type_ref_span, _, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);
+    // Trailing `:>>` redefinition after the typing, e.g. `ref self: Part :>> Item::self;`
+    // (Systems Library `Parts.sysml`). The typing may equally follow the redefinition -- the
+    // canonical emitted order and a legal `FeatureSpecializationPart` ordering -- so retry the
+    // typing after the redefinition when it wasn't already written before it.
+    let (input, redefines) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::redefinition,
+    ))
+    .parse(input)?;
+    let (input, type_ref_span, typing) = if typing.is_none() && redefines.is_some() {
+        let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+        let (type_ref_span, _, typing) =
+            crate::parser::usage::typing_reference_fields_from_result(type_result);
+        (input, type_ref_span, typing)
+    } else {
+        (input, type_ref_span, typing)
+    };
+    // `:>` subsets, independent of and in addition to `:>>` redefines (mirrors
+    // `connector::ref_decl`).
+    let (input, subsets) =
+        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    let subsets = subsets.map(|(target, _value)| target);
     let (input, value) = opt(preceded(
         preceded(ws_and_comments, tag(&b"="[..])),
         preceded(ws_and_comments, expression),
@@ -1107,8 +1129,8 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
                 direction,
                 name: name_str,
                 typing,
-                redefines: None,
-                subsets: None,
+                redefines,
+                subsets,
                 value,
                 body,
                 name_span: None,
