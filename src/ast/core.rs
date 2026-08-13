@@ -342,6 +342,12 @@ pub enum Expression {
     Extent {
         target: QualifiedReferenceId,
     },
+    /// Standalone KerML `BodyExpression` used as a primary expression, e.g. the pin
+    /// initializers `in whileTest default {true}` / `in untilTest default {false}` (Systems
+    /// Library `Actions.sysml`). Shares [`CollectionOperatorBody`]'s `{ parameters* result? }`
+    /// shape -- both render the same KerML `ExpressionBody` production -- but stands on its
+    /// own instead of following a `->op` collection operator.
+    BodyExpr(Box<Node<CollectionOperatorBody>>),
 }
 
 /// Structured KerML `BodyExpression` supplied to a collection operator.
@@ -419,6 +425,11 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
         Expression::Invocation { callee, args } => {
             out.push(take_box(callee));
             out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
+        }
+        Expression::BodyExpr(body) => {
+            if let Some(result) = body.value.result.take() {
+                out.push(*result);
+            }
         }
         Expression::CollectionOp {
             base,

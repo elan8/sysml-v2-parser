@@ -29,7 +29,7 @@ interface def Interface {
         doc
         /* The participants of an Interface must be Ports. */
         protected ref thisParticipant :>> self;
-        protected ref otherParticipants : Port[1..*] nonunique :> interfacingPorts default = participant->excludingOnce(thisParticipant);
+        protected ref otherParticipants : Port[1..*] nonunique :> interfacingPorts default participant->excludingOnce(thisParticipant);
     }
 }
 ~~~

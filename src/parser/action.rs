@@ -479,25 +479,12 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             };
         let _ = action_typed_name;
 
-        // `default { ... }` expression-body initializer used in the standard library
-        // (`in whileTest default {true} { ... }`, Systems Library `Actions.sysml`). The braced
-        // body is consumed through the action-body machinery and not yet retained as a typed
-        // expression body; tried before `feature_value_part`, which only accepts `default`
-        // followed by an expression.
-        let (input, default_brace) = opt((
-            preceded(ws_and_comments, tag(&b"default"[..])),
-            ws1,
-            consume_action_structured_brace,
-        ))
-        .parse(input)?;
         // Optional value clause: `= expr` / `:= expr` / `default (=|:=)? expr`, e.g.
         // `in a : Real = 0.0;` or `in target : Occurrence[1] default that as Occurrence`
-        // (Systems Library `Actions.sysml`).
-        let (input, value) = if default_brace.is_some() {
-            (input, None)
-        } else {
-            opt(feature_value_part).parse(input)?
-        };
+        // (Systems Library `Actions.sysml`). `feature_value_part` also covers the
+        // expression-body initializer form `default {true}` as a typed
+        // `Expression::BodyExpr`, previously consumed opaquely here and discarded.
+        let (input, value) = opt(feature_value_part).parse(input)?;
 
         // Standard library sometimes uses braced pin bodies without a trailing semicolon.
         // Accept either `;` or a `{ ... }` body as a terminator, retaining the body elements.

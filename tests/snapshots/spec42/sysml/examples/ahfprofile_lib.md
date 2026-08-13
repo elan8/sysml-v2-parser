@@ -192,16 +192,16 @@ library package AHFProfileMetadata {
     private import AHFProfileLib::*;
     port def global_sd : SD;
     metadata def <service> SDMetadata :> SemanticMetadata {
-        attribute baseType :>> baseType default = global_sd meta SysML::PortUsage;
+        attribute baseType :>> baseType default global_sd meta SysML::PortUsage;
     }
     metadata def <sos> SysLocalCloudsMetadata :> SemanticMetadata {
         attribute baseType :>> baseType = system_of_systems meta SysML::PartUsage;
     }
     metadata def <cloud> LocalCloudsMetadata :> SemanticMetadata {
-        attribute baseType :>> baseType default = system_of_systems::locclouds meta SysML::PartUsage;
+        attribute baseType :>> baseType default system_of_systems::locclouds meta SysML::PartUsage;
     }
     metadata def <system> SysDMetadata :> SemanticMetadata {
-        attribute baseType :>> baseType default = system_of_systems::locclouds::systems meta SysML::PartUsage;
+        attribute baseType :>> baseType default system_of_systems::locclouds::systems meta SysML::PartUsage;
     }
     metadata def <idd> IDDMetadata :> SDMetadata {
         attribute baseType :>> baseType = SDDD::idds meta SysML::PortUsage;

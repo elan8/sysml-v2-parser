@@ -526,6 +526,14 @@ fn collection_operator_parameter(
     ))
 }
 
+/// Standalone KerML `BodyExpression` (`{ parameters* result? }`) -- the same shape a collection
+/// operator's brace body uses; see [`Expression::BodyExpr`].
+pub(crate) fn body_expression(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<CollectionOperatorBody>> {
+    collection_operator_body(input)
+}
+
 fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<CollectionOperatorBody>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;

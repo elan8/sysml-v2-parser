@@ -19,6 +19,7 @@ use nom::Parser;
 struct FeatureValuePrefix {
     kind: FeatureValueKind,
     is_default: bool,
+    has_operator: bool,
 }
 
 /// Parses the `default`? (`=` | `:=`)? prefix and returns which form matched, without consuming
@@ -32,6 +33,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                 FeatureValuePrefix {
                     kind: FeatureValueKind::Bind,
                     is_default: false,
+                    has_operator: true,
                 },
                 ws_and_comments,
             ),
@@ -43,6 +45,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                 FeatureValuePrefix {
                     kind: FeatureValueKind::Assign,
                     is_default: false,
+                    has_operator: true,
                 },
                 ws_and_comments,
             ),
@@ -57,6 +60,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                         FeatureValuePrefix {
                             kind: FeatureValueKind::Bind,
                             is_default: true,
+                            has_operator: true,
                         },
                         ws_and_comments,
                     ),
@@ -67,6 +71,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                         FeatureValuePrefix {
                             kind: FeatureValueKind::Assign,
                             is_default: true,
+                            has_operator: true,
                         },
                         ws_and_comments,
                     ),
@@ -75,6 +80,7 @@ fn feature_value_prefix(input: Input<'_>) -> IResult<Input<'_>, FeatureValuePref
                     FeatureValuePrefix {
                         kind: FeatureValueKind::Bind,
                         is_default: true,
+                        has_operator: false,
                     },
                     ws_and_comments,
                 ),
@@ -98,6 +104,7 @@ pub(crate) fn wrap_bind_expression(expr: Node<Expression>) -> Node<FeatureValue>
         FeatureValue {
             kind: FeatureValueKind::Bind,
             is_default: false,
+            has_operator: true,
             expression: expr,
             span,
         },
@@ -110,7 +117,17 @@ pub(crate) fn feature_value_part(input: Input<'_>) -> IResult<Input<'_>, Node<Fe
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, prefix) = feature_value_prefix(input)?;
-    let (input, expression): (Input<'_>, Node<Expression>) = expression(input)?;
+    // A `{ ... }` after the prefix is a standalone KerML `BodyExpression` value, e.g. the pin
+    // initializers `default {true}` / `default {false}` (Systems Library `Actions.sysml`) --
+    // previously consumed as an opaque brace and discarded by `in_out_decl`.
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, expression): (Input<'_>, Node<Expression>) = if peek.fragment().starts_with(b"{") {
+        let (input, body) = crate::parser::expr::body_expression(input)?;
+        let span = body.span.clone();
+        (input, Node::new(span, Expression::BodyExpr(Box::new(body))))
+    } else {
+        expression(input)?
+    };
     Ok((
         input,
         node_from_to(
@@ -119,6 +136,7 @@ pub(crate) fn feature_value_part(input: Input<'_>) -> IResult<Input<'_>, Node<Fe
             FeatureValue {
                 kind: prefix.kind,
                 is_default: prefix.is_default,
+                has_operator: prefix.has_operator,
                 expression,
                 span: crate::parser::span_from_to(start, input),
             },

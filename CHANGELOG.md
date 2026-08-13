@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 114.** Feature values gain a typed standalone KerML
+  `BodyExpression` form and authored-operator fidelity: new `Expression::BodyExpr` models
+  `{ parameters* result? }` as a primary expression (sharing `CollectionOperatorBody`'s shape),
+  so the pin initializers `in whileTest default {true} { ... }` (Systems Library
+  `Actions.sysml`) parse as typed values instead of being consumed opaquely and discarded by
+  `in_out_decl`; `feature_value_part` accepts `{ ... }` after any value operator. `FeatureValue`
+  gains `has_operator`, so the bare `default expr` / `default {expr}` spellings no longer emit
+  a fabricated `= ` (`return : Real default sum0(...)` now round-trips byte-for-byte).
 - **`PARSE_AST_VERSION` is now 113.** The remaining KerML declaration grammar used by the
   pinned `sysml.library` is structurally implemented; the layered conformance scorecard's L2
   claim now **passes for both the Systems Library and the full library** (94 files, zero

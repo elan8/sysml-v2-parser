@@ -41,7 +41,7 @@ standard library package RealFunctions {
     }
     function sum :> ComplexFunctions::sum {
         in collection : Real[0..*];
-        return : Real default = NumericalFunctions::sum0(collection, 0.0);
+        return : Real default NumericalFunctions::sum0(collection, 0.0);
     }
     function includes {
         in seq : Anything[0..*] ordered nonunique;

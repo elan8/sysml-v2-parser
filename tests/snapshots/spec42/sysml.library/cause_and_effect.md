@@ -129,7 +129,7 @@ standard library package CauseAndEffect {
 		 */
         attribute annotatedElement : SysML::ConnectionDefinition :> annotatedElement;
         attribute annotatedElement : SysML::ConnectionUsage :> annotatedElement;
-        attribute isNecessary : Boolean default = false {
+        attribute isNecessary : Boolean default false {
             doc
             /* 
 			 * Whether all the causes are necessary for all the effects to occur.
@@ -137,7 +137,7 @@ standard library package CauseAndEffect {
 			 * still have occurred even if some of the causes did not.
 			 */
         }
-        attribute isSufficient : Boolean default = false {
+        attribute isSufficient : Boolean default false {
             doc
             /*
 			 * Whether the causes were sufficient for all the effects to occur.

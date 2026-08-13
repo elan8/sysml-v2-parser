@@ -288,7 +288,7 @@ package '14c-Language-Extensions' {
             attribute status : Status;
         }
         metadata def <situation> SituationMetadata :> SemanticMetadata {
-            attribute baseType :>> baseType default = situations meta SysML::Usage;
+            attribute baseType :>> baseType default situations meta SysML::Usage;
         }
         metadata def <cause> CauseMetadata :> SituationMetadata {
             attribute baseType :>> baseType = causes meta SysML::Usage;

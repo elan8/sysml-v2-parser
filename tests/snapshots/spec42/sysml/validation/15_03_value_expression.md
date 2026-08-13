@@ -68,7 +68,7 @@ package '15_03-Value Expression' {
         part tire : Tire[1];
     }
     part def Tire {
-        attribute profileDepth : LengthValue default = 6.0 [mm];
+        attribute profileDepth : LengthValue default 6.0 [mm];
         constraint hasLegalProfileDepth {
             profileDepth >= 3.5 [mm];
         }

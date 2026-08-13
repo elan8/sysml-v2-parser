@@ -883,6 +883,19 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
             else_expr: Box::new(normalize_expression_node(else_expr)),
         },
         Expression::Extent { target } => Expression::Extent { target: *target },
+        Expression::BodyExpr(body) => Expression::BodyExpr(Box::new(dummy_node(
+            body,
+            CollectionOperatorBody {
+                open_brace_span: Span::dummy(),
+                parameters: body.value.parameters.clone(),
+                result: body
+                    .value
+                    .result
+                    .as_ref()
+                    .map(|r| Box::new(normalize_expression_node(r))),
+                close_brace_span: Span::dummy(),
+            },
+        ))),
         Expression::MetadataAccess(inner) => {
             Expression::MetadataAccess(Box::new(normalize_expression_node(inner)))
         }

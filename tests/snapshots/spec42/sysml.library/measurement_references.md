@@ -594,7 +594,7 @@ standard library package MeasurementReferences {
 		 * A measurement reference can have zero or more definitionalQuantityValues that allow to specify
 		 * quantity values that carry a particular meaning or relevance for the measurement reference.
 		 */
-        attribute isBound : Boolean[1] default = false;
+        attribute isBound : Boolean[1] default false;
         attribute order :>> rank;
         attribute mRefs : ScalarMeasurementReference[1..*] nonunique :>> elements;
         attribute definitionalQuantityValues : DefinitionalQuantityValue[0..*];
@@ -614,7 +614,7 @@ standard library package MeasurementReferences {
 		 * define a vector space for state vectors as used in state-space representation models.
 		 */
         attribute  :>> dimensions : Positive[0..1];
-        attribute isOrthogonal : Boolean[1] default = true;
+        attribute isOrthogonal : Boolean[1] default true;
     }
     attribute def ScalarMeasurementReference :> VectorMeasurementReference {
         doc
@@ -719,7 +719,7 @@ standard library package MeasurementReferences {
 		 */
         attribute axisDirection : VectorQuantityValue[1];
         attribute angle :>> angularMeasure;
-        attribute isIntrinsic : Boolean[1] default = true;
+        attribute isIntrinsic : Boolean[1] default true;
     }
     attribute def TranslationRotationSequence :> CoordinateTransformation, List {
         doc
@@ -838,7 +838,7 @@ standard library package MeasurementReferences {
 		 */
         attribute referenceUnit : MeasurementUnit;
         attribute conversionFactor : Real;
-        attribute isExact : Boolean default = true;
+        attribute isExact : Boolean default true;
     }
     attribute def ConversionByConvention :> UnitConversion {
         doc

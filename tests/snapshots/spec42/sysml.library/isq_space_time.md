@@ -1348,7 +1348,7 @@ standard library package ISQSpaceTime {
         /*
          * A singleton CartesianSpatial3dCoordinateFrame that can be used as a default universal Cartesian 3D coordinate frame.
          */
-        attribute  :>> mRefs default = (SI::m, SI::m, SI::m) {
+        attribute  :>> mRefs default (SI::m, SI::m, SI::m) {
             doc
             /*
              * By default, the universalCartesianSpatial3dCoordinateFrame uses meters as the units on all three axes.

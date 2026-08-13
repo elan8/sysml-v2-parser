@@ -75,7 +75,8 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
                 | Expression::CollectionOp { .. }
                 | Expression::MetadataAccess(_)
                 | Expression::Conditional { .. }
-                | Expression::Extent { .. }) => {
+                | Expression::Extent { .. }
+                | Expression::BodyExpr(_)) => {
                     w.push_char('[');
                     emit_expression(w, other)?;
                     w.push_char(']');
@@ -187,6 +188,12 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             w.push_str("all ");
             w.push_qualified_reference("extent", *target)?;
         }
+        Expression::BodyExpr(body) => {
+            // `emit_collection_operator_body` writes the leading space its `->op {...}` context
+            // needs; a standalone body expression sits directly after the operator/keyword's own
+            // spacing.
+            emit_body_expression_bare(w, &body.value)?;
+        }
         Expression::MetadataAccess(base) => {
             emit_expression(w, &base.value)?;
             w.push_str(".metadata");
@@ -199,7 +206,16 @@ fn emit_collection_operator_body(
     w: &mut EmitWriter<'_>,
     body: &CollectionOperatorBody,
 ) -> Result<(), EmitError> {
-    w.push_str(" {");
+    w.push_char(' ');
+    emit_body_expression_bare(w, body)
+}
+
+/// Emit `{ parameters* result? }` with no leading space -- the caller supplies its own spacing.
+fn emit_body_expression_bare(
+    w: &mut EmitWriter<'_>,
+    body: &CollectionOperatorBody,
+) -> Result<(), EmitError> {
+    w.push_str("{");
     for parameter in &body.parameters {
         w.push_char(' ');
         w.push_str(match parameter.value.direction.value {
@@ -233,13 +249,15 @@ pub(crate) fn emit_feature_value(
     let v = &value.value;
     if v.is_default {
         w.push_str(" default");
-        match v.kind {
-            FeatureValueKind::Bind => {
-                // bare `default expr` or `default = expr` — prefer `=` for roundtrip of
-                // explicitly-bound defaults when expression follows.
-                w.push_str(" = ");
+        if v.has_operator {
+            match v.kind {
+                FeatureValueKind::Bind => w.push_str(" = "),
+                FeatureValueKind::Assign => w.push_str(" := "),
             }
-            FeatureValueKind::Assign => w.push_str(" := "),
+        } else {
+            // Bare `default expr` / `default {expr}`: no operator was authored, so none is
+            // emitted.
+            w.push_char(' ');
         }
     } else {
         match v.kind {

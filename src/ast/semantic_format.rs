@@ -332,6 +332,11 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 self.write_reference(*target)?;
                 self.writer.write_str("))")
             }
+            Expression::BodyExpr(body) => {
+                self.writer.write_str("(body-expr ")?;
+                self.write_collection_operator_body(body)?;
+                self.writer.write_char(')')
+            }
         }?;
         self.writer.write_char(')')
     }
