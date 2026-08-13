@@ -963,21 +963,29 @@ pub(crate) fn emit_interface_usage(
         InterfaceUsage::TypedConnect {
             name,
             interface_type,
+            subsets,
+            redefines,
             from,
             to,
             body,
             body_elements,
         } => {
-            w.push_str("interface ");
+            w.push_str("interface");
             if let Some(n) = name {
-                w.push_str(&format_name(n));
                 w.push_char(' ');
+                w.push_str(&format_name(n));
             }
             if let Some(ty) = interface_type {
-                w.push_str(": ");
+                w.push_str(" : ");
                 w.push_qualified_reference("interface type", *ty)?;
-                w.push_char(' ');
             }
+            if let Some(subsets) = subsets {
+                emit_subsetting_clause(w, &subsets.value)?;
+            }
+            if let Some(redefines) = redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
+            w.push_char(' ');
             w.push_str("connect ");
             emit_expression(w, &from.value)?;
             w.push_str(" to ");
@@ -985,11 +993,20 @@ pub(crate) fn emit_interface_usage(
             emit_interface_usage_body(w, path, body, body_elements)
         }
         InterfaceUsage::Connection {
+            subsets,
+            redefines,
             from,
             to,
             body_elements,
         } => {
-            w.push_str("interface ");
+            w.push_str("interface");
+            if let Some(subsets) = subsets {
+                emit_subsetting_clause(w, &subsets.value)?;
+            }
+            if let Some(redefines) = redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
+            w.push_char(' ');
             emit_expression(w, &from.value)?;
             w.push_str(" to ");
             emit_expression(w, &to.value)?;
@@ -998,20 +1015,32 @@ pub(crate) fn emit_interface_usage(
         InterfaceUsage::Declaration {
             name,
             interface_type,
+            subsets,
+            redefines,
             body,
             body_elements,
         } => {
-            w.push_str("interface ");
+            w.push_str("interface");
             if let Some(n) = name {
+                w.push_char(' ');
                 w.push_str(&format_name(n));
             }
             if let Some(ty) = interface_type {
-                if name.is_some() {
-                    w.push_str(" : ");
-                } else {
-                    w.push_str(": ");
-                }
+                w.push_str(" : ");
                 w.push_qualified_reference("interface type", *ty)?;
+            }
+            if let Some(subsets) = subsets {
+                emit_subsetting_clause(w, &subsets.value)?;
+            }
+            if let Some(redefines) = redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
+            if name.is_none()
+                && interface_type.is_none()
+                && subsets.is_none()
+                && redefines.is_none()
+            {
+                w.push_char(' ');
             }
             emit_interface_usage_body(w, path, body, body_elements)
         }

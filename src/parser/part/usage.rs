@@ -953,6 +953,9 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 (input, None, interface_type)
             }
         };
+    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
+    let subsets = spec.subsets.map(|(target, _)| target);
+    let redefines = spec.redefines;
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"connect") {
         let (input, _) = tag(&b"connect"[..]).parse(input)?;
@@ -969,6 +972,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 InterfaceUsage::TypedConnect {
                     name: iface_name,
                     interface_type,
+                    subsets,
+                    redefines,
                     from: from_expr,
                     to: to_expr,
                     body,
@@ -994,6 +999,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     start,
                     input,
                     InterfaceUsage::Connection {
+                        subsets: subsets.clone(),
+                        redefines: redefines.clone(),
                         from: from_expr,
                         to: to_expr,
                         body_elements: vec![],
@@ -1013,6 +1020,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
             InterfaceUsage::Declaration {
                 name: iface_name,
                 interface_type,
+                subsets,
+                redefines,
                 body,
                 body_elements,
             },

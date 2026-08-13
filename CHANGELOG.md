@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 100.** `InterfaceUsage` (all three variants) retains its `:>`/`:>>`
+  subsetting and redefinition clauses (`subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `ConnectionUsageMember`.
 - **`PARSE_AST_VERSION` is now 99.** `AnalysisCaseUsage` and `CaseUsage` retain their `:>`/`:>>`
   subsetting and redefinition clauses (`subsets`/`redefines`) instead of discarding them after
   parsing, matching sibling usage kinds such as `RequirementUsage`/`PortUsage`/`StateUsage`.

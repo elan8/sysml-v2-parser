@@ -1683,6 +1683,8 @@ pub enum InterfaceUsage {
     TypedConnect {
         name: Option<String>,
         interface_type: Option<QualifiedReferenceId>,
+        subsets: Option<Node<SubsettingRelationship>>,
+        redefines: Option<Node<SubsettingRelationship>>,
         from: Node<Expression>,
         to: Node<Expression>,
         body: ConnectBody,
@@ -1690,6 +1692,8 @@ pub enum InterfaceUsage {
     },
     /// `interface` from `to` to body.
     Connection {
+        subsets: Option<Node<SubsettingRelationship>>,
+        redefines: Option<Node<SubsettingRelationship>>,
         from: Node<Expression>,
         to: Node<Expression>,
         body_elements: Vec<Node<InterfaceUsageBodyElement>>,
@@ -1704,6 +1708,8 @@ pub enum InterfaceUsage {
     Declaration {
         name: Option<String>,
         interface_type: Option<QualifiedReferenceId>,
+        subsets: Option<Node<SubsettingRelationship>>,
+        redefines: Option<Node<SubsettingRelationship>>,
         body: ConnectBody,
         body_elements: Vec<Node<InterfaceUsageBodyElement>>,
     },
