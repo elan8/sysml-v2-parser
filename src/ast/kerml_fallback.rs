@@ -138,3 +138,41 @@ pub struct ExtendedLibraryDecl {
     pub bnf_production: String,
     pub text: String,
 }
+
+/// Structured KerML classifier declaration with a body, e.g. `abstract function isZero
+/// specializes DataFunctions::isZero { in x; return : Boolean[1]; }` (Kernel Function Library).
+/// Grows one [`KermlClassifierKeyword`] variant per structurally implemented keyword family;
+/// keywords not yet listed still fall through to the opaque
+/// [`KermlSemanticDecl`]/[`KermlFeatureDecl`] fallbacks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KermlClassifierDecl {
+    /// Leading `abstract` keyword.
+    pub is_abstract: bool,
+    /// The classifier kind keyword.
+    pub keyword: KermlClassifierKeyword,
+    pub identification: crate::ast::Identification,
+    /// `specializes`/`:>` supertype clause (multi-target).
+    pub specializes: Option<Node<crate::ast::TypingRelationship>>,
+    /// Classifier body. KerML function bodies share the calc-body member grammar (parameters,
+    /// `return` result, expressions, documentation).
+    pub body: crate::ast::CalcDefBody,
+    pub membership: crate::ast::Membership,
+}
+
+/// The classifier keyword of a structurally implemented [`KermlClassifierDecl`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum KermlClassifierKeyword {
+    /// `function` (KerML `Function`), e.g. the Kernel Function Library declarations.
+    Function,
+}
+
+impl KermlClassifierKeyword {
+    /// The authored keyword spelling.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Function => "function",
+        }
+    }
+}

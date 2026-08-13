@@ -584,6 +584,9 @@ fn collect_calc_body_errors(body: &CalcDefBody, errors: &mut Vec<ParseError>) {
                     CalcDefBodyElement::InOutDecl(n) => {
                         collect_in_out_decl_errors(&n.value, errors)
                     }
+                    CalcDefBodyElement::TypedParameter(n) => {
+                        collect_calc_body_errors(&n.value.body, errors)
+                    }
                     CalcDefBodyElement::Doc(_)
                     | CalcDefBodyElement::ReturnDecl(_)
                     | CalcDefBodyElement::Expression(_)
@@ -1433,6 +1436,9 @@ fn collect_package_body_element_errors(
     match &element.value {
         PackageBodyElement::Error(n) => {
             errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+        }
+        PackageBodyElement::KermlClassifier(n) => {
+            collect_calc_body_errors(&n.value.body, errors);
         }
         PackageBodyElement::Unsupported(n) => {
             errors.push(parse_error_from_recovery_node(

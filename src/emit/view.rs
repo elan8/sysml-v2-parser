@@ -170,7 +170,11 @@ pub(crate) fn emit_calc_usage(
     emit_calc_body(w, path, &usage.body)
 }
 
-fn emit_calc_body(w: &mut EmitWriter<'_>, path: &str, body: &CalcDefBody) -> Result<(), EmitError> {
+pub(crate) fn emit_calc_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &CalcDefBody,
+) -> Result<(), EmitError> {
     match body {
         CalcDefBody::Semicolon => {
             w.push_char(';');
@@ -205,6 +209,7 @@ fn emit_calc_body_element(
         CalcDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
+        CalcDefBodyElement::TypedParameter(p) => emit_typed_parameter(w, path, &p.value),
         CalcDefBodyElement::CalcUsage(c) => emit_calc_usage(w, path, &c.value),
         CalcDefBodyElement::CalcDef(c) => emit_calc_def(w, path, &c.value),
         CalcDefBodyElement::PartUsage(p) => super::structure::emit_part_usage(w, path, &p.value),
@@ -215,6 +220,39 @@ fn emit_calc_body_element(
         }
         CalcDefBodyElement::MetadataAnnotation(_) => w.unsupported(path, "Calc MetadataAnnotation"),
     }
+}
+
+pub(crate) fn emit_typed_parameter(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    param: &crate::ast::TypedParameterMember,
+) -> Result<(), EmitError> {
+    super::structure::emit_direction(w, param.direction);
+    w.push_str(param.kind.as_str());
+    if !param.name.is_empty() {
+        w.push_char(' ');
+        w.push_str(&format_name(&param.name));
+    }
+    if let Some(ty) = param.type_name {
+        w.push_str(" : ");
+        w.push_qualified_reference(&format!("{path}/type"), ty)?;
+    }
+    if let Some(multiplicity) = &param.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if param.ordered {
+        w.push_str(" ordered");
+    }
+    if param.nonunique {
+        w.push_str(" nonunique");
+    }
+    if let Some(redefines) = &param.redefines {
+        super::structure::emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(value) = &param.value {
+        emit_feature_value(w, value)?;
+    }
+    emit_calc_body(w, path, &param.body)
 }
 
 pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {
@@ -233,9 +271,17 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
         w.push_str(" : ");
     }
     w.push_qualified_reference("calc-return/type", ret.type_name)?;
+    if let Some(multiplicity) = &ret.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if ret.ordered {
+        w.push_str(" ordered");
+    }
+    if ret.nonunique {
+        w.push_str(" nonunique");
+    }
     if let Some(value) = &ret.value {
-        w.push_str(" = ");
-        emit_expression(w, &value.value)?;
+        emit_feature_value(w, value)?;
     }
     w.push_char(';');
     Ok(())

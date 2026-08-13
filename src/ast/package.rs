@@ -173,6 +173,9 @@ pub enum PackageBodyElement {
     FeatureDecl(Node<FeatureDecl>),
     ClassifierDecl(Node<ClassifierDecl>),
     KermlSemanticDecl(Node<KermlSemanticDecl>),
+    /// Structured KerML classifier declaration with a body (`function` families so far); see
+    /// [`crate::ast::KermlClassifierDecl`].
+    KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
     KermlFeatureDecl(Node<KermlFeatureDecl>),
     /// Structurally recognized bare KerML declaration: keyword, optional name, optional
     /// multiplicity, terminating `;` -- see [`KermlBareDeclaration`].

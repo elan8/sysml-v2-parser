@@ -120,6 +120,10 @@ pub enum CalcDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     InOutDecl(Box<Node<InOutDecl>>),
+    /// KerML kinded parameter member: `in expr fn[0..*] { ... }`, `in bool test = expr;`,
+    /// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
+    /// Libraries).
+    TypedParameter(Box<Node<crate::ast::TypedParameterMember>>),
     ReturnDecl(Node<ReturnDecl>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // formula
@@ -145,7 +149,18 @@ pub struct ReturnDecl {
     pub is_redefine: bool,
     /// True when the type is introduced with `:>` rather than `:` (validation `10b` rollups).
     pub is_subsetting: bool,
-    pub value: Option<Node<crate::ast::Expression>>,
+    /// Multiplicity clause after the type, e.g. `return : Real[1] = x;` (Kernel Function
+    /// Library). Previously unparseable.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ordered` keyword from `MultiplicityPart` (`return : Anything[0..*] ordered nonunique;`,
+    /// Kernel Function Library `BaseFunctions.kerml`).
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
+    pub nonunique: bool,
+    /// Value clause: `= expr` or `default (=|:=)? expr` (`return : Real default
+    /// NumericalFunctions::sum0(collection, 0.0);`, Kernel Function Library
+    /// `RealFunctions.kerml`).
+    pub value: Option<Node<crate::ast::FeatureValue>>,
 }
 
 // ---------------------------------------------------------------------------

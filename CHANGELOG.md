@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 112.** KerML `function` declarations parse as a structured
+  `PackageBodyElement::KermlClassifier` node (`KermlClassifierDecl`: `abstract` prefix, keyword
+  enum, identification, multi-target `specializes`/`:>` clause, calc-style body) instead of the
+  opaque `KermlSemanticDecl` fallback, covering the Kernel Function Library. Supporting grammar:
+  `ReturnDecl` gains `multiplicity`, `ordered`/`nonunique`, and a full `FeatureValue` value
+  clause (`return : Real[1] = x;`, `return : Anything[0..*] ordered nonunique;`, `return : Real
+  default …;`); new `CalcDefBodyElement::TypedParameter` models KerML kinded parameters
+  (`in expr fn[0..*] { … }`, `in bool test = expr;`, `in feature clock : Clock[1] default
+  localClock { … }`) whose bodies follow the calc-body member grammar; and `in_out_decl` rejects
+  the `expr`/`bool`/`feature` kind keywords so those forms reach the kinded-parameter arm.
+  Full-library diagnostics: 552 -> 250.
 - **`PARSE_AST_VERSION` is now 111.** `ItemUsage` gains `is_abstract` (BNF `RefPrefix`,
   accepted by the parser for the first time), `subsets` (`:> objects`, previously parsed by the
   shared usage header and discarded), and `ordered`/`nonunique` multiplicity properties

@@ -188,6 +188,62 @@ pub struct InOutDecl {
     pub body: Option<Vec<Node<ActionDefBodyElement>>>,
 }
 
+/// KerML kinded parameter member (BNF `FeatureDirection` + a feature-kind keyword), e.g.
+/// `in expr selector[0..*] { in argument: Anything[1]; return : Boolean[1]; }`,
+/// `in bool onOccurrence = changeSignal.signalCondition;`, or `in feature clock : Clock[1]
+/// default localClock { ... }` (Kernel Function/Semantic Libraries). Distinct from [`InOutDecl`]
+/// (which owns the keyword-less parameter form): the kind keyword types the parameter as an
+/// expression/boolean-expression/untyped feature, and its body members follow the calc-body
+/// grammar (nested parameters and a `return` result), which the action-body-element bodies of
+/// [`InOutDecl`] cannot represent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TypedParameterMember {
+    pub direction: InOut,
+    pub kind: KermlParameterKind,
+    /// Declared parameter name. Empty for the redefinition-only form
+    /// (`in bool redefines ifTest { ... }`).
+    pub name: String,
+    /// Arena-backed redefinition targets (`redefines`/`:>>`), from either the leading position
+    /// (`inout feature redefines replacementValues[0..*] : ObserveChange;`) or trailing the
+    /// typing (`in feature monitor : ChangeMonitor redefines onOccurrence { ... }`).
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub type_name: Option<QualifiedReferenceId>,
+    /// Multiplicity clause, accepted before or after the typing.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ordered` keyword from `MultiplicityPart`.
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart`.
+    pub nonunique: bool,
+    /// Value clause: `= expr` or `default (=|:=)? expr`.
+    pub value: Option<Node<FeatureValue>>,
+    /// Body following the calc-body member grammar: `;` or `{ ... }`.
+    pub body: crate::ast::CalcDefBody,
+}
+
+/// The feature-kind keyword of a [`TypedParameterMember`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum KermlParameterKind {
+    /// `expr` -- an expression-typed parameter.
+    Expr,
+    /// `bool` -- a boolean-expression-typed parameter.
+    Bool,
+    /// `feature` -- an explicitly feature-kinded parameter.
+    Feature,
+}
+
+impl KermlParameterKind {
+    /// The authored keyword spelling.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Expr => "expr",
+            Self::Bool => "bool",
+            Self::Feature => "feature",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InOut {

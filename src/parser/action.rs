@@ -350,6 +350,9 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     if starts_with_keyword(peek.fragment(), b"item")
         || starts_with_keyword(peek.fragment(), b"part")
         || starts_with_keyword(peek.fragment(), b"occurrence")
+        || starts_with_keyword(peek.fragment(), b"expr")
+        || starts_with_keyword(peek.fragment(), b"bool")
+        || starts_with_keyword(peek.fragment(), b"feature")
     {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,

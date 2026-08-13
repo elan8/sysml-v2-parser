@@ -15,6 +15,7 @@ use crate::parser::lex::{
 use crate::parser::usage::{feature_usage_header, redefinition};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
+use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::preceded;
@@ -336,7 +337,7 @@ fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefB
     node_from_to(start, end, CalcDefBodyElement::Other(preview))
 }
 
-fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
+pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
@@ -386,6 +387,103 @@ fn calc_usage_follows_visibility(input: Input<'_>) -> bool {
     had_modifiers && starts_with_keyword(after_mods.fragment(), b"calc")
 }
 
+/// KerML kinded parameter member: `in expr fn[0..*] { ... }`, `in bool test = expr;`,
+/// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
+/// Libraries). The kind keyword distinguishes it from the keyword-less [`in_out_decl`]
+/// parameter form, and its `{ ... }` body follows the calc-body member grammar (nested
+/// parameters plus a `return` result).
+pub(crate) fn typed_parameter_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::TypedParameterMember>> {
+    crate::parser::span::reference_transaction(input, typed_parameter_member_inner)
+}
+
+fn typed_parameter_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::TypedParameterMember>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
+    let (input, kind) = alt((
+        map(preceded(tag(&b"expr"[..]), ws1), |_| {
+            crate::ast::KermlParameterKind::Expr
+        }),
+        map(preceded(tag(&b"bool"[..]), ws1), |_| {
+            crate::ast::KermlParameterKind::Bool
+        }),
+        map(preceded(tag(&b"feature"[..]), ws1), |_| {
+            crate::ast::KermlParameterKind::Feature
+        }),
+    ))
+    .parse(input)?;
+    // Leading redefinition may replace the name entirely: `in bool redefines ifTest { ... }`,
+    // `inout feature redefines replacementValues[0..*] : ObserveChange;`.
+    let (input, leading_redefines) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::redefinition,
+    ))
+    .parse(input)?;
+    let (input, name_str) = if leading_redefines.is_some() {
+        (input, String::new())
+    } else {
+        let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+        (input, n)
+    };
+    let (input, leading_multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, type_name) = opt(map(
+        (
+            preceded(ws_and_comments, tag(&b":"[..])),
+            preceded(ws_and_comments, qualified_reference),
+        ),
+        |(_, tn)| tn,
+    ))
+    .parse(input)?;
+    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::multiplicity_node,
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, redefines) = if leading_redefines.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::redefinition,
+        ))
+        .parse(input)?
+    } else {
+        (input, leading_redefines)
+    };
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let (input, body) = calc_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::TypedParameterMember {
+                direction,
+                kind,
+                name: name_str,
+                redefines,
+                type_name,
+                multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                ordered,
+                nonunique,
+                value,
+                body,
+            },
+        ),
+    ))
+}
+
 fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -408,6 +506,11 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         // Prefer directed `in part …` before plain InOutDecl (which rejects `in part`).
         if let Ok((input, part)) = crate::parser::part::part_usage(input) {
             (input, CalcDefBodyElement::PartUsage(Box::new(part)))
+        } else if let Ok((input, param)) = typed_parameter_member(input) {
+            // `in expr …` / `in bool …` / `in feature …` kinded parameters (Kernel
+            // Function/Semantic Libraries), before plain InOutDecl, which would misread the
+            // kind keyword as the parameter name.
+            (input, CalcDefBodyElement::TypedParameter(Box::new(param)))
         } else if named_in_out_missing_type(input) {
             return Err(nom::Err::Error(nom::error::Error::new(
                 input,
@@ -612,11 +715,17 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
         (input, false)
     };
     let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
-    let (input, value) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"="[..])),
-        preceded(ws_and_comments, crate::parser::expr::expression),
+    // Multiplicity and `ordered`/`nonunique` after the type: `return : Real[1] = x;`,
+    // `return : Anything[0..*] ordered nonunique;` (Kernel Function Library).
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
+    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    // `= expr` / `:= expr` / `default (=|:=)? expr` value clause: `return : Real default
+    // NumericalFunctions::sum0(collection, 0.0);` (Kernel Function Library).
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -628,6 +737,9 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
                 type_name,
                 is_redefine,
                 is_subsetting,
+                multiplicity,
+                ordered,
+                nonunique,
                 value,
             },
         ),

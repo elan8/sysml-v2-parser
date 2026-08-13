@@ -127,6 +127,24 @@ fn emit_package_body_node(
     emit_package_body_element(w, path, &node.value)
 }
 
+fn emit_kerml_classifier_decl(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    decl: &crate::ast::KermlClassifierDecl,
+) -> Result<(), EmitError> {
+    emit_visibility(w, decl.membership.visibility);
+    if decl.is_abstract {
+        w.push_str("abstract ");
+    }
+    w.push_str(decl.keyword.as_str());
+    w.push_char(' ');
+    emit_identification(w, &decl.identification);
+    if let Some(spec) = &decl.specializes {
+        structure::emit_typing_clause(w, &spec.value)?;
+    }
+    super::view::emit_calc_body(w, path, &decl.body)
+}
+
 fn emit_kerml_bare_declaration(
     w: &mut EmitWriter<'_>,
     declaration: &crate::ast::KermlBareDeclaration,
@@ -263,6 +281,9 @@ pub(crate) fn emit_package_body_element(
         }),
         PackageBodyElement::KermlBareDeclaration(declaration) => {
             emit_kerml_bare_declaration(w, &declaration.value)
+        }
+        PackageBodyElement::KermlClassifier(declaration) => {
+            emit_kerml_classifier_decl(w, path, &declaration.value)
         }
         other @ (PackageBodyElement::Actor(_) | PackageBodyElement::FlowDef(_)) => w.unsupported(
             path,

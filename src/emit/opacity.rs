@@ -105,6 +105,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
             hit(report, path, OpacityKind::KermlSemanticDecl)
         }
         PackageBodyElement::KermlFeatureDecl(_) => hit(report, path, OpacityKind::KermlFeatureDecl),
+        PackageBodyElement::KermlClassifier(n) => walk_calc_def_body(report, path, &n.value.body),
         // Structurally recognized -- keyword, optional name, optional multiplicity, `;` -- not
         // an opaque/recovery node.
         PackageBodyElement::KermlBareDeclaration(_) => {}
@@ -316,6 +317,7 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
                 walk_attribute_body(report, &p, &metadata.value.body)
             }
             CalcDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
+            CalcDefBodyElement::TypedParameter(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Doc(_)
             | CalcDefBodyElement::ReturnDecl(_)
             | CalcDefBodyElement::Expression(_) => {}

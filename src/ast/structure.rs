@@ -951,7 +951,7 @@ pub struct ExprMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExprMemberElement {
     InOutDecl(Box<Node<InOutDecl>>),
-    ReturnDecl(Node<ReturnDecl>),
+    ReturnDecl(Box<Node<ReturnDecl>>),
 }
 
 // ---------------------------------------------------------------------------

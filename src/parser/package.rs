@@ -273,6 +273,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)
         | PackageBodyElement::KermlFeatureDecl(_)
+        | PackageBodyElement::KermlClassifier(_)
         | PackageBodyElement::KermlBareDeclaration(_)
         | PackageBodyElement::ExtendedLibraryDecl(_)
         | PackageBodyElement::AttributeUsage(_)
@@ -656,6 +657,40 @@ fn kerml_bare_declaration(
     ))
 }
 
+/// Structured KerML `function` declaration: `abstract`? `function` Identification
+/// (`specializes`/`:>` targets)? calc-style body (Kernel Function Library). Tried before the
+/// opaque [`kerml_semantic_decl`] fallback so these get a typed node; bare `function Name;`
+/// forward declarations stay on [`kerml_bare_declaration`], which is tried first.
+fn kerml_function_decl(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlClassifierDecl>> {
+    let start = input;
+    let (input, prefix) = crate::parser::definition_prefix::parse_definition_prefix(
+        input,
+        crate::parser::definition_prefix::DefinitionPrefixOptions::new(b"function")
+            .with_captured_visibility(),
+    )?;
+    let (input, body) = crate::parser::constraint::calc_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlClassifierDecl {
+                is_abstract: prefix.is_abstract,
+                keyword: crate::ast::KermlClassifierKeyword::Function,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                body,
+                membership: crate::ast::Membership::owning(
+                    prefix.visibility,
+                    prefix.visibility_span,
+                ),
+            },
+        ),
+    ))
+}
+
 fn kerml_semantic_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlSemanticDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[
@@ -898,10 +933,9 @@ fn expr_member_element(
 ) -> IResult<Input<'_>, Node<crate::ast::ExprMemberElement>> {
     let start = input;
     let (input, elem) = if starts_with_keyword(input.fragment(), b"return") {
-        map(
-            crate::parser::constraint::return_decl,
-            crate::ast::ExprMemberElement::ReturnDecl,
-        )
+        map(crate::parser::constraint::return_decl, |n| {
+            crate::ast::ExprMemberElement::ReturnDecl(Box::new(n))
+        })
         .parse(input)?
     } else {
         map(crate::parser::action::in_out_decl, |n| {
@@ -1824,6 +1858,9 @@ fn try_package_body_view<'a>(
         classifier_decl,
         PackageBodyElement::ClassifierDecl
     );
+    try_package_body_dispatch!(input, start, kerml_function_decl, |n| {
+        PackageBodyElement::KermlClassifier(Box::new(n))
+    });
     try_package_body_dispatch!(
         input,
         start,

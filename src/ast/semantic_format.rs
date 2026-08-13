@@ -2317,6 +2317,28 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::KermlSemanticDecl(_declaration) => {
                 self.write_marker(first, "kerml-semantic-declaration")
             }
+            PackageBodyElement::KermlClassifier(declaration) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(kerml-classifier (keyword ")?;
+                self.writer.write_str(declaration.value.keyword.as_str())?;
+                self.writer.write_str(") (abstract ")?;
+                self.writer.write_str(if declaration.value.is_abstract {
+                    "true"
+                } else {
+                    "false"
+                })?;
+                self.writer.write_str(") (name ")?;
+                write_optional_quoted(
+                    self.writer,
+                    declaration.value.identification.name.as_deref(),
+                )?;
+                self.writer.write_str(") (specializes ")?;
+                match &declaration.value.specializes {
+                    Some(typing) => self.write_typing(&typing.value)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str("))")
+            }
             PackageBodyElement::KermlBareDeclaration(declaration) => {
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(kerml-bare-declaration (keyword ")?;
