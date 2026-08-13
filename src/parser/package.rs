@@ -813,7 +813,14 @@ fn feature_usage_member_inner(
     let (input, value) =
         opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
     let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (ws_input, _) = ws_and_comments(input)?;
+    let (input, body) = if ws_input.fragment().starts_with(b"{") {
+        let (input, elements) = feature_body_brace(ws_input)?;
+        (input, Some(elements))
+    } else {
+        let (input, _) = tag(&b";"[..]).parse(ws_input)?;
+        (input, None)
+    };
     Ok((
         input,
         node_from_to(
@@ -829,9 +836,100 @@ fn feature_usage_member_inner(
                 typing_span,
                 membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
                 has_feature_keyword: true,
+                body,
             },
         ),
     ))
+}
+
+/// `feature NAME { ... }`'s block body: zero or more nested members, currently just a nested
+/// owned `expr NAME { ... }` (the only shape the pinned KerML fixtures exercise, see
+/// `DefaultReferenceUsage::body`'s doc comment). Not registered with `parse_structured_brace_members`
+/// (no recovery-element/starter-list machinery yet needed for this narrow shape) -- add that
+/// machinery if/when a second member kind needs it.
+fn feature_body_brace(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<Node<crate::ast::FeatureBodyElement>>> {
+    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = tag(&b"}"[..]).parse(input)?;
+            return Ok((input, elements));
+        }
+        let (next, element) = feature_body_element(input)?;
+        elements.push(element);
+        input = next;
+    }
+}
+
+fn feature_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::FeatureBodyElement>> {
+    let start = input;
+    let (input, member) = expr_member(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, crate::ast::FeatureBodyElement::Expr(member)),
+    ))
+}
+
+/// Nested owned expression feature: `expr` name `{` (`in`/`out`/`inout` parameter | `return`
+/// declaration)* `}`. Reuses the same parameter-list machinery `calc`/`constraint` bodies already
+/// share (`crate::parser::action::in_out_decl`, `crate::parser::constraint::return_decl`) rather
+/// than reimplementing `in`/`return` parsing for this nested shape.
+fn expr_member(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ExprMember>> {
+    let start = input;
+    let (input, _) = tag(&b"expr"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, (name_span, name_str)) = crate::parser::span::with_span(name).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
+    let mut input = input;
+    let mut members = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = tag(&b"}"[..]).parse(input)?;
+            return Ok((
+                input,
+                node_from_to(
+                    start,
+                    input,
+                    crate::ast::ExprMember {
+                        name: name_str,
+                        name_span: Some(name_span),
+                        body: members,
+                    },
+                ),
+            ));
+        }
+        let (next, member) = expr_member_element(input)?;
+        members.push(member);
+        input = next;
+    }
+}
+
+fn expr_member_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::ExprMemberElement>> {
+    let start = input;
+    let (input, elem) = if starts_with_keyword(input.fragment(), b"return") {
+        map(
+            crate::parser::constraint::return_decl,
+            crate::ast::ExprMemberElement::ReturnDecl,
+        )
+        .parse(input)?
+    } else {
+        map(
+            crate::parser::action::in_out_decl,
+            crate::ast::ExprMemberElement::InOutDecl,
+        )
+        .parse(input)?
+    };
+    Ok((input, node_from_to(start, input, elem)))
 }
 
 fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLibraryDecl>> {

@@ -217,7 +217,7 @@ fn emit_calc_body_element(
     }
 }
 
-fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {
+pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {
     w.push_str("return ");
     if ret.is_redefine {
         w.push_str(":>> ");

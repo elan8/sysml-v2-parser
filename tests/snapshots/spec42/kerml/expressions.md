@@ -86,7 +86,6 @@ package Expressions {
   (document "expressions.md"
     (diagnostics
       (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 139) (line 6) (column 2) (len 1309)) (message "unrecognized declaration `a` in package body"))
-      (diagnostic (code "unsupported_grammar_form") (severity warning) (category unsupportedgrammarform) (span (offset 1448) (line 52) (column 2) (len 51)) (message "the spec-valid KerML feature declaration production is retained but not structurally implemented"))
       (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 1503) (line 56) (column 2) (len 26)) (message "unrecognized declaration `bb` in package body"))
       (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 1541) (line 59) (column 3) (len 41)) (message "unrecognized declaration `var` in attribute body"))
       (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 1686) (line 69) (column 3) (len 20)) (message "unrecognized declaration `feature` in attribute body"))
@@ -147,8 +146,11 @@ package Expressions {
 	
 	expr totalMass: TotalMass { in mass; in sub; }
     feature f {
-		expr s { in x; return : Boolean; }
-	}
+        expr s {
+            in x;
+            return : Boolean;
+        }
+    }
     bb : Boolean = f.s(1);
     class def C {
         var count : ScalarValues::Integer := 0;
@@ -173,6 +175,6 @@ package Expressions {
     (reference r1 (scope relative) (span (offset 74) (line 3) (column 17) (len 23)) (segments (segment 0 (token "BaseFunctions") (name "BaseFunctions") (separator none) (span (offset 74) (line 3) (column 17) (len 13))) (segment 1 (token "ToString") (name "ToString") (separator colon-colon) (span (offset 89) (line 3) (column 32) (len 8)))))
     (reference r2 (scope relative) (span (offset 115) (line 4) (column 17) (len 16)) (segments (segment 0 (token "ControlFunctions") (name "ControlFunctions") (separator none) (span (offset 115) (line 4) (column 17) (len 16)))))
   )
-  (root (package (name "Expressions") (body (import (target (span (span (offset 38) (line 2) (column 17) (len 18))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 53) (line 2) (column 32) (len 3))) (separator (span (offset 53) (line 2) (column 32) (len 2))) (marker (span (offset 55) (line 2) (column 34) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 74) (line 3) (column 17) (len 23))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 115) (line 4) (column 17) (len 19))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 131) (line 4) (column 33) (len 3))) (separator (span (offset 131) (line 4) (column 33) (len 2))) (marker (span (offset 133) (line 4) (column 35) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (malformed (code "unrecognized_declaration_in_scope") (found "a: Integer;") (span (offset 139) (line 6) (column 2) (len 1309))) (feature-declaration) (malformed (code "unrecognized_declaration_in_scope") (found "bb : Boolean = f.s(1);") (span (offset 1503) (line 56) (column 2) (len 26))) (class-def) (default-reference-usage) (default-reference-usage) (default-reference-usage) (default-reference-usage) (class-def) (default-reference-usage) (default-reference-usage))))
+  (root (package (name "Expressions") (body (import (target (span (span (offset 38) (line 2) (column 17) (len 18))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 53) (line 2) (column 32) (len 3))) (separator (span (offset 53) (line 2) (column 32) (len 2))) (marker (span (offset 55) (line 2) (column 34) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 74) (line 3) (column 17) (len 23))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 115) (line 4) (column 17) (len 19))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 131) (line 4) (column 33) (len 3))) (separator (span (offset 131) (line 4) (column 33) (len 2))) (marker (span (offset 133) (line 4) (column 35) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (malformed (code "unrecognized_declaration_in_scope") (found "a: Integer;") (span (offset 139) (line 6) (column 2) (len 1309))) (default-reference-usage) (malformed (code "unrecognized_declaration_in_scope") (found "bb : Boolean = f.s(1);") (span (offset 1503) (line 56) (column 2) (len 26))) (class-def) (default-reference-usage) (default-reference-usage) (default-reference-usage) (default-reference-usage) (class-def) (default-reference-usage) (default-reference-usage))))
 )
 ~~~

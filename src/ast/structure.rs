@@ -9,6 +9,7 @@ use super::common::{
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
+use super::view::ReturnDecl;
 use super::view::{CalcUsage, ConstraintDef, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
@@ -873,6 +874,12 @@ pub struct DefaultReferenceUsage {
     /// `name;`/`name = expr;` form this struct is otherwise documented for. Tracked so
     /// `emit_default_reference_usage` can round-trip the keyword rather than always omitting it.
     pub has_feature_keyword: bool,
+    /// Optional `{ ... }` body, e.g. KerML `feature f { expr s { in x; return : Boolean; } }`
+    /// (spec42 `tests/snapshots/spec42/kerml/expressions.md`). `None` means the usage was
+    /// terminated with `;` instead (the only form previously supported). Only reachable for the
+    /// explicit-`feature`-keyword form (`has_feature_keyword == true`); the keyword-less
+    /// `name;`/`name = expr;` forms never populate this.
+    pub body: Option<Vec<Node<FeatureBodyElement>>>,
 }
 
 impl PartialEq for DefaultReferenceUsage {
@@ -884,7 +891,39 @@ impl PartialEq for DefaultReferenceUsage {
             && self.value == other.value
             && self.membership == other.membership
             && self.has_feature_keyword == other.has_feature_keyword
+            && self.body == other.body
     }
+}
+
+/// A member nested inside a `feature NAME { ... }` block body (KerML `Feature`'s
+/// `FeatureBodyElement` production alternatives). Narrowly scoped to the shape actually observed
+/// in the pinned KerML fixtures -- a nested owned `expr` feature -- rather than the full KerML
+/// expression sublanguage; see `DefaultReferenceUsage::body`'s doc comment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum FeatureBodyElement {
+    /// A nested owned expression feature, e.g. `expr s { in x; return : Boolean; }`.
+    Expr(Node<ExprMember>),
+}
+
+/// Nested `expr NAME { ... }` member inside a [`FeatureBodyElement::Expr`]. Its own body reuses
+/// the same `in`/`out`/`return` parameter-list machinery already shared by `calc`/`constraint`
+/// bodies (`crate::parser::action::in_out_decl`, `crate::parser::constraint::return_decl`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExprMember {
+    pub name: String,
+    pub name_span: Option<Span>,
+    pub body: Vec<Node<ExprMemberElement>>,
+}
+
+/// A single member of an [`ExprMember`]'s `{ ... }` body: a parameter (`in`/`out`/`inout`) or a
+/// `return` declaration -- the only shapes the pinned fixture (`in x; return : Boolean;`) needs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ExprMemberElement {
+    InOutDecl(Node<InOutDecl>),
+    ReturnDecl(Node<ReturnDecl>),
 }
 
 // ---------------------------------------------------------------------------

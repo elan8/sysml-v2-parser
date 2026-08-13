@@ -633,6 +633,7 @@ fn normalize_default_reference_usage(u: &DefaultReferenceUsage) -> DefaultRefere
         typing_span: None,
         membership: u.membership.clone(),
         has_feature_keyword: u.has_feature_keyword,
+        body: u.body.clone(),
     }
 }
 
