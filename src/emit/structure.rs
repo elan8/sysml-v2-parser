@@ -1472,6 +1472,9 @@ pub(crate) fn emit_default_reference_usage(
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
     }
+    if let Some(multiplicity) = &usage.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
@@ -1508,6 +1511,10 @@ fn emit_feature_body_element(
 ) -> Result<(), EmitError> {
     match el {
         crate::ast::FeatureBodyElement::Expr(e) => emit_expr_member(w, path, &e.value),
+        crate::ast::FeatureBodyElement::Binding(b) => {
+            emit_default_reference_usage(w, path, &b.value)
+        }
+        crate::ast::FeatureBodyElement::Doc(d) => super::root::emit_doc(w, &d.value),
     }
 }
 

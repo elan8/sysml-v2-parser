@@ -36,7 +36,10 @@ fn numeric_literal_text(input: Input<'_>) -> IResult<Input<'_>, String> {
             nom::error::ErrorKind::Digit,
         )));
     }
-    if i < frag.len() && frag[i] == b'.' {
+    // A `.` only continues the literal when NOT part of a `..` range operator (`1..4`) and when
+    // followed by a digit -- `1.` alone previously lexed as a real, silently turning
+    // `(1..size(seq))` into `1.` + member access instead of a Range expression.
+    if i + 1 < frag.len() && frag[i] == b'.' && frag[i + 1].is_ascii_digit() {
         i += 1;
         while i < frag.len() && frag[i].is_ascii_digit() {
             i += 1;
@@ -595,12 +598,15 @@ fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     .parse(input)
 }
 
-/// Implication: lower precedence than `or` / `and` (constraint and filter bodies).
+/// Implication tier: `implies` and the KerML null-coalescing `??` (BNF groups `'??' | 'or' |
+/// 'and' | 'implies'`; `??` binds loosest alongside `implies`), e.g. `collection->reduce '+'
+/// ?? zero` (Kernel Function Library `DataFunctions.kerml`).
 fn implies_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
-    value(
-        BinaryOperator::Implies,
-        preceded(ws_and_comments, |i| keyword_token(i, b"implies")),
-    )
+    let (input, _) = ws_and_comments(input)?;
+    alt((
+        value(BinaryOperator::Implies, |i| keyword_token(i, b"implies")),
+        value(BinaryOperator::NullCoalesce, tag(&b"??"[..])),
+    ))
     .parse(input)
 }
 
@@ -1127,7 +1133,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 input = next;
                 continue;
             }
-            if next.fragment().starts_with(b".") {
+            if next.fragment().starts_with(b".") && !next.fragment().starts_with(b"..") {
                 let (next, _) = tag(&b"."[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
                 let member_input = next;
@@ -1199,6 +1205,39 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                         input = after_lookahead;
                     }
                     continue 'outer;
+                }
+                // Function-reference argument with no parentheses: `->reduce
+                // RealFunctions::'+'`, `->reduce min`, `->reduce '*' ?? 1` (Kernel Function
+                // Library). The argument is a single (possibly qualified or quoted) function
+                // name; reserved keywords (`and`, `then`, ...) stay operators/keywords.
+                let leading_word_len = after_name
+                    .fragment()
+                    .iter()
+                    .take_while(|b| b.is_ascii_alphanumeric() || **b == b'_')
+                    .count();
+                let takes_function_ref = after_name
+                    .fragment()
+                    .first()
+                    .is_some_and(|&b| b == b'\'' || b.is_ascii_alphabetic() || b == b'_')
+                    && !crate::parser::lex::is_reserved_keyword(
+                        &after_name.fragment()[..leading_word_len],
+                    );
+                if takes_function_ref {
+                    if let Ok((after_ref, func_ref)) = qualified_reference(after_name) {
+                        let span = crate::parser::span_from_to(after_name, after_ref);
+                        let expr = Expression::CollectionOp {
+                            op: CollectionOperator::from_name(&member),
+                            base: Box::new(atom),
+                            args: vec![Argument {
+                                parameter: None,
+                                value: Node::new(span, Expression::FeatureRef(func_ref)),
+                            }],
+                            brace_body: None,
+                        };
+                        atom = node_from_to(primary_start, after_ref, expr);
+                        input = after_ref;
+                        continue;
+                    }
                 }
                 // Bare arrow access with no call (rare) -- fall back to plain member access.
                 let (_, member_ref) = qualified_reference(member_input)?;

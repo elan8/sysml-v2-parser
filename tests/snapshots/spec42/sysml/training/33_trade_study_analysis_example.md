@@ -95,19 +95,19 @@ package 'Trade Study Analysis Example' {
             in part anEngine : Engine :>> alternative;
             calc powerRollup : PowerRollup {
                 in engine = anEngine;
-                power;
+                return power;
             }
             calc massRollup : MassRollup {
                 in engine = anEngine;
-                mass;
+                return mass;
             }
             calc efficiencyRollup : EfficiencyRollup {
                 in engine = anEngine;
-                efficiency;
+                return efficiency;
             }
             calc costRollup : CostRollup {
                 in engine = anEngine;
-                cost;
+                return cost;
             }
             return :>> result : Real = EngineEvaluation(powerRollup.power, massRollup.mass, efficiencyRollup.efficiency, costRollup.cost);
         }

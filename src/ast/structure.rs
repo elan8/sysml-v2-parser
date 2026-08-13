@@ -894,6 +894,9 @@ pub struct DefaultReferenceUsage {
     pub redefines: Option<Node<SubsettingRelationship>>,
     /// Optional feature value after `=` / `default`.
     pub value: Option<Node<FeatureValue>>,
+    /// Multiplicity clause, e.g. `private instantNum: Natural[1] = ...;` (Kernel Semantic
+    /// Library `Occurrences.kerml`). Previously unparseable on keyword-less bindings.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub name_span: Option<Span>,
     pub typing_span: Option<Span>,
     pub membership: Membership,
@@ -917,6 +920,7 @@ impl PartialEq for DefaultReferenceUsage {
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.value == other.value
+            && self.multiplicity == other.multiplicity
             && self.membership == other.membership
             && self.has_feature_keyword == other.has_feature_keyword
             && self.body == other.body
@@ -932,6 +936,12 @@ impl PartialEq for DefaultReferenceUsage {
 pub enum FeatureBodyElement {
     /// A nested owned expression feature, e.g. `expr s { in x; return : Boolean; }`.
     Expr(Node<ExprMember>),
+    /// A nested keyword-less binding, e.g. `:>> dimensions = sourceVector.mRef.dimensions;`
+    /// inside `:>> mRef = transformation.target { ... }` (Domain Libraries
+    /// `VectorCalculations.sysml`).
+    Binding(Box<Node<DefaultReferenceUsage>>),
+    /// Documentation inside a feature body.
+    Doc(Node<DocComment>),
 }
 
 /// Nested `expr NAME { ... }` member inside a [`FeatureBodyElement::Expr`]. Its own body reuses

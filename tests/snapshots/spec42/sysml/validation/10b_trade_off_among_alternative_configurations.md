@@ -179,11 +179,11 @@ package '10b-Trade-off Among Alternative Configurations' {
                 in part anEngine : Engine :>> alternative;
                 calc powerRollup {
                     in engine = anEngine;
-                    return power:>ISQ::power;
+                    return power :> ISQ::power;
                 }
                 calc massRollup {
                     in engine = anEngine;
-                    return mass:>ISQ::mass;
+                    return mass :> ISQ::mass;
                 }
                 calc efficiencyRollup {
                     in engine = anEngine;

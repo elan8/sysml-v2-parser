@@ -640,6 +640,7 @@ fn normalize_default_reference_usage(u: &DefaultReferenceUsage) -> DefaultRefere
         typing: u.typing.clone(),
         subsets: u.subsets.clone(),
         redefines: u.redefines.clone(),
+        multiplicity: u.multiplicity.clone(),
         value: u.value.clone(),
         name_span: None,
         typing_span: None,

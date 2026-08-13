@@ -43,7 +43,7 @@ mod metadata;
 mod metadata_annotation;
 mod occurrence;
 mod occurrence_body;
-mod package;
+pub(crate) mod package;
 mod parse;
 mod part;
 mod payload;

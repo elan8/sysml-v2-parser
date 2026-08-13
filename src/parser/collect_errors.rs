@@ -596,12 +596,30 @@ fn collect_calc_body_errors(body: &CalcDefBody, errors: &mut Vec<ParseError>) {
                     CalcDefBodyElement::Invariant(n) => {
                         collect_calc_body_errors(&n.value.body, errors)
                     }
+                    CalcDefBodyElement::Connector(n) => {
+                        collect_calc_body_errors(&n.value.body, errors)
+                    }
+                    CalcDefBodyElement::AssertConstraint(n) => {
+                        collect_constraint_body_errors(&n.value.body, errors)
+                    }
+                    CalcDefBodyElement::KermlClassifier(n) => {
+                        collect_calc_body_errors(&n.value.body, errors)
+                    }
+                    CalcDefBodyElement::EndMember(n) => {
+                        collect_calc_body_errors(&n.value.feature.value.body, errors)
+                    }
+                    CalcDefBodyElement::AttributeUsage(n) => {
+                        collect_attribute_body_errors(&n.value.body, errors)
+                    }
+                    CalcDefBodyElement::Binding(_)
+                    | CalcDefBodyElement::Succession(_)
+                    | CalcDefBodyElement::Import(_)
+                    | CalcDefBodyElement::Comment(_)
+                    | CalcDefBodyElement::DefaultReferenceUsage(_) => {}
                     CalcDefBodyElement::ReturnDecl(n) => {
                         collect_calc_body_errors(&n.value.body, errors)
                     }
-                    CalcDefBodyElement::Doc(_)
-                    | CalcDefBodyElement::Expression(_)
-                    | CalcDefBodyElement::Other(_) => {}
+                    CalcDefBodyElement::Doc(_) | CalcDefBodyElement::Expression(_) => {}
                 }
             }
         }

@@ -148,7 +148,7 @@ package '10d-Dynamics Analysis' {
             return attribute accelerationProfile :> ISQ::acceleration[*] := null;
             private attribute position := initialPosition;
             private attribute speed := initialSpeed;
-            for i in 1..powerProfile->size() - 1  {
+            for i in 1 .. powerProfile->size() - 1  {
                 perform action dynamics : StraightLineDynamics {
                     in power = powerProfile#(i);
                     in mass = vehicle.mass;

@@ -115,6 +115,9 @@ pub enum BinaryOperator {
     Range,
     BitOr,
     BitAnd,
+    /// KerML null-coalescing operator `??` (BNF `NullCoalescingExpression`), e.g.
+    /// `collection->reduce '+' ?? zero` (Kernel Function Library `DataFunctions.kerml`).
+    NullCoalesce,
     /// Unclassified or extension operator; retains source token.
     Other(String),
 }
@@ -141,6 +144,7 @@ impl BinaryOperator {
             "||" | "or" => Self::Or,
             "xor" => Self::Xor,
             "implies" => Self::Implies,
+            "??" => Self::NullCoalesce,
             ".." => Self::Range,
             "|" => Self::BitOr,
             "&" => Self::BitAnd,
@@ -169,6 +173,7 @@ impl BinaryOperator {
             Self::Or => "||",
             Self::Xor => "xor",
             Self::Implies => "implies",
+            Self::NullCoalesce => "??",
             Self::Range => "..",
             Self::BitOr => "|",
             Self::BitAnd => "&",

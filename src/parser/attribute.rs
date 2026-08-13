@@ -394,6 +394,38 @@ pub(crate) fn attribute_feature_binding(
 /// mean `perform batCap`?" -- `tests/recovery_actions.rs`), which a permissive bare-`name;` arm
 /// would silently swallow before that diagnostic ever runs. [`bare_or_valued_feature_binding`] is
 /// the value-optional sibling used outside action bodies, where no such diagnostic exists.
+/// `{ (doc | nested binding)* }` body for a keyword-less feature binding.
+fn feature_binding_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<crate::ast::Node<crate::ast::FeatureBodyElement>>> {
+    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let mut elements = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        input = next;
+        if input.fragment().starts_with(b"}") {
+            let (input, _) = tag(&b"}"[..]).parse(input)?;
+            return Ok((input, elements));
+        }
+        if let Ok((next, doc)) = crate::parser::requirement::doc_comment(input) {
+            let span = doc.span.clone();
+            elements.push(crate::ast::Node::new(
+                span,
+                crate::ast::FeatureBodyElement::Doc(doc),
+            ));
+            input = next;
+            continue;
+        }
+        let (next, nested) = feature_value_binding(input)?;
+        let span = nested.span.clone();
+        elements.push(crate::ast::Node::new(
+            span,
+            crate::ast::FeatureBodyElement::Binding(Box::new(nested)),
+        ));
+        input = next;
+    }
+}
+
 pub(crate) fn feature_value_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
@@ -435,7 +467,17 @@ pub(crate) fn feature_value_binding(
             )))
         }
     };
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    // `;`, or a `{ ... }` body of nested bindings/documentation: `:>> mRef =
+    // transformation.target { :>> dimensions = ...; }` (Domain Libraries
+    // `VectorCalculations.sysml`).
+    let (input, _) = ws_and_comments(input)?;
+    let (input, body) = if input.fragment().starts_with(b"{") {
+        let (input, elements) = feature_binding_body(input)?;
+        (input, Some(elements))
+    } else {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        (input, None)
+    };
     Ok((
         input,
         node_from_to(
@@ -446,12 +488,13 @@ pub(crate) fn feature_value_binding(
                 typing: None,
                 subsets: spec.subsets.map(|(target, _value)| target),
                 redefines: spec.redefines,
+                multiplicity: None,
                 value: Some(value),
                 name_span: Some(name_span),
                 typing_span: None,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
                 has_feature_keyword: false,
-                body: None,
+                body,
             },
         ),
     ))
@@ -498,6 +541,7 @@ pub(crate) fn bare_or_valued_feature_binding(
                 typing: None,
                 subsets: spec.subsets.map(|(target, _value)| target),
                 redefines: spec.redefines,
+                multiplicity: None,
                 value,
                 name_span: Some(name_span),
                 typing_span: None,
@@ -1196,6 +1240,7 @@ pub(crate) fn attribute_usage_shorthand(
                 subsets: None,
                 redefines: None,
                 value,
+                multiplicity: None,
                 name_span: Some(name_span),
                 typing_span: Some(typing_span),
                 // No visibility prefix on the no-keyword shorthand form.

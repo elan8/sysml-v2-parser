@@ -286,8 +286,12 @@ pub struct KermlFeatureMember {
     pub is_var: bool,
     /// `end` prefix.
     pub is_end: bool,
-    /// The feature-kind keyword: `feature`, `step`, `expr`, or `bool`.
+    /// The feature-kind keyword: `feature`, `step`, `expr`, or `bool`. `has_kind_keyword` is
+    /// `false` for the keyword-less prefixed forms (`portion redefines portionOfLife = ...;`,
+    /// Kernel Semantic Library `Occurrences.kerml`), where the kind defaults to `Feature`.
     pub kind: KermlFeatureKind,
+    /// Whether the kind keyword was authored. See `kind`.
+    pub has_kind_keyword: bool,
     /// `all` after the kind keyword (KerML `isSufficient`).
     pub is_all: bool,
     /// Declared name (may be quoted, e.g. `'in'`). Empty for the redefinition-led form
@@ -308,8 +312,15 @@ pub struct KermlFeatureMember {
     pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
     /// `references`/`::>` clause.
     pub references: Option<Node<crate::ast::SubsettingRelationship>>,
+    /// `chains` clause target, e.g. `feature self: Anything[1] subsets things chains
+    /// things.that { ... }` (Kernel Semantic Library `Base.kerml`).
+    pub chains: Option<crate::ast::QualifiedReferenceId>,
     /// `inverse of` target chain.
     pub inverse_of: Option<crate::ast::QualifiedReferenceId>,
+    /// KerML type relationship clauses on the feature (`unions a, b`, `intersects a, b`,
+    /// `disjoint from a`), e.g. `feature withoutOccurrences: Occurrence[0..*] unions
+    /// successors, predecessors, outsideOfOccurrences` (`Occurrences.kerml`).
+    pub type_relationships: Vec<Node<KermlTypeRelationship>>,
     /// Value clause: `= expr` / `:= expr` / `default (=|:=)? expr`.
     pub value: Option<Node<crate::ast::FeatureValue>>,
     /// Body following the shared type-body member grammar: `;` or `{ ... }`.
@@ -359,5 +370,94 @@ pub struct KermlInvariantMember {
     pub name: String,
     /// Body holding the invariant's boolean expression(s) via the shared type-body grammar.
     pub body: crate::ast::CalcDefBody,
+    pub membership: crate::ast::Membership,
+}
+
+/// One end of a KerML connector/binding/succession member: optional `[multiplicity]` plus a
+/// (possibly dotted) feature chain, e.g. `[1] self` or `onOccurrence.startingAt.startShot`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KermlConnectorEnd {
+    pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    pub target: crate::ast::QualifiedReferenceId,
+    /// `references` chain on the end, e.g. `from [0..*] separateOccurrenceToo references
+    /// elements.notIntersection to ...` (Kernel Semantic Library `Occurrences.kerml`).
+    pub references: Option<crate::ast::QualifiedReferenceId>,
+}
+
+/// KerML connector member in a type body: `connector` `all`? name? `:` type multiplicity?
+/// (`from` end `to` end)? body, e.g. `connector :HappensDuring from [1] self to [1] this;` or
+/// `private connector all during: HappensDuring[0..1] from self to occ;` (Kernel Semantic
+/// Library `Occurrences.kerml`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KermlConnectorMember {
+    pub is_all: bool,
+    /// Declared name; empty for the anonymous `connector :Type` form.
+    pub name: String,
+    /// `:` type target.
+    pub typing: Option<crate::ast::QualifiedReferenceId>,
+    pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    /// `from`/`to` ends when written.
+    pub from: Option<Node<KermlConnectorEnd>>,
+    pub to: Option<Node<KermlConnectorEnd>>,
+    /// Body following the shared type-body member grammar: `;` or `{ ... }`.
+    pub body: crate::ast::CalcDefBody,
+    pub membership: crate::ast::Membership,
+}
+
+/// KerML binding connector member: `binding` (name `of`)? end `=` end `;`, e.g.
+/// `binding [1] startShot = [1] endShot;` or `binding oSelf of sourceOccurrence.portionOfLife =
+/// targetOccurrence.portionOfLife;` (Kernel Semantic Library `Occurrences.kerml`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KermlBindingMember {
+    /// Declared name before `of`; empty for the unnamed form.
+    pub name: String,
+    /// Multiplicity on the declared name (`binding instant[instantNum] of ...`,
+    /// `Triggers.kerml`).
+    pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    pub left: Node<KermlConnectorEnd>,
+    pub right: Node<KermlConnectorEnd>,
+    /// Body following the shared type-body member grammar: `;` or `{ ... }` (`binding
+    /// portionOf = self { ... }`, `Occurrences.kerml`).
+    pub body: crate::ast::CalcDefBody,
+    pub membership: crate::ast::Membership,
+}
+
+/// KerML succession member: `succession` end `then` end `;`, e.g. `succession [1] ifTest then
+/// [0..1] elseClause;` (Kernel Semantic Library `ControlPerformances.kerml`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KermlSuccessionMember {
+    /// `all` sufficiency (`private succession all [*] trigger then [*] guard;`,
+    /// `TransitionPerformances.kerml`).
+    pub is_all: bool,
+    /// Declared succession name, present only with the `first` keyword form (`succession
+    /// triggerAfter [taNum] first [0..1] transitionLinkSource then ...;`); empty otherwise.
+    pub name: String,
+    /// The succession's own multiplicity in the named `first` form (`[taNum]` above).
+    pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    pub first: Node<KermlConnectorEnd>,
+    pub then: Node<KermlConnectorEnd>,
+    pub membership: crate::ast::Membership,
+}
+
+/// KerML end member with an owned cross feature: `end` name? multiplicity? (`subsets` targets)?
+/// `feature` <feature member>, e.g. `end happensDuring [1..*] feature longerOccurrence:
+/// Occurrence redefines targetOccurrence;` (Kernel Semantic Library `Occurrences.kerml`).
+/// Distinct from a plain `end feature ...` member, which stays on [`KermlFeatureMember`] with
+/// `is_end` -- here the end itself is named/constrained and owns the nested feature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KermlEndMember {
+    /// End name; empty when the end is anonymous (`end guardedLink [0..1] feature ...` has a
+    /// name; none of the library ends are anonymous, but the grammar permits it).
+    pub name: String,
+    pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
+    /// `subsets` clause on the end itself.
+    pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
+    /// The owned cross feature.
+    pub feature: Box<Node<KermlFeatureMember>>,
     pub membership: crate::ast::Membership,
 }

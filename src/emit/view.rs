@@ -202,16 +202,28 @@ fn emit_calc_body_element(
 ) -> Result<(), EmitError> {
     match el {
         CalcDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        CalcDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         CalcDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
         CalcDefBodyElement::TypedParameter(p) => emit_typed_parameter(w, path, &p.value),
         CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature_member(w, path, &f.value),
         CalcDefBodyElement::Invariant(i) => emit_kerml_invariant_member(w, path, &i.value),
+        CalcDefBodyElement::Connector(c) => emit_kerml_connector_member(w, path, &c.value),
+        CalcDefBodyElement::AssertConstraint(a) => emit_assert_constraint(w, path, &a.value),
+        CalcDefBodyElement::KermlClassifier(k) => {
+            super::root::emit_kerml_classifier_decl(w, path, &k.value)
+        }
+        CalcDefBodyElement::Binding(b) => emit_kerml_binding_member(w, path, &b.value),
+        CalcDefBodyElement::Succession(sc) => emit_kerml_succession_member(w, path, &sc.value),
+        CalcDefBodyElement::EndMember(e) => emit_kerml_end_member(w, path, &e.value),
+        CalcDefBodyElement::Import(i) => super::root::emit_import(w, &i.value),
+        CalcDefBodyElement::Comment(c) => super::root::emit_comment(w, &c.value),
+        CalcDefBodyElement::AttributeUsage(a) => {
+            super::structure::emit_attribute_usage(w, path, &a.value)
+        }
+        CalcDefBodyElement::DefaultReferenceUsage(d) => {
+            super::structure::emit_default_reference_usage(w, path, &d.value)
+        }
         CalcDefBodyElement::CalcUsage(c) => emit_calc_usage(w, path, &c.value),
         CalcDefBodyElement::CalcDef(c) => emit_calc_def(w, path, &c.value),
         CalcDefBodyElement::PartUsage(p) => super::structure::emit_part_usage(w, path, &p.value),
@@ -230,35 +242,39 @@ pub(crate) fn emit_kerml_feature_member(
     feature: &crate::ast::KermlFeatureMember,
 ) -> Result<(), EmitError> {
     emit_visibility(w, feature.membership.visibility);
+    let mut head: Vec<&str> = Vec::new();
     if feature.is_member {
-        w.push_str("member ");
+        head.push("member");
     }
     if feature.is_derived {
-        w.push_str("derived ");
+        head.push("derived");
     }
     if feature.is_abstract {
-        w.push_str("abstract ");
+        head.push("abstract");
     }
     if feature.is_composite {
-        w.push_str("composite ");
+        head.push("composite");
     }
     if feature.is_portion {
-        w.push_str("portion ");
+        head.push("portion");
     }
     if feature.is_var {
-        w.push_str("var ");
+        head.push("var");
     }
     if feature.is_end {
-        w.push_str("end ");
+        head.push("end");
     }
-    w.push_str(feature.kind.as_str());
+    if feature.has_kind_keyword {
+        head.push(feature.kind.as_str());
+    }
     if feature.is_all {
-        w.push_str(" all");
+        head.push("all");
     }
+    let name = format_name(&feature.name);
     if !feature.name.is_empty() {
-        w.push_char(' ');
-        w.push_str(&format_name(&feature.name));
+        head.push(&name);
     }
+    w.push_str(&head.join(" "));
     if let Some(typing) = &feature.typing {
         emit_typing_clause(w, &typing.value)?;
     }
@@ -279,6 +295,24 @@ pub(crate) fn emit_kerml_feature_member(
     }
     if let Some(references) = &feature.references {
         emit_subsetting_clause(w, &references.value)?;
+    }
+    if let Some(chains) = feature.chains {
+        w.push_str(" chains ");
+        w.push_qualified_reference(&format!("{path}/chains"), chains)?;
+    }
+    for (index, clause) in feature.type_relationships.iter().enumerate() {
+        w.push_char(' ');
+        w.push_str(clause.value.keyword.as_str());
+        w.push_char(' ');
+        for (target_index, target) in clause.value.targets.iter().copied().enumerate() {
+            if target_index > 0 {
+                w.push_str(", ");
+            }
+            w.push_qualified_reference(
+                &format!("{path}/type-relationship[{index}][{target_index}]"),
+                target,
+            )?;
+        }
     }
     if let Some(inverse_of) = feature.inverse_of {
         w.push_str(" inverse of ");
@@ -305,6 +339,126 @@ pub(crate) fn emit_kerml_invariant_member(
         w.push_str(&format_name(&invariant.name));
     }
     emit_calc_body(w, path, &invariant.body)
+}
+
+pub(crate) fn emit_kerml_connector_end(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    end: &crate::ast::KermlConnectorEnd,
+) -> Result<(), EmitError> {
+    if let Some(multiplicity) = &end.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+        w.push_char(' ');
+    }
+    w.push_qualified_reference(path, end.target)?;
+    if let Some(references) = end.references {
+        w.push_str(" references ");
+        w.push_qualified_reference(&format!("{path}/references"), references)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn emit_kerml_connector_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    connector: &crate::ast::KermlConnectorMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, connector.membership.visibility);
+    w.push_str("connector");
+    if connector.is_all {
+        w.push_str(" all");
+    }
+    if !connector.name.is_empty() {
+        w.push_char(' ');
+        w.push_str(&format_name(&connector.name));
+    }
+    if let Some(typing) = connector.typing {
+        if connector.name.is_empty() {
+            // The anonymous library form is spelled with no space: `connector :HappensDuring`.
+            w.push_str(" :");
+        } else {
+            w.push_str(": ");
+        }
+        w.push_qualified_reference(&format!("{path}/type"), typing)?;
+    }
+    if let Some(multiplicity) = &connector.multiplicity {
+        if connector.name.is_empty() && connector.typing.is_none() {
+            // `connector [0..1] ...` -- keep the keyword and the multiplicity separated.
+            w.push_char(' ');
+        }
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if let (Some(from), Some(to)) = (&connector.from, &connector.to) {
+        w.push_str(" from ");
+        emit_kerml_connector_end(w, &format!("{path}/from"), &from.value)?;
+        w.push_str(" to ");
+        emit_kerml_connector_end(w, &format!("{path}/to"), &to.value)?;
+    }
+    emit_calc_body(w, path, &connector.body)
+}
+
+pub(crate) fn emit_kerml_binding_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    binding: &crate::ast::KermlBindingMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, binding.membership.visibility);
+    w.push_str("binding ");
+    if !binding.name.is_empty() {
+        w.push_str(&format_name(&binding.name));
+        w.push_str(" of ");
+    }
+    emit_kerml_connector_end(w, &format!("{path}/left"), &binding.left.value)?;
+    w.push_str(" = ");
+    emit_kerml_connector_end(w, &format!("{path}/right"), &binding.right.value)?;
+    w.push_char(';');
+    Ok(())
+}
+
+pub(crate) fn emit_kerml_succession_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    succession: &crate::ast::KermlSuccessionMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, succession.membership.visibility);
+    w.push_str("succession ");
+    if succession.is_all {
+        w.push_str("all ");
+    }
+    if !succession.name.is_empty() {
+        w.push_str(&format_name(&succession.name));
+        if let Some(multiplicity) = &succession.multiplicity {
+            emit_multiplicity(w, &multiplicity.value)?;
+        }
+        w.push_str(" first ");
+    }
+    emit_kerml_connector_end(w, &format!("{path}/first"), &succession.first.value)?;
+    w.push_str(" then ");
+    emit_kerml_connector_end(w, &format!("{path}/then"), &succession.then.value)?;
+    w.push_char(';');
+    Ok(())
+}
+
+pub(crate) fn emit_kerml_end_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    end: &crate::ast::KermlEndMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, end.membership.visibility);
+    w.push_str("end ");
+    if !end.name.is_empty() {
+        w.push_str(&format_name(&end.name));
+        w.push_char(' ');
+    }
+    if let Some(multiplicity) = &end.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+        w.push_char(' ');
+    }
+    if let Some(subsets) = &end.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
+        w.push_char(' ');
+    }
+    emit_kerml_feature_member(w, path, &end.feature.value)
 }
 
 pub(crate) fn emit_typed_parameter(
@@ -348,17 +502,21 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
     if ret.is_redefine {
         w.push_str(":>> ");
     }
+    if let Some(kind) = ret.kind_keyword {
+        w.push_str(kind.as_str());
+        w.push_char(' ');
+    }
     if !ret.name.is_empty() {
         w.push_str(&format_name(&ret.name));
     }
-    if ret.is_subsetting {
-        w.push_str(":>");
-    } else if ret.name.is_empty() {
-        w.push_str(": ");
-    } else {
-        w.push_str(" : ");
+    if let Some(type_name) = ret.type_name {
+        if ret.is_subsetting {
+            w.push_str(if ret.name.is_empty() { ":> " } else { " :> " });
+        } else {
+            w.push_str(if ret.name.is_empty() { ": " } else { " : " });
+        }
+        w.push_qualified_reference("calc-return/type", type_name)?;
     }
-    w.push_qualified_reference("calc-return/type", ret.type_name)?;
     if let Some(multiplicity) = &ret.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }

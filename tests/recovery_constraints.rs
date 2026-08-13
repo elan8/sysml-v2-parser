@@ -4,13 +4,21 @@ use sysml_v2_parser::ast::{
 use sysml_v2_parser::parse_with_diagnostics;
 
 #[test]
-fn calc_keeps_library_tolerant_other_nodes_without_new_diagnostics() {
+fn calc_reports_unmodeled_members_as_explicit_recovery() {
+    // `objective` has no calc-body production; it must surface as an explicit recovery node
+    // with a diagnostic (previously a diagnostic-silent opaque `Other(...)` capture), while the
+    // valid `return` sibling after it still parses.
     let input = "package P { calc def K { objective fuelEconomy { } return result: Real; } }";
     let result = parse_with_diagnostics(input);
-    assert!(
-        result.errors.is_empty(),
-        "accepted calc-library constructs should remain diagnostic-free: {:?}",
+    assert_eq!(
+        result.errors.len(),
+        1,
+        "the unmodeled member must produce exactly one diagnostic: {:?}",
         result.errors
+    );
+    assert_eq!(
+        result.errors[0].code.as_deref(),
+        Some("recovered_calc_body_element")
     );
     let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -32,7 +40,13 @@ fn calc_keeps_library_tolerant_other_nodes_without_new_diagnostics() {
     assert!(
         elements
             .iter()
-            .any(|e| matches!(e.value, CalcDefBodyElement::Other(_))),
-        "accepted unmodeled calc constructs should remain as Other(...)"
+            .any(|e| matches!(e.value, CalcDefBodyElement::Error(_))),
+        "the unmodeled member must be an explicit recovery element"
+    );
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(e.value, CalcDefBodyElement::ReturnDecl(_))),
+        "the valid return sibling after the recovered member must still parse"
     );
 }

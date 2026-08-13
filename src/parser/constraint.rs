@@ -320,21 +320,19 @@ fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
 }
 
 fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefBodyElement> {
-    if starts_with_any_keyword(start.fragment(), CALC_DEF_BODY_STARTERS) {
-        let recovery = build_recovery_error_node_from_span(
-            start,
-            end,
-            CALC_DEF_BODY_STARTERS,
-            "calc body",
-            "recovered_calc_body_element",
-        );
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        return node_from_to(start, end, CalcDefBodyElement::Error(node));
-    }
-    let frag = start.fragment();
-    let take = frag.len().min(120);
-    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    node_from_to(start, end, CalcDefBodyElement::Other(preview))
+    // Every unparseable member becomes an explicit recovery node with a diagnostic. Content
+    // whose first token is not a known calc starter previously became a diagnostic-silent
+    // opaque `Other(preview)` capture instead -- a swallow that made malformed input look
+    // successfully parsed.
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        CALC_DEF_BODY_STARTERS,
+        "calc body",
+        "recovered_calc_body_element",
+    );
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    node_from_to(start, end, CalcDefBodyElement::Error(node))
 }
 
 pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
@@ -524,6 +522,384 @@ fn typed_parameter_member_inner(
     ))
 }
 
+/// One end of a connector/binding/succession member: `[mult]?` feature chain.
+fn kerml_connector_end(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorEnd>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, target) =
+        preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
+    // `references <chain>` on the end itself: `from [0..*] separateOccurrenceToo references
+    // elements.notIntersection to ...` (`Occurrences.kerml`).
+    let (input, references) = opt(preceded(
+        (ws_and_comments, tag(&b"references"[..]), ws1),
+        crate::parser::lex::reference_path,
+    ))
+    .parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlConnectorEnd {
+                multiplicity,
+                target,
+                references,
+            },
+        ),
+    ))
+}
+
+/// KerML connector member: `connector` `all`? name? `:` type mult? (`from` end `to` end)? body,
+/// e.g. `connector :HappensDuring from [1] self to [1] this;` or `private connector all during:
+/// HappensDuring[0..1] from self to occ;` (Kernel Semantic Library `Occurrences.kerml`).
+pub(crate) fn kerml_connector_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorMember>> {
+    crate::parser::span::reference_transaction(input, kerml_connector_member_inner)
+}
+
+fn kerml_connector_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorMember>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, _) = tag(&b"connector"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
+    // Name is optional: the common library shapes are the anonymous `connector :Type` and the
+    // `from`-less `connector [0..1] transitionLink to [1..*] trigger;`
+    // (`TransitionPerformances.kerml`).
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, name_str) =
+        if peek.fragment().starts_with(b":") || peek.fragment().starts_with(b"[") {
+            (input, String::new())
+        } else {
+            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+            (input, n)
+        };
+    let (input, typing) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_reference),
+    ))
+    .parse(input)?;
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    // Ends: `from end to end`, or the `from`-less binary shorthand `connector [0..1]
+    // transitionLink to [1..*] trigger;` (`TransitionPerformances.kerml`).
+    let (input, ends) = opt(alt((
+        map(
+            (
+                preceded(ws_and_comments, tag(&b"from"[..])),
+                kerml_connector_end,
+                preceded(ws_and_comments, tag(&b"to"[..])),
+                kerml_connector_end,
+            ),
+            |(_, from, _, to)| (from, to),
+        ),
+        map(
+            (
+                kerml_connector_end,
+                preceded(ws_and_comments, tag(&b"to"[..])),
+                kerml_connector_end,
+            ),
+            |(from, _, to)| (from, to),
+        ),
+    )))
+    .parse(input)?;
+    let (from, to) = match ends {
+        Some((from, to)) => (Some(from), Some(to)),
+        None => (None, None),
+    };
+    let (input, body) = calc_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlConnectorMember {
+                is_all: is_all.is_some(),
+                name: name_str,
+                typing,
+                multiplicity,
+                from,
+                to,
+                body,
+                membership: Membership::feature(visibility, visibility_span),
+            },
+        ),
+    ))
+}
+
+/// KerML binding connector member: `binding` (name `of`)? end `=` end `;`
+/// (`binding [1] startShot = [1] endShot;`, `binding oSelf of a.b = c.d;`).
+pub(crate) fn kerml_binding_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlBindingMember>> {
+    crate::parser::span::reference_transaction(input, kerml_binding_member_inner)
+}
+
+fn kerml_binding_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlBindingMember>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, _) = tag(&b"binding"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    // A declared name is only present with the `of` form -- without `of`, the leading
+    // identifier is the left end's feature chain.
+    let (input, named) = opt(map(
+        (
+            preceded(ws_and_comments, name),
+            opt(preceded(
+                ws_and_comments,
+                crate::parser::usage::multiplicity_node,
+            )),
+            preceded(ws_and_comments, tag(&b"of"[..])),
+            ws1,
+        ),
+        |(n, m, _, _)| (n, m),
+    ))
+    .parse(input)?;
+    let (name_str, decl_multiplicity) = named.unwrap_or((String::new(), None));
+    let (input, left) = kerml_connector_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+    let (input, right) = kerml_connector_end(input)?;
+    let (input, body) = calc_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlBindingMember {
+                name: name_str,
+                multiplicity: decl_multiplicity,
+                left,
+                right,
+                body,
+                membership: Membership::feature(visibility, visibility_span),
+            },
+        ),
+    ))
+}
+
+/// KerML succession member: `succession` end `then` end `;`
+/// (`succession [1] ifTest then [0..1] elseClause;`, `private succession [1] entry then [*]
+/// middle;`). The named/typed succession forms stay on their existing parsers.
+pub(crate) fn kerml_succession_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlSuccessionMember>> {
+    crate::parser::span::reference_transaction(input, kerml_succession_member_inner)
+}
+
+fn kerml_succession_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlSuccessionMember>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, _) = tag(&b"succession"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
+    // Named form, only with the `first` keyword: `succession triggerAfter [taNum] first
+    // [0..1] transitionLinkSource then ...;` (`TransitionPerformances.kerml`).
+    let (input, named) = opt(map(
+        (
+            preceded(ws_and_comments, name),
+            opt(preceded(
+                ws_and_comments,
+                crate::parser::usage::multiplicity_node,
+            )),
+            preceded(ws_and_comments, tag(&b"first"[..])),
+            ws1,
+        ),
+        |(n, m, _, _)| (n, m),
+    ))
+    .parse(input)?;
+    let (name_str, decl_multiplicity) = named.unwrap_or((String::new(), None));
+    let (input, first) = kerml_connector_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, then) = kerml_connector_end(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlSuccessionMember {
+                is_all: is_all.is_some(),
+                name: name_str,
+                multiplicity: decl_multiplicity,
+                first,
+                then,
+                membership: Membership::feature(visibility, visibility_span),
+            },
+        ),
+    ))
+}
+
+/// KerML end member with an owned cross feature: `end` name? mult? (`subsets` targets)?
+/// `feature` <feature member> (`end happensDuring [1..*] feature longerOccurrence: Occurrence
+/// redefines targetOccurrence;`, Kernel Semantic Library `Occurrences.kerml`). Plain
+/// `end feature ...` stays on [`kerml_feature_member`] (its name parse fails on `feature`
+/// here, so dispatch order tries that first).
+pub(crate) fn kerml_end_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlEndMember>> {
+    crate::parser::span::reference_transaction(input, kerml_end_member_inner)
+}
+
+fn kerml_end_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlEndMember>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, _) = tag(&b"end"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    // The end name is optional: `end [1] feature transferSource references source;`
+    // (`Transfers.kerml`).
+    let (input, name_str) = if starts_with_keyword(input.fragment(), b"feature")
+        || input.fragment().starts_with(b"[")
+    {
+        (input, String::new())
+    } else {
+        let (input, n) = name(input)?;
+        (input, n)
+    };
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, subsets) =
+        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    let subsets = subsets.map(|(target, _value)| target);
+    // The owned cross feature, starting at its `feature` keyword.
+    let (peek, _) = ws_and_comments(input)?;
+    if !starts_with_keyword(peek.fragment(), b"feature") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, feature) = kerml_feature_member(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlEndMember {
+                name: name_str,
+                multiplicity,
+                subsets,
+                feature: Box::new(feature),
+                membership: Membership::feature(visibility, visibility_span),
+            },
+        ),
+    ))
+}
+
+/// Keyword-less named member binding in a type body: (visibility)? name mult? (`:` type)? mult?
+/// (`:>>`/`redefines` targets)? value? `;` -- `private instantNum: Natural[1] = if isInstant? 1
+/// else 0;`, `private thisClock : Clock :>> self;` (Kernel Semantic Library
+/// `Occurrences.kerml`/`Observation.kerml`). Requires a value or a redefinition so plain
+/// expression statements stay on the expression arm.
+pub(crate) fn calc_named_binding(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    crate::parser::span::reference_transaction(input, calc_named_binding_inner)
+}
+
+fn calc_named_binding_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, (name_span, name_str)) = crate::parser::with_span(name).parse(input)?;
+    let (input, leading_multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, typing) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
+            let before = input;
+            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+            let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+            let span = crate::parser::span_from_to(before, input);
+            (
+                input,
+                Some(crate::ast::Node::new(
+                    span.clone(),
+                    crate::ast::TypingRelationship {
+                        target: vec![target],
+                        kind: crate::ast::TypingKind::Typing,
+                        span,
+                        is_conjugated: false,
+                        is_implied: false,
+                    },
+                )),
+            )
+        } else {
+            (input, None)
+        }
+    };
+    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::multiplicity_node,
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    if value.is_none() && redefines.is_none() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    }
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let typing_span = typing.as_ref().map(|t| t.span.clone());
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::DefaultReferenceUsage {
+                name: name_str,
+                typing,
+                subsets: None,
+                redefines,
+                value,
+                multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                name_span: Some(name_span),
+                typing_span,
+                membership: Membership::feature(visibility, visibility_span),
+                has_feature_keyword: false,
+                body: None,
+            },
+        ),
+    ))
+}
+
 /// KerML feature member (type-body scope): optional `member`/`derived`/`abstract`/`composite`/
 /// `portion`/`var`/`end` prefixes, the `feature` keyword, optional `all`, then the usual
 /// declaration surface (name or leading redefinition, typing, multiplicity, `ordered`/
@@ -551,7 +927,16 @@ fn kerml_feature_member_inner(
     .parse(input)?;
     let (input, is_var) = opt(preceded(tag(&b"var"[..]), ws1)).parse(input)?;
     let (input, is_end) = opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
-    let (input, kind) = alt((
+    let had_prefix = is_member.is_some()
+        || is_derived.is_some()
+        || is_abstract.is_some()
+        || composite_or_portion.is_some()
+        || is_var.is_some()
+        || is_end.is_some();
+    // The kind keyword is optional when a prefix already marks this as a feature member:
+    // `portion redefines portionOfLife = (that as Occurrence).portionOfLife;`
+    // (`Occurrences.kerml`).
+    let (input, kind) = opt(alt((
         map(preceded(tag(&b"feature"[..]), ws1), |_| {
             crate::ast::KermlFeatureKind::Feature
         }),
@@ -564,16 +949,35 @@ fn kerml_feature_member_inner(
         map(preceded(tag(&b"bool"[..]), ws1), |_| {
             crate::ast::KermlFeatureKind::Bool
         }),
-    ))
+    )))
     .parse(input)?;
+    let has_kind_keyword = kind.is_some();
+    if kind.is_none() && !had_prefix {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let kind = kind.unwrap_or(crate::ast::KermlFeatureKind::Feature);
     let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
     // Leading redefinition may replace the name: `portion feature redefines spaceBoundary [1];`.
     let (input, leading_redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+    // The name itself is also optional when a specialization/typing/multiplicity/body follows
+    // directly: `step :> monitor.startObservation { ... }`, `private composite step : add
+    // { ... }` (`Observation.kerml`, `SequenceFunctions.kerml`).
     let (input, name_str) = if leading_redefines.is_some() {
         (input, String::new())
     } else {
-        let (input, n) = preceded(ws_and_comments, name).parse(input)?;
-        (input, n)
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":")
+            || peek.fragment().starts_with(b"[")
+            || peek.fragment().starts_with(b"{")
+        {
+            (input, String::new())
+        } else {
+            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+            (input, n)
+        }
     };
     let (input, leading_multiplicity) = opt(preceded(
         ws_and_comments,
@@ -607,6 +1011,13 @@ fn kerml_feature_member_inner(
     let subsets = clauses.subsets.map(|(target, _value)| target);
     let redefines = leading_redefines.or(clauses.redefines);
     let references = clauses.references;
+    // `chains <chain>`: `feature self: Anything[1] subsets things chains things.that { ... }`
+    // (`Base.kerml`).
+    let (input, chains) = opt(preceded(
+        (ws_and_comments, tag(&b"chains"[..]), ws1),
+        crate::parser::lex::reference_path,
+    ))
+    .parse(input)?;
     // `inverse of <chain>`: `feature all spaceShotOf: Occurrence[0..*] subsets spaceSliceOf
     // inverse of spaceShots { ... }` (`Occurrences.kerml`).
     let (input, inverse_of) = opt(preceded(
@@ -617,9 +1028,31 @@ fn kerml_feature_member_inner(
             tag(&b"of"[..]),
             ws1,
         ),
-        qualified_reference,
+        crate::parser::lex::reference_path,
     ))
     .parse(input)?;
+    // `unions a, b` / `intersects a, b` / `disjoint from a` type relationship clauses:
+    // `feature withoutOccurrences: Occurrence[0..*] unions successors, predecessors, ...`
+    // (`Occurrences.kerml`).
+    let (input, type_relationships) =
+        crate::parser::package::kerml_type_relationship_clauses(input)?;
+    // `inverse of` may also trail the type relationships (`... unions successors, ... inverse
+    // of withoutOccurrences { ... }`, `Occurrences.kerml`).
+    let (input, inverse_of) = if inverse_of.is_none() {
+        opt(preceded(
+            (
+                ws_and_comments,
+                tag(&b"inverse"[..]),
+                ws1,
+                tag(&b"of"[..]),
+                ws1,
+            ),
+            crate::parser::lex::reference_path,
+        ))
+        .parse(input)?
+    } else {
+        (input, inverse_of)
+    };
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = calc_def_body(input)?;
     Ok((
@@ -636,6 +1069,7 @@ fn kerml_feature_member_inner(
                 is_var: is_var.is_some(),
                 is_end: is_end.is_some(),
                 kind,
+                has_kind_keyword,
                 is_all: is_all.is_some(),
                 name: name_str,
                 typing,
@@ -645,7 +1079,9 @@ fn kerml_feature_member_inner(
                 subsets,
                 redefines,
                 references,
+                chains,
                 inverse_of,
+                type_relationships,
                 value,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
@@ -705,6 +1141,11 @@ fn kerml_invariant_member_inner(
 fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // Keyword dispatch looks past an optional visibility prefix (`private attribute ...`,
+    // `private connector all ...`); each arm's parser re-parses the prefix itself.
+    let after_visibility = crate::parser::lex::visibility_prefix(input)
+        .map(|(rest, _)| *rest.fragment())
+        .unwrap_or_else(|_| *input.fragment());
     let (input, elem) = if starts_with_keyword(input.fragment(), b"doc") {
         map(
             crate::parser::requirement::doc_comment,
@@ -717,28 +1158,98 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::MetadataAnnotation,
         )
         .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"import") {
+        map(crate::parser::import::import_, |n| {
+            CalcDefBodyElement::Import(Box::new(n))
+        })
+        .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"comment") {
+        map(
+            crate::parser::requirement::comment_annotation,
+            CalcDefBodyElement::Comment,
+        )
+        .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"connector") {
+        map(kerml_connector_member, |n| {
+            CalcDefBodyElement::Connector(Box::new(n))
+        })
+        .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"binding") {
+        map(kerml_binding_member, |n| {
+            CalcDefBodyElement::Binding(Box::new(n))
+        })
+        .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"succession") {
+        map(kerml_succession_member, |n| {
+            CalcDefBodyElement::Succession(Box::new(n))
+        })
+        .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"attribute") {
+        map(crate::parser::attribute::attribute_usage, |n| {
+            CalcDefBodyElement::AttributeUsage(Box::new(n))
+        })
+        .parse(input)?
+    } else if input.fragment().starts_with(b":>>") {
+        // Anonymous leading-redefinition binding: `:>> dimension = size(components);`
+        // (`VectorValues.kerml`).
+        map(crate::parser::attribute::feature_value_binding, |n| {
+            CalcDefBodyElement::DefaultReferenceUsage(Box::new(n))
+        })
+        .parse(input)?
     } else if starts_with_any_keyword(
-        input.fragment(),
+        after_visibility,
         &[
             b"member",
             b"derived",
             b"composite",
             b"portion",
             b"var",
-            b"end",
             b"feature",
             b"step",
+            b"bool",
+            b"expr",
         ],
-    ) || (starts_with_keyword(input.fragment(), b"abstract")
+    ) || (starts_with_any_keyword(after_visibility, &[b"abstract", b"end"])
         && kerml_feature_member(input).is_ok())
     {
         map(kerml_feature_member, |n| {
             CalcDefBodyElement::KermlFeature(Box::new(n))
         })
         .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"end") {
+        map(kerml_end_member, |n| {
+            CalcDefBodyElement::EndMember(Box::new(n))
+        })
+        .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"inv") {
         map(kerml_invariant_member, |n| {
             CalcDefBodyElement::Invariant(Box::new(n))
+        })
+        .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"assert") {
+        map(
+            crate::parser::occurrence_body::assert_constraint_member,
+            |n| CalcDefBodyElement::AssertConstraint(Box::new(n)),
+        )
+        .parse(input)?
+    } else if starts_with_any_keyword(
+        after_visibility,
+        &[
+            b"struct",
+            b"datatype",
+            b"metaclass",
+            b"assoc",
+            b"classifier",
+            b"function",
+            b"behavior",
+            b"predicate",
+            b"interaction",
+        ],
+    ) {
+        // Nested classifier declarations inside a type body (`struct StructuredSurface
+        // specializes ... { ... }` inside a struct, `Objects.kerml`).
+        map(crate::parser::package::kerml_classifier_structured, |n| {
+            CalcDefBodyElement::KermlClassifier(Box::new(n))
         })
         .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"in")
@@ -780,12 +1291,21 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             )));
         }
         if let Ok((input, decl)) = return_decl(input) {
-            (input, CalcDefBodyElement::ReturnDecl(decl))
+            (input, CalcDefBodyElement::ReturnDecl(Box::new(decl)))
         } else if let Ok((input, expr)) = return_expression_stmt(input) {
             (input, CalcDefBodyElement::Expression(expr))
         } else {
             other_calc_return(input)?
         }
+    } else if let Ok((next, binding)) = calc_named_binding(input) {
+        // Keyword-less named member binding (`private instantNum: Natural[1] = ...;`,
+        // `private thisClock : Clock :>> self;`) -- tried before the bare-expression arm,
+        // which cannot represent the typing/redefinition. `calc_named_binding` requires a
+        // value or redefinition, so plain expression statements never land here.
+        (
+            next,
+            CalcDefBodyElement::DefaultReferenceUsage(Box::new(binding)),
+        )
     } else {
         map(expression, CalcDefBodyElement::Expression).parse(input)?
     };
@@ -908,6 +1428,9 @@ pub(crate) fn return_expression_stmt(input: Input<'_>) -> IResult<Input<'_>, Nod
     Ok((input, expr))
 }
 
+/// A `return` member that parses as neither a [`return_decl`] nor a return expression becomes
+/// an explicit recovery node with a diagnostic (previously a diagnostic-silent opaque
+/// `Other(preview)` capture).
 fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement> {
     let start_unknown = input;
     let (next, _) = skip_statement_or_block(input)?;
@@ -917,12 +1440,15 @@ fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement>
             nom::error::ErrorKind::Many0,
         )));
     }
-    let preview = String::from_utf8_lossy(
-        &start_unknown.fragment()[..start_unknown.fragment().len().min(120)],
-    )
-    .trim()
-    .to_string();
-    Ok((next, CalcDefBodyElement::Other(preview)))
+    let recovery = build_recovery_error_node_from_span(
+        start_unknown,
+        next,
+        CALC_DEF_BODY_STARTERS,
+        "calc body",
+        "recovered_calc_body_element",
+    );
+    let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
+    Ok((next, CalcDefBodyElement::Error(node)))
 }
 
 pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
@@ -941,6 +1467,18 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     } else {
         (input, false)
     };
+    // Kind keyword: `return attribute verdict : VerdictKind = ...;` / `return feature
+    // timeSignal : TimeSignal[1] = ...` (`Observation.kerml`, `Triggers.kerml`).
+    let (input, kind_keyword) = opt(alt((
+        map(preceded(tag(&b"attribute"[..]), ws1), |_| {
+            crate::ast::ReturnKindKeyword::Attribute
+        }),
+        map(preceded(tag(&b"feature"[..]), ws1), |_| {
+            crate::ast::ReturnKindKeyword::Feature
+        }),
+    )))
+    .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
     // Anonymous typed form: `return : Type [= expr];`
     let (input, n) = if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
         (input, String::new())
@@ -949,14 +1487,26 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
         (input, n)
     };
     let (input, _) = ws_and_comments(input)?;
-    let (input, is_subsetting) = if input.fragment().starts_with(b":>") {
-        let (input, _) = tag(&b":>"[..]).parse(input)?;
-        (input, true)
-    } else {
-        let (input, _) = tag(&b":"[..]).parse(input)?;
-        (input, false)
-    };
-    let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+    // The typing is optional on named results: `return result [1..1];`, `return sampling =
+    // new SampledFunction(...);` (Domain Libraries `SampledFunctions.sysml`).
+    let (input, is_subsetting, type_name) =
+        if input.fragment().starts_with(b":>") && !input.fragment().starts_with(b":>>") {
+            let (input, _) = tag(&b":>"[..]).parse(input)?;
+            let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+            (input, true, Some(target))
+        } else if input.fragment().starts_with(b":") {
+            let (input, _) = tag(&b":"[..]).parse(input)?;
+            let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+            (input, false, Some(target))
+        } else if n.is_empty() {
+            // Nothing declared at all -- not a return declaration.
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        } else {
+            (input, false, None)
+        };
     // Multiplicity and `ordered`/`nonunique` after the type: `return : Real[1] = x;`,
     // `return : Anything[0..*] ordered nonunique;` (Kernel Function Library).
     let (input, multiplicity) = opt(preceded(
@@ -965,6 +1515,19 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     ))
     .parse(input)?;
     let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    // Trailing redefinitions; repeated clauses merge targets (`... redefines result redefines
+    // values;`, `FeatureReferencingPerformances.kerml`).
+    let mut input = input;
+    let mut redefines: Option<Node<crate::ast::SubsettingRelationship>> = None;
+    while let Ok((rest, clause)) = preceded(ws_and_comments, redefinition).parse(input) {
+        match &mut redefines {
+            None => redefines = Some(clause),
+            Some(existing) => {
+                existing.value.target.extend(clause.value.target);
+            }
+        }
+        input = rest;
+    }
     // `= expr` / `:= expr` / `default (=|:=)? expr` value clause: `return : Real default
     // NumericalFunctions::sum0(collection, 0.0);` (Kernel Function Library).
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
@@ -977,6 +1540,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
             start,
             input,
             ReturnDecl {
+                kind_keyword,
                 name: n,
                 type_name,
                 is_redefine,
@@ -984,6 +1548,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
                 multiplicity,
                 ordered,
                 nonunique,
+                redefines,
                 value,
                 body,
             },

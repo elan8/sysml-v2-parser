@@ -131,7 +131,33 @@ pub enum CalcDefBodyElement {
     /// KerML invariant member (`inv name? { expr }`); see
     /// [`crate::ast::KermlInvariantMember`].
     Invariant(Box<Node<crate::ast::KermlInvariantMember>>),
-    ReturnDecl(Node<ReturnDecl>),
+    /// KerML connector member; see [`crate::ast::KermlConnectorMember`].
+    Connector(Box<Node<crate::ast::KermlConnectorMember>>),
+    /// KerML binding connector member; see [`crate::ast::KermlBindingMember`].
+    Binding(Box<Node<crate::ast::KermlBindingMember>>),
+    /// KerML succession member; see [`crate::ast::KermlSuccessionMember`].
+    Succession(Box<Node<crate::ast::KermlSuccessionMember>>),
+    /// KerML end member with an owned cross feature; see [`crate::ast::KermlEndMember`].
+    EndMember(Box<Node<crate::ast::KermlEndMember>>),
+    /// `import` member inside a type body (`private import SequenceFunctions::*;`, Kernel
+    /// Function Library `VectorFunctions.kerml`).
+    Import(Box<Node<crate::ast::Import>>),
+    /// `comment about a, b ...` annotation member (`Occurrences.kerml`).
+    Comment(Node<crate::ast::CommentAnnotation>),
+    /// Nested `attribute` usage member (`private attribute position : Natural[1] = ...;`,
+    /// Systems Library `Interfaces.sysml`; previously captured opaquely).
+    AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
+    /// `assert constraint { ... }` member inside a type body (`ScalarValues.kerml`).
+    AssertConstraint(Box<Node<crate::ast::AssertConstraintMember>>),
+    /// Nested KerML classifier declaration inside a type body (`struct StructuredSurface
+    /// specializes StructuredSpaceObject, Surface { ... }` inside a struct body,
+    /// Kernel Semantic Library `Objects.kerml`).
+    KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
+    /// Keyword-less feature binding, named (`private instantNum: Natural[1] = ...;`) or the
+    /// anonymous leading-redefinition form (`:>> dimension = size(components);`,
+    /// `VectorValues.kerml`).
+    DefaultReferenceUsage(Box<Node<crate::ast::DefaultReferenceUsage>>),
+    ReturnDecl(Box<Node<ReturnDecl>>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // formula
     /// Nested `calc` usage inside a calc body (validation `10b` rollups).
@@ -141,17 +167,21 @@ pub enum CalcDefBodyElement {
     CalcDef(Box<Node<CalcDef>>),
     /// Directed `in part …` parameter (validation `10b`).
     PartUsage(Box<Node<crate::ast::PartUsage>>),
-    /// Unmodeled calc-body element captured as raw text (used for library parsing).
-    Other(String),
 }
 
 /// Return declaration: `return` (`:>>`)? name? (`:`|`:>`) type (`=` expr)? `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReturnDecl {
+    /// Kind keyword between `return` and the declaration (`return attribute verdict :
+    /// VerdictKind = ...;`, `return feature timeSignal : TimeSignal[1] = ...`, Kernel Semantic
+    /// Library `Observation.kerml`/`Triggers.kerml`).
+    pub kind_keyword: Option<ReturnKindKeyword>,
     /// Empty for anonymous `return : Type [= expr];` (validation `10c`, `10d`).
     pub name: String,
-    pub type_name: QualifiedReferenceId,
+    /// `None` for the untyped named forms `return result [1..1];` / `return sampling = ...;`
+    /// (Domain Libraries `SampledFunctions.sysml`).
+    pub type_name: Option<QualifiedReferenceId>,
     /// True for `return :>> name : Type = …` (validation `10b`).
     pub is_redefine: bool,
     /// True when the type is introduced with `:>` rather than `:` (validation `10b` rollups).
@@ -164,6 +194,10 @@ pub struct ReturnDecl {
     pub ordered: bool,
     /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
     pub nonunique: bool,
+    /// Trailing redefinition targets; repeated `redefines` clauses merge their targets
+    /// (`return resultValues : Anything [*] nonunique redefines result redefines values;`,
+    /// Kernel Semantic Library `FeatureReferencingPerformances.kerml`).
+    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
     /// Value clause: `= expr` or `default (=|:=)? expr` (`return : Real default
     /// NumericalFunctions::sum0(collection, 0.0);`, Kernel Function Library
     /// `RealFunctions.kerml`).
@@ -177,6 +211,26 @@ pub struct ReturnDecl {
 // ---------------------------------------------------------------------------
 // Views and Viewpoints (SysML v2 Clause 8.2.2.26)
 // ---------------------------------------------------------------------------
+
+/// The kind keyword after `return` on a [`ReturnDecl`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ReturnKindKeyword {
+    /// `attribute`.
+    Attribute,
+    /// `feature`.
+    Feature,
+}
+
+impl ReturnKindKeyword {
+    /// The authored keyword spelling.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Attribute => "attribute",
+            Self::Feature => "feature",
+        }
+    }
+}
 
 /// View definition: `view def` Identification ViewDefinitionBody.
 #[derive(Debug, Clone, PartialEq, Eq)]

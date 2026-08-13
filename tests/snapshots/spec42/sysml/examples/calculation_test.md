@@ -64,7 +64,7 @@ package CalculationExample {
     }
     calc def ms : MassSum {
         in partMasses = (vehicle.eng.m, vehicle.trans.m);
-        totalMass;
+        return totalMass;
     }
     part vehicles[*] = (vehicle, vehicle);
     attribute def masses1 = (vehicles as VehiclePart).m;

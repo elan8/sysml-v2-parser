@@ -665,7 +665,7 @@ fn kerml_bare_declaration(
 /// [`classifier_decl`]/[`kerml_semantic_decl`] fallbacks so these get a typed node; bare
 /// `keyword Name;` forward declarations stay on [`kerml_bare_declaration`], which is tried
 /// first.
-fn kerml_classifier_structured(
+pub(crate) fn kerml_classifier_structured(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlClassifierDecl>> {
     crate::parser::span::reference_transaction(input, kerml_classifier_structured_inner)
@@ -703,7 +703,7 @@ const KERML_CLASSIFIER_KEYWORDS: &[(&[u8], crate::ast::KermlClassifierKeyword)] 
 
 /// Zero or more KerML type relationship clauses following a classifier header: `disjoint from
 /// A, B`, `unions A, B`, `intersects A, B` (any order, repeatable).
-fn kerml_type_relationship_clauses(
+pub(crate) fn kerml_type_relationship_clauses(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Vec<Node<crate::ast::KermlTypeRelationship>>> {
     let mut out = Vec::new();
@@ -994,6 +994,7 @@ fn feature_usage_member_inner(
                 typing,
                 subsets: spec.subsets.map(|(target, _value)| target),
                 redefines: spec.redefines,
+                multiplicity: None,
                 value,
                 name_span: Some(name_span),
                 typing_span,

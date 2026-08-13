@@ -313,7 +313,6 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
         let p = format!("{path}/body[{i}]");
         match &element.value {
             CalcDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            CalcDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             CalcDefBodyElement::CalcUsage(c) => walk_calc_def_body(report, &p, &c.value.body),
             CalcDefBodyElement::CalcDef(c) => walk_calc_def_body(report, &p, &c.value.body),
             CalcDefBodyElement::PartUsage(pu) => walk_part_usage_body(report, &p, &pu.value.body),
@@ -324,6 +323,20 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             CalcDefBodyElement::TypedParameter(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::KermlFeature(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
+            CalcDefBodyElement::Connector(n) => walk_calc_def_body(report, &p, &n.value.body),
+            CalcDefBodyElement::AssertConstraint(n) => {
+                walk_constraint_def_body(report, &p, &n.value.body)
+            }
+            CalcDefBodyElement::KermlClassifier(n) => walk_calc_def_body(report, &p, &n.value.body),
+            CalcDefBodyElement::EndMember(n) => {
+                walk_calc_def_body(report, &p, &n.value.feature.value.body)
+            }
+            CalcDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
+            CalcDefBodyElement::Binding(_)
+            | CalcDefBodyElement::Succession(_)
+            | CalcDefBodyElement::Import(_)
+            | CalcDefBodyElement::Comment(_)
+            | CalcDefBodyElement::DefaultReferenceUsage(_) => {}
             CalcDefBodyElement::ReturnDecl(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Doc(_) | CalcDefBodyElement::Expression(_) => {}
         }

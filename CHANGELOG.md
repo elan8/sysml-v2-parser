@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 116.** Calc/type bodies no longer swallow unmodeled members as
+  diagnostic-silent opaque `Other(...)` captures: `CalcDefBodyElement::Other` is removed, every
+  unparseable member becomes an explicit recovery node with a `recovered_calc_body_element`
+  diagnostic, and the ~90 library members the swallow was hiding are structurally implemented:
+  - New type-body members: `KermlConnectorMember` (`connector :Type from [1] self to [1]
+    this;`, named/`all`/`from`-less forms, `references` end chains), `KermlBindingMember`
+    (`binding [1] a = [1] b;`, named `of` form, bodies), `KermlSuccessionMember` (`succession
+    [1] a then [*] b;`, `all`, named `first` form), `KermlEndMember` (`end name? [mult]?
+    subsets? feature ...` cross features), plus `Import`, `Comment`, `AttributeUsage`,
+    `AssertConstraint`, nested `KermlClassifier`, and keyword-less `DefaultReferenceUsage`
+    binding members (named `private x: T[1] = ...;` and anonymous `:>> x = ... { ... }` with
+    nested binding bodies via new `FeatureBodyElement::Binding`/`Doc` variants).
+  - `KermlFeatureMember` gains `chains`, type relationship clauses (`unions`/`intersects`/
+    `disjoint from`), an optional kind keyword (`portion redefines ... = ...;`), and an
+    optional name; `ReturnDecl` gains `attribute`/`feature` kind keywords, an optional type
+    (`return result [1..1];`), and merged multi-clause redefinitions;
+    `DefaultReferenceUsage` gains a multiplicity.
+  - Expression grammar: the KerML null-coalescing `??` operator
+    (`BinaryOperator::NullCoalesce`), parenthesis-free collection-operator function references
+    (`->reduce RealFunctions::'+'`), and a Range-operator lexing fix -- `1..4` previously
+    mis-lexed `1.` as a real literal, so `(1..size(x))` only "parsed" as a bogus member access
+    and plain ranges failed outright.
+  - `CalcDefBodyElement::ReturnDecl` boxes its node (clippy `large_enum_variant`).
+  The full-library scan stays at zero diagnostics with the swallow removed; the two tests that
+  asserted the old silent-`Other` behavior now assert the explicit recovery contract.
 - **`PARSE_AST_VERSION` is now 115.** `ViewUsage` retains its multiplicity on the named path
   (the shared usage header already parsed it and the named constructor discarded it) and gains
   `ordered`/`nonunique` multiplicity properties, so `view columnView[0..*] ordered { ... }`
