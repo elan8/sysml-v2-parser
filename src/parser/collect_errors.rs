@@ -1456,6 +1456,9 @@ fn collect_package_body_element_errors(
             &element.span,
             "KerML feature form",
         )),
+        // Structurally recognized: keyword, optional name, optional multiplicity, `;`. No
+        // diagnostic -- this is not a fallback node.
+        PackageBodyElement::KermlBareDeclaration(_) => {}
         PackageBodyElement::Package(n) => collect_package_body_errors(&n.value.body, errors),
         PackageBodyElement::LibraryPackage(n) => collect_package_body_errors(&n.value.body, errors),
         PackageBodyElement::Import(n) => collect_import_errors(&n.value, errors),

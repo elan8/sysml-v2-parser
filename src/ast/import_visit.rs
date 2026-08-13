@@ -176,6 +176,7 @@ impl ProvenanceValidator<'_> {
             | PackageBodyElement::ClassifierDecl(_)
             | PackageBodyElement::KermlSemanticDecl(_)
             | PackageBodyElement::KermlFeatureDecl(_)
+            | PackageBodyElement::KermlBareDeclaration(_)
             | PackageBodyElement::ExtendedLibraryDecl(_)
             | PackageBodyElement::AttributeUsage(_)
             | PackageBodyElement::ItemUsage(_)

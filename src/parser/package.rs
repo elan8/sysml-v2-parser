@@ -273,6 +273,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)
         | PackageBodyElement::KermlFeatureDecl(_)
+        | PackageBodyElement::KermlBareDeclaration(_)
         | PackageBodyElement::ExtendedLibraryDecl(_)
         | PackageBodyElement::AttributeUsage(_)
         | PackageBodyElement::ItemUsage(_)
@@ -605,6 +606,72 @@ fn parse_modeled_decl<'a>(
         .unwrap_or_else(|| "declaration".to_string());
     let (input, _) = skip_statement_or_block(input)?;
     Ok((input, (bnf_production, modeled_decl_text(raw_start, input))))
+}
+
+/// Structurally recognized bare KerML declaration: `kind` `name`? (`[` multiplicity `]`)? `;`.
+/// Covers `datatype DeferredType;`, `multiplicity exactlyOne [1..1];`,
+/// `interaction DeferredInteraction;`, `predicate deferredPredicate;`, and the same shape for
+/// every other KerML classifier/feature keyword whose bare (bodyless) form uses it. Tried before
+/// the opaque [`kerml_semantic_decl`]/[`kerml_feature_decl`] fallbacks so this common shape gets
+/// a structured node; a keyword followed by a `{` body (a different, larger production) falls
+/// through to those fallbacks unchanged.
+fn kerml_bare_declaration(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlBareDeclaration>> {
+    let start = input;
+    let starters: &[&[u8]] = &[
+        b"behavior",
+        b"bool",
+        b"function",
+        b"interaction",
+        b"datatype",
+        b"inv",
+        b"invariant",
+        b"multiplicity",
+        b"assoc",
+        b"association",
+        b"metaclass",
+        b"step",
+        b"occurrence",
+        b"expr",
+        b"predicate",
+        b"succession",
+    ];
+    let (input, _) = ws_and_comments(input)?;
+    let keyword = starters
+        .iter()
+        .find(|kw| starts_with_keyword(input.fragment(), kw))
+        .ok_or_else(|| {
+            nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+        })?;
+    let (input, _) = nom::bytes::complete::tag(*keyword).parse(input)?;
+    let keyword = String::from_utf8_lossy(keyword).to_string();
+    let (input, name_opt) =
+        opt(preceded(ws1, crate::parser::span::with_span(name))).parse(input)?;
+    let (name, name_span) = match name_opt {
+        Some((span, text)) => (Some(text), Some(span)),
+        None => (None, None),
+    };
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, _) =
+        preceded(ws_and_comments, nom::bytes::complete::tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlBareDeclaration {
+                keyword,
+                name,
+                name_span,
+                multiplicity,
+            },
+        ),
+    ))
 }
 
 fn kerml_semantic_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlSemanticDecl>> {
@@ -1668,6 +1735,12 @@ fn try_package_body_view<'a>(
     try_package_body_dispatch!(
         input,
         start,
+        kerml_bare_declaration,
+        PackageBodyElement::KermlBareDeclaration
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
         kerml_semantic_decl,
         PackageBodyElement::KermlSemanticDecl
     );
@@ -1785,6 +1858,15 @@ pub(crate) fn package_body_element(
         map(
             crate::parser::attribute::feature_value_binding,
             PackageBodyElement::DefaultReferenceUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
+    }
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            kerml_bare_declaration,
+            PackageBodyElement::KermlBareDeclaration,
         )
         .parse(input)
     }) {

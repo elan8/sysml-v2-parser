@@ -106,6 +106,23 @@ fn emit_package_body_node(
     emit_package_body_element(w, path, &node.value)
 }
 
+fn emit_kerml_bare_declaration(
+    w: &mut EmitWriter<'_>,
+    declaration: &crate::ast::KermlBareDeclaration,
+) -> Result<(), EmitError> {
+    w.push_str(&declaration.keyword);
+    if let Some(name) = &declaration.name {
+        w.push_char(' ');
+        w.push_str(name);
+    }
+    if let Some(multiplicity) = &declaration.multiplicity {
+        w.push_char(' ');
+        structure::emit_multiplicity(w, &multiplicity.value)?;
+    }
+    w.push_char(';');
+    Ok(())
+}
+
 pub(crate) fn emit_package_body_element(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -219,6 +236,9 @@ pub(crate) fn emit_package_body_element(
             path: path.to_string(),
             kind: super::OpacityKind::ExtendedLibraryDecl,
         }),
+        PackageBodyElement::KermlBareDeclaration(declaration) => {
+            emit_kerml_bare_declaration(w, &declaration.value)
+        }
         other @ (PackageBodyElement::Actor(_) | PackageBodyElement::FlowDef(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),

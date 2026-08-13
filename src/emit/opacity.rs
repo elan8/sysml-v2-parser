@@ -105,6 +105,9 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
             hit(report, path, OpacityKind::KermlSemanticDecl)
         }
         PackageBodyElement::KermlFeatureDecl(_) => hit(report, path, OpacityKind::KermlFeatureDecl),
+        // Structurally recognized -- keyword, optional name, optional multiplicity, `;` -- not
+        // an opaque/recovery node.
+        PackageBodyElement::KermlBareDeclaration(_) => {}
         PackageBodyElement::ExtendedLibraryDecl(_) => {
             hit(report, path, OpacityKind::ExtendedLibraryDecl)
         }

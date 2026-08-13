@@ -2259,6 +2259,32 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::KermlSemanticDecl(_declaration) => {
                 self.write_marker(first, "kerml-semantic-declaration")
             }
+            PackageBodyElement::KermlBareDeclaration(declaration) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(kerml-bare-declaration (keyword ")?;
+                write_quoted(self.writer, &declaration.value.keyword)?;
+                self.writer.write_str(") (name ")?;
+                write_optional_quoted(self.writer, declaration.value.name.as_deref())?;
+                self.writer.write_str(") (multiplicity ")?;
+                if let Some(multiplicity) = &declaration.value.multiplicity {
+                    self.writer.write_str("(lower ")?;
+                    if let Some(lower) = &multiplicity.value.lower {
+                        self.write_expression(lower)?;
+                    } else {
+                        self.writer.write_str("unbounded")?;
+                    }
+                    self.writer.write_str(") (upper ")?;
+                    if let Some(upper) = &multiplicity.value.upper {
+                        self.write_expression(upper)?;
+                    } else {
+                        self.writer.write_str("unbounded")?;
+                    }
+                    self.writer.write_char(')')?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str("))")
+            }
             PackageBodyElement::KermlFeatureDecl(_declaration) => {
                 self.write_marker(first, "kerml-feature-declaration")
             }

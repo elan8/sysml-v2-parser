@@ -8,7 +8,8 @@ use super::common::{
     UnsupportedGrammarNode,
 };
 use super::kerml_fallback::{
-    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlFeatureDecl, KermlSemanticDecl,
+    ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlBareDeclaration, KermlFeatureDecl,
+    KermlSemanticDecl,
 };
 use super::requirement::{
     ActorDecl, AnalysisCaseDef, AnalysisCaseUsage, CaseDef, CaseUsage, ConcernUsage, Dependency,
@@ -172,6 +173,9 @@ pub enum PackageBodyElement {
     ClassifierDecl(Node<ClassifierDecl>),
     KermlSemanticDecl(Node<KermlSemanticDecl>),
     KermlFeatureDecl(Node<KermlFeatureDecl>),
+    /// Structurally recognized bare KerML declaration: keyword, optional name, optional
+    /// multiplicity, terminating `;` -- see [`KermlBareDeclaration`].
+    KermlBareDeclaration(Node<KermlBareDeclaration>),
     ExtendedLibraryDecl(Node<ExtendedLibraryDecl>),
     /// Standalone attribute usage at package level (PAR-002: `PackageMember` in the BNF allows
     /// `DefinitionElement | UsageElement`, so a bare attribute usage is legal package content,

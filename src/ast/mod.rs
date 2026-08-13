@@ -278,6 +278,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::KermlSemanticDecl(n) => {
             PackageBodyElement::KermlSemanticDecl(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::KermlBareDeclaration(n) => {
+            PackageBodyElement::KermlBareDeclaration(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::KermlFeatureDecl(n) => {
             PackageBodyElement::KermlFeatureDecl(dummy_node(n, n.value.clone()))
         }
