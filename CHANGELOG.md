@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 103.** `ConcernUsage` (including `concern def`) retains its `:>`
+  subsetting and `:>>` redefinition clauses (`ConcernUsage::subsets`/`ConcernUsage::redefines`)
+  instead of discarding them after parsing, matching sibling usage kinds.
 - **`PARSE_AST_VERSION` is now 102.** `ViewUsage` retains its `:>` subsetting clause
   (`ViewUsage::subsets`) instead of discarding it after parsing, matching sibling usage kinds such
   as `OccurrenceUsage`/`StateUsage`/`PortUsage`.

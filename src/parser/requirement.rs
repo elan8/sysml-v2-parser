@@ -987,6 +987,8 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let val = ConcernUsage {
         name: ident,
         type_name: header.type_reference,
+        subsets: header.subsets,
+        redefines: header.redefines,
         body,
         is_definition: def_kw.is_some(),
         membership: crate::ast::Membership::feature(visibility, visibility_span),

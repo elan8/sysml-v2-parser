@@ -305,6 +305,8 @@ pub struct FrameMember {
 pub struct ConcernUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: RequirementDefBody,
     /// True for `concern def ...`, false for a bare `concern ...` usage. `concern_usage` handles
     /// both the `concern` and `concern def` textual forms itself rather than through a separate

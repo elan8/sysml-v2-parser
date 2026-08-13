@@ -512,6 +512,12 @@ pub(crate) fn emit_concern_usage(
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
+    if let Some(subsets) = &concern.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(redefines) = &concern.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
     emit_requirement_body(w, path, &concern.body)
 }
 
