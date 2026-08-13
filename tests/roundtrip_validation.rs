@@ -117,6 +117,9 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Import Tests/PrivateImportTest.sysml",
     "Import Tests/QualifiedNameImportTest.sysml",
     "Interaction Sequencing Examples/ServerSequenceModel.sysml",
+    // Promoted by the KerML declaration-grammar work: the anonymous `:>> target = expr;`
+    // binding and RefDecl kind-keyword retention fixed these fixtures' reparse.
+    "Interaction Sequencing Examples/ServerSequenceModelOutside.sysml",
     "Mass Roll-up Example/MassConstraintExample.sysml",
     "Mass Roll-up Example/Vehicles.sysml",
     "Metadata Examples/IssueMetadataExample.sysml",
@@ -136,11 +139,15 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Simple Tests/DependencyTest.sysml",
     "Simple Tests/FeaturePathTest.sysml",
     "Simple Tests/ImportTest.sysml",
+    // Promoted by the KerML declaration-grammar work (see ServerSequenceModelOutside above).
+    "Simple Tests/ItemTest.sysml",
     "Simple Tests/MultiplicityTest.sysml",
     "Simple Tests/ParameterTest.sysml",
     "Simple Tests/RootPackageTest.sysml",
     "Simple Tests/TradeStudyTest.sysml",
     "Vehicle Example/VehicleDefinitions.sysml",
+    // Promoted by the KerML declaration-grammar work (see ServerSequenceModelOutside above).
+    "v1 Spec Examples/8.4.5 Constraining Decomposition/Vehicle Decomposition - Updated.sysml",
     "Vehicle Example/VehicleIndividuals.sysml",
 ];
 

@@ -17,6 +17,11 @@
 //! and comparing/reparsing across them) -- that was the GH-66/GH-69 bug class, where an apparent
 //! AST mismatch was really just the two entry points disagreeing, not a real emit/parser bug.
 //! Covered by `tests/validation/parse_entry_point_equivalence.rs` (GH-70).
+// The deeply mutually recursive AST (type bodies nest parameters that nest type bodies, e.g.
+// `TypedParameterMember` -> `CalcDefBody` -> `InOutDecl` -> `ActionDefBodyElement` -> ...)
+// exceeds the default trait-solver recursion limit when rustdoc computes auto traits such as
+// `RefUnwindSafe`.
+#![recursion_limit = "256"]
 #![cfg_attr(
     not(test),
     deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)

@@ -42,7 +42,7 @@ pub struct PartDef {
 /// DefinitionBody` -- one or more bare `#<name>` metadata-keyword tags standing *in place of* the
 /// usual classifier keyword (`part`/`attribute`/`action`/...) that would otherwise introduce a
 /// `Definition`, e.g. `#situation def Failure;`, `#SecurityRelated #situation def Vulnerability;`,
-/// `abstract #situation def AbstractFailure;`. Reuses [`PackageBody`] for the body so any ordinary
+/// `abstract #situation def AbstractFailure;`. Reuses [`crate::ast::PackageBody`] for the body so any ordinary
 /// package/definition member (`part p;`, nested definitions, ...) parses inside it exactly as at
 /// package scope.
 #[derive(Debug, Clone, PartialEq, Eq)]
