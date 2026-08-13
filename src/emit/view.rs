@@ -464,18 +464,42 @@ pub(crate) fn emit_view_usage(
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }
-    if let Some(redefines) = &usage.redefines {
-        emit_typing_clause_as_subset(w, &redefines.value)?;
-    }
-    if let Some(ty) = &usage.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), *ty)?;
-    }
-    if let Some(subsets) = &usage.subsets {
-        emit_typing_clause_as_subset(w, &subsets.value)?;
-    }
-    if let Some(mult) = &usage.multiplicity {
-        super::structure::emit_multiplicity(w, &mult.value)?;
+    // The anonymous redefinition form parses `:>> target [mult]` (multiplicity after the
+    // target); the named form parses the multiplicity before the trailing subsets clause
+    // (`view columnView[0..*] ordered :> views`). Emit each in the order its parser reparses.
+    if usage.name.is_empty() {
+        if let Some(redefines) = &usage.redefines {
+            emit_typing_clause_as_subset(w, &redefines.value)?;
+        }
+        if let Some(mult) = &usage.multiplicity {
+            super::structure::emit_multiplicity(w, &mult.value)?;
+        }
+        if usage.ordered {
+            w.push_str(" ordered");
+        }
+        if usage.nonunique {
+            w.push_str(" nonunique");
+        }
+    } else {
+        if let Some(ty) = &usage.type_name {
+            w.push_str(" : ");
+            w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+        }
+        if let Some(mult) = &usage.multiplicity {
+            super::structure::emit_multiplicity(w, &mult.value)?;
+        }
+        if usage.ordered {
+            w.push_str(" ordered");
+        }
+        if usage.nonunique {
+            w.push_str(" nonunique");
+        }
+        if let Some(redefines) = &usage.redefines {
+            emit_typing_clause_as_subset(w, &redefines.value)?;
+        }
+        if let Some(subsets) = &usage.subsets {
+            emit_typing_clause_as_subset(w, &subsets.value)?;
+        }
     }
     match &usage.body {
         crate::ast::ViewBody::Semicolon => {

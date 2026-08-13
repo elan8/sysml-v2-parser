@@ -304,8 +304,15 @@ pub struct ViewUsage {
     /// Redefines target, e.g. `columnView` in `view :>> columnView[1] { ... }`. `None` for the
     /// ordinary named form.
     pub redefines: Option<Node<SubsettingRelationship>>,
-    /// Multiplicity, e.g. `[1]` in `view :>> columnView[1] { ... }`.
+    /// Multiplicity, e.g. `[1]` in `view :>> columnView[1] { ... }` or `[0..*]` in `view
+    /// columnView[0..*] ordered { ... }` (Systems Library `Views.sysml`). Previously captured
+    /// only by the anonymous redefinition form and discarded on the named path.
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ordered` keyword from `MultiplicityPart` (`view columnView[0..*] ordered { ... }`).
+    /// Previously skipped and discarded.
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
+    pub nonunique: bool,
     pub body: ViewBody,
     pub membership: Membership,
 }

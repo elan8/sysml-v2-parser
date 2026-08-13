@@ -33,7 +33,7 @@ package Views {
         /* renderings is the base rendering. */
     }
     rendering asElementTable : TabularRendering[1] :> renderings {
-        view columnView {
+        view columnView[0..*] ordered {
             doc
             /* The Views to be rendered in the column cells. */
         }

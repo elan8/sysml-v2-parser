@@ -441,7 +441,9 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
                 type_name: header.type_reference,
                 subsets: header.subsets,
                 redefines: header.redefines,
-                multiplicity: None,
+                multiplicity: header.multiplicity,
+                ordered: header.ordered,
+                nonunique: header.nonunique,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -459,6 +461,7 @@ fn view_usage_redefines_only<'a>(
 ) -> IResult<Input<'a>, Node<ViewUsage>> {
     let (input, (_, redefines_target)) = prefix_redefinition_target(input)?;
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
+    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
     let (input, body) = view_body(input)?;
     Ok((
         input,
@@ -471,6 +474,8 @@ fn view_usage_redefines_only<'a>(
                 subsets: None,
                 redefines: Some(redefines_target),
                 multiplicity: multiplicity_opt,
+                ordered,
+                nonunique,
                 body,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
             },

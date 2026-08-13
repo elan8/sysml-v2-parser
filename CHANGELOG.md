@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 115.** `ViewUsage` retains its multiplicity on the named path
+  (the shared usage header already parsed it and the named constructor discarded it) and gains
+  `ordered`/`nonunique` multiplicity properties, so `view columnView[0..*] ordered { ... }`
+  (Systems Library `Views.sysml`) no longer loses `[0..*] ordered` on formatting. Emission
+  orders the clauses the way each form's parser reparses them (multiplicity after the target
+  for the anonymous `:>>` form, before the trailing subsets clause for the named form).
 - **`PARSE_AST_VERSION` is now 114.** Feature values gain a typed standalone KerML
   `BodyExpression` form and authored-operator fidelity: new `Expression::BodyExpr` models
   `{ parameters* result? }` as a primary expression (sharing `CollectionOperatorBody`'s shape),
