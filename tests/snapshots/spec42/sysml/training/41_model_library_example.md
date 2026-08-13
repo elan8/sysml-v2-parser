@@ -74,7 +74,7 @@ library package 'Model Library Example' {
         occurrence  :> situations :>> causes;
         occurrence  :> situations :>> failures;
     }
-    item scenarios : Scenario;
+    item scenarios : Scenario[*] nonunique;
 }
 ~~~
 # AST

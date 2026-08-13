@@ -52,6 +52,9 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    // BNF `RefPrefix`: `(isAbstract ?= 'abstract')?`, e.g. the package-level `abstract item
+    // items : Item[0..*] nonunique :> objects { ... }` (Systems Library `Items.sysml`).
+    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1), e.g. `individual
     // item ii : II1;` (Simple Tests/IndividualTest.sysml:4).
     let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
@@ -86,11 +89,15 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
             start,
             input,
             ItemUsage {
+                is_abstract: is_abstract.is_some(),
                 name,
                 short_name,
                 type_name: header.type_reference,
                 redefines: header.redefines,
-                multiplicity,
+                subsets: header.subsets,
+                multiplicity: multiplicity.or(header.multiplicity),
+                ordered: header.ordered,
+                nonunique: header.nonunique,
                 value,
                 body,
                 direction: None,

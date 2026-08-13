@@ -68,7 +68,7 @@ package ExternalShapeRefExample {
 				shapeIri = "file:/detailed-geometry/LEMS-250W_BatteryHousing_Example.step";
 			}
         }
-        private item envelopingBoxBatteryUnit : Box {
+        private item envelopingBoxBatteryUnit : Box :> envelopingShapes {
             attribute  :>> length = 140 [mm];
             attribute  :>> width = 148 [mm];
             attribute  :>> height = 90 [mm];

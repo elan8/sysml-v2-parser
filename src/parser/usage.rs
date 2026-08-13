@@ -37,6 +37,15 @@ pub(crate) struct UsageHeader {
     pub crosses: Option<Node<SubsettingRelationship>>,
     pub intersects: Option<Node<SubsettingRelationship>>,
     pub had_specialization: bool,
+    /// Post-typing multiplicity clause, captured by [`feature_usage_header`] (the pre-typing
+    /// clause position is typically consumed by the caller before the header). `None` for
+    /// [`usage_header`], which has no multiplicity grammar.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ordered` multiplicity property from `MultiplicityPart` (BNF §8.2.2.6.6), captured by
+    /// [`feature_usage_header`]; previously skipped and discarded.
+    pub ordered: bool,
+    /// `nonunique` multiplicity property. See `ordered`.
+    pub nonunique: bool,
 }
 
 /// Multiplicity part: '[' ... ']'.
@@ -541,6 +550,9 @@ fn merge_usage_header(
         crosses,
         intersects,
         had_specialization: leading.had_any || trailing.had_any,
+        multiplicity: None,
+        ordered: false,
+        nonunique: false,
     }
 }
 
@@ -549,13 +561,17 @@ fn merge_usage_header(
 /// and `intersects` (folded into `specialization_clauses`, called for both the leading and
 /// trailing position) before the body.
 pub(crate) fn feature_usage_header(input: Input<'_>) -> IResult<Input<'_>, UsageHeader> {
-    let (input, _) = opt(multiplicity).parse(input)?;
+    let (input, leading_multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, leading) = specialization_clauses(input)?;
     let (input, type_result) = optional_typings(input)?;
-    let (input, _) = opt(multiplicity).parse(input)?;
-    let (input, _) = skip_usage_feature_modifiers(input)?;
+    let (input, trailing_multiplicity) = opt(multiplicity_node).parse(input)?;
+    let (input, (ordered, nonunique)) = usage_feature_modifier_flags(input)?;
     let (input, trailing) = specialization_clauses(input)?;
-    Ok((input, merge_usage_header(leading, trailing, type_result)))
+    let mut header = merge_usage_header(leading, trailing, type_result);
+    header.multiplicity = trailing_multiplicity.or(leading_multiplicity);
+    header.ordered = ordered;
+    header.nonunique = nonunique;
+    Ok((input, header))
 }
 
 /// Parse optional usage typing and specialization in either order:

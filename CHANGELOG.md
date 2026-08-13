@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 111.** `ItemUsage` gains `is_abstract` (BNF `RefPrefix`,
+  accepted by the parser for the first time), `subsets` (`:> objects`, previously parsed by the
+  shared usage header and discarded), and `ordered`/`nonunique` multiplicity properties
+  (previously skipped). Covers the package-level `abstract item items : Item[0..*] nonunique
+  :> objects { ... }` declarations (Systems Library `Items.sysml`/`Metadata.sysml`) that
+  previously fell through to the `ExtendedLibraryDecl` fallback. The shared
+  `feature_usage_header` now captures its post-typing multiplicity and `ordered`/`nonunique`
+  flags on `UsageHeader` instead of discarding them. The L2 Systems Library scorecard layer now
+  passes: zero diagnostics and zero fallback nodes across all 21 files.
 - **`PARSE_AST_VERSION` is now 110.** `RenderingUsage` retains its full declaration surface
   instead of discarding everything but the name and type: `is_abstract`, `multiplicity`,
   `ordered`/`nonunique`, `:>` subsets, `:>>` redefines, and a `ValuePart` feature value. The

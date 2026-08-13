@@ -469,6 +469,9 @@ pub(crate) fn emit_item_usage(
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
     }
+    if usage.is_abstract {
+        w.push_str("abstract ");
+    }
     if usage.is_individual {
         w.push_str("individual ");
     }
@@ -490,6 +493,15 @@ pub(crate) fn emit_item_usage(
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
+    }
+    if usage.ordered {
+        w.push_str(" ordered");
+    }
+    if usage.nonunique {
+        w.push_str(" nonunique");
+    }
+    if let Some(subsets) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
     }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;

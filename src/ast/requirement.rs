@@ -234,6 +234,9 @@ pub struct RequirementUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemUsage {
+    /// Leading `abstract` keyword (BNF `RefPrefix`), e.g. the package-level `abstract item
+    /// items : Item[0..*] nonunique :> objects { ... }` (Systems Library `Items.sysml`).
+    pub is_abstract: bool,
     /// Empty for the anonymous redefinition form (`item :>> shape : Cylinder { ... }`), matching
     /// `PartUsage::name`'s existing convention.
     pub name: String,
@@ -244,9 +247,17 @@ pub struct ItemUsage {
     /// `item :>> shape : Cylinder { ... }`) -- previously unparseable, falling through to opaque
     /// body-element recovery.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// `:>` subsets clause, e.g. `:> objects` (Systems Library `Items.sysml`). Previously
+    /// parsed by the shared usage header and discarded.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// Short name from `< ... >` when present. See `crate::ast::AttributeUsage::short_name`.
     pub short_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ordered` keyword from `MultiplicityPart`. Previously skipped and discarded.
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart` (`Item[0..*] nonunique`, Systems Library
+    /// `Items.sysml`). See `ordered`.
+    pub nonunique: bool,
     /// Value expression (`= expr`, `default = expr`, `:= expr`), e.g. `new Box(...)`.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
