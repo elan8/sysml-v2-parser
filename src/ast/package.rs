@@ -215,4 +215,7 @@ pub enum PackageBodyElement {
     /// Standalone `perform <action-path>;` performance usage at package level (e.g. `perform
     /// process;`). See `AttributeUsage` for the general PAR-002 rationale.
     PerformUsage(Node<Perform>),
+    /// Package-level `BindingConnectorAsUsage`, e.g. `binding instant[instantNum] of startShot =
+    /// endShot;`. See `crate::ast::BindingConnectorUsage`'s doc comment for the full grammar.
+    BindingConnectorUsage(Node<crate::ast::BindingConnectorUsage>),
 }

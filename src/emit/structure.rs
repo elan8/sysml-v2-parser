@@ -1185,6 +1185,37 @@ pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, _path: &str, bind: &Bind) -> Res
     emit_optional_connect_body(w, bind.body.as_ref())
 }
 
+pub(crate) fn emit_binding_connector_usage(
+    w: &mut EmitWriter<'_>,
+    _path: &str,
+    usage: &crate::ast::BindingConnectorUsage,
+) -> Result<(), EmitError> {
+    w.push_str("binding");
+    if usage.all {
+        w.push_str(" all");
+    }
+    if let Some(name) = &usage.name {
+        w.push_char(' ');
+        w.push_str(&format_name(name));
+    }
+    if let Some(mult) = &usage.multiplicity {
+        if usage.name.is_none() {
+            w.push_char(' ');
+        }
+        emit_multiplicity(w, &mult.value)?;
+    }
+    w.push_char(' ');
+    if usage.uses_of_keyword {
+        w.push_str("of ");
+    } else if usage.uses_bind_keyword {
+        w.push_str("bind ");
+    }
+    w.push_qualified_reference("binding left", usage.left)?;
+    w.push_str(" = ");
+    w.push_qualified_reference("binding right", usage.right)?;
+    emit_optional_connect_body(w, Some(&usage.body))
+}
+
 fn emit_optional_connect_body(
     w: &mut EmitWriter<'_>,
     body: Option<&ConnectBody>,

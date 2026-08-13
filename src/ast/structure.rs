@@ -1675,6 +1675,37 @@ pub struct Connect {
     pub redefines: Option<Node<SubsettingRelationship>>,
 }
 
+/// Package-level `BindingConnectorAsUsage` (BNF §8.2.2.13.2), the keyword-less sibling of
+/// [`Bind`]: `binding` (`all`)? name? multiplicity? (`of` | `bind`)? left `=` right body.
+/// Distinct from `Bind`/`bind_` (used inside part-def/part-usage bodies), which requires the
+/// literal `bind` keyword between the optional `binding` prefix and the `left = right` pair --
+/// here that keyword (or the alternative `of`) is itself optional decoration around the same
+/// `left = right` pair, confirmed by real usage: `binding instant[instantNum] of startShot =
+/// endShot;`, `binding all startShot = endShot;`, `binding x bind a = b;`, `binding [0..1] a =
+/// b;` all bind the same `left = right` shape regardless of which (if any) keyword separates the
+/// prefix from it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BindingConnectorUsage {
+    /// `true` for the `binding all ...` form.
+    pub all: bool,
+    /// Name of the binding connector itself, e.g. `instant` in `binding instant[instantNum] of
+    /// startShot = endShot;`. `None` when no name is given (e.g. `binding all ...`, `binding
+    /// [0..1] ...`).
+    pub name: Option<String>,
+    /// Multiplicity on the binding connector itself, e.g. `[instantNum]` / `[0..1]`.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `true` when the `of` keyword introduced `left` (e.g. `of startShot`); `false` when `left`
+    /// was introduced by `bind` or appeared bare. Retained for exact re-emission.
+    pub uses_of_keyword: bool,
+    /// `true` when the `bind` keyword introduced `left` (e.g. `binding x bind a = b;`). Retained
+    /// for exact re-emission.
+    pub uses_bind_keyword: bool,
+    pub left: QualifiedReferenceId,
+    pub right: QualifiedReferenceId,
+    pub body: ConnectBody,
+}
+
 // ---------------------------------------------------------------------------
 // Alias
 // ---------------------------------------------------------------------------

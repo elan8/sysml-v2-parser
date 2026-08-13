@@ -308,6 +308,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::PerformUsage(n) => {
             PackageBodyElement::PerformUsage(dummy_node(n, normalize_perform(&n.value)))
         }
+        PackageBodyElement::BindingConnectorUsage(n) => {
+            PackageBodyElement::BindingConnectorUsage(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::InterfaceUsage(n) => {
             PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
         }

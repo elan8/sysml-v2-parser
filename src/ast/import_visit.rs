@@ -187,7 +187,8 @@ impl ProvenanceValidator<'_> {
             | PackageBodyElement::MetadataKeywordUsage(_)
             | PackageBodyElement::Connect(_)
             | PackageBodyElement::DefaultReferenceUsage(_)
-            | PackageBodyElement::AssertConstraint(_) => Ok(()),
+            | PackageBodyElement::AssertConstraint(_)
+            | PackageBodyElement::BindingConnectorUsage(_) => Ok(()),
         }
     }
 

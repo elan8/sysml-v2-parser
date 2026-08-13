@@ -15,6 +15,7 @@ use crate::parser::case::{
     verification_case_usage,
 };
 use crate::parser::connection::connection_def;
+use crate::parser::connector::connect_body;
 use crate::parser::constraint::{calc_def, constraint_def, constraint_usage};
 use crate::parser::dependency::dependency;
 use crate::parser::enumeration::{enum_def, enum_usage};
@@ -284,7 +285,8 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::Connect(_)
         | PackageBodyElement::DefaultReferenceUsage(_)
         | PackageBodyElement::AssertConstraint(_)
-        | PackageBodyElement::PerformUsage(_) => RootElement::Member(boxed),
+        | PackageBodyElement::PerformUsage(_)
+        | PackageBodyElement::BindingConnectorUsage(_) => RootElement::Member(boxed),
     };
     Ok((input, node_from_to(start, input, elem)))
 }
@@ -376,6 +378,84 @@ fn strip_common_decl_prefixes(fragment: &[u8]) -> &[u8] {
         frag = &frag[i..];
     }
     frag
+}
+
+/// Package-level `BindingConnectorAsUsage` (BNF §8.2.2.13.2): `binding` (`all`)? name?
+/// multiplicity? (`of`|`bind`)? left `=` right body. See `crate::ast::BindingConnectorUsage`'s
+/// doc comment for the four real shapes this covers.
+fn binding_connector_usage(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::BindingConnectorUsage>> {
+    crate::parser::span::reference_transaction(input, binding_connector_usage_inner)
+}
+
+fn binding_connector_usage_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::BindingConnectorUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"binding"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, all) = opt(preceded(tag(&b"all"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
+    let (peek, _) = ws_and_comments(input)?;
+    let frag = peek.fragment();
+    let (input, name) = if all
+        || frag.starts_with(b"[")
+        || starts_with_keyword(frag, b"of")
+        || starts_with_keyword(frag, b"bind")
+    {
+        (input, None)
+    } else {
+        let (input, parsed_name) = name(input)?;
+        (input, Some(parsed_name))
+    };
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, uses_of_keyword) = if starts_with_keyword(peek.fragment(), b"of") {
+        let (input, _) = preceded(ws_and_comments, tag(&b"of"[..])).parse(input)?;
+        let (input, _) = ws1(input)?;
+        (input, true)
+    } else {
+        (input, false)
+    };
+    let (peek, _) = ws_and_comments(input)?;
+    let (input, uses_bind_keyword) =
+        if !uses_of_keyword && starts_with_keyword(peek.fragment(), b"bind") {
+            let (input, _) = preceded(ws_and_comments, tag(&b"bind"[..])).parse(input)?;
+            let (input, _) = ws1(input)?;
+            (input, true)
+        } else {
+            (input, false)
+        };
+    let (input, left) =
+        preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
+    let (input, right) =
+        preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+    let (input, body) = connect_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::BindingConnectorUsage {
+                all,
+                name,
+                multiplicity,
+                uses_of_keyword,
+                uses_bind_keyword,
+                left,
+                right,
+                body,
+            },
+        ),
+    ))
 }
 
 fn is_modeled_decl_start(fragment: &[u8], starters: &[&[u8]]) -> bool {
@@ -1028,6 +1108,17 @@ fn try_package_body_structure<'a>(
         start,
         crate::parser::part::connect_,
         PackageBodyElement::Connect
+    );
+    // `BindingConnectorAsUsage` at package level, e.g. `binding instant[instantNum] of startShot
+    // = endShot;` -- see `binding_connector_usage`'s doc comment for the full grammar this
+    // covers.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        BindingConnectorAsUsage,
+        binding_connector_usage,
+        PackageBodyElement::BindingConnectorUsage
     );
     try_package_body_dispatch!(
         input,

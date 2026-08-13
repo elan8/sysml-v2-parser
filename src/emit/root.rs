@@ -202,6 +202,9 @@ pub(crate) fn emit_package_body_element(
         }
         PackageBodyElement::AssertConstraint(a) => view::emit_assert_constraint(w, path, &a.value),
         PackageBodyElement::PerformUsage(p) => behavior::emit_perform(w, path, &p.value),
+        PackageBodyElement::BindingConnectorUsage(b) => {
+            structure::emit_binding_connector_usage(w, path, &b.value)
+        }
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)

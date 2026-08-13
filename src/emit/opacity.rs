@@ -195,6 +195,9 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
             walk_constraint_def_body(report, path, &a.value.body)
         }
         PackageBodyElement::PerformUsage(p) => walk_perform_body(report, path, &p.value.body),
+        PackageBodyElement::BindingConnectorUsage(b) => {
+            walk_connect_body(report, path, &b.value.body)
+        }
         PackageBodyElement::Satisfy(s) => walk_satisfy(report, path, &s.value),
         PackageBodyElement::Import(i) => {
             walk_optional_relationship_body(report, path, i.value.body_elements.as_deref())

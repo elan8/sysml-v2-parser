@@ -2297,6 +2297,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_perform(&perform.value)
             }
+            PackageBodyElement::BindingConnectorUsage(_binding) => {
+                self.write_marker(first, "binding-connector-usage")
+            }
         }
     }
 
