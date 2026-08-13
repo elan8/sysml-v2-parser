@@ -319,6 +319,9 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 typing,
                 redefines: None,
                 subsets: None,
+                multiplicity: None,
+                ordered: false,
+                nonunique: false,
                 value,
                 body,
                 name_span: Some(name_span),
@@ -398,7 +401,7 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
             node_from_to(start, input, StateDefBodyElement::FinalState(n))
         }),
         map(state_ref, |n| {
-            node_from_to(start, input, StateDefBodyElement::Ref(n))
+            node_from_to(start, input, StateDefBodyElement::Ref(Box::new(n)))
         }),
         map(requirement_usage, |n| {
             node_from_to(start, input, StateDefBodyElement::RequirementUsage(n))

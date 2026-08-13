@@ -1344,6 +1344,9 @@ fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
         typing: r.typing.clone(),
         redefines: r.redefines.clone(),
         subsets: r.subsets.clone(),
+        multiplicity: r.multiplicity.clone(),
+        ordered: r.ordered,
+        nonunique: r.nonunique,
         value: r.value.clone(),
         body: r.body.clone(),
         name_span: None,
@@ -1684,7 +1687,7 @@ fn normalize_state_def_body_element_node(
             StateDefBodyElement::FinalState(dummy_node(node, node.value.clone()))
         }
         StateDefBodyElement::Ref(node) => {
-            StateDefBodyElement::Ref(dummy_node(node, normalize_ref_decl(&node.value)))
+            StateDefBodyElement::Ref(Box::new(dummy_node(node, normalize_ref_decl(&node.value))))
         }
         StateDefBodyElement::RequirementUsage(node) => {
             StateDefBodyElement::RequirementUsage(dummy_node(node, node.value.clone()))

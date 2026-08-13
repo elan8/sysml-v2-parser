@@ -239,6 +239,9 @@ fn collect_ref_body_errors(body: &RefBody, errors: &mut Vec<ParseError>) {
                     RefBodyElement::Error(n) => {
                         errors.push(parse_error_from_recovery_node(&element.span, &n.value));
                     }
+                    RefBodyElement::Ref(n) => {
+                        collect_ref_body_errors(&n.value.body, errors);
+                    }
                     RefBodyElement::Action(n) => {
                         collect_action_def_body_element_errors(n, errors);
                     }

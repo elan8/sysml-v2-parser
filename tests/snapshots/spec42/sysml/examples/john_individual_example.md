@@ -69,7 +69,7 @@ package JohnIndividualExample {
 (fixture-diagnostics
   (document "john_individual_example.md"
     (diagnostics
-      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 1060) (line 45) (column 7) (len 37)) (message "unexpected keyword `assert` in relationship body"))
+      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 1060) (line 45) (column 7) (len 37)) (message "unexpected keyword `assert` in ref usage body"))
       (diagnostic (code "recovered_occurrence_body_element") (severity error) (category parseerror) (span (offset 1170) (line 50) (column 6) (len 258)) (message "unexpected token in occurrence body"))
     )
   )
@@ -104,7 +104,7 @@ package JohnIndividualExample {
 		 * This is the definition of the class of countries, each of which may have 
 		 * at most one president (at any point in time).
 		 */
-        ref presidentOfCountry :> presidentOfCountry.asPresident : Person;
+        ref presidentOfCountry : Person[0..1] :> presidentOfCountry.asPresident;
     }
     individual item def UnitedStates :> Country {
         doc
@@ -113,7 +113,7 @@ package JohnIndividualExample {
 		 * United States. It contains a single instance. The United States
 		 * always has a president who must be at least 35 years old.
 		 */
-        ref presidentOfUS :>> presidentOfCountry {
+        ref presidentOfUS[1] :>> presidentOfCountry {
             assert constraint { age >= 35 }
         }
     }

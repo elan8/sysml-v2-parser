@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 109.** Connection/interface `ref` declaration bodies are now a
+  structured member scope: `RefBodyElement` gains a `Ref(Box<Node<RefDecl>>)` variant for nested
+  keyword-less `ref` declarations, and `connector::ref_decl` accepts a `MemberPrefix` visibility
+  prefix (captured on `RefDecl::membership`) plus `nonunique`/`ordered` directly after the
+  post-typing multiplicity (before further specialization clauses). Covers Systems Library
+  `Interfaces.sysml`'s `ref port :>> participant : Port [2..*] nonunique ordered { protected ref
+  thisParticipant :>> self; ... }`. Unrecognized members recover as
+  `recovered_ref_body_element` ("ref usage body") instead of
+  `recovered_relationship_body_element`. `RefDecl` gains `multiplicity`/`ordered`/`nonunique`
+  (previously parsed and discarded by `connector::ref_decl`, so `[2..*] nonunique ordered` was
+  dropped on formatting), `emit_ref_decl` emits typing before multiplicity before the
+  subsetting-family clauses (the one order every `RefDecl` parser reparses), and
+  `StateDefBodyElement::Ref` boxes its node to keep the enum size bounded.
 - **`PARSE_AST_VERSION` is now 108.** Direction-prefixed parameter declarations (`InOutDecl`)
   now cover the full BNF `FeatureSpecializationPart`/`ValuePart` surface the Systems Library
   uses: the multiplicity clause may precede the typing (`in transitionLinkSource[1]:

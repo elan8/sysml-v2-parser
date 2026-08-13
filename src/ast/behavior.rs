@@ -779,7 +779,7 @@ pub enum StateDefBodyElement {
     /// `final` / `final state` name `;` - explicit final state.
     FinalState(Node<FinalState>),
     /// `ref` name `:` type body – reference binding in state.
-    Ref(Node<RefDecl>),
+    Ref(Box<Node<RefDecl>>),
     RequirementUsage(Node<RequirementUsage>),
     StateUsage(Node<StateUsage>),
     Transition(Box<Node<Transition>>),

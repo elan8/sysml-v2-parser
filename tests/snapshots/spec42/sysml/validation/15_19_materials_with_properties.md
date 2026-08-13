@@ -132,7 +132,7 @@ package '15_19-Materials with Properties' {
         attribute atomicMass : AtomicMassValue[1];
     }
     attribute def MaterialFraction {
-        ref material : Material;
+        ref material : Material[1];
         attribute massFraction : MassFractionValue[1];
     }
     attribute def MassFractionValue :> DimensionOneValue;
@@ -150,15 +150,15 @@ package '15_19-Materials with Properties' {
     }
     individual def Steel_980 :> Alloy {
         attribute fraction1 :> fractions {
-            ref '' :>> material : Iron;
+            ref '' : Iron :>> material;
             attribute  :>> massFraction = 0.9862 [one];
         }
         attribute fraction2 :> fractions {
-            ref '' :>> material : Carbon;
+            ref '' : Carbon :>> material;
             attribute  :>> massFraction = 0.9862 [one];
         }
         attribute fraction3 :> fractions {
-            ref '' :>> material : Manganese;
+            ref '' : Manganese :>> material;
             attribute  :>> massFraction = 0.9862 [one];
         }
         attribute tensileStrength : TensileStrengthValue = 980 ['N/mm²'];

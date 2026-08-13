@@ -50,7 +50,7 @@ pub(crate) fn relationship_body_annotations(
     Ok((input, Some(elements)))
 }
 
-fn relationship_body_element(
+pub(crate) fn relationship_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
     let start = input;

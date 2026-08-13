@@ -1281,6 +1281,15 @@ pub struct RefDecl {
     /// requirement originalRequirement[1] :>> originalRequirements :> participant { ... }`
     /// (Systems Library `Domain Libraries/Requirement Derivation/DerivationConnections.sysml`).
     pub subsets: Option<Node<SubsettingRelationship>>,
+    /// Multiplicity clause (BNF `MultiplicityPart`), from either the pre-specialization
+    /// position (`ref originalRequirement[1] :>> ...`) or the post-typing position (`ref
+    /// otherParticipants : Port [1..*] nonunique :> ...`, Systems Library `Interfaces.sysml`).
+    /// Previously parsed and discarded by `connector::ref_decl`.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ordered` keyword from `MultiplicityPart`. See `multiplicity`.
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart`. See `multiplicity`.
+    pub nonunique: bool,
     /// Optional binding value: `= expr` (SysML shorthand binding for references).
     pub value: Option<Node<FeatureValue>>,
     pub body: RefBody,
@@ -1299,6 +1308,9 @@ impl PartialEq for RefDecl {
             && self.typing == other.typing
             && self.redefines == other.redefines
             && self.subsets == other.subsets
+            && self.multiplicity == other.multiplicity
+            && self.ordered == other.ordered
+            && self.nonunique == other.nonunique
             && self.value == other.value
             && self.body == other.body
             && self.membership == other.membership
@@ -1329,6 +1341,10 @@ pub enum RefBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RefBodyElement {
+    /// A nested keyword-less `ref` declaration, e.g. the `protected ref thisParticipant :>>
+    /// self;` members inside `ref port :>> participant : Port [2..*] nonunique ordered { ... }`
+    /// (Systems Library `Interfaces.sysml`).
+    Ref(Box<Node<RefDecl>>),
     Action(Node<ActionDefBodyElement>),
     PartUsage(Node<PartUsageBodyElement>),
     State(Node<StateDefBodyElement>),

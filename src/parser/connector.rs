@@ -276,42 +276,74 @@ pub(crate) fn end_decl(
     ))
 }
 
-/// Ref body for a connection/interface `ref` declaration: `;` or `{` doc/comment/rep/metadata*
-/// `}`. Connection/interface `ref` bodies don't have a dedicated member grammar yet (unlike the
-/// action-context `ref` body in `action.rs`, which allows full nested action members), so this
-/// gets the same doc/comment/metadata + recovery baseline as [`RelationshipBodyElement`] instead
-/// of silently discarding everything.
+/// Starters for a connection/interface `ref` declaration body: the annotation members shared
+/// with `RelationshipBody` contexts plus nested (optionally visibility-prefixed) `ref`
+/// declarations (Systems Library `Interfaces.sysml`).
+const REF_USAGE_BODY_STARTERS: &[&[u8]] = &[
+    b"doc",
+    b"comment",
+    b"rep",
+    b"@",
+    b"ref",
+    b"private",
+    b"protected",
+    b"public",
+];
+
+/// Ref body for a connection/interface `ref` declaration: `;` or `{` (doc/comment/rep/metadata
+/// | nested `ref` declaration)* `}`. A `ref` usage body is a full `UsageBody` per the BNF; the
+/// members with real library evidence are annotations and nested visibility-prefixed `ref`
+/// declarations (`protected ref thisParticipant :>> self;`, Systems Library `Interfaces.sysml`),
+/// with recovery-to-`Error` for anything else.
 pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
-    let (input, elements) = relationship_body_annotations(input)?;
-    let body = match elements {
-        None => RefBody::Semicolon,
-        Some(elements) => RefBody::Brace {
-            elements: elements
-                .into_iter()
-                .map(|e| {
-                    let span = e.span.clone();
-                    let wrapped = match e.value {
-                        crate::ast::RelationshipBodyElement::Doc(n) => RefBodyElement::Doc(n),
-                        crate::ast::RelationshipBodyElement::Comment(n) => {
-                            RefBodyElement::Comment(n)
-                        }
-                        crate::ast::RelationshipBodyElement::TextualRep(n) => {
-                            RefBodyElement::TextualRep(n)
-                        }
-                        crate::ast::RelationshipBodyElement::MetadataAnnotation(n) => {
-                            RefBodyElement::MetadataAnnotation(n)
-                        }
-                        crate::ast::RelationshipBodyElement::Error(n) => RefBodyElement::Error(n),
-                        crate::ast::RelationshipBodyElement::Other(text) => {
-                            RefBodyElement::Other(text)
-                        }
-                    };
-                    Node::new(span, wrapped)
-                })
-                .collect(),
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, RefBody::Semicolon));
+    }
+    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+        input,
+        REF_USAGE_BODY_STARTERS,
+        "ref usage body",
+        "recovered_ref_body_element",
+        ref_body_element,
+        |start, end| {
+            let recovery = crate::parser::build_recovery_error_node_from_span(
+                start,
+                end,
+                REF_USAGE_BODY_STARTERS,
+                "ref usage body",
+                "recovered_ref_body_element",
+            );
+            let node: Node<crate::ast::ParseErrorNode> = node_from_to(start, end, recovery);
+            node_from_to(start, end, RefBodyElement::Error(node))
         },
+    )?;
+    Ok((input, RefBody::Brace { elements }))
+}
+
+fn ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RefBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if let Ok((input, nested)) = ref_decl(input) {
+        return Ok((
+            input,
+            node_from_to(start, input, RefBodyElement::Ref(Box::new(nested))),
+        ));
+    }
+    let (input, annotation) = crate::parser::body::relationship_body_element(input)?;
+    let span = annotation.span.clone();
+    let wrapped = match annotation.value {
+        crate::ast::RelationshipBodyElement::Doc(n) => RefBodyElement::Doc(n),
+        crate::ast::RelationshipBodyElement::Comment(n) => RefBodyElement::Comment(n),
+        crate::ast::RelationshipBodyElement::TextualRep(n) => RefBodyElement::TextualRep(n),
+        crate::ast::RelationshipBodyElement::MetadataAnnotation(n) => {
+            RefBodyElement::MetadataAnnotation(n)
+        }
+        crate::ast::RelationshipBodyElement::Error(n) => RefBodyElement::Error(n),
+        crate::ast::RelationshipBodyElement::Other(text) => RefBodyElement::Other(text),
     };
-    Ok((input, body))
+    Ok((input, Node::new(span, wrapped)))
 }
 
 /// Ref declaration: `ref` (`part`|`port`|`item`)? name? multiplicity? (`:>>` redefines)? (`:`
@@ -326,6 +358,9 @@ pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
 pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // Visibility prefix (BNF `MemberPrefix`), e.g. `protected ref thisParticipant :>> self;`
+    // (Systems Library `Interfaces.sysml`).
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = opt(preceded(
@@ -340,7 +375,8 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     .parse(input)?;
     // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
     let (input, parsed_name) = opt(preceded(ws_and_comments, with_span(name))).parse(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, leading_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
     // `redefinition` (shared with every other `:>>` call site) already handles the comma-separated
@@ -362,7 +398,15 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             (input, None, None)
         }
     };
-    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, trailing_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    // `nonunique`/`ordered` may directly follow the multiplicity, before any further
+    // specialization clause: `ref otherParticipants : Port [1..*] nonunique :>
+    // interfacingPorts default ...;` (Systems Library `Interfaces.sysml`). The later capture
+    // below covers the post-clause position (`... :>> participant [2..*] nonunique ordered
+    // { ... }`).
+    let (input, (ordered_after_multiplicity, nonunique_after_multiplicity)) =
+        crate::parser::usage::usage_feature_modifier_flags(input)?;
     // `:>>` redefines may also follow the type instead of preceding it, e.g. `ref self: Item
     // :>> Object::self;` (Systems Library `Items.sysml`) -- only retry if the earlier attempt
     // (before the type) didn't already find one.
@@ -376,11 +420,11 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // `Domain Libraries/Requirement Derivation/DerivationConnections.sysml`).
     let (input, subsets) = opt(preceded(ws_and_comments, subsetting)).parse(input)?;
     let subsets = subsets.map(|(target, _value)| target);
-    // `nonunique`/`ordered` feature modifiers (real usage: `Interfaces.sysml`'s `ref port :>>
-    // participant : Port [2..*] nonunique ordered { ... }`); accepted and discarded, matching
-    // `RefDecl`'s existing "don't model every shorthand" scope (see `value`'s doc comment for the
-    // same rationale on the binding form).
-    let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
+    // `nonunique`/`ordered` feature modifiers may also follow the specialization clauses
+    // (real usage: `Interfaces.sysml`'s `ref port :>> participant : Port [2..*] nonunique
+    // ordered { ... }`).
+    let (input, (ordered_after_clauses, nonunique_after_clauses)) =
+        crate::parser::usage::usage_feature_modifier_flags(input)?;
     // Optional value/default clause, e.g. `ref item :>> localClock : Clock[1] default
     // Time::universalClock { ... }` (Domain Libraries `SpatialItems.sysml`).
     let (input, value) = opt(preceded(ws_and_comments, feature_value_part)).parse(input)?;
@@ -396,11 +440,14 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 typing,
                 subsets,
                 redefines,
+                multiplicity: trailing_multiplicity.or(leading_multiplicity),
+                ordered: ordered_after_multiplicity || ordered_after_clauses,
+                nonunique: nonunique_after_multiplicity || nonunique_after_clauses,
                 value,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
-                membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
         ),
     ))

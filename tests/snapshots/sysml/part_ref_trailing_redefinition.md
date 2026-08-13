@@ -21,8 +21,8 @@ part def Part {
 # FORMAT
 ~~~sysml
 part def Part {
-    ref self :>> Item::self : Part;
-    ref helper :>> Item::helper :> related : Part;
+    ref self : Part :>> Item::self;
+    ref helper : Part :>> Item::helper :> related;
 }
 ~~~
 # AST

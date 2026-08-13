@@ -1205,6 +1205,7 @@ fn walk_ref_body(report: &mut OpacityReport, path: &str, body: &RefBody) {
         match &element.value {
             RefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             RefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
+            RefBodyElement::Ref(n) => walk_ref_body(report, &p, &n.value.body),
             RefBodyElement::Action(action) => {
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(action))
             }

@@ -1122,14 +1122,27 @@ pub(crate) fn emit_ref_decl(
     }
     w.push_str("ref ");
     w.push_str(&format_name(&decl.name));
+    // Typing first, then multiplicity, then the subsetting-family clauses: the one emission
+    // order every `RefDecl` parser (`connector::ref_decl`, `part_ref_usage`) accepts, including
+    // when a typing and a `:>` subsets clause co-occur (Systems Library `Interfaces.sysml`'s
+    // `ref otherParticipants : Port [1..*] nonunique :> interfacingPorts default ...`).
+    if let Some(typing) = &decl.typing {
+        emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(multiplicity) = &decl.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if decl.ordered {
+        w.push_str(" ordered");
+    }
+    if decl.nonunique {
+        w.push_str(" nonunique");
+    }
     if let Some(redefines) = &decl.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
     if let Some(subsets) = &decl.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
-    }
-    if let Some(typing) = &decl.typing {
-        emit_typing_clause(w, &typing.value)?;
     }
     if let Some(value) = &decl.value {
         emit_feature_value(w, value)?;
@@ -1171,6 +1184,7 @@ fn emit_ref_body_element(
     use crate::ast::RefBodyElement;
     match el {
         RefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RefBodyElement::Ref(n) => emit_ref_decl(w, path, &n.value),
         RefBodyElement::Comment(c) => emit_comment(w, &c.value),
         RefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RefBodyElement::Other(_) => Err(EmitError::Opaque {
