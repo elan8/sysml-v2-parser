@@ -1560,6 +1560,9 @@ pub(crate) fn emit_connection_usage(
     usage: &crate::ast::ConnectionUsageMember,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
+    if usage.by_reference {
+        w.push_str("ref ");
+    }
     w.push_str("connection ");
     if let Some(name) = &usage.name {
         w.push_str(&format_name(name));

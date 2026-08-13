@@ -398,6 +398,7 @@ fn connection_usage_member_inner(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"connection"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, name) = if input.fragment().starts_with(b":")
@@ -486,6 +487,7 @@ fn connection_usage_member_inner(
                 subsets,
                 redefines,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
+                by_reference: is_reference.is_some(),
             },
         ),
     ))
@@ -500,43 +502,19 @@ fn unsupported_part_member(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    if !starts_with_any_keyword(input.fragment(), &[b"ref", b"connection"]) {
+    if !starts_with_any_keyword(input.fragment(), &[b"connection"]) {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (production, member_start) = if starts_with_keyword(input.fragment(), b"ref") {
-        let after_ref = {
-            let (peek, _) = tag(&b"ref"[..]).parse(input)?;
-            let (peek, _) = ws1(peek)?;
-            peek
-        };
-        if starts_with_any_keyword(
-            after_ref.fragment(),
-            &[b"action", b"state", b"port", b"part"],
-        ) {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-        if !starts_with_keyword(after_ref.fragment(), b"connection") {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-        (
-            crate::ast::UnsupportedProduction::ReferenceConnectionUsage,
-            input,
-        )
-    } else {
-        (
-            crate::ast::UnsupportedProduction::ConnectionUsageInPartDefinition,
-            input,
-        )
-    };
+    // `ref connection ...` is now handled structurally by `connection_usage_member`
+    // (`by_reference`), which is tried before this fallback in the same `alt`. Only a bare
+    // `connection ...` that `connection_usage_member` itself failed to parse reaches here.
+    let (production, member_start) = (
+        crate::ast::UnsupportedProduction::ConnectionUsageInPartDefinition,
+        input,
+    );
     let (mut input, _) = skip_statement_or_block(member_start)?;
     let (after_ws, _) = ws_and_comments(input)?;
     if after_ws.fragment().starts_with(b":>") || after_ws.fragment().starts_with(b":>>") {

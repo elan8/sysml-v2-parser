@@ -214,6 +214,11 @@ pub struct ConnectionUsageMember {
     /// same "genuine new grammar coverage, not just discarded data" rationale --
     /// `connection_usage_member` did not previously accept a visibility prefix either.
     pub membership: Membership,
+    /// `true` when the member was declared as `ref connection ...` (a reference connection
+    /// usage) rather than a plain `connection ...` usage. See `unsupported_part_member`'s former
+    /// `ReferenceConnectionUsage` short-circuit in `src/parser/part/body.rs`, now folded into
+    /// `connection_usage_member_inner`.
+    pub by_reference: bool,
 }
 
 /// Exhibit state usage: `OccurrenceUsagePrefix` subset `exhibit` (`state`)? name (`:` type)?
