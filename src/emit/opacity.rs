@@ -1153,6 +1153,9 @@ fn walk_rendering_usage_body(report: &mut OpacityReport, path: &str, body: &Rend
             RenderingUsageBodyElement::ViewUsage(view) => {
                 walk_view_body(report, &p, &view.value.body)
             }
+            RenderingUsageBodyElement::Rendering(nested) => {
+                walk_rendering_usage_body(report, &p, &nested.value.body)
+            }
             RenderingUsageBodyElement::Doc(_) => {}
         }
     }

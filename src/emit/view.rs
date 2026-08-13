@@ -3,7 +3,7 @@
 use super::behavior::emit_inout_decl;
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_doc, emit_identification};
-use super::structure::emit_typing_clause;
+use super::structure::{emit_multiplicity, emit_subsetting_clause, emit_typing_clause};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
@@ -440,6 +440,9 @@ fn emit_view_rendering(
                     crate::ast::RenderingUsageBodyElement::ViewUsage(v) => {
                         emit_view_usage(w, path, &v.value)?;
                     }
+                    crate::ast::RenderingUsageBodyElement::Rendering(nested) => {
+                        emit_rendering_usage(w, &format!("{path}/body[{i}]"), &nested.value)?;
+                    }
                 }
                 w.newline();
             }
@@ -533,11 +536,35 @@ pub(crate) fn emit_rendering_usage(
     usage: &crate::ast::RenderingUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    w.push_str("rendering ");
-    w.push_str(&format_name(&usage.name));
+    if usage.is_abstract {
+        w.push_str("abstract ");
+    }
+    w.push_str("rendering");
+    if !usage.name.is_empty() {
+        w.push_char(' ');
+        w.push_str(&format_name(&usage.name));
+    }
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(multiplicity) = &usage.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if usage.ordered {
+        w.push_str(" ordered");
+    }
+    if usage.nonunique {
+        w.push_str(" nonunique");
+    }
+    if let Some(redefines) = &usage.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(value) = &usage.value {
+        emit_feature_value(w, value)?;
     }
     match &usage.body {
         crate::ast::RenderingUsageBody::Semicolon => {
@@ -556,6 +583,9 @@ pub(crate) fn emit_rendering_usage(
                     crate::ast::RenderingUsageBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::RenderingUsageBodyElement::ViewUsage(v) => {
                         emit_view_usage(w, path, &v.value)?;
+                    }
+                    crate::ast::RenderingUsageBodyElement::Rendering(nested) => {
+                        emit_rendering_usage(w, &format!("{path}/body[{i}]"), &nested.value)?;
                     }
                 }
                 w.newline();

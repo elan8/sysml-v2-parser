@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 110.** `RenderingUsage` retains its full declaration surface
+  instead of discarding everything but the name and type: `is_abstract`, `multiplicity`,
+  `ordered`/`nonunique`, `:>` subsets, `:>>` redefines, and a `ValuePart` feature value. The
+  declaration name is optional (anonymous `rendering :>> subrenderings[0..*] =
+  columnView.viewRendering;`, Systems Library `Views.sysml`), and
+  `RenderingUsageBodyElement` gains a `Rendering(Box<Node<RenderingUsage>>)` variant so
+  rendering usages can nest inside rendering usage bodies (`asElementTable`).
 - **`PARSE_AST_VERSION` is now 109.** Connection/interface `ref` declaration bodies are now a
   structured member scope: `RefBodyElement` gains a `Ref(Box<Node<RefDecl>>)` variant for nested
   keyword-less `ref` declarations, and `connector::ref_decl` accepts a `MemberPrefix` visibility

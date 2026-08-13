@@ -68,6 +68,11 @@ fn rendering_usage_body_element(
         map(view_usage, |n| {
             RenderingUsageBodyElement::ViewUsage(Box::new(n))
         }),
+        // Nested `rendering` usage, e.g. the anonymous `rendering :>> subrenderings[0..*] =
+        // columnView.viewRendering;` inside `asElementTable` (Systems Library `Views.sysml`).
+        map(rendering_usage, |n| {
+            RenderingUsageBodyElement::Rendering(Box::new(n))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -502,11 +507,62 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, is_abstract) =
+        nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"rendering"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
-    let (input, header) = parse_feature_usage_header(input)?;
+    // The declaration name is optional: the anonymous redefinition form `rendering :>>
+    // subrenderings[0..*] = columnView.viewRendering;` (Systems Library `Views.sysml`) goes
+    // straight to its specialization clause.
+    let (after_gap, _) = ws_and_comments(input)?;
+    let (input, name_str) = if after_gap.fragment().starts_with(b":")
+        || after_gap.fragment().starts_with(b"[")
+        || after_gap.fragment().starts_with(b"{")
+        || after_gap.fragment().starts_with(b";")
+    {
+        (after_gap, String::new())
+    } else {
+        let (input, _) = ws1(input)?;
+        name(input)?
+    };
+    // Header clauses, each retained: leading `:>>` redefinition (the anonymous form), typing,
+    // multiplicity (before or after the typing), and a `:>` subsets clause -- `asTreeDiagram :
+    // GraphicalRendering[1] :> renderings { ... }` (Systems Library `Views.sysml`).
+    let (input, leading_redefines) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::redefinition,
+    ))
+    .parse(input)?;
+    let (input, leading_multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let type_name = type_result.and_then(|(_, _, targets)| targets.first().copied());
+    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::multiplicity_node,
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, redefines) = if leading_redefines.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::redefinition,
+        ))
+        .parse(input)?
+    } else {
+        (input, leading_redefines)
+    };
+    let (input, subsets) =
+        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    let subsets = subsets.map(|(target, _value)| target);
+    // Optional value clause: `= columnView.viewRendering` (Systems Library `Views.sysml`).
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = rendering_usage_body(input)?;
     Ok((
         input,
@@ -514,8 +570,15 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
             start,
             input,
             RenderingUsage {
+                is_abstract: is_abstract.is_some(),
                 name: name_str,
-                type_name: header.type_reference,
+                type_name,
+                multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                ordered,
+                nonunique,
+                subsets,
+                redefines,
+                value,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },

@@ -1,6 +1,7 @@
 use super::behavior::InOutDecl;
 use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::common::{FilterMember, ImportTarget};
+use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::RequirementDefBody;
 use super::structure::MetadataAnnotation;
@@ -217,6 +218,9 @@ pub enum RenderingUsageBodyElement {
     /// Nested `view` usage member, e.g. a `columnView` redefinition (`view :>> columnView[1] {
     /// render asTextualNotation; }`).
     ViewUsage(Box<Node<ViewUsage>>),
+    /// Nested `rendering` usage member, e.g. the anonymous `rendering :>> subrenderings[0..*] =
+    /// columnView.viewRendering;` inside `asElementTable` (Systems Library `Views.sysml`).
+    Rendering(Box<Node<RenderingUsage>>),
 }
 
 /// Viewpoint definition: `viewpoint def` Identification RequirementBody.
@@ -332,8 +336,30 @@ pub struct ViewpointUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderingUsage {
+    /// Leading `abstract` keyword (BNF `RefPrefix`). Previously parsed and discarded.
+    pub is_abstract: bool,
+    /// Declared name. Empty for the anonymous redefinition form (`rendering :>>
+    /// subrenderings[0..*] = columnView.viewRendering;`, Systems Library `Views.sysml`).
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Multiplicity clause (BNF `MultiplicityPart`), e.g. `asTreeDiagram :
+    /// GraphicalRendering[1]` (Systems Library `Views.sysml`). Previously parsed and discarded
+    /// inside the shared usage header.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ordered` keyword from `MultiplicityPart` (`abstract rendering renderings :
+    /// Rendering[0..*] nonunique :> parts`, Systems Library `Views.sysml`). Previously skipped
+    /// inside the shared usage header.
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
+    pub nonunique: bool,
+    /// `:>` subsets clause, e.g. `: GraphicalRendering[1] :> renderings`. Previously parsed and
+    /// discarded.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// `:>>` redefinition clause, e.g. the anonymous `rendering :>> subrenderings[0..*] = ...`
+    /// (Systems Library `Views.sysml`).
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Optional value clause (BNF `ValuePart`), e.g. `= columnView.viewRendering`.
+    pub value: Option<Node<FeatureValue>>,
     pub body: RenderingUsageBody,
     pub membership: Membership,
 }

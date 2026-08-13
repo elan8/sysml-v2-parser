@@ -1370,6 +1370,9 @@ fn collect_rendering_usage_body_errors(
                     crate::ast::RenderingUsageBodyElement::ViewUsage(n) => {
                         collect_view_body_errors(&n.value.body, errors)
                     }
+                    crate::ast::RenderingUsageBodyElement::Rendering(n) => {
+                        collect_rendering_usage_body_errors(&n.value.body, errors)
+                    }
                     crate::ast::RenderingUsageBodyElement::Doc(_) => {}
                 }
             }
