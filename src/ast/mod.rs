@@ -329,6 +329,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::IncludeUseCase(n) => {
             PackageBodyElement::IncludeUseCase(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::ExtendedDefinition(n) => {
+            PackageBodyElement::ExtendedDefinition(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::InterfaceUsage(n) => {
             PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
         }

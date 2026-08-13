@@ -1607,6 +1607,9 @@ fn collect_package_body_element_errors(
         PackageBodyElement::IncludeUseCase(n) => {
             collect_use_case_body_errors(&n.value.body, errors)
         }
+        PackageBodyElement::ExtendedDefinition(n) => {
+            collect_package_body_errors(&n.value.body, errors)
+        }
     }
 }
 

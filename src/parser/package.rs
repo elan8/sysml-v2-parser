@@ -292,7 +292,8 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::ClassDef(_)
         | PackageBodyElement::Succession(_)
         | PackageBodyElement::ExhibitState(_)
-        | PackageBodyElement::IncludeUseCase(_) => RootElement::Member(boxed),
+        | PackageBodyElement::IncludeUseCase(_)
+        | PackageBodyElement::ExtendedDefinition(_) => RootElement::Member(boxed),
     };
     Ok((input, node_from_to(start, input, elem)))
 }
@@ -1888,6 +1889,22 @@ pub(crate) fn package_body_element(
     }
     if let Ok(r) = try_package_body_view(input, start, starter) {
         return Ok(r);
+    }
+    // `ExtendedDefinition` (SysML §8.2.2.27): `#<keyword>+ def <Name> ...`. Must be tried before
+    // `metadata_keyword_usage`/`metadata_keyword_prefix` below get first refusal on a `#<name>`
+    // sequence immediately followed by `def` -- `def Failure;` alone is not an independently
+    // valid production, so leaving it for the next body-element iteration (as
+    // `metadata_keyword_prefix` does for ordinary `PrefixMetadataMember` prefixes) would hit raw
+    // recovery. Speculative: rolls back cleanly (via `reference_transaction`) to the ordinary
+    // `#`-forms below when the `def`/name tail isn't present.
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::extended_definition,
+            PackageBodyElement::ExtendedDefinition,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, Box::new(node_from_to(start, input, elem))));
     }
     // `#keyword` metadata tag -- package bodies previously had no `#`/`@` annotation support at
     // all. Tried only after every other dispatcher above: some definitions (e.g. `connection_def`

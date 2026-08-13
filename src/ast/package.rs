@@ -244,4 +244,7 @@ pub enum PackageBodyElement {
     /// checkTires[1..*];`. Reuses [`IncludeUseCase`], the same node already parsed inside part
     /// usage/use-case-def bodies.
     IncludeUseCase(Node<IncludeUseCase>),
+    /// `ExtendedDefinition` (SysML §8.2.2.27): `#<keyword>+ def <Name> ...`, e.g. `#situation def
+    /// Failure;`. See [`crate::ast::ExtendedDefinition`].
+    ExtendedDefinition(Node<crate::ast::ExtendedDefinition>),
 }

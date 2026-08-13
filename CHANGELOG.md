@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 106.** New `PackageBodyElement::ExtendedDefinition` node models
+  SysML §8.2.2.27 `ExtendedDefinition`: one or more `#<name>` metadata-keyword tags standing in
+  place of the usual classifier keyword before `def` (`#situation def Failure;`,
+  `#SecurityRelated #situation def Vulnerability;`, `abstract #situation def AbstractFailure;`,
+  `variation #situation def V;`, with optional `:>` specialization and a `{ ... }` body reusing
+  `PackageBody`). Tried before `metadata_keyword_prefix` in package-body dispatch, so `def
+  Failure;` no longer falls through to raw error recovery.
 - **`PARSE_AST_VERSION` is now 105.** `AttributeBodyElement` gains a structured `ItemUsage`
   variant. A nested `item name : Type;` inside an `attribute def`/`attribute`/`item def`/`item`
   body now parses as a real item usage (reusing the same `item_usage` parser `part def`/`part`

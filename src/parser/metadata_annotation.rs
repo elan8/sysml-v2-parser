@@ -1,19 +1,23 @@
 //! Metadata/annotation parsing helpers.
 
 use crate::ast::{
-    Annotation, AnnotationHead, AttributeBody, MetadataAnnotation, MetadataKeywordUsage, Node,
+    Annotation, AnnotationHead, AttributeBody, DefinitionPrefix, ExtendedDefinition,
+    MetadataAnnotation, MetadataKeywordUsage, Node,
 };
 use crate::parser::attribute::metadata_body;
 use crate::parser::connector::connect_body;
 use crate::parser::lex::{
-    name, qualified_reference, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
+    identification, name, qualified_reference, starts_with_keyword, take_until_terminator, ws1,
+    ws_and_comments,
 };
 use crate::parser::node_from_to;
+use crate::parser::package::package_body;
+use crate::parser::specialization::parse_optional_definition_specialization;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
-use nom::combinator::opt;
-use nom::multi::separated_list1;
+use nom::combinator::{map, opt};
+use nom::multi::{many1, separated_list1};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -122,6 +126,84 @@ fn metadata_keyword_usage_inner(
                 body,
                 keyword_span,
                 type_span,
+            },
+        ),
+    ))
+}
+
+/// A single bare `#<name>` prefix keyword tag, as used by [`extended_definition`]'s
+/// `DefinitionExtensionKeyword+` (SysML §8.2.2.27). Unlike [`metadata_keyword_prefix`], this
+/// makes no attempt to guess whether what follows "looks like" another declaration -- the caller
+/// (`many1` followed by a required `def`) is what decides whether the whole
+/// `ExtendedDefinition` production applies, inside a speculative transaction that rolls back
+/// cleanly if it doesn't.
+fn extended_definition_prefix_tag(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
+    let start = input;
+    let (input, _) = preceded(ws_and_comments, tag(&b"#"[..])).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (keyword_span, keyword)) = with_span(name).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            MetadataKeywordUsage {
+                keyword,
+                type_reference: None,
+                about_targets: Vec::new(),
+                body: AttributeBody::Semicolon,
+                keyword_span,
+                type_span: None,
+            },
+        ),
+    ))
+}
+
+/// `ExtendedDefinition` (SysML §8.2.2.27): `DefinitionExtensionKeyword+ 'def' DefinitionDeclaration
+/// DefinitionBody`, e.g. `#situation def Failure;`, `#SecurityRelated #situation def
+/// Vulnerability;`, `abstract #situation def AbstractFailure;`, `variation #situation def V;`.
+/// Tried in package-body dispatch *before* [`metadata_keyword_prefix`] gets first refusal on a
+/// `#<name>` sequence immediately followed by `def` -- `def Failure;` alone is not an
+/// independently valid production, unlike the ordinary `PrefixMetadataMember` shape
+/// (`#fmeaspec requirement req1 { ... }`) that `metadata_keyword_prefix` exists for.
+pub(crate) fn extended_definition(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ExtendedDefinition>> {
+    crate::parser::span::reference_transaction(input, extended_definition_inner)
+}
+
+fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedDefinition>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, definition_prefix) = opt(nom::branch::alt((
+        map(preceded(tag(&b"abstract"[..]), ws1), |_| {
+            DefinitionPrefix::Abstract
+        }),
+        map(preceded(tag(&b"variation"[..]), ws1), |_| {
+            DefinitionPrefix::Variation
+        }),
+    )))
+    .parse(input)?;
+    let (input, prefix_keywords) =
+        many1(preceded(ws_and_comments, extended_definition_prefix_tag)).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b"def"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, ident) = identification(input)?;
+    let (input, specializes) = parse_optional_definition_specialization(input)?;
+    let (input, body) = package_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ExtendedDefinition {
+                prefix_keywords,
+                definition_prefix,
+                identification: ident,
+                specializes,
+                body,
             },
         ),
     ))

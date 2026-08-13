@@ -38,6 +38,29 @@ pub struct PartDef {
     pub membership: Membership,
 }
 
+/// `ExtendedDefinition` (SysML §8.2.2.27): `DefinitionExtensionKeyword+ 'def' DefinitionDeclaration
+/// DefinitionBody` -- one or more bare `#<name>` metadata-keyword tags standing *in place of* the
+/// usual classifier keyword (`part`/`attribute`/`action`/...) that would otherwise introduce a
+/// `Definition`, e.g. `#situation def Failure;`, `#SecurityRelated #situation def Vulnerability;`,
+/// `abstract #situation def AbstractFailure;`. Reuses [`PackageBody`] for the body so any ordinary
+/// package/definition member (`part p;`, nested definitions, ...) parses inside it exactly as at
+/// package scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExtendedDefinition {
+    /// One-or-more `#<name>` prefix keyword tags (BNF `DefinitionExtensionKeyword+`), in source
+    /// order. Reuses the exact `#name` tag representation `metadata_keyword_prefix` already
+    /// builds for a bare `#name` reference.
+    pub prefix_keywords: Vec<Node<MetadataKeywordUsage>>,
+    /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix), which may precede
+    /// the `#`-prefix keywords (`abstract #situation def AbstractFailure;`).
+    pub definition_prefix: Option<DefinitionPrefix>,
+    pub identification: Identification,
+    /// Supertype after `:>`.
+    pub specializes: Option<Node<TypingRelationship>>,
+    pub body: super::package::PackageBody,
+}
+
 /// BNF BasicDefinitionPrefix: `abstract` | `variation`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

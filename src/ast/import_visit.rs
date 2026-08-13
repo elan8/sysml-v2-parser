@@ -139,6 +139,7 @@ impl ProvenanceValidator<'_> {
             PackageBodyElement::VerificationCaseUsage(n) => self.use_case_body(&n.value.body),
             PackageBodyElement::ViewUsage(n) => self.view_body(&n.value.body),
             PackageBodyElement::PerformUsage(n) => self.perform_body(&n.value.body),
+            PackageBodyElement::ExtendedDefinition(n) => self.package_body(&n.value.body),
             PackageBodyElement::Error(_)
             | PackageBodyElement::Unsupported(_)
             | PackageBodyElement::Doc(_)

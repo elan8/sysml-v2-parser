@@ -1263,6 +1263,38 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_extended_definition(
+        &mut self,
+        definition: &super::ExtendedDefinition,
+    ) -> io::Result<()> {
+        self.writer.write_str("(extended-def (prefix-keywords (")?;
+        let mut first_keyword = true;
+        for keyword in &definition.prefix_keywords {
+            if !first_keyword {
+                self.writer.write_char(' ')?;
+            }
+            first_keyword = false;
+            write_quoted(self.writer, &keyword.value.keyword)?;
+        }
+        self.writer.write_str(")) (definition-prefix ")?;
+        match definition.definition_prefix {
+            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str("abstract")?,
+            Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") (specializes ")?;
+        if let Some(specializes) = &definition.specializes {
+            self.write_typing(&specializes.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_package_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_action_definition(&mut self, definition: &super::ActionDef) -> io::Result<()> {
         self.writer.write_str("(action-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
@@ -2311,6 +2343,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::MetadataKeywordUsage(_usage) => {
                 self.write_marker(first, "metadata-keyword-usage")
+            }
+            PackageBodyElement::ExtendedDefinition(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_extended_definition(&definition.value)
             }
             PackageBodyElement::MetadataAnnotation(_annotation) => {
                 self.write_marker(first, "metadata-annotation")

@@ -214,6 +214,9 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::IncludeUseCase(include) => {
             walk_use_case_def_body(report, path, &include.value.body)
         }
+        PackageBodyElement::ExtendedDefinition(definition) => {
+            walk_package_body(report, path, &definition.value.body)
+        }
         PackageBodyElement::Satisfy(s) => walk_satisfy(report, path, &s.value),
         PackageBodyElement::Import(i) => {
             walk_optional_relationship_body(report, path, i.value.body_elements.as_deref())

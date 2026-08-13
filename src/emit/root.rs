@@ -61,7 +61,28 @@ fn emit_library_package(
     emit_package_body(w, path, &pkg.body)
 }
 
-fn emit_package_body(
+fn emit_extended_definition(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::ExtendedDefinition,
+) -> Result<(), EmitError> {
+    if let Some(prefix) = &def.definition_prefix {
+        structure::emit_definition_prefix(w, Some(prefix));
+    }
+    for keyword in &def.prefix_keywords {
+        w.push_char('#');
+        w.push_str(&keyword.value.keyword);
+        w.push_char(' ');
+    }
+    w.push_str("def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        structure::emit_typing_clause(w, &spec.value)?;
+    }
+    emit_package_body(w, path, &def.body)
+}
+
+pub(crate) fn emit_package_body(
     w: &mut EmitWriter<'_>,
     path: &str,
     body: &PackageBody,
@@ -231,6 +252,7 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::IncludeUseCase(i) => {
             requirement::emit_include_use_case(w, path, &i.value)
         }
+        PackageBodyElement::ExtendedDefinition(d) => emit_extended_definition(w, path, &d.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)
