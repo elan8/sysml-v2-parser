@@ -334,6 +334,9 @@ pub(crate) fn emit_view_usage(
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
+    if let Some(subsets) = &usage.subsets {
+        emit_typing_clause_as_subset(w, &subsets.value)?;
+    }
     if let Some(mult) = &usage.multiplicity {
         super::structure::emit_multiplicity(w, &mult.value)?;
     }

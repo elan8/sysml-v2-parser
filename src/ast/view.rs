@@ -216,7 +216,7 @@ pub enum RenderingUsageBodyElement {
     Doc(Node<DocComment>),
     /// Nested `view` usage member, e.g. a `columnView` redefinition (`view :>> columnView[1] {
     /// render asTextualNotation; }`).
-    ViewUsage(Node<ViewUsage>),
+    ViewUsage(Box<Node<ViewUsage>>),
 }
 
 /// Viewpoint definition: `viewpoint def` Identification RequirementBody.
@@ -269,6 +269,8 @@ pub enum RenderingDefBodyElement {
 pub struct ViewUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Subsets target, e.g. `baseView` in `view v :> baseView { ... }`.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// Redefines target, e.g. `columnView` in `view :>> columnView[1] { ... }`. `None` for the
     /// ordinary named form.
     pub redefines: Option<Node<SubsettingRelationship>>,

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 102.** `ViewUsage` retains its `:>` subsetting clause
+  (`ViewUsage::subsets`) instead of discarding it after parsing, matching sibling usage kinds such
+  as `OccurrenceUsage`/`StateUsage`/`PortUsage`.
 - **`PARSE_AST_VERSION` is now 101.** `individual item`/`individual occurrence`/`individual port`
   short usage forms parse correctly instead of being misclassified or falling into a recovery
   cascade: package-level `item def` now requires the `def` keyword so it no longer shadows
