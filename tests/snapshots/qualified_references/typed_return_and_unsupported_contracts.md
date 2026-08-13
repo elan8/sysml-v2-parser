@@ -54,7 +54,7 @@ package TypedContracts {
         return ref result[0..*] {
             doc
             /* Result documentation. */
-            return Results::accepted.item;
+            return Results::accepted.'item';
         }
         return ref empty;
     }

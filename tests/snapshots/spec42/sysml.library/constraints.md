@@ -76,7 +76,7 @@ standard library package Constraints {
 		 * ConstraintCheck is the most general class for constraint checking. ConstraintCheck is the base
 		 * type of all ConstraintDefinitions.
 		 */
-        ref;
+        'ref';
         constraint self : ConstraintCheck :>> BooleanEvaluation::self;
     }
     constraint constraintChecks : ConstraintCheck :> booleanEvaluations {

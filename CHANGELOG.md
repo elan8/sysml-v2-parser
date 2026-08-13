@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 113.** The remaining KerML declaration grammar used by the
+  pinned `sysml.library` is structurally implemented; the layered conformance scorecard's L2
+  claim now **passes for both the Systems Library and the full library** (94 files, zero
+  diagnostics, zero `ExtendedLibraryDecl`/`KermlSemanticDecl`/`KermlFeatureDecl` fallback
+  nodes). In detail:
+  - `KermlClassifierDecl` covers `datatype`/`metaclass`/`struct`/`assoc`/`assoc struct`/
+    `behavior`/`interaction`/`predicate`/`multiplicity`/`subclassifier`/`classifier`/`class`
+    (plus `function` from 112), with `all` sufficiency, a post-name multiplicity, `:` typing
+    for feature forms, and typed `disjoint from`/`unions`/`intersects` clauses
+    (`KermlTypeRelationship`).
+  - New `KermlFeatureMember` (calc/type-body and package scope) models `member`/`derived`/
+    `abstract`/`composite`/`portion`/`var`/`end` prefixes, the `feature`/`step`/`expr`/`bool`
+    kind keywords, `all`, leading or trailing redefinitions, multi-target typing, multiplicity
+    with `ordered`/`nonunique`, subsets/redefines/references clauses, `inverse of`, values, and
+    nested type bodies. New `KermlInvariantMember` models `inv (not)? name? { ... }` at both
+    scopes.
+  - `TypedParameterMember` gains `abstract`, the `calc`/`step` kinds, post-redefinition typing
+    and multiplicity; `InOutDecl` accepts the anonymous typed form (`in : T[1];`), the
+    spelled-out `redefines` operator, and typing/multiplicity trailing a redefinition.
+  - `ReturnDecl` gains a `{ ... }` result body (`CalcDefBody`); `RefDecl` retains its kind
+    keyword (`ref item scene : Scene;` no longer drops `item` on formatting) and
+    `RefBodyElement` gains an `AttributeUsage` variant; part usage bodies dispatch kinded
+    `ref item :>> a, b;` members; `DefaultReferenceUsage` accepts the anonymous leading
+    `:>> target = expr;` binding.
+  - Formatting quotes declared names that spell reserved keywords (`'in'`, `'ref'`,
+    `'about'`), which previously re-emitted bare and could not reparse.
+  - From 112 (folded in): `ExprMemberElement::ReturnDecl` boxes its node to keep the enum size
+    bounded (wire format unchanged).
 - **`PARSE_AST_VERSION` is now 112.** KerML `function` declarations parse as a structured
   `PackageBodyElement::KermlClassifier` node (`KermlClassifierDecl`: `abstract` prefix, keyword
   enum, identification, multi-target `specializes`/`:>` clause, calc-style body) instead of the

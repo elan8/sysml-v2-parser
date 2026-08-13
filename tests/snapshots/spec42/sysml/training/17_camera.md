@@ -35,7 +35,6 @@ package Camera {
 (fixture-diagnostics
   (document "17_camera.md"
     (diagnostics
-      (diagnostic (code "recovered_part_usage_body_element") (severity error) (category parseerror) (span (offset 165) (line 9) (column 3) (len 26)) (message "unexpected token in part usage body"))
       (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 244) (line 13) (column 4) (len 82)) (message "unexpected keyword `in` in part usage body"))
       (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 404) (line 20) (column 4) (len 73)) (message "unexpected keyword `in` in part usage body"))
     )

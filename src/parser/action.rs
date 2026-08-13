@@ -218,6 +218,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
             input,
             crate::ast::RefDecl {
                 direction: None,
+                kind_keyword: None,
                 name: name_str,
                 typing,
                 redefines,
@@ -353,6 +354,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         || starts_with_keyword(peek.fragment(), b"expr")
         || starts_with_keyword(peek.fragment(), b"bool")
         || starts_with_keyword(peek.fragment(), b"feature")
+        || starts_with_keyword(peek.fragment(), b"calc")
     {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -365,7 +367,9 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     // (`in :>> MessageTransfer::payload, MessageAction::payload;`), both from Systems Library
     // `Actions.sysml`'s `SendAction`/`TransitionAction`.
     let (peek_redef, _) = ws_and_comments(input)?;
-    if peek_redef.fragment().starts_with(b":>>") {
+    if peek_redef.fragment().starts_with(b":>>")
+        || starts_with_keyword(peek_redef.fragment(), b"redefines")
+    {
         let (input, redefines) = redefinition(input)?;
         // Optional trailing `: Type` between the redefinition target and the value, e.g.
         // `out attribute :>> a_out : AccelerationValue = Acceleration(dt, tm, tp);`
@@ -404,7 +408,16 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // Library shorthand: `in action body { ... }` (treat as name `body` typed as `action`)
         let (input, action_typed_name) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
         let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
-        let (input, param_name) = name(input)?;
+        // Anonymous typed parameter: `in : TensorQuantityValue[1];` (Domain Libraries
+        // `TensorCalculations.sysml`). The name is legally omitted when the typing follows
+        // directly.
+        let (peek_anon, _) = ws_and_comments(input)?;
+        let (input, param_name) =
+            if peek_anon.fragment().starts_with(b":") && !peek_anon.fragment().starts_with(b":>") {
+                (input, String::new())
+            } else {
+                name(input)?
+            };
         // BNF `FeatureSpecializationPart` allows the `MultiplicityPart` before or after the
         // typing: `in transitionLinkSource[1]: StateAction :>> ...` (Systems Library
         // `States.sysml`) vs `inout replacementValues : Anything[0..*] nonunique;`
@@ -444,6 +457,26 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // TransitionAction::transitionLinkSource, StateTransitionPerformance::
         // transitionLinkSource;` (Systems Library `States.sysml`).
         let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+        // The typing may trail the redefinition target: `in enclosingItem :>> 'frame' :
+        // SpatialItem[1];` (Domain Libraries `SpatialItems.sysml`).
+        let (input, type_name) = if type_name.is_none() && redefines.is_some() {
+            opt(map(
+                (
+                    preceded(ws_and_comments, tag(&b":"[..])),
+                    preceded(ws_and_comments, qualified_reference),
+                ),
+                |(_, tn)| tn,
+            ))
+            .parse(input)?
+        } else {
+            (input, type_name)
+        };
+        let (input, trailing_multiplicity) =
+            if trailing_multiplicity.is_none() && leading_multiplicity.is_none() {
+                opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?
+            } else {
+                (input, trailing_multiplicity)
+            };
         let _ = action_typed_name;
 
         // `default { ... }` expression-body initializer used in the standard library

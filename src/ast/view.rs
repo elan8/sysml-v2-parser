@@ -124,6 +124,13 @@ pub enum CalcDefBodyElement {
     /// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
     /// Libraries).
     TypedParameter(Box<Node<crate::ast::TypedParameterMember>>),
+    /// KerML feature member (`derived var feature x : T[mult] redefines y;`, `feature all
+    /// s: Occurrence subsets a inverse of b { ... }`); see
+    /// [`crate::ast::KermlFeatureMember`].
+    KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// KerML invariant member (`inv name? { expr }`); see
+    /// [`crate::ast::KermlInvariantMember`].
+    Invariant(Box<Node<crate::ast::KermlInvariantMember>>),
     ReturnDecl(Node<ReturnDecl>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // formula
@@ -161,6 +168,10 @@ pub struct ReturnDecl {
     /// NumericalFunctions::sum0(collection, 0.0);`, Kernel Function Library
     /// `RealFunctions.kerml`).
     pub value: Option<Node<crate::ast::FeatureValue>>,
+    /// Result body: `;` (`CalcDefBody::Semicolon`) or `{ ... }` following the calc-body member
+    /// grammar (`return positionVector : Position3dVector[1] { attribute :>> mRef = ...; }`,
+    /// Domain Libraries `SpatialItems.sysml`).
+    pub body: CalcDefBody,
 }
 
 // ---------------------------------------------------------------------------

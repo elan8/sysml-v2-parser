@@ -200,6 +200,9 @@ pub struct InOutDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypedParameterMember {
     pub direction: InOut,
+    /// `abstract` between the direction and the kind keyword (`in abstract feature
+    /// onOccurrence : Occurrence [1] { ... }`, `FeatureReferencingPerformances.kerml`).
+    pub is_abstract: bool,
     pub kind: KermlParameterKind,
     /// Declared parameter name. Empty for the redefinition-only form
     /// (`in bool redefines ifTest { ... }`).
@@ -231,6 +234,12 @@ pub enum KermlParameterKind {
     Bool,
     /// `feature` -- an explicitly feature-kinded parameter.
     Feature,
+    /// `calc` -- a calculation-typed parameter (`in calc calculation { in x; }`, Domain
+    /// Libraries `SampledFunctions.sysml`).
+    Calc,
+    /// `step` -- a step-typed parameter (`in step redefines thenClause :
+    /// BooleanEvaluationResultToMonitorPerformance { ... }`, `Observation.kerml`).
+    Step,
 }
 
 impl KermlParameterKind {
@@ -240,6 +249,8 @@ impl KermlParameterKind {
             Self::Expr => "expr",
             Self::Bool => "bool",
             Self::Feature => "feature",
+            Self::Calc => "calc",
+            Self::Step => "step",
         }
     }
 }

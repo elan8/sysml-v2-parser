@@ -285,6 +285,7 @@ const REF_USAGE_BODY_STARTERS: &[&[u8]] = &[
     b"rep",
     b"@",
     b"ref",
+    b"attribute",
     b"private",
     b"protected",
     b"public",
@@ -331,6 +332,19 @@ fn ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RefBodyElement>
             node_from_to(start, input, RefBodyElement::Ref(Box::new(nested))),
         ));
     }
+    // `attribute :>> Disc::edges::innerSpaceDimension, ...;` (Domain Libraries
+    // `ShapeItems.sysml`).
+    if starts_with_keyword(input.fragment(), b"attribute") {
+        let (input, usage) = crate::parser::attribute::attribute_usage(input)?;
+        return Ok((
+            input,
+            node_from_to(
+                start,
+                input,
+                RefBodyElement::AttributeUsage(Box::new(usage)),
+            ),
+        ));
+    }
     let (input, annotation) = crate::parser::body::relationship_body_element(input)?;
     let span = annotation.span.clone();
     let wrapped = match annotation.value {
@@ -363,13 +377,15 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = opt(preceded(
+    let (input, kind_keyword) = opt(preceded(
         ws_and_comments,
         alt((
-            (tag(&b"part"[..]), ws1),
-            (tag(&b"port"[..]), ws1),
-            (tag(&b"item"[..]), ws1),
-            (tag(&b"requirement"[..]), ws1),
+            map((tag(&b"part"[..]), ws1), |_| crate::ast::RefDeclKind::Part),
+            map((tag(&b"port"[..]), ws1), |_| crate::ast::RefDeclKind::Port),
+            map((tag(&b"item"[..]), ws1), |_| crate::ast::RefDeclKind::Item),
+            map((tag(&b"requirement"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Requirement
+            }),
         )),
     ))
     .parse(input)?;
@@ -436,6 +452,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             input,
             RefDecl {
                 direction: None,
+                kind_keyword,
                 name: name_str,
                 typing,
                 subsets,

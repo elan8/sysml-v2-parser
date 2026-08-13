@@ -25,7 +25,7 @@ interface def Interface {
 # FORMAT
 ~~~sysml
 interface def Interface {
-    ref '' : Port[2..*] ordered nonunique :>> participant {
+    ref port '' : Port[2..*] ordered nonunique :>> participant {
         doc
         /* The participants of an Interface must be Ports. */
         protected ref thisParticipant :>> self;

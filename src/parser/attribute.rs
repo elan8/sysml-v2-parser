@@ -399,8 +399,15 @@ pub(crate) fn feature_value_binding(
 ) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    if is_reserved_shorthand_starter(&name_str) {
+    // Anonymous leading-redefinition binding: `:>> mRef = transformation.source;` (Domain
+    // Libraries `VectorCalculations.sysml`). The redefinition target stands in for the name;
+    // `specialization_clauses` below captures it.
+    let (input, (name_span, name_str)) = if input.fragment().starts_with(b":>>") {
+        (input, (crate::ast::Span::dummy(), String::new()))
+    } else {
+        with_span(name).parse(input)?
+    };
+    if !name_str.is_empty() && is_reserved_shorthand_starter(&name_str) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,

@@ -137,10 +137,30 @@ fn emit_kerml_classifier_decl(
         w.push_str("abstract ");
     }
     w.push_str(decl.keyword.as_str());
+    if decl.is_all {
+        w.push_str(" all");
+    }
     w.push_char(' ');
     emit_identification(w, &decl.identification);
+    if let Some(multiplicity) = &decl.multiplicity {
+        structure::emit_multiplicity(w, &multiplicity.value)?;
+    }
     if let Some(spec) = &decl.specializes {
         structure::emit_typing_clause(w, &spec.value)?;
+    }
+    for (index, clause) in decl.type_relationships.iter().enumerate() {
+        w.push_char(' ');
+        w.push_str(clause.value.keyword.as_str());
+        w.push_char(' ');
+        for (target_index, target) in clause.value.targets.iter().copied().enumerate() {
+            if target_index > 0 {
+                w.push_str(", ");
+            }
+            w.push_qualified_reference(
+                &format!("{path}/type-relationship[{index}][{target_index}]"),
+                target,
+            )?;
+        }
     }
     super::view::emit_calc_body(w, path, &decl.body)
 }
@@ -284,6 +304,12 @@ pub(crate) fn emit_package_body_element(
         }
         PackageBodyElement::KermlClassifier(declaration) => {
             emit_kerml_classifier_decl(w, path, &declaration.value)
+        }
+        PackageBodyElement::KermlInvariant(invariant) => {
+            super::view::emit_kerml_invariant_member(w, path, &invariant.value)
+        }
+        PackageBodyElement::KermlFeatureMember(feature) => {
+            super::view::emit_kerml_feature_member(w, path, &feature.value)
         }
         other @ (PackageBodyElement::Actor(_) | PackageBodyElement::FlowDef(_)) => w.unsupported(
             path,

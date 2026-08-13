@@ -106,11 +106,11 @@ standard library package DerivationConnections {
 		 * The single end for the originalRequirement should subset originalRequirement, while
 		 * the rest of the ends should subset derivedRequirements.
 		 */
-        ref originalRequirement[1] :>> originalRequirements :> participant {
+        ref requirement originalRequirement[1] :>> originalRequirements :> participant {
             doc
             /* The single original requirement. */
         }
-        ref ''[1..*] :>> derivedRequirements :> participant {
+        ref requirement ''[1..*] :>> derivedRequirements :> participant {
             doc
             /* The one or more requirements that are derived from the original requirement. */
         }

@@ -176,6 +176,13 @@ pub enum PackageBodyElement {
     /// Structured KerML classifier declaration with a body (`function` families so far); see
     /// [`crate::ast::KermlClassifierDecl`].
     KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
+    /// Package-level KerML invariant (`inv piPrecision { ... }`, Kernel Function Library
+    /// `TrigFunctions.kerml`); see [`crate::ast::KermlInvariantMember`].
+    KermlInvariant(Box<Node<crate::ast::KermlInvariantMember>>),
+    /// Package-level KerML feature member with the full feature-member surface (`feature i:
+    /// Complex[1] = rect(0.0, 1.0);`, Kernel Function Library `ComplexFunctions.kerml`); see
+    /// [`crate::ast::KermlFeatureMember`].
+    KermlFeatureMember(Box<Node<crate::ast::KermlFeatureMember>>),
     KermlFeatureDecl(Node<KermlFeatureDecl>),
     /// Structurally recognized bare KerML declaration: keyword, optional name, optional
     /// multiplicity, terminating `;` -- see [`KermlBareDeclaration`].

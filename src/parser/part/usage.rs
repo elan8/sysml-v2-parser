@@ -1127,6 +1127,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             input,
             RefDecl {
                 direction,
+                kind_keyword: None,
                 name: name_str,
                 typing,
                 redefines,
@@ -1373,6 +1374,12 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         alt((
             map(port_usage, PartUsageBodyElement::PortUsage),
             map(part_ref_usage, PartUsageBodyElement::Ref),
+            // Kinded `ref item :>> a, b, c;` (Domain Libraries `SpatialItems.sysml`), which
+            // `part_ref_usage` deliberately rejects; `connector::ref_decl` owns that shape.
+            map(
+                crate::parser::connector::ref_decl,
+                PartUsageBodyElement::Ref,
+            ),
             map(bind_, PartUsageBodyElement::Bind),
             map(satisfy, PartUsageBodyElement::Satisfy),
             map(

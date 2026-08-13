@@ -48,7 +48,7 @@ package 'Individuals and Time Slices' {
     individual item def Bob :> Person;
     individual  : Vehicle_1 {
         timeslice aliceDriving {
-            ref individual item : Alice :>> driver;
+            ref individual 'item' : Alice :>> driver;
             snapshot  :>> start {
                 attribute  :>> mass = 2000.0;
             }
@@ -57,7 +57,7 @@ package 'Individuals and Time Slices' {
             }
         }
         then timeslice bobDriving {
-            ref individual item : Bob :>> driver;
+            ref individual 'item' : Bob :>> driver;
         }
     }
 }

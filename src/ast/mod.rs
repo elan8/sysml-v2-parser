@@ -116,6 +116,12 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::KermlClassifier(n) => {
             PackageBodyElement::KermlClassifier(Box::new(dummy_node(n, n.value.clone())))
         }
+        PackageBodyElement::KermlInvariant(n) => {
+            PackageBodyElement::KermlInvariant(Box::new(dummy_node(n, n.value.clone())))
+        }
+        PackageBodyElement::KermlFeatureMember(n) => {
+            PackageBodyElement::KermlFeatureMember(Box::new(dummy_node(n, n.value.clone())))
+        }
         PackageBodyElement::Unsupported(n) => {
             PackageBodyElement::Unsupported(dummy_node(n, n.value.clone()))
         }
@@ -1343,6 +1349,7 @@ fn normalize_end_decl(e: &EndDecl) -> EndDecl {
 fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
     RefDecl {
         direction: r.direction,
+        kind_keyword: r.kind_keyword,
         name: r.name.clone(),
         typing: r.typing.clone(),
         redefines: r.redefines.clone(),

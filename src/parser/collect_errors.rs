@@ -242,6 +242,9 @@ fn collect_ref_body_errors(body: &RefBody, errors: &mut Vec<ParseError>) {
                     RefBodyElement::Ref(n) => {
                         collect_ref_body_errors(&n.value.body, errors);
                     }
+                    RefBodyElement::AttributeUsage(n) => {
+                        collect_attribute_body_errors(&n.value.body, errors);
+                    }
                     RefBodyElement::Action(n) => {
                         collect_action_def_body_element_errors(n, errors);
                     }
@@ -587,8 +590,16 @@ fn collect_calc_body_errors(body: &CalcDefBody, errors: &mut Vec<ParseError>) {
                     CalcDefBodyElement::TypedParameter(n) => {
                         collect_calc_body_errors(&n.value.body, errors)
                     }
+                    CalcDefBodyElement::KermlFeature(n) => {
+                        collect_calc_body_errors(&n.value.body, errors)
+                    }
+                    CalcDefBodyElement::Invariant(n) => {
+                        collect_calc_body_errors(&n.value.body, errors)
+                    }
+                    CalcDefBodyElement::ReturnDecl(n) => {
+                        collect_calc_body_errors(&n.value.body, errors)
+                    }
                     CalcDefBodyElement::Doc(_)
-                    | CalcDefBodyElement::ReturnDecl(_)
                     | CalcDefBodyElement::Expression(_)
                     | CalcDefBodyElement::Other(_) => {}
                 }
@@ -1438,6 +1449,12 @@ fn collect_package_body_element_errors(
             errors.push(parse_error_from_recovery_node(&element.span, &n.value));
         }
         PackageBodyElement::KermlClassifier(n) => {
+            collect_calc_body_errors(&n.value.body, errors);
+        }
+        PackageBodyElement::KermlInvariant(n) => {
+            collect_calc_body_errors(&n.value.body, errors);
+        }
+        PackageBodyElement::KermlFeatureMember(n) => {
             collect_calc_body_errors(&n.value.body, errors);
         }
         PackageBodyElement::Unsupported(n) => {

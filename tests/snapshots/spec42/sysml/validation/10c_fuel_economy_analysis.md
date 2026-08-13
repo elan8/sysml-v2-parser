@@ -191,7 +191,7 @@ package '10c-Fuel Economy Analysis' {
     private import ISQ::*;
     private import USCustomaryUnits::*;
     attribute def distancePerVolume : ScalarQuantityValue = length / volume;
-    attribute def gallon : MeasurementUnit = 231.0 * in ^ 3;
+    attribute def gallon : MeasurementUnit = 231.0 * 'in' ^ 3;
     package FuelEconomyRequirementsModel {
         requirement def FuelEconomyRequirement {
             attribute actualFuelEconomy :> distancePerVolume;

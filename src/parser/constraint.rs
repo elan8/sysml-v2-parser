@@ -404,6 +404,9 @@ fn typed_parameter_member_inner(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
+    // `in abstract feature onOccurrence : Occurrence [1] { ... }`
+    // (`FeatureReferencingPerformances.kerml`).
+    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, kind) = alt((
         map(preceded(tag(&b"expr"[..]), ws1), |_| {
             crate::ast::KermlParameterKind::Expr
@@ -413,6 +416,12 @@ fn typed_parameter_member_inner(
         }),
         map(preceded(tag(&b"feature"[..]), ws1), |_| {
             crate::ast::KermlParameterKind::Feature
+        }),
+        map(preceded(tag(&b"calc"[..]), ws1), |_| {
+            crate::ast::KermlParameterKind::Calc
+        }),
+        map(preceded(tag(&b"step"[..]), ws1), |_| {
+            crate::ast::KermlParameterKind::Step
         }),
     ))
     .parse(input)?;
@@ -461,6 +470,34 @@ fn typed_parameter_member_inner(
     } else {
         (input, leading_redefines)
     };
+    // The typing may trail a leading redefinition target: `in step redefines thenClause :
+    // BooleanEvaluationResultToMonitorPerformance { ... }` (`Observation.kerml`).
+    let (input, type_name) = if type_name.is_none() {
+        opt(map(
+            (
+                preceded(ws_and_comments, tag(&b":"[..])),
+                preceded(ws_and_comments, qualified_reference),
+            ),
+            |(_, tn)| tn,
+        ))
+        .parse(input)?
+    } else {
+        (input, type_name)
+    };
+    // The multiplicity may trail the redefinition target: `inout feature replacementValues :
+    // Anything redefines values [*] nonunique;` (`FeatureReferencingPerformances.kerml`).
+    let (input, post_redefines_multiplicity) =
+        if leading_multiplicity.is_none() && trailing_multiplicity.is_none() {
+            opt(preceded(
+                ws_and_comments,
+                crate::parser::usage::multiplicity_node,
+            ))
+            .parse(input)?
+        } else {
+            (input, None)
+        };
+    let (input, (post_ordered, post_nonunique)) =
+        crate::parser::usage::usage_feature_modifier_flags(input)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = calc_def_body(input)?;
     Ok((
@@ -470,15 +507,196 @@ fn typed_parameter_member_inner(
             input,
             crate::ast::TypedParameterMember {
                 direction,
+                is_abstract: is_abstract.is_some(),
                 kind,
                 name: name_str,
                 redefines,
                 type_name,
+                multiplicity: leading_multiplicity
+                    .or(trailing_multiplicity)
+                    .or(post_redefines_multiplicity),
+                ordered: ordered || post_ordered,
+                nonunique: nonunique || post_nonunique,
+                value,
+                body,
+            },
+        ),
+    ))
+}
+
+/// KerML feature member (type-body scope): optional `member`/`derived`/`abstract`/`composite`/
+/// `portion`/`var`/`end` prefixes, the `feature` keyword, optional `all`, then the usual
+/// declaration surface (name or leading redefinition, typing, multiplicity, `ordered`/
+/// `nonunique`, subsets/redefines/references, `inverse of`, value, body). Kernel Semantic
+/// Library `KerML.kerml`/`Occurrences.kerml`.
+pub(crate) fn kerml_feature_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlFeatureMember>> {
+    crate::parser::span::reference_transaction(input, kerml_feature_member_inner)
+}
+
+fn kerml_feature_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlFeatureMember>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, is_member) = opt(preceded(tag(&b"member"[..]), ws1)).parse(input)?;
+    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
+    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, composite_or_portion) = opt(alt((
+        map(preceded(tag(&b"composite"[..]), ws1), |_| true),
+        map(preceded(tag(&b"portion"[..]), ws1), |_| false),
+    )))
+    .parse(input)?;
+    let (input, is_var) = opt(preceded(tag(&b"var"[..]), ws1)).parse(input)?;
+    let (input, is_end) = opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
+    let (input, kind) = alt((
+        map(preceded(tag(&b"feature"[..]), ws1), |_| {
+            crate::ast::KermlFeatureKind::Feature
+        }),
+        map(preceded(tag(&b"step"[..]), ws1), |_| {
+            crate::ast::KermlFeatureKind::Step
+        }),
+        map(preceded(tag(&b"expr"[..]), ws1), |_| {
+            crate::ast::KermlFeatureKind::Expr
+        }),
+        map(preceded(tag(&b"bool"[..]), ws1), |_| {
+            crate::ast::KermlFeatureKind::Bool
+        }),
+    ))
+    .parse(input)?;
+    let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
+    // Leading redefinition may replace the name: `portion feature redefines spaceBoundary [1];`.
+    let (input, leading_redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+    let (input, name_str) = if leading_redefines.is_some() {
+        (input, String::new())
+    } else {
+        let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+        (input, n)
+    };
+    let (input, leading_multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+    let typing = type_result.map(|(span, is_conjugated, targets)| {
+        crate::ast::Node::new(
+            span.clone(),
+            crate::ast::TypingRelationship {
+                target: targets,
+                kind: crate::ast::TypingKind::Typing,
+                span,
+                is_conjugated,
+                is_implied: false,
+            },
+        )
+    });
+    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+        opt(preceded(
+            ws_and_comments,
+            crate::parser::usage::multiplicity_node,
+        ))
+        .parse(input)?
+    } else {
+        (input, None)
+    };
+    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, clauses) = crate::parser::usage::specialization_clauses(input)?;
+    let subsets = clauses.subsets.map(|(target, _value)| target);
+    let redefines = leading_redefines.or(clauses.redefines);
+    let references = clauses.references;
+    // `inverse of <chain>`: `feature all spaceShotOf: Occurrence[0..*] subsets spaceSliceOf
+    // inverse of spaceShots { ... }` (`Occurrences.kerml`).
+    let (input, inverse_of) = opt(preceded(
+        (
+            ws_and_comments,
+            tag(&b"inverse"[..]),
+            ws1,
+            tag(&b"of"[..]),
+            ws1,
+        ),
+        qualified_reference,
+    ))
+    .parse(input)?;
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let (input, body) = calc_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlFeatureMember {
+                is_member: is_member.is_some(),
+                is_derived: is_derived.is_some(),
+                is_abstract: is_abstract.is_some(),
+                is_composite: composite_or_portion == Some(true),
+                is_portion: composite_or_portion == Some(false),
+                is_var: is_var.is_some(),
+                is_end: is_end.is_some(),
+                kind,
+                is_all: is_all.is_some(),
+                name: name_str,
+                typing,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
                 ordered,
                 nonunique,
+                subsets,
+                redefines,
+                references,
+                inverse_of,
                 value,
                 body,
+                membership: Membership::feature(visibility, visibility_span),
+            },
+        ),
+    ))
+}
+
+/// KerML invariant member: `inv` (`not`)? name? `{ boolean-expressions }`. The bare `inv
+/// name;` forward-declaration form stays on `kerml_bare_declaration`, so this parser requires
+/// the `{` body.
+pub(crate) fn kerml_invariant_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlInvariantMember>> {
+    crate::parser::span::reference_transaction(input, kerml_invariant_member_inner)
+}
+
+fn kerml_invariant_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlInvariantMember>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    if !starts_with_keyword(input.fragment(), b"inv") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, _) = tag(&b"inv"[..]).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, is_negated) = opt(preceded(tag(&b"not"[..]), ws1)).parse(input)?;
+    let (input, name_str) = opt(preceded(ws_and_comments, name)).parse(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    if !peek.fragment().starts_with(b"{") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, body) = calc_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlInvariantMember {
+                is_negated: is_negated.is_some(),
+                name: name_str.unwrap_or_default(),
+                body,
+                membership: Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -498,6 +716,30 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             crate::parser::metadata_annotation::metadata_annotation,
             CalcDefBodyElement::MetadataAnnotation,
         )
+        .parse(input)?
+    } else if starts_with_any_keyword(
+        input.fragment(),
+        &[
+            b"member",
+            b"derived",
+            b"composite",
+            b"portion",
+            b"var",
+            b"end",
+            b"feature",
+            b"step",
+        ],
+    ) || (starts_with_keyword(input.fragment(), b"abstract")
+        && kerml_feature_member(input).is_ok())
+    {
+        map(kerml_feature_member, |n| {
+            CalcDefBodyElement::KermlFeature(Box::new(n))
+        })
+        .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"inv") {
+        map(kerml_invariant_member, |n| {
+            CalcDefBodyElement::Invariant(Box::new(n))
+        })
         .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"in")
         || starts_with_keyword(input.fragment(), b"out")
@@ -726,7 +968,9 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
     // `= expr` / `:= expr` / `default (=|:=)? expr` value clause: `return : Real default
     // NumericalFunctions::sum0(collection, 0.0);` (Kernel Function Library).
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    // `;` or a `{ ... }` result body (`return positionVector : Position3dVector[1] {
+    // attribute :>> mRef = ...; }`, Domain Libraries `SpatialItems.sysml`).
+    let (input, body) = calc_def_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -741,6 +985,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
                 ordered,
                 nonunique,
                 value,
+                body,
             },
         ),
     ))

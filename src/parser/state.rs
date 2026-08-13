@@ -315,6 +315,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             input,
             RefDecl {
                 direction: None,
+                kind_keyword: None,
                 name: name_str,
                 typing,
                 redefines: None,

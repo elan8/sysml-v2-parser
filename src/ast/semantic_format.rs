@@ -2317,6 +2317,28 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::KermlSemanticDecl(_declaration) => {
                 self.write_marker(first, "kerml-semantic-declaration")
             }
+            PackageBodyElement::KermlInvariant(invariant) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(kerml-invariant (negated ")?;
+                self.writer.write_str(if invariant.value.is_negated {
+                    "true"
+                } else {
+                    "false"
+                })?;
+                self.writer.write_str(") (name ")?;
+                if invariant.value.name.is_empty() {
+                    self.writer.write_str("none")?;
+                } else {
+                    write_quoted(self.writer, &invariant.value.name)?;
+                }
+                self.writer.write_str("))")
+            }
+            PackageBodyElement::KermlFeatureMember(feature) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(kerml-feature (name ")?;
+                self.write_usage_declaration_name(&feature.value.name)?;
+                self.writer.write_str("))")
+            }
             PackageBodyElement::KermlClassifier(declaration) => {
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(kerml-classifier (keyword ")?;

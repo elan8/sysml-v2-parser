@@ -1121,6 +1121,10 @@ pub(crate) fn emit_ref_decl(
         emit_direction(w, dir);
     }
     w.push_str("ref ");
+    if let Some(kind) = decl.kind_keyword {
+        w.push_str(kind.as_str());
+        w.push_char(' ');
+    }
     w.push_str(&format_name(&decl.name));
     // Typing first, then multiplicity, then the subsetting-family clauses: the one emission
     // order every `RefDecl` parser (`connector::ref_decl`, `part_ref_usage`) accepts, including
@@ -1185,6 +1189,7 @@ fn emit_ref_body_element(
     match el {
         RefBodyElement::Doc(d) => emit_doc(w, &d.value),
         RefBodyElement::Ref(n) => emit_ref_decl(w, path, &n.value),
+        RefBodyElement::AttributeUsage(n) => emit_attribute_usage(w, path, &n.value),
         RefBodyElement::Comment(c) => emit_comment(w, &c.value),
         RefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RefBodyElement::Other(_) => Err(EmitError::Opaque {

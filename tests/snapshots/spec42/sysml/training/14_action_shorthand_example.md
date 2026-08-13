@@ -62,7 +62,7 @@ package 'Action Shorthand Example' {
             in item scene = TakePicture::scene;
             out item image;
         }
-        flow from from focus.image to shoot.image;
+        flow 'from' from focus.image to shoot.image;
         then action shoot : Shoot {
             in item;
             out item picture = TakePicture::picture;

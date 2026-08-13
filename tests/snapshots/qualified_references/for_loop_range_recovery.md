@@ -30,7 +30,7 @@ package LoopRecovery {
 ~~~sysml
 package LoopRecovery {
     action def Traverse {
-        for item in Domain::fleet.activeMembers  {
+        for 'item' in Domain::fleet.activeMembers  {
             action visit;
         }
         for orphan in Ghost::leaked + {

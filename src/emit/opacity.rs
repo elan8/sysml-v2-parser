@@ -106,6 +106,10 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         }
         PackageBodyElement::KermlFeatureDecl(_) => hit(report, path, OpacityKind::KermlFeatureDecl),
         PackageBodyElement::KermlClassifier(n) => walk_calc_def_body(report, path, &n.value.body),
+        PackageBodyElement::KermlInvariant(n) => walk_calc_def_body(report, path, &n.value.body),
+        PackageBodyElement::KermlFeatureMember(n) => {
+            walk_calc_def_body(report, path, &n.value.body)
+        }
         // Structurally recognized -- keyword, optional name, optional multiplicity, `;` -- not
         // an opaque/recovery node.
         PackageBodyElement::KermlBareDeclaration(_) => {}
@@ -318,9 +322,10 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             }
             CalcDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             CalcDefBodyElement::TypedParameter(n) => walk_calc_def_body(report, &p, &n.value.body),
-            CalcDefBodyElement::Doc(_)
-            | CalcDefBodyElement::ReturnDecl(_)
-            | CalcDefBodyElement::Expression(_) => {}
+            CalcDefBodyElement::KermlFeature(n) => walk_calc_def_body(report, &p, &n.value.body),
+            CalcDefBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
+            CalcDefBodyElement::ReturnDecl(n) => walk_calc_def_body(report, &p, &n.value.body),
+            CalcDefBodyElement::Doc(_) | CalcDefBodyElement::Expression(_) => {}
         }
     }
 }
@@ -1211,6 +1216,7 @@ fn walk_ref_body(report: &mut OpacityReport, path: &str, body: &RefBody) {
             RefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             RefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             RefBodyElement::Ref(n) => walk_ref_body(report, &p, &n.value.body),
+            RefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             RefBodyElement::Action(action) => {
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(action))
             }

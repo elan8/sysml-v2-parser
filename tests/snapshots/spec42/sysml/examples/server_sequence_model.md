@@ -64,7 +64,7 @@ package ServerSequenceModel {
     package SignalDefinitions {
         item def Subscribe {
             attribute topic : String;
-            ref subscriber;
+            ref part subscriber;
         }
         item def Publish {
             attribute topic : String;

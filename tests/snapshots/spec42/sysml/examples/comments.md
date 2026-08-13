@@ -40,12 +40,12 @@ package Comments {
     /* Named Comment */
     comment cmt_cmt
     /* Comment about Comment */
-    comment about
+    comment 'about'
     /* Documention Comment on Part Def */
     part def C {
         doc
         /* Documentation in Part Def */
-        comment comment
+        comment 'comment'
         /* Comment about Package */
     }
 }

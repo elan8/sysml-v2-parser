@@ -274,6 +274,8 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::KermlSemanticDecl(_)
         | PackageBodyElement::KermlFeatureDecl(_)
         | PackageBodyElement::KermlClassifier(_)
+        | PackageBodyElement::KermlInvariant(_)
+        | PackageBodyElement::KermlFeatureMember(_)
         | PackageBodyElement::KermlBareDeclaration(_)
         | PackageBodyElement::ExtendedLibraryDecl(_)
         | PackageBodyElement::AttributeUsage(_)
@@ -657,19 +659,164 @@ fn kerml_bare_declaration(
     ))
 }
 
-/// Structured KerML `function` declaration: `abstract`? `function` Identification
-/// (`specializes`/`:>` targets)? calc-style body (Kernel Function Library). Tried before the
-/// opaque [`kerml_semantic_decl`] fallback so these get a typed node; bare `function Name;`
-/// forward declarations stay on [`kerml_bare_declaration`], which is tried first.
-fn kerml_function_decl(
+/// Structured KerML classifier declaration: (visibility)? `abstract`? keyword `all`?
+/// Identification multiplicity? (`specializes`/`:>` targets)? type body (Kernel Function/
+/// Semantic/Data Type Libraries). Tried before the opaque
+/// [`classifier_decl`]/[`kerml_semantic_decl`] fallbacks so these get a typed node; bare
+/// `keyword Name;` forward declarations stay on [`kerml_bare_declaration`], which is tried
+/// first.
+fn kerml_classifier_structured(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlClassifierDecl>> {
+    crate::parser::span::reference_transaction(input, kerml_classifier_structured_inner)
+}
+
+/// Keywords structurally implemented by [`kerml_classifier_structured`]. `struct` must sort
+/// before any longer spelling that would prefix-collide (none currently do;
+/// `starts_with_keyword` enforces the word boundary either way).
+const KERML_CLASSIFIER_KEYWORDS: &[(&[u8], crate::ast::KermlClassifierKeyword)] = &[
+    (b"function", crate::ast::KermlClassifierKeyword::Function),
+    (b"datatype", crate::ast::KermlClassifierKeyword::Datatype),
+    (b"metaclass", crate::ast::KermlClassifierKeyword::Metaclass),
+    (b"struct", crate::ast::KermlClassifierKeyword::Struct),
+    (b"assoc", crate::ast::KermlClassifierKeyword::Assoc),
+    (b"behavior", crate::ast::KermlClassifierKeyword::Behavior),
+    (
+        b"interaction",
+        crate::ast::KermlClassifierKeyword::Interaction,
+    ),
+    (b"predicate", crate::ast::KermlClassifierKeyword::Predicate),
+    (
+        b"multiplicity",
+        crate::ast::KermlClassifierKeyword::Multiplicity,
+    ),
+    (
+        b"subclassifier",
+        crate::ast::KermlClassifierKeyword::Subclassifier,
+    ),
+    (
+        b"classifier",
+        crate::ast::KermlClassifierKeyword::Classifier,
+    ),
+    (b"class", crate::ast::KermlClassifierKeyword::Class),
+];
+
+/// Zero or more KerML type relationship clauses following a classifier header: `disjoint from
+/// A, B`, `unions A, B`, `intersects A, B` (any order, repeatable).
+fn kerml_type_relationship_clauses(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<Node<crate::ast::KermlTypeRelationship>>> {
+    let mut out = Vec::new();
+    let mut input = input;
+    loop {
+        let before = input;
+        let (after_ws, _) = ws_and_comments(input)?;
+        let (rest, keyword) = if starts_with_keyword(after_ws.fragment(), b"disjoint") {
+            let (rest, _) = tag(&b"disjoint"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            let (rest, _) = tag(&b"from"[..]).parse(rest)?;
+            let (rest, _) = ws1(rest)?;
+            (rest, crate::ast::KermlTypeRelationshipKeyword::DisjointFrom)
+        } else if starts_with_keyword(after_ws.fragment(), b"unions") {
+            let (rest, _) = tag(&b"unions"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            (rest, crate::ast::KermlTypeRelationshipKeyword::Unions)
+        } else if starts_with_keyword(after_ws.fragment(), b"intersects") {
+            let (rest, _) = tag(&b"intersects"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            (rest, crate::ast::KermlTypeRelationshipKeyword::Intersects)
+        } else {
+            return Ok((input, out));
+        };
+        let (rest, first) = crate::parser::lex::qualified_reference(rest)?;
+        let (rest, more) = nom::multi::many0(preceded(
+            preceded(ws_and_comments, tag(&b","[..])),
+            preceded(ws_and_comments, crate::parser::lex::qualified_reference),
+        ))
+        .parse(rest)?;
+        let mut targets = vec![first];
+        targets.extend(more);
+        let span = crate::parser::span_from_to(before, rest);
+        out.push(Node::new(
+            span.clone(),
+            crate::ast::KermlTypeRelationship {
+                keyword,
+                targets,
+                span,
+            },
+        ));
+        input = rest;
+    }
+}
+
+fn kerml_classifier_structured_inner(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlClassifierDecl>> {
     let start = input;
-    let (input, prefix) = crate::parser::definition_prefix::parse_definition_prefix(
-        input,
-        crate::parser::definition_prefix::DefinitionPrefixOptions::new(b"function")
-            .with_captured_visibility(),
-    )?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (keyword_bytes, keyword) = KERML_CLASSIFIER_KEYWORDS
+        .iter()
+        .find(|(kw, _)| starts_with_keyword(input.fragment(), kw))
+        .ok_or_else(|| {
+            nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+        })?;
+    let (input, _) = tag(*keyword_bytes).parse(input)?;
+    let mut keyword = *keyword;
+    let (input, _) = ws1(input)?;
+    // `assoc struct LinkObject specializes Link, Object ...` (Kernel Semantic Library
+    // `Objects.kerml`): the compound keyword pair gets its own variant.
+    let (input, second) = if keyword == crate::ast::KermlClassifierKeyword::Assoc {
+        opt(preceded(tag(&b"struct"[..]), ws1)).parse(input)?
+    } else {
+        (input, None)
+    };
+    if second.is_some() {
+        keyword = crate::ast::KermlClassifierKeyword::AssocStruct;
+    }
+    let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
+    let (input, identification) = crate::parser::lex::identification(input)?;
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
+    let (input, specializes) =
+        crate::parser::specialization::parse_optional_definition_specialization(input)?;
+    // The `bool`/`expr` feature forms type with `:` instead of specializing:
+    // `bool earlierFirstIncomingTransferSort : IncomingTransferSort { ... }`
+    // (`Occurrences.kerml`). The relationship kind distinguishes the authored operator.
+    let (input, specializes) = if specializes.is_none() {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
+            let before = input;
+            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+            let (input, target) =
+                preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+            let span = crate::parser::span_from_to(before, input);
+            (
+                input,
+                Some(Node::new(
+                    span.clone(),
+                    crate::ast::TypingRelationship {
+                        target: vec![target],
+                        kind: crate::ast::TypingKind::Typing,
+                        span,
+                        is_conjugated: false,
+                        is_implied: false,
+                    },
+                )),
+            )
+        } else {
+            (input, None)
+        }
+    } else {
+        (input, specializes)
+    };
+    // KerML type relationship clauses: `disjoint from A, B`, `unions A, B`, `intersects A, B`
+    // (`Occurrences.kerml`, `VectorValues.kerml`). Any order, repeatable.
+    let (input, type_relationships) = kerml_type_relationship_clauses(input)?;
     let (input, body) = crate::parser::constraint::calc_def_body(input)?;
     Ok((
         input,
@@ -677,15 +824,15 @@ fn kerml_function_decl(
             start,
             input,
             crate::ast::KermlClassifierDecl {
-                is_abstract: prefix.is_abstract,
-                keyword: crate::ast::KermlClassifierKeyword::Function,
-                identification: prefix.identification,
-                specializes: prefix.specializes,
+                is_abstract: is_abstract.is_some(),
+                keyword,
+                is_all: is_all.is_some(),
+                identification,
+                multiplicity,
+                specializes,
+                type_relationships,
                 body,
-                membership: crate::ast::Membership::owning(
-                    prefix.visibility,
-                    prefix.visibility_span,
-                ),
+                membership: crate::ast::Membership::owning(visibility, visibility_span),
             },
         ),
     ))
@@ -1842,7 +1989,6 @@ fn try_package_body_view<'a>(
         rendering_usage,
         PackageBodyElement::RenderingUsage
     );
-    try_package_body_dispatch!(input, start, feature_decl, PackageBodyElement::FeatureDecl);
     // Bare `classifier`/`class` forward declarations (e.g. `classifier SpatialFrame;`, `class
     // B;`) are tried before the opaque `classifier_decl` fallback so this common shape gets a
     // structured node -- see `kerml_bare_declaration`'s doc comment.
@@ -1855,12 +2001,25 @@ fn try_package_body_view<'a>(
     try_package_body_dispatch!(
         input,
         start,
+        crate::parser::constraint::kerml_feature_member,
+        |n| { PackageBodyElement::KermlFeatureMember(Box::new(n)) }
+    );
+    try_package_body_dispatch!(input, start, feature_decl, PackageBodyElement::FeatureDecl);
+    try_package_body_dispatch!(input, start, kerml_classifier_structured, |n| {
+        PackageBodyElement::KermlClassifier(Box::new(n))
+    });
+    try_package_body_dispatch!(
+        input,
+        start,
+        crate::parser::constraint::kerml_invariant_member,
+        |n| { PackageBodyElement::KermlInvariant(Box::new(n)) }
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
         classifier_decl,
         PackageBodyElement::ClassifierDecl
     );
-    try_package_body_dispatch!(input, start, kerml_function_decl, |n| {
-        PackageBodyElement::KermlClassifier(Box::new(n))
-    });
     try_package_body_dispatch!(
         input,
         start,

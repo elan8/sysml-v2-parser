@@ -64,7 +64,7 @@ package '17b-Sequence-Modeling' {
     package PayloadDefinitions {
         item def Subscribe {
             attribute topic : String;
-            ref subscriber;
+            ref part subscriber;
         }
         item def Publish {
             attribute topic : String;

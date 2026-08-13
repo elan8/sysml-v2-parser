@@ -1268,6 +1268,10 @@ pub struct RefDecl {
     /// `part def` body (`Simple Tests/ItemTest.sysml:15`). Only parsed by `part_ref_usage`;
     /// `connector::ref_decl`'s call sites have no confirmed real usage for a leading direction.
     pub direction: Option<InOut>,
+    /// Kind keyword after `ref` (`ref item scene : Scene;`, `ref port :>> participant ...`).
+    /// Previously parsed by `connector::ref_decl` and discarded, so formatting dropped the
+    /// authored keyword.
+    pub kind_keyword: Option<RefDeclKind>,
     pub name: String,
     /// Structured typing clause mirroring `PartUsage.typing`/`AttributeUsage.typing`: every
     /// comma-separated target from a `:` clause, not just the first (S42-004).
@@ -1305,6 +1309,7 @@ pub struct RefDecl {
 impl PartialEq for RefDecl {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
+            && self.kind_keyword == other.kind_keyword
             && self.typing == other.typing
             && self.redefines == other.redefines
             && self.subsets == other.subsets
@@ -1314,6 +1319,32 @@ impl PartialEq for RefDecl {
             && self.value == other.value
             && self.body == other.body
             && self.membership == other.membership
+    }
+}
+
+/// The kind keyword after `ref` on a [`RefDecl`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RefDeclKind {
+    /// `part`.
+    Part,
+    /// `port`.
+    Port,
+    /// `item`.
+    Item,
+    /// `requirement`.
+    Requirement,
+}
+
+impl RefDeclKind {
+    /// The authored keyword spelling.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Part => "part",
+            Self::Port => "port",
+            Self::Item => "item",
+            Self::Requirement => "requirement",
+        }
     }
 }
 
@@ -1345,6 +1376,9 @@ pub enum RefBodyElement {
     /// self;` members inside `ref port :>> participant : Port [2..*] nonunique ordered { ... }`
     /// (Systems Library `Interfaces.sysml`).
     Ref(Box<Node<RefDecl>>),
+    /// A nested `attribute` usage, e.g. `attribute :>> Disc::edges::innerSpaceDimension, ...;`
+    /// (Domain Libraries `ShapeItems.sysml`).
+    AttributeUsage(Box<Node<AttributeUsage>>),
     Action(Node<ActionDefBodyElement>),
     PartUsage(Node<PartUsageBodyElement>),
     State(Node<StateDefBodyElement>),

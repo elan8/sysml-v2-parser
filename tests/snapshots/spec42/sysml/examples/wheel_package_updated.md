@@ -103,7 +103,7 @@ package 'Wheel Package - Updated' {
   (document "wheel_package_updated.md"
     (diagnostics
       (diagnostic (code "recovered_connection_def_body_element") (severity error) (category parseerror) (span (offset 471) (line 28) (column 3) (len 21)) (message "unexpected token in connection definition body"))
-      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 471) (line 28) (column 3) (len 21)) (message "suppressed 5 cascading recovered diagnostics after earlier recovery errors"))
+      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 471) (line 28) (column 3) (len 21)) (message "suppressed 3 cascading recovered diagnostics after earlier recovery errors"))
     )
   )
 )
@@ -170,8 +170,8 @@ package 'Wheel Package - Updated' {
             connection  : PressureSeat connect t.bead to w.rim;
         }
         part lugBoltJoints : LugBoltJoint[5] {
-            ref mountingHole: LugBoltMountingHole[1] subsets wheel.w.mountingHoles;
-            ref threadedHole: LugBoltThreadableHole[1] subsets hub.h;
+            ref mountingHole : LugBoltMountingHole[1] :> wheel.w.mountingHoles;
+            ref threadedHole : LugBoltThreadableHole[1] :> hub.h;
         }
         part hub : Hub[1] {
             part h : LugBoltThreadableHole[5];

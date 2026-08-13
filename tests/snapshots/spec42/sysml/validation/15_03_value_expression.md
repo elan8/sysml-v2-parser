@@ -56,7 +56,7 @@ package '15_03-Value Expression' {
         part rightFrontWheel : Wheel;
     }
     part def Wheel {
-        attribute hubDiameter : LengthValue = 18 [in];
+        attribute hubDiameter : LengthValue = 18 ['in'];
         attribute width : LengthValue = 245 [mm];
         attribute outerDiameter : LengthValue[mm] = (hubDiameter + 2 * tire.height) {
             doc

@@ -78,7 +78,6 @@ package 'Vehicle Decomposition - Updated' {
 (fixture-diagnostics
   (document "vehicle_decomposition_updated.md"
     (diagnostics
-      (diagnostic (code "recovered_part_usage_body_element") (severity error) (category parseerror) (span (offset 907) (line 53) (column 3) (len 30)) (message "unexpected token in part usage body"))
     )
   )
 )

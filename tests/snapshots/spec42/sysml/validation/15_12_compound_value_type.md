@@ -49,7 +49,7 @@ package '15_12-Compound Value Type' {
 ~~~sysml
 package '15_12-Compound Value Type' {
     private import ScalarValues::*;
-    private import USCustomaryUnits::in;
+    private import USCustomaryUnits::'in';
     attribute def PositionVector {
         attribute x : Real[1];
         attribute y : Real[1];
@@ -64,7 +64,7 @@ package '15_12-Compound Value Type' {
     }
     attribute def frenchTireInfo : TireInfo {
         attribute  :>> manufacturer = "Michelin";
-        attribute  :>> hubDiameter = 18.0 [in];
+        attribute  :>> hubDiameter = 18.0 ['in'];
         attribute  :>> width = 245;
     }
 }

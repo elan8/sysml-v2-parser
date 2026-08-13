@@ -69,7 +69,7 @@ standard library package Calculations {
 		 * Calculation is the most general class of evaluations of CalculationDefinitions in a
 		 * system or part of a system. Calculation is the base class of all CalculationDefinitions.
 		 */
-        ref;
+        'ref';
         calc self : Calculation :>> Action::self, Evaluation::self;
         calc subcalculations : Calculation {
             doc

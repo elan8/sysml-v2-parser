@@ -38,7 +38,7 @@ mod import;
 mod individual;
 mod interface;
 mod item;
-mod lex;
+pub(crate) mod lex;
 mod metadata;
 mod metadata_annotation;
 mod occurrence;

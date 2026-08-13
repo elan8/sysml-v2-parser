@@ -155,6 +155,12 @@ fn needs_quotes(name: &str) -> bool {
     if name.is_empty() {
         return true;
     }
+    // A declared name that spells a reserved keyword (`'in'`, `'private'`, Kernel Semantic
+    // Library `KerML.kerml`) was necessarily authored quoted; emitting it bare would reparse as
+    // the keyword.
+    if crate::parser::lex::is_reserved_keyword(name.as_bytes()) {
+        return true;
+    }
     let mut chars = name.chars();
     let Some(first) = chars.next() else {
         return true;

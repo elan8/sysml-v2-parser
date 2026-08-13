@@ -58,7 +58,7 @@ package Demo {
     import Base::Filtered [Members::One];
     dependency from Client::A to $::Supplier::B;
     requirement def Req {
-        subject item : $::Domain::Subject = Vehicle.mass;
+        subject 'item' : $::Domain::Subject = Vehicle.mass;
         verify Requirements::Mass :>> Base::Mass;
     }
     view overview : Views::General {

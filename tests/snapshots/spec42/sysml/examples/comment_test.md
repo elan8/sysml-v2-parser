@@ -73,12 +73,12 @@ package CommentTest {
     /* Named Comment */
     comment cmt_cmt
     /* Comment about Comment */
-    comment about
+    comment 'about'
     /* Documention Comment about Part Def */
     part def C {
         doc
         /* Documentation in Part Def */
-        comment comment
+        comment 'comment'
         /* Comment about Package */
     }
     part def A;

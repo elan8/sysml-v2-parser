@@ -210,6 +210,8 @@ fn emit_calc_body_element(
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
         CalcDefBodyElement::TypedParameter(p) => emit_typed_parameter(w, path, &p.value),
+        CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature_member(w, path, &f.value),
+        CalcDefBodyElement::Invariant(i) => emit_kerml_invariant_member(w, path, &i.value),
         CalcDefBodyElement::CalcUsage(c) => emit_calc_usage(w, path, &c.value),
         CalcDefBodyElement::CalcDef(c) => emit_calc_def(w, path, &c.value),
         CalcDefBodyElement::PartUsage(p) => super::structure::emit_part_usage(w, path, &p.value),
@@ -222,12 +224,98 @@ fn emit_calc_body_element(
     }
 }
 
+pub(crate) fn emit_kerml_feature_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    feature: &crate::ast::KermlFeatureMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, feature.membership.visibility);
+    if feature.is_member {
+        w.push_str("member ");
+    }
+    if feature.is_derived {
+        w.push_str("derived ");
+    }
+    if feature.is_abstract {
+        w.push_str("abstract ");
+    }
+    if feature.is_composite {
+        w.push_str("composite ");
+    }
+    if feature.is_portion {
+        w.push_str("portion ");
+    }
+    if feature.is_var {
+        w.push_str("var ");
+    }
+    if feature.is_end {
+        w.push_str("end ");
+    }
+    w.push_str(feature.kind.as_str());
+    if feature.is_all {
+        w.push_str(" all");
+    }
+    if !feature.name.is_empty() {
+        w.push_char(' ');
+        w.push_str(&format_name(&feature.name));
+    }
+    if let Some(typing) = &feature.typing {
+        emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(multiplicity) = &feature.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if feature.ordered {
+        w.push_str(" ordered");
+    }
+    if feature.nonunique {
+        w.push_str(" nonunique");
+    }
+    if let Some(redefines) = &feature.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(subsets) = &feature.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
+    if let Some(references) = &feature.references {
+        emit_subsetting_clause(w, &references.value)?;
+    }
+    if let Some(inverse_of) = feature.inverse_of {
+        w.push_str(" inverse of ");
+        w.push_qualified_reference(&format!("{path}/inverse-of"), inverse_of)?;
+    }
+    if let Some(value) = &feature.value {
+        emit_feature_value(w, value)?;
+    }
+    emit_calc_body(w, path, &feature.body)
+}
+
+pub(crate) fn emit_kerml_invariant_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    invariant: &crate::ast::KermlInvariantMember,
+) -> Result<(), EmitError> {
+    emit_visibility(w, invariant.membership.visibility);
+    w.push_str("inv");
+    if invariant.is_negated {
+        w.push_str(" not");
+    }
+    if !invariant.name.is_empty() {
+        w.push_char(' ');
+        w.push_str(&format_name(&invariant.name));
+    }
+    emit_calc_body(w, path, &invariant.body)
+}
+
 pub(crate) fn emit_typed_parameter(
     w: &mut EmitWriter<'_>,
     path: &str,
     param: &crate::ast::TypedParameterMember,
 ) -> Result<(), EmitError> {
     super::structure::emit_direction(w, param.direction);
+    if param.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str(param.kind.as_str());
     if !param.name.is_empty() {
         w.push_char(' ');
@@ -283,7 +371,10 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
     if let Some(value) = &ret.value {
         emit_feature_value(w, value)?;
     }
-    w.push_char(';');
+    match &ret.body {
+        CalcDefBody::Semicolon => w.push_char(';'),
+        body @ CalcDefBody::Brace { .. } => emit_calc_body(w, "calc-return", body)?,
+    }
     Ok(())
 }
 
