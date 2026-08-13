@@ -286,7 +286,8 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::DefaultReferenceUsage(_)
         | PackageBodyElement::AssertConstraint(_)
         | PackageBodyElement::PerformUsage(_)
-        | PackageBodyElement::BindingConnectorUsage(_) => RootElement::Member(boxed),
+        | PackageBodyElement::BindingConnectorUsage(_)
+        | PackageBodyElement::ClassDef(_) => RootElement::Member(boxed),
     };
     Ok((input, node_from_to(start, input, elem)))
 }
@@ -544,7 +545,9 @@ fn unsupported_package_element(
         | PackageProduction::FeaturePrefix
         | PackageProduction::UsagePrefix
         | PackageProduction::Connector
-        | PackageProduction::TextualRepresentationLanguage => return None,
+        | PackageProduction::TextualRepresentationLanguage
+        | PackageProduction::Feature
+        | PackageProduction::Class => return None,
     };
     let found = crate::parser::recovery::recovery_found_snippet_from_span(input, recovery_end);
     let recovery = crate::ast::ParseErrorNode {
@@ -662,6 +665,36 @@ fn feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureDecl>> {
     ))
 }
 
+/// KerML `class` classifier definition: `class` Identification (`:>`|`specializes`) type? body.
+/// Mirrors `individual_def` exactly (same `def`-optional, `no_abstract`, captured-visibility
+/// shape) -- see `crate::ast::ClassDef`'s doc comment.
+fn class_def(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ClassDef>> {
+    let start = input;
+    let (input, prefix) = crate::parser::definition_prefix::parse_definition_prefix(
+        input,
+        crate::parser::definition_prefix::DefinitionPrefixOptions::new(b"class")
+            .no_abstract()
+            .with_captured_visibility(),
+    )?;
+    let (input, body) = crate::parser::attribute::attribute_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::ClassDef {
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                body,
+                membership: crate::ast::Membership::owning(
+                    prefix.visibility,
+                    prefix.visibility_span,
+                ),
+            },
+        ),
+    ))
+}
+
 fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[
@@ -675,6 +708,62 @@ fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>>
     Ok((
         input,
         node_from_to(start, input, ClassifierDecl { keyword, text }),
+    ))
+}
+
+/// KerML bare `feature` usage declaration: `feature` name (`:` type | `:>` target | `:>>`
+/// target)? (`=` value)? `;`. Reuses the same `DefaultReferenceUsage` shape the keyword-less
+/// `name;` / `name = expr;` form already produces (see `feature_value_binding`/
+/// `bare_or_valued_feature_binding` in `attribute.rs`), just with the explicit leading `feature`
+/// keyword consumed first and `:` typing additionally supported (those two helpers only handle
+/// `:>`/`:>>`, never a plain `:` type since the keyword-less form can't tell a type from an
+/// expression there).
+fn feature_usage_member(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    crate::parser::span::reference_transaction(input, feature_usage_member_inner)
+}
+
+fn feature_usage_member_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"feature"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, (name_span, name_str)) = crate::parser::span::with_span(name).parse(input)?;
+    let (input, typing_result) = crate::parser::usage::optional_typings(input)?;
+    let (typing_span, typing) = typing_result
+        .map(|(span, is_conj, targets)| {
+            (
+                Some(span.clone()),
+                Some(crate::parser::usage::typing_node(span, is_conj, targets)),
+            )
+        })
+        .unwrap_or((None, None));
+    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
+    let leading_value = spec.subsets.as_ref().and_then(|(_, v)| v.clone());
+    let (input, value) =
+        opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
+    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::DefaultReferenceUsage {
+                name: name_str,
+                typing,
+                subsets: spec.subsets.map(|(target, _value)| target),
+                redefines: spec.redefines,
+                value,
+                name_span: Some(name_span),
+                typing_span,
+                membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
+                has_feature_keyword: true,
+            },
+        ),
     ))
 }
 
@@ -1303,6 +1392,27 @@ fn try_package_body_behavior<'a>(
         Individual,
         individual_def,
         PackageBodyElement::IndividualDef
+    );
+    // KerML `class` classifier definition (e.g. `class B :> A { }`), previously only reachable
+    // through the opaque `classifier_decl` fallback -- see `class_def`'s doc comment.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Class,
+        class_def,
+        PackageBodyElement::ClassDef
+    );
+    // KerML bare `feature` usage declaration (e.g. `feature x;`, `feature x : Type;`, `feature x
+    // :> Target;`), previously only reachable through the opaque `kerml_feature_decl` fallback --
+    // see `feature_usage_member`'s doc comment.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Feature,
+        feature_usage_member,
+        PackageBodyElement::DefaultReferenceUsage
     );
     try_package_body_dispatch!(
         input,

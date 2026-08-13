@@ -1589,6 +1589,7 @@ fn collect_package_body_element_errors(
         }
         PackageBodyElement::PerformUsage(n) => collect_perform_body_errors(&n.value.body, errors),
         PackageBodyElement::BindingConnectorUsage(_) => {}
+        PackageBodyElement::ClassDef(n) => collect_attribute_body_errors(&n.value.body, errors),
     }
 }
 

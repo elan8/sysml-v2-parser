@@ -218,4 +218,7 @@ pub enum PackageBodyElement {
     /// Package-level `BindingConnectorAsUsage`, e.g. `binding instant[instantNum] of startShot =
     /// endShot;`. See `crate::ast::BindingConnectorUsage`'s doc comment for the full grammar.
     BindingConnectorUsage(Node<crate::ast::BindingConnectorUsage>),
+    /// KerML `class` classifier definition, e.g. `class B :> A { }`. See
+    /// `crate::ast::ClassDef`'s doc comment.
+    ClassDef(Node<crate::ast::ClassDef>),
 }

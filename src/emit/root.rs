@@ -205,6 +205,7 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::BindingConnectorUsage(b) => {
             structure::emit_binding_connector_usage(w, path, &b.value)
         }
+        PackageBodyElement::ClassDef(c) => structure::emit_class_def(w, path, &c.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)

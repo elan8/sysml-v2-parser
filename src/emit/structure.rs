@@ -1388,12 +1388,29 @@ pub(crate) fn emit_individual_def(
     emit_attribute_body(w, path, &def.body)
 }
 
+pub(crate) fn emit_class_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::ClassDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    w.push_str("class def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    emit_attribute_body(w, path, &def.body)
+}
+
 pub(crate) fn emit_default_reference_usage(
     w: &mut EmitWriter<'_>,
     _path: &str,
     usage: &crate::ast::DefaultReferenceUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
+    if usage.has_feature_keyword {
+        w.push_str("feature ");
+    }
     w.push_str(&format_name(&usage.name));
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;

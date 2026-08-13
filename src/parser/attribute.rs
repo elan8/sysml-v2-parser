@@ -437,6 +437,7 @@ pub(crate) fn feature_value_binding(
                 name_span: Some(name_span),
                 typing_span: None,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
+                has_feature_keyword: false,
             },
         ),
     ))
@@ -487,6 +488,7 @@ pub(crate) fn bare_or_valued_feature_binding(
                 name_span: Some(name_span),
                 typing_span: None,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
+                has_feature_keyword: false,
             },
         ),
     ))
@@ -1183,6 +1185,7 @@ pub(crate) fn attribute_usage_shorthand(
                 typing_span: Some(typing_span),
                 // No visibility prefix on the no-keyword shorthand form.
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
+                has_feature_keyword: false,
             },
         ),
     ))

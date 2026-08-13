@@ -85,6 +85,12 @@ pub(crate) enum PackageProduction {
     ExhibitStateUsage,
     IncludeUseCaseUsage,
     TextualRepresentationLanguage,
+    /// KerML bare `feature` usage declaration (e.g. `feature x;`, `feature x : Type;`, `feature x
+    /// :> Target;`), previously only reachable through the opaque `kerml_feature_decl` fallback.
+    Feature,
+    /// KerML `class` classifier definition (e.g. `class B :> A { }`), previously only reachable
+    /// through the opaque `classifier_decl` fallback.
+    Class,
 }
 
 impl PackageProduction {
@@ -160,6 +166,8 @@ impl PackageProduction {
             Self::ExhibitStateUsage => "ExhibitStateUsage",
             Self::IncludeUseCaseUsage => "IncludeUseCaseUsage",
             Self::TextualRepresentationLanguage => "TextualRepresentation",
+            Self::Feature => "Feature",
+            Self::Class => "Class",
         }
     }
 }
@@ -262,6 +270,12 @@ grammar_scope!(
         (b"render", ViewRenderingUsage, Extension),
         (b"require", Requirement, Extension),
         (b"satisfy", SatisfyRequirementUsage, Extension),
+        // KerML (not SysML) `PackageBodyElement` keywords, reached via this parser's
+        // KerML-fallback productions rather than the SysML BNF's own `PackageBodyElement`
+        // production -- excluded from the spec-FIRST equality lint above like the other
+        // extensions in this block.
+        (b"feature", Feature, Extension),
+        (b"class", Class, Extension),
     ]
 );
 

@@ -311,6 +311,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::BindingConnectorUsage(n) => {
             PackageBodyElement::BindingConnectorUsage(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::ClassDef(n) => {
+            PackageBodyElement::ClassDef(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::InterfaceUsage(n) => {
             PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
         }
@@ -614,6 +617,7 @@ fn normalize_default_reference_usage(u: &DefaultReferenceUsage) -> DefaultRefere
         name_span: None,
         typing_span: None,
         membership: u.membership.clone(),
+        has_feature_keyword: u.has_feature_keyword,
     }
 }
 

@@ -2300,6 +2300,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::BindingConnectorUsage(_binding) => {
                 self.write_marker(first, "binding-connector-usage")
             }
+            PackageBodyElement::ClassDef(_definition) => self.write_marker(first, "class-def"),
         }
     }
 

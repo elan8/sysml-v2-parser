@@ -374,6 +374,19 @@ pub struct IndividualDef {
     pub membership: Membership,
 }
 
+/// KerML `class` classifier definition: `class` Identification (`:>` | `specializes`) type? body,
+/// e.g. `class B :> A { }`. Mirrors `IndividualDef` (same `def`-optional, `:>`-specialized,
+/// `AttributeBody`-bodied shape) -- previously only reachable through the opaque
+/// `classifier_decl` KerML fallback alongside `classifier`/`struct`/`structure`/`subclassifier`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ClassDef {
+    pub identification: Identification,
+    pub specializes: Option<Node<TypingRelationship>>,
+    pub body: AttributeBody,
+    pub membership: Membership,
+}
+
 /// Part usage: `part` name `:` type multiplicity? `ordered`? (`redefines`|`:>>`)? value? body.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -855,6 +868,11 @@ pub struct DefaultReferenceUsage {
     pub name_span: Option<Span>,
     pub typing_span: Option<Span>,
     pub membership: Membership,
+    /// `true` for the KerML bare `feature x;` / `feature x : Type;` form (explicit `feature`
+    /// keyword, `feature_usage_member` in `package.rs`), `false` for the keyword-less
+    /// `name;`/`name = expr;` form this struct is otherwise documented for. Tracked so
+    /// `emit_default_reference_usage` can round-trip the keyword rather than always omitting it.
+    pub has_feature_keyword: bool,
 }
 
 impl PartialEq for DefaultReferenceUsage {
@@ -865,6 +883,7 @@ impl PartialEq for DefaultReferenceUsage {
             && self.redefines == other.redefines
             && self.value == other.value
             && self.membership == other.membership
+            && self.has_feature_keyword == other.has_feature_keyword
     }
 }
 
