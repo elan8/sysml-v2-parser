@@ -106,6 +106,11 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1, gap #7), e.g.
+    // `individual port po1;` (`Simple Tests/IndividualTest.sysml`-style short usage form).
+    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
     let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
@@ -193,6 +198,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 is_abstract,
                 is_derived,
                 is_constant,
+                is_individual,
                 name: name_str,
                 short_name,
                 typing,

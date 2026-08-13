@@ -27,7 +27,7 @@ use crate::parser::grammar_scope::{
 use crate::parser::import::import_;
 use crate::parser::individual::individual_def;
 use crate::parser::interface::interface_def;
-use crate::parser::item::{item_def, item_usage};
+use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
     name, qualified_declaration_name, recover_body_element, skip_statement_or_block,
     starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
@@ -1567,16 +1567,20 @@ fn try_package_body_behavior<'a>(
         crate::parser::usecase::include_use_case,
         PackageBodyElement::IncludeUseCase
     );
+    // GH-90.2 / gap #7: package-level `item_def` requires the `def` keyword (mirroring
+    // `action_def`/`state_def`) so a bodyless `individual item i1;` short usage form isn't
+    // misclassified as an `ItemDef` with `i1` as the definition's identification name. Without
+    // `.def_required()`, `item_def`'s `individual_allowed()` option let it match `individual item
+    // i1;` before `item_usage` (below) was ever tried.
     try_package_body_dispatch!(
         input,
         start,
         starter,
         Item,
-        item_def,
+        item_def_required,
         PackageBodyElement::ItemDef
     );
-    // PAR-002: standalone item usage at package level, tried after `item_def` above (`def`-
-    // optional per its own dispatch here) for the same reason as `port_usage`/`AttributeUsage`.
+    // PAR-002: standalone item usage at package level, tried after `item_def` above.
     try_package_body_dispatch!(
         input,
         start,

@@ -148,6 +148,7 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
         input,
         DefinitionPrefixOptions::new(b"connection")
             .with_derivation_role()
+            .individual_allowed()
             .with_captured_visibility()
             .reject_header_keyword(b"connect")
             // GH-20: a `def`-less, non-`abstract` `connection name : Type { ... }` with no
@@ -171,6 +172,7 @@ pub(crate) fn connection_def_required(input: Input<'_>) -> IResult<Input<'_>, No
         input,
         DefinitionPrefixOptions::new(b"connection")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility()
             .reject_header_keyword(b"connect"),
     )
@@ -189,6 +191,7 @@ fn parse_connection_def(
             start,
             input,
             ConnectionDef {
+                is_individual: prefix.is_individual,
                 derivation_role: prefix.derivation_role,
                 identification: prefix.identification,
                 specializes: prefix.specializes,

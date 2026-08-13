@@ -994,6 +994,9 @@ pub struct PortUsage {
     pub is_derived: bool,
     /// `constant` keyword from `RefPrefix`. See `AttributeUsage::is_constant`.
     pub is_constant: bool,
+    /// `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual port po1;`
+    /// (gap #7). Mirrors `ItemUsage::is_individual`/`ActionUsage::is_individual`.
+    pub is_individual: bool,
     pub name: String,
     /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
     pub short_name: Option<String>,
@@ -1032,6 +1035,7 @@ impl PartialEq for PortUsage {
             && self.is_abstract == other.is_abstract
             && self.is_derived == other.is_derived
             && self.is_constant == other.is_constant
+            && self.is_individual == other.is_individual
             && self.name == other.name
             && self.short_name == other.short_name
             && self.typing == other.typing
@@ -1342,6 +1346,9 @@ pub enum DerivationConnectionRole {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionDef {
+    /// `individual connection def ...` (BNF `OccurrenceUsagePrefix`/definition-prefix
+    /// `isIndividual`, GH-90.1), mirroring `ActionDef::is_individual`.
+    pub is_individual: bool,
     /// Fixed derivation role and exact marker span. Ordinary connections have no role.
     pub derivation_role: Option<Node<DerivationConnectionRole>>,
     pub identification: Identification,
@@ -1489,6 +1496,12 @@ pub struct OccurrenceUsage {
     pub is_abstract: bool,
     /// Leading `constant` keyword (BNF `RefPrefix`). See `is_abstract`.
     pub is_constant: bool,
+    /// True when the literal `occurrence` kind keyword was authored (BNF
+    /// `OccurrenceUsagePrefix`/`OccurrenceUsageKeyword`), distinct from `is_individual` --
+    /// `individual occurrence o1;` and bare `individual o1;` both set `is_individual`, but only
+    /// the former also sets this (gap #7). Needed so emission doesn't fabricate or drop the
+    /// keyword relative to what was authored.
+    pub has_occurrence_keyword: bool,
     pub portion_kind: Option<OccurrencePortionKind>,
     /// Declaration label for ordinary occurrence usages.
     pub name: String,

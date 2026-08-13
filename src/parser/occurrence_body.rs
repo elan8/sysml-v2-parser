@@ -141,6 +141,9 @@ struct OccurrencePrefix {
     is_reference: bool,
     is_abstract: bool,
     is_constant: bool,
+    /// True when the literal `occurrence` kind keyword was authored -- see
+    /// `OccurrenceUsage::has_occurrence_keyword`.
+    has_occurrence_keyword: bool,
     portion_kind: Option<crate::ast::OccurrencePortionKind>,
     membership: Membership,
 }
@@ -155,6 +158,7 @@ impl Default for OccurrencePrefix {
             is_reference: false,
             is_abstract: false,
             is_constant: false,
+            has_occurrence_keyword: false,
             portion_kind: None,
             membership: Membership::feature(None, crate::ast::Span::dummy()),
         }
@@ -209,11 +213,20 @@ pub(crate) fn individual_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Occu
     let (input, is_reference) = occurrence_ref_prefix(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"individual"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
+    // BNF `OccurrenceUsagePrefix` allows an explicit `occurrence` kind keyword between
+    // `individual` and the declaration name (gap #7, e.g. `individual occurrence o1;`, `Simple
+    // Tests/IndividualTest.sysml`-style short usage form). Without this, the literal `occurrence`
+    // token was misread as the usage's name and the real name (`o1`) was left dangling. Other
+    // kind keywords (`item`/`port`/etc) are handled by their own dedicated `individual`-aware
+    // parsers (`item_usage`/`port_usage`), tried separately in package-body dispatch, so only the
+    // generic `occurrence` keyword is consumed here.
+    let (input, occurrence_kw) = opt(preceded(tag(&b"occurrence"[..]), ws1)).parse(input)?;
     occurrence_usage_tail(
         input,
         OccurrencePrefix {
             is_individual: true,
             is_reference,
+            has_occurrence_keyword: occurrence_kw.is_some(),
             membership: Membership::feature(visibility, visibility_span),
             ..Default::default()
         },
@@ -308,6 +321,7 @@ fn occurrence_usage_with_modifiers(
             is_then: prefix.is_then || then_kw.is_some(),
             is_event: event_kw.is_some(),
             is_event_reference: event_kw.is_some() && occurrence_kw.is_none(),
+            has_occurrence_keyword: occurrence_kw.is_some(),
             ..prefix
         },
     )
@@ -384,6 +398,7 @@ fn occurrence_usage_tail(
                 is_reference: prefix.is_reference,
                 is_abstract: prefix.is_abstract,
                 is_constant: prefix.is_constant,
+                has_occurrence_keyword: prefix.has_occurrence_keyword,
                 portion_kind: prefix.portion_kind,
                 name,
                 occurrence_reference,

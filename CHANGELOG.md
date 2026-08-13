@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 101.** `individual item`/`individual occurrence`/`individual port`
+  short usage forms parse correctly instead of being misclassified or falling into a recovery
+  cascade: package-level `item def` now requires the `def` keyword so it no longer shadows
+  `individual item x;`; `individual` occurrence usages accept an optional `occurrence` kind
+  keyword (`OccurrenceUsage::has_occurrence_keyword` preserves whether it was authored); `port`
+  usages accept an `individual` prefix (`PortUsage::is_individual`); and `state def`/`connection
+  def` accept `individual` (`StateDef::is_individual`/`ConnectionDef::is_individual`).
 - **`PARSE_AST_VERSION` is now 100.** `InterfaceUsage` (all three variants) retains its `:>`/`:>>`
   subsetting and redefinition clauses (`subsets`/`redefines`) instead of discarding them after
   parsing, matching sibling usage kinds such as `ConnectionUsageMember`.

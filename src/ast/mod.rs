@@ -1042,6 +1042,7 @@ fn normalize_port_usage(p: &PortUsage) -> PortUsage {
         is_abstract: p.is_abstract,
         is_derived: p.is_derived,
         is_constant: p.is_constant,
+        is_individual: p.is_individual,
         name: p.name.clone(),
         short_name: p.short_name.clone(),
         typing: p.typing.clone(),
@@ -1152,6 +1153,7 @@ fn normalize_interface_def(i: &InterfaceDef) -> InterfaceDef {
 
 fn normalize_connection_def(c: &ConnectionDef) -> ConnectionDef {
     ConnectionDef {
+        is_individual: c.is_individual,
         derivation_role: c
             .derivation_role
             .as_ref()
@@ -1605,6 +1607,7 @@ fn normalize_state_usage(s: &StateUsage) -> StateUsage {
 
 fn normalize_state_def(state: &StateDef) -> StateDef {
     StateDef {
+        is_individual: state.is_individual,
         identification: state.identification.clone(),
         specializes: state.specializes.clone(),
         body: normalize_state_def_body(&state.body),

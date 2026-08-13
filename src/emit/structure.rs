@@ -577,6 +577,9 @@ pub(crate) fn emit_port_usage(
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
     }
+    if usage.is_individual {
+        w.push_str("individual ");
+    }
     if usage.is_abstract {
         w.push_str("abstract ");
     }
@@ -1684,6 +1687,9 @@ pub(crate) fn emit_connection_def(
         }
     }
     emit_visibility(w, def.membership.visibility);
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("connection def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
