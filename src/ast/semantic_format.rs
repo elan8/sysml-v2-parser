@@ -2293,6 +2293,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::AssertConstraint(_constraint) => {
                 self.write_marker(first, "assert-constraint")
             }
+            PackageBodyElement::PerformUsage(perform) => {
+                self.write_item_prefix(first)?;
+                self.write_perform(&perform.value)
+            }
         }
     }
 

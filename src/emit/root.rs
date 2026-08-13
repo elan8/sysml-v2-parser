@@ -201,6 +201,7 @@ pub(crate) fn emit_package_body_element(
             structure::emit_default_reference_usage(w, path, &d.value)
         }
         PackageBodyElement::AssertConstraint(a) => view::emit_assert_constraint(w, path, &a.value),
+        PackageBodyElement::PerformUsage(p) => behavior::emit_perform(w, path, &p.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)

@@ -19,7 +19,7 @@ use super::structure::{
     AliasDef, AssertConstraintMember, AttributeDef, AttributeUsage, Connect, ConnectionDef,
     ConnectionUsageMember, DefaultReferenceUsage, EnumDef, IndividualDef, InterfaceDef,
     InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage, MetadataUsage, OccurrenceDef,
-    OccurrenceUsage, PartDef, PartUsage, PortDef, PortUsage, RefDecl,
+    OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
     CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
@@ -212,4 +212,7 @@ pub enum PackageBodyElement {
     /// ConstraintTest.sysml:89). Previously dispatched in six other body contexts (action, part
     /// def/usage, connection def, occurrence, attribute) but not at package scope.
     AssertConstraint(Node<AssertConstraintMember>),
+    /// Standalone `perform <action-path>;` performance usage at package level (e.g. `perform
+    /// process;`). See `AttributeUsage` for the general PAR-002 rationale.
+    PerformUsage(Node<Perform>),
 }

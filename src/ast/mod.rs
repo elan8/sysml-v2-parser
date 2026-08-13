@@ -305,6 +305,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::AssertConstraint(n) => {
             PackageBodyElement::AssertConstraint(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::PerformUsage(n) => {
+            PackageBodyElement::PerformUsage(dummy_node(n, normalize_perform(&n.value)))
+        }
         PackageBodyElement::InterfaceUsage(n) => {
             PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
         }

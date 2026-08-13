@@ -1587,6 +1587,7 @@ fn collect_package_body_element_errors(
         PackageBodyElement::AssertConstraint(n) => {
             collect_constraint_body_errors(&n.value.body, errors)
         }
+        PackageBodyElement::PerformUsage(n) => collect_perform_body_errors(&n.value.body, errors),
     }
 }
 

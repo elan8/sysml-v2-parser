@@ -283,7 +283,8 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::MetadataKeywordUsage(_)
         | PackageBodyElement::Connect(_)
         | PackageBodyElement::DefaultReferenceUsage(_)
-        | PackageBodyElement::AssertConstraint(_) => RootElement::Member(boxed),
+        | PackageBodyElement::AssertConstraint(_)
+        | PackageBodyElement::PerformUsage(_) => RootElement::Member(boxed),
     };
     Ok((input, node_from_to(start, input, elem)))
 }
@@ -1235,6 +1236,18 @@ fn try_package_body_behavior<'a>(
         Calculation,
         calc_def,
         PackageBodyElement::CalcDef
+    );
+    // Standalone `perform <action-path>;` performance usage at package level (e.g. `perform
+    // process;`, OMG spec Annex `4a-Fundamental Activities.sysml`-style shorthand form).
+    // `perform_usage` (shared with part-def/part-usage bodies) already covers the full
+    // `perform` action_path (`:>>` target)? (`=` value)? (`;`|`{ }`) grammar.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        PerformActionUsage,
+        crate::parser::part::perform_usage,
+        PackageBodyElement::PerformUsage
     );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
