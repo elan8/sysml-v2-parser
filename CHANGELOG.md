@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 104.** Bare, `;`-terminated `classifier` forward declarations
+  (e.g. `classifier SpatialFrame;`) parse as a structured `KermlBareDeclaration` node with a real
+  `name` field instead of falling through to the opaque `ClassifierDecl` raw-text fallback.
 - **`PARSE_AST_VERSION` is now 103.** `ConcernUsage` (including `concern def`) retains its `:>`
   subsetting and `:>>` redefinition clauses (`ConcernUsage::subsets`/`ConcernUsage::redefines`)
   instead of discarding them after parsing, matching sibling usage kinds.

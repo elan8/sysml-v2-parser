@@ -611,11 +611,13 @@ fn parse_modeled_decl<'a>(
 
 /// Structurally recognized bare KerML declaration: `kind` `name`? (`[` multiplicity `]`)? `;`.
 /// Covers `datatype DeferredType;`, `multiplicity exactlyOne [1..1];`,
-/// `interaction DeferredInteraction;`, `predicate deferredPredicate;`, and the same shape for
-/// every other KerML classifier/feature keyword whose bare (bodyless) form uses it. Tried before
-/// the opaque [`kerml_semantic_decl`]/[`kerml_feature_decl`] fallbacks so this common shape gets
-/// a structured node; a keyword followed by a `{` body (a different, larger production) falls
-/// through to those fallbacks unchanged.
+/// `interaction DeferredInteraction;`, `predicate deferredPredicate;`, `classifier
+/// SpatialFrame;`, and the same shape for every other KerML classifier/feature keyword whose
+/// bare (bodyless) form uses it (`class` is handled by [`class_def`] itself, whose body accepts
+/// a bare `;` -- see `attribute_body`). Tried before the opaque
+/// [`kerml_semantic_decl`]/[`classifier_decl`] fallbacks so this common shape gets a structured
+/// node; a keyword followed by a `{` body or a `:>`/`specializes` clause (a different, larger
+/// production, e.g. [`class_def`]) falls through to those other productions unchanged.
 fn kerml_bare_declaration(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlBareDeclaration>> {
@@ -637,6 +639,7 @@ fn kerml_bare_declaration(
         b"expr",
         b"predicate",
         b"succession",
+        b"classifier",
     ];
     let (input, _) = ws_and_comments(input)?;
     let keyword = starters
@@ -1829,17 +1832,20 @@ fn try_package_body_view<'a>(
         PackageBodyElement::RenderingUsage
     );
     try_package_body_dispatch!(input, start, feature_decl, PackageBodyElement::FeatureDecl);
-    try_package_body_dispatch!(
-        input,
-        start,
-        classifier_decl,
-        PackageBodyElement::ClassifierDecl
-    );
+    // Bare `classifier`/`class` forward declarations (e.g. `classifier SpatialFrame;`, `class
+    // B;`) are tried before the opaque `classifier_decl` fallback so this common shape gets a
+    // structured node -- see `kerml_bare_declaration`'s doc comment.
     try_package_body_dispatch!(
         input,
         start,
         kerml_bare_declaration,
         PackageBodyElement::KermlBareDeclaration
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        classifier_decl,
+        PackageBodyElement::ClassifierDecl
     );
     try_package_body_dispatch!(
         input,
