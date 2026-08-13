@@ -131,10 +131,10 @@ fn emit_kerml_bare_declaration(
     w: &mut EmitWriter<'_>,
     declaration: &crate::ast::KermlBareDeclaration,
 ) -> Result<(), EmitError> {
-    w.push_str(&declaration.keyword);
-    if let Some(name) = &declaration.name {
+    w.push_str(declaration.keyword.as_str());
+    if let Some(name_span) = &declaration.name_span {
         w.push_char(' ');
-        w.push_str(name);
+        w.push_span_name("kerml-bare-declaration/name", name_span)?;
     }
     if let Some(multiplicity) = &declaration.multiplicity {
         w.push_char(' ');

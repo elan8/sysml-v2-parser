@@ -62,6 +62,22 @@ impl<'a> EmitWriter<'a> {
         Ok(())
     }
 
+    /// Emit an authored name from its source span, applying the same quoting rules as an owned
+    /// name would (`format_name`). Used by nodes that keep only a span for the declared name
+    /// rather than copying its text, per the "authored spelling lives in source" contract.
+    pub(crate) fn push_span_name(&mut self, path: &str, span: &Span) -> Result<(), EmitError> {
+        let text = self
+            .document
+            .source
+            .slice(span)
+            .ok_or_else(|| EmitError::InvalidSpan {
+                path: path.to_owned(),
+                span: span.clone(),
+            })?;
+        self.push_str(&format_name(text));
+        Ok(())
+    }
+
     /// Emit one arena-backed reference without reconstructing or splitting a display string.
     pub(crate) fn push_qualified_reference(
         &mut self,

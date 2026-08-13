@@ -2297,9 +2297,14 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::KermlBareDeclaration(declaration) => {
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(kerml-bare-declaration (keyword ")?;
-                write_quoted(self.writer, &declaration.value.keyword)?;
+                write_quoted(self.writer, declaration.value.keyword.as_str())?;
                 self.writer.write_str(") (name ")?;
-                write_optional_quoted(self.writer, declaration.value.name.as_deref())?;
+                let name = declaration
+                    .value
+                    .name_span
+                    .as_ref()
+                    .and_then(|span| self.document.source.slice(span));
+                write_optional_quoted(self.writer, name)?;
                 self.writer.write_str(") (multiplicity ")?;
                 if let Some(multiplicity) = &declaration.value.multiplicity {
                     self.writer.write_str("(lower ")?;

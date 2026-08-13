@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 107.** `KermlBareDeclaration::keyword` is now an exhaustive
+  `KermlBareDeclarationKeyword` enum instead of an owned `String` (a finite grammar set, with
+  distinct variants for authored synonyms like `assoc`/`association`), and
+  `KermlBareDeclaration`/`BindingConnectorUsage` keep only a `name_span: Option<Span>` for the
+  declared name instead of also copying it into an owned `String` -- the name text is resolved
+  through the document source when needed, matching the "authored spelling lives in source, not
+  per-node strings" contract.
 - **`PARSE_AST_VERSION` is now 106.** New `PackageBodyElement::ExtendedDefinition` node models
   SysML §8.2.2.27 `ExtendedDefinition`: one or more `#<name>` metadata-keyword tags standing in
   place of the usual classifier keyword before `def` (`#situation def Failure;`,

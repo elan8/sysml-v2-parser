@@ -408,15 +408,15 @@ fn binding_connector_usage_inner(
         .map(|(i, o)| (i, o.is_some()))?;
     let (peek, _) = ws_and_comments(input)?;
     let frag = peek.fragment();
-    let (input, name) = if all
+    let (input, name_span) = if all
         || frag.starts_with(b"[")
         || starts_with_keyword(frag, b"of")
         || starts_with_keyword(frag, b"bind")
     {
         (input, None)
     } else {
-        let (input, parsed_name) = name(input)?;
-        (input, Some(parsed_name))
+        let (input, (span, _text)) = crate::parser::span::with_span(name).parse(input)?;
+        (input, Some(span))
     };
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
@@ -453,7 +453,7 @@ fn binding_connector_usage_inner(
             input,
             crate::ast::BindingConnectorUsage {
                 all,
-                name,
+                name_span,
                 multiplicity,
                 uses_of_keyword,
                 uses_bind_keyword,
@@ -623,40 +623,18 @@ fn kerml_bare_declaration(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlBareDeclaration>> {
     let start = input;
-    let starters: &[&[u8]] = &[
-        b"behavior",
-        b"bool",
-        b"function",
-        b"interaction",
-        b"datatype",
-        b"inv",
-        b"invariant",
-        b"multiplicity",
-        b"assoc",
-        b"association",
-        b"metaclass",
-        b"step",
-        b"occurrence",
-        b"expr",
-        b"predicate",
-        b"succession",
-        b"classifier",
-    ];
     let (input, _) = ws_and_comments(input)?;
-    let keyword = starters
+    let (keyword_bytes, keyword) = crate::ast::KermlBareDeclarationKeyword::starters()
         .iter()
-        .find(|kw| starts_with_keyword(input.fragment(), kw))
+        .find(|(kw, _)| starts_with_keyword(input.fragment(), kw))
         .ok_or_else(|| {
             nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
         })?;
-    let (input, _) = nom::bytes::complete::tag(*keyword).parse(input)?;
-    let keyword = String::from_utf8_lossy(keyword).to_string();
-    let (input, name_opt) =
+    let (input, _) = nom::bytes::complete::tag(*keyword_bytes).parse(input)?;
+    let keyword = *keyword;
+    let (input, name_span) =
         opt(preceded(ws1, crate::parser::span::with_span(name))).parse(input)?;
-    let (name, name_span) = match name_opt {
-        Some((span, text)) => (Some(text), Some(span)),
-        None => (None, None),
-    };
+    let name_span = name_span.map(|(span, _text)| span);
     let (input, multiplicity) = opt(preceded(
         ws_and_comments,
         crate::parser::usage::multiplicity_node,
@@ -671,7 +649,6 @@ fn kerml_bare_declaration(
             input,
             crate::ast::KermlBareDeclaration {
                 keyword,
-                name,
                 name_span,
                 multiplicity,
             },

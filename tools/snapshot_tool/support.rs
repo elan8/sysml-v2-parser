@@ -51,6 +51,7 @@ impl FormatSection {
             Err(EmitError::Opaque { .. }) => Ok(Self::UnavailableOpaqueAst),
             Err(error @ EmitError::Unsupported { .. }) => Err(error),
             Err(error @ EmitError::InvalidQualifiedReference { .. }) => Err(error),
+            Err(error @ EmitError::InvalidSpan { .. }) => Err(error),
         }
     }
 

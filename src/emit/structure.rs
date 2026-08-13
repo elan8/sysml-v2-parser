@@ -1232,12 +1232,12 @@ pub(crate) fn emit_binding_connector_usage(
     if usage.all {
         w.push_str(" all");
     }
-    if let Some(name) = &usage.name {
+    if let Some(name_span) = &usage.name_span {
         w.push_char(' ');
-        w.push_str(&format_name(name));
+        w.push_span_name("binding-connector-usage/name", name_span)?;
     }
     if let Some(mult) = &usage.multiplicity {
-        if usage.name.is_none() {
+        if usage.name_span.is_none() {
             w.push_char(' ');
         }
         emit_multiplicity(w, &mult.value)?;

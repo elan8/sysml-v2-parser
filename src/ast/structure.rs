@@ -1799,10 +1799,11 @@ pub struct Connect {
 pub struct BindingConnectorUsage {
     /// `true` for the `binding all ...` form.
     pub all: bool,
-    /// Name of the binding connector itself, e.g. `instant` in `binding instant[instantNum] of
-    /// startShot = endShot;`. `None` when no name is given (e.g. `binding all ...`, `binding
-    /// [0..1] ...`).
-    pub name: Option<String>,
+    /// Span of the binding connector's own name, e.g. `instant` in `binding
+    /// instant[instantNum] of startShot = endShot;`. `None` when no name is given (e.g. `binding
+    /// all ...`, `binding [0..1] ...`). The name text lives in the document source and is
+    /// resolved through it rather than copied into this node.
+    pub name_span: Option<Span>,
     /// Multiplicity on the binding connector itself, e.g. `[instantNum]` / `[0..1]`.
     pub multiplicity: Option<Node<Multiplicity>>,
     /// `true` when the `of` keyword introduced `left` (e.g. `of startShot`); `false` when `left`
