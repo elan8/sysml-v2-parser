@@ -2301,7 +2301,33 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 self.write_marker(first, "binding-connector-usage")
             }
             PackageBodyElement::ClassDef(_definition) => self.write_marker(first, "class-def"),
+            PackageBodyElement::Succession(statement) => {
+                self.write_item_prefix(first)?;
+                self.write_first_statement(&statement.value)
+            }
+            PackageBodyElement::ExhibitState(exhibit) => {
+                self.write_item_prefix(first)?;
+                self.write_exhibit_state(&exhibit.value)
+            }
+            PackageBodyElement::IncludeUseCase(include) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(include (target ")?;
+                self.write_reference(include.value.target)?;
+                self.writer.write_str("))")
+            }
         }
+    }
+
+    fn write_exhibit_state(&mut self, exhibit: &super::ExhibitState) -> io::Result<()> {
+        self.writer.write_str("(exhibit (declaration ")?;
+        write_quoted(self.writer, &exhibit.name)?;
+        self.writer.write_str(") (state ")?;
+        if let Some(reference) = exhibit.state_reference {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str("))")
     }
 
     fn write_package_body(&mut self, body: &PackageBody) -> io::Result<()> {

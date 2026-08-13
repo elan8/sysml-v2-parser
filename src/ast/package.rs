@@ -1,6 +1,6 @@
 use super::behavior::{
-    ActionDef, ActionUsage, AllocationDef, AllocationUsage, FlowDef, FlowUsage, StateDef,
-    StateUsage,
+    ActionDef, ActionUsage, AllocationDef, AllocationUsage, FirstStmt, FlowDef, FlowUsage,
+    StateDef, StateUsage,
 };
 use super::common::FilterMember;
 use super::common::{
@@ -12,14 +12,14 @@ use super::kerml_fallback::{
 };
 use super::requirement::{
     ActorDecl, AnalysisCaseDef, AnalysisCaseUsage, CaseDef, CaseUsage, ConcernUsage, Dependency,
-    EnumerationUsage, ItemUsage, RequirementDef, RequirementUsage, Satisfy, UseCaseDef,
-    UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
+    EnumerationUsage, IncludeUseCase, ItemUsage, RequirementDef, RequirementUsage, Satisfy,
+    UseCaseDef, UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
 };
 use super::structure::{
     AliasDef, AssertConstraintMember, AttributeDef, AttributeUsage, Connect, ConnectionDef,
-    ConnectionUsageMember, DefaultReferenceUsage, EnumDef, IndividualDef, InterfaceDef,
-    InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage, MetadataUsage, OccurrenceDef,
-    OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage, RefDecl,
+    ConnectionUsageMember, DefaultReferenceUsage, EnumDef, ExhibitState, IndividualDef,
+    InterfaceDef, InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage, MetadataUsage,
+    OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
     CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
@@ -221,4 +221,17 @@ pub enum PackageBodyElement {
     /// KerML `class` classifier definition, e.g. `class B :> A { }`. See
     /// `crate::ast::ClassDef`'s doc comment.
     ClassDef(Node<crate::ast::ClassDef>),
+    /// Package-level `SuccessionAsUsage` (BNF §8.2.2.13.3), e.g. `succession s1 : AB first a then
+    /// b;`, `first a then b;`. Reuses [`FirstStmt`], the identical shape already parsed inside
+    /// action bodies (GH-38): optional `succession` name/type/multiplicity prefix, `first`
+    /// endpoint, optional `then` endpoint, body.
+    Succession(Node<FirstStmt>),
+    /// Package-level `ExhibitStateUsage` (BNF §8.2.2.18.2), e.g. `exhibit vehicleStates.on;`,
+    /// `exhibit state s1 : StateDef { ... }`. Reuses [`ExhibitState`], the same node already
+    /// parsed inside part definition bodies (GH-27/GH-18).
+    ExhibitState(Node<ExhibitState>),
+    /// Package-level `IncludeUseCaseUsage` (BNF §8.2.2.25) reference form, e.g. `include
+    /// checkTires[1..*];`. Reuses [`IncludeUseCase`], the same node already parsed inside part
+    /// usage/use-case-def bodies.
+    IncludeUseCase(Node<IncludeUseCase>),
 }

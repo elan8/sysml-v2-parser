@@ -206,6 +206,11 @@ pub(crate) fn emit_package_body_element(
             structure::emit_binding_connector_usage(w, path, &b.value)
         }
         PackageBodyElement::ClassDef(c) => structure::emit_class_def(w, path, &c.value),
+        PackageBodyElement::Succession(f) => behavior::emit_first_stmt(w, path, &f.value),
+        PackageBodyElement::ExhibitState(e) => behavior::emit_exhibit_state(w, path, &e.value),
+        PackageBodyElement::IncludeUseCase(i) => {
+            requirement::emit_include_use_case(w, path, &i.value)
+        }
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)

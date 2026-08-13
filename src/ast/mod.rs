@@ -314,6 +314,15 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::ClassDef(n) => {
             PackageBodyElement::ClassDef(dummy_node(n, n.value.clone()))
         }
+        PackageBodyElement::Succession(n) => {
+            PackageBodyElement::Succession(dummy_node(n, normalize_first_stmt(&n.value)))
+        }
+        PackageBodyElement::ExhibitState(n) => {
+            PackageBodyElement::ExhibitState(dummy_node(n, n.value.clone()))
+        }
+        PackageBodyElement::IncludeUseCase(n) => {
+            PackageBodyElement::IncludeUseCase(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::InterfaceUsage(n) => {
             PackageBodyElement::InterfaceUsage(dummy_node(n, n.value.clone()))
         }

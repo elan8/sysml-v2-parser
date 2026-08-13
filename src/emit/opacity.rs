@@ -199,6 +199,15 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
             walk_connect_body(report, path, &b.value.body)
         }
         PackageBodyElement::ClassDef(c) => walk_attribute_body(report, path, &c.value.body),
+        PackageBodyElement::Succession(first) => {
+            walk_first_merge_body(report, path, &first.value.body)
+        }
+        PackageBodyElement::ExhibitState(exhibit) => {
+            walk_state_def_body(report, path, &exhibit.value.body)
+        }
+        PackageBodyElement::IncludeUseCase(include) => {
+            walk_use_case_def_body(report, path, &include.value.body)
+        }
         PackageBodyElement::Satisfy(s) => walk_satisfy(report, path, &s.value),
         PackageBodyElement::Import(i) => {
             walk_optional_relationship_body(report, path, i.value.body_elements.as_deref())

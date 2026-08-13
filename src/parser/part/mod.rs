@@ -5,7 +5,7 @@ mod def;
 mod prelude;
 mod usage;
 
-pub(crate) use body::connection_usage_member;
+pub(crate) use body::{connection_usage_member, exhibit_state};
 pub(crate) use def::part_def_or_usage;
 // `part_def`/`part_def_body` are reached in production code through `part_def_or_usage` and
 // `body::part_def_body`'s own callers, not through this re-export -- it exists only so

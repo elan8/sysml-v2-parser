@@ -189,7 +189,10 @@ impl ProvenanceValidator<'_> {
             | PackageBodyElement::DefaultReferenceUsage(_)
             | PackageBodyElement::AssertConstraint(_)
             | PackageBodyElement::BindingConnectorUsage(_)
-            | PackageBodyElement::ClassDef(_) => Ok(()),
+            | PackageBodyElement::ClassDef(_)
+            | PackageBodyElement::Succession(_)
+            | PackageBodyElement::ExhibitState(_)
+            | PackageBodyElement::IncludeUseCase(_) => Ok(()),
         }
     }
 

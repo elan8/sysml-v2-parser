@@ -287,7 +287,10 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::AssertConstraint(_)
         | PackageBodyElement::PerformUsage(_)
         | PackageBodyElement::BindingConnectorUsage(_)
-        | PackageBodyElement::ClassDef(_) => RootElement::Member(boxed),
+        | PackageBodyElement::ClassDef(_)
+        | PackageBodyElement::Succession(_)
+        | PackageBodyElement::ExhibitState(_)
+        | PackageBodyElement::IncludeUseCase(_) => RootElement::Member(boxed),
     };
     Ok((input, node_from_to(start, input, elem)))
 }
@@ -488,16 +491,8 @@ fn unsupported_package_element(
         PackageProduction::BindingConnectorAsUsage => {
             crate::ast::UnsupportedProduction::BindingConnectorAsUsage
         }
-        PackageProduction::Message => crate::ast::UnsupportedProduction::Message,
-        PackageProduction::Succession => crate::ast::UnsupportedProduction::SuccessionAsUsage,
         PackageProduction::PerformActionUsage => {
             crate::ast::UnsupportedProduction::PerformActionUsage
-        }
-        PackageProduction::ExhibitStateUsage => {
-            crate::ast::UnsupportedProduction::ExhibitStateUsage
-        }
-        PackageProduction::IncludeUseCaseUsage => {
-            crate::ast::UnsupportedProduction::IncludeUseCaseUsage
         }
         PackageProduction::PrefixMetadataMember
         | PackageProduction::DefinitionElement
@@ -520,6 +515,10 @@ fn unsupported_package_element(
         | PackageProduction::Expose
         | PackageProduction::ElementFilterMember
         | PackageProduction::Flow
+        | PackageProduction::Message
+        | PackageProduction::Succession
+        | PackageProduction::ExhibitStateUsage
+        | PackageProduction::IncludeUseCaseUsage
         | PackageProduction::RequirementBodyItem
         | PackageProduction::Import
         | PackageProduction::Individual
@@ -1209,6 +1208,17 @@ fn try_package_body_structure<'a>(
         binding_connector_usage,
         PackageBodyElement::BindingConnectorUsage
     );
+    // Package-level `SuccessionAsUsage` (BNF §8.2.2.13.3), e.g. `succession s1 : AB first a then
+    // b;`, `first a then b;` -- reuses `first_stmt`, the identical shape already parsed inside
+    // action bodies (GH-38).
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Succession,
+        crate::parser::action::first_stmt,
+        PackageBodyElement::Succession
+    );
     try_package_body_dispatch!(
         input,
         start,
@@ -1330,6 +1340,14 @@ fn try_package_body_structure<'a>(
         flow_usage,
         PackageBodyElement::FlowUsage
     );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Message,
+        flow_usage,
+        PackageBodyElement::FlowUsage
+    );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,
@@ -1367,6 +1385,22 @@ fn try_package_body_behavior<'a>(
     );
     try_package_body_dispatch!(input, start, state_def, PackageBodyElement::StateDef);
     try_package_body_dispatch!(input, start, state_usage, PackageBodyElement::StateUsage);
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        ExhibitStateUsage,
+        crate::parser::part::exhibit_state,
+        PackageBodyElement::ExhibitState
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        IncludeUseCaseUsage,
+        crate::parser::usecase::include_use_case,
+        PackageBodyElement::IncludeUseCase
+    );
     try_package_body_dispatch!(
         input,
         start,
