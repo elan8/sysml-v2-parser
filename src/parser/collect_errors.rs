@@ -704,6 +704,19 @@ fn collect_attribute_body_errors(body: &AttributeBody, errors: &mut Vec<ParseErr
                     AttributeBodyElement::KermlClassifier(n) => {
                         collect_calc_body_errors(&n.value.body, errors);
                     }
+                    AttributeBodyElement::Bind(n) => collect_bind_errors(&n.value, errors),
+                    AttributeBodyElement::Connection(n) => {
+                        collect_connection_def_body_errors(&n.value.body, errors)
+                    }
+                    AttributeBodyElement::CalcDef(n) => {
+                        collect_calc_body_errors(&n.value.body, errors);
+                    }
+                    AttributeBodyElement::CalcUsage(n) => {
+                        collect_calc_body_errors(&n.value.body, errors);
+                    }
+                    AttributeBodyElement::ConstraintUsage(n) => {
+                        collect_constraint_body_errors(&n.value.body, errors);
+                    }
                     AttributeBodyElement::KermlFeature(n) => {
                         collect_calc_body_errors(&n.value.body, errors)
                     }

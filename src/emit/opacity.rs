@@ -678,6 +678,15 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
                 walk_calc_def_body(report, &p, &n.value.body)
             }
             AttributeBodyElement::ClassDef(n) => walk_attribute_body(report, &p, &n.value.body),
+            AttributeBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
+            AttributeBodyElement::Connection(n) => {
+                walk_connection_def_body(report, &p, &n.value.body)
+            }
+            AttributeBodyElement::CalcDef(n) => walk_calc_def_body(report, &p, &n.value.body),
+            AttributeBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
+            AttributeBodyElement::ConstraintUsage(n) => {
+                walk_constraint_def_body(report, &p, &n.value.body)
+            }
             AttributeBodyElement::KermlClassifier(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
             }

@@ -31,8 +31,11 @@ pub(crate) fn emit_constraint_usage(
     usage: &ConstraintUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    w.push_str("constraint ");
+    // No trailing space for the anonymous body-only form (`constraint { ... }`, spec42
+    // Gap 49a): the body emits its own leading space.
+    w.push_str("constraint");
     if !usage.name.is_empty() {
+        w.push_char(' ');
         w.push_str(&format_name(&usage.name));
     }
     if let Some(ty) = &usage.type_name {

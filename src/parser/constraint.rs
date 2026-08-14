@@ -80,7 +80,16 @@ pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Cons
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
+    // Anonymous body-only form: `constraint { stateSpace.order == order }` (Domain Libraries
+    // `StateSpaceRepresentation.sysml`; spec42 Gap 49a).
+    let (input, name_str) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b"{") {
+            (input, String::new())
+        } else {
+            name(input)?
+        }
+    };
     let (input, header) = feature_usage_header(input)?;
     let (input, body) = constraint_def_body(input)?;
     Ok((

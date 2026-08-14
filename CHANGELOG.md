@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 133.** `AttributeBodyElement` gains `Bind`, `Connection`,
+  `CalcDef`, `CalcUsage`, and `ConstraintUsage` variants: named/multiplicity-qualified binding
+  members, named/typed connection usages, nested calcs, and plain (non-`assert`) constraints
+  inside attribute/item-shaped bodies now dispatch to their existing typed productions instead
+  of opaque capture (Geometry `ShapeItems.sysml`, `Time.sysml`, `Items.sysml`; spec42 gap
+  49a). `constraint_usage` additionally accepts the anonymous body-only form
+  (`constraint { expr }`).
 - **`PARSE_AST_VERSION` is now 132.** Use-case-family and variant member widening (spec42 gaps
   44/45/46): `VariantTypedUsage` gains a `Requirement` kind (`variant requirement r1;`);
   `UseCaseDefBodyElement` gains `InOutDecl` for the directed parameter shorthand (`in scenario

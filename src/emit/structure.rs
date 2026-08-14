@@ -562,6 +562,13 @@ fn emit_attribute_body_element(
         AttributeBodyElement::KermlClassifier(n) => {
             super::root::emit_kerml_classifier_decl(w, path, &n.value)
         }
+        AttributeBodyElement::Bind(b) => emit_bind(w, path, &b.value),
+        AttributeBodyElement::Connection(c) => emit_connection_usage(w, path, &c.value),
+        AttributeBodyElement::CalcDef(c) => super::view::emit_calc_def(w, path, &c.value),
+        AttributeBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
+        AttributeBodyElement::ConstraintUsage(c) => {
+            super::view::emit_constraint_usage(w, path, &c.value)
+        }
         AttributeBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         AttributeBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         AttributeBodyElement::OccurrenceUsage(o) => {

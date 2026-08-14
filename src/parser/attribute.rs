@@ -275,7 +275,30 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         // connector members (`connect a to b;`) and metadata tags (`#keyword`, bare or
         // prefixing the next member) -- see the OMG spec Annex `14c-Language Extensions.sysml`
         // FMEA library example, which uses both extensively.
-        map(crate::parser::part::connect_, AttributeBodyElement::Connect),
+        // Members `PartUsageBodyElement`/`PartDefBodyElement` already reach that this shared
+        // body silently dropped to `Other` (spec42 Gap 49a): named/multiplicity-qualified
+        // binds, named/typed connections, nested calcs, and plain (non-`assert`) constraints
+        // (Geometry `ShapeItems.sysml`, Quantities and Units `Time.sysml`, Systems Library
+        // `Items.sysml`). `calc_def_required` before `calc_usage` for the usual bare-`def`
+        // reason; `connect_` rides in the same sub-alt to stay under nom's 21-branch limit.
+        alt((
+            map(crate::parser::part::connect_, AttributeBodyElement::Connect),
+            map(crate::parser::part::bind_, |n| {
+                AttributeBodyElement::Bind(Box::new(n))
+            }),
+            map(crate::parser::part::connection_usage_member, |n| {
+                AttributeBodyElement::Connection(Box::new(n))
+            }),
+            map(crate::parser::constraint::calc_def_required, |n| {
+                AttributeBodyElement::CalcDef(Box::new(n))
+            }),
+            map(crate::parser::constraint::calc_usage, |n| {
+                AttributeBodyElement::CalcUsage(Box::new(n))
+            }),
+            map(crate::parser::constraint::constraint_usage, |n| {
+                AttributeBodyElement::ConstraintUsage(Box::new(n))
+            }),
+        )),
         map(
             crate::parser::metadata_annotation::metadata_keyword_usage,
             AttributeBodyElement::MetadataKeywordUsage,

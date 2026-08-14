@@ -42,7 +42,6 @@ package 'User Keyword Example' {
 (fixture-diagnostics
   (document "41_user_keyword_example.md"
     (diagnostics
-      (diagnostic (code "unsupported_grammar_form") (severity warning) (category unsupportedgrammarform) (span (offset 464) (line 23) (column 4) (len 46)) (message "the spec-valid extended-library declaration production is retained but not structurally implemented"))
     )
   )
 )
@@ -67,7 +66,9 @@ package 'User Keyword Example' {
         #causation;
         connect 'battery old' to 'power low';
         #situation 'power low' {
-            constraint { device.battery.power < minPower }
+            constraint {
+                device.battery.power < minPower;
+            }
         }
         #causation;
         connect 'power low' to 'device shutoff';
@@ -89,6 +90,6 @@ package 'User Keyword Example' {
     (reference r5 (scope relative) (span (offset 542) (line 26) (column 22) (len 11)) (segments (segment 0 (token "'power low'") (name "power low") (separator none) (span (offset 542) (line 26) (column 22) (len 11)))))
     (reference r6 (scope relative) (span (offset 557) (line 26) (column 37) (len 16)) (segments (segment 0 (token "'device shutoff'") (name "device shutoff") (separator none) (span (offset 557) (line 26) (column 37) (len 16)))))
   )
-  (root (package (name "User Keyword Example") (body (import (target (span (span (offset 49) (line 2) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 85) (line 3) (column 17) (len 30))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 112) (line 3) (column 44) (len 3))) (separator (span (offset 112) (line 3) (column 44) (len 2))) (marker (span (offset 114) (line 3) (column 46) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 133) (line 4) (column 17) (len 23))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (part-def (name "Device") (body (part-usage))) (extended-def (prefix-keywords ("scenario")) (definition-prefix none) (def true) (name "DeviceFailure") (specializes none) (body (ref) (attribute-def) (extended-def (prefix-keywords ("cause")) (definition-prefix none) (def false) (name "battery old") (specializes none) (body (default-reference-usage))) (metadata-keyword-usage) (connect (from (expression (span (offset 401) (line 20) (column 22) (len 13)) (ref r3))) (to (expression (span (offset 418) (line 20) (column 39) (len 11)) (ref r4))) (body semicolon) (subsets none) (redefines none)) (extended-def (prefix-keywords ("situation")) (definition-prefix none) (def false) (name "power low") (specializes none) (body (extended-library-declaration))) (metadata-keyword-usage) (connect (from (expression (span (offset 542) (line 26) (column 22) (len 11)) (ref r5))) (to (expression (span (offset 557) (line 26) (column 37) (len 16)) (ref r6))) (body semicolon) (subsets none) (redefines none)) (extended-def (prefix-keywords ("failure")) (definition-prefix none) (def false) (name "device shutoff") (specializes none) (body (default-reference-usage))))))))
+  (root (package (name "User Keyword Example") (body (import (target (span (span (offset 49) (line 2) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 85) (line 3) (column 17) (len 30))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 112) (line 3) (column 44) (len 3))) (separator (span (offset 112) (line 3) (column 44) (len 2))) (marker (span (offset 114) (line 3) (column 46) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 133) (line 4) (column 17) (len 23))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (part-def (name "Device") (body (part-usage))) (extended-def (prefix-keywords ("scenario")) (definition-prefix none) (def true) (name "DeviceFailure") (specializes none) (body (ref) (attribute-def) (extended-def (prefix-keywords ("cause")) (definition-prefix none) (def false) (name "battery old") (specializes none) (body (default-reference-usage))) (metadata-keyword-usage) (connect (from (expression (span (offset 401) (line 20) (column 22) (len 13)) (ref r3))) (to (expression (span (offset 418) (line 20) (column 39) (len 11)) (ref r4))) (body semicolon) (subsets none) (redefines none)) (extended-def (prefix-keywords ("situation")) (definition-prefix none) (def false) (name "power low") (specializes none) (body (constraint-usage))) (metadata-keyword-usage) (connect (from (expression (span (offset 542) (line 26) (column 22) (len 11)) (ref r5))) (to (expression (span (offset 557) (line 26) (column 37) (len 16)) (ref r6))) (body semicolon) (subsets none) (redefines none)) (extended-def (prefix-keywords ("failure")) (definition-prefix none) (def false) (name "device shutoff") (specializes none) (body (default-reference-usage))))))))
 )
 ~~~

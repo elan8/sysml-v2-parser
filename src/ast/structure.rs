@@ -398,6 +398,22 @@ pub enum AttributeBodyElement {
     /// `classifier`, `datatype`, `assoc`, `behavior`, ...; spec42 Gap 38); see
     /// [`crate::ast::KermlClassifierDecl`].
     KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
+    /// Named/multiplicity-qualified binding member nested in an attribute/item body
+    /// (`binding [1] bind [0..*] base.edges = [0..*] be;`, Geometry `ShapeItems.sysml`;
+    /// spec42 Gap 49a).
+    Bind(Box<Node<Bind>>),
+    /// Named/typed connection usage nested in an attribute/item body (`connection : MatesWith
+    /// connect [1] tfe to [1] tfe;`, Geometry `ShapeItems.sysml`; spec42 Gap 49a).
+    Connection(Box<Node<ConnectionUsageMember>>),
+    /// Nested `calc def` (spec42 Gap 49a).
+    CalcDef(Box<Node<crate::ast::view::CalcDef>>),
+    /// Nested `calc` usage (`private calc getElapsedUtcTime { ... }` inside `attribute def
+    /// Clock`, Quantities and Units `Time.sysml`; spec42 Gap 49a).
+    CalcUsage(Box<Node<crate::ast::view::CalcUsage>>),
+    /// Plain (non-`assert`) constraint usage nested in an attribute/item body (`abstract
+    /// constraint checkedConstraints : ConstraintCheck[0..*] :> ... { ... }`, Systems Library
+    /// `Items.sysml`; spec42 Gap 49a).
+    ConstraintUsage(Box<Node<ConstraintUsage>>),
     Other(String),
 }
 
