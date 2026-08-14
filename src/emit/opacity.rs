@@ -1010,6 +1010,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             UseCaseDefBodyElement::RefRedefinition(n) => {
                 walk_use_case_def_body(report, &p, &n.value.body.value)
             }
+            UseCaseDefBodyElement::Ref(n) => walk_ref_body(report, &p, &n.value.body),
             UseCaseDefBodyElement::AssertConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }

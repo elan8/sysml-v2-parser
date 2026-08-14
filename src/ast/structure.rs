@@ -1347,6 +1347,9 @@ pub enum RefDeclKind {
     Item,
     /// `requirement`.
     Requirement,
+    /// `use case` (`ref use case self : UseCase :>> Case::self;`, Systems Library
+    /// `UseCases.sysml`; spec42 Gap 34).
+    UseCase,
 }
 
 impl RefDeclKind {
@@ -1357,6 +1360,7 @@ impl RefDeclKind {
             Self::Port => "port",
             Self::Item => "item",
             Self::Requirement => "requirement",
+            Self::UseCase => "use case",
         }
     }
 }

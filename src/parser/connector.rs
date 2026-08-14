@@ -396,6 +396,11 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             map((tag(&b"requirement"[..]), ws1), |_| {
                 crate::ast::RefDeclKind::Requirement
             }),
+            // `ref use case self : UseCase :>> Case::self;` (Systems Library `UseCases.sysml`;
+            // spec42 Gap 34).
+            map((tag(&b"use"[..]), ws1, tag(&b"case"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::UseCase
+            }),
         )),
     ))
     .parse(input)?;
@@ -612,6 +617,31 @@ pub(crate) fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectS
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod ref_decl_kind_tests {
+    use super::ref_decl;
+
+    fn input(text: &str) -> crate::parser::Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 34: the `use case` feature-kind keyword on a full `ref` declaration
+    /// (`ref use case self : UseCase :>> Case::self;`, Systems Library `UseCases.sysml`).
+    #[test]
+    fn ref_decl_accepts_the_use_case_kind_keyword() {
+        let (rest, node) =
+            ref_decl(input("ref use case self : UseCase :>> Case::self;")).expect("ref use case");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.kind_keyword,
+            Some(crate::ast::RefDeclKind::UseCase)
+        );
+        assert_eq!(node.value.name, "self");
+        assert!(node.value.typing.is_some());
+        assert!(node.value.redefines.is_some());
+    }
 }
 
 #[cfg(test)]

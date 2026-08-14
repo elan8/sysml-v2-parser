@@ -272,6 +272,7 @@ impl ProvenanceValidator<'_> {
                 UseCaseDefBodyElement::RefRedefinition(n) => {
                     self.use_case_body(&n.value.body.value)?
                 }
+                UseCaseDefBodyElement::Ref(_) => {}
                 UseCaseDefBodyElement::ForLoop(n) => self.action_def_body(&n.value.body)?,
                 UseCaseDefBodyElement::ThenAction(n) => self.then_action(&n.value)?,
                 UseCaseDefBodyElement::Error(_)

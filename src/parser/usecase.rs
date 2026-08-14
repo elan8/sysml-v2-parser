@@ -567,7 +567,16 @@ pub(crate) fn use_case_def_body_element(
             ),
             map(then_use_case_usage, UseCaseDefBodyElement::ThenUseCaseUsage),
             map(include_use_case, UseCaseDefBodyElement::IncludeUseCase),
-            map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
+            // Full `ref` declarations (`ref use case self : UseCase :>> Case::self;`, Systems
+            // Library `UseCases.sysml`; spec42 Gap 34). `ref_redefinition` first so the bare
+            // `ref :>> target { ... }` shorthand keeps its dedicated node; nested in a sub-alt
+            // to stay under nom's 21-branch limit.
+            nom::branch::alt((
+                map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
+                map(crate::parser::connector::ref_decl, |n| {
+                    UseCaseDefBodyElement::Ref(Box::new(n))
+                }),
+            )),
             map(
                 crate::parser::occurrence_body::assert_constraint_member,
                 UseCaseDefBodyElement::AssertConstraint,

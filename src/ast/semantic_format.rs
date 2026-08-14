@@ -792,6 +792,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_reference(include.value.target)?;
                             self.writer.write_str("))")?;
                         }
+                        UseCaseDefBodyElement::Ref(_reference) => {
+                            self.write_marker(&mut first, "ref")?;
+                        }
                         UseCaseDefBodyElement::RefRedefinition(reference) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(ref-redefinition (target ")?;

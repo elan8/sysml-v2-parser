@@ -635,6 +635,10 @@ pub enum UseCaseDefBodyElement {
     ThenDone(Node<ThenDone>),
     IncludeUseCase(Node<IncludeUseCase>),
     RefRedefinition(Node<RefRedefinition>),
+    /// Full `ref` declaration (`ref use case self : UseCase :>> Case::self;`, Systems Library
+    /// `UseCases.sysml`; spec42 Gap 34). The bare `ref :>> target { ... }` shorthand stays on
+    /// [`RefRedefinition`].
+    Ref(Box<Node<crate::ast::RefDecl>>),
     AssertConstraint(Node<crate::ast::AssertConstraintMember>),
     ReturnRef(Node<ReturnRef>),
     CaseReturnDecl(Node<CaseReturnDecl>),

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 126.** `UseCaseDefBodyElement` gains a
+  `Ref(Box<Node<RefDecl>>)` variant and `RefDeclKind` gains `UseCase`, so full `ref use case
+  <name> : <Type> :>> <target>;` declarations inside use-case bodies (pervasive in Systems
+  Library `UseCases.sysml`) parse into typed `RefDecl` nodes instead of spraying per-token
+  error recovery; the bare `ref :>> target { ... }` shorthand keeps its dedicated
+  `RefRedefinition` node (spec42 gap 34).
 - **`PARSE_AST_VERSION` is now 125.** `SubjectDecl` gains a `redefines:
   Option<Node<SubsettingRelationship>>` clause (`subject subj :>> Case::subj;`, and the
   anonymous type-less `subject :>> vehicle = vehicle_large;`) and its `value` widens from a

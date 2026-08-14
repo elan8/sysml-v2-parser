@@ -864,6 +864,7 @@ fn emit_use_case_body_element(
             w.push_qualified_reference(&format!("{path}/target"), r.value.target)?;
             emit_use_case_body(w, path, &r.value.body.value)
         }
+        UseCaseDefBodyElement::Ref(r) => super::structure::emit_ref_decl(w, path, &r.value),
         UseCaseDefBodyElement::AssertConstraint(assert) => {
             crate::emit::view::emit_assert_constraint(w, path, &assert.value)
         }

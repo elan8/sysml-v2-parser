@@ -500,6 +500,9 @@ fn collect_use_case_body_errors(body: &UseCaseDefBody, errors: &mut Vec<ParseErr
                     UseCaseDefBodyElement::RefRedefinition(reference) => {
                         collect_use_case_body_errors(&reference.value.body.value, errors);
                     }
+                    UseCaseDefBodyElement::Ref(n) => {
+                        collect_ref_body_errors(&n.value.body, errors);
+                    }
                     UseCaseDefBodyElement::ReturnRef(return_ref) => {
                         collect_return_ref_body_errors(&return_ref.value.body.value, errors)
                     }
