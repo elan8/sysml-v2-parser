@@ -232,6 +232,11 @@ pub struct ViewDef {
 
 pub type ViewDefBody = Body<ViewDefBodyElement>;
 
+// A `RefDecl` carries a typing, several relationship nodes and a body, making it inherently
+// larger than the `Doc`/`Error` variants beside it. Boxing just this one variant in just this one
+// enum would be inconsistent with the other body-element enums sharing the same
+// `RefDecl(Node<RefDecl>)` shape crate-wide -- see `RequirementDefBodyElement`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewDefBodyElement {
@@ -243,6 +248,10 @@ pub enum ViewDefBodyElement {
     MetadataAnnotation(Node<MetadataAnnotation>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `ref viewpoint :>> self : ViewpointCheck;` and
+    /// `abstract ref rendering subrenderings : Rendering[0..*] :> renderings;` (Systems Library
+    /// `Views.sysml`). This scope accepted no `ref` member at all.
+    RefDecl(Node<crate::ast::RefDecl>),
 }
 
 /// View rendering usage: `render` name `:` type (`;` or body).
@@ -300,6 +309,11 @@ pub struct RenderingDef {
 
 pub type RenderingDefBody = Body<RenderingDefBodyElement>;
 
+// A `RefDecl` carries a typing, several relationship nodes and a body, making it inherently
+// larger than the `Doc`/`Error` variants beside it. Boxing just this one variant in just this one
+// enum would be inconsistent with the other body-element enums sharing the same
+// `RefDecl(Node<RefDecl>)` shape crate-wide -- see `RequirementDefBodyElement`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderingDefBodyElement {
@@ -310,6 +324,10 @@ pub enum RenderingDefBodyElement {
     Doc(Node<DocComment>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `ref rendering :>> self : Rendering;` and
+    /// `abstract ref rendering subrenderings : Rendering[0..*] :> renderings { ... }` (Systems
+    /// Library `Views.sysml`).
+    RefDecl(Node<crate::ast::RefDecl>),
 }
 
 /// View usage: `view` name `:` type? ViewBody, or the anonymous redefinition form `view :>>
@@ -343,6 +361,11 @@ pub struct ViewUsage {
 
 pub type ViewBody = Body<ViewBodyElement>;
 
+// A `RefDecl` carries a typing, several relationship nodes and a body, making it inherently
+// larger than the `Doc`/`Error` variants beside it. Boxing just this one variant in just this one
+// enum would be inconsistent with the other body-element enums sharing the same
+// `RefDecl(Node<RefDecl>)` shape crate-wide -- see `RequirementDefBodyElement`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBodyElement {
@@ -352,6 +375,9 @@ pub enum ViewBodyElement {
     ViewRendering(Node<ViewRenderingUsage>),
     Expose(Node<ExposeMember>),
     Satisfy(Node<SatisfyViewMember>),
+    /// `ref`-prefixed feature declaration, e.g. `abstract ref rendering :>> viewRendering[0..1];`
+    /// inside `view columnView[0..*] ordered { ... }` (Systems Library `Views.sysml`).
+    RefDecl(Node<crate::ast::RefDecl>),
 }
 
 /// Expose in view body: `expose` (MembershipImport | NamespaceImport) RelationshipBody.

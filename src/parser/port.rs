@@ -258,6 +258,12 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         map(item_def_required, PortDefBodyElement::ItemDef),
         map(enum_usage, PortDefBodyElement::EnumerationUsage),
         map(port_usage, PortDefBodyElement::PortUsage),
+        // After `port_usage` so `ref port ...` reaches the kind-keyword form rather than being
+        // read as an anonymous `ref` followed by stray text.
+        map(
+            crate::parser::connector::ref_decl,
+            PortDefBodyElement::RefDecl,
+        ),
         map(
             |i| {
                 crate::parser::recovery::unsupported_member(

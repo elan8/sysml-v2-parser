@@ -1016,6 +1016,11 @@ pub enum PortDefBodyElement {
     /// APIS_HTTP { ... }`) -- previously port definition bodies had no `#`/`@` annotation support
     /// at all, unlike part/item/action/etc. bodies. See `PackageBodyElement::MetadataKeywordUsage`.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `abstract ref port interfacingPorts : Port[0..*]
+    /// nonunique :> ports { ... }` and `ref self: Port :>> Object::self;` (Systems Library
+    /// `Ports.sysml`). This scope accepted no `ref` member at all, so every one of them was
+    /// captured as unsupported grammar.
+    RefDecl(Node<RefDecl>),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
@@ -1345,6 +1350,18 @@ pub enum RefDeclKind {
     /// `use case` (`ref use case self : UseCase :>> Case::self;`, Systems Library
     /// `UseCases.sysml`; spec42 Gap 34).
     UseCase,
+    /// `concern` (`ref concern :>> self: ConcernCheck;`, Systems Library `Requirements.sysml`).
+    Concern,
+    /// `viewpoint` (`ref viewpoint :>> self : ViewpointCheck;`, Systems Library `Views.sysml`).
+    Viewpoint,
+    /// `rendering` (`abstract ref rendering subrenderings : Rendering[0..*] :> renderings;`,
+    /// Systems Library `Views.sysml`).
+    Rendering,
+    /// `view` (`abstract ref view subviews : View[0..*] :> views { ... }`, Systems Library
+    /// `Views.sysml`).
+    View,
+    /// `action` (`private ref action thisConnection = self;`, Systems Library `Flows.sysml`).
+    Action,
 }
 
 impl RefDeclKind {
@@ -1356,6 +1373,11 @@ impl RefDeclKind {
             Self::Item => "item",
             Self::Requirement => "requirement",
             Self::UseCase => "use case",
+            Self::Concern => "concern",
+            Self::Viewpoint => "viewpoint",
+            Self::Rendering => "rendering",
+            Self::View => "view",
+            Self::Action => "action",
         }
     }
 }

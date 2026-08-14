@@ -658,6 +658,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Doc(_doc) => {
                             self.write_marker(&mut first, "doc")?;
                         }
+                        RequirementDefBodyElement::RefDecl(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')
@@ -678,6 +682,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_malformed(&error.value, &element.span)?;
                         }
                         ViewBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
+                        ViewBodyElement::RefDecl(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
+                        }
                         ViewBodyElement::Filter(_filter) => {
                             self.write_marker(&mut first, "filter")?;
                         }
@@ -2357,6 +2365,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                     match &element.value {
                         PortDefBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "in-out-declaration")?;
+                        }
+                        PortDefBodyElement::RefDecl(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         PortDefBodyElement::Doc(_doc) => {
                             self.write_marker(&mut first, "doc")?;

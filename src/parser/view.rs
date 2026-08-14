@@ -32,6 +32,10 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
     let (input, elem) = alt((
         map(doc_comment, ViewDefBodyElement::Doc),
         map(
+            crate::parser::connector::ref_decl,
+            ViewDefBodyElement::RefDecl,
+        ),
+        map(
             crate::parser::metadata_annotation::metadata_annotation,
             ViewDefBodyElement::MetadataAnnotation,
         ),
@@ -246,6 +250,10 @@ fn rendering_def_body_element(
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
         map(doc_comment, RenderingDefBodyElement::Doc),
+        map(
+            crate::parser::connector::ref_decl,
+            RenderingDefBodyElement::RefDecl,
+        ),
         map(view_filter_member, RenderingDefBodyElement::Filter),
         map(view_rendering_usage, RenderingDefBodyElement::ViewRendering),
         map(
@@ -330,6 +338,7 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
         map(doc_comment, ViewBodyElement::Doc),
+        map(crate::parser::connector::ref_decl, ViewBodyElement::RefDecl),
         map(view_filter_member, ViewBodyElement::Filter),
         map(view_rendering_usage, ViewBodyElement::ViewRendering),
         map(expose_member, ViewBodyElement::Expose),

@@ -113,6 +113,9 @@ fn emit_requirement_body_element(
     match el {
         RequirementDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RequirementDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RequirementDefBodyElement::RefDecl(r) => {
+            crate::emit::structure::emit_ref_decl(w, path, &r.value)
+        }
         RequirementDefBodyElement::Import(i) => emit_import(w, &i.value),
         RequirementDefBodyElement::AttributeDef(a) => {
             structure::emit_attribute_def(w, path, &a.value)

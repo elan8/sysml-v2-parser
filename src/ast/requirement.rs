@@ -76,6 +76,10 @@ pub enum RequirementDefBodyElement {
     Frame(Node<FrameMember>),
     TextualRep(Node<TextualRepresentation>),
     Doc(Node<DocComment>),
+    /// `ref`-prefixed feature declaration, e.g. `ref concern :>> self: ConcernCheck;` and `ref
+    /// part actors : Part[0..*] { ... }` (Systems Library `Requirements.sysml`). This scope
+    /// accepted no `ref` member at all.
+    RefDecl(Node<crate::ast::RefDecl>),
 }
 
 /// Viewpoint stakeholder: typed declaration, shorthand concern reference, or `:>>` redefinition.

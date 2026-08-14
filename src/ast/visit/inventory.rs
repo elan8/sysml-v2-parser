@@ -3380,6 +3380,9 @@ macro_rules! ast_traversal {
                 PortDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
                 }
+                PortDefBodyElement::RefDecl(field_0) => {
+                    visitor.visit_ref_decl(field_0);
+                }
                 PortDefBodyElement::Doc(field_0) => {
                     visitor.visit_doc_comment(field_0);
                 }
@@ -3714,6 +3717,11 @@ macro_rules! ast_traversal {
                 RefDeclKind::Item => {}
                 RefDeclKind::Requirement => {}
                 RefDeclKind::UseCase => {}
+                RefDeclKind::Concern => {}
+                RefDeclKind::Viewpoint => {}
+                RefDeclKind::Rendering => {}
+                RefDeclKind::View => {}
+                RefDeclKind::Action => {}
             }
         }
 
@@ -5475,6 +5483,9 @@ macro_rules! ast_traversal {
                 RequirementDefBodyElement::Doc(field_0) => {
                     visitor.visit_doc_comment(field_0);
                 }
+                RequirementDefBodyElement::RefDecl(field_0) => {
+                    visitor.visit_ref_decl(field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -6457,6 +6468,9 @@ macro_rules! ast_traversal {
                 ViewDefBodyElement::Doc(field_0) => {
                     visitor.visit_doc_comment(field_0);
                 }
+                ViewDefBodyElement::RefDecl(field_0) => {
+                    visitor.visit_ref_decl(field_0);
+                }
                 ViewDefBodyElement::MetadataAnnotation(field_0) => {
                     visitor.visit_metadata_annotation(field_0);
                 }
@@ -6573,6 +6587,9 @@ macro_rules! ast_traversal {
                 RenderingDefBodyElement::Doc(field_0) => {
                     visitor.visit_doc_comment(field_0);
                 }
+                RenderingDefBodyElement::RefDecl(field_0) => {
+                    visitor.visit_ref_decl(field_0);
+                }
                 RenderingDefBodyElement::Filter(field_0) => {
                     visitor.visit_filter_member(field_0);
                 }
@@ -6636,6 +6653,9 @@ macro_rules! ast_traversal {
                 }
                 ViewBodyElement::Doc(field_0) => {
                     visitor.visit_doc_comment(field_0);
+                }
+                ViewBodyElement::RefDecl(field_0) => {
+                    visitor.visit_ref_decl(field_0);
                 }
                 ViewBodyElement::Filter(field_0) => {
                     visitor.visit_filter_member(field_0);

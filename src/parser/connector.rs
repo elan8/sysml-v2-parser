@@ -314,6 +314,19 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             map((tag(&b"use"[..]), ws1, tag(&b"case"[..]), ws1), |_| {
                 crate::ast::RefDeclKind::UseCase
             }),
+            map((tag(&b"concern"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Concern
+            }),
+            map((tag(&b"viewpoint"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Viewpoint
+            }),
+            map((tag(&b"rendering"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Rendering
+            }),
+            map((tag(&b"view"[..]), ws1), |_| crate::ast::RefDeclKind::View),
+            map((tag(&b"action"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Action
+            }),
         )),
     ))
     .parse(input)?;

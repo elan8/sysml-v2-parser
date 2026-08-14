@@ -200,6 +200,10 @@ fn requirement_def_body_element(
                 RequirementDefBodyElement::TextualRep,
             ),
             map(doc_comment, RequirementDefBodyElement::Doc),
+            map(
+                crate::parser::connector::ref_decl,
+                RequirementDefBodyElement::RefDecl,
+            ),
         )),
         other_requirement_body_element,
     ))

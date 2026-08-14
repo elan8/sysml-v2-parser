@@ -361,6 +361,7 @@ fn walk_rendering_def_body(report: &mut OpacityReport, path: &str, body: &Render
             RenderingDefBodyElement::ViewRendering(rendering) => {
                 walk_rendering_usage_body(report, &p, &rendering.value.body)
             }
+            RenderingDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             RenderingDefBodyElement::Doc(_) | RenderingDefBodyElement::Filter(_) => {}
         }
     }
@@ -725,6 +726,7 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
         match &el.value {
             PortDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             PortDefBodyElement::Unsupported(_) => hit(report, &p, OpacityKind::UnsupportedGrammar),
+            PortDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             PortDefBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
             PortDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortDefBodyElement::ItemDef(n) => walk_attribute_body(report, &p, &n.value.body),
@@ -1011,6 +1013,7 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::Frame(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
+            RequirementDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             RequirementDefBodyElement::Doc(_)
             | RequirementDefBodyElement::SubjectDecl(_)
             | RequirementDefBodyElement::SubjectRef(_)
@@ -1159,6 +1162,7 @@ fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody
             ViewDefBodyElement::ViewRendering(n) => {
                 walk_rendering_usage_body(report, &p, &n.value.body)
             }
+            ViewDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             ViewDefBodyElement::Doc(_) | ViewDefBodyElement::Filter(_) => {}
         }
     }
@@ -1179,6 +1183,7 @@ fn walk_view_body_element(report: &mut OpacityReport, path: &str, el: &ViewBodyE
         ViewBodyElement::ViewRendering(n) => walk_rendering_usage_body(report, path, &n.value.body),
         ViewBodyElement::Expose(n) => walk_connect_body(report, path, &n.value.body),
         ViewBodyElement::Satisfy(n) => walk_connect_body(report, path, &n.value.body),
+        ViewBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
         ViewBodyElement::Doc(_) | ViewBodyElement::Filter(_) => {}
     }
 }

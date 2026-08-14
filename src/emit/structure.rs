@@ -711,6 +711,7 @@ fn emit_port_def_body_element(
         PortDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PortDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        PortDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         PortDefBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortDefBodyElement::ItemDef(i) => emit_item_def(w, path, &i.value),
         PortDefBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),

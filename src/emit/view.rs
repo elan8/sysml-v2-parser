@@ -604,6 +604,9 @@ pub(crate) fn emit_view_def(
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
                     crate::ast::ViewDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::ViewDefBodyElement::RefDecl(r) => {
+                        crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
                     crate::ast::ViewDefBodyElement::MetadataAnnotation(m) => {
                         super::structure::emit_metadata_annotation(w, path, &m.value)?;
                     }
@@ -685,6 +688,9 @@ pub(crate) fn emit_view_usage(
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
                     crate::ast::ViewBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::ViewBodyElement::RefDecl(r) => {
+                        crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
                     crate::ast::ViewBodyElement::Filter(f) => {
                         super::root::emit_filter(w, &f.value)?;
                     }
@@ -841,6 +847,9 @@ pub(crate) fn emit_rendering_def(
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
                     crate::ast::RenderingDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingDefBodyElement::RefDecl(r) => {
+                        crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
                     crate::ast::RenderingDefBodyElement::Filter(f) => {
                         super::root::emit_filter(w, &f.value)?;
                     }

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`ref` members are accepted in every body whose grammar allows them.** Five scopes never
+  dispatched `connector::ref_decl` at all -- port definitions, requirement definitions, view
+  definitions, rendering definitions and view usages -- so `ref self : Port :>> Object::self;`
+  (`sysml.library/Systems Library/Ports.sysml`) and its siblings were captured as unsupported
+  grammar even though the same member parsed one scope over. `RefDeclKind` also gained the
+  `concern`, `viewpoint`, `rendering`, `view` and `action` keywords, each from a library line
+  that previously had nowhere to go. **AST version 142 -> 143.**
+
 - **The `RefPrefix` modifier chain is accepted on every usage that allows it.** BNF `RefPrefix
   = 'derived'? ('abstract' | 'variation')? 'constant'?` may precede any usage keyword, but each
   parser had hand-rolled whichever subset it happened to need, so a legal prefix was a parse gap
