@@ -1134,6 +1134,51 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 input = next;
                 continue;
             }
+            // `[unit]` measurement/coordinate-frame annotation after a value-shaped atom:
+            // `(0, shape.width/2, 0)[source]`, `new Rotation(...)[frame]`, `angle[deg]` in
+            // expression position (Domain Geometry libraries; spec42 Gap 49c). Numeric literals
+            // keep their dedicated `literal_with_unit` path at atom level. Speculative: only
+            // commits when a unit-shaped token closes with `]`, so declaration-level
+            // multiplicities (`[1]`, `[0..*]`) after a typing are unaffected -- those never pass
+            // through this engine.
+            if next.fragment().starts_with(b"[")
+                && matches!(
+                    atom.value,
+                    Expression::Parenthesized(_)
+                        | Expression::Tuple(_)
+                        | Expression::Invocation { .. }
+                        | Expression::Constructor { .. }
+                        | Expression::FeatureRef(_)
+                        | Expression::MemberAccess { .. }
+                )
+            {
+                let bracket_attempt = (|| -> IResult<Input<'_>, (Span, String)> {
+                    let (after_open, _) = tag(&b"["[..]).parse(next)?;
+                    let (after_open, _) = ws_and_comments(after_open)?;
+                    let unit_start = after_open;
+                    let (after_unit, unit_name) = unit_name_in_brackets(after_open)?;
+                    let unit_span = crate::parser::span_from_to(unit_start, after_unit);
+                    let (after_unit, _) = ws_and_comments(after_unit)?;
+                    let (after_close, _) = tag(&b"]"[..]).parse(after_unit)?;
+                    Ok((after_close, (unit_span, unit_name)))
+                })();
+                if let Ok((after_close, (unit_span, unit_name))) = bracket_attempt {
+                    let unit = Node::new(
+                        unit_span.clone(),
+                        Expression::Bracket(Box::new(Node::new(
+                            unit_span,
+                            Expression::Unit(unit_name),
+                        ))),
+                    );
+                    let expr = Expression::LiteralWithUnit {
+                        value: Box::new(atom),
+                        unit: Box::new(unit),
+                    };
+                    atom = node_from_to(primary_start, after_close, expr);
+                    input = after_close;
+                    continue;
+                }
+            }
             // KerML dot shorthands for body-expression operators: `x.{in xx; xx + 1}` is the
             // `collect` sugar and `x.?{in xx; cond}` the `select` sugar (spec42
             // `kerml/expressions.md`). Checked before plain member access, whose `.` + name
@@ -1925,6 +1970,32 @@ mod tests {
             }
         }
         assert_eq!(depth, DEPTH);
+    }
+
+    /// Spec42 Gap 49c: the `[unit]` annotation applies to tuple/invocation/reference bases in
+    /// expression position (`(0, w/2, 0)[source]`, Domain Geometry coordinate-frame idiom),
+    /// not just scalar literals.
+    #[test]
+    fn unit_annotation_applies_to_non_literal_bases() {
+        for (source, expect_tuple) in [
+            ("(0, w/2, 0)[source]", true),
+            ("new Translation((0, w, 0)[source])", false),
+            ("angle[deg]", false),
+        ] {
+            let (rest, node) = expression(crate::parser::span::test_input(source)).expect(source);
+            assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+            let dump = format!("{:?}", node.value);
+            assert!(
+                dump.contains("LiteralWithUnit"),
+                "no unit in {source}: {dump}"
+            );
+            if expect_tuple {
+                let Expression::LiteralWithUnit { value, .. } = &node.value else {
+                    panic!("expected LiteralWithUnit for {source}");
+                };
+                assert!(matches!(value.value, Expression::Tuple(_)));
+            }
+        }
     }
 
     #[test]

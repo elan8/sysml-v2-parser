@@ -156,24 +156,24 @@ package '15_13-Discretely Sampled Function Value' {
             attribute :>> domainValue = 0.0 [mets];
             attribute :>> rangeValue = pv1;
             attribute pv1 : PositionAndVelocity {
-                attribute :>> position[spatialCF] = (0, 0, 0);
-                attribute :>> velocity[velocityCF] = (0, 0, 0);
+                attribute :>> position = (0, 0, 0) [spatialCF];
+                attribute :>> velocity = (0, 0, 0) [velocityCF];
             }
         }
         attribute sample2 : AscentSample {
             attribute :>> domainValue = 2.5 [mets];
             attribute :>> rangeValue = pv1;
             attribute pv1 : PositionAndVelocity {
-                attribute :>> position[spatialCF] = (0.01, 0.03, 8.6);
-                attribute :>> velocity[velocityCF] = (0, 0, 5.5);
+                attribute :>> position = (0.01, 0.03, 8.6) [spatialCF];
+                attribute :>> velocity = (0, 0, 5.5) [velocityCF];
             }
         }
         attribute sample3 : AscentSample {
             attribute :>> domainValue = 5.1 [mets];
             attribute :>> rangeValue = pv1;
             attribute pv1 : PositionAndVelocity {
-                attribute :>> position[spatialCF] = (0.04, 0.12, 18.6);
-                attribute :>> velocity[velocityCF] = (0.05, 0.03, 25.3);
+                attribute :>> position = (0.04, 0.12, 18.6) [spatialCF];
+                attribute :>> velocity = (0.05, 0.03, 25.3) [velocityCF];
             }
         }
         attribute :>> samples = (sample1, sample2, sample3);

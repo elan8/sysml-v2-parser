@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 131.** The `[unit]` annotation now applies to parenthesized
+  tuples, invocation/constructor results, and feature references in expression position
+  (`(0, shape.width/2, 0)[source]`, the Domain Geometry coordinate-frame idiom; spec42 gap
+  49c) via the existing `Expression::LiteralWithUnit` shape. Previously such brackets either
+  failed the whole statement (inside argument lists) or were silently captured as a bogus
+  declaration multiplicity after the value.
 - **`PARSE_AST_VERSION` is now 130.** The bare `:>>`/`:>` shorthand (no `attribute` keyword)
   and its metadata-body twin accept comma-separated multi-target lists like every other
   redefinition/subsets clause (`SI.kerml`'s `kelvin`; spec42 gap 49b), and `ref` declarations
