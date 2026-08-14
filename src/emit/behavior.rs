@@ -1389,10 +1389,6 @@ pub(crate) fn emit_occurrence_body_element(
 ) -> Result<(), EmitError> {
     match el {
         crate::ast::OccurrenceBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        crate::ast::OccurrenceBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         crate::ast::OccurrenceBodyElement::Doc(d) => emit_doc(w, &d.value),
         crate::ast::OccurrenceBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)

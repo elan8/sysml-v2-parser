@@ -1080,9 +1080,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_dependency(&dependency.value)?;
                         }
-                        PartDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
-                        }
                         PartDefBodyElement::AttributeDef(_definition) => {
                             self.write_marker(&mut first, "attribute-def")?;
                         }

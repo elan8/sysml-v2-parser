@@ -26,6 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drift from the other. Consumers implement only the node kinds they have a rule for; the
   default methods walk children.
 
+### Removed
+
+- **Two opaque body-member fallbacks the parser cannot produce.** `PartDefBodyElement::Other`
+  and `OccurrenceBodyElement::Other` retained unrecognized member text as a string, but no
+  parser path constructed either one: recovery in those scopes already produces a malformed or
+  unsupported node with its authored span. The variants only widened the type -- and its
+  deserialized contract -- with a state that could not occur, so the emitter and opacity report
+  carried policy for it, and two integration tests asserted members had not "degraded" into it.
+  Removing them makes that guarantee structural. Token-level `BinaryOperator::Other` and
+  `UnaryOperator::Other` are deliberately kept: they classify an authored operator spelling and
+  back a total `from_token` constructor, which is narrowly scoped opaque syntax rather than an
+  untyped scope member.
+
 ### Changed
 
 - **`PARSE_AST_VERSION` is now 136.** `EnumerationBody`'s brace members move from `values` to

@@ -30,7 +30,6 @@ fn missionpackage_structures_connection_and_comment_members() {
     let mut structured_connection_count = 0usize;
     let mut structured_comment_count = 0usize;
     let mut opaque_connection_count = 0usize;
-    let mut fallback_comment_count = 0usize;
 
     let package = match &parsed.document.root.elements[0].value {
         RootElement::Package(package) => &package.value,
@@ -51,9 +50,6 @@ fn missionpackage_structures_connection_and_comment_members() {
                 PartDefBodyElement::Connection(_) => structured_connection_count += 1,
                 PartDefBodyElement::Comment(_) => structured_comment_count += 1,
                 PartDefBodyElement::UnsupportedMember(_) => opaque_connection_count += 1,
-                PartDefBodyElement::Other(text) if text.starts_with("comment ") => {
-                    fallback_comment_count += 1
-                }
                 _ => {}
             }
         }
@@ -71,8 +67,6 @@ fn missionpackage_structures_connection_and_comment_members() {
         opaque_connection_count, 0,
         "connection members should not degrade to opaque members"
     );
-    assert_eq!(
-        fallback_comment_count, 0,
-        "comment members should not degrade to fallback Other nodes"
-    );
+    // A part definition body member can no longer degrade to opaque text: the scope has no such
+    // variant, so `structured_comment_count` above is the only way a comment can be represented.
 }

@@ -88,7 +88,6 @@ pub enum PartDefBodyElement {
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// A dependency owned by this definition (BNF `DefinitionMember`).
     Dependency(Node<Dependency>),
-    Other(String),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     /// Bare `name : Type;` / `name = expr;` without a kind keyword (SysML DefaultReferenceUsage).
@@ -1626,7 +1625,6 @@ pub enum OccurrenceBodyElement {
     Doc(Node<DocComment>),
     Annotation(Node<Annotation>),
     AssertConstraint(Node<AssertConstraintMember>),
-    Other(String),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
     AttributeUsage(Node<AttributeUsage>),
     PartUsage(Box<Node<PartUsage>>),

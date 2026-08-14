@@ -284,10 +284,6 @@ fn emit_part_def_body_element(
         PartDefBodyElement::KermlClassifier(n) => {
             super::root::emit_kerml_classifier_decl(w, path, &n.value)
         }
-        PartDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         PartDefBodyElement::UnsupportedMember(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }

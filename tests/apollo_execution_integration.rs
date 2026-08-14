@@ -10,11 +10,7 @@ use sysml_v2_parser::parse_with_diagnostics;
 const APOLLO_EXECUTION_FILE: &str =
     r"C:\Git\apollo-11-sysml-v2\Execution\Apollo11MissionExecutionPackage.sysml";
 
-fn walk_occurrence(
-    body: &OccurrenceUsageBody,
-    structured_assert_count: &mut usize,
-    degraded_assert_count: &mut usize,
-) {
+fn walk_occurrence(body: &OccurrenceUsageBody, structured_assert_count: &mut usize) {
     let OccurrenceUsageBody::Brace { elements } = body else {
         return;
     };
@@ -22,15 +18,8 @@ fn walk_occurrence(
     for element in elements {
         match &element.value {
             OccurrenceBodyElement::AssertConstraint(_) => *structured_assert_count += 1,
-            OccurrenceBodyElement::Other(text) if text == "assert constraint" => {
-                *degraded_assert_count += 1;
-            }
             OccurrenceBodyElement::OccurrenceUsage(occurrence) => {
-                walk_occurrence(
-                    &occurrence.value.body,
-                    structured_assert_count,
-                    degraded_assert_count,
-                );
+                walk_occurrence(&occurrence.value.body, structured_assert_count);
             }
             _ => {}
         }
@@ -59,7 +48,6 @@ fn apollo_execution_file_preserves_assert_constraints_structurally() {
     }
 
     let mut structured_assert_count = 0usize;
-    let mut degraded_assert_count = 0usize;
 
     let package = match &parsed.document.root.elements[0].value {
         RootElement::Package(package) => &package.value,
@@ -76,11 +64,7 @@ fn apollo_execution_file_preserves_assert_constraints_structurally() {
                         if let PartUsageBodyElement::OccurrenceUsage(occurrence) =
                             &body_element.value
                         {
-                            walk_occurrence(
-                                &occurrence.value.body,
-                                &mut structured_assert_count,
-                                &mut degraded_assert_count,
-                            );
+                            walk_occurrence(&occurrence.value.body, &mut structured_assert_count);
                         }
                     }
                 }
@@ -90,11 +74,7 @@ fn apollo_execution_file_preserves_assert_constraints_structurally() {
                     for body_element in elements {
                         if let PartDefBodyElement::OccurrenceUsage(occurrence) = &body_element.value
                         {
-                            walk_occurrence(
-                                &occurrence.value.body,
-                                &mut structured_assert_count,
-                                &mut degraded_assert_count,
-                            );
+                            walk_occurrence(&occurrence.value.body, &mut structured_assert_count);
                         }
                     }
                 }
@@ -106,9 +86,5 @@ fn apollo_execution_file_preserves_assert_constraints_structurally() {
     assert!(
         structured_assert_count > 0,
         "expected at least one structured assert-constraint member in apollo execution file"
-    );
-    assert_eq!(
-        degraded_assert_count, 0,
-        "assert constraints should not degrade into OccurrenceBodyElement::Other"
     );
 }

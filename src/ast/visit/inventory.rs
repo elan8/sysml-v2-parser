@@ -2295,9 +2295,6 @@ macro_rules! ast_traversal {
                 PartDefBodyElement::Dependency(field_0) => {
                     visitor.visit_dependency(field_0);
                 }
-                PartDefBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
-                }
                 PartDefBodyElement::AttributeDef(field_0) => {
                     visitor.visit_attribute_def(field_0);
                 }
@@ -3837,9 +3834,6 @@ macro_rules! ast_traversal {
                 }
                 OccurrenceBodyElement::AssertConstraint(field_0) => {
                     visitor.visit_assert_constraint_member(field_0);
-                }
-                OccurrenceBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
                 }
                 OccurrenceBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);

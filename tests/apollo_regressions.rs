@@ -276,12 +276,8 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
     else {
         panic!("expected ingress timeslice body");
     };
-    assert!(
-        ingress_elements.iter().all(
-            |e| !matches!(e.value, OccurrenceBodyElement::Other(ref text) if text == "assert constraint")
-        ),
-        "assert constraint should not degrade to OccurrenceBodyElement::Other"
-    );
+    // An occurrence body member can no longer degrade to opaque text: the scope has no such
+    // variant, so the structured member below is the only representation available.
     let assert_constraint = ingress_elements
         .iter()
         .find_map(|e| match &e.value {

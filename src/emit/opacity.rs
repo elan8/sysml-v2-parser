@@ -418,7 +418,6 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
         match &el.value {
             PartDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             PartDefBodyElement::KermlClassifier(n) => walk_calc_def_body(report, &p, &n.value.body),
-            PartDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             PartDefBodyElement::UnsupportedMember(_) => {
                 hit(report, &p, OpacityKind::UnsupportedGrammar)
             }
@@ -1182,7 +1181,6 @@ fn walk_occurrence_body_element(
 ) {
     match el {
         OccurrenceBodyElement::Error(_) => hit(report, path, OpacityKind::ParseError),
-        OccurrenceBodyElement::Other(_) => hit(report, path, OpacityKind::Other),
         OccurrenceBodyElement::Annotation(n) => walk_connect_body(report, path, &n.value.body),
         OccurrenceBodyElement::AssertConstraint(n) => {
             walk_constraint_def_body(report, path, &n.value.body)

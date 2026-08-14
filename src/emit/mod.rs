@@ -124,10 +124,10 @@ pub fn emit_sysml_with_options(
 mod tests {
     use super::*;
     use crate::ast::{
-        DeclarationName, Identification, Membership, MembershipKind, Node, Package, PackageBody,
-        PackageBodyElement, ParsedDocument, PartDef, PartDefBody, PartDefBodyElement,
-        QualifiedIdentification, QualifiedReferenceArena, RootElement, RootNamespace,
-        SourceStorage, Span, Visibility,
+        AttributeBody, AttributeBodyElement, AttributeDef, DeclarationName, Identification,
+        Membership, MembershipKind, Node, Package, PackageBody, PackageBodyElement, ParsedDocument,
+        PartDef, PartDefBody, PartDefBodyElement, QualifiedIdentification, QualifiedReferenceArena,
+        RootElement, RootNamespace, SourceStorage, Span, Visibility,
     };
 
     fn owning() -> Membership {
@@ -210,7 +210,29 @@ mod tests {
                                         body: PartDefBody::Brace {
                                             elements: vec![Node::new(
                                                 Span::dummy(),
-                                                PartDefBodyElement::Other("mystery;".into()),
+                                                PartDefBodyElement::AttributeDef(Node::new(
+                                                    Span::dummy(),
+                                                    AttributeDef {
+                                                        name: "mass".into(),
+                                                        short_name: None,
+                                                        typing: None,
+                                                        value: None,
+                                                        body: AttributeBody::Brace {
+                                                            elements: vec![Node::new(
+                                                                Span::dummy(),
+                                                                AttributeBodyElement::Other(
+                                                                    "mystery;".into(),
+                                                                ),
+                                                            )],
+                                                        },
+                                                        name_span: None,
+                                                        typing_span: None,
+                                                        value_span: None,
+                                                        ordered: false,
+                                                        nonunique: false,
+                                                        membership: owning(),
+                                                    },
+                                                )),
                                             )],
                                         },
                                         membership: owning(),
@@ -279,7 +301,29 @@ action def A {
                                         body: PartDefBody::Brace {
                                             elements: vec![Node::new(
                                                 Span::dummy(),
-                                                PartDefBodyElement::Other("x".into()),
+                                                PartDefBodyElement::AttributeDef(Node::new(
+                                                    Span::dummy(),
+                                                    AttributeDef {
+                                                        name: "mass".into(),
+                                                        short_name: None,
+                                                        typing: None,
+                                                        value: None,
+                                                        body: AttributeBody::Brace {
+                                                            elements: vec![Node::new(
+                                                                Span::dummy(),
+                                                                AttributeBodyElement::Other(
+                                                                    "x".into(),
+                                                                ),
+                                                            )],
+                                                        },
+                                                        name_span: None,
+                                                        typing_span: None,
+                                                        value_span: None,
+                                                        ordered: false,
+                                                        nonunique: false,
+                                                        membership: owning(),
+                                                    },
+                                                )),
                                             )],
                                         },
                                         membership: Membership::new(
