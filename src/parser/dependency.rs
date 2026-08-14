@@ -145,6 +145,19 @@ mod tests {
         );
     }
 
+    /// Spec42 Gap 37: a braced `RelationshipBody` owns feature members alongside the annotation
+    /// subset (`dependency z to x, y { feature e; }`, kerml `dependencies` fixture).
+    #[test]
+    fn dependency_body_owns_feature_members() {
+        let (dependency, _source, _arena) = parsed("dependency z to x, y { feature e; }");
+        let elements = dependency.body_elements.expect("braced body");
+        assert_eq!(elements.len(), 1);
+        let crate::ast::RelationshipBodyElement::KermlFeature(feature) = &elements[0].value else {
+            panic!("expected KermlFeature member");
+        };
+        assert_eq!(feature.value.name, "e");
+    }
+
     #[test]
     fn dependency_named_from_clients() {
         let (dependency, source, arena) =

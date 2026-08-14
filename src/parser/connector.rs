@@ -357,6 +357,15 @@ fn ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RefBodyElement>
         }
         crate::ast::RelationshipBodyElement::Error(n) => RefBodyElement::Error(n),
         crate::ast::RelationshipBodyElement::Other(text) => RefBodyElement::Other(text),
+        // `relationship_body_element` is the annotation-only subset and never produces owned
+        // feature members; those are dispatched by `relationship_body_member` (spec42 Gap 37),
+        // which ref bodies do not use.
+        crate::ast::RelationshipBodyElement::KermlFeature(_) => {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Alt,
+            )))
+        }
     };
     Ok((input, Node::new(span, wrapped)))
 }

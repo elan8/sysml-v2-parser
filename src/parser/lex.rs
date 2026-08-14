@@ -182,7 +182,8 @@ pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
 /// Starters for `RelationshipBody`-shaped brace bodies (alias/import/dependency and other
 /// annotation-only leaf bodies): BNF `RelationshipBody : Relationship = ';' | '{'
 /// (ownedRelationship += OwnedAnnotation)* '}'`.
-pub(crate) const RELATIONSHIP_BODY_STARTERS: &[&[u8]] = &[b"doc", b"comment", b"rep", b"@"];
+pub(crate) const RELATIONSHIP_BODY_STARTERS: &[&[u8]] =
+    &[b"doc", b"comment", b"rep", b"@", b"feature"];
 
 pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] =
     &[b"@", b"doc", b"filter", b"render", b"ref", b"abstract"];

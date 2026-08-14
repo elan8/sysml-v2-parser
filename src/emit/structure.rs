@@ -965,6 +965,9 @@ pub(crate) fn emit_relationship_body_element_local(
     use crate::ast::RelationshipBodyElement;
     match el {
         RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::KermlFeature(n) => {
+            super::view::emit_kerml_feature_member(w, path, &n.value)
+        }
         RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {

@@ -303,8 +303,9 @@ pub struct Dependency {
     pub clients: Vec<QualifiedReferenceId>,
     pub suppliers: Vec<QualifiedReferenceId>,
     pub body: ConnectBody,
-    /// Real annotation content from a braced body (BNF `RelationshipBody`: doc/comment/metadata
-    /// only). `None` when the body is a semicolon terminator.
+    /// Braced-body members (BNF `RelationshipBody`: the doc/comment/metadata annotation subset
+    /// plus owned feature members, spec42 Gap 37). `None` when the body is a semicolon
+    /// terminator.
     pub body_elements: Option<Vec<Node<RelationshipBodyElement>>>,
 }
 

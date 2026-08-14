@@ -450,6 +450,9 @@ fn emit_rel_body(
 ) -> Result<(), EmitError> {
     match el {
         RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::KermlFeature(n) => {
+            super::view::emit_kerml_feature_member(w, path, &n.value)
+        }
         RelationshipBodyElement::Comment(c) => super::root::emit_comment(w, &c.value),
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {

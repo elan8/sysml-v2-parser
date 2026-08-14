@@ -34,7 +34,7 @@ pub(crate) fn relationship_body_annotations(
         RELATIONSHIP_BODY_STARTERS,
         "relationship body",
         "recovered_relationship_body_element",
-        relationship_body_element,
+        relationship_body_member,
         |start, end| {
             let recovery = build_recovery_error_node_from_span(
                 start,
@@ -48,6 +48,23 @@ pub(crate) fn relationship_body_annotations(
         },
     )?;
     Ok((input, Some(elements)))
+}
+
+/// A full `RelationshipBody` member: the shared annotation subset plus owned related elements
+/// (`dependency z to x, y { feature e; }`; BNF `RelationshipBody`'s `ownedRelatedElement`,
+/// spec42 Gap 37). `relationship_body_element` stays annotation-only because ref bodies reuse it
+/// for their annotation tail.
+fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if let Ok((input, elem)) = map(crate::parser::constraint::kerml_feature_member, |n| {
+        RelationshipBodyElement::KermlFeature(Box::new(n))
+    })
+    .parse(input)
+    {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    relationship_body_element(input)
 }
 
 pub(crate) fn relationship_body_element(

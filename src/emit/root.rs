@@ -473,6 +473,9 @@ fn emit_relationship_body_element(
     use crate::ast::RelationshipBodyElement;
     match el {
         RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::KermlFeature(n) => {
+            super::view::emit_kerml_feature_member(w, path, &n.value)
+        }
         RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
         RelationshipBodyElement::TextualRep(r) => emit_textual_rep(w, &r.value),
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),

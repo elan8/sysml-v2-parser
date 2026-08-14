@@ -1280,6 +1280,9 @@ fn walk_relationship_body_elements(
         match &element.value {
             RelationshipBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             RelationshipBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
+            RelationshipBodyElement::KermlFeature(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
+            }
             RelationshipBodyElement::MetadataAnnotation(metadata) => {
                 walk_attribute_body(report, &p, &metadata.value.body)
             }

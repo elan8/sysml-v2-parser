@@ -1417,6 +1417,9 @@ pub enum RelationshipBodyElement {
     Comment(Node<CommentAnnotation>),
     TextualRep(Node<TextualRepresentation>),
     MetadataAnnotation(Node<MetadataAnnotation>),
+    /// Owned feature member (`dependency z to x, y { feature e; }`; BNF `RelationshipBody`'s
+    /// `ownedRelatedElement`, spec42 Gap 37); see [`crate::ast::KermlFeatureMember`].
+    KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
     Error(Node<ParseErrorNode>),
     /// Unmodeled body content captured as raw text (used for library parsing).
     Other(String),

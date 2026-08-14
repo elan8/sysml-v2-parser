@@ -311,6 +311,9 @@ fn collect_relationship_body_element_errors(
             RelationshipBodyElement::Error(n) => {
                 errors.push(parse_error_from_recovery_node(&element.span, &n.value));
             }
+            RelationshipBodyElement::KermlFeature(n) => {
+                collect_calc_body_errors(&n.value.body, errors);
+            }
             RelationshipBodyElement::TextualRep(n) => {
                 if let Some(diag) = textual_rep_language_diagnostic(&element.span, &n.value) {
                     errors.push(diag);

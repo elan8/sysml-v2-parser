@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 124.** `RelationshipBodyElement` gains a
+  `KermlFeature(Box<Node<KermlFeatureMember>>)` variant: braced `RelationshipBody` forms
+  (dependency/alias/relationship-statement bodies) now own feature members (`dependency z to
+  x, y { feature e; }`) per the BNF's `ownedRelatedElement`, instead of dropping the whole
+  bodied statement to error recovery (spec42 gap 37). Ref bodies keep the annotation-only
+  subset.
 - **`PARSE_AST_VERSION` is now 123.** `PartDefBodyElement`, `PartUsageBodyElement`, and
   `AttributeBodyElement` gain a `KermlClassifier(Box<Node<KermlClassifierDecl>>)` variant so
   KerML classifier-keyword declarations (`struct`, `classifier`, `datatype`, `assoc`,
