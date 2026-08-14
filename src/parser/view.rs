@@ -11,8 +11,8 @@ use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::import::import_shape;
 use crate::parser::lex::{
-    capture_opaque_member, name, qualified_reference, reference_path, starts_with_any_keyword,
-    visibility_prefix, ws1, ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    name, qualified_reference, reference_path, visibility_prefix, ws1, ws_and_comments,
+    VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::usage::{multiplicity_node, prefix_redefinition_target};
@@ -38,8 +38,14 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
         map(view_filter_member, ViewDefBodyElement::Filter),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
         map(
-            |i| capture_opaque_member(i, VIEW_DEF_OPAQUE_STARTERS),
-            ViewDefBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    VIEW_DEF_OPAQUE_STARTERS,
+                    "view definition body",
+                )
+            },
+            ViewDefBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -149,21 +155,15 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
 }
 
 fn view_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewDefBodyElement> {
-    if starts_with_any_keyword(start.fragment(), VIEW_DEF_BODY_STARTERS) {
-        let recovery = build_recovery_error_node_from_span(
-            start,
-            end,
-            VIEW_DEF_BODY_STARTERS,
-            "view definition body",
-            "recovered_view_def_body_element",
-        );
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        return node_from_to(start, end, ViewDefBodyElement::Error(node));
-    }
-    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(60)])
-        .trim()
-        .to_string();
-    node_from_to(start, end, ViewDefBodyElement::Other(preview))
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        VIEW_DEF_BODY_STARTERS,
+        "view definition body",
+        "recovered_view_def_body_element",
+    );
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    node_from_to(start, end, ViewDefBodyElement::Error(node))
 }
 
 fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
@@ -249,8 +249,14 @@ fn rendering_def_body_element(
         map(view_filter_member, RenderingDefBodyElement::Filter),
         map(view_rendering_usage, RenderingDefBodyElement::ViewRendering),
         map(
-            |i| capture_opaque_member(i, RENDERING_DEF_OPAQUE_STARTERS),
-            RenderingDefBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    RENDERING_DEF_OPAQUE_STARTERS,
+                    "rendering definition body",
+                )
+            },
+            RenderingDefBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -392,21 +398,15 @@ fn satisfy_view_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisf
 }
 
 fn view_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewBodyElement> {
-    if starts_with_any_keyword(start.fragment(), VIEW_BODY_STARTERS) {
-        let recovery = build_recovery_error_node_from_span(
-            start,
-            end,
-            VIEW_BODY_STARTERS,
-            "view body",
-            "recovered_view_body_element",
-        );
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        return node_from_to(start, end, ViewBodyElement::Error(node));
-    }
-    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(60)])
-        .trim()
-        .to_string();
-    node_from_to(start, end, ViewBodyElement::Other(preview))
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        VIEW_BODY_STARTERS,
+        "view body",
+        "recovered_view_body_element",
+    );
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    node_from_to(start, end, ViewBodyElement::Error(node))
 }
 
 fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {

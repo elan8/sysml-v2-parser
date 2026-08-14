@@ -337,6 +337,9 @@ pub type AttributeBody = Body<AttributeBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AttributeBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     AttributeDef(Node<AttributeDef>),
@@ -399,7 +402,6 @@ pub enum AttributeBodyElement {
     /// constraint checkedConstraints : ConstraintCheck[0..*] :> ... { ... }`, Systems Library
     /// `Items.sysml`; spec42 Gap 49a).
     ConstraintUsage(Box<Node<ConstraintUsage>>),
-    Other(String),
 }
 
 /// Item definition: `item def` Identification body (for events, etc.).
@@ -992,6 +994,9 @@ pub type PortDefBody = Body<PortDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PortDefBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     InOutDecl(Node<InOutDecl>),
     Doc(Node<DocComment>),
     Error(Node<ParseErrorNode>),
@@ -1009,7 +1014,6 @@ pub enum PortDefBodyElement {
     /// APIS_HTTP { ... }`) -- previously port definition bodies had no `#`/`@` annotation support
     /// at all, unlike part/item/action/etc. bodies. See `PackageBodyElement::MetadataKeywordUsage`.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
-    Other(String),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
@@ -1365,8 +1369,6 @@ pub enum RelationshipBodyElement {
     /// `ownedRelatedElement`, spec42 Gap 37); see [`crate::ast::KermlFeatureMember`].
     KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
     Error(Node<ParseErrorNode>),
-    /// Unmodeled body content captured as raw text (used for library parsing).
-    Other(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -1663,10 +1665,12 @@ pub type DefinitionBody = Body<DefinitionBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum DefinitionBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     OccurrenceMember(Node<OccurrenceBodyElement>),
-    Other(String),
 }
 // ---------------------------------------------------------------------------
 // Part usage body: bind, interface usage, connect

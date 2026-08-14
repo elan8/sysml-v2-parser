@@ -39,6 +39,9 @@ pub enum UnsupportedProduction {
     ReferenceConnectionUsage,
     ConnectionUsageInPartDefinition,
     ActionBodyMember,
+    /// A spec-valid member of a definition or usage body that this scope does not model yet.
+    /// The body it appeared in is identified by the diagnostic's span and message.
+    UnmodelledBodyMember,
 }
 
 /// Explicit AST state for valid grammar that this parser cannot yet model in the current scope.

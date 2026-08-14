@@ -112,10 +112,6 @@ fn emit_requirement_body_element(
 ) -> Result<(), EmitError> {
     match el {
         RequirementDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RequirementDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         RequirementDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         RequirementDefBodyElement::Import(i) => emit_import(w, &i.value),
         RequirementDefBodyElement::AttributeDef(a) => {
@@ -459,10 +455,6 @@ fn emit_rel_body(
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
     }
 }
 
@@ -745,10 +737,6 @@ fn emit_use_case_body_element(
 ) -> Result<(), EmitError> {
     match el {
         UseCaseDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        UseCaseDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         UseCaseDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         UseCaseDefBodyElement::SubjectDecl(s) => emit_subject_decl(w, &s.value),
         UseCaseDefBodyElement::SubjectRef(_) => {

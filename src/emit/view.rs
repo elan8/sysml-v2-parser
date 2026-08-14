@@ -83,10 +83,6 @@ pub(crate) fn emit_constraint_body_element(
 ) -> Result<(), EmitError> {
     match el {
         ConstraintDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        ConstraintDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         ConstraintDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         ConstraintDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ConstraintDefBodyElement::Expression(e) => {
@@ -95,6 +91,9 @@ pub(crate) fn emit_constraint_body_element(
             Ok(())
         }
         ConstraintDefBodyElement::Constraint(c) => emit_constraint_usage(w, path, &c.value),
+        ConstraintDefBodyElement::FeatureDecl(declaration) => {
+            super::structure::emit_default_reference_usage(w, path, &declaration.value)
+        }
         ConstraintDefBodyElement::AttributeUsage(a) => {
             // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).
             if a.value.redefines.is_some()
@@ -601,11 +600,8 @@ pub(crate) fn emit_view_def(
                     crate::ast::ViewDefBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::ViewDefBodyElement::Other(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::Other,
-                        });
+                    crate::ast::ViewDefBodyElement::Unsupported(unsupported) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
                     crate::ast::ViewDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::ViewDefBodyElement::MetadataAnnotation(m) => {
@@ -687,12 +683,6 @@ pub(crate) fn emit_view_usage(
                 match &el.value {
                     crate::ast::ViewBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
-                    }
-                    crate::ast::ViewBodyElement::Other(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::Other,
-                        });
                     }
                     crate::ast::ViewBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::ViewBodyElement::Filter(f) => {
@@ -847,11 +837,8 @@ pub(crate) fn emit_rendering_def(
                     crate::ast::RenderingDefBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::RenderingDefBodyElement::Other(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::Other,
-                        });
+                    crate::ast::RenderingDefBodyElement::Unsupported(unsupported) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
                     crate::ast::RenderingDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::RenderingDefBodyElement::Filter(f) => {

@@ -76,11 +76,14 @@ fn assert_no_other_in_constraint(src: &str) {
     let ConstraintDefBody::Brace { elements, .. } = body else {
         panic!("brace body");
     };
+    // A constraint body has no opaque member state left: unrecognized content is a diagnosed
+    // recovery node, and a spec-valid member the parser does not model is an explicit unsupported
+    // node. Either would show up here.
     assert!(
         !elements
             .iter()
-            .any(|e| matches!(e.value, ConstraintDefBodyElement::Other(_))),
-        "unexpected Other in constraint body: {:?}",
+            .any(|e| matches!(e.value, ConstraintDefBodyElement::Error(_))),
+        "unexpected recovery node in constraint body: {:?}",
         elements.iter().map(|e| &e.value).collect::<Vec<_>>()
     );
 }

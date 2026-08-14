@@ -525,7 +525,7 @@ mod tests {
             "package P;",
             Err(EmitError::Opaque {
                 path: "root.elements[0]".to_owned(),
-                kind: sysml_v2_parser::OpacityKind::Other,
+                kind: sysml_v2_parser::OpacityKind::OpaqueConnectBrace,
             }),
         )
         .expect("opacity is a representable FORMAT outcome");

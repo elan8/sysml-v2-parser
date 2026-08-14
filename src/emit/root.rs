@@ -479,10 +479,6 @@ fn emit_relationship_body_element(
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
     }
 }
 

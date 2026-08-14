@@ -865,7 +865,6 @@ pub enum StateDefBodyElement {
     Annotation(Node<Annotation>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
-    Other(String),
     /// `in`/`out`/`inout` parameter redecl inside `entry`/`do`/`exit` action bodies
     /// (e.g. `do 'sense temperature' { out temp; }`, validation `05`).
     InOutDecl(Node<InOutDecl>),

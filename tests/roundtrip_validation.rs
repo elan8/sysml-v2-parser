@@ -109,11 +109,16 @@ const ROUNDTRIP_PASS: &[&str] = &[
 const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     // Promoted by spec42 Gap 42: anonymous `action :>>`/`assert constraint` state/part-body
     // members now parse and emit without the double-space warts.
+    // Promoted by the constraint-body feature declaration (`mass : Real;`): a constraint
+    // definition body is a `DefinitionBody`, so it owns usages, not only expressions.
+    "Analysis Examples/Dynamics.sysml",
     "Analysis Examples/Turbojet Stage Analysis.sysml",
     "Arrowhead Framework Example/AHFProfileLib.sysml",
     "Camera Example/Camera.sysml",
     "Camera Example/PictureTaking.sysml",
     "Comment Examples/Comments.sysml",
+    // Promoted alongside Dynamics.sysml above.
+    "Simple Tests/ConstraintTest.sysml",
     "Geometry Examples/CarWithEnvelopingShape.sysml",
     // Promoted by spec42 Gap 42 (see Turbojet Stage Analysis above).
     "Geometry Examples/CarWithShapeAndCSG.sysml",

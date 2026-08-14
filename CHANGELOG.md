@@ -65,6 +65,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A constraint body accepts a feature declaration.** `constraint c { mass : Real; }` parsed
+  `mass` as a bare expression and left `: Real;` for recovery, which the opaque capture then hid.
+  A constraint definition body is a `DefinitionBody`, so it owns usages as well as the constraint
+  expression. Two more release examples now round-trip: `Analysis Examples/Dynamics.sysml` and
+  `Simple Tests/ConstraintTest.sysml`.
+- **A redundant `;` between body members is separator punctuation.** It reached the member parser
+  and was reported as unrecognized content; it is now consumed where members are collected.
 - **An import with a braced body could not be serialized.** Its target span ran past the reference
   to wherever suffix parsing stopped, swallowing the whitespace before `{`, so the document failed
   the crate's own provenance validation -- `15_10_primitive_data_types` in the snapshot corpus was
@@ -109,6 +116,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **`Other(String)` is gone from every body scope.** Eleven scopes carried a member that held a
+  copy of the source with no span, no structure, and -- deliberately -- no diagnostic. It fired
+  along two different paths, and both were backwards: unrecognized text was swallowed silently
+  while *recognized* keywords got a diagnostic, and one path decided by sniffing the raw text for
+  `:>>` or a leading `ref`/`abstract`/`return`. Content the scope cannot parse is now a recovery
+  node with its authored span and a report; a spec-valid member the scope does not model is an
+  explicit `Unsupported` node carrying a warning. The two states stay distinct, and each exists
+  only in the scopes that can produce it. `capture_opaque_member` and `OpacityKind::Other` are
+  removed with the last producer.
+
 - **Two opaque body-member fallbacks the parser cannot produce.** `PartDefBodyElement::Other`
   and `OccurrenceBodyElement::Other` retained unrecognized member text as a string, but no
   parser path constructed either one: recovery in those scopes already produces a malformed or
@@ -122,7 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`PARSE_AST_VERSION` is now 140.** `Body` carries its delimiters: `Semicolon` holds the `;`
+- **`PARSE_AST_VERSION` is now 141.** `Body` carries its delimiters: `Semicolon` holds the `;`
   span, `Brace` holds both brace spans, and a new `Absent` variant covers a declaration that
   never had a body to write. `IfStmt`'s branches become `ActionBranchBody`. `RefBodyElement` is
   removed: `RefBody` is now

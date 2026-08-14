@@ -124,10 +124,9 @@ pub fn emit_sysml_with_options(
 mod tests {
     use super::*;
     use crate::ast::{
-        AttributeBody, AttributeBodyElement, AttributeDef, DeclarationName, Identification,
-        Membership, MembershipKind, Node, Package, PackageBody, PackageBodyElement, ParsedDocument,
-        PartDef, PartDefBody, PartDefBodyElement, QualifiedIdentification, QualifiedReferenceArena,
-        RootElement, RootNamespace, SourceStorage, Span, Visibility,
+        DeclarationName, Identification, Membership, Node, Package, PackageBody,
+        PackageBodyElement, ParsedDocument, PartDef, PartDefBody, QualifiedIdentification,
+        QualifiedReferenceArena, RootElement, RootNamespace, SourceStorage, Span,
     };
 
     fn owning() -> Membership {
@@ -190,72 +189,31 @@ mod tests {
     }
 
     #[test]
-    fn emit_rejects_opaque_other() {
-        let root = RootNamespace {
-            elements: vec![Node::new(
-                Span::dummy(),
-                RootElement::Package(Node::new(
-                    Span::dummy(),
-                    Package {
-                        identification: package_identification("P"),
-                        body: PackageBody::Brace {
-                            open_span: Span::dummy(),
-                            close_span: Span::dummy(),
-                            elements: vec![Node::new(
-                                Span::dummy(),
-                                PackageBodyElement::PartDef(Node::new(
-                                    Span::dummy(),
-                                    PartDef {
-                                        definition_prefix: None,
-                                        is_individual: false,
-                                        identification: Identification {
-                                            short_name: None,
-                                            name: Some("Vehicle".into()),
-                                        },
-                                        specializes: None,
-                                        body: PartDefBody::Brace {
-                                            open_span: Span::dummy(),
-                                            close_span: Span::dummy(),
-                                            elements: vec![Node::new(
-                                                Span::dummy(),
-                                                PartDefBodyElement::AttributeDef(Node::new(
-                                                    Span::dummy(),
-                                                    AttributeDef {
-                                                        name: "mass".into(),
-                                                        short_name: None,
-                                                        typing: None,
-                                                        value: None,
-                                                        body: AttributeBody::Brace {
-                                                            open_span: Span::dummy(),
-                                                            close_span: Span::dummy(),
-                                                            elements: vec![Node::new(
-                                                                Span::dummy(),
-                                                                AttributeBodyElement::Other(
-                                                                    "mystery;".into(),
-                                                                ),
-                                                            )],
-                                                        },
-                                                        name_span: None,
-                                                        typing_span: None,
-                                                        value_span: None,
-                                                        ordered: false,
-                                                        nonunique: false,
-                                                        membership: owning(),
-                                                    },
-                                                )),
-                                            )],
-                                        },
-                                        membership: owning(),
-                                    },
-                                )),
-                            )],
-                        },
-                    },
-                )),
-            )],
-        };
-        let err = emit_sysml(&document(root)).expect_err("opaque");
-        assert!(matches!(err, EmitError::Opaque { .. }));
+    fn emit_rejects_an_opaque_connect_body() {
+        // A `connect` body inside a part definition is retained only as a marker, with its members
+        // held elsewhere, so emission cannot reproduce it and says so rather than guessing.
+        let source = "package P {\n    part def Q {\n        connect a to b {\n            doc /* why */\n        }\n    }\n}\n";
+        let document = crate::parse_for_editor(source).document;
+        let error = emit_sysml(&document).expect_err("an opaque body cannot be emitted");
+        assert!(
+            matches!(
+                error,
+                EmitError::Opaque {
+                    kind: OpacityKind::OpaqueConnectBrace,
+                    ..
+                }
+            ),
+            "unexpected error: {error:?}"
+        );
+    }
+
+    #[test]
+    fn opacity_report_finds_an_opaque_connect_body() {
+        let source = "package P {\n    part def Q {\n        connect a to b {\n            doc /* why */\n        }\n    }\n}\n";
+        let document = crate::parse_for_editor(source).document;
+        let report = opacity_report(&document.root);
+        assert!(!report.is_clean());
+        assert_eq!(report.hits[0].kind, OpacityKind::OpaqueConnectBrace);
     }
 
     #[test]
@@ -284,80 +242,6 @@ action def A {
             emitted,
             "package P {\n    action def A {\n        badstmt {}\n        action good {\n        }\n    }\n}\n"
         );
-    }
-
-    #[test]
-    fn opacity_report_finds_other() {
-        let root = RootNamespace {
-            elements: vec![Node::new(
-                Span::dummy(),
-                RootElement::Package(Node::new(
-                    Span::dummy(),
-                    Package {
-                        identification: package_identification("P"),
-                        body: PackageBody::Brace {
-                            open_span: Span::dummy(),
-                            close_span: Span::dummy(),
-                            elements: vec![Node::new(
-                                Span::dummy(),
-                                PackageBodyElement::PartDef(Node::new(
-                                    Span::dummy(),
-                                    PartDef {
-                                        definition_prefix: None,
-                                        is_individual: false,
-                                        identification: Identification {
-                                            short_name: None,
-                                            name: Some("Vehicle".into()),
-                                        },
-                                        specializes: None,
-                                        body: PartDefBody::Brace {
-                                            open_span: Span::dummy(),
-                                            close_span: Span::dummy(),
-                                            elements: vec![Node::new(
-                                                Span::dummy(),
-                                                PartDefBodyElement::AttributeDef(Node::new(
-                                                    Span::dummy(),
-                                                    AttributeDef {
-                                                        name: "mass".into(),
-                                                        short_name: None,
-                                                        typing: None,
-                                                        value: None,
-                                                        body: AttributeBody::Brace {
-                                                            open_span: Span::dummy(),
-                                                            close_span: Span::dummy(),
-                                                            elements: vec![Node::new(
-                                                                Span::dummy(),
-                                                                AttributeBodyElement::Other(
-                                                                    "x".into(),
-                                                                ),
-                                                            )],
-                                                        },
-                                                        name_span: None,
-                                                        typing_span: None,
-                                                        value_span: None,
-                                                        ordered: false,
-                                                        nonunique: false,
-                                                        membership: owning(),
-                                                    },
-                                                )),
-                                            )],
-                                        },
-                                        membership: Membership::new(
-                                            MembershipKind::OwningMembership,
-                                            Some(Visibility::Private),
-                                            Span::dummy(),
-                                        ),
-                                    },
-                                )),
-                            )],
-                        },
-                    },
-                )),
-            )],
-        };
-        let report = opacity_report(&root);
-        assert!(!report.is_clean());
-        assert_eq!(report.hits[0].kind, OpacityKind::Other);
     }
 
     #[test]

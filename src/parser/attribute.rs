@@ -7,8 +7,8 @@ use crate::ast::{
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::lex::{
-    capture_opaque_member, identification, name, qualified_reference, short_name_prefix,
-    starts_with_keyword, subset_operator, ws1, ws_and_comments,
+    identification, name, qualified_reference, short_name_prefix, starts_with_keyword,
+    subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -329,8 +329,14 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
             AttributeBodyElement::ItemUsage(Box::new(n))
         }),
         map(
-            |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
-            AttributeBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    ATTRIBUTE_OPAQUE_STARTERS,
+                    "attribute body",
+                )
+            },
+            AttributeBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -1284,8 +1290,14 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
             AttributeBodyElement::AssertConstraint,
         ),
         map(
-            |i| capture_opaque_member(i, METADATA_OPAQUE_STARTERS),
-            AttributeBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    METADATA_OPAQUE_STARTERS,
+                    "metadata body",
+                )
+            },
+            AttributeBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;

@@ -46,8 +46,6 @@ pub type RequirementDefBody = Body<RequirementDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RequirementDefBodyElement {
     Error(Node<ParseErrorNode>),
-    /// Unmodeled requirement-body element captured as raw text (used for library parsing).
-    Other(String),
     Annotation(Node<Annotation>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
@@ -586,8 +584,6 @@ pub enum ReturnRefBodyElement {
 #[allow(clippy::large_enum_variant)]
 pub enum UseCaseDefBodyElement {
     Error(Node<ParseErrorNode>),
-    /// Unmodeled use-case / analysis-case body element captured as raw text (used for library parsing).
-    Other(String),
     Annotation(Node<Annotation>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),

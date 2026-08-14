@@ -408,8 +408,6 @@ fn return_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
 }
 
 fn map_use_case_body_recovery(start: Input<'_>, end: Input<'_>) -> UseCaseDefBodyElement {
-    let trimmed = start.fragment();
-    let is_redefinition = trimmed.windows(3).any(|w| w == b":>>");
     let recovery = build_recovery_error_node_from_span(
         start,
         end,
@@ -417,17 +415,8 @@ fn map_use_case_body_recovery(start: Input<'_>, end: Input<'_>) -> UseCaseDefBod
         "use case body",
         "recovered_use_case_body_element",
     );
-    let should_error =
-        matches!(recovery.code.as_str(), "missing_type_reference") && !is_redefinition;
-    if should_error {
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        UseCaseDefBodyElement::Error(node)
-    } else {
-        let frag = start.fragment();
-        let take = frag.len().min(80);
-        let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-        UseCaseDefBodyElement::Other(preview)
-    }
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    UseCaseDefBodyElement::Error(node)
 }
 
 fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBodyElement> {
@@ -466,10 +455,17 @@ fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDe
             nom::error::ErrorKind::Many0,
         )));
     }
-    let frag = start_after_ws.fragment();
-    let take = frag.len().min(80);
-    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    Ok((input, UseCaseDefBodyElement::Other(preview)))
+    let recovery = build_recovery_error_node_from_span(
+        start_after_ws,
+        input,
+        USE_CASE_BODY_STARTERS,
+        "use case body",
+        "recovered_use_case_body_element",
+    );
+    Ok((
+        input,
+        UseCaseDefBodyElement::Error(node_from_to(start_after_ws, input, recovery)),
+    ))
 }
 
 pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActorDecl>> {

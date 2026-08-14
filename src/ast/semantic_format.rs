@@ -138,13 +138,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         write!(self.writer, "({kind})")
     }
 
-    fn write_opaque(&mut self, first: &mut bool, kind: &str, source: &str) -> io::Result<()> {
-        self.write_item_prefix(first)?;
-        write!(self.writer, "({kind} (source ")?;
-        write_quoted(self.writer, source)?;
-        self.writer.write_str("))")
-    }
-
     fn write_expression(&mut self, expression: &Node<Expression>) -> io::Result<()> {
         self.writer.write_str("(expression ")?;
         write_span(self.writer, &expression.span)?;
@@ -522,6 +515,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 "connection-usage-in-part-definition"
             }
             super::UnsupportedProduction::ActionBodyMember => "action-body-member",
+            super::UnsupportedProduction::UnmodelledBodyMember => "unmodelled-body-member",
         })?;
         self.writer.write_str(") (code ")?;
         write_quoted(self.writer, &unsupported.diagnostic.code)?;
@@ -543,9 +537,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
-                        }
-                        RequirementDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
                         }
                         RequirementDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
@@ -686,9 +677,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
-                        ViewBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
-                        }
                         ViewBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
                         ViewBodyElement::Filter(_filter) => {
                             self.write_marker(&mut first, "filter")?;
@@ -726,9 +714,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
-                        }
-                        UseCaseDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
                         }
                         UseCaseDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
@@ -916,9 +901,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         }
                         StateDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
-                        }
-                        StateDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
                         }
                         StateDefBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "inout-declaration")?;
@@ -2406,8 +2388,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PortDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
                         }
-                        PortDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
+                        super::PortDefBodyElement::Unsupported(unsupported) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_unsupported(&unsupported.value, &element.span)?;
                         }
                     }
                 }

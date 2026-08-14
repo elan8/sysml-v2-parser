@@ -226,6 +226,14 @@ where
                 nom::error::ErrorKind::Eof,
             )));
         }
+        // A redundant `;` between members terminates nothing: it is separator punctuation, not a
+        // member, so it is consumed here rather than reaching the member parser and being reported
+        // as unrecognized content.
+        if input.fragment().starts_with(b";") {
+            let (next, _) = tag(&b";"[..]).parse(input)?;
+            input = next;
+            continue;
+        }
         if input.fragment().starts_with(b"}") {
             let (close_start, _) = ws_and_comments(input)?;
             let (input, _) = tag(&b"}"[..]).parse(close_start)?;

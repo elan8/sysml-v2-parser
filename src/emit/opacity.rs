@@ -19,7 +19,6 @@ use crate::ast::{
 /// Kind of opaque or recovery content found in an AST.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpacityKind {
-    Other,
     ExtendedLibraryDecl,
     KermlSemanticDecl,
     KermlFeatureDecl,
@@ -292,13 +291,15 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
         let p = format!("{path}/body[{i}]");
         match &element.value {
             ConstraintDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            ConstraintDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             ConstraintDefBodyElement::Constraint(c) => {
                 walk_constraint_def_body(report, &p, &c.value.body)
             }
             ConstraintDefBodyElement::AttributeUsage(a) => {
                 walk_attribute_body(report, &p, &a.value.body)
             }
+            // A keyword-less feature declaration owns only an optional binding list, which the
+            // opacity report has nothing to walk into.
+            ConstraintDefBodyElement::FeatureDecl(_) => {}
             ConstraintDefBodyElement::MetadataAnnotation(metadata) => {
                 walk_attribute_body(report, &p, &metadata.value.body)
             }
@@ -354,7 +355,9 @@ fn walk_rendering_def_body(report: &mut OpacityReport, path: &str, body: &Render
         let p = format!("{path}/body[{i}]");
         match &element.value {
             RenderingDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            RenderingDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
+            RenderingDefBodyElement::Unsupported(_) => {
+                hit(report, &p, OpacityKind::UnsupportedGrammar)
+            }
             RenderingDefBodyElement::ViewRendering(rendering) => {
                 walk_rendering_usage_body(report, &p, &rendering.value.body)
             }
@@ -670,7 +673,9 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
         let p = format!("{path}/body[{i}]");
         match &el.value {
             AttributeBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            AttributeBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
+            AttributeBodyElement::Unsupported(_) => {
+                hit(report, &p, OpacityKind::UnsupportedGrammar)
+            }
             AttributeBodyElement::KermlFeature(n) => walk_calc_def_body(report, &p, &n.value.body),
             AttributeBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
             AttributeBodyElement::KermlConnector(n) => {
@@ -719,7 +724,7 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
         let p = format!("{path}/body[{i}]");
         match &el.value {
             PortDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            PortDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
+            PortDefBodyElement::Unsupported(_) => hit(report, &p, OpacityKind::UnsupportedGrammar),
             PortDefBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
             PortDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortDefBodyElement::ItemDef(n) => walk_attribute_body(report, &p, &n.value.body),
@@ -968,7 +973,6 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
         let p = format!("{path}/body[{i}]");
         match &el.value {
             RequirementDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            RequirementDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             RequirementDefBodyElement::Annotation(n) => {
                 walk_connect_body(report, &p, &n.value.body)
             }
@@ -1026,7 +1030,6 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
         let p = format!("{path}/body[{i}]");
         match &el.value {
             UseCaseDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            UseCaseDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             UseCaseDefBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             UseCaseDefBodyElement::MetadataAnnotation(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -1107,7 +1110,6 @@ fn walk_state_def_body_elements(
         let p = format!("{path}/body[{i}]");
         match &el.value {
             StateDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            StateDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             StateDefBodyElement::Entry(n) => walk_state_def_body(report, &p, &n.value.body),
             StateDefBodyElement::Do(n) => walk_state_def_body(report, &p, &n.value.body),
             StateDefBodyElement::Exit(n) => walk_state_def_body(report, &p, &n.value.body),
@@ -1150,7 +1152,7 @@ fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody
         let p = format!("{path}/body[{i}]");
         match &el.value {
             ViewDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            ViewDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
+            ViewDefBodyElement::Unsupported(_) => hit(report, &p, OpacityKind::UnsupportedGrammar),
             ViewDefBodyElement::MetadataAnnotation(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }
@@ -1174,7 +1176,6 @@ fn walk_view_body(report: &mut OpacityReport, path: &str, body: &ViewBody) {
 fn walk_view_body_element(report: &mut OpacityReport, path: &str, el: &ViewBodyElement) {
     match el {
         ViewBodyElement::Error(_) => hit(report, path, OpacityKind::ParseError),
-        ViewBodyElement::Other(_) => hit(report, path, OpacityKind::Other),
         ViewBodyElement::ViewRendering(n) => walk_rendering_usage_body(report, path, &n.value.body),
         ViewBodyElement::Expose(n) => walk_connect_body(report, path, &n.value.body),
         ViewBodyElement::Satisfy(n) => walk_connect_body(report, path, &n.value.body),
@@ -1190,7 +1191,9 @@ fn walk_definition_body(report: &mut OpacityReport, path: &str, body: &Definitio
         let p = format!("{path}/body[{i}]");
         match &el.value {
             DefinitionBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            DefinitionBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
+            DefinitionBodyElement::Unsupported(_) => {
+                hit(report, &p, OpacityKind::UnsupportedGrammar)
+            }
             DefinitionBodyElement::OccurrenceMember(n) => {
                 walk_occurrence_body_element(report, &p, &n.value)
             }
@@ -1278,10 +1281,10 @@ fn walk_constraint_body_elements(
         let p = format!("{path}/body[{i}]");
         match &element.value {
             ConstraintDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            ConstraintDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             ConstraintDefBodyElement::Constraint(constraint) => {
                 walk_constraint_def_body(report, &p, &constraint.value.body)
             }
+            ConstraintDefBodyElement::FeatureDecl(_) => {}
             ConstraintDefBodyElement::AttributeUsage(attribute) => {
                 walk_attribute_body(report, &p, &attribute.value.body)
             }
@@ -1327,7 +1330,6 @@ fn walk_relationship_body_elements(
         let p = format!("{path}/body[{i}]");
         match &element.value {
             RelationshipBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            RelationshipBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             RelationshipBodyElement::KermlFeature(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
             }

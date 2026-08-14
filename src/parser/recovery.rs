@@ -368,6 +368,62 @@ pub(crate) fn build_recovery_error_node_from_span(
     }
 }
 
+/// The member form of [`unsupported_body_member`]: recognizes one of the scope's spec-valid
+/// starter keywords, consumes the statement or block it introduces, and retains it as an
+/// unsupported node rather than as untyped text.
+pub(crate) fn unsupported_member<'a>(
+    input: crate::parser::Input<'a>,
+    starters: &[&[u8]],
+    scope_label: &str,
+) -> nom::IResult<crate::parser::Input<'a>, crate::ast::Node<crate::ast::UnsupportedGrammarNode>> {
+    use crate::parser::lex::{skip_statement_or_block, starts_with_any_keyword, ws_and_comments};
+    let (input, _) = ws_and_comments(input)?;
+    if !starts_with_any_keyword(input.fragment(), starters) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let start = input;
+    let (input, _) = skip_statement_or_block(input)?;
+    Ok((input, unsupported_body_member(start, input, scope_label)))
+}
+
+/// A spec-valid member that the containing scope does not model.
+///
+/// The member's text is retained by span, not copied, and it carries a diagnostic: keeping it
+/// silently -- as an opaque string with no report -- hid real gaps from every consumer.
+pub(crate) fn unsupported_body_member(
+    start: crate::parser::Input<'_>,
+    end: crate::parser::Input<'_>,
+    scope_label: &str,
+) -> crate::ast::Node<crate::ast::UnsupportedGrammarNode> {
+    let span = crate::parser::span::span_from_to(start, end);
+    let found = String::from_utf8_lossy(&start.fragment()[..span.len.min(start.fragment().len())])
+        .trim()
+        .to_string();
+    let diagnostic = ParseErrorNode {
+        message: format!(
+            "this {scope_label} member is spec-valid but not structurally implemented"
+        ),
+        code: "unsupported_grammar_form".to_owned(),
+        expected: None,
+        found: (!found.is_empty()).then_some(found),
+        suggestion: Some(
+            "The member is retained with its source span; its structure is not modelled yet."
+                .to_owned(),
+        ),
+        category: Some(DiagnosticCategory::UnsupportedGrammarForm),
+    };
+    crate::ast::Node::new(
+        span,
+        crate::ast::UnsupportedGrammarNode {
+            production: crate::ast::UnsupportedProduction::UnmodelledBodyMember,
+            diagnostic,
+        },
+    )
+}
+
 pub(crate) fn parse_error_from_recovery_node(
     span: &crate::ast::Span,
     node: &ParseErrorNode,
@@ -380,7 +436,9 @@ pub(crate) fn parse_error_from_recovery_node(
             node.category
                 .unwrap_or_else(|| category_from_code(node.code.as_str())),
         );
-    let severity = if node.code == "unsupported_annotation_syntax" {
+    let severity = if node.code == "unsupported_annotation_syntax"
+        || node.code == "unsupported_grammar_form"
+    {
         DiagnosticSeverity::Warning
     } else {
         DiagnosticSeverity::Error

@@ -1744,6 +1744,7 @@ macro_rules! ast_traversal {
                 UnsupportedProduction::ReferenceConnectionUsage => {}
                 UnsupportedProduction::ConnectionUsageInPartDefinition => {}
                 UnsupportedProduction::ActionBodyMember => {}
+                UnsupportedProduction::UnmodelledBodyMember => {}
             }
         }
 
@@ -2771,8 +2772,8 @@ macro_rules! ast_traversal {
                 AttributeBodyElement::ConstraintUsage(field_0) => {
                     visitor.visit_constraint_usage(&$($mutability)? **field_0);
                 }
-                AttributeBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
+                AttributeBodyElement::Unsupported(field_0) => {
+                    visitor.visit_unsupported_grammar_node(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -3406,8 +3407,8 @@ macro_rules! ast_traversal {
                 PortDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
-                PortDefBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
+                PortDefBodyElement::Unsupported(field_0) => {
+                    visitor.visit_unsupported_grammar_node(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -3740,9 +3741,6 @@ macro_rules! ast_traversal {
                 }
                 RelationshipBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
-                }
-                RelationshipBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -4126,8 +4124,8 @@ macro_rules! ast_traversal {
                 DefinitionBodyElement::OccurrenceMember(field_0) => {
                     visitor.visit_occurrence_body_element(field_0);
                 }
-                DefinitionBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
+                DefinitionBodyElement::Unsupported(field_0) => {
+                    visitor.visit_unsupported_grammar_node(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -5182,9 +5180,6 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
-                StateDefBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
-                }
                 StateDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
                 }
@@ -5417,9 +5412,6 @@ macro_rules! ast_traversal {
             match &$($mutability)? node.value {
                 RequirementDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
-                }
-                RequirementDefBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
                 }
                 RequirementDefBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
@@ -6043,9 +6035,6 @@ macro_rules! ast_traversal {
                 UseCaseDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                UseCaseDefBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
-                }
                 UseCaseDefBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
                 }
@@ -6246,8 +6235,8 @@ macro_rules! ast_traversal {
                 ConstraintDefBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(&$($mutability)? **field_0);
                 }
-                ConstraintDefBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
+                ConstraintDefBodyElement::FeatureDecl(field_0) => {
+                    visitor.visit_default_reference_usage(&$($mutability)? **field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -6453,8 +6442,8 @@ macro_rules! ast_traversal {
                 ViewDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                ViewDefBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
+                ViewDefBodyElement::Unsupported(field_0) => {
+                    visitor.visit_unsupported_grammar_node(field_0);
                 }
                 ViewDefBodyElement::Doc(field_0) => {
                     visitor.visit_doc_comment(field_0);
@@ -6581,8 +6570,8 @@ macro_rules! ast_traversal {
                 RenderingDefBodyElement::ViewRendering(field_0) => {
                     visitor.visit_view_rendering_usage(field_0);
                 }
-                RenderingDefBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
+                RenderingDefBodyElement::Unsupported(field_0) => {
+                    visitor.visit_unsupported_grammar_node(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -6635,9 +6624,6 @@ macro_rules! ast_traversal {
             match &$($mutability)? node.value {
                 ViewBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
-                }
-                ViewBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
                 }
                 ViewBodyElement::Doc(field_0) => {
                     visitor.visit_doc_comment(field_0);

@@ -352,8 +352,17 @@ fn test_state_def_recovery_no_longer_truncates_body() {
     assert!(
         elements
             .iter()
-            .any(|e| matches!(e.value, sysml_v2_parser::ast::StateDefBodyElement::Other(_))),
-        "unknown state members should be preserved explicitly instead of truncating the body"
+            .any(|e| matches!(e.value, sysml_v2_parser::ast::StateDefBodyElement::Error(_))),
+        "an unknown state member is kept as a diagnosed recovery node at its own position, not \
+         dropped and not swallowed as opaque text"
+    );
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|error| error.found.as_deref() == Some("unknown stuff;")),
+        "and it is reported against the text it could not parse: {:?}",
+        result.errors
     );
     assert!(
         elements.iter().any(|e| matches!(

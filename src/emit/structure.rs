@@ -541,10 +541,9 @@ fn emit_attribute_body_element(
 ) -> Result<(), EmitError> {
     match el {
         AttributeBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        AttributeBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
+        AttributeBodyElement::Unsupported(unsupported) => {
+            w.push_recovery_span(path, &unsupported.span)
+        }
         AttributeBodyElement::Doc(d) => emit_doc(w, &d.value),
         AttributeBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
@@ -706,10 +705,9 @@ fn emit_port_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         PortDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        PortDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
+        PortDefBodyElement::Unsupported(unsupported) => {
+            w.push_recovery_span(path, &unsupported.span)
+        }
         PortDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         PortDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PortDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
@@ -981,10 +979,6 @@ pub(crate) fn emit_relationship_body_element_local(
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
     }
 }
 

@@ -12,8 +12,8 @@ use crate::parser::constraint::constraint_def_body;
 use crate::parser::expr::path_expression;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::lex::{
-    capture_opaque_member, name, qualified_reference, recover_body_element, reference_path,
-    starts_with_keyword, visibility_prefix, ws1, ws_and_comments,
+    name, qualified_reference, recover_body_element, reference_path, starts_with_keyword,
+    visibility_prefix, ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -106,8 +106,14 @@ fn occurrence_definition_body_with_labels<'a>(
             let start = input;
             let (input, element) = nom::branch::alt((
                 nom::combinator::map(
-                    |i| capture_opaque_member(i, DEFINITION_BODY_OPAQUE_STARTERS),
-                    DefinitionBodyElement::Other,
+                    |i| {
+                        crate::parser::recovery::unsupported_member(
+                            i,
+                            DEFINITION_BODY_OPAQUE_STARTERS,
+                            "definition body",
+                        )
+                    },
+                    DefinitionBodyElement::Unsupported,
                 ),
                 nom::combinator::map(
                     occurrence_body_element,

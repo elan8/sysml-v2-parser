@@ -67,10 +67,17 @@ fn other_requirement_body_element(
             nom::error::ErrorKind::Many0,
         )));
     }
-    let frag = start_after_ws.fragment();
-    let take = frag.len().min(80);
-    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    Ok((input, RequirementDefBodyElement::Other(preview)))
+    let recovery = build_recovery_error_node_from_span(
+        start_after_ws,
+        input,
+        REQUIREMENT_BODY_STARTERS,
+        "requirement body",
+        "recovered_requirement_body_element",
+    );
+    Ok((
+        input,
+        RequirementDefBodyElement::Error(node_from_to(start_after_ws, input, recovery)),
+    ))
 }
 
 pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementDef>> {
@@ -125,12 +132,6 @@ fn requirement_body_recovery_element(
     start: Input<'_>,
     end: Input<'_>,
 ) -> Node<RequirementDefBodyElement> {
-    let trimmed = start.fragment();
-    let is_libraryish = trimmed.windows(3).any(|w| w == b":>>")
-        || trimmed.starts_with(b"ref ")
-        || trimmed.starts_with(b"abstract ")
-        || trimmed.starts_with(b"return ")
-        || trimmed.starts_with(b"objective ");
     let recovery = build_recovery_error_node_from_span(
         start,
         end,
@@ -138,23 +139,11 @@ fn requirement_body_recovery_element(
         "requirement body",
         "recovered_requirement_body_element",
     );
-    let should_error = if is_libraryish {
-        matches!(recovery.code.as_str(), "missing_type_reference")
-    } else {
-        true
-    };
-    if should_error {
-        node_from_to(
-            start,
-            end,
-            RequirementDefBodyElement::Error(node_from_to(start, end, recovery)),
-        )
-    } else {
-        let frag = start.fragment();
-        let take = frag.len().min(80);
-        let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-        node_from_to(start, end, RequirementDefBodyElement::Other(preview))
-    }
+    node_from_to(
+        start,
+        end,
+        RequirementDefBodyElement::Error(node_from_to(start, end, recovery)),
+    )
 }
 
 fn requirement_def_body_element(

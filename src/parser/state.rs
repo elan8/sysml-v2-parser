@@ -70,24 +70,11 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
                 "state body",
                 "recovered_state_body_element",
             );
-            if matches!(
-                recovery.code.as_str(),
-                "missing_type_reference"
-                    | "invalid_bare_identifier_in_state_body"
-                    | "missing_semicolon"
-                    | "missing_body_or_semicolon"
-            ) {
-                node_from_to(
-                    start,
-                    end,
-                    StateDefBodyElement::Error(node_from_to(start, end, recovery)),
-                )
-            } else {
-                let frag = start.fragment();
-                let take = frag.len().min(80);
-                let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-                node_from_to(start, end, StateDefBodyElement::Other(preview))
-            }
+            node_from_to(
+                start,
+                end,
+                StateDefBodyElement::Error(node_from_to(start, end, recovery)),
+            )
         },
     )?;
     Ok((input, members.into_body()))

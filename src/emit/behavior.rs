@@ -714,10 +714,6 @@ fn emit_state_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         StateDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        StateDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         StateDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         StateDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         StateDefBodyElement::Entry(e) => {
@@ -1066,11 +1062,8 @@ fn emit_definition_body(
                         crate::ast::DefinitionBodyElement::Error(error) => {
                             w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                         }
-                        crate::ast::DefinitionBodyElement::Other(_) => {
-                            return Err(EmitError::Opaque {
-                                path: format!("{path}/body[{i}]"),
-                                kind: super::OpacityKind::Other,
-                            });
+                        crate::ast::DefinitionBodyElement::Unsupported(unsupported) => {
+                            w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                         }
                         crate::ast::DefinitionBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                         crate::ast::DefinitionBodyElement::OccurrenceMember(o) => {

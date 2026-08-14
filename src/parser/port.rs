@@ -13,8 +13,8 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::enumeration::enum_usage;
 use crate::parser::item::{directed_item_usage, item_def_required, item_usage};
 use crate::parser::lex::{
-    capture_opaque_member, name, short_name_prefix, starts_with_keyword, ws1, ws_and_comments,
-    PORT_BODY_STARTERS, PORT_DEF_BODY_STARTERS,
+    name, short_name_prefix, starts_with_keyword, ws1, ws_and_comments, PORT_BODY_STARTERS,
+    PORT_DEF_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -259,8 +259,14 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         map(enum_usage, PortDefBodyElement::EnumerationUsage),
         map(port_usage, PortDefBodyElement::PortUsage),
         map(
-            |i| capture_opaque_member(i, PORT_DEF_OPAQUE_STARTERS),
-            PortDefBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    PORT_DEF_OPAQUE_STARTERS,
+                    "port definition body",
+                )
+            },
+            PortDefBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;

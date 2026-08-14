@@ -324,8 +324,8 @@ fn test_analysis_ref_redefinition_is_structured_not_other() {
     assert!(
         !case_body
             .iter()
-            .any(|e| { matches!(e.value, UseCaseDefBodyElement::Other(_)) }),
-        "ref :>> should not land in Other"
+            .any(|e| { matches!(e.value, UseCaseDefBodyElement::Error(_)) }),
+        "`ref :>>` should parse structurally, not become a recovery node"
     );
 }
 
