@@ -201,3 +201,38 @@ fn the_delimiters_slice_to_the_tokens_they_came_from() {
         ";"
     );
 }
+
+/// Spelling the delimiters correctly is not enough: a wire document could point them at any other
+/// `{ ... }` pair. They have to be *this* body's pair -- inside the owning declaration, and around
+/// its own members -- and deserialization rejects them when they are not.
+#[cfg(feature = "serde")]
+#[test]
+fn a_delimiter_redirected_to_another_body_is_rejected() {
+    let source = "package P {\n  part def A {\n    attribute x : Real;\n  }\n  part def B { }\n}\n";
+    let document = sysml_v2_parser::parse_for_editor(source).document;
+    let encoded = serde_json::to_value(&document).expect("the parsed document serializes");
+
+    // Both braces of the *first* part def, redirected to the well-formed pair of the second: the
+    // tokens still spell `{` and `}`, and the open still precedes the close.
+    let path =
+        "/root/elements/0/value/Package/value/body/Brace/elements/0/value/PartDef/value/body/Brace";
+    let sibling =
+        "/root/elements/0/value/Package/value/body/Brace/elements/1/value/PartDef/value/body/Brace";
+    let mut tampered = encoded.clone();
+    for delimiter in ["open_span", "close_span"] {
+        let replacement = tampered
+            .pointer(&format!("{sibling}/{delimiter}"))
+            .cloned()
+            .expect("the sibling body's delimiter");
+        *tampered
+            .pointer_mut(&format!("{path}/{delimiter}"))
+            .expect("the first body's delimiter") = replacement;
+    }
+    let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
+        .expect_err("delimiters belonging to another body must be rejected");
+    let message = error.to_string();
+    assert!(
+        message.contains("outside"),
+        "expected a containment failure, got: {message}"
+    );
+}

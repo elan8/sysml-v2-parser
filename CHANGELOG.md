@@ -33,9 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hand-rolled reconstruction of those positions (arithmetic over consumed lengths, in the
   `first`/`merge` body) is gone, and the shared brace-member routine now returns the delimiters
   along with the members, so no scope has to consume `{` and `}` correctly on its own. There is
-  Deserialization validates them: a delimiter span must still slice to the token it claims and a
-  body's open brace must precede its close, so a tampered wire document is rejected rather than
-  trusted. Both alternatives require an authored token, so the container cannot represent a
+  Deserialization validates them against the tree, not just against themselves: a delimiter must
+  slice to the token it claims, lie inside the declaration that owns it, and -- for a brace pair --
+  wrap that body's own members in order. Pointing a body's delimiters at another well-formed
+  `{ ... }` pair elsewhere in the document is therefore rejected. The traversal grew `enter_node`
+  and `leave_node` hooks so a consumer can tell which declaration it is inside. Both alternatives require an authored token, so the container cannot represent a
   declaration with no body at all; the two places that accept one -- a `#Name` metadata keyword
   used as a prefix, and an action usage whose terminator is inferred -- hold `Option<Body<_>>`,
   which confines that state to them instead of offering it to every scope. There is deliberately
@@ -54,6 +56,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An import with a braced body could not be serialized.** Its target span ran past the reference
+  to wherever suffix parsing stopped, swallowing the whitespace before `{`, so the document failed
+  the crate's own provenance validation -- `15_10_primitive_data_types` in the snapshot corpus was
+  one. The target now ends at its last authored token. A new corpus test serializes and
+  round-trips every snapshot document, so provenance is checked against every construct the parser
+  handles rather than a handful of fixtures.
 - **Emission no longer invents a `;` for a body that was never written.** A `#Name` prefix on a
   declaration and an action usage whose terminator the parser infers both stored their absent body
   as the semicolon form, so formatting wrote a `;` the author never typed -- splitting

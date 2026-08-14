@@ -137,6 +137,43 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     reference_transaction(input, import_inner)
 }
 
+/// The offset just past an import target's last authored token: its final suffix or filter member
+/// if it has one, otherwise the qualified reference itself.
+fn import_target_end(shape: &crate::ast::ImportShape, reference_end: usize) -> usize {
+    use crate::ast::ImportShape;
+    let span_end = |span: &crate::ast::Span| span.offset.saturating_add(span.len);
+    match shape {
+        ImportShape::Membership { recursive_suffix } => recursive_suffix
+            .as_ref()
+            .map_or(reference_end, |suffix| span_end(&suffix.span)),
+        ImportShape::Namespace {
+            wildcard_suffix,
+            recursive_suffix,
+            combined_recursive_suffix_span,
+        } => combined_recursive_suffix_span
+            .as_ref()
+            .map(span_end)
+            .or_else(|| {
+                recursive_suffix
+                    .as_ref()
+                    .map(|suffix| span_end(&suffix.span))
+            })
+            .unwrap_or_else(|| span_end(&wildcard_suffix.span)),
+        ImportShape::Filter {
+            recursive_suffix,
+            members,
+        } => members
+            .last()
+            .map(|member| span_end(&member.span))
+            .or_else(|| {
+                recursive_suffix
+                    .as_ref()
+                    .map(|suffix| span_end(&suffix.span))
+            })
+            .unwrap_or(reference_end),
+    }
+}
+
 fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -146,9 +183,14 @@ fn import_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
     let target_start = input;
     let (input, all) = opt(terminated(with_span(tag(&b"all"[..])), ws1)).parse(input)?;
     let all_span = all.map(|(span, _)| span);
-    let (input, reference) = qualified_reference(input)?;
-    let (input, shape) = import_shape(input)?;
-    let target_span = span_from_to(target_start, input);
+    let (after_reference, reference) = qualified_reference(input)?;
+    let (input, shape) = import_shape(after_reference)?;
+    // The target ends at its last authored token, not wherever shape parsing stopped: looking for
+    // an absent `::*` consumes the trivia before a braced body, and a span that swallowed it would
+    // no longer describe the target it claims.
+    let mut target_span = span_from_to(target_start, input);
+    target_span.len = import_target_end(&shape, after_reference.location_offset())
+        .saturating_sub(target_span.offset);
     let (input, body_elements) = relationship_body(input)?;
     Ok((
         input,
