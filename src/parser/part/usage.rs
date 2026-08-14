@@ -1074,12 +1074,11 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
 pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    // GH-88.4: leading `in`/`out`/`inout` direction, e.g. `private in ref y: A, B;` (Simple
-    // Tests/ItemTest.sysml:15).
-    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
-    // `BasicUsagePrefix = RefPrefix ('ref')?` -- the modifiers ahead of `ref` belong to the same
-    // production as the keyword.
+    // `BasicUsagePrefix = RefPrefix ('ref')?` -- the direction (GH-88.4, e.g. `private in ref y:
+    // A, B;`, Simple Tests/ItemTest.sysml:15) and the modifiers after it are all slots of
+    // `RefPrefix`, parsed there in the order the production gives them.
     let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
+    let direction = prefix.direction;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // Reject kinded refs so those forms parse as real PartUsage/ActionUsage/StateUsage/…

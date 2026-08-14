@@ -188,7 +188,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,
                 is_constant: prefix.is_constant,
-                direction: None,
+                direction: prefix.direction,
                 kind_keyword: None,
                 name: name_str,
                 typing,

@@ -57,25 +57,37 @@ fn gh86_6_in_out_decl_redefinition_accepts_trailing_type_clause() {
     else {
         panic!("expected brace action usage body");
     };
-    let in_out_decl = elements.iter().find_map(|e| match &e.value {
-        ActionUsageBodyElement::InOutDecl(decl) => Some(&decl.value),
-        _ => None,
-    });
-    let in_out_decl = in_out_decl.expect("expected an InOutDecl element");
+    // The `attribute` keyword makes this an attribute usage that carries a direction, not a bare
+    // directed parameter: `AttributeUsage::direction` is `RefPrefix`'s direction slot, and
+    // `in attribute y : Real;` already parsed this way. Only the keyword-less form
+    // (`in x : Real;`) is an `InOutDecl`. Before the direction became part of the shared
+    // `RefPrefix`, `attribute_usage` could not consume `out` and this fell through to
+    // `in_out_decl`, which is why this test used to look for one.
+    // The body also holds `attribute tp : Real = 1.0;`, so select the redefining member.
+    let usage = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            ActionUsageBodyElement::AttributeUsage(usage) if usage.value.redefines.is_some() => {
+                Some(&usage.value)
+            }
+            _ => None,
+        })
+        .expect("expected a redefining AttributeUsage element");
+    assert_eq!(usage.direction, Some(sysml_v2_parser::ast::InOut::Out));
     assert!(
-        in_out_decl.redefines.is_some(),
+        usage.redefines.is_some(),
         "expected structured redefinition target"
     );
     assert!(
-        in_out_decl.name.is_empty(),
+        usage.name.is_empty(),
         "a redefinition target is not a declaration name"
     );
     assert!(
-        in_out_decl.type_name.is_some(),
+        usage.typing.is_some(),
         "expected trailing type clause to be captured, not left empty"
     );
     assert!(
-        in_out_decl.value.is_some(),
+        usage.value.is_some(),
         "expected the trailing = value to still parse"
     );
 }

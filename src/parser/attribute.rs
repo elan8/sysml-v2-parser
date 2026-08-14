@@ -887,6 +887,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         (input, prefix, is_reference.is_some())
     };
     let crate::parser::usage::RefPrefix {
+        direction: prefix_direction,
         is_derived,
         usage_prefix,
         is_constant,
@@ -1129,7 +1130,9 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 name_span,
                 typing_span,
                 redefines_span,
-                direction: None,
+                // `RefPrefix`'s direction slot. `directed_attribute_usage` still overwrites this
+                // with the direction it consumed itself, which is the same value.
+                direction: prefix_direction,
                 multiplicity: mods.multiplicity,
                 ordered: mods.ordered,
                 nonunique: mods.nonunique,

@@ -17,14 +17,16 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// BNF `RefPrefix = ('derived')? ('abstract' | 'variation')? ('constant')?` (§8.2.2.6.2), the
-/// modifier chain every usage may carry ahead of its keyword.
+/// BNF `RefPrefix = FeatureDirection? 'derived'? ('abstract' | 'variation')? 'constant'?`
+/// (§8.2.2.6.2), the modifier chain every usage may carry ahead of its keyword.
 ///
 /// Owned here rather than re-spelled per usage parser: each parser that hand-rolled a subset of
 /// the chain accepted only the combinations that happened to be needed at the time, so a legal
 /// prefix was a parse gap in whichever scopes had not adopted it yet.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct RefPrefix {
+    /// `in` / `out` / `inout` -- the production's first slot, so it precedes every keyword below.
+    pub direction: Option<crate::ast::InOut>,
     pub is_derived: bool,
     /// `abstract` or `variation` -- one slot, since the BNF makes them alternatives.
     pub usage_prefix: Option<crate::ast::DefinitionPrefix>,
@@ -34,6 +36,7 @@ pub(crate) struct RefPrefix {
 /// Parse [`RefPrefix`]. Every part is optional, so this never fails; it consumes nothing when the
 /// next token is the usage keyword itself.
 pub(crate) fn ref_prefix(input: Input<'_>) -> IResult<Input<'_>, RefPrefix> {
+    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
     let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
     let (input, usage_prefix) = opt(nom::branch::alt((
         nom::combinator::map(preceded(tag(&b"abstract"[..]), ws1), |_| {
@@ -48,6 +51,7 @@ pub(crate) fn ref_prefix(input: Input<'_>) -> IResult<Input<'_>, RefPrefix> {
     Ok((
         input,
         RefPrefix {
+            direction,
             is_derived: is_derived.is_some(),
             usage_prefix,
             is_constant: is_constant.is_some(),

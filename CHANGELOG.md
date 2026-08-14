@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `in`/`out`/`inout` direction is part of the shared `RefPrefix`.** BNF
+  `RefPrefix = FeatureDirection? 'derived'? ('abstract' | 'variation')? 'constant'?` puts the
+  direction first, but it was parsed ad hoc by a few callers, so `in ref alternatives :
+  Anything[1..*] { ... }` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml`) had no
+  path in the scopes that had not hand-rolled one. It is now a slot of the shared prefix, and
+  `RefDecl` finally records it instead of hardcoding `None`. One consequence: `out attribute
+  :>> a_out : T = v;` is now the `AttributeUsage` its `attribute` keyword says it is, carrying
+  the direction on `AttributeUsage::direction`, rather than an `InOutDecl`; the keyword-less
+  `in x : Real;` is still an `InOutDecl`.
+
 - **Occurrence-style definition bodies no longer swallow members behind a visibility prefix.**
   `DefinitionBody` -- shared by `flow def`, `occurrence def`, `allocation def` and the rest --
   tried its opaque unsupported-member capture *before* the structured dispatch, the reverse of

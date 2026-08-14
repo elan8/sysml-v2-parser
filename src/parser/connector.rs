@@ -428,7 +428,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,
                 is_constant: prefix.is_constant,
-                direction: None,
+                direction: prefix.direction,
                 kind_keyword,
                 name: name_str,
                 typing,

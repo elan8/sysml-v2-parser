@@ -107,7 +107,7 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
                 nonunique: header.nonunique,
                 value,
                 body,
-                direction: None,
+                direction: prefix.direction,
                 is_individual: is_individual.is_some(),
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
