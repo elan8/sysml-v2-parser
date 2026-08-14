@@ -973,21 +973,17 @@ pub(crate) fn emit_relationship_body_element_local(
 ) -> Result<(), EmitError> {
     use crate::ast::RelationshipBodyElement;
     match el {
-        RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         RelationshipBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
-        RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
-        other @ (RelationshipBodyElement::TextualRep(_)
-        | RelationshipBodyElement::MetadataAnnotation(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
     }
 }
 
@@ -1223,10 +1219,9 @@ fn emit_ref_body_element(
 ) -> Result<(), EmitError> {
     use crate::ast::RefBodyElement;
     match el {
-        RefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RefBodyElement::Annotating(member) => super::root::emit_annotating_member(w, path, member),
         RefBodyElement::Ref(n) => emit_ref_decl(w, path, &n.value),
         RefBodyElement::AttributeUsage(n) => emit_attribute_usage(w, path, &n.value),
-        RefBodyElement::Comment(c) => emit_comment(w, &c.value),
         RefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
@@ -1234,9 +1229,7 @@ fn emit_ref_body_element(
         }),
         other @ (RefBodyElement::Action(_)
         | RefBodyElement::PartUsage(_)
-        | RefBodyElement::State(_)
-        | RefBodyElement::TextualRep(_)
-        | RefBodyElement::MetadataAnnotation(_)) => w.unsupported(
+        | RefBodyElement::State(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),

@@ -1280,12 +1280,25 @@ fn walk_ref_body(report: &mut OpacityReport, path: &str, body: &RefBody) {
             RefBodyElement::State(state) => {
                 walk_state_def_body_elements(report, &p, std::slice::from_ref(state))
             }
-            RefBodyElement::MetadataAnnotation(metadata) => {
-                walk_attribute_body(report, &p, &metadata.value.body)
-            }
-            RefBodyElement::Doc(_) | RefBodyElement::Comment(_) | RefBodyElement::TextualRep(_) => {
-            }
+            RefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
         }
+    }
+}
+
+/// Only a metadata annotation owns a body that can hide opaque members; documentation, comments,
+/// and textual representations are leaves.
+fn walk_annotating_member(
+    report: &mut OpacityReport,
+    path: &str,
+    member: &crate::ast::AnnotatingMember,
+) {
+    match member {
+        crate::ast::AnnotatingMember::MetadataAnnotation(metadata) => {
+            walk_attribute_body(report, path, &metadata.value.body)
+        }
+        crate::ast::AnnotatingMember::Doc(_)
+        | crate::ast::AnnotatingMember::Comment(_)
+        | crate::ast::AnnotatingMember::TextualRep(_) => {}
     }
 }
 
@@ -1302,12 +1315,9 @@ fn walk_relationship_body_elements(
             RelationshipBodyElement::KermlFeature(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
             }
-            RelationshipBodyElement::MetadataAnnotation(metadata) => {
-                walk_attribute_body(report, &p, &metadata.value.body)
+            RelationshipBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
             }
-            RelationshipBodyElement::Doc(_)
-            | RelationshipBodyElement::Comment(_)
-            | RelationshipBodyElement::TextualRep(_) => {}
         }
     }
 }

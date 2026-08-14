@@ -1,6 +1,6 @@
 //! Shared definition body terminators (semicolon or structured brace).
 
-use crate::ast::{DefinitionBody, Node, ParseErrorNode, RelationshipBodyElement};
+use crate::ast::{AnnotatingMember, DefinitionBody, Node, ParseErrorNode, RelationshipBodyElement};
 use crate::parser::lex::{
     recover_body_element, skip_statement_or_block, skip_until_brace_end, ws_and_comments,
     RELATIONSHIP_BODY_STARTERS,
@@ -67,36 +67,31 @@ fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<Relatio
     relationship_body_element(input)
 }
 
+/// The grammar's `AnnotatingElement` production (KerML 8.2.3.3.1, SysML 8.2.2.4.1).
+///
+/// A scope accepts the whole production or none of it, so every scope that owns annotating
+/// members dispatches through here rather than repeating the four alternatives.
+pub(crate) fn annotating_member(input: Input<'_>) -> IResult<Input<'_>, AnnotatingMember> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b"@") {
+        return map(metadata_annotation, AnnotatingMember::MetadataAnnotation).parse(input);
+    }
+    if let Ok(parsed) = map(doc_comment, AnnotatingMember::Doc).parse(input) {
+        return Ok(parsed);
+    }
+    if let Ok(parsed) = map(comment_annotation, AnnotatingMember::Comment).parse(input) {
+        return Ok(parsed);
+    }
+    map(textual_representation, AnnotatingMember::TextualRep).parse(input)
+}
+
 pub(crate) fn relationship_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b"@") {
-        let (input, elem) = map(
-            metadata_annotation,
-            RelationshipBodyElement::MetadataAnnotation,
-        )
-        .parse(input)?;
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(doc_comment, RelationshipBodyElement::Doc).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(comment_annotation, RelationshipBodyElement::Comment).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(textual_representation, RelationshipBodyElement::TextualRep).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    Err(nom::Err::Error(nom::error::Error::new(
-        input,
-        nom::error::ErrorKind::Alt,
-    )))
+    let (input, member) = annotating_member(input)?;
+    let elem = RelationshipBodyElement::Annotating(member);
+    Ok((input, node_from_to(start, input, elem)))
 }
 
 /// How to advance past a member that failed to parse.

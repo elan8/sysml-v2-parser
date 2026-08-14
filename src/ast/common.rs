@@ -519,3 +519,32 @@ pub enum ConnectBody {
     Semicolon,
     Brace,
 }
+
+/// A member that annotates its owner rather than declaring structure or behavior.
+///
+/// This is the grammar's own `AnnotatingElement` production, which both layers define
+/// identically -- KerML 8.2.3.3.1 and SysML 8.2.2.4.1 -- as
+/// `Comment | Documentation | TextualRepresentation | MetadataFeature`. A scope opts into the
+/// whole production or none of it: the family is not a place to collect members that merely look
+/// alike, and a scope that accepts only some of these members keeps them as its own variants
+/// until the parser supports the rest, so the type never claims coverage the parser lacks.
+///
+/// Two related forms are deliberately *not* here:
+///
+/// - `#Name` prefix metadata is `PrefixMetadataMember` (SysML 8.2.2.20.2), a prefix on a
+///   declaration rather than a member of a body, so it stays a scope-specific variant; and
+/// - `metadata name : Type;`, the other spelling of `MetadataUsage`, is modelled by a separate
+///   AST type whose body and ownership differ, and folding the two spellings together is a
+///   grammar question for the metadata audit rather than something this family should decide.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum AnnotatingMember {
+    /// `doc /* ... */`, optionally named.
+    Doc(Node<DocComment>),
+    /// `comment [about ...] /* ... */`, optionally named and locale-tagged.
+    Comment(Node<CommentAnnotation>),
+    /// `rep [name] language "..." /* ... */`.
+    TextualRep(Node<TextualRepresentation>),
+    /// The `@Name [about ...]` spelling of a metadata feature.
+    MetadataAnnotation(Node<crate::ast::MetadataAnnotation>),
+}

@@ -4,8 +4,7 @@ use super::behavior::{
 };
 use super::body::Body;
 use super::common::{
-    CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode,
-    TextualRepresentation,
+    AnnotatingMember, CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode,
 };
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
@@ -1368,10 +1367,8 @@ pub enum RefBodyElement {
     Action(Node<ActionDefBodyElement>),
     PartUsage(Node<PartUsageBodyElement>),
     State(Node<StateDefBodyElement>),
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
-    TextualRep(Node<TextualRepresentation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Error(Node<ParseErrorNode>),
     /// Unmodeled body content captured as raw text (used for library parsing).
     Other(String),
@@ -1386,10 +1383,8 @@ pub enum RefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RelationshipBodyElement {
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
-    TextualRep(Node<TextualRepresentation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     /// Owned feature member (`dependency z to x, y { feature e; }`; BNF `RelationshipBody`'s
     /// `ownedRelatedElement`, spec42 Gap 37); see [`crate::ast::KermlFeatureMember`].
     KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),

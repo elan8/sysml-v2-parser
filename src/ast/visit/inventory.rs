@@ -187,6 +187,11 @@ macro_rules! ast_traversal {
                 walk_textual_representation(self, node)
             }
 
+            /// Visits [`AnnotatingMember`]; the default implementation walks its children.
+            fn visit_annotating_member(&mut self, node: &$($mutability)? AnnotatingMember) {
+                walk_annotating_member(self, node)
+            }
+
             /// Visits [`ConnectBody`]; the default implementation walks its children.
             fn visit_connect_body(&mut self, node: &$($mutability)? ConnectBody) {
                 walk_connect_body(self, node)
@@ -1823,6 +1828,23 @@ macro_rules! ast_traversal {
                 visitor.visit_span(inner);
             }
             visitor.visit_text(text);
+        }
+
+        pub fn walk_annotating_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? AnnotatingMember) {
+            match node {
+                AnnotatingMember::Doc(field_0) => {
+                    visitor.visit_doc_comment(field_0);
+                }
+                AnnotatingMember::Comment(field_0) => {
+                    visitor.visit_comment_annotation(field_0);
+                }
+                AnnotatingMember::TextualRep(field_0) => {
+                    visitor.visit_textual_representation(field_0);
+                }
+                AnnotatingMember::MetadataAnnotation(field_0) => {
+                    visitor.visit_metadata_annotation(field_0);
+                }
+            }
         }
 
         pub fn walk_connect_body<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? ConnectBody) {
@@ -3537,17 +3559,8 @@ macro_rules! ast_traversal {
                 RefBodyElement::State(field_0) => {
                     visitor.visit_state_def_body_element(field_0);
                 }
-                RefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
-                }
-                RefBodyElement::Comment(field_0) => {
-                    visitor.visit_comment_annotation(field_0);
-                }
-                RefBodyElement::TextualRep(field_0) => {
-                    visitor.visit_textual_representation(field_0);
-                }
-                RefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
+                RefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 RefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
@@ -3561,17 +3574,8 @@ macro_rules! ast_traversal {
         pub fn walk_relationship_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RelationshipBodyElement>) {
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                RelationshipBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
-                }
-                RelationshipBodyElement::Comment(field_0) => {
-                    visitor.visit_comment_annotation(field_0);
-                }
-                RelationshipBodyElement::TextualRep(field_0) => {
-                    visitor.visit_textual_representation(field_0);
-                }
-                RelationshipBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
+                RelationshipBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 RelationshipBodyElement::KermlFeature(field_0) => {
                     visitor.visit_kerml_feature_member(&$($mutability)? **field_0);

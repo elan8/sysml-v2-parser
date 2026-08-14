@@ -7,8 +7,8 @@
 //! body survives into the AST instead of silently vanishing.
 
 use sysml_v2_parser::ast::{
-    AliasBody, ConnectBody, ConnectionDefBody, ConnectionDefBodyElement, PackageBody,
-    PackageBodyElement, PartDefBody, PartDefBodyElement, RefBody, RefBodyElement,
+    AliasBody, AnnotatingMember, ConnectBody, ConnectionDefBody, ConnectionDefBodyElement,
+    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RefBody, RefBodyElement,
     RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
 };
 use sysml_v2_parser::parse_with_diagnostics;
@@ -45,9 +45,10 @@ fn alias_body_retains_doc_comment() {
         panic!("expected brace alias body");
     };
     assert!(
-        elements
-            .iter()
-            .any(|e| matches!(&e.value, RelationshipBodyElement::Doc(_))),
+        elements.iter().any(|e| matches!(
+            &e.value,
+            RelationshipBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
         "expected doc comment retained in alias body, got: {elements:?}"
     );
 }
@@ -68,9 +69,10 @@ fn import_body_retains_doc_comment() {
         .as_ref()
         .expect("expected Some body_elements for a braced import body");
     assert!(
-        body_elements
-            .iter()
-            .any(|e| matches!(&e.value, RelationshipBodyElement::Doc(_))),
+        body_elements.iter().any(|e| matches!(
+            &e.value,
+            RelationshipBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
         "expected doc comment retained in import body, got: {body_elements:?}"
     );
 }
@@ -92,9 +94,10 @@ fn dependency_body_retains_doc_comment() {
         .as_ref()
         .expect("expected Some body_elements for a braced dependency body");
     assert!(
-        body_elements
-            .iter()
-            .any(|e| matches!(&e.value, RelationshipBodyElement::Doc(_))),
+        body_elements.iter().any(|e| matches!(
+            &e.value,
+            RelationshipBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
         "expected doc comment retained in dependency body, got: {body_elements:?}"
     );
 }
@@ -122,10 +125,10 @@ fn plain_connect_statement_retains_doc_comment() {
         .expect("expected connect statement");
     assert!(matches!(connect_stmt.body, ConnectBody::Brace));
     assert!(
-        connect_stmt
-            .body_elements
-            .iter()
-            .any(|e| matches!(&e.value, RelationshipBodyElement::Doc(_))),
+        connect_stmt.body_elements.iter().any(|e| matches!(
+            &e.value,
+            RelationshipBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
         "expected doc comment retained in connect statement body, got: {:?}",
         connect_stmt.body_elements
     );
@@ -157,9 +160,10 @@ fn connection_ref_body_retains_doc_comment() {
         panic!("expected brace ref body");
     };
     assert!(
-        elements
-            .iter()
-            .any(|e| matches!(&e.value, RefBodyElement::Doc(_))),
+        elements.iter().any(|e| matches!(
+            &e.value,
+            RefBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )),
         "expected doc comment retained in connection ref body, got: {elements:?}"
     );
 }

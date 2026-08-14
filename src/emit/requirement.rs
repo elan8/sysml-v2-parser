@@ -452,21 +452,17 @@ fn emit_rel_body(
     el: &RelationshipBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         RelationshipBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
-        RelationshipBodyElement::Comment(c) => super::root::emit_comment(w, &c.value),
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
-        other @ (RelationshipBodyElement::TextualRep(_)
-        | RelationshipBodyElement::MetadataAnnotation(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
     }
 }
 

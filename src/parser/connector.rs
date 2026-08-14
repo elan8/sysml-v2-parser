@@ -346,28 +346,13 @@ fn ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RefBodyElement>
             ),
         ));
     }
-    let (input, annotation) = crate::parser::body::relationship_body_element(input)?;
-    let span = annotation.span.clone();
-    let wrapped = match annotation.value {
-        crate::ast::RelationshipBodyElement::Doc(n) => RefBodyElement::Doc(n),
-        crate::ast::RelationshipBodyElement::Comment(n) => RefBodyElement::Comment(n),
-        crate::ast::RelationshipBodyElement::TextualRep(n) => RefBodyElement::TextualRep(n),
-        crate::ast::RelationshipBodyElement::MetadataAnnotation(n) => {
-            RefBodyElement::MetadataAnnotation(n)
-        }
-        crate::ast::RelationshipBodyElement::Error(n) => RefBodyElement::Error(n),
-        crate::ast::RelationshipBodyElement::Other(text) => RefBodyElement::Other(text),
-        // `relationship_body_element` is the annotation-only subset and never produces owned
-        // feature members; those are dispatched by `relationship_body_member` (spec42 Gap 37),
-        // which ref bodies do not use.
-        crate::ast::RelationshipBodyElement::KermlFeature(_) => {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Alt,
-            )))
-        }
-    };
-    Ok((input, Node::new(span, wrapped)))
+    // Ref bodies and relationship bodies accept the same annotating production, so they share its
+    // parser instead of translating one scope's members into the other's.
+    let (input, member) = crate::parser::body::annotating_member(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, RefBodyElement::Annotating(member)),
+    ))
 }
 
 /// Ref declaration: `ref` (`part`|`port`|`item`)? name? multiplicity? (`:>>` redefines)? (`:`

@@ -474,21 +474,33 @@ fn emit_relationship_body_element(
 ) -> Result<(), EmitError> {
     use crate::ast::RelationshipBodyElement;
     match el {
-        RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::Annotating(member) => emit_annotating_member(w, path, member),
         RelationshipBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
-        RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
-        RelationshipBodyElement::TextualRep(r) => emit_textual_rep(w, &r.value),
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
-        other @ RelationshipBodyElement::MetadataAnnotation(_) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+    }
+}
+
+/// The annotating members are one grammar production, so they emit the same way wherever a scope
+/// accepts them.
+pub(crate) fn emit_annotating_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    member: &crate::ast::AnnotatingMember,
+) -> Result<(), EmitError> {
+    use crate::ast::AnnotatingMember;
+    match member {
+        AnnotatingMember::Doc(d) => emit_doc(w, &d.value),
+        AnnotatingMember::Comment(c) => emit_comment(w, &c.value),
+        AnnotatingMember::TextualRep(r) => emit_textual_rep(w, &r.value),
+        AnnotatingMember::MetadataAnnotation(_) => {
+            w.unsupported(path, "metadata annotation member")
+        }
     }
 }
 

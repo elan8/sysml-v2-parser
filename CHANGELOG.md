@@ -26,6 +26,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drift from the other. Consumers implement only the node kinds they have a rule for; the
   default methods walk children.
 
+### Added
+
+- **`ast::AnnotatingMember`, the grammar's annotating production as one type.** `AnnotatingElement
+  = Comment | Documentation | TextualRepresentation | MetadataFeature` is a single production in
+  both the KerML and SysML grammars, so the scopes that accept all of it -- relationship bodies
+  and `ref` bodies -- now hold one `Annotating(AnnotatingMember)` variant instead of four parallel
+  ones. One parser dispatches the production, one emitter renders it, and a `ref` body reuses both
+  directly rather than translating relationship-body members into its own. Scopes that accept only
+  part of the production keep their own variants until the parser supports the rest, so the type
+  never claims coverage the parser lacks. `#Name` prefix metadata stays separate: it is
+  `PrefixMetadataMember`, a prefix on a declaration rather than a body member.
+
+### Fixed
+
+- **A `rep` member now emits from every scope that accepts one.** Three copies of the same match
+  handled annotating members in relationship bodies and disagreed: a textual representation
+  emitted from an import body but failed as an unsupported construct from alias, dependency, and
+  `connect` bodies, so whether a document could be formatted depended on which construct owned the
+  body. One production now means one emitter.
+
 ### Removed
 
 - **Two opaque body-member fallbacks the parser cannot produce.** `PartDefBodyElement::Other`
@@ -41,7 +61,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`PARSE_AST_VERSION` is now 136.** `EnumerationBody`'s brace members move from `values` to
+- **`PARSE_AST_VERSION` is now 137.** Relationship and `ref` body elements replace their `Doc`,
+  `Comment`, `TextualRep`, and `MetadataAnnotation` variants with a single `Annotating` variant
+  wrapping [`AnnotatingMember`]. `EnumerationBody`'s brace members move from `values` to
   `elements`, matching every other body. That is the only wire change from the body-container
   work: the shared container keeps the variant and field names the other twenty-six bodies
   already used, so their serialized shape is unchanged. Two duplicate container names collapse
