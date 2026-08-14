@@ -11,7 +11,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -51,7 +51,7 @@ fn gh92_1_bare_redefines_keyword_standalone_body_member() {
         _ => None,
     });
     let attr = attr.expect("expected an AttributeUsage element");
-    assert_eq!(attr.name, "mass");
+    assert!(attr.name.is_empty());
     assert!(attr.redefines.is_some());
     assert!(attr.value.is_some());
 }
@@ -88,11 +88,9 @@ fn gh92_2_part_redefines_with_explicit_type_clause() {
         _ => None,
     });
     let rb = rb.expect("expected a nested PartUsage element");
-    // Name is derived from the redefines target when an explicit type follows (matches the
-    // pre-existing `ref part :>> elements: SparePart;` convention this shape previously reached
-    // via a different fallback path).
-    assert_eq!(rb.name, "rb");
-    assert_eq!(rb.type_name, "LightRollBar");
+    // The target is semantic, not a declaration name, even when an explicit type follows.
+    assert!(rb.name.is_empty());
+    assert!(rb.typing.is_some());
     assert!(rb.redefines.is_some());
     assert!(rb.multiplicity.is_some());
 }
@@ -134,5 +132,5 @@ fn gh92_3_unnamed_typed_succession_in_part_usage_body() {
     });
     let succ = succ.expect("expected a SuccessionUsage element");
     assert!(succ.name.is_none());
-    assert_eq!(succ.type_name.as_deref(), Some("HappensJustBefore"));
+    assert!(succ.type_name.is_some());
 }

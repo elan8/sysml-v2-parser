@@ -16,60 +16,68 @@
 //! - `interface.rs`'s `connect_ends` never accepted the §6 G24 per-endpoint multiplicity
 //!   (`connect [0..1] a to [1] b;`) that `connection.rs`'s did -- same reasoning, no BNF basis for
 //!   restricting it to connections only.
-//! - `connection.rs`'s end name accepts the `#name` derived-end-name form (tested in
+//! - `connection.rs`'s end identity accepts fixed `#original`/`#derive` derivation roles (tested in
 //!   `tests/derivation_connections.rs`, e.g. `end #original ::> OriginalReq;`); `interface.rs`
 //!   never did. Unlike the two gaps above, this one has no matching real-usage evidence on the
-//!   interface side, so it stays parameterized (`allow_derived_name`) rather than blindly widened.
+//!   interface side, so it stays parameterized (`allow_derivation_role`) rather than blindly
+//!   widened.
 //!
 //! Consolidating here fixes the first two gaps for both callers at once and makes the third an
 //! explicit, visible choice at each call site instead of an accidental omission.
 
 use crate::ast::{
-    ConnectBody, ConnectStmt, ConnectionEnd, EndDecl, EndNestedUsage, Node, RefBody,
-    RefBodyElement, RefDecl,
+    ConnectBody, ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndIdentity,
+    EndNestedUsage, Node, RefBody, RefBodyElement, RefDecl,
 };
 use crate::parser::body::{advance_to_closing_brace, relationship_body_annotations};
 use crate::parser::expr::path_expression;
 use crate::parser::feature_value::feature_value_part;
 use crate::parser::item::item_usage;
-use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws1, ws_and_comments};
+use crate::parser::lex::{name, qualified_reference, starts_with_keyword, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::occurrence_body::occurrence_usage;
 use crate::parser::usage::{
     cross_subsetting, multiplicity_node, redefinition, reference_subsetting, single_target_typing,
-    subsetting,
+    subsetting, typing_node,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_while1};
+use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// `#name` derived-end-name form, e.g. `end #original ::> OriginalReq;` (real usage:
-/// `tests/derivation_connections.rs`, KerML `Derivation`-style connections). Only reachable when
-/// [`end_decl`] is called with `allow_derived_name: true`.
-fn derived_end_name(input: Input<'_>) -> IResult<Input<'_>, String> {
+/// Fixed derivation-end role, with its exact authored `#...` marker span.
+fn derivation_end_role(input: Input<'_>) -> IResult<Input<'_>, Node<DerivationEndRole>> {
+    let start = input;
     let (input, _) = tag(&b"#"[..]).parse(input)?;
-    let (input, value) =
-        take_while1(|c: u8| c.is_ascii_alphanumeric() || c == b'_').parse(input)?;
-    Ok((
-        input,
-        format!("#{}", String::from_utf8_lossy(value.fragment())),
-    ))
+    let (input, role) = if starts_with_keyword(input.fragment(), b"original") {
+        let (input, _) = tag(&b"original"[..]).parse(input)?;
+        (input, DerivationEndRole::Original)
+    } else if starts_with_keyword(input.fragment(), b"derive") {
+        let (input, _) = tag(&b"derive"[..]).parse(input)?;
+        (input, DerivationEndRole::Derive)
+    } else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    };
+    Ok((input, node_from_to(start, input, role)))
 }
 
 /// End declaration: `end` `#tag`? multiplicity? (`part`|`port`|`ref`|`item`)? name multiplicity?
 /// (`:` (`~`)? type (`crosses` target)? | (`::>`|`references`) target | nested `occurrence`/`item`
 /// usage) multiplicity? `;`.
 ///
-/// `allow_derived_name` gates the `#name` form above -- `true` for `connection.rs` (tested real
-/// usage), `false` for `interface.rs` (no matching evidence; preserves existing behavior exactly).
+/// `allow_derivation_role` gates the fixed derivation-role form above -- `true` for
+/// `connection.rs` (tested real usage), `false` for `interface.rs` (no matching evidence;
+/// preserves existing behavior exactly).
 pub(crate) fn end_decl(
     input: Input<'_>,
-    allow_derived_name: bool,
+    allow_derivation_role: bool,
 ) -> IResult<Input<'_>, Node<EndDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -78,12 +86,13 @@ pub(crate) fn end_decl(
     // GH-85: a `#tag` metadata-prefix annotation may precede the rest of the end declaration,
     // e.g. `end #cause cause1 : Causer1;` (OMG spec Annex `Cause and Effect Examples/
     // CauseAndEffectExample.sysml`), `end #original r1 : Req1;` (`Requirements Examples/
-    // RequirementDerivationExample.sysml`). Distinct from `allow_derived_name`'s `#name` form
+    // RequirementDerivationExample.sysml`). Distinct from `allow_derivation_role`'s fixed-role form
     // below (`end #original ::> OriginalReq;`, `tests/derivation_connections.rs`): there the
-    // `#name` *is* the end's own name, immediately followed by an operator (`::>`/`:`/`;`/mult);
-    // here `#tag` is a separate prefix and a real name still follows. The trailing
+    // fixed marker is a derivation role, immediately followed by an operator
+    // (`::>`/`:`/`;`/multiplicity); here `#tag` is a separate prefix and a declaration name still
+    // follows. The trailing
     // `peek(name)` requires that a name actually follows before committing to the prefix
-    // reading, so `#original ::> ...` still falls through to the derived-name path below intact.
+    // reading, so `#original ::> ...` still falls through to the derivation-role path intact.
     // Discarded like the kind keywords below -- `EndDecl` doesn't model metadata annotations.
     let (input, _) = opt(preceded(
         ws_and_comments,
@@ -122,10 +131,15 @@ pub(crate) fn end_decl(
     ))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = if allow_derived_name {
-        with_span(|input| alt((derived_end_name, name)).parse(input)).parse(input)?
+    let (input, identity) = if allow_derivation_role && input.fragment().starts_with(b"#") {
+        let (input, role) = derivation_end_role(input)?;
+        (input, EndIdentity::Derivation(role))
     } else {
-        with_span(name).parse(input)?
+        let (input, (span, declaration_name)) = with_span(name).parse(input)?;
+        (
+            input,
+            EndIdentity::Declaration(Node::new(span, declaration_name)),
+        )
     };
     // GH-53: a multiplicity may also appear right after the name, before the target -- the most
     // common position for most usage kinds (e.g. `end touchesToo [0..*] item ...` in
@@ -136,7 +150,7 @@ pub(crate) fn end_decl(
 
     // `::>` / `references` reference subsetting (GH-19): the target is a reference, not a type, so
     // it's modeled via the same structured `SubsettingRelationship` every other reference-
-    // subsetting clause uses -- not folded into `type_name`/typing like the `:` form below.
+    // subsetting clause uses -- not folded into typing like the `:` form below.
     if let Ok((input, references)) = reference_subsetting(input) {
         // Trailing multiplicity on the reference target (e.g. `::> mainSwitch[1]`) is parsed the
         // same way `part_usage_redefines_only`/other subsetting-family callers do: the shared
@@ -146,22 +160,19 @@ pub(crate) fn end_decl(
             opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         let type_ref_span = references.value.span.clone();
-        let type_name = references.value.target_display();
         return Ok((
             input,
             node_from_to(
                 start,
                 input,
                 EndDecl {
-                    name: name_str,
-                    type_name,
-                    uses_derived_syntax: true,
+                    identity,
+                    typing: None,
                     references: Some(references),
                     multiplicity: trailing_multiplicity.or(leading_multiplicity),
                     redefines: None,
                     crosses: None,
                     nested_usage: None,
-                    name_span: Some(name_span),
                     type_ref_span: Some(type_ref_span),
                 },
             ),
@@ -183,15 +194,13 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
-                    name: name_str,
-                    type_name: String::new(),
-                    uses_derived_syntax: false,
+                    identity,
+                    typing: None,
                     references: None,
                     multiplicity: leading_multiplicity,
                     redefines: None,
                     crosses: None,
                     nested_usage: Some(Box::new(EndNestedUsage::Occurrence(Box::new(nested)))),
-                    name_span: Some(name_span),
                     type_ref_span: None,
                 },
             ),
@@ -205,15 +214,13 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
-                    name: name_str,
-                    type_name: String::new(),
-                    uses_derived_syntax: false,
+                    identity,
+                    typing: None,
                     references: None,
                     multiplicity: leading_multiplicity,
                     redefines: None,
                     crosses: None,
                     nested_usage: Some(Box::new(EndNestedUsage::Item(Box::new(nested)))),
-                    name_span: Some(name_span),
                     type_ref_span: None,
                 },
             ),
@@ -221,16 +228,17 @@ pub(crate) fn end_decl(
     }
 
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, (tilde, (type_ref_span, type_name))) = preceded(
+    let (input, (tilde, (type_ref_span, type_reference))) = preceded(
         ws_and_comments,
-        (opt(tag(&b"~"[..])), with_span(qualified_name)),
+        (opt(tag(&b"~"[..])), with_span(qualified_reference)),
     )
     .parse(input)?;
-    let type_name = if tilde.is_some() {
-        format!("~{type_name}")
-    } else {
-        type_name
-    };
+    let typing = Some(typing_node(
+        type_ref_span.clone(),
+        tilde.is_some(),
+        vec![type_reference],
+        crate::ast::TypingSpelling::Operator,
+    ));
     let (input, trailing_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     // GH-51: `:>>` redefines may trail the typed form, e.g. `end source: Anything :>>
@@ -241,8 +249,8 @@ pub(crate) fn end_decl(
     // to (not instead of) the `:` type -- e.g. `end port p3: P ::> p.p1;` (`Simple Tests/
     // ConjugationTest.sysml`, mirrored from Systems Library `Interfaces.sysml`'s `ref port :>>
     // participant : Port ...` shape). Distinct from the `::>`-instead-of-typing branch above
-    // (`uses_derived_syntax: true`): here typing *was* written, so `uses_derived_syntax` stays
-    // `false` and this only populates the structured `references` field.
+    // (the reference-only branch above): here typing *was* written, so this only additionally
+    // populates the structured `references` field.
     let (input, trailing_references) =
         opt(preceded(ws_and_comments, reference_subsetting)).parse(input)?;
     // GH-85: `crosses` cross-subsetting may also trail the typed form, e.g. `end item cart:
@@ -256,57 +264,110 @@ pub(crate) fn end_decl(
             start,
             input,
             EndDecl {
-                name: name_str,
-                type_name,
-                uses_derived_syntax: false,
+                identity,
+                typing,
                 references: trailing_references,
                 multiplicity: trailing_multiplicity.or(leading_multiplicity),
                 redefines,
                 crosses,
                 nested_usage: None,
-                name_span: Some(name_span),
                 type_ref_span: Some(type_ref_span),
             },
         ),
     ))
 }
 
-/// Ref body for a connection/interface `ref` declaration: `;` or `{` doc/comment/rep/metadata*
-/// `}`. Connection/interface `ref` bodies don't have a dedicated member grammar yet (unlike the
-/// action-context `ref` body in `action.rs`, which allows full nested action members), so this
-/// gets the same doc/comment/metadata + recovery baseline as [`RelationshipBodyElement`] instead
-/// of silently discarding everything.
+/// Starters for a connection/interface `ref` declaration body: the annotation members shared
+/// with `RelationshipBody` contexts plus nested (optionally visibility-prefixed) `ref`
+/// declarations (Systems Library `Interfaces.sysml`).
+const REF_USAGE_BODY_STARTERS: &[&[u8]] = &[
+    b"doc",
+    b"comment",
+    b"rep",
+    b"@",
+    b"ref",
+    b"attribute",
+    b"private",
+    b"protected",
+    b"public",
+];
+
+/// Ref body for a connection/interface `ref` declaration: `;` or `{` (doc/comment/rep/metadata
+/// | nested `ref` declaration)* `}`. A `ref` usage body is a full `UsageBody` per the BNF; the
+/// members with real library evidence are annotations and nested visibility-prefixed `ref`
+/// declarations (`protected ref thisParticipant :>> self;`, Systems Library `Interfaces.sysml`),
+/// with recovery-to-`Error` for anything else.
 pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
-    let (input, elements) = relationship_body_annotations(input)?;
-    let body = match elements {
-        None => RefBody::Semicolon,
-        Some(elements) => RefBody::Brace {
-            elements: elements
-                .into_iter()
-                .map(|e| {
-                    let span = e.span.clone();
-                    let wrapped = match e.value {
-                        crate::ast::RelationshipBodyElement::Doc(n) => RefBodyElement::Doc(n),
-                        crate::ast::RelationshipBodyElement::Comment(n) => {
-                            RefBodyElement::Comment(n)
-                        }
-                        crate::ast::RelationshipBodyElement::TextualRep(n) => {
-                            RefBodyElement::TextualRep(n)
-                        }
-                        crate::ast::RelationshipBodyElement::MetadataAnnotation(n) => {
-                            RefBodyElement::MetadataAnnotation(n)
-                        }
-                        crate::ast::RelationshipBodyElement::Error(n) => RefBodyElement::Error(n),
-                        crate::ast::RelationshipBodyElement::Other(text) => {
-                            RefBodyElement::Other(text)
-                        }
-                    };
-                    Node::new(span, wrapped)
-                })
-                .collect(),
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, RefBody::Semicolon));
+    }
+    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+        input,
+        REF_USAGE_BODY_STARTERS,
+        "ref usage body",
+        "recovered_ref_body_element",
+        ref_body_element,
+        |start, end| {
+            let recovery = crate::parser::build_recovery_error_node_from_span(
+                start,
+                end,
+                REF_USAGE_BODY_STARTERS,
+                "ref usage body",
+                "recovered_ref_body_element",
+            );
+            let node: Node<crate::ast::ParseErrorNode> = node_from_to(start, end, recovery);
+            node_from_to(start, end, RefBodyElement::Error(node))
         },
+    )?;
+    Ok((input, RefBody::Brace { elements }))
+}
+
+fn ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RefBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if let Ok((input, nested)) = ref_decl(input) {
+        return Ok((
+            input,
+            node_from_to(start, input, RefBodyElement::Ref(Box::new(nested))),
+        ));
+    }
+    // `attribute :>> Disc::edges::innerSpaceDimension, ...;` (Domain Libraries
+    // `ShapeItems.sysml`).
+    if starts_with_keyword(input.fragment(), b"attribute") {
+        let (input, usage) = crate::parser::attribute::attribute_usage(input)?;
+        return Ok((
+            input,
+            node_from_to(
+                start,
+                input,
+                RefBodyElement::AttributeUsage(Box::new(usage)),
+            ),
+        ));
+    }
+    let (input, annotation) = crate::parser::body::relationship_body_element(input)?;
+    let span = annotation.span.clone();
+    let wrapped = match annotation.value {
+        crate::ast::RelationshipBodyElement::Doc(n) => RefBodyElement::Doc(n),
+        crate::ast::RelationshipBodyElement::Comment(n) => RefBodyElement::Comment(n),
+        crate::ast::RelationshipBodyElement::TextualRep(n) => RefBodyElement::TextualRep(n),
+        crate::ast::RelationshipBodyElement::MetadataAnnotation(n) => {
+            RefBodyElement::MetadataAnnotation(n)
+        }
+        crate::ast::RelationshipBodyElement::Error(n) => RefBodyElement::Error(n),
+        crate::ast::RelationshipBodyElement::Other(text) => RefBodyElement::Other(text),
+        // `relationship_body_element` is the annotation-only subset and never produces owned
+        // feature members; those are dispatched by `relationship_body_member` (spec42 Gap 37),
+        // which ref bodies do not use.
+        crate::ast::RelationshipBodyElement::KermlFeature(_) => {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Alt,
+            )))
+        }
     };
-    Ok((input, body))
+    Ok((input, Node::new(span, wrapped)))
 }
 
 /// Ref declaration: `ref` (`part`|`port`|`item`)? name? multiplicity? (`:>>` redefines)? (`:`
@@ -321,21 +382,44 @@ pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
 pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // Visibility prefix (BNF `MemberPrefix`), e.g. `protected ref thisParticipant :>> self;`
+    // (Systems Library `Interfaces.sysml`).
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = opt(preceded(
+    let (input, kind_keyword) = opt(preceded(
         ws_and_comments,
         alt((
-            (tag(&b"part"[..]), ws1),
-            (tag(&b"port"[..]), ws1),
-            (tag(&b"item"[..]), ws1),
-            (tag(&b"requirement"[..]), ws1),
+            map((tag(&b"part"[..]), ws1), |_| crate::ast::RefDeclKind::Part),
+            map((tag(&b"port"[..]), ws1), |_| crate::ast::RefDeclKind::Port),
+            map((tag(&b"item"[..]), ws1), |_| crate::ast::RefDeclKind::Item),
+            map((tag(&b"requirement"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Requirement
+            }),
+            // `ref use case self : UseCase :>> Case::self;` (Systems Library `UseCases.sysml`;
+            // spec42 Gap 34).
+            map((tag(&b"use"[..]), ws1, tag(&b"case"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::UseCase
+            }),
         )),
     ))
     .parse(input)?;
-    // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
-    let (input, parsed_name) = opt(preceded(ws_and_comments, with_span(name))).parse(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    // `ref :>> name ...` (redefinition) may omit the name before `:>>`. A relationship keyword
+    // is never the declared name: `ref redefines Item::x, subobjects::x;` (Kernel Systems
+    // Library `Items.kerml`; spec42 Gap 49d) authors the keyword spelling of `:>>` with no name,
+    // and greedily consuming it here left the target list unparseable.
+    let (input, parsed_name) = opt(preceded(
+        ws_and_comments,
+        nom::combinator::verify(with_span(name), |(_, n)| {
+            !matches!(
+                n.as_str(),
+                "redefines" | "subsets" | "references" | "crosses"
+            )
+        }),
+    ))
+    .parse(input)?;
+    let (input, leading_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
     // `redefinition` (shared with every other `:>>` call site) already handles the comma-separated
@@ -343,24 +427,29 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // participant[2] nonunique ordered;` (`Interfaces.sysml`).
     let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
 
-    let (input, type_ref_span, type_name, typing) = {
+    let (input, type_ref_span, typing) = {
         let (peek, _) = ws_and_comments(input)?;
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let (input, (type_ref_span, type_name)) = preceded(
                 ws_and_comments,
-                preceded(tag(&b":"[..]), with_span(qualified_name)),
+                preceded(tag(&b":"[..]), with_span(qualified_reference)),
             )
             .parse(input)?;
-            let typing = Some(single_target_typing(
-                type_ref_span.clone(),
-                type_name.clone(),
-            ));
-            (input, Some(type_ref_span), type_name, typing)
+            let typing = Some(single_target_typing(type_ref_span.clone(), type_name));
+            (input, Some(type_ref_span), typing)
         } else {
-            (input, None, String::new(), None)
+            (input, None, None)
         }
     };
-    let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, trailing_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    // `nonunique`/`ordered` may directly follow the multiplicity, before any further
+    // specialization clause: `ref otherParticipants : Port [1..*] nonunique :>
+    // interfacingPorts default ...;` (Systems Library `Interfaces.sysml`). The later capture
+    // below covers the post-clause position (`... :>> participant [2..*] nonunique ordered
+    // { ... }`).
+    let (input, (ordered_after_multiplicity, nonunique_after_multiplicity)) =
+        crate::parser::usage::usage_feature_modifier_flags(input)?;
     // `:>>` redefines may also follow the type instead of preceding it, e.g. `ref self: Item
     // :>> Object::self;` (Systems Library `Items.sysml`) -- only retry if the earlier attempt
     // (before the type) didn't already find one.
@@ -374,15 +463,11 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // `Domain Libraries/Requirement Derivation/DerivationConnections.sysml`).
     let (input, subsets) = opt(preceded(ws_and_comments, subsetting)).parse(input)?;
     let subsets = subsets.map(|(target, _value)| target);
-    // `nonunique`/`ordered` feature modifiers (real usage: `Interfaces.sysml`'s `ref port :>>
-    // participant : Port [2..*] nonunique ordered { ... }`); accepted and discarded, matching
-    // `RefDecl`'s existing "don't model every shorthand" scope (see `value`'s doc comment for the
-    // same rationale on the binding form).
-    let (input, _) = nom::multi::many0(preceded(
-        ws_and_comments,
-        alt((tag(&b"nonunique"[..]), tag(&b"ordered"[..]))),
-    ))
-    .parse(input)?;
+    // `nonunique`/`ordered` feature modifiers may also follow the specialization clauses
+    // (real usage: `Interfaces.sysml`'s `ref port :>> participant : Port [2..*] nonunique
+    // ordered { ... }`).
+    let (input, (ordered_after_clauses, nonunique_after_clauses)) =
+        crate::parser::usage::usage_feature_modifier_flags(input)?;
     // Optional value/default clause, e.g. `ref item :>> localClock : Clock[1] default
     // Time::universalClock { ... }` (Domain Libraries `SpatialItems.sysml`).
     let (input, value) = opt(preceded(ws_and_comments, feature_value_part)).parse(input)?;
@@ -394,16 +479,19 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             input,
             RefDecl {
                 direction: None,
+                kind_keyword,
                 name: name_str,
-                type_name,
                 typing,
                 subsets,
                 redefines,
+                multiplicity: trailing_multiplicity.or(leading_multiplicity),
+                ordered: ordered_after_multiplicity || ordered_after_clauses,
+                nonunique: nonunique_after_multiplicity || nonunique_after_clauses,
                 value,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
-                membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
         ),
     ))
@@ -544,12 +632,51 @@ pub(crate) fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectS
 }
 
 #[cfg(test)]
-mod end_decl_kind_tests {
-    use super::end_decl;
-    use nom_locate::LocatedSpan;
+mod ref_decl_kind_tests {
+    use super::ref_decl;
 
     fn input(text: &str) -> crate::parser::Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 49d: `redefines` after `ref` is the keyword spelling of `:>>`, not a declared
+    /// name (`ref redefines Item::x, subobjects::x;`, Kernel Systems Library `Items.kerml`).
+    #[test]
+    fn ref_decl_does_not_take_redefines_as_a_name() {
+        let (rest, node) = ref_decl(input(
+            "private ref redefines Item::incomingTransferSort, subobjects::incomingTransferSort;",
+        ))
+        .expect("anonymous ref redefinition");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.name.is_empty());
+        let redefines = node.value.redefines.expect("redefines clause");
+        assert_eq!(redefines.value.target.len(), 2);
+    }
+
+    /// Spec42 Gap 34: the `use case` feature-kind keyword on a full `ref` declaration
+    /// (`ref use case self : UseCase :>> Case::self;`, Systems Library `UseCases.sysml`).
+    #[test]
+    fn ref_decl_accepts_the_use_case_kind_keyword() {
+        let (rest, node) =
+            ref_decl(input("ref use case self : UseCase :>> Case::self;")).expect("ref use case");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value.kind_keyword,
+            Some(crate::ast::RefDeclKind::UseCase)
+        );
+        assert_eq!(node.value.name, "self");
+        assert!(node.value.typing.is_some());
+        assert!(node.value.redefines.is_some());
+    }
+}
+
+#[cfg(test)]
+mod end_decl_kind_tests {
+    use super::end_decl;
+    use crate::ast::EndIdentity;
+
+    fn input(text: &str) -> crate::parser::Input<'_> {
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -562,8 +689,17 @@ mod end_decl_kind_tests {
         )
         .expect("end feature");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "source");
-        assert_eq!(node.value.type_name, "Occurrence");
+        assert!(matches!(
+            &node.value.identity,
+            EndIdentity::Declaration(name) if name.value == "source"
+        ));
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
         assert!(node.value.redefines.is_some());
     }
 
@@ -575,8 +711,17 @@ mod end_decl_kind_tests {
         )
         .expect("end occurrence");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert_eq!(node.value.name, "source");
-        assert_eq!(node.value.type_name, "Occurrence");
+        assert!(matches!(
+            &node.value.identity,
+            EndIdentity::Declaration(name) if name.value == "source"
+        ));
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
         assert!(node.value.redefines.is_some());
         assert!(node.value.nested_usage.is_none());
     }

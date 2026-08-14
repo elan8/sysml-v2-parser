@@ -7,6 +7,380 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`PARSE_AST_VERSION` is now 134.** `EntryAction`/`DoAction`/`ExitAction` gain
+  `declared_name`/`type_name`/`redefines` for declaring a *new* nested action (`entry action
+  entryAction :>> 'entry';`, `do action doAction : Action :>> 'do';`, Systems Library
+  `States.sysml`) and an `effect: Option<TransitionEffect>` for `assign`/`send`/`accept`
+  effects written directly under the keyword (`entry assign counter.count := 0;`), mirroring
+  `Transition::effect` (spec42 gap 43). The reference form keeps `action_reference`.
+- **`PARSE_AST_VERSION` is now 133.** `AttributeBodyElement` gains `Bind`, `Connection`,
+  `CalcDef`, `CalcUsage`, and `ConstraintUsage` variants: named/multiplicity-qualified binding
+  members, named/typed connection usages, nested calcs, and plain (non-`assert`) constraints
+  inside attribute/item-shaped bodies now dispatch to their existing typed productions instead
+  of opaque capture (Geometry `ShapeItems.sysml`, `Time.sysml`, `Items.sysml`; spec42 gap
+  49a). `constraint_usage` additionally accepts the anonymous body-only form
+  (`constraint { expr }`).
+- **`PARSE_AST_VERSION` is now 132.** Use-case-family and variant member widening (spec42 gaps
+  44/45/46): `VariantTypedUsage` gains a `Requirement` kind (`variant requirement r1;`);
+  `UseCaseDefBodyElement` gains `InOutDecl` for the directed parameter shorthand (`in scenario
+  = cityScenario;`); `ActorUsage.type_name` becomes optional for the bare untyped actor form
+  (`actor environment;`, `actor passenger [0..4];`, OMG spec Annex A). `InOutDecl` additionally
+  gains a typed `subsets` clause: the authored `:>` spelling on a directed parameter (`out
+  voltage :> ISQ::electricPotential = ...;`) is retained as a subsetting relationship instead
+  of being silently folded into `type_name`; `ConstraintDefBodyElement::InOutDecl` is boxed
+  (wire-format neutral).
+- **`PARSE_AST_VERSION` is now 131.** The `[unit]` annotation now applies to parenthesized
+  tuples, invocation/constructor results, and feature references in expression position
+  (`(0, shape.width/2, 0)[source]`, the Domain Geometry coordinate-frame idiom; spec42 gap
+  49c) via the existing `Expression::LiteralWithUnit` shape. Previously such brackets either
+  failed the whole statement (inside argument lists) or were silently captured as a bogus
+  declaration multiplicity after the value.
+- **`PARSE_AST_VERSION` is now 130.** The bare `:>>`/`:>` shorthand (no `attribute` keyword)
+  and its metadata-body twin accept comma-separated multi-target lists like every other
+  redefinition/subsets clause (`SI.kerml`'s `kelvin`; spec42 gap 49b), and `ref` declarations
+  no longer consume the `redefines`/`subsets`/`references`/`crosses` keyword spelling of a
+  relationship clause as their declared name (`Items.kerml`; spec42 gap 49d). Anonymous
+  attribute/ref declarations also stop emitting a double space / a fabricated `''` name.
+- **`PARSE_AST_VERSION` is now 129.** The canonical anonymous flow shorthand `flow from <a> to
+  <b>;` (and its `succession flow` sibling) no longer silently misparses the `from` keyword as
+  the flow's declared name: such statements now produce `FlowUsage { name: None, .. }`, so
+  cached parses from earlier versions are invalidated even though the serialized shape is
+  unchanged (spec42 gap 47). Anonymous flows also emit the `from`-keyword spelling instead of
+  the double-spaced endpoint shorthand.
+- **`PARSE_AST_VERSION` is now 128.** `ExtendedDefinition` gains `has_def_keyword`: the bare
+  `#<keyword>+ <Name> { ... }` extended-usage shorthand (no `def` keyword at all, e.g.
+  `#clouddd ArrowheadCore { ... }`) now parses into the same typed node as its `def`-suffixed
+  sibling instead of dropping the rest of the package body into unrecovered error-token
+  consumption (spec42 gap 39). Keyword-led `#tag <member>` prefix shapes stay on
+  `metadata_keyword_prefix`.
+- **`PARSE_AST_VERSION` is now 127.** `KermlFeatureMember` and `KermlEndMember` gain an
+  `is_const` prefix flag: `const end [1] feature a;` / `const end feature b;` (KerML
+  association bodies) now attach the `const` keyword to the end/feature member instead of
+  misparsing `const` as a dangling bare feature reference followed by an unrelated end member
+  (spec42 gap 36).
+- **`PARSE_AST_VERSION` is now 126.** `UseCaseDefBodyElement` gains a
+  `Ref(Box<Node<RefDecl>>)` variant and `RefDeclKind` gains `UseCase`, so full `ref use case
+  <name> : <Type> :>> <target>;` declarations inside use-case bodies (pervasive in Systems
+  Library `UseCases.sysml`) parse into typed `RefDecl` nodes instead of spraying per-token
+  error recovery; the bare `ref :>> target { ... }` shorthand keeps its dedicated
+  `RefRedefinition` node (spec42 gap 34).
+- **`PARSE_AST_VERSION` is now 125.** `SubjectDecl` gains a `redefines:
+  Option<Node<SubsettingRelationship>>` clause (`subject subj :>> Case::subj;`, and the
+  anonymous type-less `subject :>> vehicle = vehicle_large;`) and its `value` widens from a
+  bare `=`-only `Expression` to the shared `FeatureValue` clause, adding the `default`-keyword
+  spelling (`subject generateTorque default engine1.generateTorque;`, OMG spec Annex A;
+  spec42 gap 35). Subject emission no longer prints a double space for anonymous subjects.
+- **`PARSE_AST_VERSION` is now 124.** `RelationshipBodyElement` gains a
+  `KermlFeature(Box<Node<KermlFeatureMember>>)` variant: braced `RelationshipBody` forms
+  (dependency/alias/relationship-statement bodies) now own feature members (`dependency z to
+  x, y { feature e; }`) per the BNF's `ownedRelatedElement`, instead of dropping the whole
+  bodied statement to error recovery (spec42 gap 37). Ref bodies keep the annotation-only
+  subset.
+- **`PARSE_AST_VERSION` is now 123.** `PartDefBodyElement`, `PartUsageBodyElement`, and
+  `AttributeBodyElement` gain a `KermlClassifier(Box<Node<KermlClassifierDecl>>)` variant so
+  KerML classifier-keyword declarations (`struct`, `classifier`, `datatype`, `assoc`,
+  `behavior`, ...) nested inside part/attribute-shaped bodies parse into the same typed node
+  they already get at package scope instead of falling to error recovery (spec42 gap 38;
+  `class` keeps its dedicated `ClassDef` shape).
+- **`PARSE_AST_VERSION` is now 122.** The opaque `ActionBodyDecl` node (an unparsed
+  keyword + text blob for `attribute`/`calc`/`event` declarations and nested `action def`s in
+  action bodies) is retired: `ActionDefBodyElement`/`ActionUsageBodyElement` lose their `Decl`
+  variant and gain typed `AttributeUsage`, `CalcUsage`, and `ActionDef` variants, with `event`
+  forms dispatching through the existing typed `OccurrenceUsage` (spec42 gap 33).
+  `OpacityKind::ActionBodyDecl` is removed alongside. `OccurrenceUsage` additionally accepts a
+  multiplicity authored between the name and the typing (`event occurrence
+  zeroCrossingEvents[0..*] : ZeroCrossingEventDef`), per the BNF's declaration ordering.
+- **`PARSE_AST_VERSION` is now 121.** `AllocationUsage` and `FlowUsage` gain
+  `subsets`/`redefines` (previously parsed by the shared usage header and discarded) and typed
+  connector ends: `source`/`target` and `from`/`to` are now
+  `Option<Node<KermlConnectorEnd>>` (optional multiplicity + arena-backed feature chain +
+  optional `::>`/`references` end-name split) instead of opaque `Expression` nodes, so the
+  authored allocate end names (`allocate logical ::> torqueGenerator to physical ::>
+  powerTrain`) are retained rather than discarded (spec42 gaps 27/28).
+- **`PARSE_AST_VERSION` is now 120.** Typed-field gaps from the spec42 audit:
+  `ThenTarget` gains a `Send(Box<Node<ActionUsage>>)` variant (`then send new S() to b;`,
+  spec42 gap 30); `KermlFeatureMember` gains a `crosses` cross-subsetting clause (gap 32);
+  `ViewpointUsage` gains `subsets`/`redefines` mirroring `ViewUsage` (gap 25); and
+  `RequireConstraint` gains an arena-backed `target: Option<QualifiedReferenceId>` for the
+  keyword-less reference shorthand `require <qualified.name>;` (`name` now only carries the
+  `constraint`-keyword form's declared name; gap 29).
+- **`PARSE_AST_VERSION` is now 119.** Package-level KerML declarations are unified onto their
+  typed nodes (spec42 gaps 13/14/22/23):
+  - New `KermlRelationshipDecl` (`PackageBodyElement::KermlRelationship`) models the KerML
+    explicit relationship declarations (BNF §8.2.4): `subtype`/`subclassifier`/`typing`/
+    `subset`/`redefinition` with an optional `specialization <ident>` (or doubled-keyword)
+    prefix, `disjoining? disjoint a from b`, `inverting? inverse a of b`, and `featuring (I
+    of)? a by b`, each with the annotation-only `RelationshipBody`.
+  - `KermlClassifierKeyword` gains `Type` (`type UnionType unions A, B;`) and the spelled-out
+    `Association`; `subclassifier` moved from the classifier keywords to the relationship
+    family (it declares a relationship, not a classifier). `KermlTypeRelationshipKeyword`
+    gains `Differences`.
+  - Bare forward declarations of classifier keywords (`classifier X;`, `datatype D;`, ...)
+    now parse as `KermlClassifierDecl` with a `;` body -- a resolvable named declaration --
+    instead of the span-only `KermlBareDeclaration`.
+  - Plain `feature`-keyword package members route through `KermlFeatureMember`; the
+    superseded `DefaultReferenceUsage`-shaped `feature_usage_member` production and its
+    `FeatureBodyElement::Expr`/`ExprMember`/`ExprMemberElement` machinery are removed
+    (`expr s { ... }` members parse as feature members of kind `expr`).
+  - Keyword-less implicit-feature package members parse (`causeA;`, `y = expr;`,
+    `z : Type;`) as `DefaultReferenceUsage`; bare *reserved keywords* (`then;`) still get
+    their targeted recovery diagnostic.
+  - Expression grammar: KerML dot shorthands `x.{...}` (collect) and `x.?{...}` (select)
+    parse as `CollectionOp` with a new authored-spelling `dot_shorthand` flag.
+- **`PARSE_AST_VERSION` is now 118.** KerML type-body members reach attribute-shaped bodies
+  (the body grammar `class_def`'s KerML `class`/`struct`/`datatype` definitions share with
+  SysML attribute/item bodies): `AttributeBodyElement` gains `KermlFeature`, `Invariant`,
+  `KermlConnector`, and nested `ClassDef` variants, so `feature x : Natural[1];`, `member
+  feature ...`, `composite feature ... subsets ...`, `portion feature all ...`, `var x : T;`,
+  `step`/`expr`/`bool` kinds, `inv name { ... }`, `connector a ::> a.x to b;`, and nested
+  `class` definitions parse instead of `unrecognized_declaration_in_scope` (spec42 gaps
+  15/16/17/18/19/21/24). Package bodies gain a `PackageBodyElement::KermlConnector` member
+  (`connector a2 from x.s to y.t;`, spec42 gap 16); connector ends accept the `::>` operator
+  spelling and an end-name-led binary shorthand; `InOutDecl` gains `is_var` (`out var y1;`,
+  spec42 gap 18). Resolves the `connector all` fixture wholesale.
+- **`PARSE_AST_VERSION` is now 117.** `TypingRelationship` gains a `spelling:
+  TypingSpelling` field recording whether the author wrote the symbolic operator (`:`/`:>`) or
+  the keyword form (`specializes`, `defined by`, `typed by`), and emission renders the authored
+  spelling instead of canonicalizing everything to the operator — `function abs specializes
+  ComplexFunctions::abs` now round-trips as written. Equality ignores the field (like spans):
+  `specializes B` and `:> B` name the same relationship; the spelling is provenance.
+- **`PARSE_AST_VERSION` is now 116.** Calc/type bodies no longer swallow unmodeled members as
+  diagnostic-silent opaque `Other(...)` captures: `CalcDefBodyElement::Other` is removed, every
+  unparseable member becomes an explicit recovery node with a `recovered_calc_body_element`
+  diagnostic, and the ~90 library members the swallow was hiding are structurally implemented:
+  - New type-body members: `KermlConnectorMember` (`connector :Type from [1] self to [1]
+    this;`, named/`all`/`from`-less forms, `references` end chains), `KermlBindingMember`
+    (`binding [1] a = [1] b;`, named `of` form, bodies), `KermlSuccessionMember` (`succession
+    [1] a then [*] b;`, `all`, named `first` form), `KermlEndMember` (`end name? [mult]?
+    subsets? feature ...` cross features), plus `Import`, `Comment`, `AttributeUsage`,
+    `AssertConstraint`, nested `KermlClassifier`, and keyword-less `DefaultReferenceUsage`
+    binding members (named `private x: T[1] = ...;` and anonymous `:>> x = ... { ... }` with
+    nested binding bodies via new `FeatureBodyElement::Binding`/`Doc` variants).
+  - `KermlFeatureMember` gains `chains`, type relationship clauses (`unions`/`intersects`/
+    `disjoint from`), an optional kind keyword (`portion redefines ... = ...;`), and an
+    optional name; `ReturnDecl` gains `attribute`/`feature` kind keywords, an optional type
+    (`return result [1..1];`), and merged multi-clause redefinitions;
+    `DefaultReferenceUsage` gains a multiplicity.
+  - Expression grammar: the KerML null-coalescing `??` operator
+    (`BinaryOperator::NullCoalesce`), parenthesis-free collection-operator function references
+    (`->reduce RealFunctions::'+'`), and a Range-operator lexing fix -- `1..4` previously
+    mis-lexed `1.` as a real literal, so `(1..size(x))` only "parsed" as a bogus member access
+    and plain ranges failed outright.
+  - `CalcDefBodyElement::ReturnDecl` boxes its node (clippy `large_enum_variant`).
+  The full-library scan stays at zero diagnostics with the swallow removed; the two tests that
+  asserted the old silent-`Other` behavior now assert the explicit recovery contract.
+- **`PARSE_AST_VERSION` is now 115.** `ViewUsage` retains its multiplicity on the named path
+  (the shared usage header already parsed it and the named constructor discarded it) and gains
+  `ordered`/`nonunique` multiplicity properties, so `view columnView[0..*] ordered { ... }`
+  (Systems Library `Views.sysml`) no longer loses `[0..*] ordered` on formatting. Emission
+  orders the clauses the way each form's parser reparses them (multiplicity after the target
+  for the anonymous `:>>` form, before the trailing subsets clause for the named form).
+- **`PARSE_AST_VERSION` is now 114.** Feature values gain a typed standalone KerML
+  `BodyExpression` form and authored-operator fidelity: new `Expression::BodyExpr` models
+  `{ parameters* result? }` as a primary expression (sharing `CollectionOperatorBody`'s shape),
+  so the pin initializers `in whileTest default {true} { ... }` (Systems Library
+  `Actions.sysml`) parse as typed values instead of being consumed opaquely and discarded by
+  `in_out_decl`; `feature_value_part` accepts `{ ... }` after any value operator. `FeatureValue`
+  gains `has_operator`, so the bare `default expr` / `default {expr}` spellings no longer emit
+  a fabricated `= ` (`return : Real default sum0(...)` now round-trips byte-for-byte).
+- **`PARSE_AST_VERSION` is now 113.** The remaining KerML declaration grammar used by the
+  pinned `sysml.library` is structurally implemented; the layered conformance scorecard's L2
+  claim now **passes for both the Systems Library and the full library** (94 files, zero
+  diagnostics, zero `ExtendedLibraryDecl`/`KermlSemanticDecl`/`KermlFeatureDecl` fallback
+  nodes). In detail:
+  - `KermlClassifierDecl` covers `datatype`/`metaclass`/`struct`/`assoc`/`assoc struct`/
+    `behavior`/`interaction`/`predicate`/`multiplicity`/`subclassifier`/`classifier`/`class`
+    (plus `function` from 112), with `all` sufficiency, a post-name multiplicity, `:` typing
+    for feature forms, and typed `disjoint from`/`unions`/`intersects` clauses
+    (`KermlTypeRelationship`).
+  - New `KermlFeatureMember` (calc/type-body and package scope) models `member`/`derived`/
+    `abstract`/`composite`/`portion`/`var`/`end` prefixes, the `feature`/`step`/`expr`/`bool`
+    kind keywords, `all`, leading or trailing redefinitions, multi-target typing, multiplicity
+    with `ordered`/`nonunique`, subsets/redefines/references clauses, `inverse of`, values, and
+    nested type bodies. New `KermlInvariantMember` models `inv (not)? name? { ... }` at both
+    scopes.
+  - `TypedParameterMember` gains `abstract`, the `calc`/`step` kinds, post-redefinition typing
+    and multiplicity; `InOutDecl` accepts the anonymous typed form (`in : T[1];`), the
+    spelled-out `redefines` operator, and typing/multiplicity trailing a redefinition.
+  - `ReturnDecl` gains a `{ ... }` result body (`CalcDefBody`); `RefDecl` retains its kind
+    keyword (`ref item scene : Scene;` no longer drops `item` on formatting) and
+    `RefBodyElement` gains an `AttributeUsage` variant; part usage bodies dispatch kinded
+    `ref item :>> a, b;` members; `DefaultReferenceUsage` accepts the anonymous leading
+    `:>> target = expr;` binding.
+  - Formatting quotes declared names that spell reserved keywords (`'in'`, `'ref'`,
+    `'about'`), which previously re-emitted bare and could not reparse.
+  - From 112 (folded in): `ExprMemberElement::ReturnDecl` boxes its node to keep the enum size
+    bounded (wire format unchanged).
+- **`PARSE_AST_VERSION` is now 112.** KerML `function` declarations parse as a structured
+  `PackageBodyElement::KermlClassifier` node (`KermlClassifierDecl`: `abstract` prefix, keyword
+  enum, identification, multi-target `specializes`/`:>` clause, calc-style body) instead of the
+  opaque `KermlSemanticDecl` fallback, covering the Kernel Function Library. Supporting grammar:
+  `ReturnDecl` gains `multiplicity`, `ordered`/`nonunique`, and a full `FeatureValue` value
+  clause (`return : Real[1] = x;`, `return : Anything[0..*] ordered nonunique;`, `return : Real
+  default …;`); new `CalcDefBodyElement::TypedParameter` models KerML kinded parameters
+  (`in expr fn[0..*] { … }`, `in bool test = expr;`, `in feature clock : Clock[1] default
+  localClock { … }`) whose bodies follow the calc-body member grammar; and `in_out_decl` rejects
+  the `expr`/`bool`/`feature` kind keywords so those forms reach the kinded-parameter arm.
+  Full-library diagnostics: 552 -> 250.
+- **`PARSE_AST_VERSION` is now 111.** `ItemUsage` gains `is_abstract` (BNF `RefPrefix`,
+  accepted by the parser for the first time), `subsets` (`:> objects`, previously parsed by the
+  shared usage header and discarded), and `ordered`/`nonunique` multiplicity properties
+  (previously skipped). Covers the package-level `abstract item items : Item[0..*] nonunique
+  :> objects { ... }` declarations (Systems Library `Items.sysml`/`Metadata.sysml`) that
+  previously fell through to the `ExtendedLibraryDecl` fallback. The shared
+  `feature_usage_header` now captures its post-typing multiplicity and `ordered`/`nonunique`
+  flags on `UsageHeader` instead of discarding them. The L2 Systems Library scorecard layer now
+  passes: zero diagnostics and zero fallback nodes across all 21 files.
+- **`PARSE_AST_VERSION` is now 110.** `RenderingUsage` retains its full declaration surface
+  instead of discarding everything but the name and type: `is_abstract`, `multiplicity`,
+  `ordered`/`nonunique`, `:>` subsets, `:>>` redefines, and a `ValuePart` feature value. The
+  declaration name is optional (anonymous `rendering :>> subrenderings[0..*] =
+  columnView.viewRendering;`, Systems Library `Views.sysml`), and
+  `RenderingUsageBodyElement` gains a `Rendering(Box<Node<RenderingUsage>>)` variant so
+  rendering usages can nest inside rendering usage bodies (`asElementTable`).
+- **`PARSE_AST_VERSION` is now 109.** Connection/interface `ref` declaration bodies are now a
+  structured member scope: `RefBodyElement` gains a `Ref(Box<Node<RefDecl>>)` variant for nested
+  keyword-less `ref` declarations, and `connector::ref_decl` accepts a `MemberPrefix` visibility
+  prefix (captured on `RefDecl::membership`) plus `nonunique`/`ordered` directly after the
+  post-typing multiplicity (before further specialization clauses). Covers Systems Library
+  `Interfaces.sysml`'s `ref port :>> participant : Port [2..*] nonunique ordered { protected ref
+  thisParticipant :>> self; ... }`. Unrecognized members recover as
+  `recovered_ref_body_element` ("ref usage body") instead of
+  `recovered_relationship_body_element`. `RefDecl` gains `multiplicity`/`ordered`/`nonunique`
+  (previously parsed and discarded by `connector::ref_decl`, so `[2..*] nonunique ordered` was
+  dropped on formatting), `emit_ref_decl` emits typing before multiplicity before the
+  subsetting-family clauses (the one order every `RefDecl` parser reparses), and
+  `StateDefBodyElement::Ref` boxes its node to keep the enum size bounded.
+- **`PARSE_AST_VERSION` is now 108.** Direction-prefixed parameter declarations (`InOutDecl`)
+  now cover the full BNF `FeatureSpecializationPart`/`ValuePart` surface the Systems Library
+  uses: the multiplicity clause may precede the typing (`in transitionLinkSource[1]:
+  StateAction :>> ...`), `ordered`/`nonunique` multiplicity properties are retained as typed
+  flags, a `:>>` redefinition (including comma-separated multi-target form) may trail a named
+  declaration, the value clause is a full `FeatureValue` (`= expr` / `:= expr` /
+  `default (=|:=)? expr`) instead of a bare `= expr` expression, and a `{ ... }` terminator
+  body is retained as typed action-body elements instead of being consumed and discarded.
+  `OccurrenceUsage` gains `direction: Option<InOut>` (BNF `RefPrefix`, e.g. `in occurrence
+  terminatedOccurrence[1] { ... }`, dispatched in action bodies like directed `in item`/`in
+  part`) and `value: Option<Node<FeatureValue>>` (`in occurrence terminatedOccurrence default
+  that as Occurrence { ... }`), both from Systems Library `Actions.sysml`. To keep enum sizes
+  bounded, `ExprMemberElement::InOutDecl` and `CalcDefBodyElement::InOutDecl` now box their
+  node (`Box<Node<InOutDecl>>`; serialized form unchanged).
+- **`PARSE_AST_VERSION` is now 107.** `KermlBareDeclaration::keyword` is now an exhaustive
+  `KermlBareDeclarationKeyword` enum instead of an owned `String` (a finite grammar set, with
+  distinct variants for authored synonyms like `assoc`/`association`), and
+  `KermlBareDeclaration`/`BindingConnectorUsage` keep only a `name_span: Option<Span>` for the
+  declared name instead of also copying it into an owned `String` -- the name text is resolved
+  through the document source when needed, matching the "authored spelling lives in source, not
+  per-node strings" contract.
+- **`PARSE_AST_VERSION` is now 106.** New `PackageBodyElement::ExtendedDefinition` node models
+  SysML §8.2.2.27 `ExtendedDefinition`: one or more `#<name>` metadata-keyword tags standing in
+  place of the usual classifier keyword before `def` (`#situation def Failure;`,
+  `#SecurityRelated #situation def Vulnerability;`, `abstract #situation def AbstractFailure;`,
+  `variation #situation def V;`, with optional `:>` specialization and a `{ ... }` body reusing
+  `PackageBody`). Tried before `metadata_keyword_prefix` in package-body dispatch, so `def
+  Failure;` no longer falls through to raw error recovery.
+- **`PARSE_AST_VERSION` is now 105.** `AttributeBodyElement` gains a structured `ItemUsage`
+  variant. A nested `item name : Type;` inside an `attribute def`/`attribute`/`item def`/`item`
+  body now parses as a real item usage (reusing the same `item_usage` parser `part def`/`part`
+  bodies already dispatch to) instead of being swallowed by the opaque-capture fallback into
+  `AttributeBodyElement::Other`.
+- **`PARSE_AST_VERSION` is now 104.** Bare, `;`-terminated `classifier` forward declarations
+  (e.g. `classifier SpatialFrame;`) parse as a structured `KermlBareDeclaration` node with a real
+  `name` field instead of falling through to the opaque `ClassifierDecl` raw-text fallback.
+- **`PARSE_AST_VERSION` is now 103.** `ConcernUsage` (including `concern def`) retains its `:>`
+  subsetting and `:>>` redefinition clauses (`ConcernUsage::subsets`/`ConcernUsage::redefines`)
+  instead of discarding them after parsing, matching sibling usage kinds.
+- **`PARSE_AST_VERSION` is now 102.** `ViewUsage` retains its `:>` subsetting clause
+  (`ViewUsage::subsets`) instead of discarding it after parsing, matching sibling usage kinds such
+  as `OccurrenceUsage`/`StateUsage`/`PortUsage`.
+- **`PARSE_AST_VERSION` is now 101.** `individual item`/`individual occurrence`/`individual port`
+  short usage forms parse correctly instead of being misclassified or falling into a recovery
+  cascade: package-level `item def` now requires the `def` keyword so it no longer shadows
+  `individual item x;`; `individual` occurrence usages accept an optional `occurrence` kind
+  keyword (`OccurrenceUsage::has_occurrence_keyword` preserves whether it was authored); `port`
+  usages accept an `individual` prefix (`PortUsage::is_individual`); and `state def`/`connection
+  def` accept `individual` (`StateDef::is_individual`/`ConnectionDef::is_individual`).
+- **`PARSE_AST_VERSION` is now 100.** `InterfaceUsage` (all three variants) retains its `:>`/`:>>`
+  subsetting and redefinition clauses (`subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `ConnectionUsageMember`.
+- **`PARSE_AST_VERSION` is now 99.** `AnalysisCaseUsage` and `CaseUsage` retain their `:>`/`:>>`
+  subsetting and redefinition clauses (`subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `RequirementUsage`/`PortUsage`/`StateUsage`.
+- **`PARSE_AST_VERSION` is now 97.** Package bodies gain `@ Name (: Type)? about target(,
+  ...)?;` standalone metadata-annotation support, accept stacked `#Prefix #Prefix ... member`
+  metadata tags before a member instead of at most one, and port definition bodies dispatch
+  `#Prefix`-tagged nested port declarations through the same shared metadata-keyword parsing other
+  definition bodies already use.
+- **`PARSE_AST_VERSION` is now 96.** `ConstraintUsage` retains its `:>`/`:>>` subsetting and
+  redefinition clauses (`ConstraintUsage::subsets`/`redefines`) instead of discarding them after
+  parsing, matching sibling usage kinds such as `ConnectionUsageMember`.
+- **Canonical document source ranges.** `SourceStorage::position_at`, `SourceStorage::range_of`,
+  and `ParsedDocument::range` resolve byte-backed parser spans through one lazily built,
+  document-owned newline index. Downstream diagnostics and navigation can retain a `Span` and ask
+  the parsed document for its canonical multiline range without rescanning source text.
+- **`PARSE_AST_VERSION` is now 87.** In/out parameters retain their `ref` feature prefix and
+  typed multiplicity, and occurrence-body exhibit usages retain their arena-backed state path.
+  Emission also preserves quoting for compound unit names such as `'N/mm²'`.
+- **`PARSE_AST_VERSION` is now 86.** `FirstMergeBody` brace forms retain an aggregate source span,
+  exact opening- and closing-brace spans, and ordered typed action-body members. Valid output pins
+  and other recognized members remain semantic syntax; unsupported and malformed members are
+  explicit nodes that preserve diagnostics and recovery continuation. Formatting `first`, `merge`,
+  `decide`, `join`, and `fork` bodies consumes those typed members instead of fabricating `{}` or
+  treating a source slice as successful syntax.
+- **For-loop ranges are always typed expressions.** The parser no longer publishes
+  `Expression::Opaque(String)` when range parsing fails. Malformed ranges recover as explicit error
+  nodes, roll back speculative qualified-reference identities, and preserve later siblings.
+- **`PARSE_AST_VERSION` is now 84.** Return-reference bodies now contain typed documentation,
+  result-expression, and recovery elements; calculation/constraint returns and return references
+  roll back speculative arena identities on failure; occurrence portions use the
+  `OccurrencePortionKind` enum. Connection-like part members that are not yet implemented are
+  explicit `UnsupportedGrammarNode`s rather than header-scanned `OpaqueMemberDecl`s. Package-body
+  diagnostic collection is exhaustive and reports every retained KerML/library fallback instead
+  of silently ignoring new or opaque variants.
+- **`PARSE_AST_VERSION` is now 83.** State action targets, requirement redefinition contents,
+  collection-operator bodies, and nested use-case assertion members are structured typed syntax
+  rather than opaque or copied strings.
+- **Collection operator brace bodies are structured syntax.** `Expression::CollectionOp` now
+  retains a typed `CollectionOperatorBody` instead of an opaque copied `String`: ordered
+  `in`/`out`/`inout` parameters, optional `ref` and typing syntax, the semantic result expression,
+  source-backed reference identities, and exact body/declaration token spans remain available to
+  emitters, diagnostics, navigation, serialization, and semantic snapshots. Malformed bodies fail
+  transactionally into the enclosing recovery node without leaking speculative reference IDs.
+- **Grammar conformance is now machine-readable and scope checked.** The public
+  `SUPPORTED_GRAMMAR` constant exposes the release tag, repository, and deterministic content hash
+  derived from the single `docs/conformance-target` pin; builds with the BNF checkout present reject
+  mismatched grammar bytes. Package-body recovery starters now come from one typed production table
+  whose spec entries are linted against a nullable-aware `FIRST(PackageBodyElement)` derivation.
+  Spec-valid package forms that reach an unimplemented dispatch branch produce typed
+  `UnsupportedGrammarForm` nodes instead of blaming authored input with malformed nodes.
+  `PARSE_AST_VERSION` is now 82.
+- **Snapshot regeneration uses available CPU cores.** Both the default `cargo test` snapshot
+  contract and the `snapshot_tool` CLI evaluate independent fixtures concurrently, then restore
+  deterministic path order before comparison, reporting, or updates.
+- **Semantic references are now typed, source-backed, and document-local (#119).** `parse()` and
+  editor parsing return a `ParsedDocument` that atomically owns the BOM-normalized source,
+  `QualifiedReferenceArena`, and root AST. Imports, exposes, expressions, requirement references,
+  type references, and specialization relationships store opaque `QualifiedReferenceId` values;
+  consumers resolve them through `ParsedDocument::qualified_reference()` to borrow exact authored
+  text, aggregate/segment spans, absolute-scope metadata, and typed `::`/`.` separators without
+  splitting or reparsing display strings. Import/expose wildcard, recursive, and filter forms use
+  the typed `ImportShape` representation, including distinct `::*`, `::**`, and `::*::**` shapes;
+  their aggregate suffix, exact `::`/`*`/`**` token, combined-recursive, and filter-delimiter spans
+  retain precise authored provenance without downstream source scanning. Qualified package,
+  library-package, and namespace declaration names use a distinct `QualifiedDeclarationName`
+  role wrapper over the same packed storage, preserving their scope, segments, separators, and
+  spans without misclassifying simple declaration labels as references. State `entry`, `do`, and
+  `exit` action targets are likewise arena-backed references, including qualified, dotted, quoted,
+  and absolute paths; declaration labels remain a separate identity role. Actor redefinition
+  assignment values are spanned `Expression` nodes, and reference redefinition bodies are nested,
+  spanned `UseCaseDefBody` trees, replacing both former opaque `String` fields.
+  The former `RelationshipTarget` and `FeatureChain` representations and legacy string/display
+  accessors were removed rather than retained as compatibility layers. Serde now operates on the
+  atomic parsed-document envelope and validates arena ranges and every AST identity when reading
+  or writing. `PARSE_AST_VERSION` is now 80 for this breaking schema/API migration.
+
 ### Fixed
 
 - **`AttributeUsage` emit duplicated the name for `::>`/`:>`/`:>>`-name-standing-in-prefix

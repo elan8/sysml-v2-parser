@@ -1,31 +1,33 @@
 //! Action definition and action usage parsing (function-based behavior).
 
 use crate::ast::{
-    ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstStmt, ForLoop, ForkStmt,
-    IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode,
-    TerminateStmt, ThenAction, ThenTarget, WhileStmt,
+    ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
+    ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstMergeBodyElement,
+    FirstMergeBraceBody, FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt,
+    LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget,
+    WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::{expression, path_expression};
+use crate::parser::feature_value::feature_value_part;
 use crate::parser::lex::{
-    name, qualified_name, starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
-    ws_and_comments,
+    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
+    ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
-use crate::parser::node_from_to;
 use crate::parser::part::bind_;
-use crate::parser::usage::{multiplicity_node, redefinition, targets_display_string};
+use crate::parser::usage::{multiplicity_node, redefinition, usage_feature_modifier_flags};
 use crate::parser::with_span;
 use crate::parser::Input;
+use crate::parser::{node_from_to, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded};
-use nom::IResult;
 use nom::Parser;
+use nom::{IResult, Input as _};
 
 const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"in",
@@ -97,9 +99,14 @@ fn optional_multiplicity_brackets(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// typing clause (S42-004). We also accept `= expr` bindings; anything still unrecognized before
 /// the terminator is skipped as before.
 fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
+    crate::parser::span::reference_transaction(input, action_ref_decl_inner)
+}
+
+fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefDecl>> {
     use crate::parser::expr::expression;
     use crate::parser::usage::{
-        optional_typings, single_target_redefines, single_target_typing, typing_fields_from_result,
+        optional_typings, single_target_redefines, single_target_typing,
+        typing_reference_fields_from_result,
     };
 
     let start = input;
@@ -125,16 +132,16 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
     // Optional `:>>` redefines clause: `ref NAME :>> TARGET`.
     let (input, redefines_target) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, with_span(qualified_name)),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
     let redefines = redefines_target.map(|(span, target)| single_target_redefines(span, target));
 
-    let (input, type_ref_span, type_name, typing) = if redefines.is_some() {
+    let (input, type_ref_span, typing) = if redefines.is_some() {
         // After `:>> target`, an optional `:` typing clause (possibly multi-target) may follow.
         let (input, typing_result) = optional_typings(input)?;
-        let (type_ref_span, type_name, typing) = typing_fields_from_result(typing_result);
-        (input, type_ref_span, type_name, typing)
+        let (type_ref_span, _, typing) = typing_reference_fields_from_result(typing_result);
+        (input, type_ref_span, typing)
     } else {
         // No `:>>` redefines clause seen: bare `:` (multi-target aware) or legacy `:>`
         // (single-target only; kept for backward compatibility -- no confirmed real usage of
@@ -143,13 +150,13 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
         if peek.fragment().starts_with(b":>") && !peek.fragment().starts_with(b":>>") {
             let (input, _) = preceded(ws_and_comments, tag(&b":>"[..])).parse(input)?;
             let (input, (span, target)) =
-                preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
-            let typing = Some(single_target_typing(span.clone(), target.clone()));
-            (input, Some(span), target, typing)
+                preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
+            let typing = Some(single_target_typing(span.clone(), target));
+            (input, Some(span), typing)
         } else {
             let (input, typing_result) = optional_typings(input)?;
-            let (type_ref_span, type_name, typing) = typing_fields_from_result(typing_result);
-            (input, type_ref_span, type_name, typing)
+            let (type_ref_span, _, typing) = typing_reference_fields_from_result(typing_result);
+            (input, type_ref_span, typing)
         }
     };
 
@@ -211,11 +218,14 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
             input,
             crate::ast::RefDecl {
                 direction: None,
+                kind_keyword: None,
                 name: name_str,
-                type_name,
                 typing,
                 redefines,
                 subsets: None,
+                multiplicity: None,
+                ordered: false,
+                nonunique: false,
                 value,
                 body,
                 name_span: Some(name_span),
@@ -231,13 +241,103 @@ fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| FirstMergeBody::Semicolon),
-        map(consume_action_structured_brace, |_| FirstMergeBody::Brace),
+        first_merge_brace_body,
     ))
     .parse(input)
 }
 
+fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
+    let start = input;
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        ACTION_BODY_STARTERS,
+        "first/merge body",
+        "recovered_first_merge_body_element",
+        first_merge_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                ACTION_BODY_STARTERS,
+                "first/merge body",
+                "recovered_first_merge_body_element",
+            );
+            let node = node_from_to(start, end, recovery);
+            node_from_to(start, end, FirstMergeBodyElement::Error(node))
+        },
+    )?;
+    let consumed_len = start.fragment().len() - input.fragment().len();
+    debug_assert!(consumed_len >= 2);
+    let (after_open, _) = start.take_split(1);
+    let (close_start, _) = start.take_split(consumed_len - 1);
+    Ok((
+        input,
+        FirstMergeBody::Brace(node_from_to(
+            start,
+            input,
+            FirstMergeBraceBody {
+                open_brace_span: span_from_to(start, after_open),
+                elements,
+                close_brace_span: span_from_to(close_start, input),
+            },
+        )),
+    ))
+}
+
+fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMergeBodyElement>> {
+    let (input, member) = action_def_body_element(input)?;
+    let span = member.span.clone();
+    let value = match member.value {
+        // BNF `MergeNode`/`DecisionNode`/`JoinNode`/`ForkNode` (SysML-textual-bnf.kebnf §8.2.2.17.3)
+        // all use the same `ActionBody` production as a plain action definition body, so a
+        // `first`/`merge` brace body legitimately accepts any action-body declaration (e.g. `calc
+        // opaque;`), not just the narrower allow-list this used to downgrade to `Unsupported`.
+        value @ (ActionDefBodyElement::AttributeUsage(_)
+        | ActionDefBodyElement::CalcUsage(_)
+        | ActionDefBodyElement::ActionDef(_)
+        | ActionDefBodyElement::Error(_)
+        | ActionDefBodyElement::InOutDecl(_)
+        | ActionDefBodyElement::Doc(_)
+        | ActionDefBodyElement::Annotation(_)
+        | ActionDefBodyElement::MetadataAnnotation(_)
+        | ActionDefBodyElement::MetadataKeywordUsage(_)
+        | ActionDefBodyElement::MetadataUsage(_)
+        | ActionDefBodyElement::TextualRep(_)
+        | ActionDefBodyElement::RefDecl(_)
+        | ActionDefBodyElement::Perform(_)
+        | ActionDefBodyElement::Bind(_)
+        | ActionDefBodyElement::FlowUsage(_)
+        | ActionDefBodyElement::FirstStmt(_)
+        | ActionDefBodyElement::MergeStmt(_)
+        | ActionDefBodyElement::DecisionStmt(_)
+        | ActionDefBodyElement::JoinStmt(_)
+        | ActionDefBodyElement::ForkStmt(_)
+        | ActionDefBodyElement::TerminateStmt(_)
+        | ActionDefBodyElement::WhileStmt(_)
+        | ActionDefBodyElement::LoopStmt(_)
+        | ActionDefBodyElement::IfStmt(_)
+        | ActionDefBodyElement::StateUsage(_)
+        | ActionDefBodyElement::ActionUsage(_)
+        | ActionDefBodyElement::PartUsage(_)
+        | ActionDefBodyElement::ItemUsage(_)
+        | ActionDefBodyElement::AssertConstraint(_)
+        | ActionDefBodyElement::OccurrenceUsage(_)
+        | ActionDefBodyElement::Assign(_)
+        | ActionDefBodyElement::ForLoop(_)
+        | ActionDefBodyElement::ThenAction(_)
+        | ActionDefBodyElement::DefaultReferenceUsage(_)) => {
+            FirstMergeBodyElement::Member(Box::new(Node::new(span.clone(), value)))
+        }
+    };
+    Ok((input, Node::new(span, value)))
+}
+
 /// In/out decl: `in` name `:` type `;` or `out` name `:` type `;`
 pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
+    crate::parser::span::reference_transaction(input, in_out_decl_inner)
+}
+
+fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = alt((
@@ -246,11 +346,17 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
         map(preceded(tag(&b"inout"[..]), ws1), |_| InOut::InOut),
     ))
     .parse(input)?;
-    // `in item …` / `in part …` are StructureUsageMembers, not plain InOutDecl parameters.
-    // Fail here (before the unstructured fallback) so action-body dispatch can try those arms.
+    // `in item …` / `in part …` are StructureUsageMembers and `in occurrence …` is an
+    // OccurrenceUsageMember, not plain InOutDecl parameters. Fail here (before the unstructured
+    // fallback) so action-body dispatch can try those arms.
     let (peek, _) = ws_and_comments(input)?;
     if starts_with_keyword(peek.fragment(), b"item")
         || starts_with_keyword(peek.fragment(), b"part")
+        || starts_with_keyword(peek.fragment(), b"occurrence")
+        || starts_with_keyword(peek.fragment(), b"expr")
+        || starts_with_keyword(peek.fragment(), b"bool")
+        || starts_with_keyword(peek.fragment(), b"feature")
+        || starts_with_keyword(peek.fragment(), b"calc")
     {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -263,23 +369,22 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
     // (`in :>> MessageTransfer::payload, MessageAction::payload;`), both from Systems Library
     // `Actions.sysml`'s `SendAction`/`TransitionAction`.
     let (peek_redef, _) = ws_and_comments(input)?;
-    if peek_redef.fragment().starts_with(b":>>") {
+    if peek_redef.fragment().starts_with(b":>>")
+        || starts_with_keyword(peek_redef.fragment(), b"redefines")
+    {
         let (input, redefines) = redefinition(input)?;
-        let param_name = targets_display_string(&redefines.value.target);
         // Optional trailing `: Type` between the redefinition target and the value, e.g.
         // `out attribute :>> a_out : AccelerationValue = Acceleration(dt, tm, tp);`
         // (Systems Library-adjacent Analysis Examples/Dynamics.sysml:64, GH-86).
         let (input, type_name) = opt(preceded(
             preceded(ws_and_comments, tag(&b":"[..])),
-            preceded(ws_and_comments, qualified_name),
+            preceded(ws_and_comments, qualified_reference),
         ))
         .parse(input)?;
-        let (input, _) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
-        let (input, value) = opt(preceded(
-            preceded(ws_and_comments, tag(&b"="[..])),
-            preceded(ws_and_comments, expression),
-        ))
-        .parse(input)?;
+        let (input, multiplicity) =
+            opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+        let (input, (ordered, nonunique)) = usage_feature_modifier_flags(input)?;
+        let (input, value) = opt(feature_value_part).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         return Ok((
             input,
@@ -288,10 +393,17 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                 input,
                 InOutDecl {
                     direction,
-                    name: param_name,
-                    type_name: type_name.unwrap_or_default(),
-                    is_redefinition: true,
+                    is_reference: false,
+                    is_var: false,
+                    name: String::new(),
+                    subsets: None,
+                    type_name,
+                    multiplicity,
+                    ordered,
+                    nonunique,
+                    redefines: Some(redefines),
                     value,
+                    body: None,
                 },
             ),
         ));
@@ -299,99 +411,138 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
     let parsed = (|| {
         // Library shorthand: `in action body { ... }` (treat as name `body` typed as `action`)
         let (input, action_typed_name) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
-        let (input, param_name) = name(input)?;
+        let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
+        // `out var y1;` (KerML `var` time-varying prefix on a directed parameter).
+        let (input, is_var) = opt(preceded(tag(&b"var"[..]), ws1)).parse(input)?;
+        // Anonymous typed parameter: `in : TensorQuantityValue[1];` (Domain Libraries
+        // `TensorCalculations.sysml`). The name is legally omitted when the typing follows
+        // directly.
+        let (peek_anon, _) = ws_and_comments(input)?;
+        let (input, param_name) =
+            if peek_anon.fragment().starts_with(b":") && !peek_anon.fragment().starts_with(b":>") {
+                (input, String::new())
+            } else {
+                name(input)?
+            };
+        // BNF `FeatureSpecializationPart` allows the `MultiplicityPart` before or after the
+        // typing: `in transitionLinkSource[1]: StateAction :>> ...` (Systems Library
+        // `States.sysml`) vs `inout replacementValues : Anything[0..*] nonunique;`
+        // (`Actions.sysml`). Accept one multiplicity clause in either position.
+        let (input, leading_multiplicity) =
+            opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+        let (input, (leading_ordered, leading_nonunique)) = usage_feature_modifier_flags(input)?;
         // In action usages, pin declarations may omit the type (e.g. `out videoStream;`)
         // to reference the corresponding typed parameter on the referenced action definition.
         // Action definitions generally include the type (e.g. `out videoStream : String;`),
         // but accepting the shorthand here prevents recovery errors in common models.
-        let (input, type_name) = nom::combinator::opt(alt((
-            map(
-                (
-                    preceded(ws_and_comments, tag(&b":>"[..])),
-                    preceded(ws_and_comments, qualified_name),
-                ),
-                |(_, tn)| tn,
+        // `:>` is a subsets clause, retained as such (`out voltage :> ISQ::electricPotential =
+        // ...;`, spec42 evsample); it was previously folded into `type_name`, erasing the
+        // authored relationship kind. Parsed inline (not via `usage::subsetting`) so the `=`
+        // value stays on the declaration's own `FeatureValue` clause below.
+        let subsets_start = input;
+        let subsets_attempt =
+            (|| -> IResult<Input<'_>, Node<crate::ast::SubsettingRelationship>> {
+                let (i, _) = preceded(ws_and_comments, crate::parser::lex::subset_operator)
+                    .parse(subsets_start)?;
+                let (i, targets) = preceded(
+                    ws_and_comments,
+                    crate::parser::usage::specialization_targets,
+                )
+                .parse(i)?;
+                let span = crate::parser::span_from_to(subsets_start, i);
+                Ok((
+                    i,
+                    crate::parser::usage::subsetting_relationship_node(
+                        targets,
+                        crate::ast::SubsettingKind::Subsets,
+                        span,
+                    ),
+                ))
+            })();
+        let (input, subsets) = match subsets_attempt {
+            Ok((i, node)) => (i, Some(node)),
+            Err(_) => (input, None),
+        };
+        let (input, type_name) = nom::combinator::opt(map(
+            (
+                preceded(ws_and_comments, tag(&b":"[..])),
+                preceded(ws_and_comments, qualified_reference),
             ),
-            map(
+            |(_, tn)| tn,
+        ))
+        .parse(input)?;
+        let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
+            opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?
+        } else {
+            (input, None)
+        };
+        let (input, (trailing_ordered, trailing_nonunique)) = usage_feature_modifier_flags(input)?;
+        // Trailing `:>>` redefinition after a named declaration, including the comma-separated
+        // multi-target form: `in transitionLinkSource[1]: StateAction :>>
+        // TransitionAction::transitionLinkSource, StateTransitionPerformance::
+        // transitionLinkSource;` (Systems Library `States.sysml`).
+        let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
+        // The typing may trail the redefinition target: `in enclosingItem :>> 'frame' :
+        // SpatialItem[1];` (Domain Libraries `SpatialItems.sysml`).
+        let (input, type_name) = if type_name.is_none() && redefines.is_some() {
+            opt(map(
                 (
                     preceded(ws_and_comments, tag(&b":"[..])),
-                    preceded(ws_and_comments, qualified_name),
+                    preceded(ws_and_comments, qualified_reference),
                 ),
                 |(_, tn)| tn,
-            ),
-        )))
-        .parse(input)?;
-        let mut type_name = type_name.unwrap_or_default();
-        if action_typed_name.is_some() && type_name.is_empty() {
-            type_name = "action".to_string();
-        }
+            ))
+            .parse(input)?
+        } else {
+            (input, type_name)
+        };
+        let (input, trailing_multiplicity) =
+            if trailing_multiplicity.is_none() && leading_multiplicity.is_none() {
+                opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?
+            } else {
+                (input, trailing_multiplicity)
+            };
+        let _ = action_typed_name;
 
-        // Optional `= expr` default value (e.g. `in a : Real = 0.0;`).
-        let (input, value) = opt(preceded(
-            preceded(ws_and_comments, tag(&b"="[..])),
-            preceded(ws_and_comments, expression),
-        ))
-        .parse(input)?;
-
-        // Optional `default { ... }` initializer used in the standard library.
-        let (input, _) = opt((
-            preceded(ws_and_comments, tag(&b"default"[..])),
-            ws1,
-            consume_action_structured_brace,
-        ))
-        .parse(input)?;
+        // Optional value clause: `= expr` / `:= expr` / `default (=|:=)? expr`, e.g.
+        // `in a : Real = 0.0;` or `in target : Occurrence[1] default that as Occurrence`
+        // (Systems Library `Actions.sysml`). `feature_value_part` also covers the
+        // expression-body initializer form `default {true}` as a typed
+        // `Expression::BodyExpr`, previously consumed opaquely here and discarded.
+        let (input, value) = opt(feature_value_part).parse(input)?;
 
         // Standard library sometimes uses braced pin bodies without a trailing semicolon.
-        // Accept either `;` or `{ ... }` as a terminator.
-        let (input, _) = preceded(
+        // Accept either `;` or a `{ ... }` body as a terminator, retaining the body elements.
+        let (input, body) = preceded(
             ws_and_comments,
             alt((
-                map(tag(&b";"[..]), |_| ()),
-                map(consume_action_structured_brace, |_| ()),
+                map(tag(&b";"[..]), |_| None),
+                map(consume_action_structured_brace, Some),
             )),
         )
         .parse(input)?;
-        Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (param_name, type_name, value)))
-    })();
-    let (input, (param_name, type_name, value)) = match parsed {
-        Ok(v) => v,
-        Err(_) => {
-            // Best-effort fallback: consume to `;` or start of a braced body.
-            let (input, raw_text) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
-            let raw_text = raw_text.trim().to_string();
-            let name_guess = raw_text
-                .split(|c: char| c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == ';')
-                .find(|s| !s.is_empty() && *s != ":>>")
-                .unwrap_or("param")
-                .to_string();
-            // Accept `;` or a braced body after the unstructured prefix.
-            let (input, _) = preceded(
-                ws_and_comments,
-                alt((
-                    map(tag(&b";"[..]), |_| ()),
-                    map(consume_action_structured_brace, |_| ()),
-                )),
-            )
-            .parse(input)?;
-            // If we can't parse a structured `: Type`, keep the raw text as a best-effort
-            // stand-in so downstream tools still have something to display.
-            (input, (name_guess, raw_text, None))
-        }
-    };
-    Ok((
-        input,
-        node_from_to(
-            start,
+        Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((
             input,
             InOutDecl {
                 direction,
+                is_reference: is_reference.is_some(),
+                is_var: is_var.is_some(),
                 name: param_name,
+                subsets,
                 type_name,
-                is_redefinition: false,
+                multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                ordered: leading_ordered || trailing_ordered,
+                nonunique: leading_nonunique || trailing_nonunique,
+                redefines,
                 value,
+                body,
             },
-        ),
-    ))
+        ))
+    })();
+    // Malformed declarations must fall through to the enclosing body's explicit recovery node;
+    // do not guess a declaration name from opaque text and silently turn it into valid syntax.
+    let (input, decl) = parsed?;
+    Ok((input, node_from_to(start, input, decl)))
 }
 
 /// Action def body: `;` or `{` ActionDefBodyElement* `}`
@@ -426,9 +577,12 @@ pub(crate) fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Acti
     Ok((input, ActionDefBody::Brace { elements }))
 }
 
-/// Parse `{` action-body members `}` with recovery, discarding elements (opaque ref/first/merge bodies).
-fn consume_action_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _elements) = parse_structured_brace_members(
+/// Parse a `{` action-body `}`, returning the parsed member elements. The enclosing span stays
+/// available at the caller.
+fn consume_action_structured_brace(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<Node<ActionDefBodyElement>>> {
+    parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
         "action body",
@@ -445,8 +599,7 @@ fn consume_action_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
             let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
             node_from_to(start, end, ActionDefBodyElement::Error(node))
         },
-    )?;
-    Ok((input, ()))
+    )
 }
 
 pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStmt>> {
@@ -471,6 +624,10 @@ pub(crate) fn assign_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<AssignStm
 }
 
 pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
+    crate::parser::span::reference_transaction(input, for_loop_inner)
+}
+
+fn for_loop_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"for"[..]).parse(input)?;
@@ -478,23 +635,10 @@ pub(crate) fn for_loop(input: Input<'_>) -> IResult<Input<'_>, Node<ForLoop>> {
     let (input, var) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"in"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    // Prefer a structured expression (e.g. `1..10`, `someCollection`, `x->size()`); fall back
-    // to raw text only for range forms the expression grammar still doesn't cover, kept as a
-    // defensive net rather than removed (arrow-invocation was the last known common gap here).
-    let (input, range) = match expression(input) {
-        Ok(ok) => ok,
-        Err(_) => {
-            let (next, raw) = take_until_terminator(input, b"{")?;
-            (
-                next,
-                node_from_to(
-                    input,
-                    next,
-                    crate::ast::Expression::FeatureRef(raw.trim().to_string()),
-                ),
-            )
-        }
-    };
+    // A successfully parsed loop always owns a typed expression. If the range is malformed, the
+    // complete production fails so the containing editor body inserts an explicit recovery node;
+    // `reference_transaction` also discards any references allocated before that failure.
+    let (input, range) = expression(input)?;
     let (input, body) = preceded(ws_and_comments, action_def_body_brace).parse(input)?;
     Ok((
         input,
@@ -526,12 +670,17 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
             }),
             |(span, accept)| ThenTarget::Accept(Node::new(span, accept)),
         ),
+        // `then send new S() to b;` (spec42 gap 30): the same control-node parse the
+        // standalone `send ...;` statement uses, kept as its own variant so the send shape is
+        // distinguishable from a bare feature reference.
+        map(then_send_target, |a| ThenTarget::Send(Box::new(a))),
         // `perform action …` before bare `perform …`; both before `action_usage`.
-        map(
-            crate::parser::part::perform_action_decl,
-            ThenTarget::Perform,
-        ),
-        map(crate::parser::part::perform_usage, ThenTarget::Perform),
+        map(crate::parser::part::perform_action_decl, |perform| {
+            ThenTarget::Perform(Box::new(perform))
+        }),
+        map(crate::parser::part::perform_usage, |perform| {
+            ThenTarget::Perform(Box::new(perform))
+        }),
         // `action_usage` already accepts visibility / abstract / ref / variation prefixes.
         map(action_usage, |a| ThenTarget::Action(Box::new(a))),
         map(
@@ -540,6 +689,19 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
         ),
     ))
     .parse(input)
+}
+
+/// `send ...` as a `then` succession target -- only the `send` control-node form, so the other
+/// control keywords keep their own arms.
+fn then_send_target(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
+    let (peek, _) = ws_and_comments(input)?;
+    if !starts_with_keyword(peek.fragment(), b"send") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    control_node_action_usage(input)
 }
 
 pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenAction>> {
@@ -597,7 +759,21 @@ fn action_def_body_element(
         map(assign_stmt, ActionDefBodyElement::Assign),
         map(for_loop, ActionDefBodyElement::ForLoop),
         map(then_action, ActionDefBodyElement::ThenAction),
-        map(action_body_decl, ActionDefBodyElement::Decl),
+        // Gap 33: `attribute`/`calc`/`event` declarations dispatch through their typed
+        // productions (the opaque `ActionBodyDecl` fallback is retired). Before `in_out_decl`
+        // so these keywords never read as parameter names; `occurrence_usage` covers the
+        // `event`/`event occurrence` forms.
+        nom::branch::alt((
+            map(crate::parser::attribute::attribute_usage, |a| {
+                ActionDefBodyElement::AttributeUsage(Box::new(a))
+            }),
+            map(crate::parser::constraint::calc_usage, |c| {
+                ActionDefBodyElement::CalcUsage(Box::new(c))
+            }),
+            map(crate::parser::occurrence_body::occurrence_usage, |n| {
+                ActionDefBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+        )),
         map(in_out_decl, ActionDefBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionDefBodyElement::Doc),
         map(
@@ -645,7 +821,7 @@ fn action_def_body_element(
             ),
             // Nested `action def` must win over `action_usage` (which would otherwise treat
             // `def` as a usage name).
-            map(nested_action_def_decl, ActionDefBodyElement::Decl),
+            map(action_def, |d| ActionDefBodyElement::ActionDef(Box::new(d))),
             map(control_node_action_usage, |a| {
                 ActionDefBodyElement::ActionUsage(Box::new(a))
             }),
@@ -670,6 +846,12 @@ fn action_def_body_element(
                 map(
                     crate::parser::occurrence_body::assert_constraint_member,
                     ActionDefBodyElement::AssertConstraint,
+                ),
+                // `in occurrence …` reaches here after `in_out_decl` rejects the keyword,
+                // same as directed `in item`/`in part` above.
+                map(
+                    crate::parser::occurrence_body::directed_occurrence_usage,
+                    |n| ActionDefBodyElement::OccurrenceUsage(Box::new(n)),
                 ),
                 map(crate::parser::occurrence_body::snapshot_usage, |n| {
                     ActionDefBodyElement::OccurrenceUsage(Box::new(n))
@@ -727,7 +909,11 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
 /// `sysml/src/examples/Simple Tests/ConnectionTest.sysml`'s `succession s first a then b;` /
 /// `succession s1 : AB first a then b;` (name, and name + type).
 /// `(name, type, multiplicity)` of a parsed `succession` prefix, all `None` when absent.
-type SuccessionPrefix = (Option<String>, Option<String>, Option<Node<Multiplicity>>);
+type SuccessionPrefix = (
+    Option<String>,
+    Option<crate::ast::QualifiedReferenceId>,
+    Option<Node<Multiplicity>>,
+);
 
 fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     let (input, _) = tag(&b"succession"[..]).parse(input)?;
@@ -751,7 +937,7 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
     let (input, succession_type) =
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, Some(type_name))
         } else {
             (input, None)
@@ -766,6 +952,10 @@ fn succession_prefix(input: Input<'_>) -> IResult<Input<'_>, SuccessionPrefix> {
 
 /// First stmt: (`succession` prefix)? `first` `[mult]`? path (`then` `[mult]`? path)? body
 pub(crate) fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
+    crate::parser::span::reference_transaction(input, first_stmt_inner)
+}
+
+fn first_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, succession) = opt(succession_prefix).parse(input)?;
@@ -813,6 +1003,10 @@ pub(crate) fn first_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>
 
 /// Merge stmt: `merge` path body
 fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
+    crate::parser::span::reference_transaction(input, merge_stmt_inner)
+}
+
+fn merge_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"merge"[..]).parse(input)?;
@@ -834,6 +1028,10 @@ fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
 
 /// Decision node: `decide` path body
 fn decision_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
+    crate::parser::span::reference_transaction(input, decision_stmt_inner)
+}
+
+fn decision_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"decide"[..]).parse(input)?;
@@ -855,6 +1053,10 @@ fn decision_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
 
 /// Join node: `join` path body
 fn join_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
+    crate::parser::span::reference_transaction(input, join_stmt_inner)
+}
+
+fn join_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"join"[..]).parse(input)?;
@@ -876,6 +1078,10 @@ fn join_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
 
 /// Fork node: `fork` path body
 fn fork_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
+    crate::parser::span::reference_transaction(input, fork_stmt_inner)
+}
+
+fn fork_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"fork"[..]).parse(input)?;
@@ -1096,7 +1302,19 @@ pub(crate) fn action_usage_body_element(
         map(assign_stmt, ActionUsageBodyElement::Assign),
         map(for_loop, ActionUsageBodyElement::ForLoop),
         map(then_action, ActionUsageBodyElement::ThenAction),
-        map(action_body_decl, ActionUsageBodyElement::Decl),
+        // Gap 33: typed dispatch replacing the retired opaque `ActionBodyDecl`; see the
+        // matching branch in `action_def_body_element`.
+        nom::branch::alt((
+            map(crate::parser::attribute::attribute_usage, |a| {
+                ActionUsageBodyElement::AttributeUsage(Box::new(a))
+            }),
+            map(crate::parser::constraint::calc_usage, |c| {
+                ActionUsageBodyElement::CalcUsage(Box::new(c))
+            }),
+            map(crate::parser::occurrence_body::occurrence_usage, |n| {
+                ActionUsageBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+        )),
         map(in_out_decl, ActionUsageBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionUsageBodyElement::Doc),
         map(
@@ -1141,7 +1359,9 @@ pub(crate) fn action_usage_body_element(
                 crate::parser::requirement::textual_representation,
                 ActionUsageBodyElement::TextualRep,
             ),
-            map(nested_action_def_decl, ActionUsageBodyElement::Decl),
+            map(action_def, |d| {
+                ActionUsageBodyElement::ActionDef(Box::new(d))
+            }),
             map(control_node_action_usage, |a| {
                 ActionUsageBodyElement::ActionUsage(Box::new(a))
             }),
@@ -1166,6 +1386,12 @@ pub(crate) fn action_usage_body_element(
                 map(
                     crate::parser::occurrence_body::assert_constraint_member,
                     ActionUsageBodyElement::AssertConstraint,
+                ),
+                // `in occurrence …` reaches here after `in_out_decl` rejects the keyword,
+                // same as directed `in item`/`in part` above.
+                map(
+                    crate::parser::occurrence_body::directed_occurrence_usage,
+                    |n| ActionUsageBodyElement::OccurrenceUsage(Box::new(n)),
                 ),
                 map(crate::parser::occurrence_body::snapshot_usage, |n| {
                     ActionUsageBodyElement::OccurrenceUsage(Box::new(n))
@@ -1193,61 +1419,6 @@ pub(crate) fn action_usage_body_element(
 fn visibility_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     // `action_usage` already captures visibility / abstract / ref.
     action_usage(input)
-}
-
-/// Nested `action def …` inside an action body. Kept as a lightweight Decl so we do not bump
-/// AST shape for this recovery/parity fix; Spec42 already ignores `Decl`.
-fn nested_action_def_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>> {
-    let start = input;
-    let (input, def) = action_def(input)?;
-    let name = def
-        .value
-        .identification
-        .name
-        .clone()
-        .unwrap_or_else(|| "action".to_string());
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            ActionBodyDecl {
-                keyword: "action".to_string(),
-                text: format!("def {name}"),
-            },
-        ),
-    ))
-}
-
-fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(alt((
-        preceded(tag(&b"public"[..]), ws1),
-        preceded(tag(&b"private"[..]), ws1),
-        preceded(tag(&b"protected"[..]), ws1),
-    )))
-    .parse(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, keyword) = alt((
-        map(tag(&b"attribute"[..]), |_| "attribute".to_string()),
-        map(tag(&b"calc"[..]), |_| "calc".to_string()),
-        map(tag(&b"event"[..]), |_| "event".to_string()),
-    ))
-    .parse(input)?;
-
-    let (input, text) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = alt((
-        map(tag(&b";"[..]), |_| ()),
-        map(consume_action_structured_brace, |_| ()),
-    ))
-    .parse(input)?;
-
-    Ok((
-        input,
-        node_from_to(start, input, ActionBodyDecl { keyword, text }),
-    ))
 }
 
 /// True when `action` is followed by an `accept`/`send` *payload* clause rather than a usage named
@@ -1346,7 +1517,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
     let (input, trailing) = crate::parser::usage::specialization_clauses(input)?;
     let (type_ref_span, type_name, typing) =
-        crate::parser::usage::typing_fields_from_result(type_result);
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
     let subsets = trailing
         .subsets
         .clone()
@@ -1455,12 +1626,95 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
 }
 
 #[cfg(test)]
-mod control_node_gap_tests {
+mod in_out_decl_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    /// Systems Library `Actions.sysml`: `in transitionLinkSource : Action :>>
+    /// TransitionPerformance::transitionLinkSource;` -- a `:>>` redefinition trailing a named,
+    /// typed declaration.
+    #[test]
+    fn in_out_decl_accepts_trailing_redefinition_after_typing() {
+        let (rest, node) = in_out_decl(input("in transitionLinkSource : Action :>> T::t;"))
+            .expect("trailing redefinition");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "transitionLinkSource");
+        assert!(node.value.type_name.is_some());
+        let redefines = node.value.redefines.as_ref().expect("redefines");
+        assert_eq!(redefines.value.target.len(), 1);
+    }
+
+    /// Systems Library `States.sysml`: multiplicity before the typing, and a comma-separated
+    /// multi-target redefinition. Both targets must be retained.
+    #[test]
+    fn in_out_decl_accepts_multiplicity_before_typing_and_multi_target_redefines() {
+        let (rest, node) = in_out_decl(input(
+            "in transitionLinkSource[1]: StateAction :>> A::t, B::t;",
+        ))
+        .expect("multiplicity before typing");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.multiplicity.is_some());
+        assert!(node.value.type_name.is_some());
+        let redefines = node.value.redefines.as_ref().expect("redefines");
+        assert_eq!(redefines.value.target.len(), 2);
+    }
+
+    /// Systems Library `Actions.sysml`/`Interfaces.sysml`: `ordered`/`nonunique` multiplicity
+    /// properties, with and without a typing clause.
+    #[test]
+    fn in_out_decl_retains_ordered_and_nonunique_flags() {
+        let (_, node) = in_out_decl(input("inout replacementValues : Anything[0..*] nonunique;"))
+            .expect("nonunique after typing");
+        assert!(node.value.nonunique);
+        assert!(!node.value.ordered);
+
+        let (_, node) =
+            in_out_decl(input("in seq[1..*] nonunique ordered;")).expect("untyped modifiers");
+        assert!(node.value.nonunique);
+        assert!(node.value.ordered);
+        assert!(node.value.type_name.is_none());
+    }
+
+    /// Systems Library `Actions.sysml`: `default <expr>` value clause plus a retained `{ ... }`
+    /// terminator body.
+    #[test]
+    fn in_out_decl_accepts_default_expression_value_with_body() {
+        let (rest, node) = in_out_decl(input(
+            "in target : Occurrence[1] default that as Occurrence { doc /* d */ }",
+        ))
+        .expect("default value with body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let value = node.value.value.as_ref().expect("feature value");
+        assert!(value.value.is_default);
+        let body = node.value.body.as_ref().expect("retained body");
+        assert_eq!(body.len(), 1);
+        assert!(matches!(body[0].value, ActionDefBodyElement::Doc(_)));
+    }
+
+    /// A malformed declaration must fail the parser (so the enclosing body produces an explicit
+    /// recovery node) instead of guessing a declaration.
+    #[test]
+    fn in_out_decl_rejects_malformed_declaration() {
+        assert!(in_out_decl(input("in : ;")).is_err());
+    }
+
+    /// `in occurrence …` must be rejected here so action-body dispatch routes it to the directed
+    /// occurrence-usage arm.
+    #[test]
+    fn in_out_decl_rejects_occurrence_keyword() {
+        assert!(in_out_decl(input("in occurrence o[1];")).is_err());
+    }
+}
+
+#[cfg(test)]
+mod control_node_gap_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
     }
 
     /// PARSER_BACKLOG_ROADMAP.md §6, G13: `first <name>;` with no `then` clause marks an initial
@@ -1526,13 +1780,19 @@ mod control_node_gap_tests {
     /// `ConnectionTest.sysml`).
     #[test]
     fn action_body_accepts_named_and_typed_succession_prefix() {
-        let (rest, node) = action_def_body_element(input("succession s1 : AB first a then b;"))
-            .expect("named + typed succession stmt");
+        let source = input("succession s1 : AB first a then b;");
+        let (rest, node) = action_def_body_element(source).expect("named + typed succession stmt");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::FirstStmt(f) => {
                 assert_eq!(f.value.succession_name.as_deref(), Some("s1"));
-                assert_eq!(f.value.succession_type.as_deref(), Some("AB"));
+                assert_eq!(
+                    f.value
+                        .succession_type
+                        .and_then(|id| crate::parser::usage::reference_text(source, id))
+                        .as_deref(),
+                    Some("AB")
+                );
             }
             other => panic!("expected FirstStmt, got {other:?}"),
         }
@@ -1563,20 +1823,70 @@ mod control_node_gap_tests {
     /// end multiplicities and a brace body (real usage: Systems Library `States.sysml`).
     #[test]
     fn action_body_accepts_named_succession_with_end_multiplicities_and_brace_body() {
-        let (rest, node) = action_def_body_element(input(
-            "succession stateSequencing first [0..1] exclusiveStates then [0..1] exclusiveStates { }",
-        ))
-        .expect("named succession with multiplicities + brace body");
+        let source = "succession stateSequencing first [0..1] exclusiveStates then [0..1] exclusiveStates { in pin; }";
+        let (rest, node) = action_def_body_element(input(source))
+            .expect("named succession with multiplicities + brace body");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::FirstStmt(f) => {
                 assert_eq!(f.value.succession_name.as_deref(), Some("stateSequencing"));
                 assert!(f.value.first_multiplicity.is_some());
                 assert!(f.value.then_multiplicity.is_some());
-                assert!(matches!(f.value.body, FirstMergeBody::Brace));
+                let FirstMergeBody::Brace(body) = f.value.body else {
+                    panic!("expected source-backed brace body");
+                };
+                assert_eq!(
+                    &source[body.span.offset..body.span.offset + body.span.len],
+                    "{ in pin; }"
+                );
+                assert_eq!(body.value.open_brace_span.offset, body.span.offset);
+                assert_eq!(body.value.open_brace_span.len, 1);
+                assert_eq!(body.value.elements.len(), 1);
+                assert!(matches!(
+                    &body.value.elements[0].value,
+                    FirstMergeBodyElement::Member(member)
+                        if matches!(member.value, ActionDefBodyElement::InOutDecl(_))
+                ));
+                assert_eq!(
+                    body.value.close_brace_span.offset,
+                    body.span.offset + body.span.len - 1
+                );
+                assert_eq!(body.value.close_brace_span.len, 1);
             }
             other => panic!("expected FirstStmt, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn first_merge_body_keeps_structured_decl_and_malformed_members_then_resumes() {
+        // BNF `MergeNode`/`DecisionNode`/`JoinNode`/`ForkNode` (SysML-textual-bnf.kebnf
+        // §8.2.2.17.3) all use the same `ActionBody` production as a plain action definition
+        // body, so `calc opaque;` here is a typed `ActionDefBodyElement::CalcUsage` member, not
+        // an unsupported one.
+        let source = "first start then finish { calc opaque; bogus ???; in resumed; }";
+        let (rest, node) = action_def_body_element(input(source)).expect("first/merge body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let ActionDefBodyElement::FirstStmt(first) = node.value else {
+            panic!("expected FirstStmt");
+        };
+        let FirstMergeBody::Brace(body) = first.value.body else {
+            panic!("expected brace body");
+        };
+        assert_eq!(body.value.elements.len(), 3);
+        assert!(matches!(
+            &body.value.elements[0].value,
+            FirstMergeBodyElement::Member(member)
+                if matches!(member.value, ActionDefBodyElement::CalcUsage(_))
+        ));
+        assert!(matches!(
+            body.value.elements[1].value,
+            FirstMergeBodyElement::Error(_)
+        ));
+        assert!(matches!(
+            &body.value.elements[2].value,
+            FirstMergeBodyElement::Member(member)
+                if matches!(member.value, ActionDefBodyElement::InOutDecl(_))
+        ));
     }
 
     /// §6 G14: `loop { ... }` is a `while` with no condition. The §5 audit wired
@@ -1595,6 +1905,78 @@ mod control_node_gap_tests {
             action_usage_body_element(input("loop { action x; }")).expect("loop stmt");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, ActionUsageBodyElement::LoopStmt(_)));
+    }
+
+    /// Spec42 Gap 33: `attribute`/`calc`/`event`/nested `action def` members in action bodies
+    /// dispatch through their typed productions instead of the retired opaque `ActionBodyDecl`.
+    #[test]
+    fn action_def_body_dispatches_declarations_to_typed_productions() {
+        let parse = |source| {
+            let (rest, node) = action_def_body_element(input(source)).expect(source);
+            assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+            node.value
+        };
+        assert!(matches!(
+            parse("attribute mass = 5;"),
+            ActionDefBodyElement::AttributeUsage(_)
+        ));
+        assert!(matches!(
+            parse("calc estimate : Estimate;"),
+            ActionDefBodyElement::CalcUsage(_)
+        ));
+        assert!(matches!(
+            parse("event occurrence crossings[0..*] : Crossing;"),
+            ActionDefBodyElement::OccurrenceUsage(_)
+        ));
+        assert!(matches!(
+            parse("action def Nested { in signal; }"),
+            ActionDefBodyElement::ActionDef(_)
+        ));
+    }
+
+    #[test]
+    fn action_usage_body_dispatches_declarations_to_typed_productions() {
+        let parse = |source| {
+            let (rest, node) = action_usage_body_element(input(source)).expect(source);
+            assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+            node.value
+        };
+        assert!(matches!(
+            parse("attribute duration = 10;"),
+            ActionUsageBodyElement::AttributeUsage(_)
+        ));
+        assert!(matches!(
+            parse("calc estimate : Estimate;"),
+            ActionUsageBodyElement::CalcUsage(_)
+        ));
+        assert!(matches!(
+            parse("event marker;"),
+            ActionUsageBodyElement::OccurrenceUsage(_)
+        ));
+        assert!(matches!(
+            parse("action def Nested { in signal; }"),
+            ActionUsageBodyElement::ActionDef(_)
+        ));
+    }
+
+    /// Spec42 Gap 33: the nested `action def`'s full declaration is retained (formerly flattened
+    /// to an opaque keyword/text pair).
+    #[test]
+    fn nested_action_def_retains_its_declaration() {
+        let (rest, node) =
+            action_def_body_element(input("action def Nested { in signal; }")).expect("action def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let ActionDefBodyElement::ActionDef(def) = node.value else {
+            panic!("expected ActionDef");
+        };
+        assert_eq!(def.value.identification.name.as_deref(), Some("Nested"));
+        let ActionDefBody::Brace { elements, .. } = &def.value.body else {
+            panic!("expected brace body");
+        };
+        assert!(matches!(
+            elements[0].value,
+            ActionDefBodyElement::InOutDecl(_)
+        ));
     }
 
     /// §6 G23 (found while fixing G13): only `then action ...` was accepted, so the two other
@@ -1638,10 +2020,20 @@ mod control_node_gap_tests {
 
     #[test]
     fn then_succession_accepts_perform_target() {
-        let (rest, node) = then_action(input("then perform body;")).expect("then perform");
+        let source = input("then perform body;");
+        let (rest, node) = then_action(source).expect("then perform");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value.target {
-            ThenTarget::Perform(p) => assert_eq!(p.value.action_name, "body"),
+            ThenTarget::Perform(p) => {
+                assert!(p.value.action_name.is_empty());
+                assert_eq!(
+                    p.value
+                        .action_reference
+                        .and_then(|id| crate::parser::usage::reference_text(source, id))
+                        .as_deref(),
+                    Some("body")
+                );
+            }
             other => panic!("expected Perform target, got {other:?}"),
         }
     }
@@ -1734,7 +2126,10 @@ mod control_node_gap_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             ActionDefBodyElement::OccurrenceUsage(o) => {
-                assert_eq!(o.value.portion_kind.as_deref(), Some("snapshot"));
+                assert_eq!(
+                    o.value.portion_kind,
+                    Some(crate::ast::OccurrencePortionKind::Snapshot)
+                );
                 assert_eq!(o.value.name, "trued");
             }
             other => panic!("expected OccurrenceUsage, got {other:?}"),
@@ -1797,10 +2192,10 @@ mod control_node_gap_tests {
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+    use crate::ast::Expression;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on ActionDef/ActionUsage ---
@@ -1849,31 +2244,41 @@ mod membership_tests {
     fn abstract_ref_action_with_multiplicity_and_subsets_is_structured() {
         let src =
             "abstract ref action performedActions: Action[0..*] :> actions, enactedPerformances;";
-        let (rest, node) = action_usage(input(src)).expect("ref action usage");
+        let source = input(src);
+        let (rest, node) = action_usage(source).expect("ref action usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_abstract);
         assert!(node.value.is_reference);
         assert_eq!(node.value.name, "performedActions");
-        assert_eq!(node.value.type_name, "Action");
-        assert!(node.value.typing.is_some());
         assert_eq!(
             node.value
-                .multiplicity
-                .as_ref()
-                .map(|m| m.value.to_bracket_string()),
-            Some("[0..*]".to_string())
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("Action")
         );
-        let subsets = node
+        assert!(node.value.typing.is_some());
+        let multiplicity = &node
             .value
-            .subsets
+            .multiplicity
             .as_ref()
-            .expect("subsets clause")
-            .value
-            .target
-            .iter()
-            .map(|t| t.value.to_display_string())
-            .collect::<Vec<_>>()
-            .join(", ");
+            .expect("multiplicity")
+            .value;
+        assert!(matches!(
+            multiplicity.lower.as_deref().map(|bound| &bound.value),
+            Some(Expression::LiteralInteger(0))
+        ));
+        assert!(multiplicity.upper.is_none());
+        let subsets = crate::parser::usage::reference_list_text(
+            source,
+            &node
+                .value
+                .subsets
+                .as_ref()
+                .expect("subsets clause")
+                .value
+                .target,
+        );
         assert_eq!(subsets, "actions, enactedPerformances");
     }
 }

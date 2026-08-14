@@ -3,6 +3,15 @@
 use sysml_v2_parser::ast::*;
 use sysml_v2_parser::parse;
 
+fn reference_text(
+    document: &ParsedDocument,
+    reference: Option<QualifiedReferenceId>,
+) -> Option<&str> {
+    reference
+        .and_then(|id| document.qualified_reference(id))
+        .map(|view| view.authored_text())
+}
+
 #[test]
 fn test_view_def_parse() {
     let input = "package P { view def Name { } }";
@@ -84,7 +93,7 @@ fn test_view_usage_parse() {
     match &elements[0].value {
         PackageBodyElement::ViewUsage(vu) => {
             assert_eq!(vu.name, "name");
-            assert_eq!(vu.type_name.as_deref(), Some("ViewType"));
+            assert_eq!(reference_text(&result, vu.type_name), Some("ViewType"));
             assert!(matches!(&vu.body, ViewBody::Brace { ref elements } if elements.is_empty()));
         }
         _ => panic!("expected ViewUsage"),
@@ -141,7 +150,10 @@ viewpoint safety defined by Mission::SafetyViewpoint { }
         PackageBodyElement::ViewpointUsage(v) => v,
         other => panic!("expected viewpoint usage, got {:?}", other),
     };
-    assert_eq!(viewpoint.value.type_name, "Mission::SafetyViewpoint");
+    assert_eq!(
+        reference_text(&result, viewpoint.value.type_name),
+        Some("Mission::SafetyViewpoint")
+    );
 }
 
 #[test]
@@ -165,14 +177,17 @@ view dashboard typed by Mission::DashboardView;
         PackageBodyElement::ActionUsage(a) => a,
         other => panic!("expected action usage, got {:?}", other),
     };
-    assert_eq!(action_usage.value.type_name, "Mission::SendAction");
+    assert_eq!(
+        reference_text(&result, action_usage.value.type_name),
+        Some("Mission::SendAction")
+    );
 
     let state_usage = match &elements[1].value {
         PackageBodyElement::StateUsage(s) => s,
         other => panic!("expected state usage, got {:?}", other),
     };
     assert_eq!(
-        state_usage.value.type_name.as_deref(),
+        reference_text(&result, state_usage.value.type_name),
         Some("Mission::Mode")
     );
 
@@ -181,7 +196,7 @@ view dashboard typed by Mission::DashboardView;
         other => panic!("expected view usage, got {:?}", other),
     };
     assert_eq!(
-        view_usage.value.type_name.as_deref(),
+        reference_text(&result, view_usage.value.type_name),
         Some("Mission::DashboardView")
     );
 }
@@ -205,7 +220,7 @@ rendering skin typed by Mission::Renderer;
         other => panic!("expected rendering usage, got {:?}", other),
     };
     assert_eq!(
-        rendering_usage.value.type_name.as_deref(),
+        reference_text(&result, rendering_usage.value.type_name),
         Some("Mission::Renderer")
     );
 }

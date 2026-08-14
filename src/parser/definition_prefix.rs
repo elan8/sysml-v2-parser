@@ -38,11 +38,13 @@
 //! def-optional shape), that's the signal to stop adding narrow booleans and unify them into one
 //! general definition-shape check instead.
 
-use crate::ast::{Identification, Node, TypingKind, TypingRelationship, Visibility};
+use crate::ast::{
+    DerivationConnectionRole, Identification, Node, TypingKind, TypingRelationship, Visibility,
+};
 use crate::parser::definition_header::parse_definition_header_after_ident;
 use crate::parser::lex::{contains_keyword, identification, ws1, ws_and_comments};
 use crate::parser::Input;
-use nom::bytes::complete::{tag, take_while1};
+use nom::bytes::complete::tag;
 use nom::combinator::opt;
 use nom::sequence::preceded;
 use nom::IResult;
@@ -68,10 +70,10 @@ pub enum VisibilityPrefix {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AnnotationMode {
+pub enum DerivationRoleMode {
     None,
-    /// Leading `#identifier` (connection definitions).
-    HashIdentifier,
+    /// Fixed leading `#derivation` marker on derivation connection definitions.
+    Connection,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -91,7 +93,7 @@ pub struct DefinitionPrefixOptions {
     /// from it and must keep rejecting a leading `individual` as usual.
     pub individual_allowed: bool,
     pub visibility: VisibilityPrefix,
-    pub annotation: AnnotationMode,
+    pub derivation_role: DerivationRoleMode,
     /// When set, fail this definition parse if the plain `: Type` header scan swallows this
     /// keyword as part of its discarded trailing text. See
     /// [`DefinitionPrefixOptions::reject_header_keyword`].
@@ -112,7 +114,7 @@ impl DefinitionPrefixOptions {
             abstract_allowed: true,
             individual_allowed: false,
             visibility: VisibilityPrefix::None,
-            annotation: AnnotationMode::None,
+            derivation_role: DerivationRoleMode::None,
             reject_header_keyword: None,
             reject_plain_typed_header_without_def: false,
         }
@@ -147,8 +149,8 @@ impl DefinitionPrefixOptions {
         self
     }
 
-    pub const fn with_hash_annotation(mut self) -> Self {
-        self.annotation = AnnotationMode::HashIdentifier;
+    pub const fn with_derivation_role(mut self) -> Self {
+        self.derivation_role = DerivationRoleMode::Connection;
         self
     }
 
@@ -187,7 +189,7 @@ impl DefinitionPrefixOptions {
 pub struct DefinitionPrefixResult {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    pub annotation: Option<String>,
+    pub derivation_role: Option<Node<DerivationConnectionRole>>,
     pub is_abstract: bool,
     /// `individual` prefix, captured only when
     /// [`DefinitionPrefixOptions::individual_allowed`] was set; `false` otherwise.
@@ -209,17 +211,20 @@ pub(crate) fn parse_definition_prefix(
 ) -> IResult<Input<'_>, DefinitionPrefixResult> {
     let (input, _) = ws_and_comments(input)?;
 
-    let (input, annotation) = match options.annotation {
-        AnnotationMode::None => (input, None),
-        AnnotationMode::HashIdentifier => {
-            let (input, raw) = opt(preceded(
-                tag(&b"#"[..]),
-                take_while1(|c: u8| c.is_ascii_alphanumeric() || c == b'_'),
-            ))
-            .parse(input)?;
-            let annotation = raw.map(|span| String::from_utf8_lossy(span.fragment()).to_string());
+    let (input, derivation_role) = match options.derivation_role {
+        DerivationRoleMode::None => (input, None),
+        DerivationRoleMode::Connection => {
+            let marker_start = input;
+            let (input, marker) = opt((tag(&b"#"[..]), tag(&b"derivation"[..]))).parse(input)?;
+            let role = marker.map(|_| {
+                crate::parser::node_from_to(
+                    marker_start,
+                    input,
+                    DerivationConnectionRole::Derivation,
+                )
+            });
             let (input, _) = ws_and_comments(input)?;
-            (input, annotation)
+            (input, role)
         }
     };
 
@@ -301,7 +306,7 @@ pub(crate) fn parse_definition_prefix(
         DefinitionPrefixResult {
             identification,
             specializes,
-            annotation,
+            derivation_role,
             is_abstract,
             is_individual,
             visibility,
@@ -313,11 +318,17 @@ pub(crate) fn parse_definition_prefix(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::usage::targets_display_string;
-    use nom_locate::LocatedSpan;
+    use crate::ast::QualifiedReferenceId;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    fn target_texts(source: Input<'_>, targets: &[QualifiedReferenceId]) -> Vec<String> {
+        targets
+            .iter()
+            .map(|id| crate::parser::usage::reference_text(source, *id).expect("reference text"))
+            .collect()
     }
 
     #[test]
@@ -331,8 +342,8 @@ mod tests {
             prefix
                 .specializes
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("Base".to_string())
+                .map(|n| target_texts(input, &n.value.target)),
+            Some(vec!["Base".to_string()])
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
     }
@@ -350,28 +361,40 @@ mod tests {
             prefix
                 .specializes
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("linkObjects, parts".to_string())
+                .map(|n| target_texts(input, &n.value.target)),
+            Some(vec!["linkObjects".to_string(), "parts".to_string()])
         );
         assert!(rest.fragment().starts_with(b"{"));
     }
 
     #[test]
-    fn prefix_parses_hash_annotation_connection() {
-        let input = span_input("#MyConn abstract connection conn :> Base ;");
+    fn prefix_parses_derivation_connection_role() {
+        let input = span_input("#derivation abstract connection conn :> Base ;");
         let (rest, prefix) = parse_definition_prefix(
             input,
-            DefinitionPrefixOptions::new(b"connection").with_hash_annotation(),
+            DefinitionPrefixOptions::new(b"connection").with_derivation_role(),
         )
         .expect("prefix");
-        assert_eq!(prefix.annotation.as_deref(), Some("MyConn"));
+        assert!(matches!(
+            prefix.derivation_role.as_ref().map(|node| node.value),
+            Some(DerivationConnectionRole::Derivation)
+        ));
+        assert_eq!(
+            prefix.derivation_role.as_ref().map(|node| &node.span),
+            Some(&crate::ast::Span {
+                offset: 0,
+                line: 1,
+                column: 1,
+                len: 11,
+            })
+        );
         assert!(prefix.is_abstract);
         assert_eq!(
             prefix
                 .specializes
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("Base".to_string())
+                .map(|n| target_texts(input, &n.value.target)),
+            Some(vec!["Base".to_string()])
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
@@ -406,8 +429,8 @@ mod tests {
             prefix
                 .specializes
                 .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("Y".to_string())
+                .map(|n| target_texts(input, &n.value.target)),
+            Some(vec!["Y".to_string()])
         );
     }
 }

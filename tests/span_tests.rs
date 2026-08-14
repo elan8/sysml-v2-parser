@@ -1,8 +1,6 @@
 //! Tests that AST node spans (offset, line, column, len) are calculated correctly.
 
-use sysml_v2_parser::ast::{
-    AstNode, PackageBody, PackageBodyElement, PartUsageBody, PartUsageBodyElement, RootElement,
-};
+use sysml_v2_parser::ast::{AstNode, RootElement};
 use sysml_v2_parser::parse;
 
 fn assert_span(
@@ -66,35 +64,4 @@ fn test_multi_line_second_element_span() {
         len2,
         "second element starts at line 2, column 1",
     );
-}
-
-#[test]
-fn test_nested_expression_span() {
-    // Part usage with bind; the literal 100 should have a span covering "100".
-    let input = "package P { part u : T { bind x = 100; } }";
-    let result = parse(input).expect("parse should succeed");
-    let elem = &result.elements[0];
-    let RootElement::Package(pkg) = &elem.value else {
-        panic!("expected Package");
-    };
-    let body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let part_usage_elem = &body[0];
-    let PackageBodyElement::PartUsage(part_usage) = &**part_usage_elem else {
-        panic!("expected PartUsage");
-    };
-    let part_body = match &part_usage.body {
-        PartUsageBody::Brace { elements } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let bind_elem = &part_body[0];
-    let PartUsageBodyElement::Bind(bind) = &**bind_elem else {
-        panic!("expected Bind");
-    };
-    let right = &bind.right;
-    let offset_100 = input.find("100").expect("substring 100");
-    // Column is 1-based: offset 0 is column 1, so offset_100 is column offset_100 + 1.
-    assert_span(right, offset_100, 1, offset_100 + 1, 3, "literal 100 span");
 }

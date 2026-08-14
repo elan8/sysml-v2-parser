@@ -12,7 +12,7 @@ action def A {
 }
 }"#;
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -67,7 +67,7 @@ action def ComputeBatteryInfo {
         .as_deref()
         .is_some_and(|s| s.contains("perform batCap")));
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };

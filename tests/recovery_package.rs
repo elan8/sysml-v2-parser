@@ -13,7 +13,7 @@ fn package_recovery_inserts_error_node_and_keeps_later_sibling() {
         parse(input).is_err(),
         "strict should reject the unsupported annotation"
     );
-    let root = parse_with_diagnostics(input).root;
+    let root = parse_with_diagnostics(input).document.root;
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),

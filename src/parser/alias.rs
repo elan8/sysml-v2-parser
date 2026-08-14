@@ -1,10 +1,11 @@
 //! Alias definition parsing.
 
-use crate::ast::{AliasBody, AliasDef, Node, RelationshipTarget};
+use crate::ast::{AliasBody, AliasDef, Node};
 use crate::parser::body::relationship_body_annotations;
-use crate::parser::lex::{identification, qualified_name_segments, ws1, ws_and_comments};
+use crate::parser::lex::{identification, qualified_reference, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::{span_from_to, Input};
+use crate::parser::span::reference_transaction;
+use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::sequence::preceded;
 use nom::IResult;
@@ -22,6 +23,10 @@ fn alias_body(input: Input<'_>) -> IResult<Input<'_>, AliasBody> {
 
 /// Alias definition: `alias` Identification `for` qualified_name body
 pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> {
+    reference_transaction(input, alias_def_inner)
+}
+
+fn alias_def_inner(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
@@ -30,12 +35,7 @@ pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> 
     let (input, identification) = identification(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"for"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let target_start = input;
-    let (input, target_segments) = qualified_name_segments(input)?;
-    let target = RelationshipTarget {
-        segments: target_segments,
-        span: span_from_to(target_start, input),
-    };
+    let (input, target) = qualified_reference(input)?;
     let (input, body) = alias_body(input)?;
     Ok((
         input,
@@ -59,10 +59,9 @@ pub(crate) fn alias_def(input: Input<'_>) -> IResult<Input<'_>, Node<AliasDef>> 
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on AliasDef ---

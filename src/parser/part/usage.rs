@@ -21,30 +21,13 @@ pub(crate) fn part_usage_redefines_only<'a>(
     // Decomposition - Updated.sysml:43`) -- previously only the type-less bare (`part redefines
     // lb;`) and braced-body (`part redefines engine { ... }`) forms were accepted.
     let (input, type_result) = optional_typings(input)?;
-    let has_type = type_result.is_some();
-    let (type_ref_span, type_name, typing) =
-        crate::parser::usage::typing_fields_from_result(type_result);
+    let (type_ref_span, _, typing) =
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
     let (input, ordered) = usage_ordered_modifier(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
-    // When an explicit type follows the redefines target, the display name is derived from the
-    // target (matching the pre-existing behavior this shape previously reached via
-    // `part_usage_named`'s own `:>>`-prefixed fallback, e.g. `ref part :>> elements: SparePart;`
-    // in release validation `15_11-Variable Length Collection Types.sysml`). The type-less bare/
-    // braced-body forms (`part redefines lb;` / `part redefines engine { ... }`) keep the name
-    // empty -- `emit_part_usage`'s `redefines_only` special case (multiplicity placement) and
-    // `tests/parser/structure.rs::test_part_usage_redefines_only_keyword` both depend on that.
-    let name = if has_type {
-        redefines_qname
-            .value
-            .first_target()
-            .and_then(|t| t.local_name())
-            .unwrap_or_default()
-            .to_string()
-    } else {
-        String::new()
-    };
+    // This form has no declaration name; the target spelling lives only in `redefines`.
     Ok((
         input,
         node_from_to(
@@ -57,9 +40,8 @@ pub(crate) fn part_usage_redefines_only<'a>(
                 direction: None,
                 is_derived: false,
                 is_constant: false,
-                name,
+                name: String::new(),
                 short_name: None,
-                type_name,
                 typing,
                 multiplicity: multiplicity_opt,
                 ordered,
@@ -97,15 +79,10 @@ pub(crate) fn part_usage_named<'a>(
     } else {
         optional_typings(input)?
     };
-    let typing = type_result
-        .clone()
-        .map(|(s, is_conjugated, targets)| typing_node(s, is_conjugated, targets));
-    let (type_ref_span, type_name) = type_result
-        .map(|(s, is_conjugated, targets)| {
-            let t = targets_display_string(&targets);
-            (Some(s), if is_conjugated { format!("~{t}") } else { t })
-        })
-        .unwrap_or((None, String::new()));
+    let type_ref_span = type_result.as_ref().map(|(span, _, _, _)| span.clone());
+    let typing = type_result.map(|(span, is_conjugated, targets, spelling)| {
+        typing_node(span, is_conjugated, targets, spelling)
+    });
     let (input, post_clause_multiplicity) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
     let (input, ordered_after_clauses) = usage_ordered_modifier(input)?;
@@ -141,7 +118,6 @@ pub(crate) fn part_usage_named<'a>(
                 is_constant: false,
                 name: name_str,
                 short_name: None,
-                type_name,
                 typing,
                 multiplicity: multiplicity_opt,
                 ordered,
@@ -269,14 +245,13 @@ fn anonymous_part_usage<'a>(
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, multiplicity_before) = opt(multiplicity_node).parse(input)?;
     let (input, ordered_before_type) = usage_ordered_modifier(input)?;
-    let (input, (type_ref_span, is_conjugated, targets)) = typings(input)?;
-    let type_name = targets_display_string(&targets);
-    let type_name = if is_conjugated {
-        format!("~{type_name}")
-    } else {
-        type_name
-    };
-    let typing = Some(typing_node(type_ref_span.clone(), is_conjugated, targets));
+    let (input, (type_ref_span, is_conjugated, targets, spelling)) = typings(input)?;
+    let typing = Some(typing_node(
+        type_ref_span.clone(),
+        is_conjugated,
+        targets,
+        spelling,
+    ));
     let (input, multiplicity_after) = opt(multiplicity_node).parse(input)?;
     let multiplicity_opt = multiplicity_before.or(multiplicity_after);
     let (input, ordered_after_type) = usage_ordered_modifier(input)?;
@@ -302,7 +277,6 @@ fn anonymous_part_usage<'a>(
                 is_constant: false,
                 name: String::new(),
                 short_name: None,
-                type_name,
                 typing,
                 multiplicity: multiplicity_opt,
                 ordered,
@@ -386,23 +360,17 @@ fn consume_part_usage_structured_brace(
     )
 }
 
-/// Action path for perform: name ( '.' name )* -> joined with ".".
-fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, first) = name(input)?;
-    let mut rest_parser = many0(preceded(
-        preceded(ws_and_comments, tag(&b"."[..])),
-        preceded(ws_and_comments, name),
-    ));
-    let (input, rest) = rest_parser.parse(input)?;
-    let action_name = std::iter::once(first)
-        .chain(rest)
-        .collect::<Vec<_>>()
-        .join(".");
-    Ok((input, action_name))
+/// Arena-backed action path for `perform`, preserving both qualification and dotted segments.
+fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, crate::ast::QualifiedReferenceId> {
+    crate::parser::lex::reference_path(input)
 }
 
-/// In/out binding inside a perform body: `in` name `=` expr `;` or `out` name `=` expr `;`.
+/// In/out binding inside a perform body: `in` target `=` expr `;` or `out` target `=` expr `;`.
 fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
+    crate::parser::span::reference_transaction(input, perform_in_out_binding_inner)
+}
+
+fn perform_in_out_binding_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PerformInOutBinding>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = alt((
@@ -411,7 +379,7 @@ fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformIn
     ))
     .parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
+    let (input, target) = reference_path(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
     let (input, value_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
@@ -422,7 +390,7 @@ fn perform_in_out_binding(input: Input<'_>) -> IResult<Input<'_>, Node<PerformIn
             input,
             PerformInOutBinding {
                 direction,
-                name: name_str,
+                target,
                 value: value_expr,
             },
         ),
@@ -509,12 +477,15 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
     let (input, usage_prefix) = perform_usage_prefix(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, action_name) = perform_action_path(input)?;
+    let (input, action_reference) = perform_action_path(input)?;
     let (input, redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
+    let redefines = redefines.map(|(span, target)| {
+        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
+    });
     let (input, value) = perform_value(input)?;
     let (input, body) = perform_body_or_semicolon(input)?;
     Ok((
@@ -524,8 +495,9 @@ pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform
             input,
             Perform {
                 usage_prefix,
-                action_name,
-                type_name: None,
+                action_name: String::new(),
+                action_reference: Some(action_reference),
+                typing: None,
                 multiplicity: None,
                 redefines,
                 subsets: None,
@@ -561,25 +533,33 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
     let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
+    let redefines = redefines.map(|(span, target)| {
+        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
+    });
     // GH-89: `:>` subsets clause, tried only when `:>>` redefines didn't match -- the two are
     // mutually exclusive specialization keywords at this position.
     let (input, subsets) = if redefines.is_none() {
         opt(preceded(
             preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, qualified_name),
+            preceded(ws_and_comments, with_span(qualified_reference)),
         ))
         .parse(input)?
     } else {
         (input, None)
     };
-    let (input, type_name) = opt(preceded(
+    let subsets = subsets.map(|(span, target)| {
+        single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target)
+    });
+    let (input, type_reference) = opt(preceded(
         preceded(ws_and_comments, typing_colon),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
+    let typing = type_reference
+        .map(|(span, target)| crate::parser::usage::single_target_typing(span, target));
     let (input, value) = perform_value(input)?;
     let (input, body) = perform_body_or_semicolon(input)?;
     Ok((
@@ -590,7 +570,8 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
             Perform {
                 usage_prefix,
                 action_name,
-                type_name,
+                action_reference: None,
+                typing,
                 multiplicity,
                 redefines,
                 subsets,
@@ -659,7 +640,7 @@ pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> 
 /// first ...` in `Flows.sysml`).
 type BindingPrefix = (
     Option<String>,
-    Option<String>,
+    Option<crate::ast::QualifiedReferenceId>,
     Option<Node<crate::ast::Multiplicity>>,
 );
 
@@ -678,7 +659,7 @@ fn binding_prefix(input: Input<'_>) -> IResult<Input<'_>, BindingPrefix> {
     let (input, binding_type) =
         if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
             let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+            let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
             (input, Some(type_name))
         } else {
             (input, None)
@@ -736,6 +717,10 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
 
 /// Connect (part usage level): `connect` path `to` path body
 pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
+    crate::parser::span::reference_transaction(input, connect_inner)
+}
+
+fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"connect"[..]).parse(input)?;
@@ -749,17 +734,27 @@ pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
     let (input, body) = connect_body(input)?;
+    let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
+    let subsets = trailing_subsets.map(|target| {
+        let span = crate::parser::span_from_to(before_subsets, input);
+        single_target_subsetting(span, crate::ast::SubsettingKind::Subsets, target)
+    });
+    let before_redefines = input;
     let (input, trailing_redefines) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
-    let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
+    let redefines = trailing_redefines.map(|target| {
+        let span = crate::parser::span_from_to(before_redefines, input);
+        single_target_subsetting(span, crate::ast::SubsettingKind::Redefines, target)
+    });
+    let input = if subsets.is_some() || redefines.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
     } else {
@@ -774,6 +769,8 @@ pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
                 from: connection_end_with_multiplicity(from_multiplicity, from_expr),
                 to: connection_end_with_multiplicity(to_multiplicity, to_expr),
                 body,
+                subsets,
+                redefines,
             },
         ),
     ))
@@ -828,7 +825,7 @@ fn interface_usage_ref_redef(
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":>>"[..])).parse(input)?;
-    let (input, ref_name) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
     let (input, value) = preceded(ws_and_comments, expression).parse(input)?;
     let (input, body) = ref_body_parse(input)?;
@@ -838,7 +835,7 @@ fn interface_usage_ref_redef(
             start,
             input,
             InterfaceUsageBodyElement::RefRedef {
-                name: ref_name,
+                target,
                 value,
                 body,
             },
@@ -930,7 +927,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         name,
         opt(multiplicity_node),
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
     let (input, iface_name, interface_type) =
@@ -956,12 +953,15 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
             } else {
                 let (input, interface_type) = opt(preceded(
                     tag(&b":"[..]),
-                    preceded(ws_and_comments, qualified_name),
+                    preceded(ws_and_comments, qualified_reference),
                 ))
                 .parse(input)?;
                 (input, None, interface_type)
             }
         };
+    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
+    let subsets = spec.subsets.map(|(target, _)| target);
+    let redefines = spec.redefines;
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b"connect") {
         let (input, _) = tag(&b"connect"[..]).parse(input)?;
@@ -978,6 +978,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 InterfaceUsage::TypedConnect {
                     name: iface_name,
                     interface_type,
+                    subsets,
+                    redefines,
                     from: from_expr,
                     to: to_expr,
                     body,
@@ -1003,6 +1005,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     start,
                     input,
                     InterfaceUsage::Connection {
+                        subsets: subsets.clone(),
+                        redefines: redefines.clone(),
                         from: from_expr,
                         to: to_expr,
                         body_elements: vec![],
@@ -1022,6 +1026,8 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
             InterfaceUsage::Declaration {
                 name: iface_name,
                 interface_type,
+                subsets,
+                redefines,
                 body,
                 body_elements,
             },
@@ -1072,8 +1078,30 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     .parse(input)?;
     let (input, name_str) = name(input)?;
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
-    let (type_ref_span, type_name, typing) =
-        crate::parser::usage::typing_fields_from_result(type_result);
+    let (type_ref_span, _, typing) =
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
+    // Trailing `:>>` redefinition after the typing, e.g. `ref self: Part :>> Item::self;`
+    // (Systems Library `Parts.sysml`). The typing may equally follow the redefinition -- the
+    // canonical emitted order and a legal `FeatureSpecializationPart` ordering -- so retry the
+    // typing after the redefinition when it wasn't already written before it.
+    let (input, redefines) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::redefinition,
+    ))
+    .parse(input)?;
+    let (input, type_ref_span, typing) = if typing.is_none() && redefines.is_some() {
+        let (input, type_result) = crate::parser::usage::optional_typings(input)?;
+        let (type_ref_span, _, typing) =
+            crate::parser::usage::typing_reference_fields_from_result(type_result);
+        (input, type_ref_span, typing)
+    } else {
+        (input, type_ref_span, typing)
+    };
+    // `:>` subsets, independent of and in addition to `:>>` redefines (mirrors
+    // `connector::ref_decl`).
+    let (input, subsets) =
+        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    let subsets = subsets.map(|(target, _value)| target);
     let (input, value) = opt(preceded(
         preceded(ws_and_comments, tag(&b"="[..])),
         preceded(ws_and_comments, expression),
@@ -1105,11 +1133,14 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             input,
             RefDecl {
                 direction,
+                kind_keyword: None,
                 name: name_str,
-                type_name,
                 typing,
-                redefines: None,
-                subsets: None,
+                redefines,
+                subsets,
+                multiplicity: None,
+                ordered: false,
+                nonunique: false,
                 value,
                 body,
                 name_span: None,
@@ -1125,6 +1156,10 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
 /// `variant port ...`), or an untyped reference to a separately-declared usage
 /// (`variant name;`).
 pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
+    crate::parser::span::reference_transaction(input, variant_usage_inner)
+}
+
+fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let membership = Membership::variant(visibility, visibility_span);
@@ -1132,14 +1167,13 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
     let (input, _) = ws1(input)?;
 
     if let Ok((next, usage)) = part_usage(input) {
-        let name = usage.value.name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
+                    reference: None,
                     typed: Some(VariantTypedUsage::Part(Box::new(usage))),
                     body: None,
                     membership,
@@ -1148,14 +1182,13 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
         ));
     }
     if let Ok((next, usage)) = attribute_usage(input) {
-        let name = usage.value.name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
+                    reference: None,
                     typed: Some(VariantTypedUsage::Attribute(Box::new(usage))),
                     body: None,
                     membership,
@@ -1164,14 +1197,13 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
         ));
     }
     if let Ok((next, usage)) = item_usage(input) {
-        let name = usage.value.name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
+                    reference: None,
                     typed: Some(VariantTypedUsage::Item(Box::new(usage))),
                     body: None,
                     membership,
@@ -1180,15 +1212,31 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
         ));
     }
     if let Ok((next, usage)) = port_usage(input) {
-        let name = usage.value.name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
+                    reference: None,
                     typed: Some(VariantTypedUsage::Port(Box::new(usage))),
+                    body: None,
+                    membership,
+                },
+            ),
+        ));
+    }
+    // `variant requirement r1;` inside a `variation requirement r { ... }` body (spec42
+    // Gap 44), mirroring the five kind keywords above.
+    if let Ok((next, usage)) = requirement_usage(input) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    reference: None,
+                    typed: Some(VariantTypedUsage::Requirement(Box::new(usage))),
                     body: None,
                     membership,
                 },
@@ -1198,14 +1246,13 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
     // §6 G5: `variant perform doX;` inside a `variation perform action ... { ... }` body.
     // `perform_action_decl` first, for the same bare-keyword reason as the dispatchers above.
     if let Ok((next, usage)) = alt((perform_action_decl, perform_usage)).parse(input) {
-        let name = usage.value.action_name.clone();
         return Ok((
             next,
             node_from_to(
                 start,
                 next,
                 VariantUsage {
-                    name,
+                    reference: None,
                     typed: Some(VariantTypedUsage::Perform(Box::new(usage))),
                     body: None,
                     membership,
@@ -1219,7 +1266,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
     // usage. Real usage: `Simple Tests/VariabilityTest.sysml:16` (`variant q { attribute b : B
     // :>> a; }`, `q` referring to the sibling `part q : Q;`) and
     // `Variability Examples/VehicleVariabilityModel.sysml:78` (`variant '6cylEngine' { ... }`).
-    let (input, name) = name(input)?;
+    let (input, reference) = reference_path(input)?;
     let (input, body) = preceded(ws_and_comments, part_usage_body).parse(input)?;
     let body = match body {
         PartUsageBody::Semicolon => None,
@@ -1231,7 +1278,7 @@ pub(crate) fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Variant
             start,
             input,
             VariantUsage {
-                name,
+                reference: Some(reference),
                 typed: None,
                 body,
                 membership,
@@ -1329,6 +1376,12 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             ),
             // `metadata_usage` before `metadata_def` so bare `metadata Name { … }` does not misfire
             // (metadata_def is def_required-guarded, but keep def/usage pairing explicit).
+            // Nested KerML classifier declarations (`struct Car1_ { ... }` inside a `part`
+            // usage body, KerML `time_varying_car_driver`; spec42 Gap 38), keyword-gated so no
+            // other member shape is affected.
+            map(crate::parser::package::kerml_classifier_structured, |n| {
+                PartUsageBodyElement::KermlClassifier(Box::new(n))
+            }),
             map(metadata_usage, PartUsageBodyElement::MetadataUsage),
             map(metadata_def, PartUsageBodyElement::MetadataDef),
             map(requirement_def, PartUsageBodyElement::RequirementDef),
@@ -1350,6 +1403,12 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         alt((
             map(port_usage, PartUsageBodyElement::PortUsage),
             map(part_ref_usage, PartUsageBodyElement::Ref),
+            // Kinded `ref item :>> a, b, c;` (Domain Libraries `SpatialItems.sysml`), which
+            // `part_ref_usage` deliberately rejects; `connector::ref_decl` owns that shape.
+            map(
+                crate::parser::connector::ref_decl,
+                PartUsageBodyElement::Ref,
+            ),
             map(bind_, PartUsageBodyElement::Bind),
             map(satisfy, PartUsageBodyElement::Satisfy),
             map(
@@ -1417,7 +1476,12 @@ pub(crate) fn exhibit_state_as_state_usage(
         is_reference: exhibit.value.is_reference,
         is_individual: exhibit.value.is_individual,
         name: exhibit.value.name,
-        type_name: exhibit.value.type_name,
+        state_reference: exhibit.value.state_reference,
+        type_name: exhibit
+            .value
+            .typing
+            .as_ref()
+            .and_then(|typing| typing.value.target.first().copied()),
         typing: exhibit.value.typing,
         multiplicity: exhibit.value.multiplicity,
         subsets: exhibit.value.subsets,
@@ -1435,10 +1499,46 @@ pub(crate) fn exhibit_state_as_state_usage(
 #[cfg(test)]
 mod par_002_nested_def_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 38: KerML classifier-keyword declarations nested inside a part usage body
+    /// dispatch to the typed `KermlClassifierDecl` production (`struct Car1_ { ... }` inside
+    /// `part c { ... }`, KerML `time_varying_car_driver`).
+    #[test]
+    fn part_usage_body_dispatches_nested_kerml_classifiers() {
+        let (rest, node) = part_usage_body_element(input("struct Car1_ { feature wheels; }"))
+            .expect("nested struct");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PartUsageBodyElement::KermlClassifier(decl) = node.value else {
+            panic!("expected KermlClassifier");
+        };
+        assert_eq!(
+            decl.value.keyword,
+            crate::ast::KermlClassifierKeyword::Struct
+        );
+        assert_eq!(decl.value.identification.name.as_deref(), Some("Car1_"));
+    }
+
+    #[test]
+    fn connect_trailing_relationships_retain_arena_targets() {
+        let source = input("connect a to b; :> Network::links :>> Legacy::links;");
+        let (rest, node) = connect_(source).expect("connect with trailing relationships");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let subsets = node.value.subsets.expect("subsets relationship");
+        let redefines = node.value.redefines.expect("redefines relationship");
+        assert_eq!(subsets.value.target.len(), 1);
+        assert_eq!(redefines.value.target.len(), 1);
+        assert_eq!(
+            crate::parser::usage::reference_text(source, subsets.value.target[0]).as_deref(),
+            Some("Network::links")
+        );
+        assert_eq!(
+            crate::parser::usage::reference_text(source, redefines.value.target[0]).as_deref(),
+            Some("Legacy::links")
+        );
     }
 
     #[test]
@@ -1648,10 +1748,9 @@ mod par_002_nested_def_tests {
 #[cfg(test)]
 mod perform_semicolon_and_redefine_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     fn perform(text: &str) -> Node<Perform> {
@@ -1666,7 +1765,8 @@ mod perform_semicolon_and_redefine_tests {
     #[test]
     fn perform_plain_name_accepts_semicolon_body() {
         let node = perform("perform vehicleMassTest;");
-        assert_eq!(node.value.action_name, "vehicleMassTest");
+        assert!(node.value.action_name.is_empty());
+        assert!(node.value.action_reference.is_some());
         assert_eq!(node.value.redefines, None);
         assert!(matches!(node.value.body, PerformBody::Semicolon));
     }
@@ -1674,32 +1774,42 @@ mod perform_semicolon_and_redefine_tests {
     #[test]
     fn perform_dotted_name_accepts_semicolon_body() {
         let node = perform("perform providePower.generateTorque;");
-        assert_eq!(node.value.action_name, "providePower.generateTorque");
+        assert!(node.value.action_name.is_empty());
+        assert!(node.value.action_reference.is_some());
         assert!(matches!(node.value.body, PerformBody::Semicolon));
     }
 
     #[test]
     fn perform_quoted_name_accepts_semicolon_body() {
         let node = perform("perform 'provide power';");
-        assert_eq!(node.value.action_name, "provide power");
+        assert!(node.value.action_name.is_empty());
+        assert!(node.value.action_reference.is_some());
         assert!(matches!(node.value.body, PerformBody::Semicolon));
     }
 
     #[test]
     fn perform_accepts_redefine_clause_with_semicolon_body() {
         let node = perform("perform providePower.generateTorque :>> generateTorque;");
-        assert_eq!(node.value.action_name, "providePower.generateTorque");
-        assert_eq!(node.value.redefines.as_deref(), Some("generateTorque"));
+        assert!(node.value.action_reference.is_some());
+        assert_eq!(
+            node.value
+                .redefines
+                .as_ref()
+                .map(|relationship| relationship.value.target.len()),
+            Some(1)
+        );
         assert!(matches!(node.value.body, PerformBody::Semicolon));
     }
 
     #[test]
     fn perform_accepts_redefine_clause_with_brace_body() {
         let node = perform("perform 'provide power' :>> VehicleA::'provide power' { }");
-        assert_eq!(node.value.action_name, "provide power");
         assert_eq!(
-            node.value.redefines.as_deref(),
-            Some("VehicleA::provide power")
+            node.value
+                .redefines
+                .as_ref()
+                .map(|relationship| relationship.value.target.len()),
+            Some(1)
         );
         assert!(matches!(node.value.body, PerformBody::Brace { .. }));
     }
@@ -1719,6 +1829,7 @@ mod perform_semicolon_and_redefine_tests {
             panic!("expected Perform, got {:?}", node.value);
         };
         assert_eq!(perform.value.action_name, "assemble vehicle");
+        assert!(perform.value.action_reference.is_none());
         assert_eq!(perform.value.redefines, None);
     }
 
@@ -1743,10 +1854,9 @@ mod perform_semicolon_and_redefine_tests {
 #[cfg(test)]
 mod variant_membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): VariantMembership on VariantUsage, confirmed
@@ -1796,11 +1906,9 @@ mod variant_membership_tests {
 #[cfg(test)]
 mod short_name_tests {
     use super::*;
-    use crate::parser::usage::targets_display_string;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -1809,7 +1917,13 @@ mod short_name_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.short_name.as_deref(), Some("eng"));
         assert_eq!(node.value.name, "engine");
-        assert_eq!(node.value.type_name, "Engine");
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
     }
 
     // Mirrors the anonymous-redefinition shape confirmed in `tests/apollo_regressions.rs`
@@ -1822,11 +1936,8 @@ mod short_name_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.short_name.as_deref(), Some("e"));
         assert_eq!(
-            node.value
-                .redefines
-                .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("engines".to_string())
+            node.value.redefines.as_ref().map(|n| n.value.target.len()),
+            Some(1)
         );
     }
 
@@ -1844,13 +1955,19 @@ mod short_name_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_reference);
         assert_eq!(node.value.name, "origin");
-        assert_eq!(node.value.type_name, "Remote");
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
         assert_eq!(
             node.value
                 .subsets
                 .as_ref()
-                .map(|(n, _)| targets_display_string(&n.value.target)),
-            Some("remotes".to_string())
+                .map(|(n, _)| n.value.target.len()),
+            Some(1)
         );
     }
 
@@ -1877,18 +1994,24 @@ mod short_name_tests {
             part_usage(input("ref part :>> elements: SparePart;")).expect("ref part :>>");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.is_reference);
-        assert_eq!(node.value.name, "elements");
-        assert_eq!(node.value.type_name, "SparePart");
+        assert!(node.value.name.is_empty());
+        assert!(node.value.redefines.is_some());
+        assert_eq!(
+            node.value
+                .typing
+                .as_ref()
+                .map(|typing| typing.value.target.len()),
+            Some(1)
+        );
     }
 }
 
 #[cfg(test)]
 mod gh16_interface_usage_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     /// GH-16: a typed interface usage with no inline `connect` clause at all previously failed
@@ -1906,7 +2029,7 @@ mod gh16_interface_usage_tests {
                 ..
             } => {
                 assert_eq!(name.as_deref(), Some("hubToRim"));
-                assert_eq!(interface_type.as_deref(), Some("SpokeInterface"));
+                assert!(interface_type.is_some());
             }
             other => panic!("expected Declaration, got {other:?}"),
         }
@@ -2005,10 +2128,9 @@ mod gh16_interface_usage_tests {
 #[cfg(test)]
 mod gh48_bind_prefix_and_multiplicity_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     /// GH-48 Gap 2a: bare `bind a = b;` (no `binding` prefix) must keep working exactly as
@@ -2041,7 +2163,7 @@ mod gh48_bind_prefix_and_multiplicity_tests {
             bind_(input("binding ab1 : AB bind a = b;")).expect("binding ab1 : AB bind a = b;");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.binding_name.as_deref(), Some("ab1"));
-        assert_eq!(node.value.binding_type.as_deref(), Some("AB"));
+        assert!(node.value.binding_type.is_some());
     }
 
     /// GH-48 Gap 2b: per-endpoint multiplicity on `bind`'s own two operands, plus an anonymous

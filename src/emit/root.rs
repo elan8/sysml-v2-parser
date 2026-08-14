@@ -1,11 +1,12 @@
 //! Root namespace / package / import emission.
 
-use super::writer::{emit_visibility, format_name, format_qualified_name, EmitWriter};
+use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use super::{behavior, requirement, structure, view};
 use crate::ast::{
-    CommentAnnotation, DocComment, FilterMember, Identification, Import, LibraryPackage, Package,
-    PackageBody, PackageBodyElement, RootElement, RootNamespace, TextualRepresentation,
+    CommentAnnotation, DeclarationName, DocComment, FilterMember, Identification, Import,
+    ImportShape, ImportTarget, LibraryPackage, Package, PackageBody, PackageBodyElement,
+    QualifiedIdentification, RootElement, RootNamespace, TextualRepresentation,
 };
 
 pub(crate) fn emit_root(w: &mut EmitWriter<'_>, root: &RootNamespace) -> Result<(), EmitError> {
@@ -29,11 +30,11 @@ fn emit_root_element(
         RootElement::LibraryPackage(p) => emit_library_package(w, path, &p.value),
         RootElement::Namespace(n) => {
             w.push_str("namespace ");
-            emit_identification(w, &n.value.identification);
+            emit_qualified_identification(w, path, &n.value.identification)?;
             emit_package_body(w, path, &n.value.body)
         }
         RootElement::Import(i) => emit_import(w, &i.value),
-        RootElement::Member(m) => emit_package_body_element(w, path, &m.value),
+        RootElement::Member(m) => emit_package_body_node(w, path, m),
     }
 }
 
@@ -43,7 +44,7 @@ pub(crate) fn emit_package(
     pkg: &Package,
 ) -> Result<(), EmitError> {
     w.push_str("package ");
-    emit_identification(w, &pkg.identification);
+    emit_qualified_identification(w, path, &pkg.identification)?;
     emit_package_body(w, path, &pkg.body)
 }
 
@@ -56,11 +57,34 @@ fn emit_library_package(
         w.push_str("standard ");
     }
     w.push_str("library package ");
-    emit_identification(w, &pkg.identification);
+    emit_qualified_identification(w, path, &pkg.identification)?;
     emit_package_body(w, path, &pkg.body)
 }
 
-fn emit_package_body(
+fn emit_extended_definition(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::ExtendedDefinition,
+) -> Result<(), EmitError> {
+    if let Some(prefix) = &def.definition_prefix {
+        structure::emit_definition_prefix(w, Some(prefix));
+    }
+    for keyword in &def.prefix_keywords {
+        w.push_char('#');
+        w.push_str(&keyword.value.keyword);
+        w.push_char(' ');
+    }
+    if def.has_def_keyword {
+        w.push_str("def ");
+    }
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        structure::emit_typing_clause(w, &spec.value)?;
+    }
+    emit_package_body(w, path, &def.body)
+}
+
+pub(crate) fn emit_package_body(
     w: &mut EmitWriter<'_>,
     path: &str,
     body: &PackageBody,
@@ -75,7 +99,7 @@ fn emit_package_body(
             w.newline();
             w.indent();
             for (i, el) in elements.iter().enumerate() {
-                emit_package_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
+                emit_package_body_node(w, &format!("{path}/body[{i}]"), el)?;
                 w.newline();
             }
             w.dedent();
@@ -85,16 +109,166 @@ fn emit_package_body(
     }
 }
 
+fn emit_package_body_node(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    node: &crate::ast::Node<PackageBodyElement>,
+) -> Result<(), EmitError> {
+    if matches!(
+        node.value,
+        PackageBodyElement::Error(_)
+            | PackageBodyElement::Unsupported(_)
+            | PackageBodyElement::FeatureDecl(_)
+            | PackageBodyElement::ClassifierDecl(_)
+            | PackageBodyElement::KermlSemanticDecl(_)
+            | PackageBodyElement::KermlFeatureDecl(_)
+            | PackageBodyElement::ExtendedLibraryDecl(_)
+    ) {
+        return w.push_recovery_span(path, &node.span);
+    }
+    emit_package_body_element(w, path, &node.value)
+}
+
+fn emit_kerml_relationship_decl(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    decl: &crate::ast::KermlRelationshipDecl,
+) -> Result<(), EmitError> {
+    use crate::ast::KermlRelationshipKeyword as Kw;
+    emit_visibility(w, decl.membership.visibility);
+    // The prefix keyword and identification placement depend on the relationship family.
+    match decl.keyword {
+        Kw::Subtype | Kw::Subclassifier | Kw::Typing | Kw::Subset | Kw::Redefinition => {
+            if let Some(identification) = &decl.identification {
+                w.push_str("specialization ");
+                emit_identification(w, identification);
+                w.push_char(' ');
+            }
+        }
+        Kw::Disjoint => {
+            if let Some(identification) = &decl.identification {
+                w.push_str("disjoining ");
+                emit_identification(w, identification);
+                w.push_char(' ');
+            }
+        }
+        Kw::Inverse => {
+            if let Some(identification) = &decl.identification {
+                w.push_str("inverting ");
+                emit_identification(w, identification);
+                w.push_char(' ');
+            }
+        }
+        Kw::Featuring => {}
+    }
+    w.push_str(decl.keyword.as_str());
+    w.push_char(' ');
+    if decl.keyword == Kw::Featuring {
+        if let Some(identification) = &decl.identification {
+            emit_identification(w, identification);
+            w.push_str(" of ");
+        }
+    }
+    w.push_qualified_reference(&format!("{path}/source"), decl.source)?;
+    w.push_str(match decl.keyword {
+        Kw::Subtype | Kw::Subclassifier => " specializes ",
+        Kw::Typing => " typed by ",
+        Kw::Subset => " subsets ",
+        Kw::Redefinition => " redefines ",
+        Kw::Disjoint => " from ",
+        Kw::Inverse => " of ",
+        Kw::Featuring => " by ",
+    });
+    w.push_qualified_reference(&format!("{path}/target"), decl.target)?;
+    // Annotation-only RelationshipBody; `None` is the `;` form. Annotations inside the brace
+    // form are rare and re-emitted via the shared relationship-body element emitter.
+    match &decl.body {
+        None => w.push_char(';'),
+        Some(elements) if elements.is_empty() => w.push_str(" {}"),
+        Some(elements) => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                super::structure::emit_relationship_body_element_local(
+                    w,
+                    &format!("{path}/body[{i}]"),
+                    &el.value,
+                )?;
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn emit_kerml_classifier_decl(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    decl: &crate::ast::KermlClassifierDecl,
+) -> Result<(), EmitError> {
+    emit_visibility(w, decl.membership.visibility);
+    if decl.is_abstract {
+        w.push_str("abstract ");
+    }
+    w.push_str(decl.keyword.as_str());
+    if decl.is_all {
+        w.push_str(" all");
+    }
+    w.push_char(' ');
+    emit_identification(w, &decl.identification);
+    if let Some(multiplicity) = &decl.multiplicity {
+        structure::emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if let Some(spec) = &decl.specializes {
+        structure::emit_typing_clause(w, &spec.value)?;
+    }
+    for (index, clause) in decl.type_relationships.iter().enumerate() {
+        w.push_char(' ');
+        w.push_str(clause.value.keyword.as_str());
+        w.push_char(' ');
+        for (target_index, target) in clause.value.targets.iter().copied().enumerate() {
+            if target_index > 0 {
+                w.push_str(", ");
+            }
+            w.push_qualified_reference(
+                &format!("{path}/type-relationship[{index}][{target_index}]"),
+                target,
+            )?;
+        }
+    }
+    super::view::emit_calc_body(w, path, &decl.body)
+}
+
+fn emit_kerml_bare_declaration(
+    w: &mut EmitWriter<'_>,
+    declaration: &crate::ast::KermlBareDeclaration,
+) -> Result<(), EmitError> {
+    w.push_str(declaration.keyword.as_str());
+    if let Some(name_span) = &declaration.name_span {
+        w.push_char(' ');
+        w.push_span_name("kerml-bare-declaration/name", name_span)?;
+    }
+    if let Some(multiplicity) = &declaration.multiplicity {
+        w.push_char(' ');
+        structure::emit_multiplicity(w, &multiplicity.value)?;
+    }
+    w.push_char(';');
+    Ok(())
+}
+
 pub(crate) fn emit_package_body_element(
     w: &mut EmitWriter<'_>,
     path: &str,
     el: &PackageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        PackageBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        PackageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        PackageBodyElement::Unsupported(unsupported) => {
+            w.push_recovery_span(path, &unsupported.span)
+        }
         PackageBodyElement::Doc(d) => emit_doc(w, &d.value),
         PackageBodyElement::Comment(c) => emit_comment(w, &c.value),
         PackageBodyElement::TextualRep(t) => emit_textual_rep(w, &t.value),
@@ -175,11 +349,25 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
+        PackageBodyElement::MetadataAnnotation(m) => {
+            structure::emit_metadata_annotation(w, path, &m.value)
+        }
         PackageBodyElement::Ref(r) => structure::emit_ref_decl(w, path, &r.value),
         PackageBodyElement::DefaultReferenceUsage(d) => {
             structure::emit_default_reference_usage(w, path, &d.value)
         }
         PackageBodyElement::AssertConstraint(a) => view::emit_assert_constraint(w, path, &a.value),
+        PackageBodyElement::PerformUsage(p) => behavior::emit_perform(w, path, &p.value),
+        PackageBodyElement::BindingConnectorUsage(b) => {
+            structure::emit_binding_connector_usage(w, path, &b.value)
+        }
+        PackageBodyElement::ClassDef(c) => structure::emit_class_def(w, path, &c.value),
+        PackageBodyElement::Succession(f) => behavior::emit_first_stmt(w, path, &f.value),
+        PackageBodyElement::ExhibitState(e) => behavior::emit_exhibit_state(w, path, &e.value),
+        PackageBodyElement::IncludeUseCase(i) => {
+            requirement::emit_include_use_case(w, path, &i.value)
+        }
+        PackageBodyElement::ExtendedDefinition(d) => emit_extended_definition(w, path, &d.value),
         PackageBodyElement::FeatureDecl(_)
         | PackageBodyElement::ClassifierDecl(_)
         | PackageBodyElement::KermlSemanticDecl(_)
@@ -188,7 +376,25 @@ pub(crate) fn emit_package_body_element(
             path: path.to_string(),
             kind: super::OpacityKind::ExtendedLibraryDecl,
         }),
-        other => w.unsupported(
+        PackageBodyElement::KermlBareDeclaration(declaration) => {
+            emit_kerml_bare_declaration(w, &declaration.value)
+        }
+        PackageBodyElement::KermlClassifier(declaration) => {
+            emit_kerml_classifier_decl(w, path, &declaration.value)
+        }
+        PackageBodyElement::KermlConnector(connector) => {
+            super::view::emit_kerml_connector_member(w, path, &connector.value)
+        }
+        PackageBodyElement::KermlRelationship(relationship) => {
+            emit_kerml_relationship_decl(w, path, &relationship.value)
+        }
+        PackageBodyElement::KermlInvariant(invariant) => {
+            super::view::emit_kerml_invariant_member(w, path, &invariant.value)
+        }
+        PackageBodyElement::KermlFeatureMember(feature) => {
+            super::view::emit_kerml_feature_member(w, path, &feature.value)
+        }
+        other @ (PackageBodyElement::Actor(_) | PackageBodyElement::FlowDef(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -198,18 +404,10 @@ pub(crate) fn emit_package_body_element(
 pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(), EmitError> {
     emit_visibility(w, import.membership.visibility);
     w.push_str("import ");
-    // `target` already includes `::*` when is_import_all; segments are unquoted in the AST.
-    w.push_str(&format_qualified_name(&import.target));
-    if import.is_recursive && !import.target.ends_with("::**") {
-        w.push_str("::**");
+    if import.target.all_span.is_some() {
+        w.push_str("all ");
     }
-    if let Some(filters) = &import.filter_members {
-        for f in filters {
-            w.push_str(" [");
-            super::expr::emit_expression(w, &f.value.expression.value)?;
-            w.push_char(']');
-        }
-    }
+    emit_import_target(w, "import/target", &import.target)?;
     // Preserve RelationshipBody shape: `None` → `;`, `Some` → `{ ... }` even when empty
     // (brace bodies with only trivia comments parse as `Some([])`).
     match &import.body_elements {
@@ -230,6 +428,45 @@ pub(crate) fn emit_import(w: &mut EmitWriter<'_>, import: &Import) -> Result<(),
     Ok(())
 }
 
+pub(crate) fn emit_import_target(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    target: &ImportTarget,
+) -> Result<(), EmitError> {
+    w.push_qualified_reference(path, target.reference)?;
+    match &target.shape {
+        ImportShape::Membership { recursive_suffix } => {
+            if recursive_suffix.is_some() {
+                w.push_str("::**");
+            }
+        }
+        ImportShape::Namespace {
+            wildcard_suffix: _,
+            recursive_suffix,
+            combined_recursive_suffix_span: _,
+        } => {
+            w.push_str("::*");
+            if recursive_suffix.is_some() {
+                w.push_str("::**");
+            }
+        }
+        ImportShape::Filter {
+            recursive_suffix,
+            members,
+        } => {
+            if recursive_suffix.is_some() {
+                w.push_str("::**");
+            }
+            for member in members {
+                w.push_str(" [");
+                super::expr::emit_expression(w, &member.value.expression.value)?;
+                w.push_char(']');
+            }
+        }
+    }
+    Ok(())
+}
+
 fn emit_relationship_body_element(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -238,17 +475,17 @@ fn emit_relationship_body_element(
     use crate::ast::RelationshipBodyElement;
     match el {
         RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::KermlFeature(n) => {
+            super::view::emit_kerml_feature_member(w, path, &n.value)
+        }
         RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
         RelationshipBodyElement::TextualRep(r) => emit_textual_rep(w, &r.value),
-        RelationshipBodyElement::Error(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ParseError,
-        }),
+        RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
         }),
-        other => w.unsupported(
+        other @ RelationshipBodyElement::MetadataAnnotation(_) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -264,6 +501,26 @@ pub(crate) fn emit_identification(w: &mut EmitWriter<'_>, id: &Identification) {
     if let Some(name) = &id.name {
         w.push_str(&format_name(name));
     }
+}
+
+fn emit_qualified_identification(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    id: &QualifiedIdentification,
+) -> Result<(), EmitError> {
+    if let Some(short) = &id.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short));
+        w.push_str("> ");
+    }
+    match &id.name {
+        Some(DeclarationName::Simple(name)) => w.push_str(&format_name(name)),
+        Some(DeclarationName::Qualified(name)) => {
+            w.push_qualified_reference(&format!("{path}/declaration-name"), name.storage_id())?
+        }
+        None => {}
+    }
+    Ok(())
 }
 
 pub(crate) fn emit_doc(w: &mut EmitWriter<'_>, doc: &DocComment) -> Result<(), EmitError> {

@@ -13,7 +13,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -110,23 +110,18 @@ fn gh87_2_package_scope_name_equals_expr_binding() {
     assert!(default_ref.value.is_some());
 }
 
-/// Regression: bare identifiers (and misused keywords) with *no value* at package scope must
-/// keep triggering their existing targeted recovery diagnostics rather than silently parsing as
-/// an empty-value `DefaultReferenceUsage` -- package-scope dispatch uses the value-mandatory
-/// `feature_value_binding` (matching this gap's actual cited scope of `name = expr;`), not the
-/// bare-name-permitting `bare_or_valued_feature_binding` used in part def bodies for #87.1.
+/// Bare *identifiers* at package scope are the KerML implicit-feature shorthand (`causeA;` in
+/// the Cause-and-Effect examples; spec42 gap 23) and parse as a `DefaultReferenceUsage`;
+/// misused *reserved keywords* (`then;`) must keep triggering their existing targeted recovery
+/// diagnostics rather than silently parsing as an implicit feature.
 #[test]
 fn gh87_2_bare_identifier_at_package_scope_still_reports_diagnostic() {
     let result = parse_with_diagnostics("package P { test; }");
     assert_eq!(
         result.errors.len(),
-        1,
-        "unexpected diagnostics: {:?}",
+        0,
+        "a bare identifier is the implicit-feature shorthand: {:?}",
         result.errors
-    );
-    assert_eq!(
-        result.errors[0].code.as_deref(),
-        Some("unrecognized_declaration_in_scope")
     );
 
     let result = parse_with_diagnostics("package P { then; }");

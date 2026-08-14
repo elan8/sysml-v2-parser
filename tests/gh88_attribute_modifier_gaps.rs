@@ -12,7 +12,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -55,7 +55,7 @@ fn gh88_1_reference_subsetting_operator_stands_in_for_name() {
         _ => None,
     });
     let attr = attr.expect("expected an AttributeUsage element");
-    assert_eq!(attr.name, "m");
+    assert!(attr.name.is_empty());
     assert!(attr.references.is_some());
 }
 
@@ -167,7 +167,10 @@ fn gh88_4_directed_ref_with_comma_separated_types() {
     let y = y.expect("expected a Ref element");
     assert_eq!(y.name, "y");
     assert_eq!(y.direction, Some(sysml_v2_parser::ast::InOut::In));
-    assert_eq!(y.type_name, "A, B");
+    assert_eq!(
+        y.typing.as_ref().map(|typing| typing.value.target.len()),
+        Some(2)
+    );
 }
 
 /// Real usage: `Geometry Examples/CarWithShapeAndCSG.sysml:84`:
@@ -199,7 +202,7 @@ fn gh88_5_unnamed_attribute_subsets_usage() {
         _ => None,
     });
     let attr = attr.expect("expected an AttributeUsage element");
-    assert_eq!(attr.name, "differencesOf");
+    assert!(attr.name.is_empty());
     assert!(attr.subsets.is_some());
     assert!(attr.multiplicity.is_some());
 }

@@ -33,6 +33,18 @@ fn assert_all_productions_are_classified(
 #[test]
 fn textual_bnf_productions_are_covered_by_status_map() {
     let target = load_conformance_target();
+    assert_eq!(
+        sysml_v2_parser::SUPPORTED_GRAMMAR.release_tag,
+        target.release_tag
+    );
+    assert_eq!(
+        sysml_v2_parser::SUPPORTED_GRAMMAR.release_repository,
+        target.release_repo
+    );
+    assert_eq!(
+        sysml_v2_parser::SUPPORTED_GRAMMAR.content_hash,
+        target.grammar_content_hash
+    );
     let root = release_root();
     let sysml_bnf = root.join("bnf").join("SysML-textual-bnf.kebnf");
     let kerml_bnf = root.join("bnf").join("KerML-textual-bnf.kebnf");

@@ -6,7 +6,7 @@ use crate::ast::{
 use crate::parser::action::action_usage_body;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_name, starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
+    name, qualified_reference, starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::with_span;
@@ -23,7 +23,7 @@ pub(crate) fn typed_payload_clause(input: Input<'_>) -> IResult<Input<'_>, Paylo
     let (input, (name_span, name)) = with_span(name).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, (type_span, type_name)) =
-        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
+        preceded(ws_and_comments, with_span(qualified_reference)).parse(input)?;
     Ok((
         input,
         PayloadClause {
@@ -49,6 +49,10 @@ fn trigger_kind(input: Input<'_>) -> IResult<Input<'_>, TriggerKind> {
 /// After `accept` keyword: `name : Type` or shorthand expression, with an optional trailing
 /// `via <port>` clause (e.g. `accept TurnOn via commPort`).
 pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
+    crate::parser::span::reference_transaction(input, transition_accept_inner)
+}
+
+fn transition_accept_inner(input: Input<'_>) -> IResult<Input<'_>, TransitionAccept> {
     let (input, _) = preceded(ws_and_comments, tag(&b"accept"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     // §6 G8: a `TriggerKind` keyword replaces the payload entirely. Checked before `expression`,
@@ -58,10 +62,11 @@ pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, Transiti
         let (input, expr_node) = expression(input)?;
         return Ok((input, TransitionAccept::TimeTrigger(kind, expr_node)));
     }
+    let payload_name = name(input).ok().map(|(_, value)| value);
     let (input, expr_node) = expression(input)?;
     let (input, type_suffix) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, with_span(qualified_name)),
+        preceded(ws_and_comments, with_span(qualified_reference)),
     ))
     .parse(input)?;
     let (input, via) = opt(preceded(
@@ -69,14 +74,14 @@ pub(crate) fn transition_accept(input: Input<'_>) -> IResult<Input<'_>, Transiti
         preceded(ws1, expression),
     ))
     .parse(input)?;
-    if let (Expression::FeatureRef(name), Some((type_span, type_name))) =
-        (&expr_node.value, type_suffix)
+    if let (Expression::FeatureRef(_), Some(name), Some((type_span, type_name))) =
+        (&expr_node.value, payload_name, type_suffix)
     {
         return Ok((
             input,
             TransitionAccept::Payload(
                 PayloadClause {
-                    name: name.clone(),
+                    name,
                     type_name: Some(type_name),
                     name_span: expr_node.span.clone(),
                     type_span: Some(type_span),
@@ -171,7 +176,7 @@ fn control_node_payload_stmt<'a>(
                 is_reference: false,
                 is_individual: false,
                 name: control_name.to_string(),
-                type_name: String::new(),
+                type_name: None,
                 typing: None,
                 multiplicity: None,
                 subsets: None,
@@ -204,4 +209,23 @@ pub(crate) fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, 
         input,
         nom::error::ErrorKind::Tag,
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typed_payload_uses_arena_backed_qualified_reference() {
+        let source = crate::parser::span::test_input("signal : $::Signals::Command");
+        let (rest, payload) = typed_payload_clause(source).expect("typed payload");
+        assert!(rest.fragment().is_empty());
+        assert_eq!(
+            payload
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("$::Signals::Command")
+        );
+    }
 }

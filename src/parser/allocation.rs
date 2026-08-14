@@ -1,7 +1,6 @@
-use crate::ast::{AllocationDef, AllocationUsage, Expression, Membership, Node};
+use crate::ast::{AllocationDef, AllocationUsage, Membership, Node};
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::expression;
 use crate::parser::lex::{name, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::feature_usage_header;
@@ -13,14 +12,10 @@ use nom::IResult;
 use nom::Parser;
 
 /// Allocate end: optional `endName ::>` then an expression (`logical ::> torqueGenerator`).
-fn allocation_end_expr(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let (input, _) = opt((
-        name,
-        preceded(ws_and_comments, tag(&b"::>"[..])),
-        ws_and_comments,
-    ))
-    .parse(input)?;
-    expression(input)
+fn allocation_end_expr(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorEnd>> {
+    crate::parser::constraint::kerml_connector_end(input)
 }
 
 pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<AllocationDef>> {
@@ -57,7 +52,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, header) = feature_usage_header(input)?;
-    let type_name = header.type_name;
+    let type_name = header.type_reference;
     // `#73`: `allocate logical ::> torqueGenerator to physical ::> powerTrain` — optional
     // end-name + `::>` before each allocate expression (same shape as connect ends).
     let (input, source) = opt(preceded(
@@ -83,6 +78,9 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
             AllocationUsage {
                 name: name_str,
                 type_name,
+                type_is_conjugated: header.type_is_conjugated,
+                subsets: header.subsets,
+                redefines: header.redefines,
                 source,
                 target,
                 body,
@@ -109,6 +107,9 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
             AllocationUsage {
                 name: String::new(),
                 type_name: None,
+                type_is_conjugated: false,
+                subsets: None,
+                redefines: None,
                 source: Some(source),
                 target: Some(target),
                 body,
@@ -121,10 +122,9 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on AllocationDef/AllocationUsage ---
@@ -196,11 +196,17 @@ mod membership_tests {
 
     #[test]
     fn allocation_usage_accepts_named_reference_ends() {
-        let (rest, node) = allocation_usage(input(
-            "allocation a : T allocate logical ::> src to physical ::> dst;",
-        ))
-        .expect("allocation with ::> ends");
+        let source =
+            input("allocation a : $::Allocations::T allocate logical ::> src to physical ::> dst;");
+        let (rest, node) = allocation_usage(source).expect("allocation with ::> ends");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(
+            node.value
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("$::Allocations::T")
+        );
         assert!(node.value.source.is_some());
         assert!(node.value.target.is_some());
     }

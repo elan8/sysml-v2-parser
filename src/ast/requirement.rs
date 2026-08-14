@@ -12,6 +12,7 @@ use super::view::{CalcUsage, ConstraintDefBodyElement, ConstraintUsage};
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
+use crate::ast::QualifiedReferenceId;
 
 /// Requirement definition: `requirement def` Identification (`:>` specializes)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,32 +85,24 @@ pub enum RequirementDefBodyElement {
     Doc(Node<DocComment>),
 }
 
-/// Viewpoint stakeholder: typed parameter, shorthand concern reference, or `:>>` redefinition.
-#[derive(Debug, Clone, Eq)]
+/// Viewpoint stakeholder: typed declaration, shorthand concern reference, or `:>>` redefinition.
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StakeholderMember {
-    pub name: String,
-    pub type_name: Option<String>,
+    /// Declaration label for `stakeholder name : Type;`; empty for reference forms.
+    pub declaration_name: String,
+    /// Concern reference for `stakeholder Concern;` and `stakeholder :>> Concern;`.
+    pub target: Option<QualifiedReferenceId>,
+    pub type_name: Option<QualifiedReferenceId>,
     /// True for `stakeholder :>> name;` (validation `11a`).
     pub is_redefinition: bool,
-    pub name_span: Span,
-    pub type_span: Option<Span>,
-}
-
-impl PartialEq for StakeholderMember {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.type_name == other.type_name
-            && self.is_redefinition == other.is_redefinition
-    }
 }
 
 /// Viewpoint purpose concern reference.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PurposeMember {
-    pub target: String,
-    pub target_span: Span,
+    pub target: QualifiedReferenceId,
 }
 
 impl PartialEq for PurposeMember {
@@ -124,9 +117,15 @@ impl PartialEq for PurposeMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubjectDecl {
     pub name: String,
-    pub type_name: String,
+    pub type_name: Option<QualifiedReferenceId>,
+    /// `:>>`/`redefines` redefinition clause (`subject subj :>> Case::subj;`, or the type-less
+    /// anonymous form `subject :>> vehicle = vehicle_large;`; spec42 Gap 35).
+    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
-    pub value: Option<Node<Expression>>,
+    /// `= expr` / `default expr` value clause (`subject generateTorque default
+    /// engine1.generateTorque;`, OMG spec Annex A; spec42 Gap 35 widened this from a bare
+    /// `=`-only `Expression`).
+    pub value: Option<Node<crate::ast::FeatureValue>>,
 }
 
 /// Actor parameter in a requirement body: `actor` name? `:` type `;`.
@@ -134,7 +133,7 @@ pub struct SubjectDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RequirementActorDecl {
     pub name: String,
-    pub type_name: String,
+    pub type_name: QualifiedReferenceId,
 }
 
 /// Require/assume constraint: `(require|assume) constraint` name? body.
@@ -146,8 +145,14 @@ pub struct RequireConstraint {
     /// True when the `constraint` keyword follows `require`/`assume`.
     /// False for `require name;` / `require name { … }` (validation `08`).
     pub has_constraint_keyword: bool,
-    /// Optional usage name (`assume constraint fuelConstraint { … }`).
+    /// Optional usage name (`assume constraint fuelConstraint { … }`) -- the *declared* name of
+    /// the `constraint`-keyword form.
     pub name: Option<String>,
+    /// Arena-backed target of the keyword-less reference shorthand `require <qualified.name>;`
+    /// / `assume <name>;` (spec42 gap 29): the referenced constraint, resolvable through the
+    /// document's qualified-reference table. `None` for the `constraint`-keyword declaration
+    /// form, whose `name` declares rather than references.
+    pub target: Option<crate::ast::QualifiedReferenceId>,
     pub body: RequireConstraintBody,
 }
 
@@ -161,9 +166,9 @@ pub struct VerifyRequirementMember {
     /// Parsed requirement usage when explicit form is used.
     pub requirement: Option<Node<RequirementUsage>>,
     /// Shorthand verified requirement reference (`verify QualifiedName;`).
-    pub target: Option<String>,
+    pub target: Option<QualifiedReferenceId>,
     /// Redefinition target after `:>>` (`verify vehicleMassRequirement :>> massRequirement;`).
-    pub redefines: Option<String>,
+    pub redefines: Option<QualifiedReferenceId>,
 }
 
 /// Require constraint body: `;` or `{` ConstraintDefBodyElement* `}`.
@@ -200,7 +205,7 @@ pub struct Satisfy {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InlineSatisfyRequirement {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
 }
 
 /// Bare requirement Usage.
@@ -210,7 +215,7 @@ pub struct RequirementUsage {
     pub name: String,
     /// Short name from `< ... >` when present (e.g. `requirement <'1.1'> vehicleMass1 : …`).
     pub short_name: Option<String>,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Reference subsetting after `::>` / `references` (validation `08`:
     /// `requirement references vehicleMass1 { … }`).
@@ -241,19 +246,30 @@ pub struct RequirementUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemUsage {
+    /// Leading `abstract` keyword (BNF `RefPrefix`), e.g. the package-level `abstract item
+    /// items : Item[0..*] nonunique :> objects { ... }` (Systems Library `Items.sysml`).
+    pub is_abstract: bool,
     /// Empty for the anonymous redefinition form (`item :>> shape : Cylinder { ... }`), matching
     /// `PartUsage::name`'s existing convention.
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     /// Redefines target, e.g. `shape` in `item :>> shape : Cylinder { ... }`. `None` for the
     /// ordinary named form. Confirmed real usage in the OMG Geometry domain library's
     /// `VehicleGeometryAndCoordinateFrames.sysml` example (`item :>> shape = new Box(...);` and
     /// `item :>> shape : Cylinder { ... }`) -- previously unparseable, falling through to opaque
     /// body-element recovery.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// `:>` subsets clause, e.g. `:> objects` (Systems Library `Items.sysml`). Previously
+    /// parsed by the shared usage header and discarded.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// Short name from `< ... >` when present. See `crate::ast::AttributeUsage::short_name`.
     pub short_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `ordered` keyword from `MultiplicityPart`. Previously skipped and discarded.
+    pub ordered: bool,
+    /// `nonunique` keyword from `MultiplicityPart` (`Item[0..*] nonunique`, Systems Library
+    /// `Items.sysml`). See `ordered`.
+    pub nonunique: bool,
     /// Value expression (`= expr`, `default = expr`, `:= expr`), e.g. `new Box(...)`.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
@@ -275,7 +291,7 @@ pub struct ItemUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumerationUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     pub multiplicity: Option<Node<Multiplicity>>,
     pub body: AttributeBody,
     /// `end` keyword from `EndUsagePrefix` (BNF §8.2.2.6.2, `isEnd ?= 'end'`), reached through
@@ -290,11 +306,12 @@ pub struct EnumerationUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Dependency {
     pub identification: Option<Identification>,
-    pub clients: Vec<String>,
-    pub suppliers: Vec<String>,
+    pub clients: Vec<QualifiedReferenceId>,
+    pub suppliers: Vec<QualifiedReferenceId>,
     pub body: ConnectBody,
-    /// Real annotation content from a braced body (BNF `RelationshipBody`: doc/comment/metadata
-    /// only). `None` when the body is a semicolon terminator.
+    /// Braced-body members (BNF `RelationshipBody`: the doc/comment/metadata annotation subset
+    /// plus owned feature members, spec42 Gap 37). `None` when the body is a semicolon
+    /// terminator.
     pub body_elements: Option<Vec<Node<RelationshipBodyElement>>>,
 }
 
@@ -311,7 +328,9 @@ pub struct FrameMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcernUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: RequirementDefBody,
     /// True for `concern def ...`, false for a bare `concern ...` usage. `concern_usage` handles
     /// both the `concern` and `concern def` textual forms itself rather than through a separate
@@ -342,7 +361,9 @@ pub struct CaseDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CaseUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract case ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -372,7 +393,9 @@ pub struct AnalysisCaseDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AnalysisCaseUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract analysis ...`.
     pub is_abstract: bool,
     /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual
@@ -403,7 +426,7 @@ pub struct VerificationCaseDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerificationCaseUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     /// True for `abstract verification ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -417,7 +440,7 @@ pub struct VerificationCaseUsage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UseCaseUsage {
     pub name: String,
-    pub type_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
     /// True for `abstract use case ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -465,7 +488,7 @@ pub enum UseCaseDefBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FirstSuccession {
-    pub target: String,
+    pub target: QualifiedReferenceId,
 }
 
 /// `then done;` inside a case/use-case body.
@@ -477,7 +500,7 @@ pub struct ThenDone {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IncludeUseCase {
-    pub name: String,
+    pub target: QualifiedReferenceId,
     /// Optional multiplicity suffix like `[0..*]`, parsed into structured lower/upper bounds.
     pub multiplicity: Option<Node<Multiplicity>>,
     pub body: UseCaseDefBody,
@@ -506,18 +529,18 @@ pub struct SubjectRef {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActorRedefinitionAssignment {
-    pub name: String,
-    /// Raw RHS expression text up to `;` (we don't model the expression grammar here yet).
-    pub rhs: String,
+    pub target: QualifiedReferenceId,
+    /// Structured assignment value with its exact authored expression span.
+    pub value: Node<Expression>,
 }
 
 /// `ref :>> <name> { ... }` redefinition used in SysML v2 release fixtures.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RefRedefinition {
-    pub name: String,
-    /// Raw body text for now (balanced `{ ... }` including nested braces).
-    pub body: String,
+    pub target: QualifiedReferenceId,
+    /// Structured nested body with an aggregate span covering its authored terminator or braces.
+    pub body: Node<UseCaseDefBody>,
 }
 
 /// Optional feature-kind keyword on a case return (`return part …` / `return attribute …`).
@@ -533,13 +556,14 @@ pub enum CaseReturnFeatureKind {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CaseReturnDecl {
-    pub name: String,
+    /// Declaration name for an ordinary return parameter. Empty for the `:>> target` shorthand.
+    pub declaration_name: String,
     pub name_span: Option<Span>,
-    pub type_name: Option<String>,
+    /// Redefinition target for `return :>> target` / `return part :>> target`.
+    pub target: Option<QualifiedReferenceId>,
+    pub type_name: Option<QualifiedReferenceId>,
     /// Optional value after `=` / `:=` (validation `10d` uses `:= ()`).
     pub value: Option<Node<FeatureValue>>,
-    /// True for `return :>> name` / `return part :>> name` redefine form.
-    pub is_redefine: bool,
     /// True when the type is introduced with `:>` rather than `:`.
     pub is_subsetting: bool,
     /// Optional `part` / `attribute` keyword after `return`.
@@ -549,10 +573,10 @@ pub struct CaseReturnDecl {
 
 impl PartialEq for CaseReturnDecl {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+        self.declaration_name == other.declaration_name
+            && self.target == other.target
             && self.type_name == other.type_name
             && self.value == other.value
-            && self.is_redefine == other.is_redefine
             && self.is_subsetting == other.is_subsetting
             && self.feature_kind == other.feature_kind
             && self.multiplicity == other.multiplicity
@@ -565,10 +589,24 @@ impl PartialEq for CaseReturnDecl {
 pub struct ReturnRef {
     pub name: String,
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// Raw body text (balanced `{ ... }` including nested braces).
-    pub body: String,
-    /// Structured `return <expr>;` inside the body when parsed.
-    pub return_expression: Option<crate::ast::Node<crate::ast::Expression>>,
+    pub body: Node<ReturnRefBody>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ReturnRefBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<ReturnRefBodyElement>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ReturnRefBodyElement {
+    Doc(Node<crate::ast::DocComment>),
+    Result(Node<Expression>),
+    Error(Node<ParseErrorNode>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -597,6 +635,15 @@ pub enum UseCaseDefBodyElement {
     ThenDone(Node<ThenDone>),
     IncludeUseCase(Node<IncludeUseCase>),
     RefRedefinition(Node<RefRedefinition>),
+    /// Full `ref` declaration (`ref use case self : UseCase :>> Case::self;`, Systems Library
+    /// `UseCases.sysml`; spec42 Gap 34). The bare `ref :>> target { ... }` shorthand stays on
+    /// [`RefRedefinition`].
+    Ref(Box<Node<crate::ast::RefDecl>>),
+    /// Directed parameter-member shorthand with no kind keyword (`in scenario = cityScenario;`,
+    /// `out voltage :> ISQ::electricPotential = ...;`), mirroring
+    /// `ConstraintDefBodyElement`/`CalcDefBodyElement`'s existing wiring (spec42 Gap 45).
+    InOutDecl(Box<Node<crate::ast::InOutDecl>>),
+    AssertConstraint(Node<crate::ast::AssertConstraintMember>),
     ReturnRef(Node<ReturnRef>),
     CaseReturnDecl(Node<CaseReturnDecl>),
     Assign(Node<AssignStmt>),
@@ -624,7 +671,9 @@ pub enum UseCaseDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActorUsage {
     pub name: String,
-    pub type_name: String,
+    /// `None` for the bare untyped form `actor environment;` / `actor passenger [0..4];`
+    /// (OMG spec Annex A; spec42 Gap 46).
+    pub type_name: Option<QualifiedReferenceId>,
     /// Optional multiplicity after the type, e.g. `[0..4]` in `actor passengers : Person[0..4];`
     /// (validation `18-Use Case`).
     pub multiplicity: Option<Node<Multiplicity>>,

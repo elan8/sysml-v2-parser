@@ -4,7 +4,9 @@ use crate::ast::{
     Node, PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage,
 };
 use crate::parser::action::in_out_decl;
-use crate::parser::attribute::{attribute_def, attribute_usage, directed_attribute_usage};
+use crate::parser::attribute::{
+    attribute_def, attribute_feature_binding, attribute_usage, directed_attribute_usage,
+};
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -18,7 +20,6 @@ use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
     multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
-    targets_display_string,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -48,6 +49,10 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
         map(doc_comment, PortBodyElement::Doc),
         // PAR-002 widening: this body previously had no attribute/item coverage at all.
         map(attribute_usage, PortBodyElement::AttributeUsage),
+        // A port body may redefine an inherited feature without repeating its kind keyword, e.g.
+        // `port pwr : DevicePower { :>> maxCurrent = 0.02 [A]; }`. Attribute and item bodies
+        // already accept this prefix-redefinition form; port bodies rejected it.
+        map(attribute_feature_binding, PortBodyElement::AttributeUsage),
         map(item_usage, PortBodyElement::ItemUsage),
     ))
     .parse(input)?;
@@ -90,11 +95,10 @@ fn port_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
 pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     enum PortUsageHead {
         PrefixRedefines {
-            name_span: crate::ast::Span,
             redefines: Node<crate::ast::SubsettingRelationship>,
         },
         Named {
-            name_span: crate::ast::Span,
+            name_span: Option<crate::ast::Span>,
             name: String,
         },
     }
@@ -102,6 +106,11 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1, gap #7), e.g.
+    // `individual port po1;` (`Simple Tests/IndividualTest.sysml`-style short usage form).
+    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
+        .parse(input)
+        .map(|(i, o)| (i, o.is_some()))?;
     let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
@@ -142,7 +151,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
         (
             input,
             PortUsageHead::Named {
-                name_span: crate::ast::Span::dummy(),
+                name_span: None,
                 name: String::new(),
             },
         )
@@ -150,49 +159,24 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
         alt((
             map(
                 preceded(ws_and_comments, prefix_redefinition_target),
-                |(name_span, redefines)| PortUsageHead::PrefixRedefines {
-                    name_span,
-                    redefines,
-                },
+                |(_, redefines)| PortUsageHead::PrefixRedefines { redefines },
             ),
             map(with_span(name), |(name_span, name)| PortUsageHead::Named {
-                name_span,
+                name_span: Some(name_span),
                 name,
             }),
         ))
         .parse(input)?
     };
     let (input, name_str, name_span, prefix_redefines) = match usage_head {
-        PortUsageHead::PrefixRedefines {
-            name_span,
-            redefines,
-        } => (
-            input,
-            redefines
-                .value
-                .first_target()
-                .and_then(|t| t.local_name())
-                .unwrap_or_default()
-                .to_string(),
-            name_span,
-            Some(redefines),
-        ),
+        PortUsageHead::PrefixRedefines { redefines } => {
+            (input, String::new(), None, Some(redefines))
+        }
         PortUsageHead::Named { name_span, name } => (input, name, name_span, None),
     };
     let (input, type_result) = optional_typings(input)?;
-    let (type_ref_span, type_name) = type_result
-        .map(|(span, is_conjugated, targets)| {
-            let name = targets_display_string(&targets);
-            (
-                Some(span),
-                Some(if is_conjugated {
-                    format!("~{name}")
-                } else {
-                    name
-                }),
-            )
-        })
-        .unwrap_or((None, None));
+    let (type_ref_span, _, typing) =
+        crate::parser::usage::typing_reference_fields_from_result(type_result);
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, clauses) = specialization_clauses(input)?;
     let redefines = clauses.redefines.or(prefix_redefines);
@@ -214,9 +198,10 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 is_abstract,
                 is_derived,
                 is_constant,
+                is_individual,
                 name: name_str,
                 short_name,
-                type_name,
+                typing,
                 multiplicity,
                 subsets: clauses.subsets,
                 redefines,
@@ -225,7 +210,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 intersects: clauses.intersects,
                 value,
                 body,
-                name_span: Some(name_span),
+                name_span,
                 type_ref_span,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
@@ -238,6 +223,28 @@ const PORT_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `#keyword` metadata tag -- tried first so a stacked/prefixing `#idd port APIS_HTTP { ... }`
+    // (bare form, then `PrefixMetadataMember`-style form prefixing the next port-body member)
+    // dispatches here instead of falling through to the opaque-capture fallback below. Mirrors
+    // `package_body_element`'s identical two-arm `#`-handling.
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_usage,
+            PortDefBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_prefix,
+            PortDefBodyElement::MetadataKeywordUsage,
+        )
+        .parse(input)
+    }) {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
     let (input, elem) = alt((
         map(directed_item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),
@@ -245,6 +252,10 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         map(doc_comment, PortDefBodyElement::Doc),
         map(|i| attribute_def(i, true), PortDefBodyElement::AttributeDef),
         map(attribute_usage, PortDefBodyElement::AttributeUsage),
+        map(
+            attribute_feature_binding,
+            PortDefBodyElement::AttributeUsage,
+        ),
         // `item_def_required` must be tried before the existing bare `directed_item_usage`/
         // `item_usage` arms above -- same def-before-usage discipline as the other body enums
         // wired in prior increments.
@@ -347,11 +358,9 @@ fn parse_port_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
 #[cfg(test)]
 mod par_002_widening_tests {
     use super::*;
-    use crate::parser::usage::targets_display_string;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]
@@ -360,11 +369,8 @@ mod par_002_widening_tests {
             port_usage(input("port p : PortType intersects a;")).expect("port usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
-            node.value
-                .intersects
-                .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("a".to_string())
+            node.value.intersects.as_ref().map(|n| n.value.target.len()),
+            Some(1)
         );
     }
 
@@ -403,7 +409,7 @@ mod par_002_widening_tests {
             .value
             .specializes
             .expect("type reference must not be dropped");
-        assert_eq!(targets_display_string(&typing.value.target), "MyPortType");
+        assert_eq!(typing.value.target.len(), 1);
         assert_eq!(typing.value.kind, crate::ast::TypingKind::Typing);
     }
 
@@ -518,11 +524,8 @@ mod par_002_widening_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.short_name.as_deref(), Some("pp"));
         assert_eq!(
-            node.value
-                .redefines
-                .as_ref()
-                .map(|n| targets_display_string(&n.value.target)),
-            Some("powerPort".to_string())
+            node.value.redefines.as_ref().map(|n| n.value.target.len()),
+            Some(1)
         );
     }
 

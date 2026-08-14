@@ -3,6 +3,14 @@
 use sysml_v2_parser::ast::*;
 use sysml_v2_parser::parse;
 
+fn reference_text(document: &ParsedDocument, id: QualifiedReferenceId) -> &str {
+    document
+        .qualified_references
+        .get(&document.source, id)
+        .expect("reference ID should resolve in its parsed document")
+        .authored_text()
+}
+
 #[test]
 fn test_objective_parses_named_typed_requirement_usage() {
     let input = "package P { use case def U { objective missionObjective : MaximizeObjective; } }";
@@ -32,7 +40,11 @@ fn test_objective_parses_named_typed_requirement_usage() {
         .expect("objective should be present");
     assert_eq!(objective.requirement.value.name, "missionObjective");
     assert_eq!(
-        objective.requirement.value.type_name.as_deref(),
+        objective
+            .requirement
+            .value
+            .type_name
+            .map(|id| reference_text(&result, id)),
         Some("MaximizeObjective")
     );
     assert!(matches!(
@@ -111,7 +123,11 @@ fn test_objective_typed_semicolon_uses_default_name() {
         .expect("objective should be present");
     assert_eq!(objective.requirement.value.name, "objective");
     assert_eq!(
-        objective.requirement.value.type_name.as_deref(),
+        objective
+            .requirement
+            .value
+            .type_name
+            .map(|id| reference_text(&result, id)),
         Some("MaximizeObjective")
     );
 }
@@ -191,7 +207,10 @@ fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
             _ => None,
         })
         .expect("shorthand verify should be present");
-    assert_eq!(shorthand.target.as_deref(), Some("vehicleMassRequirement"));
+    assert_eq!(
+        shorthand.target.map(|id| reference_text(&result, id)),
+        Some("vehicleMassRequirement")
+    );
     let explicit = req_body_elements
         .iter()
         .find_map(|e| match &e.value {
@@ -209,7 +228,10 @@ fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
         .expect("explicit form should include parsed requirement usage");
     assert_eq!(explicit_req.value.name, "vehicleMassRequirement");
     assert_eq!(
-        explicit_req.value.type_name.as_deref(),
+        explicit_req
+            .value
+            .type_name
+            .map(|id| reference_text(&result, id)),
         Some("VehicleMassRequirement")
     );
 }
@@ -245,13 +267,19 @@ fn test_verification_return_ref_parses_return_expression() {
         })
         .expect("return ref should be present");
     assert_eq!(return_ref.name, "verdictResult");
-    let expr = return_ref
-        .return_expression
-        .as_ref()
+    let ReturnRefBody::Brace { elements } = &return_ref.body.value else {
+        panic!("expected structured return-ref body");
+    };
+    let expr = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            ReturnRefBodyElement::Result(expression) => Some(expression),
+            ReturnRefBodyElement::Doc(_) | ReturnRefBodyElement::Error(_) => None,
+        })
         .expect("return expression should be parsed");
     let token = match &expr.value {
-        Expression::MemberAccess(_, member) => member.as_str(),
-        Expression::FeatureRef(name) => name.as_str(),
+        Expression::MemberAccess { member, .. } => reference_text(&result, *member),
+        Expression::FeatureRef(name) => reference_text(&result, *name),
         other => panic!("unexpected verdict expression: {other:?}"),
     };
     assert!(
@@ -534,7 +562,10 @@ fn test_parse_requirement_subject_shorthand_without_name() {
         })
         .expect("subject decl should be present");
     assert_eq!(subject.name, "");
-    assert_eq!(subject.type_name, "Laptop");
+    assert_eq!(
+        subject.type_name.map(|id| reference_text(&result, id)),
+        Some("Laptop")
+    );
     assert!(
         body_elements.iter().any(|e| matches!(
             e.value,
@@ -563,8 +594,12 @@ requirement VehicleReq; subsets BaseReq;
         other => panic!("expected requirement usage, got {:?}", other),
     };
     assert_eq!(
-        req.value.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("BaseReq".to_string())
+        req.value
+            .subsets
+            .as_ref()
+            .and_then(|n| n.value.first_target())
+            .map(|id| reference_text(&result, id)),
+        Some("BaseReq")
     );
 }
 
@@ -587,8 +622,12 @@ requirement VehicleReq; subsets BaseReq :> LatestReq;
         other => panic!("expected requirement usage, got {:?}", other),
     };
     assert_eq!(
-        req.value.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("LatestReq".to_string())
+        req.value
+            .subsets
+            .as_ref()
+            .and_then(|n| n.value.first_target())
+            .map(|id| reference_text(&result, id)),
+        Some("LatestReq")
     );
 }
 
@@ -649,7 +688,7 @@ requirement def VehicleMassRequirement {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -695,7 +734,7 @@ requirement systemSpecification {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };

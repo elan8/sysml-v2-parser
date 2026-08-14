@@ -12,18 +12,19 @@ fn test_parse_with_diagnostics_partial_ast_and_multiple_errors() {
     assert!(!result.is_ok(), "should have parse errors");
     assert_eq!(result.errors.len(), 2, "should report two parse errors");
     assert_eq!(
-        result.root.elements.len(),
-        2,
-        "partial AST should contain both valid packages"
+        result.document.root.elements.len(),
+        4,
+        "partial AST should retain two malformed nodes and both valid packages"
     );
-    // First element is Foo, second is Bar
+    // Filtering recovery nodes leaves the valid Foo and Bar packages in source order.
     let names: Vec<&str> = result
+        .document
         .root
         .elements
         .iter()
         .filter_map(|n| {
             if let RootElement::Package(p) = &n.value {
-                p.value.identification.name.as_deref()
+                p.value.identification.simple_name()
             } else {
                 None
             }
@@ -150,7 +151,7 @@ action def B { }
     );
 
     // Ensure we still parsed the later action def `B`.
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         sysml_v2_parser::ast::RootElement::Package(p) => &p.value,
         _ => panic!("expected package root element"),
     };
@@ -186,7 +187,7 @@ fn test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling() {
     // parse_with_diagnostics is the entry point meant to tolerate this: it should still recover
     // and keep the later valid sibling, with the annotation surfaced as a diagnostic.
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -228,7 +229,7 @@ fn test_package_body_recovery_skips_malformed_abstract_part_and_keeps_next_membe
 
     // parse_with_diagnostics still recovers and preserves both part declarations.
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -253,7 +254,7 @@ fn test_part_def_nested_state_and_attribute_siblings() {
     let input =
         "package P {\npart def Vehicle {\nstate monitor: Mode;\nattribute mass: MassValue;\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -294,7 +295,7 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
     let input =
         "package P {\npart def Vehicle {\nwidget monitor: Mode;\nattribute mass: MassValue;\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -331,7 +332,7 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
 fn test_state_def_recovery_no_longer_truncates_body() {
     let input = "package P {\nstate def Machine {\nunknown stuff;\ntransition t then Ready;\n}\n}";
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -473,7 +474,7 @@ fn test_parse_with_diagnostics_reports_missing_attribute_type_in_part_body() {
         !result.errors.is_empty(),
         "missing attribute type should be reported"
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -511,7 +512,7 @@ fn test_parse_with_diagnostics_reports_missing_occurrence_type_and_keeps_sibling
         !result.errors.is_empty(),
         "missing occurrence type should be reported"
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -620,11 +621,11 @@ fn test_parse_with_diagnostics_accepts_root_level_part_definition() {
     );
     assert!(
         matches!(
-            result.root.elements[0].value,
+            result.document.root.elements[0].value,
             RootElement::Member(ref m) if matches!(m.value, sysml_v2_parser::ast::PackageBodyElement::PartDef(_))
         ),
         "expected RootElement::Member(PartDef), got {:?}",
-        result.root.elements[0].value
+        result.document.root.elements[0].value
     );
 }
 
@@ -656,6 +657,11 @@ fn test_parse_with_diagnostics_reports_missing_closing_brace_for_unterminated_pa
         .find(|e| e.code.as_deref() == Some("missing_closing_brace"))
         .expect("expected missing closing brace diagnostic");
     assert_eq!(err.expected.as_deref(), Some("'}'"));
+    assert!(matches!(
+        result.document.root.elements.first().map(|node| &node.value),
+        Some(RootElement::Member(member))
+            if matches!(member.value, PackageBodyElement::Error(_))
+    ));
 }
 
 #[test]

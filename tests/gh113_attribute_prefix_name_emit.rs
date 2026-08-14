@@ -1,9 +1,9 @@
-//! GH-113: `AttributeUsage`'s name-standing-in-prefix forms (`attribute :>> target;`,
+//! GH-113: `AttributeUsage`'s target-only prefix forms (`attribute :>> target;`,
 //! `attribute ::> target;`, `attribute :> target;` -- no separate name written, per
 //! `AttributeUsageHead::PrefixRedefines`/`PrefixReferences`/`PrefixSubsets` in
 //! `src/parser/attribute.rs`) used to round-trip incorrectly: `emit_attribute_usage`
-//! unconditionally emitted the derived display name *and* the subsets/redefines/references
-//! clause, duplicating the target (`attribute :>> target;` re-emitted as `attribute target :>>
+//! historically emitted a derived display name *and* the subsets/redefines/references clause,
+//! duplicating the target (`attribute :>> target;` re-emitted as `attribute target :>>
 //! target;`, a structurally different, self-referential construct).
 //!
 //! Each test below parses the original anonymous form, emits it, reparses the emitted text, and
@@ -16,7 +16,7 @@ use sysml_v2_parser::{emit_sysml, parse};
 
 /// Digs out the *last* `AttributeUsage` in the first `part def`'s body of a `package P { part def
 /// Q { ... } }`-shaped fixture -- the fixtures below declare a plain named attribute first (so
-/// the redefines/subsets target resolves) and the name-standing-in-prefix form second.
+/// the redefines/subsets target resolves) and the target-only prefix form second.
 fn part_def_attribute(src: &str) -> sysml_v2_parser::ast::AttributeUsage {
     let ast = parse(src).expect("parse");
     let RootElement::Package(pkg) = &ast.elements[0].value else {
@@ -53,8 +53,7 @@ fn assert_roundtrips(src: &str) {
     );
 }
 
-/// `attribute :>> target;` (redefines form) -- name is derived from `target`, must not also be
-/// written explicitly on emit.
+/// `attribute :>> target;` (redefines form) has no declaration name.
 #[test]
 fn gh113_redefines_prefix_name_not_duplicated_on_emit() {
     let src = r#"package P {
@@ -64,7 +63,7 @@ fn gh113_redefines_prefix_name_not_duplicated_on_emit() {
         }
     }"#;
     let attr = part_def_attribute(src);
-    assert_eq!(attr.name, "differencesOf");
+    assert!(attr.name.is_empty());
     assert!(attr.redefines.is_some());
     assert_roundtrips(src);
 }
@@ -94,7 +93,7 @@ fn gh113_subsets_prefix_name_not_duplicated_on_emit() {
         }
     }"#;
     let attr = part_def_attribute(src);
-    assert_eq!(attr.name, "differencesOf");
+    assert!(attr.name.is_empty());
     assert!(attr.subsets.is_some());
     assert_roundtrips(src);
 }

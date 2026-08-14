@@ -32,7 +32,7 @@ fn missionpackage_structures_connection_and_comment_members() {
     let mut opaque_connection_count = 0usize;
     let mut fallback_comment_count = 0usize;
 
-    let package = match &parsed.root.elements[0].value {
+    let package = match &parsed.document.root.elements[0].value {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package root, got {other:?}"),
     };
@@ -50,11 +50,7 @@ fn missionpackage_structures_connection_and_comment_members() {
             match &member.value {
                 PartDefBodyElement::Connection(_) => structured_connection_count += 1,
                 PartDefBodyElement::Comment(_) => structured_comment_count += 1,
-                PartDefBodyElement::OpaqueMember(opaque)
-                    if opaque.value.keyword == "connection" =>
-                {
-                    opaque_connection_count += 1
-                }
+                PartDefBodyElement::UnsupportedMember(_) => opaque_connection_count += 1,
                 PartDefBodyElement::Other(text) if text.starts_with("comment ") => {
                     fallback_comment_count += 1
                 }

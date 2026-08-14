@@ -27,7 +27,7 @@ fn package_elements(
 ) {
     let result = parse_with_diagnostics(input);
     let elements = {
-        let pkg = match &result.root.elements[0].value {
+        let pkg = match &result.document.root.elements[0].value {
             RootElement::Package(p) => &p.value,
             _ => panic!("expected package"),
         };
@@ -208,6 +208,7 @@ fn fixture_nested_bad_block_recovers_inside_part_and_keeps_outer_siblings() {
         .iter()
         .any(|e| matches!(e.value, PartDefBodyElement::Ref(_))));
     assert!(result
+        .document
         .root
         .elements
         .iter()
@@ -236,14 +237,13 @@ fn fixture_unmatched_brace_reports_local_eof_error_without_extra_recovery_noise(
         "EOF brace diagnostic should stay near the end: {:?}",
         err
     );
-    assert!(
-        result.root.elements.is_empty()
-            || result
-                .root
-                .elements
-                .iter()
-                .any(|e| matches!(e.value, RootElement::Package(_)))
-    );
+    assert!(result.document.root.elements.iter().any(|element| {
+        matches!(
+            element.value,
+            RootElement::Member(ref member)
+                if matches!(member.value, PackageBodyElement::Error(_))
+        )
+    }));
 }
 
 #[test]
@@ -274,7 +274,12 @@ fn fixture_expose_feature_chain_parses_without_separator_diagnostic() {
         other => panic!("expected view usage, got {other:?}"),
     };
     assert_eq!(
-        expose_target, "SurveillanceDrone.SurveillanceQuadrotorDrone",
+        result
+            .document
+            .qualified_reference(expose_target.reference)
+            .expect("expose target reference")
+            .authored_text(),
+        "SurveillanceDrone.SurveillanceQuadrotorDrone",
         "feature-chain segments should be preserved in expose target"
     );
 }
@@ -456,10 +461,15 @@ package Later {
         "malformed package body should not cascade as top-level errors: {:?}",
         result.errors
     );
-    assert!(result.root.elements.iter().any(|e| match &e.value {
-        RootElement::Package(pkg) => pkg.value.identification.name.as_deref() == Some("Later"),
-        _ => false,
-    }));
+    assert!(result
+        .document
+        .root
+        .elements
+        .iter()
+        .any(|e| match &e.value {
+            RootElement::Package(pkg) => pkg.value.identification.simple_name() == Some("Later"),
+            _ => false,
+        }));
 }
 
 #[test]
@@ -650,7 +660,7 @@ fn fixture_reference_usage_in_part_def_parses_without_bare_feature_diagnostic() 
         "DefaultReferenceUsage `Capacity : Real;` is valid; unexpected errors: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -712,11 +722,12 @@ fn fixture_glued_package_member_parses_without_separator_diagnostic() {
         result.errors
     );
     let packages: Vec<_> = result
+        .document
         .root
         .elements
         .iter()
         .filter_map(|e| match &e.value {
-            RootElement::Package(p) => Some(p.value.identification.name.as_deref()),
+            RootElement::Package(p) => Some(p.value.identification.simple_name()),
             _ => None,
         })
         .collect();
@@ -736,7 +747,7 @@ fn state_ref_brace_body_recovers_without_aborting_siblings() {
   part def Good;
 }"#;
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -786,7 +797,7 @@ fn part_usage_bind_brace_body_recovers_without_aborting_siblings() {
   }
 }"#;
     let result = parse_with_diagnostics(input);
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -988,8 +999,9 @@ fn far_field_comment_does_not_poison_missing_expression_diagnostic() {
 fn unrecognized_identifier_is_not_reported_as_a_keyword() {
     // GH-18 (Problem 2): `test` is an ordinary identifier, not a SysML keyword, so it must not be
     // reported as "unexpected keyword" -- that would wrongly imply it's valid-but-unsupported
-    // syntax rather than an input defect.
-    let input = "package P { test; }";
+    // syntax rather than an input defect. (Bare `test;` alone is now the legal implicit-feature
+    // shorthand -- spec42 gap 23 -- so the malformed member here adds a second token.)
+    let input = "package P { test junk!; }";
     let result = parse_with_diagnostics(input);
 
     assert_eq!(
@@ -1080,6 +1092,20 @@ fn interface_def_body_recovery_works_nested_in_a_part_def() {
         !result.errors.is_empty(),
         "nested interface def recovery must also surface a diagnostic: {:?}",
         result.errors
+    );
+}
+
+#[test]
+fn recovery_inside_metadata_body_reaches_document_diagnostics() {
+    // Metadata bodies use the shared attribute-body grammar. The metadata member itself parses
+    // successfully even when that nested grammar inserts an Error node, so diagnostics traversal
+    // must descend through the metadata wrapper rather than only inspect its containing package.
+    let input = "package P { #audit { attribute broken: ; } part def StillParsedAfterRecovery; }";
+    let result = parse_with_diagnostics(input);
+
+    assert!(
+        !result.errors.is_empty(),
+        "recovery nested in a metadata body must reach document diagnostics"
     );
 }
 

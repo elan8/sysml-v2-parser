@@ -1,10 +1,115 @@
 //! Parser input type and span extraction for source locations.
 
-use crate::ast::{Node, Span};
+use crate::ast::{
+    Node, QualifiedReferenceArena, QualifiedReferenceArenaBuilder,
+    QualifiedReferenceArenaCheckpoint, QualifiedReferenceId, ReferenceSegment, Span,
+};
 use nom_locate::LocatedSpan;
+use std::cell::RefCell;
 
-/// Parser input: bytes with location tracking (offset, line, column).
-pub type Input<'a> = LocatedSpan<&'a [u8]>;
+/// Mutable state owned for the duration of one document parse.
+///
+/// The nom input itself remains cheap to copy: it carries a [`ParseContextRef`] pointing back to
+/// this owner, while the arena builder uses interior mutability to collect references from parser
+/// combinators. Once parsing is complete, [`finish`](Self::finish) turns the builder into the
+/// immutable arena stored in the parsed-document envelope.
+#[derive(Debug, Default)]
+pub(crate) struct ParseContext {
+    qualified_references: RefCell<QualifiedReferenceArenaBuilder>,
+}
+
+impl ParseContext {
+    pub(crate) fn new() -> Self {
+        Self {
+            qualified_references: RefCell::new(QualifiedReferenceArenaBuilder::new()),
+        }
+    }
+
+    /// Create a location-aware parser input backed by this parse context.
+    pub(crate) fn input<'a>(&'a self, source: &'a [u8]) -> Input<'a> {
+        LocatedSpan::new_extra(source, ParseContextRef { owner: self })
+    }
+
+    /// Finish the document-local qualified-reference arena after all parser inputs are dropped.
+    pub(crate) fn finish(self) -> QualifiedReferenceArena {
+        self.qualified_references.into_inner().finish()
+    }
+}
+
+/// Copyable handle carried as [`LocatedSpan`]'s extra data.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ParseContextRef<'a> {
+    owner: &'a ParseContext,
+}
+
+impl ParseContextRef<'_> {
+    /// Mark the current arena length before a parser branch performs speculative allocation.
+    pub(crate) fn reference_checkpoint(self) -> QualifiedReferenceArenaCheckpoint {
+        self.owner.qualified_references.borrow().checkpoint()
+    }
+
+    /// Discard reference identities allocated by a parser branch that subsequently backtracked.
+    pub(crate) fn rollback_references(self, checkpoint: QualifiedReferenceArenaCheckpoint) {
+        self.owner
+            .qualified_references
+            .borrow_mut()
+            .rollback(checkpoint);
+    }
+
+    /// Add a fully parsed semantic reference to the document arena.
+    ///
+    /// Arena exhaustion is reported as `None`; callers translate it into their parser's ordinary
+    /// error type so adversarial input cannot panic the parser.
+    pub(crate) fn add_reference(
+        self,
+        is_absolute: bool,
+        span: Span,
+        segments: impl IntoIterator<Item = ReferenceSegment>,
+    ) -> Option<QualifiedReferenceId> {
+        self.owner
+            .qualified_references
+            .borrow_mut()
+            .add_reference(is_absolute, span, segments)
+            .ok()
+    }
+
+    /// Test-only bridge for resolving an ID against the parser input that allocated it.
+    #[cfg(test)]
+    pub(crate) fn reference_span(self, id: QualifiedReferenceId) -> Option<Span> {
+        self.owner.qualified_references.borrow().reference_span(id)
+    }
+}
+
+/// Parser input: source bytes with location tracking and a document-local arena context.
+pub type Input<'a> = LocatedSpan<&'a [u8], ParseContextRef<'a>>;
+
+/// Run one complete parser production as an arena transaction.
+///
+/// Reference lexers allocate only after accepting a complete path, but a containing production
+/// can still fail after that point (for example, an import target followed by a malformed body).
+/// `nom` may then try another alternative or editor recovery. Rolling back here prevents IDs from
+/// failed productions from becoming observable in the finished document arena.
+pub(crate) fn reference_transaction<'a, O, E, F>(
+    input: Input<'a>,
+    parser: F,
+) -> nom::IResult<Input<'a>, O, E>
+where
+    F: FnOnce(Input<'a>) -> nom::IResult<Input<'a>, O, E>,
+{
+    let checkpoint = input.extra.reference_checkpoint();
+    let result = parser(input);
+    if result.is_err() {
+        input.extra.rollback_references(checkpoint);
+    }
+    result
+}
+
+/// Test-only convenience for the many focused parser unit tests that need an arena context.
+#[cfg(test)]
+pub(crate) fn test_input(text: &str) -> Input<'_> {
+    let context: &'static ParseContext = Box::leak(Box::new(ParseContext::new()));
+    context.input(text.as_bytes())
+}
 
 /// Build a Span from the start and rest inputs (the consumed region).
 pub fn span_from_to(start: Input<'_>, rest: Input<'_>) -> Span {
@@ -40,17 +145,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{span_from_to, Input};
+    use super::{span_from_to, Input, ParseContext};
     use crate::ast::Span;
     use nom::bytes::complete::tag;
     use nom::error::Error;
     use nom::Parser;
-    use nom_locate::LocatedSpan;
 
     #[test]
     fn span_from_to_consumed_region() {
+        let context = ParseContext::new();
         let bytes = b"package Foo;" as &[u8];
-        let start = LocatedSpan::new(bytes);
+        let start = context.input(bytes);
         let (rest, _) = tag::<_, Input<'_>, Error<Input<'_>>>(&b"package"[..])
             .parse(start)
             .unwrap();

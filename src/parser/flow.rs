@@ -1,15 +1,18 @@
-use crate::ast::{Expression, FlowDef, FlowUsage, FlowUsageKind, Membership, Node, PayloadFeature};
+use crate::ast::{FlowDef, FlowUsage, FlowUsageKind, Membership, Node, PayloadFeature};
 
-type FlowEndpoints<'a> =
-    nom::IResult<Input<'a>, (Option<Node<Expression>>, Option<Node<Expression>>)>;
+type FlowEndpoints<'a> = nom::IResult<
+    Input<'a>,
+    (
+        Option<Node<crate::ast::KermlConnectorEnd>>,
+        Option<Node<crate::ast::KermlConnectorEnd>>,
+    ),
+>;
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::expression;
 use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::{
     conjugated_qualified_name, feature_usage_header, multiplicity_node, optional_typings,
-    targets_display_string,
 };
 use crate::parser::Input;
 use nom::branch::alt;
@@ -83,14 +86,10 @@ fn optional_payload(input: Input<'_>) -> IResult<Input<'_>, Option<Node<PayloadF
 fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>> {
     let start = input;
     if let Ok((after_name, feature_name)) = preceded(ws_and_comments, name).parse(input) {
-        if let Ok((after_typing, Some((_, is_conjugated, targets)))) = optional_typings(after_name)
+        if let Ok((after_typing, Some((_, is_conjugated, targets, _)))) =
+            optional_typings(after_name)
         {
-            let base = targets_display_string(&targets);
-            let type_name = Some(if is_conjugated {
-                format!("~{base}")
-            } else {
-                base
-            });
+            let type_name = targets.first().copied();
             let (rest, multiplicity) =
                 nom::combinator::opt(preceded(ws_and_comments, multiplicity_node))
                     .parse(after_typing)?;
@@ -102,6 +101,7 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
                     PayloadFeature {
                         name: Some(feature_name),
                         type_name,
+                        type_is_conjugated: is_conjugated,
                         multiplicity,
                     },
                 ),
@@ -109,10 +109,9 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
         }
     }
     // Bare type reference: no explicit feature name.
-    let (input, (conjugated, target)) =
+    let (input, (is_conjugated, target)) =
         preceded(ws_and_comments, conjugated_qualified_name).parse(input)?;
-    let base = targets_display_string(std::slice::from_ref(&target));
-    let type_name = Some(if conjugated { format!("~{base}") } else { base });
+    let type_name = Some(target);
     let (input, multiplicity) =
         nom::combinator::opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     Ok((
@@ -123,6 +122,7 @@ fn payload_feature(input: Input<'_>) -> IResult<Input<'_>, Node<PayloadFeature>>
             PayloadFeature {
                 name: None,
                 type_name,
+                type_is_conjugated: is_conjugated,
                 multiplicity,
             },
         ),
@@ -137,20 +137,25 @@ fn flow_endpoints(input: Input<'_>) -> FlowEndpoints<'_> {
     }
     if starts_with_keyword(peek.fragment(), b"from") {
         let (input, _) = preceded(ws_and_comments, tag(&b"from"[..])).parse(input)?;
-        let (input, from) = preceded(ws1, expression).parse(input)?;
+        let (input, from) =
+            preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to) = preceded(ws1, expression).parse(input)?;
+        let (input, to) =
+            preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         return Ok((input, (Some(from), Some(to))));
     }
-    // Shorthand: expr `to` expr (no `from` keyword).
-    let (input, from) = expression(input)?;
+    // Shorthand: end `to` end (no `from` keyword).
+    let start = input;
+    let (input, from) = crate::parser::constraint::kerml_connector_end(input)?;
     let (peek, _) = ws_and_comments(input)?;
     if starts_with_keyword(peek.fragment(), b"to") {
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to) = preceded(ws1, expression).parse(input)?;
+        let (input, to) =
+            preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         Ok((input, (Some(from), Some(to))))
     } else {
-        Ok((input, (None, None)))
+        // No `to`: this member has no endpoints; leave the input untouched.
+        Ok((start, (None, None)))
     }
 }
 
@@ -166,7 +171,10 @@ fn flow_usage_named(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
         FlowUsage {
             kind: FlowUsageKind::Flow, // overwritten by caller
             name: Some(name_str),
-            type_name: header.type_name,
+            type_name: header.type_reference,
+            type_is_conjugated: header.type_is_conjugated,
+            subsets: header.subsets,
+            redefines: header.redefines,
             payload,
             from,
             to,
@@ -188,6 +196,9 @@ fn flow_usage_payload_first(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
             kind: FlowUsageKind::Flow, // overwritten by caller
             name: None,
             type_name: None,
+            type_is_conjugated: false,
+            subsets: None,
+            redefines: None,
             payload,
             from,
             to,
@@ -198,9 +209,9 @@ fn flow_usage_payload_first(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
 }
 
 fn flow_usage_anonymous(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
-    let (input, from) = expression(input)?;
+    let (input, from) = crate::parser::constraint::kerml_connector_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-    let (input, to) = preceded(ws1, expression).parse(input)?;
+    let (input, to) = preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
@@ -209,6 +220,9 @@ fn flow_usage_anonymous(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
             kind: FlowUsageKind::Flow,
             name: None,
             type_name: None,
+            type_is_conjugated: false,
+            subsets: None,
+            redefines: None,
             payload: None,
             from: Some(from),
             to: Some(to),
@@ -236,12 +250,18 @@ pub(crate) fn flow_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<Flo
             flow_usage_payload_first(peek)?
         } else {
             match name(peek) {
-                Ok((after_name, _name_str)) => {
+                Ok((after_name, name_str)) => {
                     let (after_name, _) = ws_and_comments(after_name)?;
                     let fragment = after_name.fragment();
-                    let is_anonymous =
-                        fragment.starts_with(b".") || starts_with_keyword(fragment, b"to");
-                    if is_anonymous {
+                    // The canonical anonymous shorthand `flow from a to b;` (OMG spec Annex A's
+                    // preferred spelling) starts directly at the `from` keyword; `name()` would
+                    // otherwise consume `from` itself as a declared name and silently misparse
+                    // the statement as a flow named "from" (spec42 Gap 47). `flow_endpoints`
+                    // owns the `from`-keyword spelling, so route through the payload-first
+                    // production with no payload.
+                    if name_str == "from" {
+                        flow_usage_payload_first(peek)?
+                    } else if fragment.starts_with(b".") || starts_with_keyword(fragment, b"to") {
                         flow_usage_anonymous(peek)?
                     } else {
                         flow_usage_named(peek)?
@@ -264,10 +284,32 @@ pub(crate) fn flow_usage(input: Input<'_>) -> IResult<Input<'_>, Node<FlowUsage>
 #[cfg(test)]
 mod payload_first_gap_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 47: `flow from a to b;` is the canonical anonymous shorthand — `from` is the
+    /// endpoint keyword, not a declared flow name. Genuinely named flows keep their name.
+    #[test]
+    fn from_keyword_is_not_a_flow_name() {
+        let (rest, node) =
+            flow_usage_member(input("flow from focus.image to shoot.image;")).expect("anonymous");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, None);
+        assert!(node.value.from.is_some());
+        assert!(node.value.to.is_some());
+
+        let (rest, node) =
+            flow_usage_member(input("succession flow from focus.image to shoot.image;"))
+                .expect("anonymous succession flow");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, None);
+        assert_eq!(node.value.kind, crate::ast::FlowUsageKind::SuccessionFlow);
+
+        let (_, node) = flow_usage_member(input("succession flow lightFlow from a.x to b.y;"))
+            .expect("named succession flow");
+        assert_eq!(node.value.name.as_deref(), Some("lightFlow"));
     }
 
     /// PARSER_BACKLOG_ROADMAP.md §6, G12: the payload clause may precede the endpoints, with no
@@ -275,15 +317,22 @@ mod payload_first_gap_tests {
     /// spec Annex `3d-Function-based Behavior-item.sysml`.
     #[test]
     fn flow_usage_accepts_a_payload_before_the_endpoints() {
-        let (rest, node) = flow_usage_member(input(
-            "flow of fuel : Fuel from storageTank.fuelOutPort.fuel to pump.fuelInPort.fuel;",
-        ))
-        .expect("payload-first flow");
+        let source = input(
+            "flow of fuel : $::Payloads::Fuel from storageTank.fuelOutPort.fuel to pump.fuelInPort.fuel;",
+        );
+        let (rest, node) = flow_usage_member(source).expect("payload-first flow");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, None);
         let payload = node.value.payload.expect("payload");
         assert_eq!(payload.value.name.as_deref(), Some("fuel"));
-        assert_eq!(payload.value.type_name.as_deref(), Some("Fuel"));
+        assert_eq!(
+            payload
+                .value
+                .type_name
+                .and_then(|id| crate::parser::usage::reference_text(source, id))
+                .as_deref(),
+            Some("$::Payloads::Fuel")
+        );
         assert!(node.value.from.is_some() && node.value.to.is_some());
     }
 
@@ -309,10 +358,9 @@ mod payload_first_gap_tests {
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on FlowDef/FlowUsage ---

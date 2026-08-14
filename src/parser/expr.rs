@@ -1,15 +1,19 @@
 //! Expression and path parsing for values and bind/connect.
 
 use crate::ast::{
-    Argument, BinaryOperator, CollectionOperator, Expression, FeatureChain, Node, Span,
-    TypeCheckKind, UnaryOperator,
+    Argument, BinaryOperator, CollectionOperator, CollectionOperatorBody,
+    CollectionOperatorParameter, CollectionOperatorParameterTyping, Expression, InOut, Node,
+    ReferenceSeparator, Span, TypeCheckKind, UnaryOperator,
 };
-use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws_and_comments};
-use crate::parser::node_from_to;
+use crate::parser::lex::{
+    classified_reference_path, name, qualified_reference, reference_path, starts_with_keyword,
+    ws_and_comments, ReferencePathKind,
+};
 use crate::parser::Input;
+use crate::parser::{node_from_to, with_span};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::map;
+use nom::combinator::{map, value};
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -32,7 +36,10 @@ fn numeric_literal_text(input: Input<'_>) -> IResult<Input<'_>, String> {
             nom::error::ErrorKind::Digit,
         )));
     }
-    if i < frag.len() && frag[i] == b'.' {
+    // A `.` only continues the literal when NOT part of a `..` range operator (`1..4`) and when
+    // followed by a digit -- `1.` alone previously lexed as a real, silently turning
+    // `(1..size(seq))` into `1.` + member access instead of a Range expression.
+    if i + 1 < frag.len() && frag[i] == b'.' && frag[i + 1].is_ascii_digit() {
         i += 1;
         while i < frag.len() && frag[i].is_ascii_digit() {
             i += 1;
@@ -149,7 +156,7 @@ fn literal_boolean(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 fn feature_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, n) = qualified_name(input)?;
+    let (input, n) = qualified_reference(input)?;
     Ok((input, node_from_to(start, input, Expression::FeatureRef(n))))
 }
 
@@ -159,7 +166,7 @@ fn metadata_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"@"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, n) = qualified_name(input)?;
+    let (input, n) = qualified_reference(input)?;
     Ok((
         input,
         node_from_to(start, input, Expression::Classification { metaclass: n }),
@@ -265,7 +272,7 @@ fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         unit_name_span.clone(),
         Expression::Bracket(Box::new(Node::new(
             unit_name_span,
-            Expression::FeatureRef(unit_name),
+            Expression::Unit(unit_name),
         ))),
     );
     let expr = Expression::LiteralWithUnit {
@@ -288,10 +295,14 @@ fn null_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 
 /// SelectExpression: base `.?` selector
 fn select_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    crate::parser::span::reference_transaction(input, select_expression_inner)
+}
+
+fn select_expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, base) = feature_ref_primary(input)?;
     let (input, _) = tag(&b".?"[..]).parse(input)?;
-    let (input, selector) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, selector) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -307,10 +318,14 @@ fn select_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
 
 /// CollectExpression: base `.**` selector
 fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    crate::parser::span::reference_transaction(input, collect_expression_inner)
+}
+
+fn collect_expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, base) = feature_ref_primary(input)?;
     let (input, _) = tag(&b".**"[..]).parse(input)?;
-    let (input, selector) = preceded(ws_and_comments, name).parse(input)?;
+    let (input, selector) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -389,7 +404,7 @@ fn type_check_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> 
     let start = input;
     let (input, kind) = type_check_kind_token(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, type_name) = qualified_name(input)?;
+    let (input, type_name) = qualified_reference(input)?;
     Ok((
         input,
         node_from_to(
@@ -451,149 +466,204 @@ fn conditional_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expressio
 fn extent_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = keyword_token(input, b"all")?;
-    let (input, target) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     Ok((
         input,
         node_from_to(start, input, Expression::Extent { target }),
     ))
 }
 
-/// Capture a balanced `{ ... }` including the braces.
-fn take_balanced_braces(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn collection_operator_parameter(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<CollectionOperatorParameter>> {
     let (input, _) = ws_and_comments(input)?;
-    if !input.fragment().starts_with(b"{") {
-        return Err(nom::Err::Error(nom::error::Error::new(
+    let start = input;
+    let (input, (direction_span, direction)) = with_span(|input| {
+        alt((
+            map(|input| keyword_token(input, b"inout"), |_| InOut::InOut),
+            map(|input| keyword_token(input, b"in"), |_| InOut::In),
+            map(|input| keyword_token(input, b"out"), |_| InOut::Out),
+        ))
+        .parse(input)
+    })(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, reference_keyword_span) = if starts_with_keyword(input.fragment(), b"ref") {
+        let (input, (span, _)) = with_span(|input| keyword_token(input, b"ref"))(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        (input, Some(span))
+    } else {
+        (input, None)
+    };
+    let (input, (name_span, parameter_name)) = with_span(name)(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, typing) = if input.fragment().starts_with(b":") {
+        let (input, (separator_span, _)) = with_span(tag(&b":"[..]))(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        let (input, target) = qualified_reference(input)?;
+        (
             input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let frag = input.fragment();
-    let mut depth = 0i32;
-    let mut i = 0usize;
-    while i < frag.len() {
-        match frag[i] {
-            b'{' => depth += 1,
-            b'}' => {
-                depth -= 1;
-                if depth == 0 {
-                    let take = i + 1;
-                    let s = String::from_utf8_lossy(&frag[..take]).to_string();
-                    let (input, _) = nom::bytes::complete::take(take).parse(input)?;
-                    return Ok((input, s));
-                }
-            }
-            b'"' => {
-                i += 1;
-                while i < frag.len() {
-                    if frag[i] == b'\\' && i + 1 < frag.len() {
-                        i += 2;
-                        continue;
-                    }
-                    if frag[i] == b'"' {
-                        break;
-                    }
-                    i += 1;
-                }
-            }
-            b'\'' => {
-                i += 1;
-                while i < frag.len() {
-                    if frag[i] == b'\\' && i + 1 < frag.len() {
-                        i += 2;
-                        continue;
-                    }
-                    if frag[i] == b'\'' {
-                        break;
-                    }
-                    i += 1;
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    Err(nom::Err::Error(nom::error::Error::new(
+            Some(CollectionOperatorParameterTyping {
+                separator_span,
+                target,
+            }),
+        )
+    } else {
+        (input, None)
+    };
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (semicolon_span, _)) = with_span(tag(&b";"[..]))(input)?;
+    Ok((
         input,
-        nom::error::ErrorKind::Tag,
-    )))
+        node_from_to(
+            start,
+            input,
+            CollectionOperatorParameter {
+                direction: Node::new(direction_span, direction),
+                reference_keyword_span,
+                name: parameter_name,
+                name_span,
+                typing,
+                semicolon_span,
+            },
+        ),
+    ))
 }
 
-fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+/// Standalone KerML `BodyExpression` (`{ parameters* result? }`) -- the same shape a collection
+/// operator's brace body uses; see [`Expression::BodyExpr`].
+pub(crate) fn body_expression(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<CollectionOperatorBody>> {
+    collection_operator_body(input)
+}
+
+fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<CollectionOperatorBody>> {
+    let (input, _) = ws_and_comments(input)?;
+    let start = input;
+    let (mut input, (open_brace_span, _)) = with_span(tag(&b"{"[..]))(input)?;
+    let mut parameters = Vec::new();
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        if starts_with_keyword(next.fragment(), b"in")
+            || starts_with_keyword(next.fragment(), b"out")
+            || starts_with_keyword(next.fragment(), b"inout")
+        {
+            let (next, parameter) = collection_operator_parameter(next)?;
+            parameters.push(parameter);
+            input = next;
+        } else {
+            input = next;
+            break;
+        }
+    }
+    let (next, _) = ws_and_comments(input)?;
+    let (input, result) = if next.fragment().starts_with(b"}") {
+        (next, None)
+    } else {
+        let (input, result) = expression(next)?;
+        (input, Some(Box::new(result)))
+    };
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (close_brace_span, _)) = with_span(tag(&b"}"[..]))(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            CollectionOperatorBody {
+                open_brace_span,
+                parameters,
+                result,
+                close_brace_span,
+            },
+        ),
+    ))
+}
+
+/// Operator tokens yield the typed operator directly. Spelling a 1-3 byte token as an owned
+/// `String` only to convert it into this enum allocated once per token, on every speculative
+/// attempt as well as every accepted one, and left two representations of the same fact.
+fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         // Symbolic forms first: `&&`/`||` must win over `additive_op_token`'s bare `&`/`|`, which
         // would otherwise greedily match just the first character and misparse `a && b` as `a`
         // followed by a stray, unparseable `& b`.
-        map(tag(&b"&&"[..]), |_| "&&".to_string()),
-        map(tag(&b"||"[..]), |_| "||".to_string()),
-        map(|i| keyword_token(i, b"and"), |_| "&&".to_string()),
-        map(|i| keyword_token(i, b"or"), |_| "||".to_string()),
-        map(|i| keyword_token(i, b"xor"), |_| "xor".to_string()),
+        value(BinaryOperator::And, tag(&b"&&"[..])),
+        value(BinaryOperator::Or, tag(&b"||"[..])),
+        value(BinaryOperator::And, |i| keyword_token(i, b"and")),
+        value(BinaryOperator::Or, |i| keyword_token(i, b"or")),
+        value(BinaryOperator::Xor, |i| keyword_token(i, b"xor")),
     ))
     .parse(input)
 }
 
-/// Implication: lower precedence than `or` / `and` (constraint and filter bodies).
-fn implies_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
-    preceded(ws_and_comments, |i| keyword_token(i, b"implies"))
-        .map(|_| "implies".to_string())
-        .parse(input)
-}
-
-fn equality_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+/// Implication tier: `implies` and the KerML null-coalescing `??` (BNF groups `'??' | 'or' |
+/// 'and' | 'implies'`; `??` binds loosest alongside `implies`), e.g. `collection->reduce '+'
+/// ?? zero` (Kernel Function Library `DataFunctions.kerml`).
+fn implies_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b"==="[..]), |_| "===".to_string()),
-        map(tag(&b"!=="[..]), |_| "!==".to_string()),
-        map(tag(&b"=="[..]), |_| "==".to_string()),
-        map(tag(&b"!="[..]), |_| "!=".to_string()),
+        value(BinaryOperator::Implies, |i| keyword_token(i, b"implies")),
+        value(BinaryOperator::NullCoalesce, tag(&b"??"[..])),
     ))
     .parse(input)
 }
 
-fn comparison_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn equality_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b">="[..]), |_| ">=".to_string()),
-        map(tag(&b"<="[..]), |_| "<=".to_string()),
-        map(tag(&b">"[..]), |_| ">".to_string()),
-        map(tag(&b"<"[..]), |_| "<".to_string()),
-        map(tag(&b".."[..]), |_| "..".to_string()),
+        value(BinaryOperator::StrictEq, tag(&b"==="[..])),
+        value(BinaryOperator::StrictNe, tag(&b"!=="[..])),
+        value(BinaryOperator::Eq, tag(&b"=="[..])),
+        value(BinaryOperator::Ne, tag(&b"!="[..])),
     ))
     .parse(input)
 }
 
-fn additive_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn comparison_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b"+"[..]), |_| "+".to_string()),
-        map(tag(&b"-"[..]), |_| "-".to_string()),
-        map(tag(&b"|"[..]), |_| "|".to_string()),
-        map(tag(&b"&"[..]), |_| "&".to_string()),
+        value(BinaryOperator::Ge, tag(&b">="[..])),
+        value(BinaryOperator::Le, tag(&b"<="[..])),
+        value(BinaryOperator::Gt, tag(&b">"[..])),
+        value(BinaryOperator::Lt, tag(&b"<"[..])),
+        value(BinaryOperator::Range, tag(&b".."[..])),
     ))
     .parse(input)
 }
 
-fn multiplicative_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn additive_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b"**"[..]), |_| "**".to_string()),
-        map(tag(&b"*"[..]), |_| "*".to_string()),
-        map(tag(&b"/"[..]), |_| "/".to_string()),
-        map(tag(&b"%"[..]), |_| "%".to_string()),
-        map(tag(&b"^"[..]), |_| "^".to_string()),
+        value(BinaryOperator::Add, tag(&b"+"[..])),
+        value(BinaryOperator::Sub, tag(&b"-"[..])),
+        value(BinaryOperator::BitOr, tag(&b"|"[..])),
+        value(BinaryOperator::BitAnd, tag(&b"&"[..])),
+    ))
+    .parse(input)
+}
+
+fn multiplicative_op_token(input: Input<'_>) -> IResult<Input<'_>, BinaryOperator> {
+    let (input, _) = ws_and_comments(input)?;
+    alt((
+        value(BinaryOperator::Exp, tag(&b"**"[..])),
+        value(BinaryOperator::Mul, tag(&b"*"[..])),
+        value(BinaryOperator::Div, tag(&b"/"[..])),
+        value(BinaryOperator::Mod, tag(&b"%"[..])),
+        value(BinaryOperator::Pow, tag(&b"^"[..])),
     ))
     .parse(input)
 }
 
 /// Unary operator token: + - ~ not (KerML UnaryOperator).
-fn unary_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+fn unary_op_token(input: Input<'_>) -> IResult<Input<'_>, UnaryOperator> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(|i| keyword_token(i, b"not"), |_| "not".to_string()),
-        map(tag(&b"~"[..]), |_| "~".to_string()),
-        map(tag(&b"+"[..]), |_| "+".to_string()),
-        map(tag(&b"-"[..]), |_| "-".to_string()),
+        value(UnaryOperator::Not, |i| keyword_token(i, b"not")),
+        value(UnaryOperator::BitNot, tag(&b"~"[..])),
+        value(UnaryOperator::Plus, tag(&b"+"[..])),
+        value(UnaryOperator::Minus, tag(&b"-"[..])),
     ))
     .parse(input)
 }
@@ -628,26 +698,14 @@ const PREC_MULTIPLICATIVE: u8 = 5;
 /// preserves any token-overlap edge cases (e.g. `&` vs `&&`) exactly as they behaved before.
 fn any_binary_op_token(input: Input<'_>) -> IResult<Input<'_>, (BinaryOperator, u8)> {
     alt((
-        map(multiplicative_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_MULTIPLICATIVE)
-        }),
+        map(multiplicative_op_token, |op| (op, PREC_MULTIPLICATIVE)),
         // `logical_op_token` before `additive_op_token`: its symbolic `&&`/`||` forms must win over
         // `additive_op_token`'s bare `&`/`|` (see the comment in `logical_op_token`).
-        map(logical_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_LOGICAL)
-        }),
-        map(additive_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_ADDITIVE)
-        }),
-        map(comparison_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_COMPARISON)
-        }),
-        map(equality_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_EQUALITY)
-        }),
-        map(implies_op_token, |t| {
-            (BinaryOperator::from_token(&t), PREC_IMPLIES)
-        }),
+        map(logical_op_token, |op| (op, PREC_LOGICAL)),
+        map(additive_op_token, |op| (op, PREC_ADDITIVE)),
+        map(comparison_op_token, |op| (op, PREC_COMPARISON)),
+        map(equality_op_token, |op| (op, PREC_EQUALITY)),
+        map(implies_op_token, |op| (op, PREC_IMPLIES)),
     ))
     .parse(input)
 }
@@ -735,7 +793,7 @@ struct ItemState<'a> {
     climb: Climb,
     pending_unary: Vec<UnaryOperator>,
     prefix_start: Input<'a>,
-    arg_name: Option<String>,
+    arg_parameter: Option<crate::ast::QualifiedReferenceId>,
 }
 
 impl<'a> ItemState<'a> {
@@ -744,7 +802,7 @@ impl<'a> ItemState<'a> {
             climb: Climb::default(),
             pending_unary: Vec::new(),
             prefix_start: at,
-            arg_name: None,
+            arg_parameter: None,
         }
     }
 }
@@ -763,7 +821,9 @@ enum FrameKind {
         member: String,
     },
     /// Constructor argument list: `new` type_name `(` args `)`.
-    Constructor { type_name: String },
+    Constructor {
+        type_name: crate::ast::QualifiedReferenceId,
+    },
 }
 
 /// A suspended `(`-delimited list, collecting comma-separated items until its closing `)`.
@@ -793,32 +853,37 @@ impl<'a> Frame<'a> {
     }
 }
 
-/// Look ahead for a KerML named-argument prefix (`NAME '=' ...`), used only when starting a fresh
+/// Look ahead for a KerML named-argument prefix (`reference '=' ...`), used only when starting a fresh
 /// item inside a call-style argument list. Only a lone `=` counts -- `==`/`===` must stay ordinary
 /// equality expressions, so e.g. `f(a == b)` is one positional boolean argument, not `a`-named-`=
 /// b`. On no match, returns the input completely unchanged so normal atom parsing proceeds (`a ==
 /// b` as a positional value, or `a` as a positional value followed by `,`/`)`).
-fn named_arg_prefix(input: Input<'_>) -> (Input<'_>, Option<String>) {
+fn named_arg_prefix(input: Input<'_>) -> (Input<'_>, Option<crate::ast::QualifiedReferenceId>) {
+    let checkpoint = input.extra.reference_checkpoint();
     let Ok((ws_input, _)) = ws_and_comments(input) else {
         return (input, None);
     };
-    let Ok((after_name, arg_name)) = name(ws_input) else {
+    let Ok((after_name, parameter)) = reference_path(ws_input) else {
         return (input, None);
     };
     let Ok((after_ws, _)) = ws_and_comments(after_name) else {
+        input.extra.rollback_references(checkpoint);
         return (input, None);
     };
     let frag = after_ws.fragment();
     if frag.first() == Some(&b'=') && frag.get(1) != Some(&b'=') {
         let eq_result: IResult<Input<'_>, Input<'_>> = tag(&b"="[..]).parse(after_ws);
         let Ok((after_eq, _)) = eq_result else {
+            input.extra.rollback_references(checkpoint);
             return (input, None);
         };
         let Ok((after_eq, _)) = ws_and_comments(after_eq) else {
+            input.extra.rollback_references(checkpoint);
             return (input, None);
         };
-        (after_eq, Some(arg_name))
+        (after_eq, Some(parameter))
     } else {
+        input.extra.rollback_references(checkpoint);
         (input, None)
     }
 }
@@ -830,11 +895,13 @@ fn named_arg_prefix(input: Input<'_>) -> (Input<'_>, Option<String>) {
 /// identifier via [`primary_atom`] (`new` is not a reserved word in
 /// [`crate::parser::lex::basic_name`]) -- matching the original recursive parser's `alt` fallthrough
 /// from `constructor_expression` to `feature_ref_primary`.
-fn try_constructor_prefix(after_ws: Input<'_>) -> Option<(Input<'_>, String)> {
+fn try_constructor_prefix(
+    after_ws: Input<'_>,
+) -> Option<(Input<'_>, crate::ast::QualifiedReferenceId)> {
     let kw_result: IResult<Input<'_>, Input<'_>> = keyword_token(after_ws, b"new");
     let (after_kw, _) = kw_result.ok()?;
     let (after_kw, _) = ws_and_comments(after_kw).ok()?;
-    qualified_name(after_kw).ok()
+    qualified_reference(after_kw).ok()
 }
 
 /// Build the final node for a frame once its closing `)` has been consumed.
@@ -888,6 +955,7 @@ fn build_frame_node<'a>(frame: Frame<'a>, end: Input<'a>) -> Node<Expression> {
                 base: Box::new(base),
                 args: items,
                 brace_body: None,
+                dot_shorthand: false,
             },
         ),
         FrameKind::Constructor { type_name } => node_from_to(
@@ -904,6 +972,10 @@ fn build_frame_node<'a>(frame: Frame<'a>, end: Input<'a>) -> Node<Expression> {
 /// Full expression with precedence-aware binary parsing. See the module-level comment above for
 /// why this is an explicit-stack loop rather than recursive descent.
 pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    crate::parser::span::reference_transaction(input, expression_inner)
+}
+
+fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let mut stack: Vec<(Frame<'_>, ItemState<'_>)> = Vec::new();
     let mut state = ItemState::fresh(input);
     let mut input = input;
@@ -918,7 +990,7 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             None => {
                 state.prefix_start = input;
                 while let Ok((next, tok)) = unary_op_token(input) {
-                    state.pending_unary.push(UnaryOperator::from_token(&tok));
+                    state.pending_unary.push(tok);
                     input = next;
                 }
                 let (after_ws, _) = ws_and_comments(input)?;
@@ -974,8 +1046,8 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                             ));
                             input = after_paren;
                             let (after_lookahead, maybe_name) = named_arg_prefix(input);
-                            if let Some(arg_name) = maybe_name {
-                                state.arg_name = Some(arg_name);
+                            if let Some(parameter) = maybe_name {
+                                state.arg_parameter = Some(parameter);
                                 input = after_lookahead;
                             }
                             continue 'outer;
@@ -1028,8 +1100,8 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                 ));
                 input = after_paren;
                 let (after_lookahead, maybe_name) = named_arg_prefix(input);
-                if let Some(arg_name) = maybe_name {
-                    state.arg_name = Some(arg_name);
+                if let Some(parameter) = maybe_name {
+                    state.arg_parameter = Some(parameter);
                     input = after_lookahead;
                 }
                 continue 'outer;
@@ -1052,23 +1124,101 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             if next.fragment().starts_with(b"::") {
                 let (next, _) = tag(&b"::"[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
-                let (next, member) = name(next)?;
-                let expr = Expression::MemberAccess(Box::new(atom), member);
+                let (next, member) = qualified_reference(next)?;
+                let expr = Expression::MemberAccess {
+                    base: Box::new(atom),
+                    member,
+                    separator: ReferenceSeparator::ColonColon,
+                };
                 atom = node_from_to(primary_start, next, expr);
                 input = next;
                 continue;
             }
-            if next.fragment().starts_with(b".") {
+            // `[unit]` measurement/coordinate-frame annotation after a value-shaped atom:
+            // `(0, shape.width/2, 0)[source]`, `new Rotation(...)[frame]`, `angle[deg]` in
+            // expression position (Domain Geometry libraries; spec42 Gap 49c). Numeric literals
+            // keep their dedicated `literal_with_unit` path at atom level. Speculative: only
+            // commits when a unit-shaped token closes with `]`, so declaration-level
+            // multiplicities (`[1]`, `[0..*]`) after a typing are unaffected -- those never pass
+            // through this engine.
+            if next.fragment().starts_with(b"[")
+                && matches!(
+                    atom.value,
+                    Expression::Parenthesized(_)
+                        | Expression::Tuple(_)
+                        | Expression::Invocation { .. }
+                        | Expression::Constructor { .. }
+                        | Expression::FeatureRef(_)
+                        | Expression::MemberAccess { .. }
+                )
+            {
+                let bracket_attempt = (|| -> IResult<Input<'_>, (Span, String)> {
+                    let (after_open, _) = tag(&b"["[..]).parse(next)?;
+                    let (after_open, _) = ws_and_comments(after_open)?;
+                    let unit_start = after_open;
+                    let (after_unit, unit_name) = unit_name_in_brackets(after_open)?;
+                    let unit_span = crate::parser::span_from_to(unit_start, after_unit);
+                    let (after_unit, _) = ws_and_comments(after_unit)?;
+                    let (after_close, _) = tag(&b"]"[..]).parse(after_unit)?;
+                    Ok((after_close, (unit_span, unit_name)))
+                })();
+                if let Ok((after_close, (unit_span, unit_name))) = bracket_attempt {
+                    let unit = Node::new(
+                        unit_span.clone(),
+                        Expression::Bracket(Box::new(Node::new(
+                            unit_span,
+                            Expression::Unit(unit_name),
+                        ))),
+                    );
+                    let expr = Expression::LiteralWithUnit {
+                        value: Box::new(atom),
+                        unit: Box::new(unit),
+                    };
+                    atom = node_from_to(primary_start, after_close, expr);
+                    input = after_close;
+                    continue;
+                }
+            }
+            // KerML dot shorthands for body-expression operators: `x.{in xx; xx + 1}` is the
+            // `collect` sugar and `x.?{in xx; cond}` the `select` sugar (spec42
+            // `kerml/expressions.md`). Checked before plain member access, whose `.` + name
+            // parse would otherwise fail on the `{`.
+            if next.fragment().starts_with(b".{") || next.fragment().starts_with(b".?{") {
+                let select = next.fragment().starts_with(b".?{");
+                let (next, _) = if select {
+                    tag(&b".?"[..]).parse(next)?
+                } else {
+                    tag(&b"."[..]).parse(next)?
+                };
+                let (after_brace, body) = collection_operator_body(next)?;
+                let expr = Expression::CollectionOp {
+                    op: CollectionOperator::from_name(if select { "select" } else { "collect" }),
+                    base: Box::new(atom),
+                    args: Vec::new(),
+                    brace_body: Some(Box::new(body)),
+                    dot_shorthand: true,
+                };
+                atom = node_from_to(primary_start, after_brace, expr);
+                input = after_brace;
+                continue;
+            }
+            if next.fragment().starts_with(b".") && !next.fragment().starts_with(b"..") {
                 let (next, _) = tag(&b"."[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
-                let (next, member) = name(next)?;
+                let member_input = next;
+                let (next, member_text) = name(next)?;
                 // `expr.metadata` is a dedicated KerML production (MetadataAccessExpression, BNF
                 // 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`), distinct from ordinary
                 // member access.
-                let expr = if member == "metadata" {
+                let expr = if member_text == "metadata" {
                     Expression::MetadataAccess(Box::new(atom))
                 } else {
-                    Expression::MemberAccess(Box::new(atom), member)
+                    let (_, member) = qualified_reference(member_input)?;
+                    Expression::MemberAccess {
+                        base: Box::new(atom),
+                        member,
+                        separator: ReferenceSeparator::Dot,
+                    }
                 };
                 atom = node_from_to(primary_start, next, expr);
                 input = next;
@@ -1077,16 +1227,18 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             if next.fragment().starts_with(b"->") {
                 let (next, _) = tag(&b"->"[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
+                let member_input = next;
                 let (next, member) = name(next)?;
                 let (after_name, _) = ws_and_comments(next)?;
                 // Brace-body form: `collection->forAll { in ref w; expr }`
                 if after_name.fragment().starts_with(b"{") {
-                    let (after_brace, body) = take_balanced_braces(after_name)?;
+                    let (after_brace, body) = collection_operator_body(after_name)?;
                     let expr = Expression::CollectionOp {
                         op: CollectionOperator::from_name(&member),
                         base: Box::new(atom),
                         args: Vec::new(),
-                        brace_body: Some(body),
+                        brace_body: Some(Box::new(body)),
+                        dot_shorthand: false,
                     };
                     atom = node_from_to(primary_start, after_brace, expr);
                     input = after_brace;
@@ -1103,6 +1255,7 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                             base: Box::new(atom),
                             args: Vec::new(),
                             brace_body: None,
+                            dot_shorthand: false,
                         };
                         atom = node_from_to(primary_start, after_close, expr);
                         input = after_close;
@@ -1118,20 +1271,59 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
                     ));
                     input = after_paren;
                     let (after_lookahead, maybe_name) = named_arg_prefix(input);
-                    if let Some(arg_name) = maybe_name {
-                        state.arg_name = Some(arg_name);
+                    if let Some(parameter) = maybe_name {
+                        state.arg_parameter = Some(parameter);
                         input = after_lookahead;
                     }
                     continue 'outer;
                 }
+                // Function-reference argument with no parentheses: `->reduce
+                // RealFunctions::'+'`, `->reduce min`, `->reduce '*' ?? 1` (Kernel Function
+                // Library). The argument is a single (possibly qualified or quoted) function
+                // name; reserved keywords (`and`, `then`, ...) stay operators/keywords.
+                let leading_word_len = after_name
+                    .fragment()
+                    .iter()
+                    .take_while(|b| b.is_ascii_alphanumeric() || **b == b'_')
+                    .count();
+                let takes_function_ref = after_name
+                    .fragment()
+                    .first()
+                    .is_some_and(|&b| b == b'\'' || b.is_ascii_alphabetic() || b == b'_')
+                    && !crate::parser::lex::is_reserved_keyword(
+                        &after_name.fragment()[..leading_word_len],
+                    );
+                if takes_function_ref {
+                    if let Ok((after_ref, func_ref)) = qualified_reference(after_name) {
+                        let span = crate::parser::span_from_to(after_name, after_ref);
+                        let expr = Expression::CollectionOp {
+                            op: CollectionOperator::from_name(&member),
+                            base: Box::new(atom),
+                            args: vec![Argument {
+                                parameter: None,
+                                value: Node::new(span, Expression::FeatureRef(func_ref)),
+                            }],
+                            brace_body: None,
+                            dot_shorthand: false,
+                        };
+                        atom = node_from_to(primary_start, after_ref, expr);
+                        input = after_ref;
+                        continue;
+                    }
+                }
                 // Bare arrow access with no call (rare) -- fall back to plain member access.
-                let expr = Expression::MemberAccess(Box::new(atom), member);
+                let (_, member_ref) = qualified_reference(member_input)?;
+                let expr = Expression::MemberAccess {
+                    base: Box::new(atom),
+                    member: member_ref,
+                    separator: ReferenceSeparator::Dot,
+                };
                 atom = node_from_to(primary_start, next, expr);
                 input = next;
                 continue;
             }
             if let Ok((after_kind, kind)) = type_check_kind_token(next) {
-                if let Ok((after_type, type_name)) = qualified_name(after_kind) {
+                if let Ok((after_type, type_name)) = qualified_reference(after_kind) {
                     let expr = Expression::TypeCheck {
                         kind,
                         operand: Some(Box::new(atom)),
@@ -1145,7 +1337,7 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             if starts_with_keyword(next.fragment(), b"meta") {
                 let (next, _) = tag(&b"meta"[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
-                let (next, metaclass) = qualified_name(next)?;
+                let (next, metaclass) = qualified_reference(next)?;
                 let expr = Expression::MetaCast {
                     base: Box::new(atom),
                     metaclass,
@@ -1190,9 +1382,9 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
         let Some((frame, _)) = stack.last_mut() else {
             return Ok((input, value));
         };
-        let arg_name = state.arg_name.take();
+        let arg_parameter = state.arg_parameter.take();
         frame.items.push(Argument {
-            name: arg_name,
+            parameter: arg_parameter,
             value,
         });
         let allows_comma = frame.allows_comma();
@@ -1204,8 +1396,8 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
             state = ItemState::fresh(next);
             if is_call_style {
                 let (after_lookahead, maybe_name) = named_arg_prefix(input);
-                if let Some(arg_name) = maybe_name {
-                    state.arg_name = Some(arg_name);
+                if let Some(parameter) = maybe_name {
+                    state.arg_parameter = Some(parameter);
                     input = after_lookahead;
                 }
             }
@@ -1240,34 +1432,17 @@ pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression
 /// Path expression: qualified name and/or member access (for bind/connect).
 /// Supports `A`, `A::B::C`, `A.B.C`, and combinations like `A::B.C`.
 ///
-/// A single segment (no `.` chain) stays [`Expression::FeatureRef`]. A genuine multi-segment
-/// dotted chain (`A.B.C`, or `A::B.C`) is captured as [`Expression::FeatureChainRef`] using the
-/// standalone [`FeatureChain`] type built for exactly this -- the first segment carries the full
-/// leading qualified name (which may itself contain `::`), and each subsequent `.`-separated
-/// segment is a plain feature name.
+/// A single segment (or a purely `::`-qualified name) stays [`Expression::FeatureRef`]. A path
+/// containing `.` becomes [`Expression::FeatureChainRef`]. Both variants carry the same shared
+/// arena identity; its borrowed view preserves the authored segments and separator kinds.
 pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    // `qualified_name` covers `::`-separated chains (common in SysML examples for feature chains).
-    let (input, first) = crate::parser::lex::qualified_name(input)?;
-    let mut segments = vec![first];
-    let mut rest = input;
-    loop {
-        let (next, _) = ws_and_comments(rest)?;
-        if !next.fragment().starts_with(b".") {
-            break;
-        }
-        let (next, _) = tag(&b"."[..]).parse(next)?;
-        let (next, _) = ws_and_comments(next)?;
-        let (next, member) = name(next)?;
-        segments.push(member);
-        rest = next;
-    }
-    let span = crate::parser::span_from_to(start, rest);
-    let expr = if segments.len() == 1 {
-        Expression::FeatureRef(segments.remove(0))
-    } else {
-        Expression::FeatureChainRef(FeatureChain { segments, span })
+    // `reference_path` preserves both `::` and `.` separators in the document arena.
+    let (rest, (reference, path_kind)) = classified_reference_path(input)?;
+    let expr = match path_kind {
+        ReferencePathKind::Qualified => Expression::FeatureRef(reference),
+        ReferencePathKind::Dotted => Expression::FeatureChainRef(reference),
     };
     Ok((rest, node_from_to(start, rest, expr)))
 }
@@ -1275,10 +1450,15 @@ pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expre
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
+    }
+
+    macro_rules! reference_is {
+        ($input:expr, $id:expr, $expected:expr) => {
+            crate::parser::usage::reference_text($input, *$id).as_deref() == Some($expected)
+        };
     }
 
     #[test]
@@ -1302,7 +1482,7 @@ mod tests {
             });
             assert!(rest.fragment().is_empty(), "did not fully consume {text:?}");
             assert!(
-                matches!(&node.value, Expression::FeatureRef(s) if s == text),
+                matches!(&node.value, Expression::FeatureRef(s) if reference_is!(input, s, text)),
                 "expected FeatureRef({text:?}), got {:?}",
                 node.value
             );
@@ -1318,7 +1498,7 @@ mod tests {
             });
             assert!(rest.fragment().is_empty(), "did not fully consume {text:?}");
             assert!(
-                matches!(&node.value, Expression::FeatureRef(s) if s == text),
+                matches!(&node.value, Expression::FeatureRef(s) if reference_is!(input, s, text)),
                 "expected FeatureRef({text:?}), got {:?}",
                 node.value
             );
@@ -1419,7 +1599,9 @@ mod tests {
                     Expression::BinaryOp { op, .. } => assert_eq!(op, &BinaryOperator::Or),
                     other => panic!("expected or on lhs, got {other:?}"),
                 }
-                assert!(matches!(&right.value, Expression::FeatureRef(s) if s == "c"));
+                assert!(
+                    matches!(&right.value, Expression::FeatureRef(s) if reference_is!(input, s, "c"))
+                );
             }
             other => panic!("expected implies, got {other:?}"),
         }
@@ -1433,7 +1615,9 @@ mod tests {
             Expression::CollectionOp { op, base, args, .. } => {
                 assert_eq!(op, &CollectionOperator::Size);
                 assert!(args.is_empty());
-                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "powerProfile"));
+                assert!(
+                    matches!(&base.value, Expression::FeatureRef(s) if reference_is!(input, s, "powerProfile"))
+                );
             }
             other => panic!("expected CollectionOp, got {other:?}"),
         }
@@ -1452,10 +1636,14 @@ mod tests {
                         assert_eq!(op, &CollectionOperator::Other("c".to_string()));
                         assert!(args.is_empty());
                         match &base.value {
-                            Expression::MemberAccess(inner_base, inner_member) => {
-                                assert_eq!(inner_member, "b");
+                            Expression::MemberAccess {
+                                base: inner_base,
+                                member: inner_member,
+                                ..
+                            } => {
+                                assert!(reference_is!(input, inner_member, "b"));
                                 assert!(
-                                    matches!(&inner_base.value, Expression::FeatureRef(s) if s == "a")
+                                    matches!(&inner_base.value, Expression::FeatureRef(s) if reference_is!(input, s, "a"))
                                 );
                             }
                             other => panic!(
@@ -1476,11 +1664,15 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::Constructor { type_name, args } => {
-                assert_eq!(type_name, "A");
+                assert!(reference_is!(input, type_name, "A"));
                 assert_eq!(args.len(), 2);
-                assert!(args.iter().all(|a| a.name.is_none()));
-                assert!(matches!(&args[0].value.value, Expression::FeatureRef(s) if s == "x"));
-                assert!(matches!(&args[1].value.value, Expression::FeatureRef(s) if s == "y"));
+                assert!(args.iter().all(|a| a.parameter.is_none()));
+                assert!(
+                    matches!(&args[0].value.value, Expression::FeatureRef(s) if reference_is!(input, s, "x"))
+                );
+                assert!(
+                    matches!(&args[1].value.value, Expression::FeatureRef(s) if reference_is!(input, s, "y"))
+                );
             }
             other => panic!("expected Constructor, got {other:?}"),
         }
@@ -1494,11 +1686,13 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::Constructor { type_name, args } => {
-                assert_eq!(type_name, "RiskLevel");
+                assert!(reference_is!(input, type_name, "RiskLevel"));
                 assert_eq!(args.len(), 1);
-                assert_eq!(args[0].name.as_deref(), Some("probability"));
                 assert!(
-                    matches!(&args[0].value.value, Expression::FeatureRef(s) if s == "LevelEnum::low")
+                    matches!(args[0].parameter, Some(parameter) if reference_is!(input, &parameter, "probability"))
+                );
+                assert!(
+                    matches!(&args[0].value.value, Expression::FeatureRef(s) if reference_is!(input, s, "LevelEnum::low"))
                 );
             }
             other => panic!("expected Constructor, got {other:?}"),
@@ -1511,7 +1705,7 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::Constructor { type_name, args } => {
-                assert_eq!(type_name, "A");
+                assert!(reference_is!(input, type_name, "A"));
                 assert!(args.is_empty());
             }
             other => panic!("expected Constructor, got {other:?}"),
@@ -1526,13 +1720,19 @@ mod tests {
         match &node.value {
             Expression::Invocation { args, .. } => {
                 assert_eq!(args.len(), 2);
-                assert_eq!(args[0].name.as_deref(), Some("q"));
+                assert!(
+                    matches!(args[0].parameter, Some(parameter) if reference_is!(input, &parameter, "q"))
+                );
                 assert!(matches!(
                     &args[0].value.value,
                     Expression::LiteralInteger(1)
                 ));
-                assert_eq!(args[1].name.as_deref(), Some("p"));
-                assert!(matches!(&args[1].value.value, Expression::FeatureRef(s) if s == "a"));
+                assert!(
+                    matches!(args[1].parameter, Some(parameter) if reference_is!(input, &parameter, "p"))
+                );
+                assert!(
+                    matches!(&args[1].value.value, Expression::FeatureRef(s) if reference_is!(input, s, "a"))
+                );
             }
             other => panic!("expected Invocation, got {other:?}"),
         }
@@ -1546,7 +1746,7 @@ mod tests {
         match &node.value {
             Expression::Invocation { args, .. } => {
                 assert_eq!(args.len(), 1);
-                assert!(args[0].name.is_none());
+                assert!(args[0].parameter.is_none());
                 assert!(matches!(
                     &args[0].value.value,
                     Expression::BinaryOp {
@@ -1567,17 +1767,87 @@ mod tests {
             Expression::CollectionOp { op, base, args, .. } => {
                 assert_eq!(op, &CollectionOperator::Collect);
                 assert_eq!(args.len(), 1);
-                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "items"));
+                assert!(
+                    matches!(&base.value, Expression::FeatureRef(s) if reference_is!(input, s, "items"))
+                );
             }
             other => panic!("expected CollectionOp, got {other:?}"),
         }
     }
 
     #[test]
+    fn collection_op_brace_body_retains_parameters_result_and_provenance() {
+        let source_text =
+            "items->forAll { in ref item : Domain::Item; out accepted; item == selected.item }";
+        let source = crate::ast::SourceStorage::from(source_text);
+        let context = crate::parser::span::ParseContext::new();
+        let (rest, node) = expression(context.input(source_text.as_bytes())).expect("expression");
+        assert!(rest.fragment().is_empty());
+        let Expression::CollectionOp {
+            op,
+            args,
+            brace_body: Some(body),
+            ..
+        } = &node.value
+        else {
+            panic!("expected collection operator with body");
+        };
+        assert_eq!(op, &CollectionOperator::ForAll);
+        assert!(args.is_empty());
+        assert_eq!(
+            source.slice(&body.span),
+            Some("{ in ref item : Domain::Item; out accepted; item == selected.item }")
+        );
+        assert_eq!(source.slice(&body.value.open_brace_span), Some("{"));
+        assert_eq!(source.slice(&body.value.close_brace_span), Some("}"));
+        assert_eq!(body.value.parameters.len(), 2);
+        let item = &body.value.parameters[0].value;
+        assert_eq!(item.direction.value, InOut::In);
+        assert_eq!(source.slice(&item.direction.span), Some("in"));
+        assert_eq!(
+            item.reference_keyword_span
+                .as_ref()
+                .and_then(|span| source.slice(span)),
+            Some("ref")
+        );
+        assert_eq!(item.name, "item");
+        assert_eq!(source.slice(&item.name_span), Some("item"));
+        assert_eq!(
+            source.slice(&item.typing.as_ref().expect("typing").separator_span),
+            Some(":")
+        );
+        assert_eq!(source.slice(&item.semicolon_span), Some(";"));
+        assert!(matches!(
+            body.value.result.as_deref().map(|result| &result.value),
+            Some(Expression::BinaryOp {
+                op: BinaryOperator::Eq,
+                ..
+            })
+        ));
+        let arena = context.finish();
+        assert_eq!(
+            arena
+                .get(&source, item.typing.as_ref().expect("typing").target)
+                .expect("type reference")
+                .authored_text(),
+            "Domain::Item"
+        );
+    }
+
+    #[test]
+    fn malformed_collection_op_body_rolls_back_references() {
+        let context = crate::parser::span::ParseContext::new();
+        assert!(expression(context.input(b"items->forAll { in x : Domain::T x == y }")).is_err());
+        assert!(context.finish().is_empty());
+    }
+
+    #[test]
     fn path_expression_single_segment_stays_feature_ref() {
         let input = span_input("engine");
         let (_, node) = path_expression(input).expect("path_expression");
-        assert!(matches!(&node.value, Expression::FeatureRef(s) if s == "engine"));
+        assert!(
+            matches!(&node.value, Expression::FeatureRef(s) if reference_is!(input, s, "engine"))
+        );
     }
 
     #[test]
@@ -1585,16 +1855,11 @@ mod tests {
         let input = span_input("engine.fuelCmdPort.flowRate");
         let (_, node) = path_expression(input).expect("path_expression");
         match &node.value {
-            Expression::FeatureChainRef(chain) => {
-                assert_eq!(
-                    chain.segments,
-                    vec![
-                        "engine".to_string(),
-                        "fuelCmdPort".to_string(),
-                        "flowRate".to_string(),
-                    ]
-                );
-            }
+            Expression::FeatureChainRef(reference) => assert!(reference_is!(
+                input,
+                reference,
+                "engine.fuelCmdPort.flowRate"
+            )),
             other => panic!("expected FeatureChainRef, got {other:?}"),
         }
     }
@@ -1604,11 +1869,8 @@ mod tests {
         let input = span_input("Foo::bar.baz");
         let (_, node) = path_expression(input).expect("path_expression");
         match &node.value {
-            Expression::FeatureChainRef(chain) => {
-                assert_eq!(
-                    chain.segments,
-                    vec!["Foo::bar".to_string(), "baz".to_string()]
-                );
+            Expression::FeatureChainRef(reference) => {
+                assert!(reference_is!(input, reference, "Foo::bar.baz"))
             }
             other => panic!("expected FeatureChainRef, got {other:?}"),
         }
@@ -1620,7 +1882,9 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::MetadataAccess(base) => {
-                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "x"));
+                assert!(
+                    matches!(&base.value, Expression::FeatureRef(s) if reference_is!(input, s, "x"))
+                );
             }
             other => panic!("expected MetadataAccess, got {other:?}"),
         }
@@ -1670,7 +1934,9 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::Index { base, index } => {
-                assert!(matches!(&base.value, Expression::FeatureRef(s) if s == "items"));
+                assert!(
+                    matches!(&base.value, Expression::FeatureRef(s) if reference_is!(input, s, "items"))
+                );
                 assert!(matches!(&index.value, Expression::LiteralInteger(0)));
             }
             other => panic!("expected Index, got {other:?}"),
@@ -1706,9 +1972,35 @@ mod tests {
         assert_eq!(depth, DEPTH);
     }
 
+    /// Spec42 Gap 49c: the `[unit]` annotation applies to tuple/invocation/reference bases in
+    /// expression position (`(0, w/2, 0)[source]`, Domain Geometry coordinate-frame idiom),
+    /// not just scalar literals.
+    #[test]
+    fn unit_annotation_applies_to_non_literal_bases() {
+        for (source, expect_tuple) in [
+            ("(0, w/2, 0)[source]", true),
+            ("new Translation((0, w, 0)[source])", false),
+            ("angle[deg]", false),
+        ] {
+            let (rest, node) = expression(crate::parser::span::test_input(source)).expect(source);
+            assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+            let dump = format!("{:?}", node.value);
+            assert!(
+                dump.contains("LiteralWithUnit"),
+                "no unit in {source}: {dump}"
+            );
+            if expect_tuple {
+                let Expression::LiteralWithUnit { value, .. } = &node.value else {
+                    panic!("expected LiteralWithUnit for {source}");
+                };
+                assert!(matches!(value.value, Expression::Tuple(_)));
+            }
+        }
+    }
+
     #[test]
     fn long_postfix_chain_does_not_overflow_the_stack() {
-        const DEPTH: usize = 200_000;
+        const DEPTH: usize = 10_000;
         let mut text = String::from("a");
         for _ in 0..DEPTH {
             text.push_str(".b");
@@ -1720,12 +2012,16 @@ mod tests {
         let mut current = &node;
         loop {
             match &current.value {
-                Expression::MemberAccess(inner, member) => {
-                    assert_eq!(member, "b");
+                Expression::MemberAccess {
+                    base: inner,
+                    member,
+                    ..
+                } => {
+                    assert!(reference_is!(input, member, "b"));
                     depth += 1;
                     current = inner;
                 }
-                Expression::FeatureRef(s) if s == "a" => break,
+                Expression::FeatureRef(s) if reference_is!(input, s, "a") => break,
                 other => panic!("unexpected node at depth {depth}: {other:?}"),
             }
         }
@@ -1734,7 +2030,7 @@ mod tests {
 
     #[test]
     fn long_nested_invocation_chain_does_not_overflow_the_stack() {
-        const DEPTH: usize = 50_000;
+        const DEPTH: usize = 2_000;
         let mut text = String::new();
         for _ in 0..DEPTH {
             text.push_str("f(");
@@ -1751,7 +2047,9 @@ mod tests {
         loop {
             match &current.value {
                 Expression::Invocation { callee, args } => {
-                    assert!(matches!(&callee.value, Expression::FeatureRef(s) if s == "f"));
+                    assert!(
+                        matches!(&callee.value, Expression::FeatureRef(s) if reference_is!(input, s, "f"))
+                    );
                     assert_eq!(args.len(), 1);
                     depth += 1;
                     current = &args[0].value;

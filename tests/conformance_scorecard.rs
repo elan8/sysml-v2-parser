@@ -135,7 +135,7 @@ fn scan_library(dir: &Path) -> LibraryScan {
             scan.diagnostic_count += result.errors.len();
         }
         let mut type_counts = BTreeMap::new();
-        collect_package_body_type_counts(&result.root, &mut type_counts);
+        collect_package_body_type_counts(&result.document.root, &mut type_counts);
         scan.extended_library_decl += *type_counts.get("ExtendedLibraryDecl").unwrap_or(&0);
         scan.kerml_semantic_decl += *type_counts.get("KermlSemanticDecl").unwrap_or(&0);
         scan.kerml_feature_decl += *type_counts.get("KermlFeatureDecl").unwrap_or(&0);

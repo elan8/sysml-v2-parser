@@ -1,69 +1,16 @@
 //! Lexer and skip helpers: whitespace, comments, names, qualified names, and body-skip utilities.
 
-use crate::ast::Identification;
-use crate::parser::Input;
+use crate::ast::{
+    Identification, QualifiedDeclarationName, QualifiedReferenceId, ReferenceSegment,
+    ReferenceSeparator, Span,
+};
+use crate::parser::{span_from_to, Input};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_while, take_while1};
 use nom::combinator::{map, opt, rest, value};
-use nom::multi::many0;
 use nom::sequence::{delimited, preceded, terminated};
 use nom::IResult;
 use nom::Parser;
-
-pub(crate) const PACKAGE_BODY_STARTERS: &[&[u8]] = &[
-    b"#",
-    b"action",
-    b"actor",
-    b"analysis",
-    b"alias",
-    b"allocate",
-    b"allocation",
-    b"abstract",
-    b"assert",
-    b"assume",
-    b"attribute",
-    b"calc",
-    b"comment",
-    b"concern",
-    b"connection",
-    b"constraint",
-    b"case",
-    b"dependency",
-    b"doc",
-    b"enum",
-    b"expose",
-    b"filter",
-    b"frame",
-    b"flow",
-    b"import",
-    b"individual",
-    b"interface",
-    b"item",
-    b"library",
-    b"metadata",
-    b"namespace",
-    b"occurrence",
-    b"package",
-    b"part",
-    b"port",
-    b"private",
-    b"protected",
-    b"public",
-    b"render",
-    b"rendering",
-    b"rep",
-    b"require",
-    b"requirement",
-    b"satisfy",
-    b"state",
-    b"snapshot",
-    b"timeslice",
-    b"use",
-    b"variation",
-    b"verification",
-    b"view",
-    b"viewpoint",
-];
 
 pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"#",
@@ -109,9 +56,26 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"variation",
     b"analysis",
     b"metadata",
+    // KerML classifier-keyword family dispatched via `kerml_classifier_structured`
+    // (spec42 Gap 38).
+    b"classifier",
+    b"struct",
+    b"datatype",
+    b"association",
+    b"assoc",
+    b"behavior",
+    b"interaction",
+    b"predicate",
+    b"metaclass",
+    b"function",
+    b"multiplicity",
+    b"type",
+    b"class",
 ];
 
 pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b":>>",
+    b":>",
     b"doc",
     b"attribute",
     b"port",
@@ -122,7 +86,8 @@ pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"abstract",
 ];
 
-pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[b"doc", b"port", b"in", b"out", b"inout"];
+pub(crate) const PORT_BODY_STARTERS: &[&[u8]] =
+    &[b":>>", b":>", b"doc", b"port", b"in", b"out", b"inout"];
 
 pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"#",
@@ -217,7 +182,8 @@ pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
 /// Starters for `RelationshipBody`-shaped brace bodies (alias/import/dependency and other
 /// annotation-only leaf bodies): BNF `RelationshipBody : Relationship = ';' | '{'
 /// (ownedRelationship += OwnedAnnotation)* '}'`.
-pub(crate) const RELATIONSHIP_BODY_STARTERS: &[&[u8]] = &[b"doc", b"comment", b"rep", b"@"];
+pub(crate) const RELATIONSHIP_BODY_STARTERS: &[&[u8]] =
+    &[b"doc", b"comment", b"rep", b"@", b"feature"];
 
 pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] =
     &[b"@", b"doc", b"filter", b"render", b"ref", b"abstract"];
@@ -244,45 +210,67 @@ pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
 /// be parsed explicitly so it appears in the AST. //* ... */ is tried before line_comment so that
 /// "//*" starts a block comment, not a line comment.
 pub(crate) fn ws_and_comments(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let mut input = input;
+    let skipped = trivia_len(input.fragment());
+    Ok((nom::Input::take_from(&input, skipped), ()))
+}
+
+/// Byte length of the trivia run at the start of `bytes`.
+///
+/// This is the parser's hottest lexical routine: it runs before every token and again for every
+/// alternative that backtracks over the same position, so it is written as one explicit scan
+/// rather than composed combinators. The recognized forms and their precedence match the grammar
+/// documented on [`ws_and_comments`]: whitespace, a terminated `/* ... */`, a terminated
+/// `//* ... */`, and `//` to end of line. An unterminated `/*` is not trivia and stops the scan,
+/// leaving it for the caller to report; an unterminated `//*` is an ordinary line comment.
+fn trivia_len(bytes: &[u8]) -> usize {
+    let mut pos = 0usize;
     loop {
-        let start = input.location_offset();
-        let (next, _) =
-            take_while(|c: u8| c == b' ' || c == b'\t' || c == b'\n' || c == b'\r').parse(input)?;
-        input = next;
-        let (next, _) =
-            many0(alt((block_comment, block_comment_slash_star, line_comment))).parse(input)?;
-        input = next;
-        if input.location_offset() == start {
-            return Ok((input, ()));
+        while let Some(&byte) = bytes.get(pos) {
+            if byte == b' ' || byte == b'\t' || byte == b'\n' || byte == b'\r' {
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        let rest = &bytes[pos..];
+        if rest.starts_with(b"/*") {
+            match block_comment_end(rest, 2) {
+                Some(end) => pos += end,
+                None => return pos,
+            }
+        } else if rest.starts_with(b"//") {
+            if rest.starts_with(b"//*") {
+                if let Some(end) = block_comment_end(rest, 3) {
+                    pos += end;
+                    continue;
+                }
+            }
+            pos += line_comment_len(rest);
+        } else {
+            return pos;
         }
     }
 }
 
-/// Block comment: /* ... */
-fn block_comment(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = tag(&b"/*"[..]).parse(input)?;
-    let (input, _) = take_until(&b"*/"[..]).parse(input)?;
-    let (input, _) = tag(&b"*/"[..]).parse(input)?;
-    let (input, _) = ws(input)?;
-    Ok((input, ()))
+/// Length of a block comment whose body starts at `body_start`, or `None` when it is unterminated.
+fn block_comment_end(bytes: &[u8], body_start: usize) -> Option<usize> {
+    let offset = bytes[body_start..]
+        .windows(2)
+        .position(|pair| pair == b"*/")?;
+    Some(body_start + offset + 2)
 }
 
-/// Block comment starting with //* ... */ (e.g. in 4a fixture).
-fn block_comment_slash_star(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = tag(&b"//*"[..]).parse(input)?;
-    let (input, _) = take_until(&b"*/"[..]).parse(input)?;
-    let (input, _) = tag(&b"*/"[..]).parse(input)?;
-    let (input, _) = ws(input)?;
-    Ok((input, ()))
-}
-
-/// Single-line comment: // to EOL (consumes the newline).
-fn line_comment(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = tag(&b"//"[..]).parse(input)?;
-    let (input, _) = take_while(|c: u8| c != b'\n' && c != b'\r').parse(input)?;
-    let (input, _) = take_while(|c: u8| c == b'\n' || c == b'\r').parse(input)?;
-    Ok((input, ()))
+/// Length of a `//` line comment, including the newline run that ends it.
+fn line_comment_len(bytes: &[u8]) -> usize {
+    let mut pos = match bytes[2..].iter().position(|&b| b == b'\n' || b == b'\r') {
+        Some(offset) => 2 + offset,
+        None => return bytes.len(),
+    };
+    while matches!(bytes.get(pos), Some(b'\n') | Some(b'\r')) {
+        pos += 1;
+    }
+    pos
 }
 
 /// Parse one or more whitespace characters (consumes at least one).
@@ -307,6 +295,102 @@ pub(crate) fn skip_to_next_sync_point(input: Input<'_>) -> IResult<Input<'_>, ()
         value((), rest),
     ))
     .parse(input)
+}
+
+/// Skip one malformed root fragment without stopping inside a brace-delimited block.
+///
+/// A newline or semicolon at depth zero is a safe boundary. Braces, quoted strings, and comments
+/// are tracked so resilient parsing retains one exact recovery span and can continue with later
+/// top-level siblings.
+pub(crate) fn skip_to_next_balanced_sync_point(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let fragment = input.fragment();
+    let mut pos = 0usize;
+    let mut brace_depth = 0usize;
+    let mut block_comment_depth = 0usize;
+    let mut line_comment = false;
+    let mut quote = None;
+    let mut escaped = false;
+
+    while pos < fragment.len() {
+        let byte = fragment[pos];
+        let next = fragment.get(pos + 1).copied();
+        if line_comment {
+            pos += 1;
+            if byte == b'\n' {
+                line_comment = false;
+                if brace_depth == 0 {
+                    break;
+                }
+            }
+            continue;
+        }
+        if block_comment_depth > 0 {
+            if byte == b'/' && next == Some(b'*') {
+                block_comment_depth += 1;
+                pos += 2;
+            } else if byte == b'*' && next == Some(b'/') {
+                block_comment_depth -= 1;
+                pos += 2;
+            } else {
+                pos += 1;
+            }
+            continue;
+        }
+        if let Some(delimiter) = quote {
+            pos += 1;
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == delimiter {
+                quote = None;
+            }
+            continue;
+        }
+
+        match (byte, next) {
+            (b'/', Some(b'/')) => {
+                line_comment = true;
+                pos += 2;
+            }
+            (b'/', Some(b'*')) => {
+                block_comment_depth = 1;
+                pos += 2;
+            }
+            (b'\'' | b'"', _) => {
+                quote = Some(byte);
+                pos += 1;
+            }
+            (b'{', _) => {
+                brace_depth += 1;
+                pos += 1;
+            }
+            (b'}', _) if brace_depth == 0 => break,
+            (b'}', _) => {
+                brace_depth -= 1;
+                pos += 1;
+                if brace_depth == 0 {
+                    break;
+                }
+            }
+            (b';', _) if brace_depth == 0 => {
+                pos += 1;
+                break;
+            }
+            (b'\n' | b'\r', _) if brace_depth == 0 => {
+                pos += 1;
+                if byte == b'\r' && next == Some(b'\n') {
+                    pos += 1;
+                }
+                break;
+            }
+            _ => pos += 1,
+        }
+    }
+
+    let advance = pos.max(1).min(fragment.len());
+    let (input, _) = nom::bytes::complete::take(advance).parse(input)?;
+    Ok((input, ()))
 }
 
 /// Skip to the next root-level package or namespace (next line starting with "package " or "namespace "
@@ -474,16 +558,23 @@ pub(crate) fn is_reserved_keyword(word: &[u8]) -> bool {
 }
 
 pub(crate) fn starts_with_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
+    // Candidates are tested against the same position in long starter lists (52 entries for a
+    // package body), so the cheap discriminating test comes first: nearly every candidate fails on
+    // its first byte, and only a match pays for classifying the keyword's shape.
+    if !fragment.starts_with(keyword) {
+        return false;
+    }
+    // A punctuation starter such as `:>>` is not identifier-shaped and needs no token boundary
+    // after it; an identifier-shaped keyword must not be the prefix of a longer name.
     if keyword
         .iter()
         .any(|b| !b.is_ascii_alphanumeric() && *b != b'_')
     {
-        return fragment.starts_with(keyword);
+        return true;
     }
-    fragment.starts_with(keyword)
-        && fragment
-            .get(keyword.len())
-            .is_none_or(|b| b.is_ascii_whitespace() || matches!(*b, b'{' | b':' | b';' | b'['))
+    fragment
+        .get(keyword.len())
+        .is_none_or(|b| b.is_ascii_whitespace() || matches!(*b, b'{' | b':' | b';' | b'['))
 }
 
 pub(crate) fn starts_with_any_keyword(fragment: &[u8], keywords: &[&[u8]]) -> bool {
@@ -512,56 +603,6 @@ pub(crate) fn contains_keyword(fragment: &[u8], keyword: &[u8]) -> bool {
     })
 }
 
-/// Count `{` / `}` outside comments (line and block) for EOF brace balance checks.
-pub(crate) fn brace_balance_outside_comments(bytes: &[u8]) -> (usize, usize) {
-    let mut opens = 0usize;
-    let mut closes = 0usize;
-    let mut pos = 0usize;
-    while pos < bytes.len() {
-        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"/*") {
-            if let Some(rel) = find_subslice(&bytes[pos..], b"*/") {
-                pos += rel + 2;
-                continue;
-            }
-            break;
-        }
-        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"//") {
-            while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
-                pos += 1;
-            }
-            continue;
-        }
-        match bytes[pos] {
-            b'{' => opens += 1,
-            b'}' => closes += 1,
-            _ => {}
-        }
-        pos += 1;
-    }
-    (opens, closes)
-}
-
-fn balanced_inline_depth(fragment: &[u8], pos: usize, brace_depth: &mut usize) -> Option<usize> {
-    if pos >= fragment.len() {
-        return None;
-    }
-    match fragment[pos] {
-        b'{' => {
-            *brace_depth += 1;
-            Some(pos + 1)
-        }
-        b'}' => {
-            if *brace_depth == 0 {
-                None
-            } else {
-                *brace_depth -= 1;
-                Some(pos + 1)
-            }
-        }
-        _ => Some(pos + 1),
-    }
-}
-
 fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Option<Input<'a>> {
     let (input, _) = ws_and_comments(input).ok()?;
     let fragment = input.fragment();
@@ -571,19 +612,62 @@ fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Opt
 
     let mut pos = 0usize;
     let mut brace_depth = 0usize;
+    let mut block_comment_depth = 0usize;
+    let mut line_comment = false;
+    let mut quote = None;
+    let mut escaped = false;
     while pos < fragment.len() {
-        if pos + 2 <= fragment.len() && fragment[pos..].starts_with(b"/*") {
-            if let Some(rel) = find_subslice(&fragment[pos..], b"*/") {
-                pos += rel + 2;
+        let byte = fragment[pos];
+        let next = fragment.get(pos + 1).copied();
+        if line_comment {
+            if matches!(byte, b'\n' | b'\r') {
+                line_comment = false;
+            } else {
+                pos += 1;
                 continue;
             }
-            return None;
         }
-        if pos + 2 <= fragment.len() && fragment[pos..].starts_with(b"//") {
-            while pos < fragment.len() && fragment[pos] != b'\n' && fragment[pos] != b'\r' {
+        if block_comment_depth > 0 {
+            if byte == b'/' && next == Some(b'*') {
+                block_comment_depth += 1;
+                pos += 2;
+            } else if byte == b'*' && next == Some(b'/') {
+                block_comment_depth -= 1;
+                pos += 2;
+            } else {
                 pos += 1;
             }
             continue;
+        }
+        if let Some(delimiter) = quote {
+            pos += 1;
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == delimiter {
+                quote = None;
+            }
+            continue;
+        }
+
+        match (byte, next) {
+            (b'/', Some(b'/')) => {
+                line_comment = true;
+                pos += 2;
+                continue;
+            }
+            (b'/', Some(b'*')) => {
+                block_comment_depth = 1;
+                pos += 2;
+                continue;
+            }
+            (b'\'' | b'"', _) => {
+                quote = Some(byte);
+                pos += 1;
+                continue;
+            }
+            _ => {}
         }
 
         if pos < fragment.len()
@@ -609,11 +693,13 @@ fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Opt
             continue;
         }
 
-        if let Some(next_pos) = balanced_inline_depth(fragment, pos, &mut brace_depth) {
-            pos = next_pos;
-        } else {
-            break;
+        match byte {
+            b'{' => brace_depth += 1,
+            b'}' if brace_depth == 0 => break,
+            b'}' => brace_depth -= 1,
+            _ => {}
         }
+        pos += 1;
     }
 
     None
@@ -715,113 +801,275 @@ fn quoted_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     Ok((input, s))
 }
 
-/// QualifiedName: ( '$' '::' )? ( NAME '::' )* NAME. Returns string like "SI::kg" or "ISQ::mass".
-pub(crate) fn qualified_name(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, opt_dollar) = opt(tag(&b"$"[..])).parse(input)?;
-    let (input, _) = opt(preceded(tag(&b"::"[..]), ws_and_comments)).parse(input)?;
-    let (input, first) = name(input)?;
-    let (input, rest_segments) = many0(preceded(
-        preceded(ws_and_comments, tag(&b"::"[..])),
-        preceded(ws_and_comments, name),
-    ))
-    .parse(input)?;
-    let mut segments = Vec::new();
-    if opt_dollar.is_some() {
-        segments.push("$".to_string());
-    }
-    segments.push(first);
-    segments.extend(rest_segments);
-    let s = segments.join("::");
-    Ok((input, s))
-}
+/// Parse one authored name token without decoding or allocating its spelling.
+///
+/// The returned span includes quotes for unrestricted names. Unlike the legacy `quoted_name`
+/// decoder, this source-backed path requires a closing quote and therefore cannot manufacture a
+/// successful reference from an unterminated token.
+fn reference_name_span(input: Input<'_>) -> IResult<Input<'_>, Span> {
+    let start = input;
+    let fragment = input.fragment();
+    let Some(first) = fragment.first().copied() else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Eof,
+        )));
+    };
 
-/// Like [`qualified_name`], but returns the individual `::`-separated segments (with separator
-/// markers) instead of joining them into one opaque string. Used to build
-/// [`crate::ast::RelationshipTarget`]s for typing/subclassification/subsetting targets, which need
-/// to keep `::`-qualification distinguishable from `.`-feature-chaining (see
-/// `crate::ast::relationship_target` module docs).
-pub(crate) fn qualified_name_segments(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Vec<crate::ast::RelationshipTargetSegment>> {
-    use crate::ast::{RelationshipTargetSegment, SegmentSeparator};
-
-    let (input, _) = ws_and_comments(input)?;
-    let (input, opt_dollar) = opt(tag(&b"$"[..])).parse(input)?;
-    let (input, _) = opt(preceded(tag(&b"::"[..]), ws_and_comments)).parse(input)?;
-    let (input, first) = name(input)?;
-    let (input, rest_segments) = many0(preceded(
-        preceded(ws_and_comments, tag(&b"::"[..])),
-        preceded(ws_and_comments, name),
-    ))
-    .parse(input)?;
-    let mut segments = Vec::new();
-    if opt_dollar.is_some() {
-        segments.push(RelationshipTargetSegment {
-            name: "$".to_string(),
-            separator: None,
-        });
-        segments.push(RelationshipTargetSegment {
-            name: first,
-            separator: Some(SegmentSeparator::ColonColon),
-        });
+    let consumed = if first == b'\'' {
+        let mut index = 1usize;
+        let mut closing_quote = None;
+        while index < fragment.len() {
+            if fragment[index] == b'\\'
+                && fragment.get(index + 1).is_some_and(|next| *next == b'\'')
+            {
+                index += 2;
+            } else if fragment[index] == b'\'' {
+                closing_quote = index.checked_add(1);
+                break;
+            } else {
+                index += 1;
+            }
+        }
+        closing_quote.ok_or_else(|| {
+            nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Char))
+        })?
     } else {
-        segments.push(RelationshipTargetSegment {
-            name: first,
-            separator: None,
-        });
-    }
-    segments.extend(
-        rest_segments
-            .into_iter()
-            .map(|name| RelationshipTargetSegment {
-                name,
-                separator: Some(SegmentSeparator::ColonColon),
-            }),
-    );
-    Ok((input, segments))
+        if !(first.is_ascii_alphabetic() || first == b'_') {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Alpha,
+            )));
+        }
+        fragment
+            .iter()
+            .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+            .count()
+    };
+
+    let (rest, _) = nom::bytes::complete::take(consumed).parse(input)?;
+    Ok((rest, span_from_to(start, rest)))
 }
 
-/// Skip any content until we see '}' at the same brace level (tracks nesting, skips comments).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReferencePathKind {
+    Qualified,
+    Dotted,
+}
+
+fn source_backed_reference(
+    input: Input<'_>,
+    allow_dot: bool,
+    require_qualification: bool,
+) -> IResult<Input<'_>, (QualifiedReferenceId, ReferencePathKind)> {
+    let (input, _) = ws_and_comments(input)?;
+    let reference_start = input;
+    let (mut rest, absolute) = if input.fragment().starts_with(b"$::") {
+        let (input, _) = tag(&b"$::"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        (input, true)
+    } else {
+        (input, false)
+    };
+
+    let segments_start = rest;
+    let (next, _) = reference_name_span(rest)?;
+    rest = next;
+    let mut path_kind = ReferencePathKind::Qualified;
+    let mut is_qualified = absolute;
+
+    loop {
+        let (after_ws, _) = ws_and_comments(rest)?;
+        let separator = if after_ws.fragment().starts_with(b"::") {
+            Some((ReferenceSeparator::ColonColon, &b"::"[..]))
+        } else if allow_dot && after_ws.fragment().starts_with(b".") {
+            Some((ReferenceSeparator::Dot, &b"."[..]))
+        } else {
+            None
+        };
+        let Some((separator_before, token)) = separator else {
+            break;
+        };
+
+        let (after_separator, _) = tag(token).parse(after_ws)?;
+        let (after_separator_ws, _) = ws_and_comments(after_separator)?;
+        // A `::*`/`::**` import suffix and malformed/trailing separators belong to the caller.
+        // Only commit the separator after proving that another authored name follows it.
+        let Ok((after_name, source_span)) = reference_name_span(after_separator_ws) else {
+            break;
+        };
+        if separator_before == ReferenceSeparator::Dot {
+            path_kind = ReferencePathKind::Dotted;
+        }
+        is_qualified = true;
+        let _ = (source_span, separator_before);
+        rest = after_name;
+    }
+
+    // Declaration labels use ordinary `String` storage unless their authored grammar is actually
+    // qualified. Reject before arena mutation so the simple-name alternative can parse without a
+    // speculative orphan entry.
+    if require_qualification && !is_qualified {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            reference_start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
+    let span = span_from_to(reference_start, rest);
+    // Walk the already-validated token range a second time and stream segments straight into the
+    // packed arena. This avoids a mandatory per-reference `Vec` allocation while keeping parser
+    // failure atomic: no arena mutation happens until the whole reference is known to be valid.
+    let end_offset = rest.location_offset();
+    let mut cursor = segments_start;
+    let mut first = true;
+    let segments = std::iter::from_fn(move || {
+        if cursor.location_offset() >= end_offset {
+            return None;
+        }
+        let separator_before = if first {
+            first = false;
+            None
+        } else {
+            let (after_ws, _) = ws_and_comments(cursor).ok()?;
+            let (after_separator, separator) = if after_ws.fragment().starts_with(b"::") {
+                let (next, _) = tag::<_, _, nom::error::Error<Input<'_>>>(&b"::"[..])
+                    .parse(after_ws)
+                    .ok()?;
+                (next, ReferenceSeparator::ColonColon)
+            } else {
+                let (next, _) = tag::<_, _, nom::error::Error<Input<'_>>>(&b"."[..])
+                    .parse(after_ws)
+                    .ok()?;
+                (next, ReferenceSeparator::Dot)
+            };
+            let (after_ws, _) = ws_and_comments(after_separator).ok()?;
+            cursor = after_ws;
+            Some(separator)
+        };
+        let (after_name, source_span) = reference_name_span(cursor).ok()?;
+        cursor = after_name;
+        Some(ReferenceSegment {
+            source_span,
+            separator_before,
+        })
+    });
+    let id = input
+        .extra
+        .add_reference(absolute, span, segments)
+        .ok_or_else(|| {
+            nom::Err::Error(nom::error::Error::new(
+                reference_start,
+                nom::error::ErrorKind::Fail,
+            ))
+        })?;
+    Ok((rest, (id, path_kind)))
+}
+
+/// Parse a source-backed `::`-qualified semantic reference into the document arena.
+pub(crate) fn qualified_reference(input: Input<'_>) -> IResult<Input<'_>, QualifiedReferenceId> {
+    let (input, (reference, _)) = source_backed_reference(input, false, false)?;
+    Ok((input, reference))
+}
+
+/// Parse a genuinely qualified declaration identity (`A::B` or `$::A`) into arena-backed storage.
+/// A simple `A` is rejected before allocation so the declaration parser can retain it as a label.
+pub(crate) fn qualified_declaration_name(
+    input: Input<'_>,
+) -> IResult<Input<'_>, QualifiedDeclarationName> {
+    let (input, (reference, _)) = source_backed_reference(input, false, true)?;
+    Ok((input, QualifiedDeclarationName::new(reference)))
+}
+
+/// Parse a source-backed semantic path with authored `::` and `.` separators.
+pub(crate) fn reference_path(input: Input<'_>) -> IResult<Input<'_>, QualifiedReferenceId> {
+    let (input, (reference, _)) = source_backed_reference(input, true, false)?;
+    Ok((input, reference))
+}
+
+/// Parse a semantic path and retain whether its accepted grammar contained a dotted feature-chain
+/// separator. This prevents expression parsing from rediscovering that syntax by inspecting text.
+pub(crate) fn classified_reference_path(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (QualifiedReferenceId, ReferencePathKind)> {
+    source_backed_reference(input, true, false)
+}
+
+/// Skip any content until we see `}` at the same brace level.
+///
+/// Nested braces are ignored inside line/block comments and quoted values so recovery cannot
+/// mistake authored text for structure and truncate the enclosing body.
 pub(crate) fn skip_until_brace_end(input: Input<'_>) -> IResult<Input<'_>, ()> {
     let frag = input.fragment();
     let mut depth = 1u32;
     let mut pos = 0usize;
+    let mut block_comment_depth = 0usize;
+    let mut line_comment = false;
+    let mut quote = None;
+    let mut escaped = false;
     while depth > 0 && pos < frag.len() {
-        if pos + 2 <= frag.len() && frag[pos..].starts_with(b"/*") {
-            if let Some(rel) = find_subslice(&frag[pos..], b"*/") {
-                pos += rel + 2;
-                continue;
+        let byte = frag[pos];
+        let next = frag.get(pos + 1).copied();
+        if line_comment {
+            pos += 1;
+            if matches!(byte, b'\n' | b'\r') {
+                line_comment = false;
             }
-            break;
-        }
-        if pos + 2 <= frag.len() && frag[pos..].starts_with(b"//") {
-            let mut j = pos + 2;
-            while j < frag.len() && frag[j] != b'\n' && frag[j] != b'\r' {
-                j += 1;
-            }
-            while j < frag.len() && (frag[j] == b'\n' || frag[j] == b'\r') {
-                j += 1;
-            }
-            pos = j;
             continue;
         }
-        if frag[pos] == b'{' {
-            depth += 1;
-        } else if frag[pos] == b'}' {
-            depth -= 1;
-            if depth == 0 {
-                break;
+        if block_comment_depth > 0 {
+            if byte == b'/' && next == Some(b'*') {
+                block_comment_depth += 1;
+                pos += 2;
+            } else if byte == b'*' && next == Some(b'/') {
+                block_comment_depth -= 1;
+                pos += 2;
+            } else {
+                pos += 1;
             }
+            continue;
         }
-        pos += 1;
+        if let Some(delimiter) = quote {
+            pos += 1;
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == delimiter {
+                quote = None;
+            }
+            continue;
+        }
+
+        match (byte, next) {
+            (b'/', Some(b'/')) => {
+                line_comment = true;
+                pos += 2;
+            }
+            (b'/', Some(b'*')) => {
+                block_comment_depth = 1;
+                pos += 2;
+            }
+            (b'\'' | b'"', _) => {
+                quote = Some(byte);
+                pos += 1;
+            }
+            (b'{', _) => {
+                depth += 1;
+                pos += 1;
+            }
+            (b'}', _) => {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+                pos += 1;
+            }
+            _ => pos += 1,
+        }
     }
     let (input, _) = nom::bytes::complete::take(pos).parse(input)?;
     Ok((input, ()))
-}
-
-pub(crate) fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack.windows(needle.len()).position(|w| w == needle)
 }
 
 const DECLARATION_BOUNDARY_STARTERS: &[&[u8]] = &[
@@ -943,7 +1191,26 @@ pub(crate) fn take_until_terminator<'a>(
 ) -> IResult<Input<'a>, String> {
     let frag = input.fragment();
     let mut i = 0;
+    let mut quote = None;
+    let mut escaped = false;
     while i < frag.len() {
+        let byte = frag[i];
+        if let Some(delimiter) = quote {
+            i += 1;
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == delimiter {
+                quote = None;
+            }
+            continue;
+        }
+        if matches!(byte, b'\'' | b'"') {
+            quote = Some(byte);
+            i += 1;
+            continue;
+        }
         if terminators.contains(&frag[i]) {
             let s = String::from_utf8_lossy(&frag[..i]).trim().to_string();
             let (input, _) = nom::bytes::complete::take(i).parse(input)?;
@@ -1002,46 +1269,81 @@ pub(crate) fn skip_statement_or_block(input: Input<'_>) -> IResult<Input<'_>, ()
 
     let mut depth = 0usize;
     let mut pos = 0usize;
+    let mut block_comment_depth = 0usize;
+    let mut line_comment = false;
+    let mut quote = None;
+    let mut escaped = false;
     while pos < frag.len() {
-        if pos + 2 <= frag.len() && frag[pos..].starts_with(b"/*") {
-            if let Some(rel) = find_subslice(&frag[pos..], b"*/") {
-                pos += rel + 2;
-                continue;
-            }
-            pos = frag.len();
-            break;
-        }
-        if pos + 2 <= frag.len() && frag[pos..].starts_with(b"//") {
-            while pos < frag.len() && frag[pos] != b'\n' && frag[pos] != b'\r' {
-                pos += 1;
-            }
-            while pos < frag.len() && (frag[pos] == b'\n' || frag[pos] == b'\r') {
-                pos += 1;
-            }
-            if depth == 0 {
-                break;
-            }
-            continue;
-        }
-        match frag[pos] {
-            b'{' => depth += 1,
-            b'}' => {
-                if depth == 0 {
-                    break;
-                }
-                depth -= 1;
+        let byte = frag[pos];
+        let next = frag.get(pos + 1).copied();
+        if line_comment {
+            if matches!(byte, b'\n' | b'\r') {
                 if depth == 0 {
                     pos += 1;
                     break;
                 }
+                line_comment = false;
             }
-            b';' if depth == 0 => {
+            pos += 1;
+            continue;
+        }
+        if block_comment_depth > 0 {
+            if byte == b'/' && next == Some(b'*') {
+                block_comment_depth += 1;
+                pos += 2;
+            } else if byte == b'*' && next == Some(b'/') {
+                block_comment_depth -= 1;
+                pos += 2;
+            } else {
+                pos += 1;
+            }
+            continue;
+        }
+        if let Some(delimiter) = quote {
+            pos += 1;
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == delimiter {
+                quote = None;
+            }
+            continue;
+        }
+
+        match (byte, next) {
+            (b'/', Some(b'/')) => {
+                line_comment = true;
+                pos += 2;
+            }
+            (b'/', Some(b'*')) => {
+                block_comment_depth = 1;
+                pos += 2;
+            }
+            (b'\'' | b'"', _) => {
+                quote = Some(byte);
+                pos += 1;
+            }
+            (b'{', _) => {
+                depth += 1;
+                pos += 1;
+            }
+            (b'}', _) => {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+                pos += 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            (b';', _) if depth == 0 => {
                 pos += 1;
                 break;
             }
-            _ => {}
+            _ => pos += 1,
         }
-        pos += 1;
     }
     let advance = pos.max(1).min(frag.len());
     let (input, _) = nom::bytes::complete::take(advance).parse(input)?;
@@ -1050,10 +1352,15 @@ pub(crate) fn skip_statement_or_block(input: Input<'_>) -> IResult<Input<'_>, ()
 
 /// Parse specialization marker in SysML concrete syntax:
 /// either symbolic `:>` or keyword `specializes`.
-pub(crate) fn specialization_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+pub(crate) fn specialization_operator(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::TypingSpelling> {
     alt((
-        value((), tag(&b":>"[..])),
-        value((), terminated(tag(&b"specializes"[..]), ws1)),
+        value(crate::ast::TypingSpelling::Operator, tag(&b":>"[..])),
+        value(
+            crate::ast::TypingSpelling::Specializes,
+            terminated(tag(&b"specializes"[..]), ws1),
+        ),
     ))
     .parse(input)
 }
@@ -1080,11 +1387,19 @@ pub(crate) fn redefine_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
 
 /// Parse typing marker in SysML concrete syntax:
 /// symbolic `:`, or keyword pairs `defined by` / `typed by`.
-pub(crate) fn typed_by_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+pub(crate) fn typed_by_operator(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::TypingSpelling> {
     alt((
-        value((), tag(&b":"[..])),
-        value((), (tag(&b"defined"[..]), ws1, tag(&b"by"[..]), ws1)),
-        value((), (tag(&b"typed"[..]), ws1, tag(&b"by"[..]), ws1)),
+        value(crate::ast::TypingSpelling::Operator, tag(&b":"[..])),
+        value(
+            crate::ast::TypingSpelling::DefinedBy,
+            (tag(&b"defined"[..]), ws1, tag(&b"by"[..]), ws1),
+        ),
+        value(
+            crate::ast::TypingSpelling::TypedBy,
+            (tag(&b"typed"[..]), ws1, tag(&b"by"[..]), ws1),
+        ),
     ))
     .parse(input)
 }
@@ -1137,10 +1452,14 @@ pub(crate) fn string_value(input: Input<'_>) -> IResult<Input<'_>, String> {
 #[cfg(test)]
 mod lexical_bnf_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
+    use crate::ast::SourceStorage;
+    use crate::parser::span::ParseContext;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        // Convenience for legacy lexer tests that do not inspect the arena. Semantic-reference
+        // tests retain and finish their context explicitly below.
+        let context = Box::leak(Box::new(ParseContext::new()));
+        context.input(text.as_bytes())
     }
 
     #[test]
@@ -1163,8 +1482,159 @@ mod lexical_bnf_tests {
 
     #[test]
     fn qualified_name_parses_scoped_name() {
-        let (_, q) = qualified_name(span_input("SI::kg")).expect("QualifiedName");
-        assert_eq!(q, "SI::kg");
+        let source_text = "SI::kg";
+        let context = ParseContext::new();
+        let (rest, id) =
+            qualified_reference(context.input(source_text.as_bytes())).expect("QualifiedName");
+        assert!(rest.fragment().is_empty());
+        let arena = context.finish();
+        let source = SourceStorage::from(source_text);
+        assert_eq!(
+            arena
+                .get(&source, id)
+                .expect("reference view")
+                .authored_text(),
+            source_text
+        );
+    }
+
+    #[test]
+    fn qualified_declaration_name_requires_qualification_before_allocating() {
+        let simple_context = ParseContext::new();
+        assert!(qualified_declaration_name(simple_context.input(b"Simple")).is_err());
+        assert!(simple_context.finish().is_empty());
+
+        let source_text = "AstronomyReference::Domain";
+        let context = ParseContext::new();
+        let (rest, declaration) = qualified_declaration_name(context.input(source_text.as_bytes()))
+            .expect("qualified declaration name");
+        assert!(rest.fragment().is_empty());
+        let arena = context.finish();
+        let source = SourceStorage::from(source_text);
+        let view = arena
+            .get(&source, declaration.storage_id())
+            .expect("qualified declaration view");
+        assert_eq!(view.authored_text(), source_text);
+        assert_eq!(view.segments.len(), 2);
+        assert_eq!(
+            view.segments[1].separator_before,
+            Some(ReferenceSeparator::ColonColon)
+        );
+    }
+
+    #[test]
+    fn qualified_name_requires_atomic_absolute_prefix() {
+        let source_text = "$::SI::kg";
+        let context = ParseContext::new();
+        let (rest, id) = qualified_reference(context.input(source_text.as_bytes()))
+            .expect("absolute QualifiedName");
+        assert!(rest.fragment().is_empty());
+        let arena = context.finish();
+        let source = SourceStorage::from(source_text);
+        let view = arena.get(&source, id).expect("reference view");
+        assert!(view.metadata.is_absolute);
+        assert_eq!(view.authored_text(), source_text);
+        assert!(qualified_reference(span_input("$SI::kg")).is_err());
+        assert!(qualified_reference(span_input("::SI::kg")).is_err());
+    }
+
+    #[test]
+    fn source_backed_reference_captures_mixed_separators_and_exact_spans() {
+        let source_text = "Vehicle::'mass value'.amount";
+        let context = ParseContext::new();
+        let (rest, id) = reference_path(context.input(source_text.as_bytes()))
+            .expect("source-backed reference path");
+        assert!(rest.fragment().is_empty());
+        let arena = context.finish();
+        let source = SourceStorage::from(source_text);
+        arena.validate(&source).expect("valid arena");
+        let view = arena.get(&source, id).expect("reference view");
+
+        assert!(!view.metadata.is_absolute);
+        assert_eq!(view.authored_text(), source_text);
+        assert_eq!(view.segments.len(), 3);
+        assert_eq!(view.segment_authored_text(0), Some("Vehicle"));
+        assert_eq!(view.segment_authored_text(1), Some("'mass value'"));
+        assert_eq!(view.segment_decoded_text(1).as_deref(), Some("mass value"));
+        assert_eq!(view.segment_authored_text(2), Some("amount"));
+        assert_eq!(
+            view.segments[1].separator_before,
+            Some(ReferenceSeparator::ColonColon)
+        );
+        assert_eq!(
+            view.segments[2].separator_before,
+            Some(ReferenceSeparator::Dot)
+        );
+        assert_eq!(
+            view.segments[1].source_span,
+            Span {
+                offset: 9,
+                line: 1,
+                column: 10,
+                len: 12,
+            }
+        );
+    }
+
+    #[test]
+    fn source_backed_absolute_reference_uses_metadata_not_segment() {
+        let source_text = "$::Library::Thing";
+        let context = ParseContext::new();
+        let (rest, id) = qualified_reference(context.input(source_text.as_bytes()))
+            .expect("absolute qualified reference");
+        assert!(rest.fragment().is_empty());
+        let arena = context.finish();
+        let source = SourceStorage::from(source_text);
+        let view = arena.get(&source, id).expect("reference view");
+
+        assert!(view.metadata.is_absolute);
+        assert_eq!(view.segments.len(), 2);
+        assert_eq!(view.segment_authored_text(0), Some("Library"));
+        assert_eq!(view.segment_authored_text(1), Some("Thing"));
+        assert!(view
+            .segments
+            .iter()
+            .all(|segment| source.slice(&segment.source_span) != Some("$")));
+    }
+
+    #[test]
+    fn source_backed_reference_rejects_malformed_absolute_and_quoted_names() {
+        let context = ParseContext::new();
+        assert!(qualified_reference(context.input(b"$Library::Thing")).is_err());
+        assert!(qualified_reference(context.input(b"::Library::Thing")).is_err());
+        assert!(qualified_reference(context.input(b"'unterminated")).is_err());
+    }
+
+    #[test]
+    fn qualified_reference_leaves_import_wildcard_suffix_for_shape_parser() {
+        let context = ParseContext::new();
+        let (rest, _) = qualified_reference(context.input(b"Library::*::**"))
+            .expect("qualified reference before suffix");
+        assert_eq!(*rest.fragment(), &b"::*::**"[..]);
+    }
+
+    #[test]
+    fn recovery_skip_balances_braces_outside_quotes_and_nested_comments() {
+        let input = span_input(
+            "broken { text = \"}\"; /* outer { /* inner } */ still } */ nested { x; } } part ok;",
+        );
+        let (rest, ()) = skip_statement_or_block(input).expect("balanced recovery skip");
+        assert_eq!(*rest.fragment(), &b" part ok;"[..]);
+    }
+
+    #[test]
+    fn local_recovery_does_not_sync_to_a_keyword_inside_a_quoted_name() {
+        let input = span_input("broken 'line one\npart fake'\npart good;");
+        let (rest, ()) = recover_body_element(input, &[b"part"]).expect("body recovery");
+        assert_eq!(*rest.fragment(), &b"part good;"[..]);
+    }
+
+    #[test]
+    fn terminator_scan_ignores_punctuation_inside_quotes() {
+        let input = span_input(r#"name "};"; next"#);
+        let (rest, captured) = take_until_terminator(input, b";{").expect("quoted terminator scan");
+        assert_eq!(captured, r#"name "};""#);
+        assert_eq!(*rest.fragment(), &b"; next"[..]);
     }
 
     #[test]
@@ -1184,6 +1654,44 @@ mod lexical_bnf_tests {
         let input = span_input("  // line\n  /* block */  part");
         let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
         assert!(rest.fragment().starts_with(b"part"));
+    }
+
+    #[test]
+    fn ws_and_comments_starts_a_block_comment_at_slash_slash_star() {
+        // `//*` is a block comment, so the newline inside it does not end it.
+        let input = span_input("//* still\n comment */ part");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert_eq!(*rest.fragment(), &b"part"[..]);
+    }
+
+    #[test]
+    fn ws_and_comments_treats_unterminated_slash_slash_star_as_a_line_comment() {
+        let input = span_input("//* never closed\npart");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert_eq!(*rest.fragment(), &b"part"[..]);
+    }
+
+    #[test]
+    fn ws_and_comments_leaves_an_unterminated_block_comment_for_the_caller() {
+        // An unterminated `/*` is not trivia: the scan stops in front of it so the caller can
+        // report it rather than silently consuming the rest of the document.
+        let input = span_input("  /* never closed\npart");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert!(rest.fragment().starts_with(b"/* never closed"));
+    }
+
+    #[test]
+    fn ws_and_comments_consumes_runs_of_mixed_trivia() {
+        let input = span_input("\r\n\t // a\r// b\n/* c */\n//* d */\t part");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert_eq!(*rest.fragment(), &b"part"[..]);
+    }
+
+    #[test]
+    fn ws_and_comments_is_a_no_op_on_a_token() {
+        let input = span_input("part p;");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert_eq!(rest.location_offset(), 0);
     }
 
     #[test]

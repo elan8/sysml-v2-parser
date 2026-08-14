@@ -25,7 +25,7 @@ fn assert_entry_points_agree(src: &str, label: &str) {
     );
     assert_eq!(
         strict.normalize_for_test_comparison(),
-        editor.root.normalize_for_test_comparison(),
+        editor.document.root.normalize_for_test_comparison(),
         "{label}: parse() and parse_for_editor() built different ASTs for the same clean input"
     );
 }

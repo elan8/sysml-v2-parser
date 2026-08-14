@@ -1,10 +1,10 @@
 //! Span, Node, Expression, and shared AST traits.
 
-use super::feature_chain::FeatureChain;
-use super::relationship_target::RelationshipTarget;
+use super::{QualifiedReferenceId, ReferenceSeparator};
 
 /// Source location: byte offset, line, column, and length in the source file.
-/// Line and column are **1-based**. Use [`Span::to_lsp_range`] for 0-based LSP ranges.
+/// Line and column are **1-based**. Use [`crate::ast::ParsedDocument::range`] when deriving
+/// navigation or diagnostic ranges; a span alone cannot correctly calculate a multiline end.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Span {
@@ -25,7 +25,9 @@ impl Span {
         }
     }
 
-    /// LSP uses 0-based line and 0-based character. Returns (start_line, start_character, end_line, end_character).
+    /// Legacy single-line projection. Prefer [`crate::ast::ParsedDocument::range`], which uses the
+    /// canonical document-owned source index and handles multiline spans.
+    #[deprecated(note = "use ParsedDocument::range so multiline ranges use canonical source data")]
     pub fn to_lsp_range(&self) -> (u32, u32, u32, u32) {
         let start_line = self.line.saturating_sub(1);
         let start_char = self.column.saturating_sub(1);
@@ -113,6 +115,9 @@ pub enum BinaryOperator {
     Range,
     BitOr,
     BitAnd,
+    /// KerML null-coalescing operator `??` (BNF `NullCoalescingExpression`), e.g.
+    /// `collection->reduce '+' ?? zero` (Kernel Function Library `DataFunctions.kerml`).
+    NullCoalesce,
     /// Unclassified or extension operator; retains source token.
     Other(String),
 }
@@ -139,6 +144,7 @@ impl BinaryOperator {
             "||" | "or" => Self::Or,
             "xor" => Self::Xor,
             "implies" => Self::Implies,
+            "??" => Self::NullCoalesce,
             ".." => Self::Range,
             "|" => Self::BitOr,
             "&" => Self::BitAnd,
@@ -167,6 +173,7 @@ impl BinaryOperator {
             Self::Or => "||",
             Self::Xor => "xor",
             Self::Implies => "implies",
+            Self::NullCoalesce => "??",
             Self::Range => "..",
             Self::BitOr => "|",
             Self::BitAnd => "&",
@@ -225,10 +232,17 @@ pub enum Expression {
     LiteralReal(String),
     LiteralString(String),
     LiteralBoolean(bool),
+    /// Authored unit token inside brackets. Units may contain operators such as `/` and `^`, so
+    /// they are not qualified references.
+    Unit(String),
     /// Single name or qualified name.
-    FeatureRef(String),
+    FeatureRef(QualifiedReferenceId),
     /// base.member (e.g. engine.fuelCmdPort).
-    MemberAccess(Box<Node<Expression>>, String),
+    MemberAccess {
+        base: Box<Node<Expression>>,
+        member: QualifiedReferenceId,
+        separator: ReferenceSeparator,
+    },
     /// base#(index) e.g. frontWheel#(1).
     Index {
         base: Box<Node<Expression>>,
@@ -261,28 +275,28 @@ pub enum Expression {
     Tuple(Vec<Node<Expression>>),
     /// Metadata classification: `@Metaclass` (e.g. `@SysML::PartUsage`).
     Classification {
-        metaclass: String,
+        metaclass: QualifiedReferenceId,
     },
     /// Reflective meta cast: `expr meta Metaclass` (e.g. `userActions meta SysML::Usage`).
     MetaCast {
         base: Box<Node<Expression>>,
-        metaclass: String,
+        metaclass: QualifiedReferenceId,
     },
     /// Type test: `expr istype Type`, `expr hastype Type`, or `expr as Type`.
     TypeCheck {
         kind: TypeCheckKind,
         operand: Option<Box<Node<Expression>>>,
-        type_name: String,
+        type_name: QualifiedReferenceId,
     },
     /// Select expression: `base.?selector`.
     Select {
         base: Box<Node<Expression>>,
-        selector: String,
+        selector: QualifiedReferenceId,
     },
     /// Collect expression: `base.**selector`.
     Collect {
         base: Box<Node<Expression>>,
-        selector: String,
+        selector: QualifiedReferenceId,
     },
     /// KerML null or empty sequence ().
     Null,
@@ -292,18 +306,18 @@ pub enum Expression {
     /// (carried by the enclosing `Node`) includes them.
     Parenthesized(Box<Node<Expression>>),
     /// Constructor/instantiation expression: `new Type(...)` (KerML `ConstructorExpression`,
-    /// BNF 8.2.5.8.3). `type_name` is the qualified type name (consistent with how
-    /// [`Expression::TypeCheck`]/[`Expression::MetaCast`]/[`Expression::Classification`] already
-    /// represent qualified type references as plain strings rather than [`FeatureChain`] --
-    /// `new Foo::Bar(...)` names a *type*, not a dot-separated feature access path).
+    /// BNF 8.2.5.8.3). `type_name` is an arena-backed qualified type reference, consistent with
+    /// [`Expression::TypeCheck`], [`Expression::MetaCast`], and
+    /// [`Expression::Classification`]. `new Foo::Bar(...)` names a type, not a dotted feature
+    /// access path.
     Constructor {
-        type_name: String,
+        type_name: QualifiedReferenceId,
         args: Vec<Argument>,
     },
-    /// Multi-segment dotted feature-chain reference, e.g. `engine.fuelCmdPort.flowRate`
-    /// (PAR-005 item 3, using the standalone [`FeatureChain`] type built for exactly this by
-    /// PAR-004 item 6). A single, unchained name stays [`Expression::FeatureRef`].
-    FeatureChainRef(FeatureChain),
+    /// Multi-segment dotted feature-chain reference, e.g. `engine.fuelCmdPort.flowRate`.
+    /// The arena view preserves each `.`/`::` separator and segment span; a single, unchained
+    /// name stays [`Expression::FeatureRef`].
+    FeatureChainRef(QualifiedReferenceId),
     /// KerML collection-operator invocation via `->`, e.g. `xs->collect(f)`, `xs->select(p)`,
     /// `xs->size()`, `xs->includes(x)` (PAR-005 item 2). Distinguished from a generic
     /// [`Expression::Invocation`] so the specific operator is recoverable from the AST without
@@ -312,8 +326,12 @@ pub enum Expression {
         op: CollectionOperator,
         base: Box<Node<Expression>>,
         args: Vec<Argument>,
-        /// Brace-body form `->forAll { … }` (validation `15_05`, `7b`); paren form leaves this `None`.
-        brace_body: Option<String>,
+        /// Structured BodyExpression form `->forAll { in ref item : T; predicate }`.
+        /// Parenthesized invocation leaves this `None`.
+        brace_body: Option<Box<Node<CollectionOperatorBody>>>,
+        /// True for the KerML dot shorthand spellings `x.{...}` (collect) and `x.?{...}`
+        /// (select), so emission renders the authored form instead of `->collect`/`->select`.
+        dot_shorthand: bool,
     },
     /// Metadata-access expression: `expr.metadata` (KerML `MetadataAccessExpression`, BNF
     /// 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`). Distinct from [`Expression::Classification`]
@@ -330,8 +348,50 @@ pub enum Expression {
     },
     /// Extent expression: `all QualifiedName` (KerML; validation `10b`).
     Extent {
-        target: String,
+        target: QualifiedReferenceId,
     },
+    /// Standalone KerML `BodyExpression` used as a primary expression, e.g. the pin
+    /// initializers `in whileTest default {true}` / `in untilTest default {false}` (Systems
+    /// Library `Actions.sysml`). Shares [`CollectionOperatorBody`]'s `{ parameters* result? }`
+    /// shape -- both render the same KerML `ExpressionBody` production -- but stands on its
+    /// own instead of following a `->op` collection operator.
+    BodyExpr(Box<Node<CollectionOperatorBody>>),
+}
+
+/// Structured KerML `BodyExpression` supplied to a collection operator.
+///
+/// The enclosing [`Node`] spans the complete `{ ... }` form. Exact delimiter and declaration
+/// token spans are retained for navigation and diagnostics without scanning the source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CollectionOperatorBody {
+    pub open_brace_span: Span,
+    pub parameters: Vec<Node<CollectionOperatorParameter>>,
+    pub result: Option<Box<Node<Expression>>>,
+    pub close_brace_span: Span,
+}
+
+/// One typed parameter declaration in a collection-operator body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CollectionOperatorParameter {
+    /// Direction keyword and its exact authored span.
+    pub direction: Node<super::InOut>,
+    /// Exact `ref` keyword span when the parameter is a reference feature.
+    pub reference_keyword_span: Option<Span>,
+    /// Decoded declaration label; `name_span` preserves its authored spelling.
+    pub name: String,
+    pub name_span: Span,
+    pub typing: Option<CollectionOperatorParameterTyping>,
+    pub semicolon_span: Span,
+}
+
+/// Exact `:` typing syntax plus its source-backed target identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CollectionOperatorParameterTyping {
+    pub separator_span: Span,
+    pub target: QualifiedReferenceId,
 }
 
 /// Move every direct `Node<Expression>` child out of `expr`, replacing each with a cheap
@@ -346,7 +406,7 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
     }
 
     match expr {
-        Expression::MemberAccess(base, _)
+        Expression::MemberAccess { base, .. }
         | Expression::Bracket(base)
         | Expression::Parenthesized(base)
         | Expression::MetadataAccess(base)
@@ -374,9 +434,24 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
             out.push(take_box(callee));
             out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
         }
-        Expression::CollectionOp { base, args, .. } => {
+        Expression::BodyExpr(body) => {
+            if let Some(result) = body.value.result.take() {
+                out.push(*result);
+            }
+        }
+        Expression::CollectionOp {
+            base,
+            args,
+            brace_body,
+            ..
+        } => {
             out.push(take_box(base));
             out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
+            if let Some(body) = brace_body {
+                if let Some(result) = body.value.result.take() {
+                    out.push(*result);
+                }
+            }
         }
         Expression::Conditional {
             test,
@@ -402,6 +477,7 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
         | Expression::LiteralReal(_)
         | Expression::LiteralString(_)
         | Expression::LiteralBoolean(_)
+        | Expression::Unit(_)
         | Expression::FeatureRef(_)
         | Expression::Classification { .. }
         | Expression::Null
@@ -432,9 +508,9 @@ impl Drop for Expression {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Argument {
-    /// `Some(name)` for a named argument (the redefined parameter name to the left of `=`);
-    /// `None` for a positional argument.
-    pub name: Option<String>,
+    /// `Some(parameter)` for a named argument (the redefined parameter reference to the left of
+    /// `=`); `None` for a positional argument.
+    pub parameter: Option<QualifiedReferenceId>,
     pub value: Node<Expression>,
 }
 
@@ -562,16 +638,15 @@ pub enum TypingKind {
 /// ISQ::mass;` (typing) or the `Vehicle` in `part def Car :> Vehicle;` (subclassification)
 /// (PAR-004 item 1, folding in PAR-003's conjugation concept from item 4).
 ///
-/// The target is a list of [`RelationshipTarget`]s (parser work item 2, post-PAR-006) rather than
-/// a single joined `String`: a `:` / `:>` clause can name more than one comma-separated target
-/// (e.g. `:> Base, Other`), and each target's `::`- vs. `.`-separated segments are kept distinct
-/// instead of being collapsed into one opaque string. Almost always has exactly one element --
-/// use [`TypingRelationship::first_target`] for that common case.
+/// The target is a list of document-local [`QualifiedReferenceId`]s rather than a joined string:
+/// a `:` / `:>` clause can name more than one comma-separated target (e.g. `:> Base, Other`), and
+/// the shared arena keeps every target's `::`- vs. `.`-separated segments distinct. Almost always
+/// has exactly one element -- use [`TypingRelationship::first_target`] for that common case.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypingRelationship {
     /// The type/supertype target(s), e.g. `[ISQ::mass]`. Always has at least one element.
-    pub target: Vec<Node<RelationshipTarget>>,
+    pub target: Vec<QualifiedReferenceId>,
     pub kind: TypingKind,
     /// Span of the whole relationship fragment (operator/keyword through target), when known.
     pub span: Span,
@@ -584,10 +659,29 @@ pub struct TypingRelationship {
     /// but the field exists so a future implied-relationship producer doesn't need another AST
     /// migration.
     pub is_implied: bool,
+    /// Which spelling the author wrote for the relationship operator. Emission renders this
+    /// spelling instead of canonicalizing `specializes` to `:>` / `defined by` to `:`.
+    pub spelling: TypingSpelling,
 }
 
-/// Equality ignores `span`, matching `Node<T>`'s and `Multiplicity`'s conventions elsewhere in
-/// this crate: hand-built expected ASTs in tests don't need to reproduce real source spans.
+/// The authored spelling of a [`TypingRelationship`]'s operator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TypingSpelling {
+    /// The symbolic operator: `:` for typing, `:>` for subclassification.
+    Operator,
+    /// The `specializes` keyword (subclassification).
+    Specializes,
+    /// The `defined by` keyword pair (typing).
+    DefinedBy,
+    /// The `typed by` keyword pair (typing).
+    TypedBy,
+}
+
+/// Equality ignores `span` and `spelling`, matching `Node<T>`'s and `Multiplicity`'s
+/// span-ignoring conventions elsewhere in this crate: hand-built expected ASTs in tests don't
+/// need to reproduce real source spans, and `specializes B` and `:> B` name the same
+/// relationship (the spelling is provenance, faithfully re-emitted but not identity).
 impl PartialEq for TypingRelationship {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
@@ -603,19 +697,8 @@ impl TypingRelationship {
     /// The single target for the overwhelmingly common case of a `:`/`:>` clause naming exactly
     /// one type. Returns the first target when a rare comma-separated multi-target clause is
     /// present, and `None` only if `target` is unexpectedly empty.
-    pub fn first_target(&self) -> Option<&RelationshipTarget> {
-        self.target.first().map(|n| &n.value)
-    }
-
-    /// All targets rebuilt into a single `", "`-joined display string (e.g.
-    /// `"Base"` or `"Base, Other"`), for callers that only need the textual form and don't care
-    /// about per-target `::`/`.` segment structure.
-    pub fn target_display(&self) -> String {
-        self.target
-            .iter()
-            .map(|n| n.value.to_display_string())
-            .collect::<Vec<_>>()
-            .join(", ")
+    pub fn first_target(&self) -> Option<QualifiedReferenceId> {
+        self.target.first().copied()
     }
 }
 
@@ -648,7 +731,7 @@ pub struct SubsettingRelationship {
     /// The subsetted/redefined/crossed target(s), e.g. `[rearWheel]`. A clause can name more than
     /// one comma-separated target; almost always has exactly one element -- use
     /// [`SubsettingRelationship::first_target`] for that common case.
-    pub target: Vec<Node<RelationshipTarget>>,
+    pub target: Vec<QualifiedReferenceId>,
     pub kind: SubsettingKind,
     /// Span of the whole relationship fragment (operator/keyword through target).
     pub span: Span,
@@ -670,19 +753,8 @@ impl SubsettingRelationship {
     /// The single target for the overwhelmingly common case of a subsetting-family clause naming
     /// exactly one target. Returns the first target when a rare comma-separated multi-target
     /// clause is present, and `None` only if `target` is unexpectedly empty.
-    pub fn first_target(&self) -> Option<&RelationshipTarget> {
-        self.target.first().map(|n| &n.value)
-    }
-
-    /// All targets rebuilt into a single `", "`-joined display string (e.g.
-    /// `"wheel"` or `"a, b"`), for callers that only need the textual form and don't care about
-    /// per-target `::`/`.` segment structure.
-    pub fn target_display(&self) -> String {
-        self.target
-            .iter()
-            .map(|n| n.value.to_display_string())
-            .collect::<Vec<_>>()
-            .join(", ")
+    pub fn first_target(&self) -> Option<QualifiedReferenceId> {
+        self.target.first().copied()
     }
 }
 
@@ -725,29 +797,6 @@ impl Eq for ConnectionEnd {}
 /// call sites can name "interface end" vs. "connection end" for readability without pretending
 /// they're semantically different today.
 pub type InterfaceEnd = ConnectionEnd;
-
-impl Multiplicity {
-    /// Renders the multiplicity back to canonical bracket text, e.g. `[1]`, `[0..1]`, `[1..*]`.
-    /// Literal integer bounds and the unbounded `*` render exactly; other bound expressions fall
-    /// back to their `Debug` form. Intended for tests/diagnostics, not for round-tripping source.
-    pub fn to_bracket_string(&self) -> String {
-        fn bound_str(bound: &Option<Box<Node<Expression>>>) -> String {
-            match bound {
-                None => "*".to_string(),
-                Some(node) => match &node.value {
-                    Expression::LiteralInteger(i) => i.to_string(),
-                    Expression::FeatureRef(name) => name.clone(),
-                    other => format!("{other:?}"),
-                },
-            }
-        }
-        if self.lower == self.upper {
-            format!("[{}]", bound_str(&self.lower))
-        } else {
-            format!("[{}..{}]", bound_str(&self.lower), bound_str(&self.upper))
-        }
-    }
-}
 
 impl Expression {
     /// Whether this expression node is a literal Boolean.

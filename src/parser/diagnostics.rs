@@ -1,5 +1,6 @@
 //! Diagnostic classification, nom error mapping, and error post-processing.
 
+use super::delimiters::DelimiterScan;
 use super::lex;
 use super::Input;
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
@@ -22,6 +23,10 @@ pub(crate) fn fragment_to_found_snippet(fragment: &[u8]) -> (String, usize) {
     (s.trim_end().to_string(), len)
 }
 /// Map nom error kind to a human-readable message for language server diagnostics.
+// `ErrorKind` is a foreign, dependency-owned enum. The generic arm intentionally keeps new nom
+// parser error kinds classified as a stable generic diagnostic instead of coupling this API to
+// every nom release; parser-specific kinds above remain explicit.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
     use nom::error::ErrorKind;
     match code {
@@ -45,6 +50,9 @@ fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
 }
 
 /// Map nom error kind to a specific code for LSP/quick fixes.
+// See `nom_error_kind_to_message`: dependency-owned additions deliberately retain the stable
+// `parse_error` fallback, while parser-specific classifications are enumerated above.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn nom_error_kind_to_code(code: &nom::error::ErrorKind) -> &'static str {
     use nom::error::ErrorKind;
     match code {
@@ -337,7 +345,7 @@ pub(crate) fn invalid_expose_separator_diagnostic(
     ))
 }
 
-fn invalid_requirement_short_name_syntax_diagnostic(
+pub(crate) fn invalid_requirement_short_name_syntax_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
     let fragment = trim_ascii_start(fragment);
@@ -816,17 +824,16 @@ pub(crate) fn unexpected_closing_brace_parse_error(input: Input<'_>) -> ParseErr
         .with_category(DiagnosticCategory::ParseError)
 }
 
-pub(crate) fn missing_closing_brace_error(bytes: &[u8], input: Input<'_>) -> Option<ParseError> {
-    if !input.fragment().is_empty() {
+/// Report an unterminated body when the parser stopped at end of input with a body still open.
+pub(crate) fn missing_closing_brace_error(
+    bytes: &[u8],
+    input: Input<'_>,
+    delimiters: &DelimiterScan,
+) -> Option<ParseError> {
+    if !input.fragment().is_empty() || !delimiters.has_unclosed_brace() {
         return None;
     }
-    let consumed = &bytes[..input.location_offset().min(bytes.len())];
-    let opens = consumed.iter().filter(|&&b| b == b'{').count();
-    let closes = consumed.iter().filter(|&&b| b == b'}').count();
-    if opens <= closes {
-        return None;
-    }
-    Some(missing_closing_brace_error_at_eof(consumed))
+    Some(missing_closing_brace_error_at_eof(bytes))
 }
 
 pub(crate) fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
@@ -840,42 +847,17 @@ pub(crate) fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
         .with_category(DiagnosticCategory::ParseError)
 }
 
-pub(crate) fn extra_closing_brace_at_eof(bytes: &[u8]) -> Option<ParseError> {
-    let (opens, closes) = lex::brace_balance_outside_comments(bytes);
+/// Report the trailing `}` of a document that closes more bodies than it opens.
+pub(crate) fn extra_closing_brace_at_eof(
+    bytes: &[u8],
+    delimiters: &DelimiterScan,
+) -> Option<ParseError> {
+    let (opens, closes) = delimiters.balance();
     if closes <= opens {
         return None;
     }
-    let mut last_brace: Option<(usize, u32, usize)> = None;
-    let mut line = 1u32;
-    let mut column = 1usize;
-    let mut pos = 0usize;
-    while pos < bytes.len() {
-        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"/*") {
-            if let Some(rel) = lex::find_subslice(&bytes[pos..], b"*/") {
-                pos += rel + 2;
-                continue;
-            }
-            break;
-        }
-        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"//") {
-            while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
-                pos += 1;
-            }
-            continue;
-        }
-        let b = bytes[pos];
-        if b == b'}' {
-            last_brace = Some((pos, line, column));
-        }
-        if b == b'\n' {
-            line += 1;
-            column = 1;
-        } else {
-            column += 1;
-        }
-        pos += 1;
-    }
-    let (offset, line, column) = last_brace?;
+    let offset = delimiters.last_close()?;
+    let (line, column) = eof_line_column(&bytes[..offset]);
     Some(
         ParseError::new("unexpected closing '}' at end of file")
             .with_location(offset, line, column)
@@ -896,11 +878,6 @@ pub(crate) fn category_from_code(code: &str) -> DiagnosticCategory {
     } else {
         DiagnosticCategory::ParseError
     }
-}
-
-pub(crate) fn has_unclosed_brace(bytes: &[u8]) -> bool {
-    let (opens, closes) = lex::brace_balance_outside_comments(bytes);
-    opens > closes
 }
 
 fn eof_line_column(bytes: &[u8]) -> (u32, usize) {
@@ -945,6 +922,15 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
 /// Drop `unexpected_closing_brace` on a line that already has a parse error for an
 /// invalid statement block (e.g. `badstmt {} }` â€” the second `}` closes the package).
 pub(crate) fn suppress_redundant_closing_brace_errors(errors: Vec<ParseError>) -> Vec<ParseError> {
+    // Recovery nodes can cover the entire unterminated declaration while the document-level
+    // balance check reports the same condition at EOF. Keep the local EOF diagnostic: it gives the
+    // editor the actionable insertion point and avoids publishing the recovery node's broad span as
+    // a second error for the same missing token.
+    let final_missing_closing_brace = errors
+        .iter()
+        .filter(|error| error.code.as_deref() == Some("missing_closing_brace"))
+        .filter_map(|error| error.offset)
+        .max();
     let lines_with_block_error: std::collections::HashSet<u32> = errors
         .iter()
         .filter(|e| e.code.as_deref() != Some("unexpected_closing_brace"))
@@ -963,6 +949,9 @@ pub(crate) fn suppress_redundant_closing_brace_errors(errors: Vec<ParseError>) -
     errors
         .into_iter()
         .filter(|e| {
+            if e.code.as_deref() == Some("missing_closing_brace") {
+                return e.offset == final_missing_closing_brace;
+            }
             if e.code.as_deref() != Some("unexpected_closing_brace") {
                 return true;
             }

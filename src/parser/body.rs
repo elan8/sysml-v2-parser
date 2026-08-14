@@ -34,7 +34,7 @@ pub(crate) fn relationship_body_annotations(
         RELATIONSHIP_BODY_STARTERS,
         "relationship body",
         "recovered_relationship_body_element",
-        relationship_body_element,
+        relationship_body_member,
         |start, end| {
             let recovery = build_recovery_error_node_from_span(
                 start,
@@ -50,7 +50,24 @@ pub(crate) fn relationship_body_annotations(
     Ok((input, Some(elements)))
 }
 
-fn relationship_body_element(
+/// A full `RelationshipBody` member: the shared annotation subset plus owned related elements
+/// (`dependency z to x, y { feature e; }`; BNF `RelationshipBody`'s `ownedRelatedElement`,
+/// spec42 Gap 37). `relationship_body_element` stays annotation-only because ref bodies reuse it
+/// for their annotation tail.
+fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if let Ok((input, elem)) = map(crate::parser::constraint::kerml_feature_member, |n| {
+        RelationshipBodyElement::KermlFeature(Box::new(n))
+    })
+    .parse(input)
+    {
+        return Ok((input, node_from_to(start, input, elem)));
+    }
+    relationship_body_element(input)
+}
+
+pub(crate) fn relationship_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
     let start = input;
@@ -121,6 +138,32 @@ pub(crate) fn parse_structured_brace_members_with_skip<'a, E, F, G>(
     starters: &[&[u8]],
     _scope_label: &str,
     _recovery_code: &str,
+    parse_element: F,
+    map_recovery: G,
+    skip_mode: BraceMemberSkip,
+) -> IResult<Input<'a>, Vec<Node<E>>>
+where
+    F: FnMut(Input<'a>) -> IResult<Input<'a>, Node<E>>,
+    G: FnMut(Input<'a>, Input<'a>) -> Node<E>,
+{
+    crate::parser::stack::with_nested_body_stack(move || {
+        parse_structured_brace_members_inner(
+            input,
+            starters,
+            _scope_label,
+            _recovery_code,
+            parse_element,
+            map_recovery,
+            skip_mode,
+        )
+    })
+}
+
+fn parse_structured_brace_members_inner<'a, E, F, G>(
+    input: Input<'a>,
+    starters: &[&[u8]],
+    _scope_label: &str,
+    _recovery_code: &str,
     mut parse_element: F,
     mut map_recovery: G,
     skip_mode: BraceMemberSkip,
@@ -144,9 +187,11 @@ where
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
             return Ok((input, elements));
         }
+        let reference_checkpoint = input.extra.reference_checkpoint();
         match parse_element(input) {
             Ok((next, element)) => {
                 if next.location_offset() == input.location_offset() {
+                    input.extra.rollback_references(reference_checkpoint);
                     return Err(nom::Err::Error(nom::error::Error::new(
                         input,
                         nom::error::ErrorKind::Many0,
@@ -156,6 +201,7 @@ where
                 input = next;
             }
             Err(_) => {
+                input.extra.rollback_references(reference_checkpoint);
                 let start_unknown = input;
                 let (after_ws, _) = ws_and_comments(input)?;
                 if after_ws.fragment().starts_with(b"}") {
@@ -165,26 +211,29 @@ where
                 let next = match skip_mode {
                     BraceMemberSkip::StatementOrBlock => {
                         let Ok((next, _)) = skip_statement_or_block(input) else {
-                            let (input, _) = advance_to_closing_brace(input)?;
+                            let (closing, _) = advance_to_closing_brace(input)?;
+                            elements.push(map_recovery(start_unknown, closing));
                             let (input, _) =
-                                preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                                preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
                             return Ok((input, elements));
                         };
                         next
                     }
                     BraceMemberSkip::BodyElementRecover => {
                         let Ok((next, _)) = recover_body_element(input, starters) else {
-                            let (input, _) = advance_to_closing_brace(input)?;
+                            let (closing, _) = advance_to_closing_brace(input)?;
+                            elements.push(map_recovery(start_unknown, closing));
                             let (input, _) =
-                                preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                                preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
                             return Ok((input, elements));
                         };
                         next
                     }
                 };
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                    let (closing, _) = advance_to_closing_brace(input)?;
+                    elements.push(map_recovery(start_unknown, closing));
+                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
                     return Ok((input, elements));
                 }
                 let (next, _) = ws_and_comments(next)?;
@@ -248,10 +297,9 @@ pub(crate) fn semicolon_or_opaque_brace_body(
 mod tests {
     use super::*;
     use crate::ast::DefinitionBodyElement;
-    use nom_locate::LocatedSpan;
 
     fn span_input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     #[test]

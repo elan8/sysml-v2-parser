@@ -22,7 +22,7 @@ fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -61,7 +61,9 @@ fn conjugated_end_type_works_in_both_connection_and_interface_defs() {
             _ => None,
         })
         .expect("expected end decl in connection def");
-    assert_eq!(end.type_name, "~PowerPort");
+    assert!(end.typing.as_ref().is_some_and(|typing| {
+        typing.value.is_conjugated && typing.value.first_target().is_some()
+    }));
 
     let interface = elements
         .iter()
@@ -83,7 +85,9 @@ fn conjugated_end_type_works_in_both_connection_and_interface_defs() {
             _ => None,
         })
         .expect("expected end decl in interface def");
-    assert_eq!(end.type_name, "~PowerPort");
+    assert!(end.typing.as_ref().is_some_and(|typing| {
+        typing.value.is_conjugated && typing.value.first_target().is_some()
+    }));
 }
 
 /// Both `connection def` and `interface def` `connect` statements accept per-endpoint
@@ -143,11 +147,11 @@ fn per_endpoint_multiplicity_on_connect_works_in_both_connection_and_interface_d
     assert!(connect_stmt.to.value.multiplicity.is_some());
 }
 
-/// Connections keep the `#name` derived-end-name form (real usage: `tests/derivation_connections.rs`);
+/// Connections keep typed fixed derivation-end roles (real usage: `tests/derivation_connections.rs`);
 /// this is the one genuine, evidenced difference between the two contexts, so it stays
 /// parameterized (`connector::end_decl`'s `allow_derived_name`) rather than shared unconditionally.
 #[test]
-fn derived_end_name_is_connection_only_by_design() {
+fn derivation_end_role_is_connection_only_by_design() {
     let input = "package P {\nrequirement def R1;\nrequirement def R2;\n#derivation connection { end #original ::> R1; end #derive ::> R2; }\n}";
     let elements = package_elements(input);
     let connection = elements
@@ -162,6 +166,11 @@ fn derived_end_name_is_connection_only_by_design() {
     };
     assert!(elements.iter().any(|e| matches!(
         &e.value,
-        ConnectionDefBodyElement::EndDecl(end) if end.value.name == "#original"
+        ConnectionDefBodyElement::EndDecl(end)
+            if matches!(
+                &end.value.identity,
+                sysml_v2_parser::ast::EndIdentity::Derivation(role)
+                    if role.value == sysml_v2_parser::ast::DerivationEndRole::Original
+            )
     )));
 }

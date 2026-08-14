@@ -21,7 +21,7 @@ fn calc_body_parses_return_expression_without_swallowing_siblings() {
         "calc return-expression bodies should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -55,8 +55,8 @@ fn calc_body_parses_return_expression_without_swallowing_siblings() {
         assert!(
             !elements
                 .iter()
-                .any(|e| matches!(e.value, CalcDefBodyElement::Other(_))),
-            "return expression must not be recovered as Other(...)"
+                .any(|e| matches!(e.value, CalcDefBodyElement::Error(_))),
+            "return expression must not fall through to recovery"
         );
     }
 }

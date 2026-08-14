@@ -1,8 +1,8 @@
 use crate::ast::{
     ActorDecl, ActorRedefinitionAssignment, ActorUsage, CalcUsage, CaseReturnDecl, FirstSuccession,
     IncludeUseCase, Membership, Node, Objective, ParseErrorNode, RefRedefinition, ReturnRef,
-    SubjectRef, ThenDone, ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody,
-    UseCaseDefBodyElement, UseCaseUsage, Visibility,
+    ReturnRefBody, ReturnRefBodyElement, SubjectRef, ThenDone, ThenIncludeUseCase,
+    ThenUseCaseUsage, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
 use crate::parser::body::parse_structured_brace_members;
@@ -10,7 +10,7 @@ use crate::parser::constraint::return_expression_stmt;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_statement_or_block, take_until_terminator,
+    identification, name, qualified_reference, skip_statement_or_block, take_until_terminator,
     visibility_prefix, ws1, ws_and_comments, USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -22,16 +22,45 @@ use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_sp
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
-fn slice_text(start: Input<'_>, end: Input<'_>) -> String {
-    let delta = end
-        .location_offset()
-        .saturating_sub(start.location_offset());
-    let bytes = start.fragment();
-    let take = delta.min(bytes.len());
-    String::from_utf8_lossy(&bytes[..take]).trim().to_string()
+#[cfg(test)]
+mod use_case_member_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 46: the typing on an actor declaration is optional (`actor environment;`,
+    /// `actor passenger [0..4];`, OMG spec Annex A).
+    #[test]
+    fn actor_usage_accepts_the_untyped_form() {
+        let (rest, node) = actor_usage(input("actor environment;")).expect("bare actor");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "environment");
+        assert!(node.value.type_name.is_none());
+
+        let (_, node) = actor_usage(input("actor passenger [0..4];")).expect("actor with mult");
+        assert!(node.value.type_name.is_none());
+        assert!(node.value.multiplicity.is_some());
+
+        assert!(
+            actor_usage(input("actor ;")).is_err(),
+            "bare actor; must not parse"
+        );
+    }
+
+    /// Spec42 Gap 45: the directed parameter shorthand dispatches inside use-case-family
+    /// bodies (`in scenario = cityScenario;`).
+    #[test]
+    fn use_case_body_dispatches_directed_parameters() {
+        let (rest, node) =
+            use_case_def_body_element(input("in scenario = cityScenario;")).expect("in shorthand");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, UseCaseDefBodyElement::InOutDecl(_)));
+    }
 }
 
 fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
@@ -42,10 +71,14 @@ fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
 }
 
 fn first_succession(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession>> {
+    crate::parser::span::reference_transaction(input, first_succession_inner)
+}
+
+fn first_succession_inner(input: Input<'_>) -> IResult<Input<'_>, Node<FirstSuccession>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"first"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, target) = name(input)?;
+    let (input, target) = qualified_reference(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
@@ -63,10 +96,14 @@ fn then_done(input: Input<'_>) -> IResult<Input<'_>, Node<ThenDone>> {
 }
 
 pub(crate) fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
+    crate::parser::span::reference_transaction(input, include_use_case_inner)
+}
+
+fn include_use_case_inner(input: Input<'_>) -> IResult<Input<'_>, Node<IncludeUseCase>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"include"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, n) = name(input)?;
+    let (input, target) = qualified_reference(input)?;
     let (input, mult) = opt(multiplicity_node).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = use_case_def_body(input)?;
@@ -76,7 +113,7 @@ pub(crate) fn include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<Incl
             start,
             input,
             IncludeUseCase {
-                name: n,
+                target,
                 multiplicity: mult,
                 body,
             },
@@ -108,7 +145,7 @@ fn use_case_usage_tail(
         input,
         UseCaseUsage {
             name: ident,
-            type_name: header.type_name,
+            type_name: header.type_reference,
             is_abstract,
             body,
             membership,
@@ -148,39 +185,50 @@ fn then_use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ThenUseCaseU
 fn actor_redefinition_assignment(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
+    crate::parser::span::reference_transaction(input, actor_redefinition_assignment_inner)
+}
+
+fn actor_redefinition_assignment_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<ActorRedefinitionAssignment>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"actor"[..])).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b":>>"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, n) = name(input)?;
+    let (input, target) = qualified_reference(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
-    let (input, rhs) = take_until_terminator(input, b";")?;
+    let (input, value) = preceded(ws_and_comments, expression).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
         input,
-        node_from_to(start, input, ActorRedefinitionAssignment { name: n, rhs }),
+        node_from_to(start, input, ActorRedefinitionAssignment { target, value }),
     ))
 }
 
 fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition>> {
+    crate::parser::span::reference_transaction(input, ref_redefinition_inner)
+}
+
+fn ref_redefinition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"ref"[..])).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b":>>"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, n) = name(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let body_start = input;
-    let (input, _) = if input.fragment().starts_with(b"{") {
-        consume_use_case_structured_brace(input)
-    } else {
-        skip_statement_or_block(input)
-    }?;
-    let body = slice_text(body_start, input);
+    let (input, target) = qualified_reference(input)?;
+    let (body_start, _) = ws_and_comments(input)?;
+    let (input, body) = use_case_def_body(body_start)?;
     Ok((
         input,
-        node_from_to(start, input, RefRedefinition { name: n, body }),
+        node_from_to(
+            start,
+            input,
+            RefRedefinition {
+                target,
+                body: node_from_to(body_start, input, body),
+            },
+        ),
     ))
 }
 
@@ -191,6 +239,10 @@ fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition
 /// the output parameter (e.g. `return verdict : VerdictKind = ...`).
 /// This is tried before `return_ref` so that `return ref` forms still reach `return_ref`.
 fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>> {
+    crate::parser::span::reference_transaction(input, case_return_decl_inner)
+}
+
+fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -223,13 +275,17 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
         (input, false)
     };
     let (input, _) = ws_and_comments(input)?;
-    // Anonymous typed form: `return : Type [= expr];`
-    let (input, (name_span, n)) =
-        if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
-            (input, (crate::ast::Span::dummy(), String::new()))
-        } else {
-            with_span(name).parse(input)?
-        };
+    // A `:>>` form carries a semantic target, not a declaration name. Ordinary and anonymous
+    // return declarations keep those grammar alternatives structurally distinct.
+    let (input, (declaration_name, name_span, target)) = if is_redefine {
+        let (input, target) = qualified_reference(input)?;
+        (input, (String::new(), None, Some(target)))
+    } else if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
+        (input, (String::new(), None, None))
+    } else {
+        let (input, (span, declaration_name)) = with_span(name).parse(input)?;
+        (input, (declaration_name, Some(span), None))
+    };
     // Optional `: type` or `:> type`.
     let (input, _) = ws_and_comments(input)?;
     let (input, (is_subsetting, type_name)) = if input.fragment().starts_with(b":>>") {
@@ -237,12 +293,12 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
     } else if input.fragment().starts_with(b":>") {
         let (input, _) = tag(&b":>"[..]).parse(input)?;
         let (input, _) = ws_and_comments(input)?;
-        let (input, tn) = crate::parser::lex::qualified_name(input)?;
+        let (input, tn) = crate::parser::lex::qualified_reference(input)?;
         (input, (true, Some(tn)))
     } else if input.fragment().starts_with(b":") {
         let (input, _) = tag(&b":"[..]).parse(input)?;
         let (input, _) = ws_and_comments(input)?;
-        let (input, tn) = crate::parser::lex::qualified_name(input)?;
+        let (input, tn) = crate::parser::lex::qualified_reference(input)?;
         (input, (false, Some(tn)))
     } else {
         (input, (false, None))
@@ -260,11 +316,11 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
             start,
             input,
             CaseReturnDecl {
-                name: n,
-                name_span: Some(name_span),
+                declaration_name,
+                name_span,
+                target,
                 type_name,
                 value,
-                is_redefine,
                 is_subsetting,
                 feature_kind,
                 multiplicity,
@@ -273,28 +329,54 @@ fn case_return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<CaseReturnDecl>
     ))
 }
 
-fn return_ref_body(
-    input: Input<'_>,
-) -> IResult<Input<'_>, (String, Option<crate::ast::Node<crate::ast::Expression>>)> {
-    let body_start = input;
+fn return_ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRefBodyElement>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b"{") {
-        let (input, return_expression) = delimited(
-            preceded(ws_and_comments, tag(&b"{"[..])),
-            opt(return_expression_stmt),
-            preceded(ws_and_comments, tag(&b"}"[..])),
-        )
-        .parse(input)?;
-        let body = slice_text(body_start, input);
-        Ok((input, (body, return_expression)))
-    } else {
-        let (input, _) = skip_statement_or_block(input)?;
-        let body = slice_text(body_start, input);
-        Ok((input, (body, None)))
+    let (input, element) = alt((
+        map(doc_comment, ReturnRefBodyElement::Doc),
+        map(return_expression_stmt, ReturnRefBodyElement::Result),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, element)))
+}
+
+fn return_ref_body(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRefBody>> {
+    let (input, _) = ws_and_comments(input)?;
+    let start = input;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, node_from_to(start, input, ReturnRefBody::Semicolon)));
     }
+    let starters: &[&[u8]] = &[b"doc", b"return"];
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        starters,
+        "return reference body",
+        "recovered_return_ref_body_element",
+        return_ref_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                starters,
+                "return reference body",
+                "recovered_return_ref_body_element",
+            );
+            let error = node_from_to(start, end, recovery);
+            node_from_to(start, end, ReturnRefBodyElement::Error(error))
+        },
+    )?;
+    Ok((
+        input,
+        node_from_to(start, input, ReturnRefBody::Brace { elements }),
+    ))
 }
 
 fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
+    crate::parser::span::reference_transaction(input, return_ref_inner)
+}
+
+fn return_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -303,7 +385,7 @@ fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
     let (input, n) = name(input)?;
     let (input, mult) = opt(multiplicity_node).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, (body, return_expression)) = return_ref_body(input)?;
+    let (input, body) = return_ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -313,7 +395,6 @@ fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
                 name: n,
                 multiplicity: mult,
                 body,
-                return_expression,
             },
         ),
     ))
@@ -340,18 +421,6 @@ fn map_use_case_body_recovery(start: Input<'_>, end: Input<'_>) -> UseCaseDefBod
         let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
         UseCaseDefBodyElement::Other(preview)
     }
-}
-
-fn consume_use_case_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _elements) = parse_structured_brace_members(
-        input,
-        USE_CASE_BODY_STARTERS,
-        "use case body",
-        "recovered_use_case_body_element",
-        use_case_def_body_element,
-        |start, end| node_from_to(start, end, map_use_case_body_recovery(start, end)),
-    )?;
-    Ok((input, ()))
 }
 
 fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBodyElement> {
@@ -536,7 +605,25 @@ pub(crate) fn use_case_def_body_element(
             ),
             map(then_use_case_usage, UseCaseDefBodyElement::ThenUseCaseUsage),
             map(include_use_case, UseCaseDefBodyElement::IncludeUseCase),
-            map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
+            // Full `ref` declarations (`ref use case self : UseCase :>> Case::self;`, Systems
+            // Library `UseCases.sysml`; spec42 Gap 34). `ref_redefinition` first so the bare
+            // `ref :>> target { ... }` shorthand keeps its dedicated node; nested in a sub-alt
+            // to stay under nom's 21-branch limit. The directed parameter-member shorthand
+            // (`in scenario = cityScenario;`, `out voltage :> ... = ...;`; spec42 Gap 45)
+            // rides in the same sub-alt, mirroring `CalcDefBodyElement`'s wiring.
+            nom::branch::alt((
+                map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
+                map(crate::parser::connector::ref_decl, |n| {
+                    UseCaseDefBodyElement::Ref(Box::new(n))
+                }),
+                map(crate::parser::action::in_out_decl, |n| {
+                    UseCaseDefBodyElement::InOutDecl(Box::new(n))
+                }),
+            )),
+            map(
+                crate::parser::occurrence_body::assert_constraint_member,
+                UseCaseDefBodyElement::AssertConstraint,
+            ),
             map(case_return_decl, UseCaseDefBodyElement::CaseReturnDecl),
             map(return_ref, UseCaseDefBodyElement::ReturnRef),
             map(
@@ -639,6 +726,10 @@ fn directed_requirement_usage(
 }
 
 pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
+    crate::parser::span::reference_transaction(input, actor_usage_inner)
+}
+
+fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
@@ -655,8 +746,19 @@ pub(crate) fn actor_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsag
         let (input, n) = name(input)?;
         (input, n)
     };
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    // The typing is optional: `actor environment;` / `actor passenger [0..4];` (OMG spec
+    // Annex A; spec42 Gap 46). A bare `actor;` still fails (no name and no type).
+    let (input, type_name) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_reference),
+    ))
+    .parse(input)?;
+    if n.is_empty() && type_name.is_none() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((
@@ -704,10 +806,9 @@ pub(crate) fn objective(input: Input<'_>) -> IResult<Input<'_>, Node<Objective>>
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (continuation): Membership on UseCaseDef/UseCaseUsage ---
@@ -780,7 +881,15 @@ mod membership_tests {
             .expect("actor with multiplicity");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "passengers");
-        assert_eq!(node.value.type_name, "Person");
+        let _type_reference = node.value.type_name;
         assert!(node.value.multiplicity.is_some());
+    }
+
+    #[test]
+    fn failed_return_ref_rolls_back_nested_expression_references() {
+        let context = crate::parser::span::ParseContext::new();
+        let parsed = return_ref(context.input(b"return ref result { return Ghost::value;"));
+        assert!(parsed.is_err());
+        assert!(context.finish().is_empty());
     }
 }

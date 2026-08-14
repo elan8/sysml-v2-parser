@@ -130,7 +130,7 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
             input,
             EnumerationUsage {
                 name,
-                type_name: header.type_name,
+                type_name: header.type_reference,
                 multiplicity,
                 body,
                 is_end,
@@ -143,10 +143,9 @@ pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Enumeratio
 #[cfg(test)]
 mod membership_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // --- parser work item 4b (final sweep): Membership on EnumDef/EnumerationUsage ---
@@ -195,10 +194,9 @@ mod membership_tests {
 #[cfg(test)]
 mod enumerated_value_tests {
     use super::*;
-    use nom_locate::LocatedSpan;
 
     fn input(text: &str) -> Input<'_> {
-        LocatedSpan::new(text.as_bytes())
+        crate::parser::span::test_input(text)
     }
 
     // Regression coverage: `enumerated_value` used to return a bare `String`, so enumerated

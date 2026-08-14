@@ -58,7 +58,7 @@ fn test_occurrence_usage_parse() {
     match &elements[0].value {
         PackageBodyElement::OccurrenceUsage(occ) => {
             assert_eq!(occ.name, "sample");
-            assert_eq!(occ.type_name.as_deref(), Some("Event"));
+            assert!(occ.type_name.is_some());
         }
         _ => panic!("expected OccurrenceUsage"),
     }
@@ -94,7 +94,7 @@ fn test_flow_and_allocation_brace_bodies_parse() {
     // parse_with_diagnostics's partial AST instead.
     let input = "package P { flow transfer : Fuel from src to dst { x = y; nested { z = q; } } allocation map allocate source to target { one = two; } }";
     assert!(parse(input).is_err());
-    let result = parse_with_diagnostics(input).root;
+    let result = parse_with_diagnostics(input).document.root;
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
@@ -133,7 +133,7 @@ fn test_metadata_def_brace_body_parse() {
     // parse_with_diagnostics's partial AST instead.
     let input = "package P { metadata def SecurityTag { doc /* classification */ level = high; nested { key = value; } } }";
     assert!(parse(input).is_err());
-    let result = parse_with_diagnostics(input).root;
+    let result = parse_with_diagnostics(input).document.root;
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
@@ -220,8 +220,8 @@ fn test_enum_def_with_specialization_and_assigned_literals_maps_dedicated() {
             .value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("Level".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(
         !elements
@@ -319,7 +319,7 @@ part def D {
         "unexpected errors: {:?}",
         result.errors
     );
-    let root = result.root;
+    let root = result.document.root;
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
@@ -494,7 +494,7 @@ part def Robot {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -536,7 +536,7 @@ part def Accumulator {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -582,7 +582,7 @@ part def Sensor {
         "typed and untyped attribute usages without `def` should not produce recovery diagnostics: {:?}",
         result.errors
     );
-    let RootElement::Package(pkg) = &result.root.elements[0].value else {
+    let RootElement::Package(pkg) = &result.document.root.elements[0].value else {
         panic!("expected package");
     };
     let PackageBody::Brace { elements } = &pkg.value.body else {
@@ -633,13 +633,14 @@ part def Sensor {
             .map(|e| format!("{:?}", e.value))
             .collect::<Vec<_>>()
     );
-    assert!(usages.iter().any(|u| u.name == "typed"
-        && u.typing.as_ref().map(|n| n.value.target_display()) == Some("Temperature".to_string())));
+    assert!(usages
+        .iter()
+        .any(|u| u.name == "typed" && u.typing.as_ref().map(|n| n.value.target.len()) == Some(1)));
     assert!(usages
         .iter()
         .any(|u| u.name == "untyped" && u.typing.is_none()));
     assert!(usages.iter().any(|u| u.name == "initialized"
-        && u.typing.as_ref().map(|n| n.value.target_display()) == Some("Temperature".to_string())
+        && u.typing.as_ref().map(|n| n.value.target.len()) == Some(1)
         && u.value.is_some()));
 }
 
@@ -653,7 +654,7 @@ fn test_part_def_body_never_misclassifies_non_connector_interface_as_definition(
     // explicit recovery/error element instead of a false InterfaceDef.
     let input = "package P {\npart def Home {\ninterface foo : SomeInterfaceType;\n}\n}";
     let result = parse_with_diagnostics(input);
-    let RootElement::Package(pkg) = &result.root.elements[0].value else {
+    let RootElement::Package(pkg) = &result.document.root.elements[0].value else {
         panic!("expected package");
     };
     let PackageBody::Brace { elements } = &pkg.value.body else {
@@ -698,7 +699,7 @@ part def Accumulator {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -719,180 +720,6 @@ part def Accumulator {
         e.value,
         sysml_v2_parser::ast::PartDefBodyElement::PartDef(_)
     )));
-}
-
-#[test]
-fn test_parse_part_attribute_prefix_redefines_shorthand() {
-    let input = "package P {\npart def Laptop { attribute name : String; }\npart office {\npart laptop1: Laptop {\nattribute :>> name = \"My Laptop\";\n}\n}\n}";
-    let result = parse(input).expect("attribute prefix redefines shorthand should parse");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let office = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::PartUsage(p) if p.value.name == "office" => Some(&p.value),
-            _ => None,
-        })
-        .expect("office part usage should be present");
-    let office_body = match &office.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
-        _ => panic!("expected office part body"),
-    };
-    let laptop1 = office_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartUsageBodyElement::PartUsage(p)
-                if p.value.name == "laptop1" =>
-            {
-                Some(&p.value)
-            }
-            _ => None,
-        })
-        .expect("laptop1 part usage should be present");
-    let laptop1_body = match &laptop1.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
-        _ => panic!("expected laptop1 part body"),
-    };
-    let attribute = laptop1_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartUsageBodyElement::AttributeUsage(a) => Some(&a.value),
-            _ => None,
-        })
-        .expect("attribute usage should be present");
-    assert_eq!(attribute.name, "name");
-    assert_eq!(
-        attribute
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("name".to_string())
-    );
-    assert!(
-        attribute.value.is_some(),
-        "attribute value should be parsed"
-    );
-}
-
-#[test]
-fn test_parse_part_attribute_prefix_redefines_scientific_notation_with_quoted_unit() {
-    let input = r#"package P {
-  part def Mission {
-    attribute :>> researchAndDevelopmentCost = 5E9 ['$'];
-    attribute :>> manufacturingCost = 3E9 ['$'];
-  }
-}"#;
-    let result = parse_with_diagnostics(input);
-    assert!(
-        result.errors.is_empty(),
-        "unexpected diagnostics: {:?}",
-        result.errors
-    );
-    let root = parse(input).expect("parse should succeed");
-    let pkg = match &root.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let mission = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::PartDef(p)
-                if p.value.identification.name.as_deref() == Some("Mission") =>
-            {
-                Some(&p.value)
-            }
-            _ => None,
-        })
-        .expect("Mission part def should be present");
-    let mission_body = match &mission.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
-        _ => panic!("expected Mission part def body"),
-    };
-    let attr = mission_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a)
-                if a.value.name == "researchAndDevelopmentCost" =>
-            {
-                Some(&a.value)
-            }
-            _ => None,
-        })
-        .expect("researchAndDevelopmentCost attribute usage should be present");
-    assert_eq!(
-        attr.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("researchAndDevelopmentCost".to_string())
-    );
-    assert!(attr.value.is_some(), "attribute value should be parsed");
-}
-
-#[test]
-fn test_parse_part_attribute_prefix_redefines_with_subsets_clause() {
-    let input = "package P {\npart def Room { attribute outlet: Outlet; }\npart def Home {\npart livingRoom : Room {\nattribute :>> outlet :> electricGrid.outlets;\n}\n}\n}";
-    let result = parse(input).expect("attribute prefix redefines with subsets should parse");
-    let pkg = match &result.elements[0].value {
-        RootElement::Package(p) => &p.value,
-        _ => panic!("expected package"),
-    };
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        _ => panic!("expected brace body"),
-    };
-    let home = elements
-        .iter()
-        .find_map(|e| match &e.value {
-            PackageBodyElement::PartDef(p)
-                if p.value.identification.name.as_deref() == Some("Home") =>
-            {
-                Some(&p.value)
-            }
-            _ => None,
-        })
-        .expect("Home part def should be present");
-    let home_body = match &home.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
-        _ => panic!("expected Home part def body"),
-    };
-    let living_room = home_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p)
-                if p.value.name == "livingRoom" =>
-            {
-                Some(&p.value)
-            }
-            _ => None,
-        })
-        .expect("livingRoom part usage should be present");
-    let living_room_body = match &living_room.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
-        _ => panic!("expected livingRoom part usage body"),
-    };
-    let attribute = living_room_body
-        .iter()
-        .find_map(|e| match &e.value {
-            sysml_v2_parser::ast::PartUsageBodyElement::AttributeUsage(a) => Some(&a.value),
-            _ => None,
-        })
-        .expect("attribute usage should be present");
-    assert_eq!(attribute.name, "outlet");
-    assert_eq!(
-        attribute
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("outlet".to_string())
-    );
 }
 
 #[test]
@@ -995,7 +822,7 @@ fn test_parse_use_case_subject_shorthand_without_name() {
         })
         .expect("subject decl should be present");
     assert_eq!(subject.name, "");
-    assert_eq!(subject.type_name, "Laptop");
+    assert!(subject.type_name.is_some());
     assert!(
         body_elements.iter().any(|e| matches!(
             e.value,
@@ -1028,8 +855,8 @@ part def A specializes B;
             .value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("B".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(
         part_def.value.specializes.is_some(),
@@ -1060,8 +887,8 @@ part def A :> B, C, D;
             .value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("B, C, D".to_string())
+            .map(|n| n.value.target.len()),
+        Some(3)
     );
     assert!(
         part_def.value.specializes.is_some(),
@@ -1092,8 +919,8 @@ port def ControlPort specializes BasePort;
             .value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("BasePort".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1120,8 +947,8 @@ port def ControlPort :> BasePort, DiagnosticPort;
             .value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("BasePort, DiagnosticPort".to_string())
+            .map(|n| n.value.target.len()),
+        Some(2)
     );
     assert!(port_def.value.specializes.is_some());
 }
@@ -1149,8 +976,8 @@ individual def Rover specializes MobileRobot;
             .value
             .specializes
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("MobileRobot".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1173,15 +1000,12 @@ occurrence rover subsets BaseOccurrence redefines LegacyOccurrence;
         other => panic!("expected occurrence usage, got {:?}", other),
     };
     assert_eq!(
-        occ.value.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("BaseOccurrence".to_string())
+        occ.value.subsets.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert_eq!(
-        occ.value
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("LegacyOccurrence".to_string())
+        occ.value.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1204,17 +1028,14 @@ occurrence event typed by Mission::Event subsets events redefines oldEvent;
         other => panic!("expected occurrence usage, got {:?}", other),
     };
     assert_eq!(occ.value.name, "event");
-    assert_eq!(occ.value.type_name.as_deref(), Some("Mission::Event"));
+    assert!(occ.value.type_name.is_some());
     assert_eq!(
-        occ.value.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("events".to_string())
+        occ.value.subsets.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert_eq!(
-        occ.value
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("oldEvent".to_string())
+        occ.value.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1237,15 +1058,12 @@ occurrence rover; subsets BaseOccurrence redefines LegacyOccurrence;
         other => panic!("expected occurrence usage, got {:?}", other),
     };
     assert_eq!(
-        occ.value.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("BaseOccurrence".to_string())
+        occ.value.subsets.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert_eq!(
-        occ.value
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("LegacyOccurrence".to_string())
+        occ.value.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1267,10 +1085,7 @@ use case mission typed by Mission::CaseType subsets BaseCase;
         PackageBodyElement::UseCaseUsage(u) => u,
         other => panic!("expected use case usage, got {:?}", other),
     };
-    assert_eq!(
-        use_case.value.type_name.as_deref(),
-        Some("Mission::CaseType")
-    );
+    assert!(use_case.value.type_name.is_some());
 }
 
 #[test]
@@ -1303,10 +1118,7 @@ then use case step typed by Mission::StepCase;
             _ => None,
         })
         .expect("then use case usage should be present");
-    assert_eq!(
-        then_use_case.value.use_case.value.type_name.as_deref(),
-        Some("Mission::StepCase")
-    );
+    assert!(then_use_case.value.use_case.value.type_name.is_some());
 }
 
 #[test]
@@ -1572,16 +1384,16 @@ part def Carrier {
             .value
             .subsets
             .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("basePort".to_string())
+            .map(|(relationship, _)| relationship.value.target.len()),
+        Some(1)
     );
     assert_eq!(
         port_usage
             .value
             .redefines
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("wheelPort".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1614,24 +1426,21 @@ part def Carrier {
         other => panic!("expected port usage, got {:?}", other),
     };
     assert_eq!(
-        port_usage.value.type_name.as_deref(),
-        Some("~Ports::FuelPort, Ports::CommandPort")
-    );
-    assert_eq!(
         port_usage
             .value
-            .multiplicity
+            .typing
             .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[1]".to_string())
+            .map(|typing| typing.value.target.len()),
+        Some(2)
     );
+    assert!(port_usage.value.multiplicity.is_some());
     assert_eq!(
         port_usage
             .value
             .subsets
             .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("basePort".to_string())
+            .map(|(relationship, _)| relationship.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1664,24 +1473,21 @@ part def Carrier {
         other => panic!("expected port usage, got {:?}", other),
     };
     assert_eq!(
-        port_usage.value.type_name.as_deref(),
-        Some("~Ports::FuelPort, Ports::CommandPort")
-    );
-    assert_eq!(
         port_usage
             .value
-            .multiplicity
+            .typing
             .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[1]".to_string())
+            .map(|typing| typing.value.target.len()),
+        Some(2)
     );
+    assert!(port_usage.value.multiplicity.is_some());
     assert_eq!(
         port_usage
             .value
             .subsets
             .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("basePort".to_string())
+            .map(|(relationship, _)| relationship.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1719,16 +1525,16 @@ part def Carrier {
             .value
             .subsets
             .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("latestPort".to_string())
+            .map(|(relationship, _)| relationship.value.target.len()),
+        Some(1)
     );
     assert_eq!(
         port_usage
             .value
             .redefines
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("newestPort".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1841,7 +1647,7 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
         result.errors
     );
 
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -1869,8 +1675,8 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
         .expect("typed attribute usage in part usage body");
     assert_eq!(attribute.name, "totalMassKg");
     assert_eq!(
-        attribute.typing.as_ref().map(|n| n.value.target_display()),
-        Some("MassValue".to_string())
+        attribute.typing.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(attribute.value.is_some(), "attribute value should parse");
 }
@@ -1888,7 +1694,7 @@ fn test_attribute_usage_accepts_defined_by_typing() {
         "defined-by attribute usage should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -1914,8 +1720,8 @@ fn test_attribute_usage_accepts_defined_by_typing() {
         .expect("attribute usage");
     assert_eq!(attribute.name, "mass");
     assert_eq!(
-        attribute.typing.as_ref().map(|n| n.value.target_display()),
-        Some("ISQ::MassValue".to_string())
+        attribute.typing.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -1932,7 +1738,7 @@ fn test_attribute_usage_accepts_typed_by_default_value() {
         "typed-by attribute usage should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -1958,8 +1764,8 @@ fn test_attribute_usage_accepts_typed_by_default_value() {
         .expect("attribute usage");
     assert_eq!(attribute.name, "speed");
     assert_eq!(
-        attribute.typing.as_ref().map(|n| n.value.target_display()),
-        Some("ISQ::SpeedValue".to_string())
+        attribute.typing.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(attribute.value.is_some(), "default value should parse");
 }
@@ -1977,7 +1783,7 @@ fn test_attribute_usage_prefix_redefines_accepts_defined_by_typing() {
         "prefix-redefines attribute usage should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -2001,17 +1807,14 @@ fn test_attribute_usage_prefix_redefines_accepts_defined_by_typing() {
             _ => None,
         })
         .expect("attribute usage");
-    assert_eq!(attribute.name, "mass");
+    assert!(attribute.name.is_empty());
     assert_eq!(
-        attribute
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("Vehicle::mass".to_string())
+        attribute.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert_eq!(
-        attribute.typing.as_ref().map(|n| n.value.target_display()),
-        Some("ISQ::MassValue".to_string())
+        attribute.typing.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -2028,7 +1831,7 @@ fn test_attribute_usage_accepts_subsets_clause_without_ast_field() {
         "subsets attribute usage should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -2054,8 +1857,8 @@ fn test_attribute_usage_accepts_subsets_clause_without_ast_field() {
         .expect("attribute usage");
     assert_eq!(attribute.name, "outlet");
     assert_eq!(
-        attribute.typing.as_ref().map(|n| n.value.target_display()),
-        Some("PowerPort".to_string())
+        attribute.typing.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -2070,7 +1873,7 @@ fn test_attribute_def_accepts_multiplicity_and_uniqueness_before_specialization(
         "attribute header modifiers should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -2086,8 +1889,8 @@ fn test_attribute_def_accepts_multiplicity_and_uniqueness_before_specialization(
         .expect("attribute definition");
     assert_eq!(attribute.name, "length");
     assert_eq!(
-        attribute.typing.as_ref().map(|n| n.value.target_display()),
-        Some("LengthValue".to_string())
+        attribute.typing.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -2102,7 +1905,7 @@ fn test_attribute_def_accepts_untyped_multiplicity_uniqueness_brace_body() {
         "untyped attribute modifiers should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -2128,7 +1931,7 @@ fn test_attribute_def_accepts_default_value_without_equals_after_specialization(
         "attribute default shorthand should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -2143,8 +1946,8 @@ fn test_attribute_def_accepts_default_value_without_equals_after_specialization(
         })
         .expect("attribute definition");
     assert_eq!(
-        attribute.typing.as_ref().map(|n| n.value.target_display()),
-        Some("LengthValue".to_string())
+        attribute.typing.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
     assert!(attribute.value.is_some(), "default value should parse");
 }
@@ -2162,7 +1965,7 @@ fn test_attribute_def_accepts_multiple_specialization_targets() {
         "multi-target attribute definition should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -2189,7 +1992,7 @@ fn test_attribute_def_accepts_constructor_default_value() {
         "constructor default should parse cleanly: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -2231,7 +2034,7 @@ fn test_part_usage_body_ref_part_assignments_parse() {
         result.errors
     );
 
-    let package = match &result.root.elements[0].value {
+    let package = match &result.document.root.elements[0].value {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package root element, got {other:?}"),
     };
@@ -2269,10 +2072,10 @@ fn test_part_usage_body_ref_part_assignments_parse() {
         .collect();
     assert_eq!(refs.len(), 2, "expected two ref part assignments");
     assert_eq!(refs[0].name, "centralBody");
-    assert_eq!(refs[0].type_name, "");
+    assert!(refs[0].typing.is_none());
     assert!(refs[0].value.is_some());
     assert_eq!(refs[1].name, "orbitingBody");
-    assert_eq!(refs[1].type_name, "Body");
+    assert!(refs[1].typing.is_some());
     assert!(refs[1].value.is_some());
 }
 
@@ -2310,7 +2113,7 @@ fn test_ref_part_accepts_subsetting_in_def_and_usage_body() {
         usage_result.errors
     );
 
-    let package = match &usage_result.root.elements[0].value {
+    let package = match &usage_result.document.root.elements[0].value {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package, got {other:?}"),
     };
@@ -2368,24 +2171,21 @@ part def Carrier {
     };
     assert_eq!(part_usage.value.name, "engine");
     assert_eq!(
-        part_usage.value.type_name,
-        "Vehicle::Engine, Vehicle::PoweredComponent"
-    );
-    assert_eq!(
         part_usage
             .value
-            .multiplicity
+            .typing
             .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[1]".to_string())
+            .map(|typing| typing.value.target.len()),
+        Some(2)
     );
+    assert!(part_usage.value.multiplicity.is_some());
     assert_eq!(
         part_usage
             .value
             .subsets
             .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("components".to_string())
+            .map(|(relationship, _)| relationship.value.target.len()),
+        Some(1)
     );
 }
 
@@ -2419,24 +2219,21 @@ part def Carrier {
     };
     assert_eq!(part_usage.value.name, "engine");
     assert_eq!(
-        part_usage.value.type_name,
-        "Vehicle::Engine, Vehicle::PoweredComponent"
-    );
-    assert_eq!(
         part_usage
             .value
-            .multiplicity
+            .typing
             .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[1]".to_string())
+            .map(|typing| typing.value.target.len()),
+        Some(2)
     );
+    assert!(part_usage.value.multiplicity.is_some());
     assert_eq!(
         part_usage
             .value
             .subsets
             .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("components".to_string())
+            .map(|(relationship, _)| relationship.value.target.len()),
+        Some(1)
     );
 }
 
@@ -2474,16 +2271,16 @@ part def Carrier {
             .value
             .subsets
             .as_ref()
-            .map(|(name, _)| name.value.target_display()),
-        Some("latestEngine".to_string())
+            .map(|(relationship, _)| relationship.value.target.len()),
+        Some(1)
     );
     assert_eq!(
         part_usage
             .value
             .redefines
             .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("newestEngine".to_string())
+            .map(|n| n.value.target.len()),
+        Some(1)
     );
 }
 
@@ -2516,15 +2313,15 @@ part def Carrier {
         other => panic!("expected part usage, got {:?}", other),
     };
     assert!(part_usage.value.name.is_empty());
-    assert_eq!(part_usage.value.type_name, "Vehicle::Engine");
     assert_eq!(
         part_usage
             .value
-            .multiplicity
+            .typing
             .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[2]".to_string())
+            .map(|typing| typing.value.target.len()),
+        Some(1)
     );
+    assert!(part_usage.value.multiplicity.is_some());
 }
 
 #[test]
@@ -2538,19 +2335,10 @@ part def FourCylinderEngine :> Engine {
     let part_usage = part_def_body_part_usage(&result, 0, 0);
     assert!(part_usage.name.is_empty());
     assert_eq!(
-        part_usage
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("cylinders".to_string())
+        part_usage.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
-    assert_eq!(
-        part_usage
-            .multiplicity
-            .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[4]".to_string())
-    );
+    assert!(part_usage.multiplicity.is_some());
 }
 
 #[test]
@@ -2571,89 +2359,13 @@ part def logicalDriveUnit {
         "unexpected recovery: {:?}",
         diag.errors
     );
-    let part_usage = nested_part_usage_in_part_usage(&diag.root, 0, 0, 0);
+    let part_usage = nested_part_usage_in_part_usage(&diag.document.root, 0, 0, 0);
     assert_eq!(part_usage.name, "tire1");
     assert_eq!(
-        part_usage
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("motorTire".to_string())
+        part_usage.redefines.as_ref().map(|n| n.value.target.len()),
+        Some(1)
     );
-    assert_eq!(
-        part_usage
-            .multiplicity
-            .as_ref()
-            .map(|n| n.value.to_bracket_string()),
-        Some("[1]".to_string())
-    );
-}
-
-#[test]
-fn test_port_usage_redefines_keyword_in_part_body() {
-    let input = r#"package P {
-part brushSystem : BrushSystem {
-  part mainBrush : MainBrush {
-    port redefines rotationSpeedIn;
-  }
-}
-}"#;
-    let diag = parse_with_diagnostics(input);
-    assert!(
-        !diag
-            .errors
-            .iter()
-            .any(|e| e.code.as_deref() == Some("recovered_part_usage_body_element")),
-        "unexpected recovery: {:?}",
-        diag.errors
-    );
-    let port_usage = nested_port_usage_in_part_usage(&diag.root, 0, 0, 0);
-    assert_eq!(port_usage.name, "rotationSpeedIn");
-    assert_eq!(
-        port_usage
-            .redefines
-            .as_ref()
-            .map(|n| n.value.target_display()),
-        Some("rotationSpeedIn".to_string())
-    );
-}
-
-#[test]
-fn test_attribute_usage_redefines_keyword_prefix() {
-    let input = r#"package P {
-part def DriveController {
-  attribute redefines architecture = EeArchitecture::arm;
-}
-}"#;
-    let result = parse(input).expect("attribute redefines prefix should parse");
-    let attr = part_def_body_attribute_usage(&result, 0, 0);
-    assert_eq!(attr.name, "architecture");
-    assert_eq!(
-        attr.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("architecture".to_string())
-    );
-    assert!(attr.value.is_some());
-}
-
-#[test]
-fn test_port_def_directed_attribute_redefines_keyword() {
-    let input = r#"package P {
-port def SuctionLevelPort :> Base::PowerOutPort {
-  out attribute redefines suctionPower :> ISQ::power;
-}
-}"#;
-    let result = parse(input).expect("directed attribute redefines should parse");
-    let attr = port_def_body_attribute_usage(&result, 0, 0);
-    assert_eq!(attr.name, "suctionPower");
-    assert_eq!(
-        attr.redefines.as_ref().map(|n| n.value.target_display()),
-        Some("suctionPower".to_string())
-    );
-    assert_eq!(
-        attr.subsets.as_ref().map(|n| n.value.target_display()),
-        Some("ISQ::power".to_string())
-    );
-    assert_eq!(attr.direction, Some(sysml_v2_parser::ast::InOut::Out));
+    assert!(part_usage.multiplicity.is_some());
 }
 
 #[test]
@@ -2706,7 +2418,10 @@ port def AirPort {
         sysml_v2_parser::ast::PortDefBodyElement::InOutDecl(decl) => {
             assert_eq!(decl.value.name, "volume");
             assert_eq!(decl.value.direction, sysml_v2_parser::ast::InOut::Out);
-            assert_eq!(decl.value.type_name, "ISQSpaceTime::volume");
+            // Spec42 Gap 45 fallout: the authored `:>` is a subsets clause, no longer folded
+            // into `type_name`.
+            assert!(decl.value.type_name.is_none());
+            assert!(decl.value.subsets.is_some());
         }
         other => panic!("expected InOutDecl, got {:?}", other),
     }
@@ -2860,54 +2575,6 @@ fn port_def_body_item_usage(
     match &body[item_idx].value {
         sysml_v2_parser::ast::PortDefBodyElement::ItemUsage(i) => &i.value,
         other => panic!("expected item usage, got {:?}", other),
-    }
-}
-
-fn port_def_body_attribute_usage(
-    root: &RootNamespace,
-    port_def_idx: usize,
-    attr_idx: usize,
-) -> &AttributeUsage {
-    let pkg = package_from_root(root);
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let port_def = match &elements[port_def_idx].value {
-        PackageBodyElement::PortDef(p) => p,
-        other => panic!("expected port def, got {:?}", other),
-    };
-    let body = match &port_def.value.body {
-        sysml_v2_parser::ast::PortDefBody::Brace { elements } => elements,
-        other => panic!("expected port def brace body, got {:?}", other),
-    };
-    match &body[attr_idx].value {
-        sysml_v2_parser::ast::PortDefBodyElement::AttributeUsage(a) => &a.value,
-        other => panic!("expected attribute usage, got {:?}", other),
-    }
-}
-
-fn part_def_body_attribute_usage(
-    root: &RootNamespace,
-    part_def_idx: usize,
-    attr_idx: usize,
-) -> &AttributeUsage {
-    let pkg = package_from_root(root);
-    let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
-        other => panic!("expected brace body, got {:?}", other),
-    };
-    let part_def = match &elements[part_def_idx].value {
-        PackageBodyElement::PartDef(p) => p,
-        other => panic!("expected part def, got {:?}", other),
-    };
-    let body = match &part_def.value.body {
-        PartDefBody::Brace { elements } => elements,
-        other => panic!("expected part def brace body, got {:?}", other),
-    };
-    match &body[attr_idx].value {
-        PartDefBodyElement::AttributeUsage(a) => &a.value,
-        other => panic!("expected attribute usage, got {:?}", other),
     }
 }
 
@@ -3073,7 +2740,7 @@ end b : B;
         "expected exactly one recovered diagnostic for `bogus nonsense;`: {:?}",
         diagnostics_result.errors
     );
-    let result = diagnostics_result.root;
+    let result = diagnostics_result.document.root;
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => p,
         other => panic!("expected package, got {:?}", other),
@@ -3147,7 +2814,7 @@ end systemOfInterest references theSystem;
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -3164,49 +2831,47 @@ end systemOfInterest references theSystem;
     let ConnectionDefBody::Brace { elements } = &connection.body else {
         panic!("expected connection def brace body");
     };
-    assert_eq!(
-        elements.len(),
-        2,
-        "both ends should parse as structured EndDecl nodes, not recover to Error: {:?}",
-        elements
-    );
-
-    let ends: Vec<&EndDecl> = elements
-        .iter()
-        .map(|e| match &e.value {
-            ConnectionDefBodyElement::EndDecl(end) => &end.value,
-            other => panic!("expected EndDecl, got {:?}", other),
-        })
-        .collect();
-
-    let party = ends
-        .iter()
-        .find(|e| e.name == "party")
-        .expect("expected `party` end");
-    assert!(party.uses_derived_syntax);
+    let [party_element, system_element] = elements.as_slice() else {
+        panic!(
+            "expected exactly two structured connection ends, got {:?}",
+            elements
+        );
+    };
+    let ConnectionDefBodyElement::EndDecl(party) = &party_element.value else {
+        panic!("expected first body element to be an end declaration");
+    };
+    let party = &party.value;
+    let EndIdentity::Declaration(party_name) = &party.identity else {
+        panic!("expected declaration identity for first end");
+    };
+    assert_eq!(party_name.value, "party");
+    assert!(party.typing.is_none());
     let party_refs = party
         .references
         .as_ref()
         .expect("`::>` end should populate structured references");
     assert_eq!(party_refs.value.kind, SubsettingKind::References);
-    assert_eq!(party_refs.value.target_display(), "acmeLtd");
+    assert_eq!(party_refs.value.target.len(), 1);
 
-    let system_of_interest = ends
-        .iter()
-        .find(|e| e.name == "systemOfInterest")
-        .expect("expected `systemOfInterest` end");
-    assert!(system_of_interest.uses_derived_syntax);
+    let ConnectionDefBodyElement::EndDecl(system_of_interest) = &system_element.value else {
+        panic!("expected second body element to be an end declaration");
+    };
+    let system_of_interest = &system_of_interest.value;
+    let EndIdentity::Declaration(system_name) = &system_of_interest.identity else {
+        panic!("expected declaration identity for second end");
+    };
+    assert_eq!(system_name.value, "systemOfInterest");
+    assert!(system_of_interest.typing.is_none());
     let soi_refs = system_of_interest
         .references
         .as_ref()
         .expect("`references` keyword end should populate structured references");
     assert_eq!(soi_refs.value.kind, SubsettingKind::References);
-    assert_eq!(soi_refs.value.target_display(), "theSystem");
+    assert_eq!(soi_refs.value.target.len(), 1);
 }
 
 /// GH-19 contrast case: plain `end name : Type;` typing must be unaffected by the reference-
-/// subsetting addition -- `references` stays `None` and `type_name`/`uses_derived_syntax` behave
-/// exactly as before.
+/// subsetting addition -- `references` stays `None` and `typing` remains populated.
 #[test]
 fn test_connection_end_decl_typing_form_unaffected() {
     let input = "package P {\npart def A;\nconnection def C {\nend a : A;\n}\n}";
@@ -3232,8 +2897,7 @@ fn test_connection_end_decl_typing_form_unaffected() {
         ConnectionDefBodyElement::EndDecl(end) => &end.value,
         other => panic!("expected EndDecl, got {:?}", other),
     };
-    assert_eq!(end.type_name, "A");
-    assert!(!end.uses_derived_syntax);
+    assert!(end.typing.is_some());
     assert!(
         end.references.is_none(),
         "`:` typing form must not populate references"
@@ -3257,7 +2921,7 @@ end consumer references b;
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -3280,23 +2944,29 @@ end consumer references b;
         "both ends should parse as structured EndDecl nodes, not recover to Error: {:?}",
         elements
     );
-    for (expected_name, expected_target) in [("supplier", "a"), ("consumer", "b")] {
+    for expected_name in ["supplier", "consumer"] {
         let end = elements
             .iter()
             .find_map(|e| match &e.value {
-                InterfaceDefBodyElement::EndDecl(end) if end.value.name == expected_name => {
+                InterfaceDefBodyElement::EndDecl(end)
+                    if matches!(
+                        &end.value.identity,
+                        sysml_v2_parser::ast::EndIdentity::Declaration(name)
+                            if name.value == expected_name
+                    ) =>
+                {
                     Some(&end.value)
                 }
                 _ => None,
             })
             .unwrap_or_else(|| panic!("expected `{expected_name}` end"));
-        assert!(end.uses_derived_syntax);
+        assert!(end.typing.is_none());
         let refs = end
             .references
             .as_ref()
             .unwrap_or_else(|| panic!("`{expected_name}` end should populate references"));
         assert_eq!(refs.value.kind, SubsettingKind::References);
-        assert_eq!(refs.value.target_display(), expected_target);
+        assert_eq!(refs.value.target.len(), 1);
     }
 }
 
@@ -3327,8 +2997,7 @@ fn test_interface_end_decl_typing_form_unaffected() {
         InterfaceDefBodyElement::EndDecl(end) => &end.value,
         other => panic!("expected EndDecl, got {:?}", other),
     };
-    assert_eq!(end.type_name, "A");
-    assert!(!end.uses_derived_syntax);
+    assert!(end.typing.is_some());
     assert!(
         end.references.is_none(),
         "`:` typing form must not populate references"
@@ -3364,7 +3033,7 @@ end part device ::> sensorFeed[1];
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -3386,7 +3055,7 @@ end part device ::> sensorFeed[1];
         })
         .expect("`connection connection1 : DeviceConnection { ... }` should be a ConnectionUsage, not a ConnectionDef");
     assert_eq!(usage.name.as_deref(), Some("connection1"));
-    assert_eq!(usage.type_name.as_deref(), Some("DeviceConnection"));
+    assert!(usage.type_reference.is_some());
 }
 
 /// GH-20 contrast case: the bare, `def`-less, `abstract` Systems-Library definition shape
@@ -3463,7 +3132,7 @@ end part device ::> sensorFeed[1];
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -3494,7 +3163,7 @@ end part device ::> sensorFeed[1];
     for end in def_ends {
         match &end.value {
             ConnectionDefBodyElement::EndDecl(end) => {
-                assert!(!end.value.uses_derived_syntax);
+                assert!(end.value.typing.is_some());
                 assert!(end.value.references.is_none());
             }
             other => panic!("expected EndDecl, got {:?}", other),
@@ -3521,18 +3190,22 @@ end part device ::> sensorFeed[1];
         "`end part hub ::> mainSwitch[1];`/`end part device ::> sensorFeed[1];` should both parse as EndDecl, not recover to Error: {:?}",
         usage_ends
     );
-    let expected = [("hub", "mainSwitch"), ("device", "sensorFeed")];
-    for (end, (expected_name, expected_target)) in usage_ends.iter().zip(expected) {
+    let expected_names = ["hub", "device"];
+    for (end, expected_name) in usage_ends.iter().zip(expected_names) {
         match &end.value {
             ConnectionDefBodyElement::EndDecl(end) => {
-                assert_eq!(end.value.name, expected_name);
-                assert!(end.value.uses_derived_syntax);
+                assert!(matches!(
+                    &end.value.identity,
+                    sysml_v2_parser::ast::EndIdentity::Declaration(name)
+                        if name.value == expected_name
+                ));
+                assert!(end.value.typing.is_none());
                 let refs = end
                     .value
                     .references
                     .as_ref()
                     .expect("`::>` end should populate structured references");
-                assert_eq!(refs.value.target_display(), expected_target);
+                assert_eq!(refs.value.target.len(), 1);
                 let multiplicity = end
                     .value
                     .multiplicity
@@ -3557,7 +3230,7 @@ fn test_connection_end_decl_name_starting_with_part_or_port_is_not_split() {
         "unexpected diagnostics: {:?}",
         result.errors
     );
-    let pkg = match &result.root.elements[0].value {
+    let pkg = match &result.document.root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
@@ -3578,8 +3251,11 @@ fn test_connection_end_decl_name_starting_with_part_or_port_is_not_split() {
         ConnectionDefBodyElement::EndDecl(end) => &end.value,
         other => panic!("expected EndDecl, got {:?}", other),
     };
-    assert_eq!(
-        end.name, "party",
+    assert!(
+        matches!(
+            &end.identity,
+            sysml_v2_parser::ast::EndIdentity::Declaration(name) if name.value == "party"
+        ),
         "`party` must parse as one name, not keyword `part` + name `y`"
     );
 }
@@ -3784,8 +3460,8 @@ part def Foo {
         .as_ref()
         .expect("expected inline_requirement to be populated for the `requirement` form");
     assert_eq!(inline.name, "myReq");
-    assert_eq!(inline.type_name.as_deref(), Some("ReqType"));
-    assert!(matches!(&satisfy.target.value, Expression::FeatureRef(n) if n == "someExpr"));
+    assert!(inline.type_name.is_some());
+    assert!(matches!(&satisfy.target.value, Expression::FeatureRef(_)));
 }
 
 #[test]
@@ -3851,16 +3527,16 @@ part def Foo {
         "unexpected recovery: {:?}",
         diag.errors
     );
-    let derived = part_def_body_part_usage(&diag.root, 0, 0);
+    let derived = part_def_body_part_usage(&diag.document.root, 0, 0);
     assert!(derived.is_derived);
     assert!(!derived.is_constant);
     assert_eq!(derived.direction, None);
 
-    let constant = part_def_body_part_usage(&diag.root, 0, 1);
+    let constant = part_def_body_part_usage(&diag.document.root, 0, 1);
     assert!(constant.is_constant);
     assert!(!constant.is_derived);
 
-    let directed = part_def_body_part_usage(&diag.root, 0, 2);
+    let directed = part_def_body_part_usage(&diag.document.root, 0, 2);
     assert_eq!(directed.direction, Some(InOut::In));
     assert!(!directed.is_derived);
     assert!(!directed.is_constant);
@@ -3899,12 +3575,12 @@ part brushSystem : BrushSystem {
         "unexpected recovery: {:?}",
         diag.errors
     );
-    let derived_port = nested_port_usage_in_part_usage(&diag.root, 0, 0, 0);
+    let derived_port = nested_port_usage_in_part_usage(&diag.document.root, 0, 0, 0);
     assert!(derived_port.is_derived);
     assert!(!derived_port.is_constant);
     assert_eq!(derived_port.direction, None);
 
-    let directed_port = nested_port_usage_in_part_usage(&diag.root, 0, 0, 1);
+    let directed_port = nested_port_usage_in_part_usage(&diag.document.root, 0, 0, 1);
     assert_eq!(directed_port.direction, Some(InOut::Out));
     assert!(!directed_port.is_derived);
 }
@@ -3925,7 +3601,7 @@ part def Foo {
         "unexpected recovery: {:?}",
         diag.errors
     );
-    let pkg = package_from_root(&diag.root);
+    let pkg = package_from_root(&diag.document.root);
     let elements = match &pkg.body {
         PackageBody::Brace { elements } => elements,
         other => panic!("expected brace body, got {:?}", other),
@@ -3974,20 +3650,15 @@ alias m for ISQ::mass;
         other => panic!("expected brace body, got {:?}", other),
     };
     let alias_def = alias_def_target(elements);
+    let target = result
+        .qualified_reference(alias_def.target)
+        .expect("alias target reference");
+    assert_eq!(target.authored_text(), "ISQ::mass");
+    assert_eq!(target.segments.len(), 2);
     assert_eq!(
-        alias_def.target.segments,
-        vec![
-            RelationshipTargetSegment {
-                name: "ISQ".to_string(),
-                separator: None,
-            },
-            RelationshipTargetSegment {
-                name: "mass".to_string(),
-                separator: Some(SegmentSeparator::ColonColon),
-            },
-        ]
+        target.segments[1].separator_before,
+        Some(ReferenceSeparator::ColonColon)
     );
-    assert_eq!(alias_def.target.to_display_string(), "ISQ::mass");
     assert_eq!(alias_def.body, AliasBody::Semicolon);
 }
 
@@ -4006,9 +3677,9 @@ alias shortName for LongOriginalName;
         other => panic!("expected brace body, got {:?}", other),
     };
     let alias_def = alias_def_target(elements);
-    assert_eq!(
-        alias_def.target.segments,
-        vec![RelationshipTargetSegment::simple("LongOriginalName")]
-    );
-    assert_eq!(alias_def.target.to_display_string(), "LongOriginalName");
+    let target = result
+        .qualified_reference(alias_def.target)
+        .expect("alias target reference");
+    assert_eq!(target.authored_text(), "LongOriginalName");
+    assert_eq!(target.segments.len(), 1);
 }

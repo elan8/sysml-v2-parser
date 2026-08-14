@@ -1,8 +1,9 @@
 //! Public parse entry points.
 
-use super::collect_errors::{collect_recovery_errors, collect_requirement_id_dialect_diagnostics};
+use super::collect_errors::collect_recovery_errors;
+use super::delimiters::DelimiterScan;
 use super::diagnostics::{
-    dedup_errors, extra_closing_brace_at_eof, fragment_to_found_snippet, has_unclosed_brace,
+    dedup_errors, extra_closing_brace_at_eof, fragment_to_found_snippet,
     missing_closing_brace_error, missing_closing_brace_error_at_eof, nom_err_to_parse_error,
     root_body_recovery_error, root_body_scope, suppress_diagnostic_cascades,
     suppress_redundant_closing_brace_errors, trim_ascii_start,
@@ -10,9 +11,12 @@ use super::diagnostics::{
 };
 use super::lex;
 use super::package;
-use crate::ast::RootNamespace;
+use super::span::{node_from_to, ParseContext};
+use crate::ast::{
+    Node, PackageBodyElement, ParseErrorNode, ParsedDocument, RootElement, RootNamespace,
+    SourceStorage, Span,
+};
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
-use nom_locate::LocatedSpan;
 
 /// Maximum structural brace nesting accepted by the recursive-descent parser.
 ///
@@ -20,131 +24,34 @@ use nom_locate::LocatedSpan;
 /// pathological nesting before descent keeps parser stack usage bounded on every host.
 pub const MAX_SYNTAX_NESTING: usize = 32;
 
-/// Minimum stack headroom the parser requires from the *caller's* stack before it's safe to
-/// recurse on it as-is.
-///
-/// `stacker::maybe_grow` only samples remaining stack once, at this single outermost call --
-/// the recursive-descent grammar itself never re-checks -- so this has to be an upper bound on
-/// total stack the parser could use in the worst case (`MAX_SYNTAX_NESTING`-deep nesting in an
-/// unoptimized/debug build), not a small per-frame "red zone" like typical `maybe_grow` usage.
-/// Measured worst case is ~4 MiB; 16 MiB leaves generous margin. Most callers (default Windows
-/// main-thread stacks are ~1 MiB) will be below this and pay one one-time fiber/segment switch;
-/// callers that already provide a large stack skip it entirely.
-const PARSE_STACK_RED_ZONE: usize = 16 * 1024 * 1024;
-
-/// Size of the stack segment allocated when [`PARSE_STACK_RED_ZONE`] isn't already available.
-///
-/// The recursive-descent grammar walks the call stack once per structural nesting level (see
-/// `MAX_SYNTAX_NESTING`), and unoptimized (debug) builds spend far more stack per frame than
-/// release builds do -- large enough real-world models (e.g. the SysML v2 spec's own Annex A
-/// vehicle example) could exceed a thread's default stack purely from legitimate, bounded
-/// nesting and abort the process with `STATUS_STACK_OVERFLOW` instead of returning a
-/// [`ParseError`]. 64 MiB comfortably covers `MAX_SYNTAX_NESTING`-deep nesting in debug builds
-/// with headroom to spare.
-const PARSE_STACK_GROWTH: usize = 64 * 1024 * 1024;
-
-/// Runs `f` with extra stack headroom if the caller's stack doesn't already meet
-/// [`PARSE_STACK_RED_ZONE`].
-///
-/// See [`PARSE_STACK_GROWTH`] for why the recursive-descent parser needs this.
-fn with_parse_stack<R>(f: impl FnOnce() -> R) -> R {
-    stacker::maybe_grow(PARSE_STACK_RED_ZONE, PARSE_STACK_GROWTH, f)
+/// Build the `nesting_too_deep` diagnostic for the offending `{` recorded by the prescan.
+fn nesting_limit_error(input: &[u8], delimiters: &DelimiterScan) -> Option<ParseError> {
+    let offset = delimiters.nesting_overflow()?;
+    let prefix = &input[..offset];
+    let line = 1 + prefix.iter().filter(|&&b| b == b'\n').count();
+    let column = prefix
+        .iter()
+        .rposition(|&b| b == b'\n')
+        .map_or(offset + 1, |newline| offset - newline);
+    Some(
+        ParseError::new(format!(
+            "model nesting exceeds the supported limit of {MAX_SYNTAX_NESTING}"
+        ))
+        .with_location(offset, line as u32, column)
+        .with_length(1)
+        .with_code("nesting_too_deep")
+        .with_category(DiagnosticCategory::ParseError)
+        .with_suggestion(
+            "Split deeply nested declarations into packages or definitions referenced by name.",
+        ),
+    )
 }
 
-fn nesting_limit_error(input: &[u8]) -> Option<ParseError> {
-    let mut brace_depth = 0usize;
-    let mut block_comment_depth = 0usize;
-    let mut in_line_comment = false;
-    let mut quote = None;
-    let mut escaped = false;
-    let mut index = 0usize;
-
-    while index < input.len() {
-        let byte = input[index];
-        let next = input.get(index + 1).copied();
-
-        if in_line_comment {
-            if byte == b'\n' {
-                in_line_comment = false;
-            }
-            index += 1;
-            continue;
-        }
-        if block_comment_depth > 0 {
-            if byte == b'/' && next == Some(b'*') {
-                block_comment_depth += 1;
-                index += 2;
-            } else if byte == b'*' && next == Some(b'/') {
-                block_comment_depth -= 1;
-                index += 2;
-            } else {
-                index += 1;
-            }
-            continue;
-        }
-        if let Some(delimiter) = quote {
-            if escaped {
-                escaped = false;
-            } else if byte == b'\\' {
-                escaped = true;
-            } else if byte == delimiter {
-                quote = None;
-            }
-            index += 1;
-            continue;
-        }
-
-        match (byte, next) {
-            (b'/', Some(b'/')) => {
-                in_line_comment = true;
-                index += 2;
-            }
-            (b'/', Some(b'*')) => {
-                block_comment_depth = 1;
-                index += 2;
-            }
-            (b'"' | b'\'', _) => {
-                quote = Some(byte);
-                index += 1;
-            }
-            (b'{', _) => {
-                brace_depth += 1;
-                if brace_depth > MAX_SYNTAX_NESTING {
-                    let prefix = &input[..index];
-                    let line = 1 + prefix.iter().filter(|&&b| b == b'\n').count();
-                    let column = prefix
-                        .iter()
-                        .rposition(|&b| b == b'\n')
-                        .map_or(index + 1, |newline| index - newline);
-                    return Some(
-                        ParseError::new(format!(
-                            "model nesting exceeds the supported limit of {MAX_SYNTAX_NESTING}"
-                        ))
-                        .with_location(index, line as u32, column)
-                        .with_length(1)
-                        .with_code("nesting_too_deep")
-                        .with_category(DiagnosticCategory::ParseError)
-                        .with_suggestion(
-                            "Split deeply nested declarations into packages or definitions referenced by name.",
-                        ),
-                    );
-                }
-                index += 1;
-            }
-            (b'}', _) => {
-                brace_depth = brace_depth.saturating_sub(1);
-                index += 1;
-            }
-            _ => index += 1,
-        }
-    }
-    None
-}
 /// Result of parsing with error recovery: a (possibly partial) AST and zero or more diagnostics.
 #[derive(Debug, Clone)]
 pub struct ParseResult {
-    /// Root namespace; contains all successfully parsed top-level elements (partial when errors occurred).
-    pub root: RootNamespace,
+    /// Source, reference arena, and root AST. The AST is partial when errors occurred.
+    pub document: ParsedDocument,
     /// All parse errors encountered (multiple when recovery is used).
     pub errors: Vec<ParseError>,
 }
@@ -161,23 +68,43 @@ impl ParseResult {
 /// match (surfaced as an embedded recovery diagnostic, the same ones [`parse_with_diagnostics`]
 /// reports) so both entry points agree on whether a document is valid.
 #[allow(clippy::result_large_err)]
-pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
-    with_parse_stack(|| parse_root_inner(input))
+pub fn parse_root(input: &str) -> Result<ParsedDocument, ParseError> {
+    parse_root_inner(input)
+}
+
+/// Parse an owned source buffer without cloning the complete document.
+#[allow(clippy::result_large_err)]
+pub fn parse_root_owned(input: String) -> Result<ParsedDocument, ParseError> {
+    parse_root_source(SourceStorage::new(input))
 }
 
 #[allow(clippy::result_large_err)]
-fn parse_root_inner(input: &str) -> Result<RootNamespace, ParseError> {
-    let bytes = input
-        .strip_prefix('\u{FEFF}')
-        .map(str::as_bytes)
-        .unwrap_or_else(|| input.as_bytes());
-    let located = LocatedSpan::new(bytes);
-    if let Some(error) = nesting_limit_error(bytes) {
+fn parse_root_inner(input: &str) -> Result<ParsedDocument, ParseError> {
+    parse_root_source(SourceStorage::new(input.to_owned()))
+}
+
+#[allow(clippy::result_large_err)]
+fn parse_root_source(source: SourceStorage) -> Result<ParsedDocument, ParseError> {
+    let context = ParseContext::new();
+    let root = parse_root_namespace(source.as_str(), &context)?;
+    Ok(ParsedDocument {
+        source,
+        qualified_references: context.finish(),
+        root,
+    })
+}
+
+#[allow(clippy::result_large_err)]
+fn parse_root_namespace(source: &str, context: &ParseContext) -> Result<RootNamespace, ParseError> {
+    let bytes = source.as_bytes();
+    let located = context.input(bytes);
+    let delimiters = DelimiterScan::new(bytes);
+    if let Some(error) = nesting_limit_error(bytes, &delimiters) {
         return Err(error);
     }
     match package::root_namespace(located) {
         Ok((rest, root)) => {
-            if !rest.fragment().is_empty() && has_unclosed_brace(bytes) {
+            if !rest.fragment().is_empty() && delimiters.has_unclosed_brace() {
                 return Err(missing_closing_brace_error_at_eof(bytes));
             }
             if rest.fragment().is_empty() {
@@ -219,14 +146,14 @@ fn parse_root_inner(input: &str) -> Result<RootNamespace, ParseError> {
                 Err(pe)
             }
         }
-        Err(nom::Err::Error(e)) => Err(missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
+        Err(nom::Err::Error(e)) => Err(missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
             nom_err_to_parse_error(
                 &e,
                 None,
                 Some("package-body element at root (package, namespace, import, definition, or usage)"),
             )
         })),
-        Err(nom::Err::Failure(e)) => Err(missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
+        Err(nom::Err::Failure(e)) => Err(missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
             nom_err_to_parse_error(
                 &e,
                 None,
@@ -246,21 +173,41 @@ const MAX_RECOVERY_ERRORS: usize = 100;
 /// Parse input with error recovery: collects multiple diagnostics and returns a partial AST when errors occur.
 /// Use this for language servers so the user sees all parse errors and features (e.g. hover) can use the partial AST.
 pub fn parse_with_diagnostics(input: &str) -> ParseResult {
-    with_parse_stack(|| parse_with_diagnostics_inner(input))
+    parse_with_diagnostics_inner(input)
+}
+
+/// Parse an owned source buffer for editor use without cloning the complete document.
+pub fn parse_with_diagnostics_owned(input: String) -> ParseResult {
+    parse_with_diagnostics_source(SourceStorage::new(input))
 }
 
 fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
-    let bytes = input
-        .strip_prefix('\u{FEFF}')
-        .map(str::as_bytes)
-        .unwrap_or_else(|| input.as_bytes());
-    let located = LocatedSpan::new(bytes);
-    if let Some(error) = nesting_limit_error(bytes) {
-        return ParseResult {
-            root: RootNamespace { elements: vec![] },
-            errors: vec![error],
-        };
+    parse_with_diagnostics_source(SourceStorage::new(input.to_owned()))
+}
+
+fn parse_with_diagnostics_source(source: SourceStorage) -> ParseResult {
+    let context = ParseContext::new();
+    let (root, errors) = parse_with_diagnostics_document(source.as_str(), &context);
+    ParseResult {
+        document: ParsedDocument {
+            source,
+            qualified_references: context.finish(),
+            root,
+        },
+        errors,
     }
+}
+
+fn parse_with_diagnostics_document(
+    source: &str,
+    context: &ParseContext,
+) -> (RootNamespace, Vec<ParseError>) {
+    let bytes = source.as_bytes();
+    let delimiters = DelimiterScan::new(bytes);
+    if let Some(error) = nesting_limit_error(bytes, &delimiters) {
+        return (RootNamespace { elements: vec![] }, vec![error]);
+    }
+    let located = context.input(bytes);
 
     let mut elements = Vec::new();
     let mut errors = Vec::new();
@@ -268,12 +215,12 @@ fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
     let (mut input, _) = match lex::ws_and_comments(located) {
         Ok(x) => x,
         Err(_) => {
-            return ParseResult {
-                root: RootNamespace { elements: vec![] },
-                errors: vec![ParseError::new("invalid input")
+            return (
+                RootNamespace { elements: vec![] },
+                vec![ParseError::new("invalid input")
                     .with_code("invalid_input")
                     .with_category(DiagnosticCategory::ParseError)],
-            };
+            );
         }
     };
 
@@ -301,13 +248,40 @@ fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
                     continue;
                 }
                 if errors.is_empty()
-                    && has_unclosed_brace(bytes)
+                    && delimiters.has_unclosed_brace()
                     && (lex::starts_with_keyword(trimmed.fragment(), b"package")
                         || lex::starts_with_keyword(trimmed.fragment(), b"namespace")
                         || lex::starts_with_keyword(trimmed.fragment(), b"library")
                         || lex::starts_with_keyword(trimmed.fragment(), b"standard"))
                 {
-                    errors.push(missing_closing_brace_error_at_eof(bytes));
+                    let pe = missing_closing_brace_error_at_eof(bytes);
+                    errors.push(pe.clone());
+                    // Keep the entire unterminated root declaration as one explicit recovery
+                    // node. Returning an empty root here loses the user's source and prevents the
+                    // editor emitter from reproducing it while the closing brace is being typed.
+                    if let Ok((rest, _)) = lex::skip_to_next_balanced_sync_point(input) {
+                        if rest.location_offset() > input.location_offset() {
+                            let recovery = ParseErrorNode {
+                                message: pe.message,
+                                code: pe
+                                    .code
+                                    .unwrap_or_else(|| "missing_closing_brace".to_owned()),
+                                expected: pe.expected,
+                                found: pe.found,
+                                suggestion: pe.suggestion,
+                                category: pe.category,
+                            };
+                            let error =
+                                PackageBodyElement::Error(Node::new(Span::dummy(), recovery));
+                            let member = node_from_to(input, rest, error);
+                            elements.push(node_from_to(
+                                input,
+                                rest,
+                                RootElement::Member(Box::new(member)),
+                            ));
+                            input = rest;
+                        }
+                    }
                     break;
                 }
                 if let Some(scope) = root_body_scope(input.fragment()) {
@@ -325,18 +299,39 @@ fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
                         }
                     }
                 }
-                let pe = missing_closing_brace_error(bytes, e.input).unwrap_or_else(|| {
+                let pe = missing_closing_brace_error(bytes, e.input, &delimiters).unwrap_or_else(|| {
                     nom_err_to_parse_error(
                         &e,
                         None,
                         Some("package-body element at root (package, namespace, import, definition, or usage)"),
                     )
                 });
-                errors.push(pe);
-                let skip_result = lex::skip_to_next_sync_point(e.input);
+                let recovery_start = input;
+                errors.push(pe.clone());
+                let skip_result = lex::skip_to_next_balanced_sync_point(recovery_start);
                 match skip_result {
-                    Ok((rest, _)) => input = rest,
+                    Ok((rest, _)) if rest.location_offset() > recovery_start.location_offset() => {
+                        let recovery = ParseErrorNode {
+                            message: pe.message,
+                            code: pe
+                                .code
+                                .unwrap_or_else(|| "recovered_root_element".to_owned()),
+                            expected: pe.expected,
+                            found: pe.found,
+                            suggestion: pe.suggestion,
+                            category: pe.category,
+                        };
+                        let error = PackageBodyElement::Error(Node::new(Span::dummy(), recovery));
+                        let member = node_from_to(recovery_start, rest, error);
+                        elements.push(node_from_to(
+                            recovery_start,
+                            rest,
+                            RootElement::Member(Box::new(member)),
+                        ));
+                        input = rest;
+                    }
                     Err(_) => break,
+                    _ => break,
                 }
             }
             Err(nom::Err::Incomplete(_)) => {
@@ -366,9 +361,9 @@ fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
             )
         })
     {
-        if let Some(err) = extra_closing_brace_at_eof(bytes) {
+        if let Some(err) = extra_closing_brace_at_eof(bytes, &delimiters) {
             errors.push(err);
-        } else if has_unclosed_brace(bytes) {
+        } else if delimiters.has_unclosed_brace() {
             errors.push(missing_closing_brace_error_at_eof(bytes));
         }
     }
@@ -402,15 +397,11 @@ fn parse_with_diagnostics_inner(input: &str) -> ParseResult {
     errors.extend(collect_recovery_errors(&RootNamespace {
         elements: elements.clone(),
     }));
-    errors.extend(collect_requirement_id_dialect_diagnostics(bytes));
     errors = suppress_redundant_closing_brace_errors(errors);
     errors = dedup_errors(errors);
     errors = suppress_diagnostic_cascades(errors);
 
-    ParseResult {
-        root: RootNamespace { elements },
-        errors,
-    }
+    (RootNamespace { elements }, errors)
 }
 
 #[cfg(test)]
@@ -443,7 +434,7 @@ mod tests {
         source.push_str("}\n");
 
         let parsed = parse_root(&source).expect("large flat model");
-        assert_eq!(parsed.elements.len(), 1);
+        assert_eq!(parsed.root.elements.len(), 1);
     }
 
     #[test]
@@ -464,7 +455,8 @@ mod tests {
             "{".repeat(MAX_SYNTAX_NESTING + 1),
             "{".repeat(MAX_SYNTAX_NESTING + 1)
         );
-        let error = nesting_limit_error(source.as_bytes());
+        let bytes = source.as_bytes();
+        let error = nesting_limit_error(bytes, &DelimiterScan::new(bytes));
         assert!(error.is_none(), "comments and strings are not model scopes");
     }
 
@@ -504,9 +496,20 @@ mod tests {
     #[test]
     fn still_accepts_clean_input() {
         let source = "package P { part def A { attribute x : Real; } }";
-        let root = parse_root(source).expect("well-formed input should still parse");
-        assert_eq!(root.elements.len(), 1);
+        let document = parse_root(source).expect("well-formed input should still parse");
+        assert_eq!(document.root.elements.len(), 1);
         let editor = parse_with_diagnostics(source);
         assert!(editor.is_ok());
+    }
+
+    #[test]
+    fn parsed_documents_retain_the_bom_stripped_source() {
+        let source = "\u{FEFF}package P;";
+        let strict = parse_root(source).expect("well-formed input should parse");
+        assert_eq!(strict.source.as_str(), "package P;");
+
+        let editor = parse_with_diagnostics(source);
+        assert!(editor.is_ok());
+        assert_eq!(editor.document.source.as_str(), "package P;");
     }
 }
