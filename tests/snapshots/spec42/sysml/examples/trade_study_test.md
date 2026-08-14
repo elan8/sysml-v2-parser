@@ -44,7 +44,7 @@ package TradeStudyTest {
     part engine1 : Engine;
     part engine2 : Engine;
     analysis engineTradeStudy : TradeStudy {
-        subject  : Engine[1..*] = (engine1, engine2);
+        subject : Engine[1..*] = (engine1, engine2);
         objective : MaximizeObjective ;
         calc :>> evaluationFunction {
             in part  : Engine;

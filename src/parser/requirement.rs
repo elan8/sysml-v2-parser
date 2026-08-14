@@ -484,33 +484,16 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
     let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
 
-    // Bare binding: `subject = expr;`
-    if input.fragment().starts_with(b"=") {
-        let (input, _) = tag(&b"="[..]).parse(input)?;
-        let (input, value) = preceded(ws_and_comments, expression).parse(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        return Ok((
-            input,
-            node_from_to(
-                start,
-                input,
-                SubjectDecl {
-                    name: String::new(),
-                    type_name: None,
-                    multiplicity: None,
-                    value: Some(value),
-                },
-            ),
-        ));
-    }
-
-    // `subject` name? (`:` type)? multiplicity? (`=` value)? `;`
-    // Reject bare `subject;` — that is [`subject_ref`].
+    // `subject` name? redefines? (`:` type)? redefines? multiplicity? value? `;`
+    // Reject bare `subject;` — that is [`subject_ref`]. The anonymous forms start directly at
+    // `:`/`:>>`/`[`/`=`/`default` (`subject = expr;`, `subject :>> vehicle = vehicle_large;`,
+    // spec42 Gap 35).
     let (input, n) = {
         if input.fragment().starts_with(b":")
             || input.fragment().starts_with(b"[")
             || input.fragment().starts_with(b"=")
             || input.fragment().starts_with(b";")
+            || crate::parser::lex::starts_with_keyword(input.fragment(), b"default")
         {
             (input, String::new())
         } else {
@@ -518,17 +501,24 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
             (input, n)
         }
     };
+    // `:>>` may be authored before the typing (`subject subj :>> Case::subj;`, Systems Library
+    // `UseCases.sysml`) or after it; capture either spelling on the same field (spec42 Gap 35).
+    let (input, leading_redefines) = opt(crate::parser::usage::redefinition).parse(input)?;
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
         preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
+    let (input, trailing_redefines) = if leading_redefines.is_none() {
+        opt(crate::parser::usage::redefinition).parse(input)?
+    } else {
+        (input, None)
+    };
+    let redefines = leading_redefines.or(trailing_redefines);
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
-    let (input, value) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"="[..])),
-        preceded(ws_and_comments, expression),
-    ))
-    .parse(input)?;
+    // `= expr`, `default expr`, and `default = expr` all land on the shared `FeatureValue`
+    // clause (`subject generateTorque default engine1.generateTorque;`, OMG spec Annex A).
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     // `;` or a braced body (docs / nested members discarded for now — validation `08`
     // `subject vehicle : Vehicle { doc … }`).
     let (input, _) = alt((
@@ -536,7 +526,7 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
         map(structured_constraint_body, |_| ()),
     ))
     .parse(input)?;
-    if n.is_empty() && type_name.is_none() && value.is_none() {
+    if n.is_empty() && type_name.is_none() && value.is_none() && redefines.is_none() {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
@@ -550,6 +540,7 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
             SubjectDecl {
                 name: n,
                 type_name,
+                redefines,
                 multiplicity,
                 value,
             },
@@ -609,6 +600,7 @@ fn requirement_parameter_decl<'a>(
             SubjectDecl {
                 name: n,
                 type_name: Some(type_name),
+                redefines: None,
                 multiplicity: None,
                 value: None,
             },

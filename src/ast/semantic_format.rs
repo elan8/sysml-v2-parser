@@ -572,9 +572,14 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             } else {
                                 self.writer.write_str("none")?;
                             }
+                            self.writer.write_str(") (redefines ")?;
+                            match &subject.value.redefines {
+                                Some(redefines) => self.write_subsetting(&redefines.value)?,
+                                None => self.writer.write_str("none")?,
+                            }
                             self.writer.write_str(") (value ")?;
                             if let Some(value) = &subject.value.value {
-                                self.write_expression(value)?;
+                                self.write_feature_value(&value.value)?;
                             } else {
                                 self.writer.write_str("none")?;
                             }

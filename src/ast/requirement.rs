@@ -118,8 +118,14 @@ impl PartialEq for PurposeMember {
 pub struct SubjectDecl {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// `:>>`/`redefines` redefinition clause (`subject subj :>> Case::subj;`, or the type-less
+    /// anonymous form `subject :>> vehicle = vehicle_large;`; spec42 Gap 35).
+    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
-    pub value: Option<Node<Expression>>,
+    /// `= expr` / `default expr` value clause (`subject generateTorque default
+    /// engine1.generateTorque;`, OMG spec Annex A; spec42 Gap 35 widened this from a bare
+    /// `=`-only `Expression`).
+    pub value: Option<Node<crate::ast::FeatureValue>>,
 }
 
 /// Actor parameter in a requirement body: `actor` name? `:` type `;`.

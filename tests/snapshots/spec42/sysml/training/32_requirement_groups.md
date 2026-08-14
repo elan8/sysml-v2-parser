@@ -68,10 +68,10 @@ package 'Requirement Groups' {
         /* Engine power requirements group */
         subject engine : Engine;
         requirement drivePowerInterface : DrivePowerInterface {
-            subject  = engine.clutchPort;
+            subject = engine.clutchPort;
         }
         requirement torqueGeneration : TorqueGeneration {
-            subject  = engine.generateTorque;
+            subject = engine.generateTorque;
         }
     }
 }

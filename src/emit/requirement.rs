@@ -324,20 +324,23 @@ fn emit_verify_requirement(
 }
 
 fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<(), EmitError> {
-    w.push_str("subject ");
+    w.push_str("subject");
     if !subject.name.is_empty() {
+        w.push_char(' ');
         w.push_str(&format_name(&subject.name));
     }
     if let Some(type_name) = subject.type_name {
         w.push_str(" : ");
         w.push_qualified_reference("subject/type", type_name)?;
     }
+    if let Some(redefines) = &subject.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
+    }
     if let Some(mult) = &subject.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
     if let Some(value) = &subject.value {
-        w.push_str(" = ");
-        emit_expression(w, &value.value)?;
+        super::expr::emit_feature_value(w, value)?;
     }
     w.push_char(';');
     Ok(())

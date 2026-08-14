@@ -66,7 +66,7 @@ package AnalysisTest {
     analysis def AnalysisCase {
         subject v : V;
         objective obj : AnalysisObjective  {
-            subject  = result;
+            subject = result;
         }
         v.m;
     }

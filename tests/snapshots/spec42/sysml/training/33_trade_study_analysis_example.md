@@ -89,7 +89,7 @@ package 'Trade Study Analysis Example' {
         return evaluation : Real;
     }
     analysis engineTradeStudy : TradeStudy {
-        subject  : Engine = (engine4cyl, engine6cyl);
+        subject : Engine = (engine4cyl, engine6cyl);
         objective : MaximizeObjective ;
         calc :>> evaluationFunction {
             in part anEngine : Engine :>> alternative;

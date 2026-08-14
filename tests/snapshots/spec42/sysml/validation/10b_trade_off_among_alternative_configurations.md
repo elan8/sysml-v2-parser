@@ -173,7 +173,7 @@ package '10b-Trade-off Among Alternative Configurations' {
             return evaluation : Real;
         }
         analysis engineTradeStudy : TradeStudy {
-            subject  : Engine[1..*] = all engineChoice;
+            subject : Engine[1..*] = all engineChoice;
             objective : MaximizeObjective ;
             calc :>> evaluationFunction {
                 in part anEngine : Engine :>> alternative;

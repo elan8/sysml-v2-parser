@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 125.** `SubjectDecl` gains a `redefines:
+  Option<Node<SubsettingRelationship>>` clause (`subject subj :>> Case::subj;`, and the
+  anonymous type-less `subject :>> vehicle = vehicle_large;`) and its `value` widens from a
+  bare `=`-only `Expression` to the shared `FeatureValue` clause, adding the `default`-keyword
+  spelling (`subject generateTorque default engine1.generateTorque;`, OMG spec Annex A;
+  spec42 gap 35). Subject emission no longer prints a double space for anonymous subjects.
 - **`PARSE_AST_VERSION` is now 124.** `RelationshipBodyElement` gains a
   `KermlFeature(Box<Node<KermlFeatureMember>>)` variant: braced `RelationshipBody` forms
   (dependency/alias/relationship-statement bodies) now own feature members (`dependency z to
