@@ -795,8 +795,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_reference(include.value.target)?;
                             self.writer.write_str("))")?;
                         }
-                        UseCaseDefBodyElement::Ref(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        UseCaseDefBodyElement::Ref(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         UseCaseDefBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "in-out")?;
@@ -970,8 +971,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         StateDefBodyElement::FinalState(_state) => {
                             self.write_marker(&mut first, "final-state")?;
                         }
-                        StateDefBodyElement::Ref(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        StateDefBodyElement::Ref(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         StateDefBodyElement::RequirementUsage(_usage) => {
                             self.write_marker(&mut first, "requirement-usage")?;
@@ -1099,8 +1101,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::ItemUsage(_usage) => {
                             self.write_marker(&mut first, "item-usage")?;
                         }
-                        PartDefBodyElement::Ref(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        PartDefBodyElement::Ref(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         PartDefBodyElement::PortUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1527,7 +1530,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::TextualRep(_text) => {
                 self.writer.write_str("(textual-representation)")
             }
-            ActionDefBodyElement::RefDecl(_reference) => self.writer.write_str("(ref)"),
+            ActionDefBodyElement::RefDecl(declaration) => {
+                self.write_ref_declaration(&declaration.value)
+            }
             ActionDefBodyElement::Perform(perform) => self.write_perform(&perform.value),
             ActionDefBodyElement::Bind(_bind) => self.writer.write_str("(bind)"),
             ActionDefBodyElement::FlowUsage(_flow) => self.writer.write_str("(flow-usage)"),
@@ -1646,8 +1651,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
                         }
-                        InterfaceDefBodyElement::RefDecl(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        InterfaceDefBodyElement::RefDecl(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         InterfaceDefBodyElement::ConnectStmt(_connect) => {
                             self.write_marker(&mut first, "connect")?;
@@ -1699,8 +1705,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
                         }
-                        ConnectionDefBodyElement::RefDecl(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        ConnectionDefBodyElement::RefDecl(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         ConnectionDefBodyElement::ConnectStmt(_connect) => {
                             self.write_marker(&mut first, "connect")?;
@@ -1745,6 +1752,210 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                     }
                 }
                 self.writer.write_char(')')
+            }
+        }
+    }
+
+    /// One projection for a `ref` declaration, shared by every scope that owns one.
+    ///
+    /// `UsageBody = DefinitionBody`, so a `ref` body holds the same members wherever it appears.
+    /// Rendering it as a bare marker per owner would hide exactly the differences that matter --
+    /// which members parsed, in what order, under which owner -- so every owner uses this.
+    fn write_ref_declaration(&mut self, declaration: &super::RefDecl) -> io::Result<()> {
+        self.writer.write_str("(ref (name ")?;
+        write_quoted(self.writer, &declaration.name)?;
+        self.writer.write_str(") (kind ")?;
+        match declaration.kind_keyword {
+            Some(kind) => self.writer.write_str(kind.as_str())?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &declaration.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("redefines", declaration.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", declaration.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_ref_body(&declaration.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_ref_body(&mut self, body: &super::RefBody) -> io::Result<()> {
+        match body {
+            super::RefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::RefBody::Brace { elements, .. } => {
+                self.writer.write_str("(body ")?;
+                let mut first = true;
+                for element in elements {
+                    match &element.value {
+                        super::PartUsageBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::PartUsageBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::PartUsageBodyElement::Annotation(_member) => {
+                            self.write_marker(&mut first, "annotation")?;
+                        }
+                        super::PartUsageBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        super::PartUsageBodyElement::DefaultReferenceUsage(_member) => {
+                            self.write_marker(&mut first, "default-reference-usage")?;
+                        }
+                        super::PartUsageBodyElement::EnumerationUsage(_member) => {
+                            self.write_marker(&mut first, "enumeration-usage")?;
+                        }
+                        super::PartUsageBodyElement::PartUsage(_member) => {
+                            self.write_marker(&mut first, "part-usage")?;
+                        }
+                        super::PartUsageBodyElement::OccurrenceUsage(_member) => {
+                            self.write_marker(&mut first, "occurrence-usage")?;
+                        }
+                        super::PartUsageBodyElement::PortUsage(_member) => {
+                            self.write_marker(&mut first, "port-usage")?;
+                        }
+                        super::PartUsageBodyElement::Bind(_member) => {
+                            self.write_marker(&mut first, "bind")?;
+                        }
+                        // A nested `ref` projects the same way, so an owner cannot hide what
+                        // its nested declarations hold either.
+                        super::PartUsageBodyElement::Ref(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
+                        }
+                        super::PartUsageBodyElement::InterfaceUsage(_member) => {
+                            self.write_marker(&mut first, "interface-usage")?;
+                        }
+                        super::PartUsageBodyElement::Connect(_member) => {
+                            self.write_marker(&mut first, "connect")?;
+                        }
+                        super::PartUsageBodyElement::FlowUsage(_member) => {
+                            self.write_marker(&mut first, "flow-usage")?;
+                        }
+                        super::PartUsageBodyElement::Perform(_member) => {
+                            self.write_marker(&mut first, "perform")?;
+                        }
+                        super::PartUsageBodyElement::SuccessionUsage(_member) => {
+                            self.write_marker(&mut first, "succession-usage")?;
+                        }
+                        super::PartUsageBodyElement::Allocate(_member) => {
+                            self.write_marker(&mut first, "allocate")?;
+                        }
+                        super::PartUsageBodyElement::Satisfy(_member) => {
+                            self.write_marker(&mut first, "satisfy")?;
+                        }
+                        super::PartUsageBodyElement::StateUsage(_member) => {
+                            self.write_marker(&mut first, "state-usage")?;
+                        }
+                        super::PartUsageBodyElement::ActionUsage(_member) => {
+                            self.write_marker(&mut first, "action-usage")?;
+                        }
+                        super::PartUsageBodyElement::MetadataKeywordUsage(_member) => {
+                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        }
+                        super::PartUsageBodyElement::VariantUsage(_member) => {
+                            self.write_marker(&mut first, "variant-usage")?;
+                        }
+                        super::PartUsageBodyElement::StateDef(_member) => {
+                            self.write_marker(&mut first, "state-def")?;
+                        }
+                        super::PartUsageBodyElement::MetadataDef(_member) => {
+                            self.write_marker(&mut first, "metadata-def")?;
+                        }
+                        super::PartUsageBodyElement::FlowDef(_member) => {
+                            self.write_marker(&mut first, "flow-def")?;
+                        }
+                        super::PartUsageBodyElement::RequirementDef(_member) => {
+                            self.write_marker(&mut first, "requirement-def")?;
+                        }
+                        super::PartUsageBodyElement::OccurrenceDef(_member) => {
+                            self.write_marker(&mut first, "occurrence-def")?;
+                        }
+                        super::PartUsageBodyElement::PortDef(_member) => {
+                            self.write_marker(&mut first, "port-def")?;
+                        }
+                        super::PartUsageBodyElement::CalcDef(_member) => {
+                            self.write_marker(&mut first, "calc-def")?;
+                        }
+                        super::PartUsageBodyElement::ConnectionDef(_member) => {
+                            self.write_marker(&mut first, "connection-def")?;
+                        }
+                        super::PartUsageBodyElement::EnumDef(_member) => {
+                            self.write_marker(&mut first, "enum-def")?;
+                        }
+                        super::PartUsageBodyElement::Connection(_member) => {
+                            self.write_marker(&mut first, "connection")?;
+                        }
+                        super::PartUsageBodyElement::AssertConstraint(_member) => {
+                            self.write_marker(&mut first, "assert-constraint")?;
+                        }
+                        super::PartUsageBodyElement::ConstraintDef(_member) => {
+                            self.write_marker(&mut first, "constraint-def")?;
+                        }
+                        super::PartUsageBodyElement::ConstraintUsage(_member) => {
+                            self.write_marker(&mut first, "constraint-usage")?;
+                        }
+                        super::PartUsageBodyElement::CalcUsage(_member) => {
+                            self.write_marker(&mut first, "calc-usage")?;
+                        }
+                        super::PartUsageBodyElement::Import(_member) => {
+                            self.write_marker(&mut first, "import")?;
+                        }
+                        super::PartUsageBodyElement::RequirementUsage(_member) => {
+                            self.write_marker(&mut first, "requirement-usage")?;
+                        }
+                        super::PartUsageBodyElement::ItemDef(_member) => {
+                            self.write_marker(&mut first, "item-def")?;
+                        }
+                        super::PartUsageBodyElement::ItemUsage(_member) => {
+                            self.write_marker(&mut first, "item-usage")?;
+                        }
+                        super::PartUsageBodyElement::MetadataUsage(_member) => {
+                            self.write_marker(&mut first, "metadata-usage")?;
+                        }
+                        super::PartUsageBodyElement::AnalysisCaseDef(_member) => {
+                            self.write_marker(&mut first, "analysis-case-def")?;
+                        }
+                        super::PartUsageBodyElement::AnalysisCaseUsage(_member) => {
+                            self.write_marker(&mut first, "analysis-case-usage")?;
+                        }
+                        super::PartUsageBodyElement::AliasDef(_member) => {
+                            self.write_marker(&mut first, "alias-def")?;
+                        }
+                        super::PartUsageBodyElement::IncludeUseCase(_member) => {
+                            self.write_marker(&mut first, "include-use-case")?;
+                        }
+                        super::PartUsageBodyElement::UseCaseUsage(_member) => {
+                            self.write_marker(&mut first, "use-case-usage")?;
+                        }
+                        super::PartUsageBodyElement::VerificationCaseUsage(_member) => {
+                            self.write_marker(&mut first, "verification-case-usage")?;
+                        }
+                        super::PartUsageBodyElement::KermlClassifier(_member) => {
+                            self.write_marker(&mut first, "kerml-classifier")?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_annotating_member(&mut self, member: &super::AnnotatingMember) -> io::Result<()> {
+        match member {
+            super::AnnotatingMember::Doc(_) => self.writer.write_str("(doc)"),
+            super::AnnotatingMember::Comment(_) => self.writer.write_str("(comment)"),
+            super::AnnotatingMember::TextualRep(_) => self.writer.write_str("(textual-rep)"),
+            super::AnnotatingMember::MetadataAnnotation(_) => {
+                self.writer.write_str("(metadata-annotation)")
             }
         }
     }
@@ -2507,7 +2718,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::InterfaceUsage(_usage) => {
                 self.write_marker(first, "interface-usage")
             }
-            PackageBodyElement::Ref(_reference) => self.write_marker(first, "ref"),
+            PackageBodyElement::Ref(declaration) => {
+                self.write_item_prefix(first)?;
+                self.write_ref_declaration(&declaration.value)
+            }
             PackageBodyElement::EnumerationUsage(_usage) => {
                 self.write_marker(first, "enumeration-usage")
             }

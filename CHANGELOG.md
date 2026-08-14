@@ -54,6 +54,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never claims coverage the parser lacks. `#Name` prefix metadata stays separate: it is
   `PrefixMetadataMember`, a prefix on a declaration rather than a body member.
 
+### Changed
+
+- **`ref` declarations project their structure in semantic snapshots.** Every scope rendered one
+  as a bare `(ref)` marker, so the snapshot could not show which members a `ref` body held, in what
+  order, or with what typing -- the invariant that one `ref` body parser exists to guarantee. One
+  projection now serves every owner, recursing into nested `ref` declarations, and reference
+  labels appear for the identities inside them, which were previously absent from the snapshot's
+  reference list entirely.
+
 ### Fixed
 
 - **An import with a braced body could not be serialized.** Its target span ran past the reference

@@ -29,7 +29,12 @@ part def Part {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 30) (line 2) (column 15) (len 4)) (segments (segment 0 (token "Part") (name "Part") (separator none) (span (offset 30) (line 2) (column 15) (len 4)))))
+    (reference r1 (scope relative) (span (offset 39) (line 2) (column 24) (len 10)) (segments (segment 0 (token "Item") (name "Item") (separator none) (span (offset 39) (line 2) (column 24) (len 4))) (segment 1 (token "self") (name "self") (separator colon-colon) (span (offset 45) (line 2) (column 30) (len 4)))))
+    (reference r2 (scope relative) (span (offset 67) (line 3) (column 17) (len 4)) (segments (segment 0 (token "Part") (name "Part") (separator none) (span (offset 67) (line 3) (column 17) (len 4)))))
+    (reference r3 (scope relative) (span (offset 76) (line 3) (column 26) (len 12)) (segments (segment 0 (token "Item") (name "Item") (separator none) (span (offset 76) (line 3) (column 26) (len 4))) (segment 1 (token "helper") (name "helper") (separator colon-colon) (span (offset 82) (line 3) (column 32) (len 6)))))
+    (reference r4 (scope relative) (span (offset 92) (line 3) (column 42) (len 7)) (segments (segment 0 (token "related") (name "related") (separator none) (span (offset 92) (line 3) (column 42) (len 7)))))
   )
-  (root (part-def (name "Part") (body (ref) (ref))))
+  (root (part-def (name "Part") (body (ref (name "self") (kind none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (redefines (relationship (kind redefines) (implied false) (targets (ref r1)))) (subsets none) (body semicolon)) (ref (name "helper") (kind none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (redefines (relationship (kind redefines) (implied false) (targets (ref r3)))) (subsets (relationship (kind subsets) (implied false) (targets (ref r4)))) (body semicolon)))))
 )
 ~~~
