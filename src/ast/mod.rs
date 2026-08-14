@@ -1707,6 +1707,10 @@ fn normalize_state_def_body_element_node(
             EntryAction {
                 action_reference: node.value.action_reference,
                 has_action_keyword: node.value.has_action_keyword,
+                declared_name: node.value.declared_name.clone(),
+                type_name: node.value.type_name,
+                redefines: node.value.redefines.clone(),
+                effect: node.value.effect.clone(),
                 body: normalize_state_def_body(&node.value.body),
             },
         )),
@@ -1715,6 +1719,10 @@ fn normalize_state_def_body_element_node(
             DoAction {
                 action_reference: node.value.action_reference,
                 has_action_keyword: node.value.has_action_keyword,
+                declared_name: node.value.declared_name.clone(),
+                type_name: node.value.type_name,
+                redefines: node.value.redefines.clone(),
+                effect: node.value.effect.clone(),
                 body: normalize_state_def_body(&node.value.body),
             },
         )),
@@ -1723,6 +1731,10 @@ fn normalize_state_def_body_element_node(
             ExitAction {
                 action_reference: node.value.action_reference,
                 has_action_keyword: node.value.has_action_keyword,
+                declared_name: node.value.declared_name.clone(),
+                type_name: node.value.type_name,
+                redefines: node.value.redefines.clone(),
+                effect: node.value.effect.clone(),
                 body: normalize_state_def_body(&node.value.body),
             },
         )),

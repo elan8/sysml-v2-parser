@@ -928,6 +928,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                                 "entry",
                                 entry.value.has_action_keyword,
                                 entry.value.action_reference,
+                                entry.value.declared_name.as_deref(),
+                                entry.value.type_name,
+                                entry.value.redefines.as_ref().map(|n| &n.value),
+                                entry.value.effect.is_some(),
                                 &entry.value.body,
                             )?;
                         }
@@ -937,6 +941,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                                 "do",
                                 action.value.has_action_keyword,
                                 action.value.action_reference,
+                                action.value.declared_name.as_deref(),
+                                action.value.type_name,
+                                action.value.redefines.as_ref().map(|n| &n.value),
+                                action.value.effect.is_some(),
                                 &action.value.body,
                             )?;
                         }
@@ -946,6 +954,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                                 "exit",
                                 exit.value.has_action_keyword,
                                 exit.value.action_reference,
+                                exit.value.declared_name.as_deref(),
+                                exit.value.type_name,
+                                exit.value.redefines.as_ref().map(|n| &n.value),
+                                exit.value.effect.is_some(),
                                 &exit.value.body,
                             )?;
                         }
@@ -977,11 +989,16 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_state_behavior_action(
         &mut self,
         kind: &str,
         has_action_keyword: bool,
         action_reference: Option<QualifiedReferenceId>,
+        declared_name: Option<&str>,
+        type_name: Option<QualifiedReferenceId>,
+        redefines: Option<&SubsettingRelationship>,
+        has_effect: bool,
         body: &StateDefBody,
     ) -> io::Result<()> {
         write!(
@@ -993,7 +1010,19 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         } else {
             self.writer.write_str("none")?;
         }
-        self.writer.write_str(") ")?;
+        self.writer.write_str(") (declared-name ")?;
+        write_optional_quoted(self.writer, declared_name)?;
+        self.writer.write_str(") (type ")?;
+        match type_name {
+            Some(reference) => self.write_reference(reference)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (redefines ")?;
+        match redefines {
+            Some(redefines) => self.write_subsetting(redefines)?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(self.writer, ") (effect {has_effect}) ")?;
         self.write_state_body(body)?;
         self.writer.write_char(')')
     }

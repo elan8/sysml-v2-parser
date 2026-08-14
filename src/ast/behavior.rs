@@ -896,6 +896,18 @@ pub struct EntryAction {
     pub action_reference: Option<QualifiedReferenceId>,
     /// True when the `action` keyword was written (`entry action path` vs `entry path`).
     pub has_action_keyword: bool,
+    /// Declared name of a *new* nested action (`entry action entryAction :>> 'entry';`,
+    /// Systems Library `States.sysml`; spec42 Gap 43). Mutually exclusive with
+    /// `action_reference`, which the reference form keeps.
+    pub declared_name: Option<String>,
+    /// `: Action` typing on the declaration form (`do action doAction : Action :>> 'do';`).
+    pub type_name: Option<QualifiedReferenceId>,
+    /// `:>> target` redefinition on the declaration form.
+    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
+    /// `assign`/`send`/`accept` effect written directly under the keyword (`entry assign
+    /// counter.count := 0;`, spec42 `assignment_test`), mirroring [`Transition::effect`]
+    /// (spec42 Gap 43).
+    pub effect: Option<TransitionEffect>,
     pub body: StateDefBody,
 }
 
@@ -908,6 +920,18 @@ pub struct DoAction {
     pub action_reference: Option<QualifiedReferenceId>,
     /// True when the `action` keyword was written (`do action path` vs `do path`).
     pub has_action_keyword: bool,
+    /// Declared name of a *new* nested action (`entry action entryAction :>> 'entry';`,
+    /// Systems Library `States.sysml`; spec42 Gap 43). Mutually exclusive with
+    /// `action_reference`, which the reference form keeps.
+    pub declared_name: Option<String>,
+    /// `: Action` typing on the declaration form (`do action doAction : Action :>> 'do';`).
+    pub type_name: Option<QualifiedReferenceId>,
+    /// `:>> target` redefinition on the declaration form.
+    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
+    /// `assign`/`send`/`accept` effect written directly under the keyword (`entry assign
+    /// counter.count := 0;`, spec42 `assignment_test`), mirroring [`Transition::effect`]
+    /// (spec42 Gap 43).
+    pub effect: Option<TransitionEffect>,
     pub body: StateDefBody,
 }
 
@@ -920,6 +944,18 @@ pub struct ExitAction {
     pub action_reference: Option<QualifiedReferenceId>,
     /// True when the `action` keyword was written (`exit action path` vs `exit path`).
     pub has_action_keyword: bool,
+    /// Declared name of a *new* nested action (`entry action entryAction :>> 'entry';`,
+    /// Systems Library `States.sysml`; spec42 Gap 43). Mutually exclusive with
+    /// `action_reference`, which the reference form keeps.
+    pub declared_name: Option<String>,
+    /// `: Action` typing on the declaration form (`do action doAction : Action :>> 'do';`).
+    pub type_name: Option<QualifiedReferenceId>,
+    /// `:>> target` redefinition on the declaration form.
+    pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
+    /// `assign`/`send`/`accept` effect written directly under the keyword (`entry assign
+    /// counter.count := 0;`, spec42 `assignment_test`), mirroring [`Transition::effect`]
+    /// (spec42 Gap 43).
+    pub effect: Option<TransitionEffect>,
     pub body: StateDefBody,
 }
 

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 134.** `EntryAction`/`DoAction`/`ExitAction` gain
+  `declared_name`/`type_name`/`redefines` for declaring a *new* nested action (`entry action
+  entryAction :>> 'entry';`, `do action doAction : Action :>> 'do';`, Systems Library
+  `States.sysml`) and an `effect: Option<TransitionEffect>` for `assign`/`send`/`accept`
+  effects written directly under the keyword (`entry assign counter.count := 0;`), mirroring
+  `Transition::effect` (spec42 gap 43). The reference form keeps `action_reference`.
 - **`PARSE_AST_VERSION` is now 133.** `AttributeBodyElement` gains `Bind`, `Connection`,
   `CalcDef`, `CalcUsage`, and `ConstraintUsage` variants: named/multiplicity-qualified binding
   members, named/typed connection usages, nested calcs, and plain (non-`assert`) constraints

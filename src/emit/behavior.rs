@@ -700,6 +700,25 @@ fn emit_state_def_body_element(
         StateDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         StateDefBodyElement::Entry(e) => {
             w.push_str("entry");
+            if let Some(effect) = &e.value.effect {
+                w.push_char(' ');
+                emit_transition_effect(w, path, effect)?;
+            }
+            if let Some(declared_name) = &e.value.declared_name {
+                if e.value.has_action_keyword {
+                    w.push_str(" action ");
+                } else {
+                    w.push_char(' ');
+                }
+                w.push_str(&format_name(declared_name));
+                if let Some(type_name) = e.value.type_name {
+                    w.push_str(" : ");
+                    w.push_qualified_reference(&format!("{path}/entry/type"), type_name)?;
+                }
+                if let Some(redefines) = &e.value.redefines {
+                    emit_subsetting_clause(w, &redefines.value)?;
+                }
+            }
             if let Some(reference) = e.value.action_reference {
                 if e.value.has_action_keyword {
                     w.push_str(" action ");
@@ -712,6 +731,25 @@ fn emit_state_def_body_element(
         }
         StateDefBodyElement::Do(d) => {
             w.push_str("do");
+            if let Some(effect) = &d.value.effect {
+                w.push_char(' ');
+                emit_transition_effect(w, path, effect)?;
+            }
+            if let Some(declared_name) = &d.value.declared_name {
+                if d.value.has_action_keyword {
+                    w.push_str(" action ");
+                } else {
+                    w.push_char(' ');
+                }
+                w.push_str(&format_name(declared_name));
+                if let Some(type_name) = d.value.type_name {
+                    w.push_str(" : ");
+                    w.push_qualified_reference(&format!("{path}/do/type"), type_name)?;
+                }
+                if let Some(redefines) = &d.value.redefines {
+                    emit_subsetting_clause(w, &redefines.value)?;
+                }
+            }
             if let Some(reference) = d.value.action_reference {
                 if d.value.has_action_keyword {
                     w.push_str(" action ");
@@ -724,6 +762,25 @@ fn emit_state_def_body_element(
         }
         StateDefBodyElement::Exit(e) => {
             w.push_str("exit");
+            if let Some(effect) = &e.value.effect {
+                w.push_char(' ');
+                emit_transition_effect(w, path, effect)?;
+            }
+            if let Some(declared_name) = &e.value.declared_name {
+                if e.value.has_action_keyword {
+                    w.push_str(" action ");
+                } else {
+                    w.push_char(' ');
+                }
+                w.push_str(&format_name(declared_name));
+                if let Some(type_name) = e.value.type_name {
+                    w.push_str(" : ");
+                    w.push_qualified_reference(&format!("{path}/exit/type"), type_name)?;
+                }
+                if let Some(redefines) = &e.value.redefines {
+                    emit_subsetting_clause(w, &redefines.value)?;
+                }
+            }
             if let Some(reference) = e.value.action_reference {
                 if e.value.has_action_keyword {
                     w.push_str(" action ");
@@ -828,6 +885,70 @@ pub(crate) fn emit_allocation_usage(
         super::view::emit_kerml_connector_end(w, path, &target.value)?;
     }
     emit_definition_body(w, path, &usage.body)
+}
+
+pub(crate) fn emit_transition_effect(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    effect: &crate::ast::TransitionEffect,
+) -> Result<(), EmitError> {
+    match effect {
+        crate::ast::TransitionEffect::Perform { name, type_name } => {
+            w.push_str("action ");
+            if let Some(n) = name {
+                w.push_str(&format_name(n));
+            }
+            if let Some(ty) = type_name {
+                w.push_str(" : ");
+                w.push_qualified_reference(path, *ty)?;
+            }
+        }
+        crate::ast::TransitionEffect::Accept {
+            payload,
+            type_name,
+            via,
+        } => {
+            w.push_str("accept ");
+            emit_expression(w, &payload.value)?;
+            if let Some(ty) = type_name {
+                w.push_str(" : ");
+                w.push_qualified_reference(path, *ty)?;
+            }
+            if let Some(v) = via {
+                w.push_str(" via ");
+                emit_expression(w, &v.value)?;
+            }
+        }
+        crate::ast::TransitionEffect::Send {
+            payload,
+            type_name,
+            via,
+            to,
+        } => {
+            w.push_str("send ");
+            emit_expression(w, &payload.value)?;
+            if let Some(ty) = type_name {
+                w.push_str(" : ");
+                w.push_qualified_reference(path, *ty)?;
+            }
+            if let Some(v) = via {
+                w.push_str(" via ");
+                emit_expression(w, &v.value)?;
+            }
+            if let Some(t) = to {
+                w.push_str(" to ");
+                emit_expression(w, &t.value)?;
+            }
+        }
+        crate::ast::TransitionEffect::Assign { lhs, rhs } => {
+            w.push_str("assign ");
+            emit_expression(w, &lhs.value)?;
+            w.push_str(" := ");
+            emit_expression(w, &rhs.value)?;
+        }
+        crate::ast::TransitionEffect::Expression(e) => emit_expression(w, &e.value)?,
+    }
+    Ok(())
 }
 
 pub(crate) fn emit_flow_usage(
@@ -1007,62 +1128,7 @@ fn emit_transition(
     }
     if let Some(effect) = &t.effect {
         w.push_str("do ");
-        match effect {
-            crate::ast::TransitionEffect::Perform { name, type_name } => {
-                w.push_str("action ");
-                if let Some(n) = name {
-                    w.push_str(&format_name(n));
-                }
-                if let Some(ty) = type_name {
-                    w.push_str(" : ");
-                    w.push_qualified_reference(path, *ty)?;
-                }
-            }
-            crate::ast::TransitionEffect::Accept {
-                payload,
-                type_name,
-                via,
-            } => {
-                w.push_str("accept ");
-                emit_expression(w, &payload.value)?;
-                if let Some(ty) = type_name {
-                    w.push_str(" : ");
-                    w.push_qualified_reference(path, *ty)?;
-                }
-                if let Some(v) = via {
-                    w.push_str(" via ");
-                    emit_expression(w, &v.value)?;
-                }
-            }
-            crate::ast::TransitionEffect::Send {
-                payload,
-                type_name,
-                via,
-                to,
-            } => {
-                w.push_str("send ");
-                emit_expression(w, &payload.value)?;
-                if let Some(ty) = type_name {
-                    w.push_str(" : ");
-                    w.push_qualified_reference(path, *ty)?;
-                }
-                if let Some(v) = via {
-                    w.push_str(" via ");
-                    emit_expression(w, &v.value)?;
-                }
-                if let Some(t) = to {
-                    w.push_str(" to ");
-                    emit_expression(w, &t.value)?;
-                }
-            }
-            crate::ast::TransitionEffect::Assign { lhs, rhs } => {
-                w.push_str("assign ");
-                emit_expression(w, &lhs.value)?;
-                w.push_str(" := ");
-                emit_expression(w, &rhs.value)?;
-            }
-            crate::ast::TransitionEffect::Expression(e) => emit_expression(w, &e.value)?,
-        }
+        emit_transition_effect(w, path, effect)?;
         w.push_char(' ');
     }
     w.push_str("then ");
