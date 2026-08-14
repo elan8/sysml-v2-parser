@@ -156,7 +156,10 @@ pub(crate) fn emit_action_usage(
             w.push_str(" to ");
             emit_expression(w, &to.value)?;
         }
-        return emit_action_usage_body(w, path, &usage.body);
+        return match &usage.body {
+            Some(body) => emit_action_usage_body(w, path, body),
+            None => Ok(()),
+        };
     }
     // Anonymous usages (`action :>> subactions;`, `action { ... }`) get no trailing space
     // after the keyword -- the clause emitters below supply their own leading space.
@@ -196,7 +199,10 @@ pub(crate) fn emit_action_usage(
         w.push_str(" to ");
         emit_expression(w, &to.value)?;
     }
-    emit_action_usage_body(w, path, &usage.body)
+    match &usage.body {
+        Some(body) => emit_action_usage_body(w, path, body),
+        None => Ok(()),
+    }
 }
 
 fn emit_payload_clause(
@@ -244,7 +250,6 @@ pub(crate) fn emit_action_def_body(
     body: &ActionDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        ActionDefBody::Absent => Ok(()),
         ActionDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -348,7 +353,6 @@ fn emit_action_usage_body(
     body: &ActionUsageBody,
 ) -> Result<(), EmitError> {
     match body {
-        ActionUsageBody::Absent => Ok(()),
         ActionUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -525,7 +529,6 @@ fn emit_perform_body(
     body: &PerformBody,
 ) -> Result<(), EmitError> {
     match body {
-        PerformBody::Absent => Ok(()),
         PerformBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -685,7 +688,6 @@ fn emit_state_def_body(
     body: &StateDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        StateDefBody::Absent => Ok(()),
         StateDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -1047,7 +1049,6 @@ fn emit_definition_body(
     body: &crate::ast::DefinitionBody,
 ) -> Result<(), EmitError> {
     match body {
-        crate::ast::DefinitionBody::Absent => Ok(()),
         crate::ast::DefinitionBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -1381,7 +1382,6 @@ pub(crate) fn emit_occurrence_usage(
         emit_feature_value(w, value)?;
     }
     match &usage.body {
-        crate::ast::OccurrenceUsageBody::Absent => Ok(()),
         crate::ast::OccurrenceUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())

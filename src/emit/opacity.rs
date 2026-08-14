@@ -126,7 +126,9 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::PortDef(p) => walk_port_def_body(report, path, &p.value.body),
         PackageBodyElement::InterfaceDef(i) => walk_interface_def_body(report, path, &i.value.body),
         PackageBodyElement::ActionDef(a) => walk_action_def_body(report, path, &a.value.body),
-        PackageBodyElement::ActionUsage(a) => walk_action_usage_body(report, path, &a.value.body),
+        PackageBodyElement::ActionUsage(a) => {
+            walk_optional_action_usage_body(report, path, &a.value.body)
+        }
         PackageBodyElement::RequirementDef(r) => {
             walk_requirement_def_body(report, path, &r.value.body)
         }
@@ -198,7 +200,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::Ref(r) => walk_ref_body(report, path, &r.value.body),
         PackageBodyElement::EnumerationUsage(e) => walk_attribute_body(report, path, &e.value.body),
         PackageBodyElement::MetadataKeywordUsage(m) => {
-            walk_attribute_body(report, path, &m.value.body)
+            walk_optional_attribute_body(report, path, &m.value.body)
         }
         PackageBodyElement::MetadataAnnotation(m) => {
             walk_attribute_body(report, path, &m.value.body)
@@ -427,12 +429,14 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
             PartDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PartDefBodyElement::ActionDef(n) => walk_action_def_body(report, &p, &n.value.body),
-            PartDefBodyElement::ActionUsage(n) => walk_action_usage_body(report, &p, &n.value.body),
+            PartDefBodyElement::ActionUsage(n) => {
+                walk_optional_action_usage_body(report, &p, &n.value.body)
+            }
             PartDefBodyElement::MetadataAnnotation(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }
             PartDefBodyElement::MetadataKeywordUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             PartDefBodyElement::Dependency(n) => {
                 walk_optional_relationship_body(report, &p, n.value.body_elements.as_deref())
@@ -569,7 +573,7 @@ fn walk_part_usage_body_elements(
                 walk_attribute_body(report, &p, &n.value.body)
             }
             PartUsageBodyElement::ActionUsage(n) => {
-                walk_action_usage_body(report, &p, &n.value.body)
+                walk_optional_action_usage_body(report, &p, &n.value.body)
             }
             PartUsageBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             PartUsageBodyElement::EnumerationUsage(n) => {
@@ -593,7 +597,7 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             PartUsageBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             PartUsageBodyElement::MetadataKeywordUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             PartUsageBodyElement::VariantUsage(n) => walk_variant_usage(report, &p, &n.value),
             PartUsageBodyElement::StateDef(n) => walk_state_def_body(report, &p, &n.value.body),
@@ -694,7 +698,7 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
                 walk_occurrence_usage_body(report, &p, &n.value.body)
             }
             AttributeBodyElement::MetadataKeywordUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             AttributeBodyElement::AssertConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
@@ -725,7 +729,7 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
             }
             PortDefBodyElement::PortUsage(n) => walk_port_body(report, &p, &n.value.body),
             PortDefBodyElement::MetadataKeywordUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             PortDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             PortDefBodyElement::Doc(_) => {}
@@ -797,7 +801,7 @@ fn walk_action_def_body_elements(
                 walk_attribute_body(report, &p, &n.value.body)
             }
             ActionDefBodyElement::MetadataKeywordUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             ActionDefBodyElement::MetadataUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -816,7 +820,7 @@ fn walk_action_def_body_elements(
             }
             ActionDefBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             ActionDefBodyElement::ActionUsage(n) => {
-                walk_action_usage_body(report, &p, &n.value.body)
+                walk_optional_action_usage_body(report, &p, &n.value.body)
             }
             ActionDefBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             ActionDefBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
@@ -853,6 +857,27 @@ fn walk_action_def_body_elements(
     }
 }
 
+/// The absent body of an inferred-terminator action usage or a `#Name` prefix has nothing to walk.
+fn walk_optional_action_usage_body(
+    report: &mut OpacityReport,
+    path: &str,
+    body: &Option<crate::ast::ActionUsageBody>,
+) {
+    if let Some(body) = body {
+        walk_action_usage_body(report, path, body);
+    }
+}
+
+fn walk_optional_attribute_body(
+    report: &mut OpacityReport,
+    path: &str,
+    body: &Option<crate::ast::AttributeBody>,
+) {
+    if let Some(body) = body {
+        walk_attribute_body(report, path, body);
+    }
+}
+
 fn walk_action_usage_body(report: &mut OpacityReport, path: &str, body: &ActionUsageBody) {
     let ActionUsageBody::Brace { elements, .. } = body else {
         return;
@@ -879,7 +904,7 @@ fn walk_action_usage_body_elements(
                 walk_attribute_body(report, &p, &n.value.body)
             }
             ActionUsageBodyElement::MetadataKeywordUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             ActionUsageBodyElement::MetadataUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -897,7 +922,7 @@ fn walk_action_usage_body_elements(
             }
             ActionUsageBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             ActionUsageBodyElement::ActionUsage(n) => {
-                walk_action_usage_body(report, &p, &n.value.body)
+                walk_optional_action_usage_body(report, &p, &n.value.body)
             }
             ActionUsageBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             ActionUsageBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
@@ -951,7 +976,7 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
                 walk_attribute_body(report, &p, &n.value.body)
             }
             RequirementDefBodyElement::MetadataKeywordUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             RequirementDefBodyElement::Import(n) => {
                 walk_optional_relationship_body(report, &p, n.value.body_elements.as_deref())
@@ -1007,7 +1032,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
                 walk_attribute_body(report, &p, &n.value.body)
             }
             UseCaseDefBodyElement::MetadataKeywordUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             UseCaseDefBodyElement::AttributeDef(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -1038,7 +1063,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             UseCaseDefBodyElement::ForLoop(n) => walk_action_def_body(report, &p, &n.value.body),
             UseCaseDefBodyElement::ThenAction(n) => walk_then_target(report, &p, &n.value.target),
             UseCaseDefBodyElement::ActionUsage(n) => {
-                walk_action_usage_body(report, &p, &n.value.body)
+                walk_optional_action_usage_body(report, &p, &n.value.body)
             }
             UseCaseDefBodyElement::AnalysisCaseUsage(n) => {
                 walk_use_case_def_body(report, &p, &n.value.body)
@@ -1093,7 +1118,7 @@ fn walk_state_def_body_elements(
                 walk_attribute_body(report, &p, &n.value.body)
             }
             StateDefBodyElement::MetadataKeywordUsage(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             StateDefBodyElement::RequirementUsage(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
@@ -1104,7 +1129,7 @@ fn walk_state_def_body_elements(
                 walk_attribute_body(report, &p, &n.value.body)
             }
             StateDefBodyElement::ActionUsage(n) => {
-                walk_action_usage_body(report, &p, &n.value.body)
+                walk_optional_action_usage_body(report, &p, &n.value.body)
             }
             StateDefBodyElement::SuccessionUsage(n) => walk_connect_body(report, &p, &n.value.body),
             StateDefBodyElement::AssertConstraint(n) => {
@@ -1407,12 +1432,16 @@ fn walk_perform_body(report: &mut OpacityReport, path: &str, body: &PerformBody)
 
 fn walk_then_target(report: &mut OpacityReport, path: &str, target: &ThenTarget) {
     match target {
-        ThenTarget::Action(action) => walk_action_usage_body(report, path, &action.value.body),
+        ThenTarget::Action(action) => {
+            walk_optional_action_usage_body(report, path, &action.value.body)
+        }
         ThenTarget::Perform(perform) => walk_perform_body(report, path, &perform.value.body),
         ThenTarget::Merge(merge) => walk_first_merge_body(report, path, &merge.value.body),
         ThenTarget::Fork(fork) => walk_first_merge_body(report, path, &fork.value.body),
         ThenTarget::Decide(decision) => walk_first_merge_body(report, path, &decision.value.body),
-        ThenTarget::Send(action) => walk_action_usage_body(report, path, &action.value.body),
+        ThenTarget::Send(action) => {
+            walk_optional_action_usage_body(report, path, &action.value.body)
+        }
         ThenTarget::Accept(_) | ThenTarget::Feature(_) => {}
     }
 }

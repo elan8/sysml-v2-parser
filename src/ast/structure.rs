@@ -542,7 +542,10 @@ pub struct MetadataKeywordUsage {
     pub keyword: String,
     pub type_reference: Option<QualifiedReferenceId>,
     pub about_targets: Vec<QualifiedReferenceId>,
-    pub body: AttributeBody,
+    /// `None` for the prefix spelling (`#safety part def X`), which annotates the declaration
+    /// that follows it and has no body of its own to write. The member spelling (`#safety;`,
+    /// `#safety { ... }`) always has one.
+    pub body: Option<AttributeBody>,
     pub keyword_span: Span,
     pub type_span: Option<Span>,
 }

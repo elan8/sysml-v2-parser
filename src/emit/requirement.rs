@@ -86,7 +86,6 @@ fn emit_requirement_body(
     body: &RequirementDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        RequirementDefBody::Absent => Ok(()),
         RequirementDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -369,7 +368,6 @@ fn emit_require_constraint(
         w.push_qualified_reference(&format!("{path}/target"), target)?;
     }
     match &req.body {
-        crate::ast::ConstraintDefBody::Absent => Ok(()),
         crate::ast::ConstraintDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -721,7 +719,6 @@ pub(crate) fn emit_use_case_body(
     body: &UseCaseDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        UseCaseDefBody::Absent => Ok(()),
         UseCaseDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -903,7 +900,6 @@ fn emit_return_ref(
         emit_multiplicity(w, &multiplicity.value)?;
     }
     match &return_ref.body.value {
-        ReturnRefBody::Absent => {}
         ReturnRefBody::Semicolon { .. } => {
             w.push_char(';');
         }

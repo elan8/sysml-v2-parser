@@ -54,7 +54,7 @@ pub(crate) fn relationship_body_annotations(
 ) -> IResult<Input<'_>, Option<Vec<Node<RelationshipBodyElement>>>> {
     let (input, body) = relationship_body(input)?;
     let elements = match body {
-        crate::ast::Body::Semicolon { .. } | crate::ast::Body::Absent => None,
+        crate::ast::Body::Semicolon { .. } => None,
         crate::ast::Body::Brace { elements, .. } => Some(elements),
     };
     Ok((input, elements))

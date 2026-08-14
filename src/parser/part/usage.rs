@@ -1283,7 +1283,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
     let (input, reference) = reference_path(input)?;
     let (input, body) = preceded(ws_and_comments, part_usage_body).parse(input)?;
     let body = match body {
-        PartUsageBody::Semicolon { .. } | PartUsageBody::Absent => None,
+        PartUsageBody::Semicolon { .. } => None,
         brace @ PartUsageBody::Brace { .. } => Some(brace),
     };
     Ok((

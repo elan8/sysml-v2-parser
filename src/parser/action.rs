@@ -1165,16 +1165,17 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
     ))
 }
 
-/// Action usage body: `;`, `{` … `}`, or an implicit empty body when the next token starts
-/// another statement/succession (Systems Library `LoopAction` style without braces).
-pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
+/// Action usage body: `;`, `{` … `}`, or no body at all when the next token starts another
+/// statement/succession (Systems Library `LoopAction` style without braces).
+///
+/// `None` is that third case. The grammar requires a terminator, so recording its absence keeps
+/// the parser's leniency visible instead of fabricating a `;` nobody wrote.
+pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, Option<ActionUsageBody>> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        crate::parser::body::semicolon_body,
-        action_usage_body_brace,
-        map(peek_implicit_action_usage_body_end, |_| {
-            ActionUsageBody::Absent
-        }),
+        map(crate::parser::body::semicolon_body, Some),
+        map(action_usage_body_brace, Some),
+        map(peek_implicit_action_usage_body_end, |_| None),
     ))
     .parse(input)
 }

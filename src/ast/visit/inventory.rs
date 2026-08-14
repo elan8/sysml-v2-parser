@@ -1984,7 +1984,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PackageBody::Absent => {}
                 PackageBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -2307,7 +2306,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PartDefBody::Absent => {}
                 PartDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -2625,7 +2623,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                AttributeBody::Absent => {}
                 AttributeBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -2796,7 +2793,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PartUsageBody::Absent => {}
                 PartUsageBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -2837,7 +2833,9 @@ macro_rules! ast_traversal {
             for inner in about_targets {
                 visitor.visit_qualified_reference(inner);
             }
-            visitor.visit_attribute_body(body);
+            if let Some(inner) = body {
+                visitor.visit_attribute_body(inner);
+            }
             visitor.visit_span(keyword_span);
             if let Some(inner) = type_span {
                 visitor.visit_span(inner);
@@ -3094,7 +3092,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PerformBody::Absent => {}
                 PerformBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -3260,7 +3257,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PortDefBody::Absent => {}
                 PortDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -3369,7 +3365,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                PortBody::Absent => {}
                 PortBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -3436,7 +3431,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                InterfaceDefBody::Absent => {}
                 InterfaceDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -3601,7 +3595,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                RefBody::Absent => {}
                 RefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -3659,7 +3652,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ConnectionDefBody::Absent => {}
                 ConnectionDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -3765,7 +3757,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                EnumerationBody::Absent => {}
                 EnumerationBody::Brace { open_span, elements: values, close_span } => {
                     visitor.visit_span(open_span);
                     for inner in values {
@@ -3857,7 +3848,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                OccurrenceUsageBody::Absent => {}
                 OccurrenceUsageBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -3964,7 +3954,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                DefinitionBody::Absent => {}
                 DefinitionBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -4142,7 +4131,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                AliasBody::Absent => {}
                 AliasBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -4183,7 +4171,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ActionDefBody::Absent => {}
                 ActionDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -4565,7 +4552,9 @@ macro_rules! ast_traversal {
             if let Some(inner) = to {
                 visitor.visit_expression(inner);
             }
-            visitor.visit_action_usage_body(body);
+            if let Some(inner) = body {
+                visitor.visit_action_usage_body(inner);
+            }
             if let Some(inner) = name_span {
                 visitor.visit_span(inner);
             }
@@ -4581,7 +4570,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ActionUsageBody::Absent => {}
                 ActionUsageBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -4944,7 +4932,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                StateDefBody::Absent => {}
                 StateDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -5175,7 +5162,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                RequirementDefBody::Absent => {}
                 RequirementDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -5602,7 +5588,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                UseCaseDefBody::Absent => {}
                 UseCaseDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -5715,7 +5700,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ReturnRefBody::Absent => {}
                 ReturnRefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -5906,7 +5890,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ConstraintDefBody::Absent => {}
                 ConstraintDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -5987,7 +5970,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                CalcDefBody::Absent => {}
                 CalcDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -6121,7 +6103,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ViewDefBody::Absent => {}
                 ViewDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -6174,7 +6155,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                RenderingUsageBody::Absent => {}
                 RenderingUsageBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -6232,7 +6212,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                RenderingDefBody::Absent => {}
                 RenderingDefBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);
@@ -6293,7 +6272,6 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                ViewBody::Absent => {}
                 ViewBody::Brace { open_span, elements, close_span } => {
                     visitor.visit_body_braces(open_span, close_span);
                     visitor.visit_span(open_span);

@@ -90,7 +90,6 @@ pub(crate) fn emit_package_body(
     body: &PackageBody,
 ) -> Result<(), EmitError> {
     match body {
-        PackageBody::Absent => Ok(()),
         PackageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())

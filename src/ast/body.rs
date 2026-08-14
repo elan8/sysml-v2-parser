@@ -18,6 +18,14 @@ use super::core::{Node, Span};
 /// difference matters to the caller -- the first makes an absent brace body visible as `None`,
 /// the second deliberately flattens it away for consumers that only want the members.
 ///
+/// # A body is always written
+///
+/// Both alternatives require an authored token, so this type cannot represent a declaration that
+/// has no body at all. The two places where the parser accepts one -- a `#Name` metadata keyword
+/// used as a prefix on another declaration, and an action usage whose terminator is implied by the
+/// statement after it -- hold `Option<Body<_>>` instead, which confines that state to the two
+/// grammar contexts that have it rather than offering it to every scope.
+///
 /// # Delimiter provenance
 ///
 /// Both brace tokens and the semicolon are retained exactly as authored, so a consumer never has
@@ -30,15 +38,6 @@ pub enum Body<E> {
         /// Exact `;` token that ended the declaration.
         semicolon_span: Span,
     },
-    /// No body was authored at all: neither `;` nor `{ ... }`.
-    ///
-    /// `DefinitionBody` requires one of the two, so this is not a grammatical alternative -- it is
-    /// the state of a declaration that never had a body to write. A `#Name` metadata keyword used
-    /// as a *prefix* on another declaration is one (`#safety part def X`), and an action usage
-    /// whose terminator the parser infers from the statement that follows it is another. Keeping
-    /// it distinct from [`Semicolon`](Self::Semicolon) is what stops emission from inventing a
-    /// `;` that was never written.
-    Absent,
     /// `{ ... }` -- an ordered, possibly empty list of members in source order.
     Brace {
         /// Exact `{` token opening the body.
@@ -71,7 +70,7 @@ impl<E> Body<E> {
     /// Use this when an absent body and an empty one lead to different behavior.
     pub fn braced_elements(&self) -> Option<&[Node<E>]> {
         match self {
-            Self::Semicolon { .. } | Self::Absent => None,
+            Self::Semicolon { .. } => None,
             Self::Brace { elements, .. } => Some(elements),
         }
     }
@@ -82,7 +81,7 @@ impl<E> Body<E> {
     /// members themselves. Use [`braced_elements`](Self::braced_elements) when it matters.
     pub fn members(&self) -> std::slice::Iter<'_, Node<E>> {
         match self {
-            Self::Semicolon { .. } | Self::Absent => [].iter(),
+            Self::Semicolon { .. } => [].iter(),
             Self::Brace { elements, .. } => elements.iter(),
         }
     }

@@ -534,7 +534,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_requirement_body(&mut self, body: &RequirementDefBody) -> io::Result<()> {
         match body {
-            RequirementDefBody::Absent => self.writer.write_str("(body absent)"),
             RequirementDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             RequirementDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
@@ -677,7 +676,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_view_body(&mut self, body: &ViewBody) -> io::Result<()> {
         match body {
-            ViewBody::Absent => self.writer.write_str("(body absent)"),
             ViewBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             ViewBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
@@ -719,7 +717,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_use_case_body(&mut self, body: &UseCaseDefBody) -> io::Result<()> {
         match body {
-            UseCaseDefBody::Absent => self.writer.write_str("(body absent)"),
             UseCaseDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             UseCaseDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
@@ -825,7 +822,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             write_span(self.writer, &return_ref.value.body.span)?;
                             self.writer.write_str(") ")?;
                             match &return_ref.value.body.value {
-                                super::ReturnRefBody::Absent => {}
                                 super::ReturnRefBody::Semicolon { .. } => {
                                     self.writer.write_str("(body semicolon)")?;
                                 }
@@ -900,7 +896,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_state_body(&mut self, body: &StateDefBody) -> io::Result<()> {
         match body {
-            StateDefBody::Absent => self.writer.write_str("(body absent)"),
             StateDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             StateDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
@@ -1047,7 +1042,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_part_body(&mut self, body: &PartDefBody) -> io::Result<()> {
         match body {
-            PartDefBody::Absent => self.writer.write_str("(body absent)"),
             PartDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             PartDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
@@ -1393,7 +1387,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_action_body(&mut self, body: &super::ActionDefBody) -> io::Result<()> {
         match body {
-            super::ActionDefBody::Absent => self.writer.write_str("(body absent)"),
             super::ActionDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             super::ActionDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body")?;
@@ -1590,7 +1583,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.write_reference(definition.target)?;
         self.writer.write_str(") (body ")?;
         match &definition.body {
-            super::AliasBody::Absent => self.writer.write_str("absent")?,
             super::AliasBody::Semicolon { .. } => self.writer.write_str("semicolon")?,
             super::AliasBody::Brace { elements, .. } => {
                 write!(self.writer, "brace (element-count {})", elements.len())?;
@@ -1641,7 +1633,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_interface_body(&mut self, body: &InterfaceDefBody) -> io::Result<()> {
         match body {
-            InterfaceDefBody::Absent => self.writer.write_str("(body absent)"),
             InterfaceDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             InterfaceDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
@@ -1698,7 +1689,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_connection_body(&mut self, body: &ConnectionDefBody) -> io::Result<()> {
         match body {
-            ConnectionDefBody::Absent => self.writer.write_str("(body absent)"),
             ConnectionDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             ConnectionDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
@@ -1936,7 +1926,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_perform_body(&mut self, body: &PerformBody) -> io::Result<()> {
         match body {
-            PerformBody::Absent => self.writer.write_str("(body absent)"),
             PerformBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             PerformBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
@@ -2094,7 +2083,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (body ")?;
         match &usage.body {
-            super::AttributeBody::Absent => self.writer.write_str("absent")?,
             super::AttributeBody::Semicolon { .. } => self.writer.write_str("semicolon")?,
             super::AttributeBody::Brace { elements, .. } => {
                 write!(self.writer, "brace (element-count {})", elements.len())?;
@@ -2144,7 +2132,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (body ")?;
         match &usage.body {
-            super::PortBody::Absent => self.writer.write_str("absent")?,
             super::PortBody::Semicolon { .. } => self.writer.write_str("semicolon")?,
             super::PortBody::Brace { elements, .. } => {
                 write!(self.writer, "brace (element-count {})", elements.len())?;
@@ -2169,7 +2156,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_port_definition_body(&mut self, body: &PortDefBody) -> io::Result<()> {
         match body {
-            PortDefBody::Absent => self.writer.write_str("(body absent)"),
             PortDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             PortDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
@@ -2584,7 +2570,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_package_body(&mut self, body: &PackageBody) -> io::Result<()> {
         match body {
-            PackageBody::Absent => self.writer.write_str("(body absent)"),
             PackageBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             PackageBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;

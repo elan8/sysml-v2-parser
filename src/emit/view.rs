@@ -57,7 +57,6 @@ pub(crate) fn emit_constraint_body(
     body: &ConstraintDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        ConstraintDefBody::Absent => Ok(()),
         ConstraintDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -180,7 +179,6 @@ pub(crate) fn emit_calc_body(
     body: &CalcDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        CalcDefBody::Absent => Ok(()),
         CalcDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -544,7 +542,6 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
         emit_feature_value(w, value)?;
     }
     match &ret.body {
-        CalcDefBody::Absent => {}
         CalcDefBody::Semicolon { .. } => w.push_char(';'),
         body @ CalcDefBody::Brace { .. } => emit_calc_body(w, "calc-return", body)?,
     }
@@ -591,7 +588,6 @@ pub(crate) fn emit_view_def(
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::ViewDefBody::Absent => Ok(()),
         crate::ast::ViewDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -679,7 +675,6 @@ pub(crate) fn emit_view_usage(
         }
     }
     match &usage.body {
-        crate::ast::ViewBody::Absent => Ok(()),
         crate::ast::ViewBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -758,7 +753,6 @@ fn emit_view_rendering(
         w.push_qualified_reference(&format!("{path}/render/type"), *ty)?;
     }
     match &r.body {
-        crate::ast::RenderingUsageBody::Absent => Ok(()),
         crate::ast::RenderingUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -840,7 +834,6 @@ pub(crate) fn emit_rendering_def(
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::RenderingDefBody::Absent => Ok(()),
         crate::ast::RenderingDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
@@ -914,7 +907,6 @@ pub(crate) fn emit_rendering_usage(
         emit_feature_value(w, value)?;
     }
     match &usage.body {
-        crate::ast::RenderingUsageBody::Absent => Ok(()),
         crate::ast::RenderingUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())

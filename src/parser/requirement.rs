@@ -955,9 +955,7 @@ fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
             (crate::ast::ConnectBody::Semicolon, None)
         }),
         map(constraint_def_body, |body| match body {
-            ConstraintDefBody::Semicolon { .. } | ConstraintDefBody::Absent => {
-                (crate::ast::ConnectBody::Semicolon, None)
-            }
+            ConstraintDefBody::Semicolon { .. } => (crate::ast::ConnectBody::Semicolon, None),
             ConstraintDefBody::Brace { elements, .. } => {
                 (crate::ast::ConnectBody::Brace, Some(elements))
             }

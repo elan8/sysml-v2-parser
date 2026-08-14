@@ -404,7 +404,10 @@ pub struct ActionUsage {
     /// Optional trailing `to <expr>` clause on a standalone `send` statement (BNF
     /// `SenderReceiverPart`, GH-86), e.g. `then send new S() to b;` (Simple Tests/ActionTest.sysml).
     pub to: Option<Node<Expression>>,
-    pub body: ActionUsageBody,
+    /// `None` when no terminator was authored and the following statement implies the end of
+    /// this usage (Systems Library `LoopAction` style). The grammar requires `;` or `{ ... }`,
+    /// so this records that neither was written rather than pretending a `;` was.
+    pub body: Option<ActionUsageBody>,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
     /// Span of the type reference after `:` (for semantic tokens).

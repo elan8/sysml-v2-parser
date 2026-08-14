@@ -35,7 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   along with the members, so no scope has to consume `{` and `}` correctly on its own. There is
   Deserialization validates them: a delimiter span must still slice to the token it claims and a
   body's open brace must precede its close, so a tampered wire document is rejected rather than
-  trusted. There is deliberately no state for a missing closing brace: an unterminated body does not currently
+  trusted. Both alternatives require an authored token, so the container cannot represent a
+  declaration with no body at all; the two places that accept one -- a `#Name` metadata keyword
+  used as a prefix, and an action usage whose terminator is inferred -- hold `Option<Body<_>>`,
+  which confines that state to them instead of offering it to every scope. There is deliberately
+  no state for a missing closing brace: an unterminated body does not currently
   produce a body at all -- the enclosing declaration becomes a recovery node -- so a typed close
   outcome would be an unreachable variant until recovery can retain the members it read.
 - **`ast::AnnotatingMember`, the grammar's annotating production as one type.** `AnnotatingElement
@@ -54,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declaration and an action usage whose terminator the parser infers both stored their absent body
   as the semicolon form, so formatting wrote a `;` the author never typed -- splitting
   `#situation x : T;` into two members and `action a accept M via v;` into a member plus a stray
-  clause. `Body::Absent` keeps "no body was written" distinct from "a semicolon was written".
+  clause. `MetadataKeywordUsage::body` and `ActionUsage::body` are now `Option`, keeping "no body
+  was written" distinct from "a semicolon was written" without adding that state to every scope.
 - **The brace-less `if` branch keeps its authored spelling.** `if x then y;` was stored as a
   one-member brace body and re-emitted as `if x  { then y; }` -- braces the author never wrote,
   plus a doubled space. `ActionBranchBody` distinguishes the two spellings the grammar offers, so

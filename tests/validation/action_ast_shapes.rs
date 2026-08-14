@@ -33,7 +33,9 @@ fn scan_package(pkg: &Package, for_loops: &mut usize, then_assigns: &mut usize) 
                 scan_action_def_body(&a.value.body, for_loops, then_assigns)
             }
             PackageBodyElement::ActionUsage(a) => {
-                scan_action_usage_body(&a.value.body, for_loops, then_assigns)
+                if let Some(body) = &a.value.body {
+                    scan_action_usage_body(body, for_loops, then_assigns);
+                }
             }
             PackageBodyElement::AnalysisCaseDef(a) => {
                 scan_use_case_body(&a.value.body, for_loops, then_assigns)
@@ -55,7 +57,9 @@ fn scan_action_def_body(body: &ActionDefBody, for_loops: &mut usize, then_assign
             ActionDefBodyElement::ForLoop(_) => *for_loops += 1,
             ActionDefBodyElement::Assign(a) if a.value.is_then => *then_assigns += 1,
             ActionDefBodyElement::ActionUsage(u) => {
-                scan_action_usage_body(&u.value.body, for_loops, then_assigns)
+                if let Some(body) = &u.value.body {
+                    scan_action_usage_body(body, for_loops, then_assigns);
+                }
             }
             _ => {}
         }
@@ -71,7 +75,9 @@ fn scan_action_usage_body(body: &ActionUsageBody, for_loops: &mut usize, then_as
             ActionUsageBodyElement::ForLoop(_) => *for_loops += 1,
             ActionUsageBodyElement::Assign(a) if a.value.is_then => *then_assigns += 1,
             ActionUsageBodyElement::ActionUsage(u) => {
-                scan_action_usage_body(&u.value.body, for_loops, then_assigns)
+                if let Some(body) = &u.value.body {
+                    scan_action_usage_body(body, for_loops, then_assigns);
+                }
             }
             _ => {}
         }

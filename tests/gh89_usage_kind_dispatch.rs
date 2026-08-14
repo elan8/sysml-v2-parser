@@ -478,7 +478,8 @@ fn gh89_7_bare_variant_reference_in_action_body() {
     let PackageBodyElement::ActionUsage(provide_power) = &elements[1] else {
         panic!("expected ActionUsage, got {:?}", elements[1]);
     };
-    let sysml_v2_parser::ast::ActionUsageBody::Brace { elements, .. } = &provide_power.value.body
+    let sysml_v2_parser::ast::ActionUsageBody::Brace { elements, .. } =
+        provide_power.value.body.as_ref().expect("an authored body")
     else {
         panic!("expected brace action usage body");
     };
@@ -487,7 +488,11 @@ fn gh89_7_bare_variant_reference_in_action_body() {
     else {
         panic!("expected nested ActionUsage, got {:?}", elements[0]);
     };
-    let sysml_v2_parser::ast::ActionUsageBody::Brace { elements, .. } = &generate_torque.value.body
+    let sysml_v2_parser::ast::ActionUsageBody::Brace { elements, .. } = generate_torque
+        .value
+        .body
+        .as_ref()
+        .expect("an authored body")
     else {
         panic!("expected brace action usage body");
     };
