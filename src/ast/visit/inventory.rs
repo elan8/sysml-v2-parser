@@ -3666,10 +3666,15 @@ macro_rules! ast_traversal {
         pub fn walk_ref_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RefDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RefDecl { direction, kind_keyword, name, typing, redefines, subsets, multiplicity, ordered, nonunique, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            let RefDecl { direction, is_derived, usage_prefix, is_constant, kind_keyword, name, typing, redefines, subsets, multiplicity, ordered, nonunique, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
             if let Some(inner) = direction {
                 visitor.visit_in_out_value(inner);
             }
+            let _ = is_derived;
+            if let Some(inner) = usage_prefix {
+                visitor.visit_definition_prefix(inner);
+            }
+            let _ = is_constant;
             if let Some(inner) = kind_keyword {
                 visitor.visit_ref_decl_kind(inner);
             }
@@ -5619,8 +5624,12 @@ macro_rules! ast_traversal {
         pub fn walk_item_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ItemUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ItemUsage { is_abstract, name, type_name, redefines, subsets, short_name, multiplicity, ordered, nonunique, value, body, direction, is_individual, membership } = &$($mutability)? node.value;
-            let _ = is_abstract;
+            let ItemUsage { is_derived, usage_prefix, is_constant, name, type_name, redefines, subsets, short_name, multiplicity, ordered, nonunique, value, body, direction, is_individual, membership } = &$($mutability)? node.value;
+            let _ = is_derived;
+            if let Some(inner) = usage_prefix {
+                visitor.visit_definition_prefix(inner);
+            }
+            let _ = is_constant;
             visitor.visit_text(name);
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);

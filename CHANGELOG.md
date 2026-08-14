@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `RefPrefix` modifier chain is accepted on every usage that allows it.** BNF `RefPrefix
+  = 'derived'? ('abstract' | 'variation')? 'constant'?` may precede any usage keyword, but each
+  parser had hand-rolled whichever subset it happened to need, so a legal prefix was a parse gap
+  in the scopes that had not adopted it. `derived ref item receiverArgument : Expression[0..1]
+  subsets Metadata::metadataItems;` (`sysml.library/Systems Library/SysML.sysml`) and every one
+  of its 190 siblings fell through to unsupported-grammar capture. The chain is now parsed in
+  one place (`parser::usage::ref_prefix`) and used by all four `RefDecl` parsers plus
+  `item_usage` and `attribute_usage`. `RefDecl` and `ItemUsage` gained `is_derived`,
+  `usage_prefix` and `is_constant` to hold it; `ItemUsage::is_abstract` became `usage_prefix`,
+  which can also represent the `variation` alternative. **AST version 141 -> 142.**
+- **A repeated specialization clause keeps every target.** Writing a subsetting-family clause
+  kind twice in one header (`subsets parameter, usage subsets Metadata::metadataItems`) kept
+  only the last clause, dropping the earlier targets with no diagnostic. Repeated clauses now
+  accumulate into the one relationship they describe, and its span covers every authored
+  fragment.
+- **The `abstract` prefix on a `ref` declaration survives emission.** It was parsed and
+  discarded because `RefDecl` had nowhere to put it, so `abstract ref :>> trailerHitch[1];`
+  formatted as `ref :>> trailerHitch;`.
+- **One emission order for the `RefPrefix` keywords.** The part, port and attribute emitters
+  each spelled the chain inline and had drifted into three different orders, so `derived
+  abstract x` could come back out as `abstract derived x`.
+
 ### Added
 
 - **`ast::Body<E>`, one container for every declaration body.** Twenty-seven per-family body

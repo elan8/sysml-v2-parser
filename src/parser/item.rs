@@ -52,9 +52,14 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    // BNF `RefPrefix`: `(isAbstract ?= 'abstract')?`, e.g. the package-level `abstract item
-    // items : Item[0..*] nonunique :> objects { ... }` (Systems Library `Items.sysml`).
-    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // BNF `RefPrefix = 'derived'? ('abstract' | 'variation')? 'constant'?`, e.g. the package-level
+    // `abstract item items : Item[0..*] nonunique :> objects { ... }` (Systems Library
+    // `Items.sysml`) and `derived item ownedActorParameter : PartUsage[1..1] redefines
+    // ownedMemberParameter subsets Metadata::metadataItems;` (`sysml.library/Systems
+    // Library/SysML.sysml:28`). Only `abstract` was accepted before, so the `derived` form fell
+    // through to unsupported-grammar capture. `ref item` stays with `connector::ref_decl`, which
+    // owns the `ref` kind-keyword forms.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1), e.g. `individual
     // item ii : II1;` (Simple Tests/IndividualTest.sysml:4).
     let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
@@ -89,7 +94,9 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
             start,
             input,
             ItemUsage {
-                is_abstract: is_abstract.is_some(),
+                is_derived: prefix.is_derived,
+                usage_prefix: prefix.usage_prefix,
+                is_constant: prefix.is_constant,
                 name,
                 short_name,
                 type_name: header.type_reference,

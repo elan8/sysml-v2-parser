@@ -1263,6 +1263,15 @@ pub struct RefDecl {
     /// `part def` body (`Simple Tests/ItemTest.sysml:15`). Only parsed by `part_ref_usage`;
     /// `connector::ref_decl`'s call sites have no confirmed real usage for a leading direction.
     pub direction: Option<InOut>,
+    /// `derived` from BNF `RefPrefix`, e.g. `derived ref item receiverArgument : Expression[0..1]
+    /// subsets Metadata::metadataItems;` (`sysml.library/Systems Library/SysML.sysml:14`).
+    pub is_derived: bool,
+    /// `abstract` or `variation` from `RefPrefix` -- alternatives there, so one field, matching
+    /// [`AttributeUsage::usage_prefix`]. E.g. `abstract ref port outgoingTransfersFromSelf : ...`
+    /// (`sysml.library/Systems Library/Ports.sysml`).
+    pub usage_prefix: Option<DefinitionPrefix>,
+    /// `constant` from `RefPrefix`. See [`AttributeUsage::is_constant`].
+    pub is_constant: bool,
     /// Kind keyword after `ref` (`ref item scene : Scene;`, `ref port :>> participant ...`).
     /// Previously parsed by `connector::ref_decl` and discarded, so formatting dropped the
     /// authored keyword.
@@ -1305,6 +1314,9 @@ impl PartialEq for RefDecl {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
             && self.direction == other.direction
+            && self.is_derived == other.is_derived
+            && self.usage_prefix == other.usage_prefix
+            && self.is_constant == other.is_constant
             && self.kind_keyword == other.kind_keyword
             && self.typing == other.typing
             && self.redefines == other.redefines

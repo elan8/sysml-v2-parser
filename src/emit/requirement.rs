@@ -467,9 +467,14 @@ pub(crate) fn emit_item_usage(
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
     }
-    if usage.is_abstract {
-        w.push_str("abstract ");
-    }
+    // `OccurrenceUsagePrefix = BasicUsagePrefix ('individual')?` -- the `RefPrefix` keywords come
+    // before `individual`.
+    crate::emit::structure::emit_ref_prefix(
+        w,
+        usage.is_derived,
+        usage.usage_prefix.as_ref(),
+        usage.is_constant,
+    );
     if usage.is_individual {
         w.push_str("individual ");
     }

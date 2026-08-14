@@ -4,6 +4,7 @@ use super::common::TextualRepresentation;
 use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
+use super::structure::DefinitionPrefix;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
@@ -228,9 +229,17 @@ pub struct RequirementUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemUsage {
-    /// Leading `abstract` keyword (BNF `RefPrefix`), e.g. the package-level `abstract item
-    /// items : Item[0..*] nonunique :> objects { ... }` (Systems Library `Items.sysml`).
-    pub is_abstract: bool,
+    /// `derived` from BNF `RefPrefix`, e.g. `derived item ownedActorParameter : PartUsage[1..1]
+    /// redefines ownedMemberParameter subsets Metadata::metadataItems;` (`sysml.library/Systems
+    /// Library/SysML.sysml:28`).
+    pub is_derived: bool,
+    /// `abstract` or `variation` from `RefPrefix` -- alternatives there, so one field, matching
+    /// [`crate::ast::AttributeUsage::usage_prefix`]. E.g. the package-level `abstract item items :
+    /// Item[0..*] nonunique :> objects { ... }` (Systems Library `Items.sysml`). Was a bare
+    /// `is_abstract` flag, which could not represent the `variation` alternative at all.
+    pub usage_prefix: Option<DefinitionPrefix>,
+    /// `constant` from `RefPrefix`. See [`crate::ast::AttributeUsage::is_constant`].
+    pub is_constant: bool,
     /// Empty for the anonymous redefinition form (`item :>> shape : Cylinder { ... }`), matching
     /// `PartUsage::name`'s existing convention.
     pub name: String,

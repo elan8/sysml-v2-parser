@@ -292,6 +292,12 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // Visibility prefix (BNF `MemberPrefix`), e.g. `protected ref thisParticipant :>> self;`
     // (Systems Library `Interfaces.sysml`).
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    // `BasicUsagePrefix = RefPrefix ('ref')?` -- the modifiers ahead of `ref` are part of the same
+    // production, e.g. `derived ref item receiverArgument : Expression[0..1] subsets
+    // Metadata::metadataItems;` (`sysml.library/Systems Library/SysML.sysml:14`) and `abstract ref
+    // port outgoingTransfersFromSelf : ...` (`Systems Library/Ports.sysml`). Without them the
+    // whole member fell through to unsupported-grammar capture.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, kind_keyword) = opt(preceded(
@@ -368,8 +374,29 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // `:>` subsets, independent of and in addition to `:>>` redefines, e.g. `ref requirement
     // originalRequirement[1] :>> originalRequirements :> participant { ... }` (Systems Library
     // `Domain Libraries/Requirement Derivation/DerivationConnections.sysml`).
-    let (input, subsets) = opt(preceded(ws_and_comments, subsetting)).parse(input)?;
-    let subsets = subsets.map(|(target, _value)| target);
+    //
+    // Both kinds may repeat, and they may interleave: `derived ref item subjectParameter :
+    // Usage[1..1] subsets parameter, usage subsets Metadata::metadataItems;`
+    // (`sysml.library/Systems Library/SysML.sysml:78`) writes two `subsets` clauses. Only these
+    // two kinds are read, because they are the only two `RefDecl` can hold -- a `::>`/`=>`
+    // clause stays unconsumed and is reported rather than silently dropped.
+    let (input, subsets, redefines) = {
+        let mut input = input;
+        let mut subsets: Option<Node<crate::ast::SubsettingRelationship>> = None;
+        let mut redefines = redefines;
+        loop {
+            let (after_ws, _) = ws_and_comments(input)?;
+            if let Ok((rest, (relationship, _value))) = subsetting(after_ws) {
+                crate::parser::usage::merge_into(&mut subsets, relationship);
+                input = rest;
+            } else if let Ok((rest, relationship)) = redefinition(after_ws) {
+                crate::parser::usage::merge_into(&mut redefines, relationship);
+                input = rest;
+            } else {
+                break (input, subsets, redefines);
+            }
+        }
+    };
     // `nonunique`/`ordered` feature modifiers may also follow the specialization clauses
     // (real usage: `Interfaces.sysml`'s `ref port :>> participant : Port [2..*] nonunique
     // ordered { ... }`).
@@ -385,6 +412,9 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             start,
             input,
             RefDecl {
+                is_derived: prefix.is_derived,
+                usage_prefix: prefix.usage_prefix,
+                is_constant: prefix.is_constant,
                 direction: None,
                 kind_keyword,
                 name: name_str,

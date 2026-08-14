@@ -117,10 +117,10 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
         preceded(tag(&b"protected"[..]), ws1),
     )))
     .parse(input)?;
-    // `abstract ref :>> trailerHitch[1];` (OMG spec Annex `3c-Function-based Behavior-structure
-    // mod-2.sysml`) -- the modifier is accepted and discarded, matching `RefDecl`, which has no
-    // `is_abstract` field.
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // `BasicUsagePrefix = RefPrefix ('ref')?`, e.g. `abstract ref :>> trailerHitch[1];` (OMG spec
+    // Annex `3c-Function-based Behavior-structure mod-2.sysml`). The modifiers used to be accepted
+    // and discarded, because `RefDecl` had nowhere to put them.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
@@ -185,6 +185,9 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
             start,
             input,
             crate::ast::RefDecl {
+                is_derived: prefix.is_derived,
+                usage_prefix: prefix.usage_prefix,
+                is_constant: prefix.is_constant,
                 direction: None,
                 kind_keyword: None,
                 name: name_str,

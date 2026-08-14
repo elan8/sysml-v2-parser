@@ -38,16 +38,15 @@ pub(crate) fn emit_part_usage(
     usage: &PartUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    emit_definition_prefix(w, usage.usage_prefix.as_ref());
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
     }
-    if usage.is_derived {
-        w.push_str("derived ");
-    }
-    if usage.is_constant {
-        w.push_str("constant ");
-    }
+    emit_ref_prefix(
+        w,
+        usage.is_derived,
+        usage.usage_prefix.as_ref(),
+        usage.is_constant,
+    );
     if usage.is_reference {
         w.push_str("ref ");
     }
@@ -158,13 +157,12 @@ pub(crate) fn emit_attribute_usage(
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
     }
-    if usage.is_derived {
-        w.push_str("derived ");
-    }
-    emit_definition_prefix(w, usage.usage_prefix.as_ref());
-    if usage.is_constant {
-        w.push_str("constant ");
-    }
+    emit_ref_prefix(
+        w,
+        usage.is_derived,
+        usage.usage_prefix.as_ref(),
+        usage.is_constant,
+    );
     if usage.is_reference {
         w.push_str("ref ");
     }
@@ -608,17 +606,18 @@ pub(crate) fn emit_port_usage(
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
     }
+    // `OccurrenceUsagePrefix = BasicUsagePrefix ('individual')?` puts `individual` after the
+    // `RefPrefix` keywords, not before them.
+    emit_ref_prefix(
+        w,
+        usage.is_derived,
+        usage
+            .is_abstract
+            .then_some(&crate::ast::DefinitionPrefix::Abstract),
+        usage.is_constant,
+    );
     if usage.is_individual {
         w.push_str("individual ");
-    }
-    if usage.is_abstract {
-        w.push_str("abstract ");
-    }
-    if usage.is_derived {
-        w.push_str("derived ");
-    }
-    if usage.is_constant {
-        w.push_str("constant ");
     }
     w.push_str("port ");
     if let Some(short) = &usage.short_name {
@@ -1142,6 +1141,12 @@ pub(crate) fn emit_ref_decl(
     if let Some(dir) = decl.direction {
         emit_direction(w, dir);
     }
+    emit_ref_prefix(
+        w,
+        decl.is_derived,
+        decl.usage_prefix.as_ref(),
+        decl.is_constant,
+    );
     w.push_str("ref");
     if let Some(kind) = decl.kind_keyword {
         w.push_char(' ');
@@ -1287,6 +1292,27 @@ fn emit_optional_connect_body(
             w.push_str(" {}");
             Ok(())
         }
+    }
+}
+
+/// BNF `RefPrefix = 'derived'? ('abstract' | 'variation')? 'constant'?` (§8.2.2.6.2), in the one
+/// order the grammar allows.
+///
+/// Each usage emitter used to spell this inline and the three had drifted into three different
+/// orders, so `derived abstract x` came back out as `abstract derived x` -- a reordering the
+/// grammar does not permit, and one no whole-AST comparison could see.
+pub(crate) fn emit_ref_prefix(
+    w: &mut EmitWriter<'_>,
+    is_derived: bool,
+    usage_prefix: Option<&DefinitionPrefix>,
+    is_constant: bool,
+) {
+    if is_derived {
+        w.push_str("derived ");
+    }
+    emit_definition_prefix(w, usage_prefix);
+    if is_constant {
+        w.push_str("constant ");
     }
 }
 

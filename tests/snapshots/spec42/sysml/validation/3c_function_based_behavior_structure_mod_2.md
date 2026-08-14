@@ -90,10 +90,10 @@ package '3c-Function-based Behavior-structure mod-2' {
         }
         perform action  {
             action 'connect trailer to vehicle' {
-                ref :>> trailerHitch;
+                abstract ref :>> trailerHitch;
             }
             then action 'disconnect trailer from vehicle' {
-                ref :>> trailerHitch;
+                abstract ref :>> trailerHitch;
             }
         }
     }

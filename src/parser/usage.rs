@@ -7,7 +7,7 @@ use crate::ast::{
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     crosses_operator, qualified_reference, redefine_operator, reference_path, references_operator,
-    starts_with_keyword, subset_operator, typed_by_operator, ws_and_comments,
+    starts_with_keyword, subset_operator, typed_by_operator, ws1, ws_and_comments,
 };
 use crate::parser::{span_from_to, Input};
 use nom::bytes::complete::{tag, take_until};
@@ -16,6 +16,44 @@ use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
+
+/// BNF `RefPrefix = ('derived')? ('abstract' | 'variation')? ('constant')?` (§8.2.2.6.2), the
+/// modifier chain every usage may carry ahead of its keyword.
+///
+/// Owned here rather than re-spelled per usage parser: each parser that hand-rolled a subset of
+/// the chain accepted only the combinations that happened to be needed at the time, so a legal
+/// prefix was a parse gap in whichever scopes had not adopted it yet.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct RefPrefix {
+    pub is_derived: bool,
+    /// `abstract` or `variation` -- one slot, since the BNF makes them alternatives.
+    pub usage_prefix: Option<crate::ast::DefinitionPrefix>,
+    pub is_constant: bool,
+}
+
+/// Parse [`RefPrefix`]. Every part is optional, so this never fails; it consumes nothing when the
+/// next token is the usage keyword itself.
+pub(crate) fn ref_prefix(input: Input<'_>) -> IResult<Input<'_>, RefPrefix> {
+    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
+    let (input, usage_prefix) = opt(nom::branch::alt((
+        nom::combinator::map(preceded(tag(&b"abstract"[..]), ws1), |_| {
+            crate::ast::DefinitionPrefix::Abstract
+        }),
+        nom::combinator::map(preceded(tag(&b"variation"[..]), ws1), |_| {
+            crate::ast::DefinitionPrefix::Variation
+        }),
+    )))
+    .parse(input)?;
+    let (input, is_constant) = opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?;
+    Ok((
+        input,
+        RefPrefix {
+            is_derived: is_derived.is_some(),
+            usage_prefix,
+            is_constant: is_constant.is_some(),
+        },
+    ))
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct SpecializationClauses {
@@ -503,7 +541,10 @@ fn merge_groups(
 }
 
 /// [`merge_clause`] against a slot that may not hold a clause yet.
-fn merge_into(slot: &mut Option<Node<SubsettingRelationship>>, next: Node<SubsettingRelationship>) {
+pub(crate) fn merge_into(
+    slot: &mut Option<Node<SubsettingRelationship>>,
+    next: Node<SubsettingRelationship>,
+) {
     match slot {
         Some(existing) => merge_clause(existing, next),
         None => *slot = Some(next),

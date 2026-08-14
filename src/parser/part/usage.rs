@@ -1077,6 +1077,9 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     // GH-88.4: leading `in`/`out`/`inout` direction, e.g. `private in ref y: A, B;` (Simple
     // Tests/ItemTest.sysml:15).
     let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
+    // `BasicUsagePrefix = RefPrefix ('ref')?` -- the modifiers ahead of `ref` belong to the same
+    // production as the keyword.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // Reject kinded refs so those forms parse as real PartUsage/ActionUsage/StateUsage/…
@@ -1146,6 +1149,9 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             start,
             input,
             RefDecl {
+                is_derived: prefix.is_derived,
+                usage_prefix: prefix.usage_prefix,
+                is_constant: prefix.is_constant,
                 direction,
                 kind_keyword: None,
                 name: name_str,

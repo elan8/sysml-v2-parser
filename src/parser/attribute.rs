@@ -878,29 +878,19 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     // attribute minMass :> ISQ::mass;`, Mass Roll-up Example/MassRollup.sysml:21) -- a previous
     // assumption that `abstract`/`variation` "aren't legal on an attribute usage" was incorrect.
     // Skipped entirely when `end` already matched, since the two are alternatives.
-    let (input, is_derived, usage_prefix, is_constant, is_reference) = if is_end {
-        (input, false, None, false, false)
+    let (input, prefix, is_reference) = if is_end {
+        (input, crate::parser::usage::RefPrefix::default(), false)
     } else {
-        let (input, is_derived) =
-            nom::combinator::opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
-        let is_derived = is_derived.is_some();
-        let (input, usage_prefix) = nom::combinator::opt(alt((
-            map(preceded(tag(&b"abstract"[..]), ws1), |_| {
-                crate::ast::DefinitionPrefix::Abstract
-            }),
-            map(preceded(tag(&b"variation"[..]), ws1), |_| {
-                crate::ast::DefinitionPrefix::Variation
-            }),
-        )))
-        .parse(input)?;
-        let (input, is_constant) =
-            nom::combinator::opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?;
-        let is_constant = is_constant.is_some();
+        let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
         let (input, is_reference) =
             nom::combinator::opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
-        let is_reference = is_reference.is_some();
-        (input, is_derived, usage_prefix, is_constant, is_reference)
+        (input, prefix, is_reference.is_some())
     };
+    let crate::parser::usage::RefPrefix {
+        is_derived,
+        usage_prefix,
+        is_constant,
+    } = prefix;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     // SysML allows anonymous attribute usages: `attribute: Real;` (Identification may be empty).
     let (after_kw, _) = ws_and_comments(input)?;
