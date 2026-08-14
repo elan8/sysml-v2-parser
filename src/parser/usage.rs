@@ -272,7 +272,9 @@ fn specialization_target(input: Input<'_>) -> IResult<Input<'_>, QualifiedRefere
 
 /// One or more comma-separated [`specialization_target`]s, e.g. the `Base, Other` in
 /// `:> Base, Other`. Each target receives its own document-local identity.
-fn specialization_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<QualifiedReferenceId>> {
+pub(crate) fn specialization_targets(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<QualifiedReferenceId>> {
     let (input, first) = specialization_target(input)?;
     let (input, rest) = many0(preceded(
         preceded(ws_and_comments, tag(&b","[..])),
@@ -358,7 +360,7 @@ pub(crate) fn single_target_subsetting(
 
 /// Build a `SubsettingRelationship` node from target(s) and the span of the whole clause
 /// (operator/keyword through target).
-fn subsetting_relationship_node(
+pub(crate) fn subsetting_relationship_node(
     target: Vec<QualifiedReferenceId>,
     kind: SubsettingKind,
     span: Span,

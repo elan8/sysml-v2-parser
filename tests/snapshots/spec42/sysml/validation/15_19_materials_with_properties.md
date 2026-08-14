@@ -106,24 +106,24 @@ package '15_19-Materials with Properties' {
     attribute def AtomicMassValue :> MassValue;
     attribute def TensileStrengthUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def TensileStrengthValue :> ScalarQuantityValue {
-        attribute  :>> num : Real;
-        attribute  :>> mRef : TensileStrengthUnit;
+        attribute :>> num : Real;
+        attribute :>> mRef : TensileStrengthUnit;
     }
     attribute def <'N/mm²'> 'newton per square millimetre' : TensileStrengthUnit = N / mm ^ 2;
     part def Substance;
@@ -140,7 +140,7 @@ package '15_19-Materials with Properties' {
         attribute fractions : MaterialFraction[2..*];
     }
     individual def Iron :> Metal {
-        attribute  :>> atomicMass = 55.845 [Da];
+        attribute :>> atomicMass = 55.845 [Da];
     }
     individual def Carbon :> Metal {
         attribute atomicMass :>> Metal::atomicMass = 12.011 [Da];
@@ -150,16 +150,16 @@ package '15_19-Materials with Properties' {
     }
     individual def Steel_980 :> Alloy {
         attribute fraction1 :> fractions {
-            ref '' : Iron :>> material;
-            attribute  :>> massFraction = 0.9862 [one];
+            ref : Iron :>> material;
+            attribute :>> massFraction = 0.9862 [one];
         }
         attribute fraction2 :> fractions {
-            ref '' : Carbon :>> material;
-            attribute  :>> massFraction = 0.9862 [one];
+            ref : Carbon :>> material;
+            attribute :>> massFraction = 0.9862 [one];
         }
         attribute fraction3 :> fractions {
-            ref '' : Manganese :>> material;
-            attribute  :>> massFraction = 0.9862 [one];
+            ref : Manganese :>> material;
+            attribute :>> massFraction = 0.9862 [one];
         }
         attribute tensileStrength : TensileStrengthValue = 980 ['N/mm²'];
     }

@@ -42,11 +42,11 @@ package MassRollup1 {
         attribute totalMass :> ISQ::mass;
     }
     part simpleThing : MassedThing {
-        attribute  :>> totalMass = simpleMass;
+        attribute :>> totalMass = simpleMass;
     }
     part compositeThing : MassedThing {
         part subcomponents : MassedThing[*];
-        attribute  :>> totalMass = simpleMass + sum(subcomponents.totalMass);
+        attribute :>> totalMass = simpleMass + sum(subcomponents.totalMass);
     }
 }
 ~~~

@@ -613,7 +613,7 @@ standard library package MeasurementReferences {
 		 * A pair of a specialization of VectorQuantityValue and a specialization of VectorMeasurementReference can also be used to
 		 * define a vector space for state vectors as used in state-space representation models.
 		 */
-        attribute  :>> dimensions : Positive[0..1];
+        attribute :>> dimensions : Positive[0..1];
         attribute isOrthogonal : Boolean[1] default true;
     }
     attribute def ScalarMeasurementReference :> VectorMeasurementReference {
@@ -628,9 +628,9 @@ standard library package MeasurementReferences {
 		 * Attribute mRefs is bound to self for a ScalarMeasurementReference, for consistency with tensor and vector measurement references,
 		 * as the dimension or component of a scalar quantity is itself.
 		 */
-        attribute  :>> dimensions = null;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs = self;
+        attribute :>> dimensions = null;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs = self;
         attribute quantityDimension : QuantityDimension[1];
     }
     attribute def CoordinateFrame :> VectorMeasurementReference {
@@ -644,7 +644,7 @@ standard library package MeasurementReferences {
 		 * the next higher element (Object, Item or Part) in a composite structure.
 		 */
         attribute transformation : CoordinateTransformation[0..1] {
-            attribute  :>> target = that;
+            attribute :>> target = that;
         }
     }
     attribute def '3dCoordinateFrame' :> CoordinateFrame {
@@ -652,7 +652,7 @@ standard library package MeasurementReferences {
         /*
          * Most general 3-dimensional coordinate frame
          */
-        attribute  :>> dimensions = 3;
+        attribute :>> dimensions = 3;
     }
     alias ThreeDCoordinateFrame for '3dCoordinateFrame';
     attribute def CoordinateTransformation {
@@ -732,7 +732,7 @@ standard library package MeasurementReferences {
 	 * Any sequence can be reduced to a single combination of a translation and a rotation about a particular axis, but in general 
 	 * the original sequence cannot be retrieved as there are infinitely many sequences representing the reduced transformation.
 	 */
-        attribute  :>> elements : TranslationOrRotation[1..*] ordered nonunique;
+        attribute :>> elements : TranslationOrRotation[1..*] ordered nonunique;
     }
     attribute def AffineTransformationMatrix3d :> CoordinateTransformation, Array {
         doc
@@ -754,14 +754,14 @@ standard library package MeasurementReferences {
 		 * Note: See https://en.wikipedia.org/wiki/Transformation_matrix, under affine transformations for a general explanation.
 		 */
         attribute rotationMatrix : Array {
-            attribute  :>> elements : Real[9] ordered nonunique;
-            attribute  :>> dimensions = (3, 3);
+            attribute :>> elements : Real[9] ordered nonunique;
+            attribute :>> dimensions = (3, 3);
         }
         attribute translationVector : ThreeVectorValue[1] {
-            attribute  :>> elements : Real[3];
+            attribute :>> elements : Real[3];
         }
-        attribute  :>> dimensions = (4, 4);
-        attribute  :>> elements : Real[16] ordered nonunique = (rotationMatrix.elements#(1), rotationMatrix.elements#(2), rotationMatrix.elements#(3), translationVector#(1), rotationMatrix.elements#(4), rotationMatrix.elements#(5), rotationMatrix.elements#(6), translationVector#(2), rotationMatrix.elements#(7), rotationMatrix.elements#(8), rotationMatrix.elements#(9), translationVector#(3), 0, 0, 0, 1);
+        attribute :>> dimensions = (4, 4);
+        attribute :>> elements : Real[16] ordered nonunique = (rotationMatrix.elements#(1), rotationMatrix.elements#(2), rotationMatrix.elements#(3), translationVector#(1), rotationMatrix.elements#(4), rotationMatrix.elements#(5), rotationMatrix.elements#(6), translationVector#(2), rotationMatrix.elements#(7), rotationMatrix.elements#(8), rotationMatrix.elements#(9), translationVector#(3), 0, 0, 0, 1);
         assert constraint validSourceDimensions {
             source.dimensions == 3;
         }
@@ -772,11 +772,11 @@ standard library package MeasurementReferences {
 		 * NullTransformation is a three dimensional CoordinateTransformation that places the target CoordinateFrame at the
 		 * same position and orientation as the source CoordinateFrame.
 		 */
-        attribute  :>> rotationMatrix {
-            attribute  :>> elements = (1, 0, 0, 0, 1, 0, 0, 0, 1);
+        attribute :>> rotationMatrix {
+            attribute :>> elements = (1, 0, 0, 0, 1, 0, 0, 0, 1);
         }
-        attribute  :>> translationVector {
-            attribute  :>> elements = (0, 0, 0);
+        attribute :>> translationVector {
+            attribute :>> elements = (0, 0, 0);
         }
     }
     attribute def nullTransformation : NullTransformation;
@@ -793,7 +793,7 @@ standard library package MeasurementReferences {
 		 *
 		 * A MeasurementUnit specifies one or more UnitPowerFactors.
 		 */
-        attribute  :>> isBound = false;
+        attribute :>> isBound = false;
         attribute unitPowerFactors : UnitPowerFactor[0..*] ordered;
         attribute unitConversion : UnitConversion[0..1];
         assert constraint hasValidUnitPowerFactors : VerifyUnitPowerFactors {
@@ -807,7 +807,7 @@ standard library package MeasurementReferences {
 		 * Representation of a measurement unit that does not depend on any other measurement unit.
 		 */
         private attribute simpleUnitSelf : SimpleUnit = self;
-        attribute  :>> unitPowerFactors : UnitPowerFactor[1] {
+        attribute :>> unitPowerFactors : UnitPowerFactor[1] {
             attribute unit :>> UnitPowerFactor::unit = simpleUnitSelf;
             attribute exponent :>> UnitPowerFactor::exponent = 1;
         }
@@ -892,7 +892,7 @@ standard library package MeasurementReferences {
 		 * An IntervalScale is also a CoordinateFrame
 		 * The offset of one interval measurement scale w.r.t. another interval or ratio scale is defined through a quantityValueMapping, see MeasurementReference.
 		 */
-        attribute  :>> isBound = true;
+        attribute :>> isBound = true;
     }
     attribute def CyclicRatioScale :> MeasurementScale {
         doc
@@ -967,15 +967,15 @@ standard library package MeasurementReferences {
         /*
 		 * Explicit definition of "unit of dimension one", also known as "dimensionless unit".
 		 */
-        attribute  :>> unitPowerFactors = null;
+        attribute :>> unitPowerFactors = null;
     }
     attribute def DimensionOneValue :> ScalarQuantityValue {
         doc
         /*
 		 * A ScalarQuantityValue with a DimensionOneUnit.
 		 */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : DimensionOneUnit;
+        attribute :>> num : Real;
+        attribute :>> mRef : DimensionOneUnit;
     }
     attribute def dimensionOneQuantities : DimensionOneValue nonunique;
     attribute def one : DimensionOneUnit = new DimensionOneUnit();

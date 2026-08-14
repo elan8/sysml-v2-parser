@@ -146,10 +146,10 @@ package MassConstraintExample {
     part def Vehicle1 {
         attribute m : MassValue = eng.m + trans.m;
         part eng : Engine {
-            attribute  :>> m : MassValue;
+            attribute :>> m : MassValue;
         }
         part trans : Transmission {
-            attribute  :>> m : MassValue;
+            attribute :>> m : MassValue;
         }
     }
     part def Vehicle2 {
@@ -158,10 +158,10 @@ package MassConstraintExample {
         }
         attribute m : MassValue;
         part eng : Engine {
-            attribute  :>> m : MassValue;
+            attribute :>> m : MassValue;
         }
         part trans : Transmission {
-            attribute  :>> m : MassValue;
+            attribute :>> m : MassValue;
         }
     }
     constraint def MassConstraint3 {
@@ -198,10 +198,10 @@ package MassConstraintExample {
         }
         attribute m : MassValue;
         part eng : Engine {
-            attribute  :>> m : MassValue;
+            attribute :>> m : MassValue;
         }
         part trans : Transmission {
-            attribute  :>> m : MassValue;
+            attribute :>> m : MassValue;
         }
     }
     constraint def MassLimit {
@@ -216,10 +216,10 @@ package MassConstraintExample {
         }
         attribute m : MassValue = eng.m + trans.m;
         part eng : Engine {
-            attribute  :>> m : MassValue;
+            attribute :>> m : MassValue;
         }
         part trans : Transmission {
-            attribute  :>> m : MassValue;
+            attribute :>> m : MassValue;
         }
     }
 }

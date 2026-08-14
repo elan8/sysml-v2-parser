@@ -309,8 +309,8 @@ package '10c-Fuel Economy Analysis' {
                 in requirement fuelEconomyRequirement = highwayFuelEconomyRequirement;
             }
             part vehicle1_c1_analysized :> vehicle1_c1 {
-                attribute  :>> fuelEconomy_city = cityFuelEconomyAnalysis.calculatedFuelEconomy;
-                attribute  :>> fuelEconomy_highway = highwayFuelEconomyAnalysis.calculatedFuelEconomy;
+                attribute :>> fuelEconomy_city = cityFuelEconomyAnalysis.calculatedFuelEconomy;
+                attribute :>> fuelEconomy_highway = highwayFuelEconomyAnalysis.calculatedFuelEconomy;
             }
             satisfy vehicleFuelEconomyRequirementsGroup by vehicle1_c1_analysized;
         }

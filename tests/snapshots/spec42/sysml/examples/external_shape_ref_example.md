@@ -69,9 +69,9 @@ package ExternalShapeRefExample {
 			}
         }
         private item envelopingBoxBatteryUnit : Box :> envelopingShapes {
-            attribute  :>> length = 140 [mm];
-            attribute  :>> width = 148 [mm];
-            attribute  :>> height = 90 [mm];
+            attribute :>> length = 140 [mm];
+            attribute :>> width = 148 [mm];
+            attribute :>> height = 90 [mm];
         }
     }
 }

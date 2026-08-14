@@ -110,7 +110,7 @@ standard library package DerivationConnections {
             doc
             /* The single original requirement. */
         }
-        ref requirement ''[1..*] :>> derivedRequirements :> participant {
+        ref requirement[1..*] :>> derivedRequirements :> participant {
             doc
             /* The one or more requirements that are derived from the original requirement. */
         }

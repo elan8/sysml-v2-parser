@@ -125,7 +125,7 @@ package ServerSequenceOutsideRealization_2 {
         part producer_2[1] {
             attribute someTopic : String;
             private item somePublication;
-            attribute  :>> incomingTransferSort = Occurrences::earlierFirstIncomingTransferSort;
+            attribute :>> incomingTransferSort = Occurrences::earlierFirstIncomingTransferSort;
             port publicationPort : ~PublicationPort;
             perform action producerBehavior {
                 action publish send new Publish(someTopic, somePublication) via publicationPort;
@@ -135,7 +135,7 @@ package ServerSequenceOutsideRealization_2 {
         part server_2[1] {
             port publicationPort : PublicationPort;
             port subscriptionPort : SubscriptionPort;
-            attribute  :>> incomingTransferSort = Occurrences::earlierFirstIncomingTransferSort;
+            attribute :>> incomingTransferSort = Occurrences::earlierFirstIncomingTransferSort;
             state serverBehavior {
                 entry;
                 then waitForSubscription;
@@ -148,7 +148,7 @@ package ServerSequenceOutsideRealization_2 {
         interface consumer_2.subscriptionPort to server_2.subscriptionPort {}
         part consumer_2[1] {
             attribute myTopic : String;
-            attribute  :>> incomingTransferSort = Occurrences::earlierFirstIncomingTransferSort;
+            attribute :>> incomingTransferSort = Occurrences::earlierFirstIncomingTransferSort;
             port subscriptionPort : ~SubscriptionPort;
             perform action consumerBehavior {
 				action subscribe send new Subscribe(myTopic, consumer_2) to server_2;

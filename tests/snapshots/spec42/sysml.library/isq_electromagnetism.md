@@ -2382,21 +2382,21 @@ standard library package ISQElectromagnetism {
          * definition: `d(Q) = I dt` where `I` is electric current (item 6-1) and `t` is time (ISO 80000-3, item 3-7)
          * remarks: Electric charge is carried by discrete particles and can be positive or negative. The sign convention is such that the elementary electric charge `e`, i.e. the charge of the proton, is positive. See IEC 60050-121, item121-11-01. To denote a point charge `q` is often used, and that is done in the present document.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricChargeUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricChargeUnit[1];
     }
     attribute def electricCharge : ElectricChargeValue nonunique;
     attribute def ElectricChargeUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (durationPF, electricCurrentPF);
         }
     }
     attribute def ElectricChargeDensityValue :> ScalarQuantityValue {
@@ -2412,25 +2412,25 @@ standard library package ISQElectromagnetism {
          * definition: `ρ = (dQ)/(dV)` where `Q` is electric charge (item 6-2) and `V` is volume (ISO 80000-3, item 3-4)
          * remarks: See IEC 60050-121, item 121-11-07.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricChargeDensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricChargeDensityUnit[1];
     }
     attribute def electricChargeDensity : ElectricChargeDensityValue nonunique;
     attribute def ElectricChargeDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -3;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
         }
     }
     alias VolumicElectricChargeUnit for ElectricChargeDensityUnit;
@@ -2449,25 +2449,25 @@ standard library package ISQElectromagnetism {
          * definition: `ρ_A = (dQ)/(dA)` where `Q` is electric charge (item 6-2) and `A` is area (ISO 80000-3, item 3-3)`
          * remarks: See IEC 60050-121, item 121-11-08.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SurfaceDensityOfElectricChargeUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SurfaceDensityOfElectricChargeUnit[1];
     }
     attribute def surfaceDensityOfElectricCharge : SurfaceDensityOfElectricChargeValue nonunique;
     attribute def SurfaceDensityOfElectricChargeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
         }
     }
     alias AreicElectricChargeUnit for SurfaceDensityOfElectricChargeUnit;
@@ -2486,25 +2486,25 @@ standard library package ISQElectromagnetism {
          * definition: `ρ_l = (dQ)/(dl)` where `Q` is electric charge (item 6-2) and `l` is length (ISO 80000-3, item 3-1.1)
          * remarks: See IEC 60050-121, item121-11-09.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LinearDensityOfElectricChargeUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LinearDensityOfElectricChargeUnit[1];
     }
     attribute def linearDensityOfElectricCharge : LinearDensityOfElectricChargeValue nonunique;
     attribute def LinearDensityOfElectricChargeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
         }
     }
     alias LineicElectricChargeUnit for LinearDensityOfElectricChargeUnit;
@@ -2523,25 +2523,25 @@ standard library package ISQElectromagnetism {
          * definition: `vec(p) = q (vec(r_+) - vec(r_-))` where `vec(r_+)` and `vec(r_-)` are the position vectors (ISO 80000-3, item 3-1.11) to carriers of electric charges `q` and `-q` (item 6-2), respectively
          * remarks: The electric dipole moment of a substance within a domain is the vector sum of electric dipole moments of electric dipoles included in the domain. See IEC 60050-121, items 121-11-35 and 121-11-36.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricDipoleMomentUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricDipoleMomentUnit[1];
     }
     attribute def electricDipoleMoment : ElectricDipoleMomentValue nonunique;
     attribute def ElectricDipoleMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
         }
     }
     attribute def CartesianElectricDipoleMoment3dVector :> '3dVectorQuantityValue' {
@@ -2557,14 +2557,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(p) = q (vec(r_+) - vec(r_-))` where `vec(r_+)` and `vec(r_-)` are the position vectors (ISO 80000-3, item 3-1.11) to carriers of electric charges `q` and `-q` (item 6-2), respectively
          * remarks: The electric dipole moment of a substance within a domain is the vector sum of electric dipole moments of electric dipoles included in the domain. See IEC 60050-121, items 121-11-35 and 121-11-36.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianElectricDipoleMoment3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianElectricDipoleMoment3dCoordinateFrame[1];
     }
     attribute def cartesianElectricDipoleMoment3dVector : CartesianElectricDipoleMoment3dVector;
     attribute def CartesianElectricDipoleMoment3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : ElectricDipoleMomentUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : ElectricDipoleMomentUnit[3];
     }
     attribute def ElectricPolarizationValue :> ScalarQuantityValue {
         doc
@@ -2579,25 +2579,25 @@ standard library package ISQElectromagnetism {
          * definition: `vec(P) = (d vec(p))/(dV)` where `vec(p)` is electric dipole moment (item 6-6) of a substance within a domain with volume `V` (ISO 80000-3, item 3-4)
          * remarks: See IEC 60050-121, item 121-11-37.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricPolarizationUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricPolarizationUnit[1];
     }
     attribute def electricPolarization : ElectricPolarizationValue nonunique;
     attribute def ElectricPolarizationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
         }
     }
     attribute def CartesianElectricPolarization3dVector :> '3dVectorQuantityValue' {
@@ -2613,14 +2613,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(P) = (d vec(p))/(dV)` where `vec(p)` is electric dipole moment (item 6-6) of a substance within a domain with volume `V` (ISO 80000-3, item 3-4)
          * remarks: See IEC 60050-121, item 121-11-37.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianElectricPolarization3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianElectricPolarization3dCoordinateFrame[1];
     }
     attribute def cartesianElectricPolarization3dVector : CartesianElectricPolarization3dVector;
     attribute def CartesianElectricPolarization3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : ElectricPolarizationUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : ElectricPolarizationUnit[3];
     }
     attribute def ElectricCurrentDensityValue :> ScalarQuantityValue {
         doc
@@ -2635,21 +2635,21 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J) = ρ vec(v)` where `ρ` is electric charge density (item 6-3) and `vec(v)` is velocity (ISO 80000-3, item 3-8.1)
          * remarks: Electric current `I` (item 6-1) through a surface `S` is `I = int_S vec(J) * vec(e_n) dA` where `vec(e_n) dA` is vector surface element. See IEC 60050-121, item 121-11-11.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricCurrentDensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricCurrentDensityUnit[1];
     }
     attribute def electricCurrentDensity : ElectricCurrentDensityValue nonunique;
     attribute def ElectricCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
         }
     }
     attribute def CartesianElectricCurrentDensity3dVector :> '3dVectorQuantityValue' {
@@ -2665,14 +2665,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J) = ρ vec(v)` where `ρ` is electric charge density (item 6-3) and `vec(v)` is velocity (ISO 80000-3, item 3-8.1)
          * remarks: Electric current `I` (item 6-1) through a surface `S` is `I = int_S vec(J) * vec(e_n) dA` where `vec(e_n) dA` is vector surface element. See IEC 60050-121, item 121-11-11.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianElectricCurrentDensity3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianElectricCurrentDensity3dCoordinateFrame[1];
     }
     attribute def cartesianElectricCurrentDensity3dVector : CartesianElectricCurrentDensity3dVector;
     attribute def CartesianElectricCurrentDensity3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : ElectricCurrentDensityUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : ElectricCurrentDensityUnit[3];
     }
     alias CartesianAreicElectricCurrent3dCoordinateFrame for CartesianElectricCurrentDensity3dCoordinateFrame;
     alias cartesianAreicElectricCurrent3dVector for cartesianElectricCurrentDensity3dVector;
@@ -2689,21 +2689,21 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J_S) = ρ_A vec(v)` where `ρ_A` is surface density of electric charge (item 6-4) and `vec(v)` is velocity (ISO 80000-3, item 3-8.1)
          * remarks: Electric current `I` (item 6-1) through a curve `C` on a surface is `I = int_C vec(J_S) xx vec(e_n) * d vec(r)` where `vec(e_n)` is a unit vector perpendicular to the surface and line vector element and `d vec(r)` is the differential of position vector `vec(r)`. See IEC 60050-121, item 121-11-12.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LinearElectricCurrentDensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LinearElectricCurrentDensityUnit[1];
     }
     attribute def linearElectricCurrentDensity : LinearElectricCurrentDensityValue nonunique;
     attribute def LinearElectricCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
         }
     }
     attribute def CartesianLinearElectricCurrentDensity3dVector :> '3dVectorQuantityValue' {
@@ -2719,14 +2719,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J_S) = ρ_A vec(v)` where `ρ_A` is surface density of electric charge (item 6-4) and `vec(v)` is velocity (ISO 80000-3, item 3-8.1)
          * remarks: Electric current `I` (item 6-1) through a curve `C` on a surface is `I = int_C vec(J_S) xx vec(e_n) * d vec(r)` where `vec(e_n)` is a unit vector perpendicular to the surface and line vector element and `d vec(r)` is the differential of position vector `vec(r)`. See IEC 60050-121, item 121-11-12.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianLinearElectricCurrentDensity3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianLinearElectricCurrentDensity3dCoordinateFrame[1];
     }
     attribute def cartesianLinearElectricCurrentDensity3dVector : CartesianLinearElectricCurrentDensity3dVector;
     attribute def CartesianLinearElectricCurrentDensity3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : LinearElectricCurrentDensityUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : LinearElectricCurrentDensityUnit[3];
     }
     alias CartesianLineicElectricCurrent3dCoordinateFrame for CartesianLinearElectricCurrentDensity3dCoordinateFrame;
     alias cartesianLineicElectricCurrent3dVector for cartesianLinearElectricCurrentDensity3dVector;
@@ -2743,29 +2743,29 @@ standard library package ISQElectromagnetism {
          * definition: `vec(E) = vec(F)/q` where `vec(F)` is force (ISO 80000-4, item 4-9.1) and `q` is electric charge (item 6-2)
          * remarks: See IEC 60050, item 121-11-18. `q` is the charge of a test particle at rest.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricFieldStrengthUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricFieldStrengthUnit[1];
     }
     attribute def electricFieldStrength : ElectricFieldStrengthValue nonunique;
     attribute def ElectricFieldStrengthUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def CartesianElectricFieldStrength3dVector :> '3dVectorQuantityValue' {
@@ -2781,14 +2781,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(E) = vec(F)/q` where `vec(F)` is force (ISO 80000-4, item 4-9.1) and `q` is electric charge (item 6-2)
          * remarks: See IEC 60050, item 121-11-18. `q` is the charge of a test particle at rest.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianElectricFieldStrength3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianElectricFieldStrength3dCoordinateFrame[1];
     }
     attribute def cartesianElectricFieldStrength3dVector : CartesianElectricFieldStrength3dVector;
     attribute def CartesianElectricFieldStrength3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : ElectricFieldStrengthUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : ElectricFieldStrengthUnit[3];
     }
     attribute def ElectricPotentialValue :> ScalarQuantityValue {
         doc
@@ -2803,29 +2803,29 @@ standard library package ISQElectromagnetism {
          * definition: `-grad(V) = vec(E) + (del A)/(del t)` where `vec(E)` is electric field strength (item 610), `A` is magnetic vector potential (item 6-32) and `t` is time (ISO 80000-3, item 3-7)
          * remarks: The electric potential is not unique, since any constant scalar field quantity can be added to it without changing its gradient. See IEC 60050-121, item 121-11-25.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricPotentialUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricPotentialUnit[1];
     }
     attribute def electricPotential : ElectricPotentialValue nonunique;
     attribute def ElectricPotentialUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def ElectricPotentialDifferenceValue :> ScalarQuantityValue {
@@ -2841,29 +2841,29 @@ standard library package ISQElectromagnetism {
          * definition: `V_(ab) = int_(vec(r_a))^(vec(r_b)) (vec(E) + (del A)/(del t)) * d vec(r)` where `vec(E)` is electric field strength (item 610), `A` is magnetic vector potential (item 6-32), `t` is time (ISO 80000-3, item 3-7), and `vec(r)` is position vector (ISO 80000-3, item 3-1.11) along a given curve `C` from point `a` to point `b`
          * remarks: `V_(ab) = V_a - V_b` where `V_a` and `V_b` are the potentials at points `a` and `b`, respectively. See IEC 60050-121, item 121-11-26.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricPotentialDifferenceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricPotentialDifferenceUnit[1];
     }
     attribute def electricPotentialDifference : ElectricPotentialDifferenceValue nonunique;
     attribute def ElectricPotentialDifferenceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def voltage : ElectricPotentialDifferenceValue {
@@ -2894,25 +2894,25 @@ standard library package ISQElectromagnetism {
          * definition: `vec(D) = ε_0 vec(E) + vec(P)` where `ε_0` is the electric constant (item 6-14.1 ), `vec(E)` is electric field strength (item 6-10), and `vec(P)` is electric polarization (item 6-7)
          * remarks: The electric flux density is related to electric charge density via `nabla * vec(D) = ρ` where `nabla * vec(D)` denotes the divergence of `vec(D)`. See IEC 60050-121, item 121-11-40.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricFluxDensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricFluxDensityUnit[1];
     }
     attribute def electricFluxDensity : ElectricFluxDensityValue nonunique;
     attribute def ElectricFluxDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF, electricCurrentPF);
         }
     }
     attribute def CartesianElectricFluxDensity3dVector :> '3dVectorQuantityValue' {
@@ -2928,14 +2928,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(D) = ε_0 vec(E) + vec(P)` where `ε_0` is the electric constant (item 6-14.1 ), `vec(E)` is electric field strength (item 6-10), and `vec(P)` is electric polarization (item 6-7)
          * remarks: The electric flux density is related to electric charge density via `nabla * vec(D) = ρ` where `nabla * vec(D)` denotes the divergence of `vec(D)`. See IEC 60050-121, item 121-11-40.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianElectricFluxDensity3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianElectricFluxDensity3dCoordinateFrame[1];
     }
     attribute def cartesianElectricFluxDensity3dVector : CartesianElectricFluxDensity3dVector;
     attribute def CartesianElectricFluxDensity3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : ElectricFluxDensityUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : ElectricFluxDensityUnit[3];
     }
     alias CartesianElectricDisplacement3dCoordinateFrame for CartesianElectricFluxDensity3dCoordinateFrame;
     alias cartesianElectricDisplacement3dVector for cartesianElectricFluxDensity3dVector;
@@ -2952,29 +2952,29 @@ standard library package ISQElectromagnetism {
          * definition: `C = Q/U` where `Q` is electric charge (item 6-2) and `U` is voltage (6-11.3)
          * remarks: See IEC 60050-131, item 131-12-13.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : CapacitanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : CapacitanceUnit[1];
     }
     attribute def capacitance : CapacitanceValue nonunique;
     attribute def CapacitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 4;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 4;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def ElectricConstantValue :> ScalarQuantityValue {
@@ -2990,29 +2990,29 @@ standard library package ISQElectromagnetism {
          * definition: `ε_0 = 1 / (μ_0 * c_0^2)` where `μ_0` is the magnetic constant (item 6-26.1) and `c_0` is the speed of light (item 6-35.2)
          * remarks: `ε_0 = 8.854188 * 10^-12` F/m. See IEC 60050-121, item 121-11-03.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricConstantUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricConstantUnit[1];
     }
     attribute def electricConstant : ElectricConstantValue nonunique;
     attribute def ElectricConstantUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -3;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 4;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 4;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     alias PermittivityOfVacuumUnit for ElectricConstantUnit;
@@ -3031,29 +3031,29 @@ standard library package ISQElectromagnetism {
          * definition: `vec(D) = ε vec(E)` where `vec(D)` is electric flux density (item 6-12) and `vec(E)` is electric field strength (item 6-10)
          * remarks: This definition applies to an isotropic medium. For an anisotropic medium, permittivity is a second order tensor. See IEC 60050-121, item 121-12-12.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PermittivityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PermittivityUnit[1];
     }
     attribute def permittivity : PermittivityValue nonunique;
     attribute def PermittivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -3;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 4;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 4;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def RelativePermittivityValue :> DimensionOneValue {
@@ -3099,21 +3099,21 @@ standard library package ISQElectromagnetism {
          * definition: `Ψ = int_S vec(D) * vec(e_n) dA` over a surface `S`, where `vec(D)` is electric flux (item 6-12) en `vec(e_n) dA` is the vector surface element (ISO 80000-3 item 3-3)
          * remarks: See IEC 60050-121, item 121-11-41.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectricFluxUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectricFluxUnit[1];
     }
     attribute def electricFlux : ElectricFluxValue nonunique;
     attribute def ElectricFluxUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (durationPF, electricCurrentPF);
         }
     }
     attribute def DisplacementCurrentDensityValue :> ScalarQuantityValue {
@@ -3129,21 +3129,21 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J_D) = (del vec(D))/(del t)` where `vec(D)` is electric flux density (item 6-12) and `t` is time (ISO 80000-3, item 3-7) 
          * remarks: See IEC 60050-121, item 121-11-42.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : DisplacementCurrentDensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : DisplacementCurrentDensityUnit[1];
     }
     attribute def displacementCurrentDensity : DisplacementCurrentDensityValue nonunique;
     attribute def DisplacementCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
         }
     }
     attribute def CartesianDisplacementCurrentDensity3dVector :> '3dVectorQuantityValue' {
@@ -3159,14 +3159,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J_D) = (del vec(D))/(del t)` where `vec(D)` is electric flux density (item 6-12) and `t` is time (ISO 80000-3, item 3-7) 
          * remarks: See IEC 60050-121, item 121-11-42.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianDisplacementCurrentDensity3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianDisplacementCurrentDensity3dCoordinateFrame[1];
     }
     attribute def cartesianDisplacementCurrentDensity3dVector : CartesianDisplacementCurrentDensity3dVector;
     attribute def CartesianDisplacementCurrentDensity3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : DisplacementCurrentDensityUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : DisplacementCurrentDensityUnit[3];
     }
     attribute def displacementCurrent : ElectricCurrentValue {
         doc
@@ -3209,21 +3209,21 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J_(tot)) = vec(J) +vec(J_D)` where `vec(J)` is electric current density (item 6-8) and `vec(J_D)` is displacement current density (item 6-18)
          * remarks: See IEC 60050-121, item 121-11-44.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : TotalCurrentDensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : TotalCurrentDensityUnit[1];
     }
     attribute def totalCurrentDensity : TotalCurrentDensityValue nonunique;
     attribute def TotalCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
         }
     }
     attribute def CartesianTotalCurrentDensity3dVector :> '3dVectorQuantityValue' {
@@ -3239,14 +3239,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J_(tot)) = vec(J) +vec(J_D)` where `vec(J)` is electric current density (item 6-8) and `vec(J_D)` is displacement current density (item 6-18)
          * remarks: See IEC 60050-121, item 121-11-44.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianTotalCurrentDensity3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianTotalCurrentDensity3dCoordinateFrame[1];
     }
     attribute def cartesianTotalCurrentDensity3dVector : CartesianTotalCurrentDensity3dVector;
     attribute def CartesianTotalCurrentDensity3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : TotalCurrentDensityUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : TotalCurrentDensityUnit[3];
     }
     attribute def MagneticFluxDensityValue :> ScalarQuantityValue {
         doc
@@ -3261,25 +3261,25 @@ standard library package ISQElectromagnetism {
          * definition: `vec(F) = q vec(v) xx vec(B)` where `vec(F)` is force (ISO 80000-4, item 4-9.1) and `vec(v)` is velocity (ISO 80000-3, item 3-8.1) of any test particle with electric charge `q` (item 6-2)
          * remarks: The magnetic flux density has zero divergence, `nabla * vec(B) = 0`. See IEC 60050-121, item 121-11-19.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagneticFluxDensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagneticFluxDensityUnit[1];
     }
     attribute def magneticFluxDensity : MagneticFluxDensityValue nonunique;
     attribute def MagneticFluxDensityUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def CartesianMagneticFluxDensity3dVector :> '3dVectorQuantityValue' {
@@ -3295,14 +3295,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(F) = q vec(v) xx vec(B)` where `vec(F)` is force (ISO 80000-4, item 4-9.1) and `vec(v)` is velocity (ISO 80000-3, item 3-8.1) of any test particle with electric charge `q` (item 6-2)
          * remarks: The magnetic flux density has zero divergence, `nabla * vec(B) = 0`. See IEC 60050-121, item 121-11-19.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianMagneticFluxDensity3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianMagneticFluxDensity3dCoordinateFrame[1];
     }
     attribute def cartesianMagneticFluxDensity3dVector : CartesianMagneticFluxDensity3dVector;
     attribute def CartesianMagneticFluxDensity3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : MagneticFluxDensityUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : MagneticFluxDensityUnit[3];
     }
     attribute def MagneticFluxValue :> ScalarQuantityValue {
         doc
@@ -3317,29 +3317,29 @@ standard library package ISQElectromagnetism {
          * definition: `Φ = int_S vec(B) * vec(e_n) dA` over a surface `S`, where `vec(B)` is magnetic flux density (item 6-21) and `vec(e_n) dA` is vector surface element (ISO 80000-3, item 3-3)
          * remarks: See IEC 60050-121, item 121-11-21.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagneticFluxUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagneticFluxUnit[1];
     }
     attribute def magneticFlux : MagneticFluxValue nonunique;
     attribute def MagneticFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def LinkedFluxValue :> ScalarQuantityValue {
@@ -3355,29 +3355,29 @@ standard library package ISQElectromagnetism {
          * definition: `Ψ_m = int_C vec(A) * d vec(r)` where `vec(A)` is magnetic vector potential (item 6-32) and `d vec(r)` is line vector element of the curve `C`
          * remarks: Line vector element `d vec(r)` is the differential of position vector `vec(r)` (ISO 80000-3, item 3-1.11). See IEC 60050-121, item 121-11-24.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LinkedFluxUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LinkedFluxUnit[1];
     }
     attribute def linkedFlux : LinkedFluxValue nonunique;
     attribute def LinkedFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def MagneticMomentValue :> ScalarQuantityValue {
@@ -3393,21 +3393,21 @@ standard library package ISQElectromagnetism {
          * definition: `vec(m) = I vec(e_n) A` where `I` is electric current (item 6-1) in a small closed loop, `vec(e_n)` is a unit vector perpendicular to the loop, and `A` is area (ISO 80000-3, item 3-3) of the loop
          * remarks: The magnetic moment of a substance within a domain is the vector sum of the magnetic moments of all entities included in the domain. See IEC 60050-121, items 121-11-49 and 121-11-50.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagneticMomentUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagneticMomentUnit[1];
     }
     attribute def magneticMoment : MagneticMomentValue nonunique;
     attribute def MagneticMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
         }
     }
     attribute def CartesianMagneticMoment3dVector :> '3dVectorQuantityValue' {
@@ -3423,14 +3423,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(m) = I vec(e_n) A` where `I` is electric current (item 6-1) in a small closed loop, `vec(e_n)` is a unit vector perpendicular to the loop, and `A` is area (ISO 80000-3, item 3-3) of the loop
          * remarks: The magnetic moment of a substance within a domain is the vector sum of the magnetic moments of all entities included in the domain. See IEC 60050-121, items 121-11-49 and 121-11-50.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianMagneticMoment3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianMagneticMoment3dCoordinateFrame[1];
     }
     attribute def cartesianMagneticMoment3dVector : CartesianMagneticMoment3dVector;
     attribute def CartesianMagneticMoment3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : MagneticMomentUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : MagneticMomentUnit[3];
     }
     alias CartesianMagneticAreaMoment3dCoordinateFrame for CartesianMagneticMoment3dCoordinateFrame;
     alias cartesianMagneticAreaMoment3dVector for cartesianMagneticMoment3dVector;
@@ -3447,21 +3447,21 @@ standard library package ISQElectromagnetism {
          * definition: `vec(M) = (d vec(m)) / (dV)` where `vec(m)` is magnetic moment (item 6-23) of a substance in a domain with volume `V` (ISO 80000-3, item 3-4)
          * remarks: See IEC 60050-121, item 121-11-52.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagnetizationUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagnetizationUnit[1];
     }
     attribute def magnetization : MagnetizationValue nonunique;
     attribute def MagnetizationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
         }
     }
     attribute def CartesianMagnetization3dVector :> '3dVectorQuantityValue' {
@@ -3477,14 +3477,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(M) = (d vec(m)) / (dV)` where `vec(m)` is magnetic moment (item 6-23) of a substance in a domain with volume `V` (ISO 80000-3, item 3-4)
          * remarks: See IEC 60050-121, item 121-11-52.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianMagnetization3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianMagnetization3dCoordinateFrame[1];
     }
     attribute def cartesianMagnetization3dVector : CartesianMagnetization3dVector;
     attribute def CartesianMagnetization3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : MagnetizationUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : MagnetizationUnit[3];
     }
     attribute def MagneticFieldStrengthValue :> ScalarQuantityValue {
         doc
@@ -3499,21 +3499,21 @@ standard library package ISQElectromagnetism {
          * definition: `vec(H) = vec(B)/μ_0 - vec(M)` where `vec(B)` is magnetic flux density (item 6-21), `μ_0` is the magnetic constant (item 6-26.1), and `vec(M)` is magnetization (item 6-24)
          * remarks: The magnetic field strength is related to the total current density `vec(J_(t ot))` (item 6-20) via `rot vec(H) = vec(J_(t ot))`. See IEC 60050-121, item 121-11-56.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagneticFieldStrengthUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagneticFieldStrengthUnit[1];
     }
     attribute def magneticFieldStrength : MagneticFieldStrengthValue nonunique;
     attribute def MagneticFieldStrengthUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
         }
     }
     attribute def CartesianMagneticFieldStrength3dVector :> '3dVectorQuantityValue' {
@@ -3529,14 +3529,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(H) = vec(B)/μ_0 - vec(M)` where `vec(B)` is magnetic flux density (item 6-21), `μ_0` is the magnetic constant (item 6-26.1), and `vec(M)` is magnetization (item 6-24)
          * remarks: The magnetic field strength is related to the total current density `vec(J_(t ot))` (item 6-20) via `rot vec(H) = vec(J_(t ot))`. See IEC 60050-121, item 121-11-56.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianMagneticFieldStrength3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianMagneticFieldStrength3dCoordinateFrame[1];
     }
     attribute def cartesianMagneticFieldStrength3dVector : CartesianMagneticFieldStrength3dVector;
     attribute def CartesianMagneticFieldStrength3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : MagneticFieldStrengthUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : MagneticFieldStrengthUnit[3];
     }
     alias CartesianMagnetizingField3dCoordinateFrame for CartesianMagneticFieldStrength3dCoordinateFrame;
     alias cartesianMagnetizingField3dVector for cartesianMagneticFieldStrength3dVector;
@@ -3553,29 +3553,29 @@ standard library package ISQElectromagnetism {
          * definition: `μ_0 = 4 π * 10^-7` H/m
          * remarks: For this definition of `μ_0` see item 6-1.a. `μ_0 ~~ 1.256637 * 10^-6` H/m. See IEC 60050-121, item 121-11-14.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagneticConstantUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagneticConstantUnit[1];
     }
     attribute def magneticConstant : MagneticConstantValue nonunique;
     attribute def MagneticConstantUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     alias PermeabilityOfVacuumUnit for MagneticConstantUnit;
@@ -3594,29 +3594,29 @@ standard library package ISQElectromagnetism {
          * definition: `vec(B) = μ vec(H)` where `vec(B)` is magnetic flux density (item 6-21) and `vec(H)` is magnetic field strength (item 6-25)
          * remarks: This definition applies to an isotropic medium. For an anisotropic medium permeability is a second order tensor. See IEC 60050-121, item 121-12-28.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PermeabilityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PermeabilityUnit[1];
     }
     attribute def permeability : PermeabilityValue nonunique;
     attribute def PermeabilityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def RelativePermeabilityValue :> DimensionOneValue {
@@ -3662,25 +3662,25 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J_m) = μ_0 vec(M)` where `μ_0` is the magnetic constant (item 6-26.1), and `vec(M)` is magnetization (item 6-24)
          * remarks: See IEC 60050-121, item 121-11-54.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagneticPolarizationUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagneticPolarizationUnit[1];
     }
     attribute def magneticPolarization : MagneticPolarizationValue nonunique;
     attribute def MagneticPolarizationUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def CartesianMagneticPolarization3dVector :> '3dVectorQuantityValue' {
@@ -3696,14 +3696,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J_m) = μ_0 vec(M)` where `μ_0` is the magnetic constant (item 6-26.1), and `vec(M)` is magnetization (item 6-24)
          * remarks: See IEC 60050-121, item 121-11-54.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianMagneticPolarization3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianMagneticPolarization3dCoordinateFrame[1];
     }
     attribute def cartesianMagneticPolarization3dVector : CartesianMagneticPolarization3dVector;
     attribute def CartesianMagneticPolarization3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : MagneticPolarizationUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : MagneticPolarizationUnit[3];
     }
     attribute def MagneticDipoleMomentValue :> ScalarQuantityValue {
         doc
@@ -3718,29 +3718,29 @@ standard library package ISQElectromagnetism {
          * definition: `vec(j_m) = μ_0 vec(m)` where `μ_0` is the magnetic constant (item 6-26.1), and `vec(m)` is magnetic moment (item 6-23)
          * remarks: See IEC 60050-121, item 121-11-55.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagneticDipoleMomentUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagneticDipoleMomentUnit[1];
     }
     attribute def magneticDipoleMoment : MagneticDipoleMomentValue nonunique;
     attribute def MagneticDipoleMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 3;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def CartesianMagneticDipoleMoment3dVector :> '3dVectorQuantityValue' {
@@ -3756,14 +3756,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(j_m) = μ_0 vec(m)` where `μ_0` is the magnetic constant (item 6-26.1), and `vec(m)` is magnetic moment (item 6-23)
          * remarks: See IEC 60050-121, item 121-11-55.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianMagneticDipoleMoment3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianMagneticDipoleMoment3dCoordinateFrame[1];
     }
     attribute def cartesianMagneticDipoleMoment3dVector : CartesianMagneticDipoleMoment3dVector;
     attribute def CartesianMagneticDipoleMoment3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : MagneticDipoleMomentUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : MagneticDipoleMomentUnit[3];
     }
     attribute def CoercivityValue :> ScalarQuantityValue {
         doc
@@ -3778,21 +3778,21 @@ standard library package ISQElectromagnetism {
          * definition: magnetic field strength (item 6-25) to be applied to bring the magnetic flux density (item 6-21) in a substance from its remaining magnetic flux density to zero
          * remarks: See IEC 60050-121, item 121-12-69. Also called coercive field strength.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : CoercivityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : CoercivityUnit[1];
     }
     attribute def coercivity : CoercivityValue nonunique;
     attribute def CoercivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, electricCurrentPF);
         }
     }
     attribute def MagneticVectorPotentialValue :> ScalarQuantityValue {
@@ -3808,29 +3808,29 @@ standard library package ISQElectromagnetism {
          * definition: `vec(B) = rot vec(A)` where `vec(B)` is magnetic flux density (item 6-21)
          * remarks: The magnetic vector potential is not unique since any irrotational vector field can be added to it without changing its rotation. See IEC 60050-121, item 121-11-23.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagneticVectorPotentialUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagneticVectorPotentialUnit[1];
     }
     attribute def magneticVectorPotential : MagneticVectorPotentialValue nonunique;
     attribute def MagneticVectorPotentialUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def CartesianMagneticVectorPotential3dVector :> '3dVectorQuantityValue' {
@@ -3846,14 +3846,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(B) = rot vec(A)` where `vec(B)` is magnetic flux density (item 6-21)
          * remarks: The magnetic vector potential is not unique since any irrotational vector field can be added to it without changing its rotation. See IEC 60050-121, item 121-11-23.
          */
-        attribute  :>> isBound = true;
-        attribute  :>> mRef : CartesianMagneticVectorPotential3dCoordinateFrame[1];
+        attribute :>> isBound = true;
+        attribute :>> mRef : CartesianMagneticVectorPotential3dCoordinateFrame[1];
     }
     attribute def cartesianMagneticVectorPotential3dVector : CartesianMagneticVectorPotential3dVector;
     attribute def CartesianMagneticVectorPotential3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = true;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : MagneticVectorPotentialUnit[3];
+        attribute :>> isBound = true;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : MagneticVectorPotentialUnit[3];
     }
     attribute def ElectromagneticEnergyDensityValue :> ScalarQuantityValue {
         doc
@@ -3868,25 +3868,25 @@ standard library package ISQElectromagnetism {
          * definition: `ω = 1/2*(vec(E)*vec(D) + vec(B) * vec(H))` where `vec(E)` is electric field strength (item 6-10), `vec(D)` is electric flux density (item 6-12), `vec(B)` is magnetic flux density (item 6-21), and `vec(H)` is magnetic field strength (item 6-25)
          * remarks: See IEC 60050-121, item 121-11-65.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ElectromagneticEnergyDensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ElectromagneticEnergyDensityUnit[1];
     }
     attribute def electromagneticEnergyDensity : ElectromagneticEnergyDensityValue nonunique;
     attribute def ElectromagneticEnergyDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     alias VolumicElectromagneticEnergyUnit for ElectromagneticEnergyDensityUnit;
@@ -3905,21 +3905,21 @@ standard library package ISQElectromagnetism {
          * definition: `vec(S) = vec(E) xx vec(H)` where `vec(E)` is electric field strength (item 6-10) and `vec(H)` is magnetic field strength (item 6-25)
          * remarks: See IEC 60050-121, item 121-11-66.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PoyntingVectorMagnitudeUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PoyntingVectorMagnitudeUnit[1];
     }
     attribute def poyntingVectorMagnitude : PoyntingVectorMagnitudeValue nonunique;
     attribute def PoyntingVectorMagnitudeUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     attribute def CartesianPoynting3dVector :> '3dVectorQuantityValue' {
@@ -3935,14 +3935,14 @@ standard library package ISQElectromagnetism {
          * definition: `vec(S) = vec(E) xx vec(H)` where `vec(E)` is electric field strength (item 6-10) and `vec(H)` is magnetic field strength (item 6-25)
          * remarks: See IEC 60050-121, item 121-11-66.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianPoynting3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianPoynting3dCoordinateFrame[1];
     }
     attribute def cartesianPoynting3dVector : CartesianPoynting3dVector;
     attribute def CartesianPoynting3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : PoyntingVectorMagnitudeUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : PoyntingVectorMagnitudeUnit[3];
     }
     attribute def PhaseSpeedOfElectromagneticWavesValue :> ScalarQuantityValue {
         doc
@@ -3957,21 +3957,21 @@ standard library package ISQElectromagnetism {
          * definition: `c = ω/k` where `ω` is angular frequency (ISO 80000-3, item 3-16) and `k` is angular wavenumber (ISO 80000-3, item 3-19)
          * remarks: See ISO 80000-3, item 3-20.1.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhaseSpeedOfElectromagneticWavesUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhaseSpeedOfElectromagneticWavesUnit[1];
     }
     attribute def phaseSpeedOfElectromagneticWaves : PhaseSpeedOfElectromagneticWavesValue nonunique;
     attribute def PhaseSpeedOfElectromagneticWavesUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     attribute def SpeedOfLightValue :> ScalarQuantityValue {
@@ -3987,21 +3987,21 @@ standard library package ISQElectromagnetism {
          * definition: speed of electromagnetic waves in vacuum; `c_0 = 299792458` m/s
          * remarks: For this value of `c_0` see ISO 80000-3, item 3-1.a. `c_0 = 1/sqrt(ε_0 μ_0)`. See IEC 60050-111, item 111-13-07.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpeedOfLightUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpeedOfLightUnit[1];
     }
     attribute def speedOfLight : SpeedOfLightValue nonunique;
     attribute def SpeedOfLightUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     alias LightSpeedUnit for SpeedOfLightUnit;
@@ -4020,29 +4020,29 @@ standard library package ISQElectromagnetism {
          * definition: voltage (item 6-11.3) between the two terminals of a voltage source when there is no electric current (item 6-1) through the source
          * remarks: The name "electromotive force" with the abbreviation EMF and the symbol `E` is deprecated. See IEC 60050-131, item 131-12-22.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SourceVoltageUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SourceVoltageUnit[1];
     }
     attribute def sourceVoltage : SourceVoltageValue nonunique;
     attribute def SourceVoltageUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     alias SourceTensionUnit for SourceVoltageUnit;
@@ -4089,17 +4089,17 @@ standard library package ISQElectromagnetism {
          * definition: `F_m = oint_C vec(H) * d vec(r)` where `vec(H)` is magnetic field strength (item 6-25) and `vec(r)` is position vector (ISO 80000-3, item 3-1 .11) along a closed curve `C`
          * remarks: This quantity name is under consideration . Compare remark to item 6-36. See IEC 60050-121, item 121-11-60.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MagnetomotiveForceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MagnetomotiveForceUnit[1];
     }
     attribute def magnetomotiveForce : MagnetomotiveForceValue nonunique;
     attribute def MagnetomotiveForceUnit :> DerivedUnit {
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = electricCurrentPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = electricCurrentPF;
         }
     }
     attribute def currentLinkage : ElectricCurrentValue {
@@ -4143,29 +4143,29 @@ standard library package ISQElectromagnetism {
          * definition: `R_m = U_m/Φ` where `U_m` is magnetic tension (item 6-37.2) and `Φ` is magnetic flux (item 6-22 .1)
          * remarks: See IEC 60050-131 , item 131-12-28.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ReluctanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ReluctanceUnit[1];
     }
     attribute def reluctance : ReluctanceValue nonunique;
     attribute def ReluctanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def PermeanceValue :> ScalarQuantityValue {
@@ -4181,29 +4181,29 @@ standard library package ISQElectromagnetism {
          * definition: `Λ = 1/R_m` where `R_m` is reluctance (item 6-39)
          * remarks: See IEC 60050-131 , item 131-12-29.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PermeanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PermeanceUnit[1];
     }
     attribute def permeance : PermeanceValue nonunique;
     attribute def PermeanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def InductanceValue :> ScalarQuantityValue {
@@ -4219,29 +4219,29 @@ standard library package ISQElectromagnetism {
          * definition: `L = Ψ / I` where `I` is an electric current (item 6-1) in a thin conducting loop and `Ψ` is the linked flux (item 6-22.2) caused by that electric current
          * remarks: The name "self inductance" is used for the quantity associated to mutual inductance when `n = m`. See IEC 60050-131 , items 131-12-19 and 131 -12-35.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : InductanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : InductanceUnit[1];
     }
     attribute def inductance : InductanceValue nonunique;
     attribute def InductanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     alias SelfInductanceUnit for InductanceUnit;
@@ -4304,29 +4304,29 @@ standard library package ISQElectromagnetism {
          * definition: `vec(J) = σ vec(E)` where `vec(J)` is electric current density (item 6-8) and `vec(E)` is electric field strength (item 6-10)
          * remarks: This definition applies to an isotropic medium. For an anisotropic medium `σ` is a second order tensor. `κ` is used in electrochemistry. See IEC 60050-121 , item 121-12-03.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ConductivityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ConductivityUnit[1];
     }
     attribute def conductivity : ConductivityValue nonunique;
     attribute def ConductivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -3;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def ResistivityValue :> ScalarQuantityValue {
@@ -4342,29 +4342,29 @@ standard library package ISQElectromagnetism {
          * definition: `ρ = 1/σ` if is exists, where `σ` is conductivity (item 6-43)
          * remarks: See IEC 60050-121, item 121-12-04.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ResistivityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ResistivityUnit[1];
     }
     attribute def resistivity : ResistivityValue nonunique;
     attribute def ResistivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 3;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def electricPower : PowerValue {
@@ -4395,29 +4395,29 @@ standard library package ISQElectromagnetism {
          * definition: for resistive component `R = u i` where `u` is instantaneous voltage (item 6-11.3) and `i` is instantaneous electric current (item 6-1)
          * remarks: For alternating current, see item 6-51.2. See IEC 60050-131, item 131-12-04.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ResistanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ResistanceUnit[1];
     }
     attribute def resistance : ResistanceValue nonunique;
     attribute def ResistanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def ConductanceValue :> ScalarQuantityValue {
@@ -4433,29 +4433,29 @@ standard library package ISQElectromagnetism {
          * definition: for resistive component `G = 1/R` where `R` is resistance (item 6-46)
          * remarks: For alternating current, see item 6-52.2. See IEC 60050-131, item 131-12-06.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ConductanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ConductanceUnit[1];
     }
     attribute def conductance : ConductanceValue nonunique;
     attribute def ConductanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def PhaseDifferenceValue :> ScalarQuantityValue {
@@ -4471,8 +4471,8 @@ standard library package ISQElectromagnetism {
          * definition: `φ = φ_u - φ_i` where `φ_u` is the initial phase of the voltage (item 6-11 .3) and `φ_i` is the initial phase of the electric current (item 6-1)
          * remarks: When `u = hat(U) cos(ωt - φ_u)`, `i = hat(I) cos(ωt - φ_i)` where `u` is the voltage (item 6-11 . 3) and `i` is the electric current (item 6-1 ), `ω` is angular frequency (ISO 80000-3, item 3-16) and `t` is time (ISO 80000-3, item 3-7), then `φ` is phase difference. For phase angle, see items 6-49 and 6-50.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhaseDifferenceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhaseDifferenceUnit[1];
     }
     attribute def phaseDifference : PhaseDifferenceValue nonunique;
     attribute def PhaseDifferenceUnit :> DimensionOneUnit {
@@ -4518,29 +4518,29 @@ standard library package ISQElectromagnetism {
          * definition: `underline(Z) = underline(U)/underline(I)` where `underline(U)` is the voltage phasor (item 6-50), and `underline(I)` is the electric current phasor (item 6-49)
          * remarks: `underline(Z) = R + jX`, where `R` is resistance (item 6-51.2) and `X` is reactance (item 6-51 .3). `j` is the imaginary unit. `underline(Z) = |underline(Z)| e^(jφ)`. See IEC 60050-131 , item 131-12-43.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ImpedanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ImpedanceUnit[1];
     }
     attribute def impedance : ImpedanceValue nonunique;
     attribute def ImpedanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     alias ComplexImpedanceUnit for ImpedanceUnit;
@@ -4559,29 +4559,29 @@ standard library package ISQElectromagnetism {
          * definition: `R = "Re" underline(Z)` where `underline(Z)`, is impedance (item 6-5.1) and `"Re"` denotes the real part
          * remarks: See IEC 60050-131, item 131-12-45.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ResistanceToAlternatingCurrentUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ResistanceToAlternatingCurrentUnit[1];
     }
     attribute def resistanceToAlternatingCurrent : ResistanceToAlternatingCurrentValue nonunique;
     attribute def ResistanceToAlternatingCurrentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def ReactanceValue :> ScalarQuantityValue {
@@ -4597,29 +4597,29 @@ standard library package ISQElectromagnetism {
          * definition: `X = "Im" underline(Z)` where `underline(Z)`, is impedance (item 6-5.1) and `"Im"` denotes the imaginary part
          * remarks: `X = ωL - 1/(ωC)`. See IEC 60050-131 , item 131-12-46.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ReactanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ReactanceUnit[1];
     }
     attribute def reactance : ReactanceValue nonunique;
     attribute def ReactanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def ModulusOfImpedanceValue :> ScalarQuantityValue {
@@ -4635,29 +4635,29 @@ standard library package ISQElectromagnetism {
          * definition: `Z = |underline(Z)|` where `underline(Z)` is impedance (item 6-51.1)
          * remarks: See IEC 60050-131 , item 131-12-44. Apparent impedance is defined more generally as the quotient of rms voltage and rms electric  current; it is often denoted by `Z`.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ModulusOfImpedanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ModulusOfImpedanceUnit[1];
     }
     attribute def modulusOfImpedance : ModulusOfImpedanceValue nonunique;
     attribute def ModulusOfImpedanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def AdmittanceValue :> ScalarQuantityValue {
@@ -4673,29 +4673,29 @@ standard library package ISQElectromagnetism {
          * definition: `underline(Y) = 1/underline(Z)` where `underline(Z)` is impedance (item 6-51.1)
          * remarks: `underline(Y) = G + jB`, where `G` is conductance (item 6-52 .2) and `B` is susceptance (item 6-52 .3). `j` is the imaginary unit. `underline(Y) = |underline(Y)| e^-(jφ)`. See IEC 60050-131, item 131 -12-51.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : AdmittanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : AdmittanceUnit[1];
     }
     attribute def admittance : AdmittanceValue nonunique;
     attribute def AdmittanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     alias ComplexAdmittanceUnit for AdmittanceUnit;
@@ -4728,29 +4728,29 @@ standard library package ISQElectromagnetism {
          * definition: `B = "Im" underline(Y)` where `underline(Y)` is admittance (item 6-52.1)
          * remarks: See IEC 60050-131, item 131-12-54.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SusceptanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SusceptanceUnit[1];
     }
     attribute def susceptance : SusceptanceValue nonunique;
     attribute def SusceptanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def ModulusOfAdmittanceValue :> ScalarQuantityValue {
@@ -4766,29 +4766,29 @@ standard library package ISQElectromagnetism {
          * definition: `Y = |underline(Y)|` where `underline(Y)` is admittance (item 6-52.1)
          * remarks: Apparent admittance is defined more generally as the quotient of rms electric current voltage and rms voltage; it is often denoted by `Y`.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : ModulusOfAdmittanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : ModulusOfAdmittanceUnit[1];
     }
     attribute def modulusOfAdmittance : ModulusOfAdmittanceValue nonunique;
     attribute def ModulusOfAdmittanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 3;
         }
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.I;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.I;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, electricCurrentPF);
         }
     }
     attribute def QualityFactorValue :> DimensionOneValue {

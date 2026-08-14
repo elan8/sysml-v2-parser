@@ -143,7 +143,7 @@ package VehicleUsages {
         part frontAxleAssembly : AxleAssembly {
             part frontWheel[2] :> narrowRimWheel {
                 part  :>> lugbolt[4] {
-                    attribute  :>> tighteningTorque = T1;
+                    attribute :>> tighteningTorque = T1;
                 }
             }
             part frontAxle : Axle;
@@ -151,7 +151,7 @@ package VehicleUsages {
         part rearAxleAssembly : AxleAssembly {
             part rearWheel[2] :> wideRimWheel {
                 part  :>> lugbolt[6] {
-                    attribute  :>> tighteningTorque = T2;
+                    attribute :>> tighteningTorque = T2;
                 }
             }
             part rearAxle : Axle;

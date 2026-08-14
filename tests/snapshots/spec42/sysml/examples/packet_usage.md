@@ -39,7 +39,7 @@ package 'Packet Usage' {
     part packet2 : 'Thermal Data Packet';
     part packet3 : 'Thermal Data Packet' {
         attribute 'special data field' :>> 'packet data field' {
-            attribute  :>> 'user data field' {
+            attribute :>> 'user data field' {
                 attribute 'special data' : Real;
             }
         }

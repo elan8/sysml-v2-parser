@@ -56,7 +56,7 @@ package CalculationExample {
     part vehicle : Vehicle {
         part eng : VehiclePart;
         part trans : VehiclePart;
-        attribute  ::> m = ms.totalMass;
+        attribute ::> m = ms.totalMass;
     }
     calc def MassSum {
         in partMasses : MassValue[0..*];

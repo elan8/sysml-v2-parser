@@ -404,8 +404,20 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         )),
     ))
     .parse(input)?;
-    // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
-    let (input, parsed_name) = opt(preceded(ws_and_comments, with_span(name))).parse(input)?;
+    // `ref :>> name ...` (redefinition) may omit the name before `:>>`. A relationship keyword
+    // is never the declared name: `ref redefines Item::x, subobjects::x;` (Kernel Systems
+    // Library `Items.kerml`; spec42 Gap 49d) authors the keyword spelling of `:>>` with no name,
+    // and greedily consuming it here left the target list unparseable.
+    let (input, parsed_name) = opt(preceded(
+        ws_and_comments,
+        nom::combinator::verify(with_span(name), |(_, n)| {
+            !matches!(
+                n.as_str(),
+                "redefines" | "subsets" | "references" | "crosses"
+            )
+        }),
+    ))
+    .parse(input)?;
     let (input, leading_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
@@ -625,6 +637,20 @@ mod ref_decl_kind_tests {
 
     fn input(text: &str) -> crate::parser::Input<'_> {
         crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 49d: `redefines` after `ref` is the keyword spelling of `:>>`, not a declared
+    /// name (`ref redefines Item::x, subobjects::x;`, Kernel Systems Library `Items.kerml`).
+    #[test]
+    fn ref_decl_does_not_take_redefines_as_a_name() {
+        let (rest, node) = ref_decl(input(
+            "private ref redefines Item::incomingTransferSort, subobjects::incomingTransferSort;",
+        ))
+        .expect("anonymous ref redefinition");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.name.is_empty());
+        let redefines = node.value.redefines.expect("redefines clause");
+        assert_eq!(redefines.value.target.len(), 2);
     }
 
     /// Spec42 Gap 34: the `use case` feature-kind keyword on a full `ref` declaration

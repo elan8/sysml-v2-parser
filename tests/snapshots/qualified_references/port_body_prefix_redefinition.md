@@ -37,11 +37,11 @@ package Power {
     }
     part def Microcontroller {
         port pwr : DevicePower {
-            attribute  :>> maxCurrent = 0.02 [A];
+            attribute :>> maxCurrent = 0.02 [A];
         }
     }
     port def LimitedPower :> DevicePower {
-        attribute  :>> maxCurrent = 0.5 [A];
+        attribute :>> maxCurrent = 0.5 [A];
     }
 }
 ~~~

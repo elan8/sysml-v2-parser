@@ -150,7 +150,7 @@ standard library package Quantities {
         attribute isBound : Boolean;
         attribute num : Number[1..*] ordered nonunique :>> elements;
         attribute mRef : MeasurementReferences::TensorMeasurementReference;
-        attribute  :>> dimensions = mRef.dimensions;
+        attribute :>> dimensions = mRef.dimensions;
         attribute order :>> rank;
         attribute contravariantOrder : Natural;
         attribute covariantOrder : Natural;
@@ -162,10 +162,10 @@ standard library package Quantities {
         }
     }
     attribute def VectorQuantityValue :> TensorQuantityValue, NumericalVectorValue {
-        attribute  :>> mRef : MeasurementReferences::VectorMeasurementReference;
+        attribute :>> mRef : MeasurementReferences::VectorMeasurementReference;
     }
     attribute def ScalarQuantityValue :> VectorQuantityValue, NumericalValue {
-        attribute  :>> mRef : MeasurementReferences::ScalarMeasurementReference;
+        attribute :>> mRef : MeasurementReferences::ScalarMeasurementReference;
     }
     attribute def tensorQuantities : TensorQuantityValue nonunique {
         doc
@@ -182,7 +182,7 @@ standard library package Quantities {
         /*
     	 * Most general representation of real 3-vector quantities
     	 */
-        attribute  :>> num : Real[3];
+        attribute :>> num : Real[3];
     }
     alias ThreeDVectorQuantityValue for '3dVectorQuantityValue';
     alias QuantityValue for TensorQuantityValue;

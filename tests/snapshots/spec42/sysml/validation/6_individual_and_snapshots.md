@@ -246,47 +246,47 @@ package '6-Individual and Snapshots' {
         private import Values::*;
         individual reference : 'Temporal-Spatial Reference_ID1' {
             snapshot context_t0 : VehicleRoadContext_ID1 {
-                attribute  :>> t = t0 {
+                attribute :>> t = t0 {
                 }
                 snapshot vehicle_ID1_t0 : VehicleA_ID1 {
-                    attribute  :>> mass = m;
-                    attribute  :>> position = p0;
-                    attribute  :>> velocity = v0;
-                    attribute  :>> acceleration = a0;
+                    attribute :>> mass = m;
+                    attribute :>> position = p0;
+                    attribute :>> velocity = v0;
+                    attribute :>> acceleration = a0;
                     exhibit vehicleStates.on {
                     }
                 }
                 snapshot road_ID1_t0 : Road_ID1 {
-                    attribute  :>> angle = theta0;
-                    attribute  :>> surfaceFriction = sf0;
+                    attribute :>> angle = theta0;
+                    attribute :>> surfaceFriction = sf0;
                 }
             }
             snapshot context_t1 : VehicleRoadContext_ID1 {
-                attribute  :>> t = t1;
+                attribute :>> t = t1;
                 snapshot vehicle_ID1_t1 : VehicleA_ID1 {
-                    attribute  :>> mass = m;
-                    attribute  :>> position = p1;
-                    attribute  :>> velocity = v1;
-                    attribute  :>> acceleration = a1;
+                    attribute :>> mass = m;
+                    attribute :>> position = p1;
+                    attribute :>> velocity = v1;
+                    attribute :>> acceleration = a1;
                     exhibit vehicleStates.on;
                 }
                 snapshot road_ID1_t1 : Road_ID1 {
-                    attribute  :>> angle = theta1;
-                    attribute  :>> surfaceFriction = sf1;
+                    attribute :>> angle = theta1;
+                    attribute :>> surfaceFriction = sf1;
                 }
             }
             snapshot context_tn : VehicleRoadContext_ID1 {
-                attribute  :>> t = tn;
+                attribute :>> t = tn;
                 snapshot vehicle_ID1_tn : VehicleA_ID1 {
-                    attribute  :>> mass = m;
-                    attribute  :>> position = pn;
-                    attribute  :>> velocity = vn;
-                    attribute  :>> acceleration = an;
+                    attribute :>> mass = m;
+                    attribute :>> position = pn;
+                    attribute :>> velocity = vn;
+                    attribute :>> acceleration = an;
                     exhibit vehicleStates.off;
                 }
                 snapshot road_ID1_tn : Road_ID1 {
-                    attribute  :>> angle = theta1;
-                    attribute  :>> surfaceFriction = sfn;
+                    attribute :>> angle = theta1;
+                    attribute :>> surfaceFriction = sfn;
                 }
             }
         }

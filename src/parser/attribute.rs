@@ -13,8 +13,8 @@ use crate::parser::lex::{
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
-    multiplicity_node, optional_typings, prefix_redefinition_target, single_target_subsetting,
-    specialization_clauses, typing_node, typing_relationship_node, typings,
+    multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
+    typing_node, typing_relationship_node, typings,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -352,7 +352,15 @@ pub(crate) fn attribute_feature_binding(
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (_, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, target) = qualified_reference(input)?;
+    // The prefixed forms take the same comma-separated multi-target list as every other
+    // `:>>`/`:>` clause (`:>> A::x, B::y { ... }`, Quantities and Units `SI.kerml`; spec42
+    // Gap 49b); the unprefixed binding keeps its single name-reference.
+    let (input, targets) = if prefix.is_some() {
+        crate::parser::usage::specialization_targets(input)?
+    } else {
+        let (input, target) = qualified_reference(input)?;
+        (input, vec![target])
+    };
     if is_reserved_shorthand_starter(&name_str) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
@@ -377,19 +385,19 @@ pub(crate) fn attribute_feature_binding(
     let (input, body) = attribute_body(input)?;
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
-            Some(single_target_subsetting(
-                prefix_span,
+            Some(crate::parser::usage::subsetting_relationship_node(
+                targets,
                 SubsettingKind::Subsets,
-                target,
+                prefix_span,
             )),
             None,
         ),
         Some(MetadataBindingPrefix::Redefines) => (
             None,
-            Some(single_target_subsetting(
-                prefix_span,
+            Some(crate::parser::usage::subsetting_relationship_node(
+                targets,
                 SubsettingKind::Redefines,
-                target,
+                prefix_span,
             )),
         ),
         None => (None, None),
@@ -1132,7 +1140,15 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (_, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, target) = qualified_reference(input)?;
+    // The prefixed forms take the same comma-separated multi-target list as every other
+    // `:>>`/`:>` clause (`:>> A::x, B::y { ... }`, Quantities and Units `SI.kerml`; spec42
+    // Gap 49b); the unprefixed binding keeps its single name-reference.
+    let (input, targets) = if prefix.is_some() {
+        crate::parser::usage::specialization_targets(input)?
+    } else {
+        let (input, target) = qualified_reference(input)?;
+        (input, vec![target])
+    };
     if is_reserved_shorthand_starter(&name_str) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
@@ -1153,19 +1169,19 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
-            Some(single_target_subsetting(
-                prefix_span,
+            Some(crate::parser::usage::subsetting_relationship_node(
+                targets,
                 SubsettingKind::Subsets,
-                target,
+                prefix_span,
             )),
             None,
         ),
         Some(MetadataBindingPrefix::Redefines) => (
             None,
-            Some(single_target_subsetting(
-                prefix_span,
+            Some(crate::parser::usage::subsetting_relationship_node(
+                targets,
                 SubsettingKind::Redefines,
-                target,
+                prefix_span,
             )),
         ),
         None => (None, None),
@@ -1352,6 +1368,19 @@ mod attribute_body_tests {
             .iter()
             .map(|id| crate::parser::usage::reference_text(source, *id).expect("reference text"))
             .collect()
+    }
+
+    /// Spec42 Gap 49b: the bare `:>>`/`:>` shorthand (no `attribute` keyword) accepts the same
+    /// comma-separated multi-target list as every other redefinition clause (`SI.kerml`'s
+    /// `kelvin` member).
+    #[test]
+    fn bare_redefinition_shorthand_accepts_multiple_targets() {
+        let (rest, node) = attribute_feature_binding(input(":>> A::x::factors, B::y::factors;"))
+            .expect("bare multi-target redefinition");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let redefines = node.value.redefines.as_ref().expect("redefines clause");
+        assert_eq!(redefines.value.target.len(), 2);
+        assert!(node.value.name.is_empty());
     }
 
     /// Spec42 Gap 40: `metadata def` bodies dispatch the same structured members as other

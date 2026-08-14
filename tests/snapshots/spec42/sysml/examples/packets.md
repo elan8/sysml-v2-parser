@@ -66,7 +66,7 @@ package Packets {
             attribute 'packet identification' : String;
             attribute 'packet data length' : Integer;
         }
-        attribute  :>> 'packet data field';
+        attribute :>> 'packet data field';
     }
     part def 'Thermal Data Packet' :> 'Data Packet' {
         attribute 'packet data field' :>> Packets::'packet data field' {

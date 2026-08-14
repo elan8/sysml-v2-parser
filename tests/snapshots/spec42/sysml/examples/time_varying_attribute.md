@@ -61,8 +61,7 @@ package TimeVaryingAttribute {
 (fixture-diagnostics
   (document "time_varying_attribute.md"
     (diagnostics
-      (diagnostic (code "recovered_occurrence_body_element") (severity error) (category parseerror) (span (offset 566) (line 19) (column 17) (len 37)) (message "unexpected token in occurrence body"))
-      (diagnostic (code "recovery_cascade_suppressed") (severity warning) (category parseerror) (span (offset 566) (line 19) (column 17) (len 37)) (message "suppressed 2 cascading recovered diagnostics after earlier recovery errors"))
+      (diagnostic (code "recovered_occurrence_body_element") (severity error) (category parseerror) (span (offset 1069) (line 38) (column 13) (len 135)) (message "unexpected token in occurrence body"))
     )
   )
 )
@@ -78,21 +77,21 @@ package TimeVaryingAttribute {
         private import Time::*;
         attribute startTime = TimeOf(start);
         attribute elapseTime :> ISQ::duration;
-        attribute  :>> localClock.currentTime = startTime + elapseTime;
+        attribute :>> localClock.currentTime = startTime + elapseTime;
         out item pwrCmd : PwrCmd;
         timeslice  :>> portionOfLife {
             snapshot  :>> start {
-                attribute  :>> elapseTime = 0 [s];
-                :>> pwrCmd.pwrLevel = 0;
+                attribute :>> elapseTime = 0 [s];
+                attribute :>> pwrCmd.pwrLevel = 0;
             }
             snapshot  :>> done {
-                attribute  :>> elapseTime = 2 [s];
-                :>> pwrCmd.pwrLevel = 1;
+                attribute :>> elapseTime = 2 [s];
+                attribute :>> pwrCmd.pwrLevel = 1;
             }
         }
         timeslice transportPeriod {
             snapshot  :>> start {
-                attribute  :>> elapseTime = 1 [s];
+                attribute :>> elapseTime = 1 [s];
             }
             snapshot :>> done {
                 :>> elapseTime = 1.5 [s];

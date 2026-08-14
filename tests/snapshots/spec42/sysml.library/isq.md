@@ -84,17 +84,17 @@ standard library package ISQ {
          * temperature difference
          * A separate temperature difference quantity and unit are needed in order to support °C, °F and centrigrade temperature differences
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : TemperatureDifferenceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : TemperatureDifferenceUnit[1];
     }
     attribute def temperatureDifference : TemperatureDifferenceValue nonunique;
     attribute def TemperatureDifferenceUnit :> SimpleUnit {
         private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.'Θ';
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.'Θ';
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = thermodynamicTemperaturePF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = thermodynamicTemperaturePF;
         }
     }
 }

@@ -1323,7 +1323,7 @@ standard library package ISQSpaceTime {
         /*
          * Most general spatial 3D coordinate frame
          */
-        attribute  :>> isBound = true;
+        attribute :>> isBound = true;
     }
     attribute def CartesianSpatial3dCoordinateFrame :> Spatial3dCoordinateFrame {
         doc
@@ -1340,21 +1340,21 @@ standard library package ISQSpaceTime {
         attribute xUnit : LengthUnit = mRefs#(1);
         attribute yUnit : LengthUnit = mRefs#(2);
         attribute zUnit : LengthUnit = mRefs#(3);
-        attribute  :>> mRefs : LengthUnit[3];
-        attribute  :>> isOrthogonal = true;
+        attribute :>> mRefs : LengthUnit[3];
+        attribute :>> isOrthogonal = true;
     }
     attribute def universalCartesianSpatial3dCoordinateFrame : CartesianSpatial3dCoordinateFrame {
         doc
         /*
          * A singleton CartesianSpatial3dCoordinateFrame that can be used as a default universal Cartesian 3D coordinate frame.
          */
-        attribute  :>> mRefs default (SI::m, SI::m, SI::m) {
+        attribute :>> mRefs default (SI::m, SI::m, SI::m) {
             doc
             /*
              * By default, the universalCartesianSpatial3dCoordinateFrame uses meters as the units on all three axes.
              */
         }
-        attribute  :>> transformation[0] {
+        attribute :>> transformation[0] {
             doc
             /*
              * The universalCartesianSpatial3dCoordinateFrame is the "top-level" coordinate frame, not nested in any other frame.
@@ -1385,8 +1385,8 @@ standard library package ISQSpaceTime {
         attribute radialDistanceUnit : LengthUnit;
         attribute azimuthUnit : AngularMeasureUnit;
         attribute zUnit : LengthUnit;
-        attribute  :>> mRefs = (radialDistanceUnit, azimuthUnit, zUnit);
-        attribute  :>> isOrthogonal = true;
+        attribute :>> mRefs = (radialDistanceUnit, azimuthUnit, zUnit);
+        attribute :>> isOrthogonal = true;
     }
     attribute def SphericalSpatial3dCoordinateFrame :> Spatial3dCoordinateFrame {
         doc
@@ -1412,8 +1412,8 @@ standard library package ISQSpaceTime {
         attribute radialDistanceUnit : LengthUnit;
         attribute inclinationUnit : AngularMeasureUnit;
         attribute azimuthUnit : AngularMeasureUnit;
-        attribute  :>> mRefs = (radialDistanceUnit, inclinationUnit, azimuthUnit);
-        attribute  :>> isOrthogonal = true;
+        attribute :>> mRefs = (radialDistanceUnit, inclinationUnit, azimuthUnit);
+        attribute :>> isOrthogonal = true;
     }
     attribute def PlanetarySpatial3dCoordinateFrame :> Spatial3dCoordinateFrame {
         doc
@@ -1450,8 +1450,8 @@ standard library package ISQSpaceTime {
         attribute latitudeUnit : AngularMeasureUnit;
         attribute longitudeUnit : AngularMeasureUnit;
         attribute altitudeUnit : LengthUnit;
-        attribute  :>> mRefs = (longitudeUnit, latitudeUnit, altitudeUnit);
-        attribute  :>> isOrthogonal = true;
+        attribute :>> mRefs = (longitudeUnit, latitudeUnit, altitudeUnit);
+        attribute :>> isOrthogonal = true;
     }
     attribute def Position3dVector :> '3dVectorQuantityValue' {
         doc
@@ -1466,36 +1466,36 @@ standard library package ISQSpaceTime {
          * definition: vector (ISO 80000-2) quantity from the origin of a coordinate system to a point in space
          * remarks: Position vectors are so-called bounded vectors, i.e. their magnitude (ISO 80000-2) and direction depend on the particular coordinate system used.
          */
-        attribute  :>> isBound = true;
-        attribute  :>> mRef : Spatial3dCoordinateFrame[1];
+        attribute :>> isBound = true;
+        attribute :>> mRef : Spatial3dCoordinateFrame[1];
     }
     attribute def position3dVector : Position3dVector;
     attribute def CartesianPosition3dVector :> Position3dVector {
         attribute x : LengthValue[mRef.mRefs#(1)] = num#(1);
         attribute y : LengthValue[mRef.mRefs#(2)] = num#(2);
         attribute z : LengthValue[mRef.mRefs#(3)] = num#(3);
-        attribute  :>> mRef : CartesianSpatial3dCoordinateFrame[1];
+        attribute :>> mRef : CartesianSpatial3dCoordinateFrame[1];
     }
     attribute def cartesianPosition3dVector : CartesianPosition3dVector;
     attribute def CylindricalPosition3dVector :> Position3dVector {
         attribute <'ρ'> radialDistance : LengthValue[mRef.mRefs#(1)] = num#(1);
         attribute <'φ'> azimuth : AngularMeasureUnit[mRef.mRefs#(2)] = num#(2);
         attribute <h> height : LengthValue[mRef.mRefs#(3)] = num#(3);
-        attribute  :>> mRef : CylindricalSpatial3dCoordinateFrame[1];
+        attribute :>> mRef : CylindricalSpatial3dCoordinateFrame[1];
     }
     attribute def cylindricalPosition3dVector : CylindricalPosition3dVector;
     attribute def SphericalPosition3dVector :> Position3dVector {
         attribute <r> radialDistance : LengthValue[mRef.mRefs#(1)] = num#(1);
         attribute <'θ'> inclination : AngularMeasureUnit[mRef.mRefs#(2)] = num#(2);
         attribute <'φ'> azimuth : AngularMeasureUnit[mRef.mRefs#(3)] = num#(3);
-        attribute  :>> mRef : SphericalSpatial3dCoordinateFrame[1];
+        attribute :>> mRef : SphericalSpatial3dCoordinateFrame[1];
     }
     attribute def sphericalPosition3dVector : SphericalPosition3dVector;
     attribute def PlanetaryPosition3dVector :> Position3dVector {
         attribute <lat> latitude : AngularMeasureUnit[mRef.mRefs#(1)] = num#(1);
         attribute <long> longitude : AngularMeasureUnit[mRef.mRefs#(2)] = num#(2);
         attribute <h> altitude : LengthValue[mRef.mRefs#(3)] = num#(3);
-        attribute  :>> mRef : PlanetarySpatial3dCoordinateFrame[1];
+        attribute :>> mRef : PlanetarySpatial3dCoordinateFrame[1];
     }
     attribute def planetaryPosition3dVector : PlanetaryPosition3dVector;
     attribute def Displacement3dVector :> '3dVectorQuantityValue' {
@@ -1511,29 +1511,29 @@ standard library package ISQSpaceTime {
          * definition: vector (ISO 80000-2) quantity between any two points in space
          * remarks: Displacement vectors are so-called free vectors, i.e. their magnitude (ISO 80000-2) and direction do not depend on a particular coordinate system. The magnitude of this vector is also called displacement.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : Spatial3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : Spatial3dCoordinateFrame[1];
     }
     attribute def displacement3dVector : Displacement3dVector;
     attribute def CartesianDisplacement3dVector :> Displacement3dVector {
         attribute x : LengthValue[mRef.mRefs#(1)] = num#(1);
         attribute y : LengthValue[mRef.mRefs#(2)] = num#(2);
         attribute z : LengthValue[mRef.mRefs#(3)] = num#(3);
-        attribute  :>> mRef : CartesianSpatial3dCoordinateFrame[1];
+        attribute :>> mRef : CartesianSpatial3dCoordinateFrame[1];
     }
     attribute def cartesianDisplacement3dVector : CartesianDisplacement3dVector;
     attribute def CylindricalDisplacement3dVector :> Displacement3dVector {
         attribute <'ρ'> radialDistance : LengthValue[mRef.mRefs#(1)] = num#(1);
         attribute <'φ'> azimuth : AngularMeasureUnit[mRef.mRefs#(2)] = num#(2);
         attribute <h> height : LengthValue[mRef.mRefs#(3)] = num#(3);
-        attribute  :>> mRef : CylindricalSpatial3dCoordinateFrame[1];
+        attribute :>> mRef : CylindricalSpatial3dCoordinateFrame[1];
     }
     attribute def cylindricalDisplacement3dVector : CylindricalDisplacement3dVector;
     attribute def SphericalDisplacement3dVector :> Displacement3dVector {
         attribute <r> radialDistance : LengthValue[mRef.mRefs#(1)] = num#(1);
         attribute <'θ'> inclination : AngularMeasureUnit[mRef.mRefs#(2)] = num#(2);
         attribute <'φ'> azimuth : AngularMeasureUnit[mRef.mRefs#(3)] = num#(3);
-        attribute  :>> mRef : SphericalSpatial3dCoordinateFrame[1];
+        attribute :>> mRef : SphericalSpatial3dCoordinateFrame[1];
     }
     attribute def sphericalDisplacement3dVector : SphericalDisplacement3dVector;
     attribute def radiusOfCurvature : LengthValue {
@@ -1563,17 +1563,17 @@ standard library package ISQSpaceTime {
          * definition: inverse of the radius of curvature (item 3-1.12)
          * remarks: The curvature is given by: `κ = 1/ρ` where `ρ` denotes the radius of curvature (item 3-1.12).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : CurvatureUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : CurvatureUnit[1];
     }
     attribute def curvature : CurvatureValue nonunique;
     attribute def CurvatureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     attribute def AreaValue :> ScalarQuantityValue {
@@ -1589,17 +1589,17 @@ standard library package ISQSpaceTime {
          * definition: extent of a two-dimensional geometrical shape
          * remarks: The surface element at a given point of a surface is given by: `dA = g du dv` where `u` and `v` denote the Gaussian surface coordinates and `g` denotes the determinant of the metric tensor (ISO 80000-2) at the particular point. The symbol `dσ` is also used for the surface element.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : AreaUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : AreaUnit[1];
     }
     attribute def area : AreaValue nonunique;
     attribute def AreaUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     attribute def VolumeValue :> ScalarQuantityValue {
@@ -1615,17 +1615,17 @@ standard library package ISQSpaceTime {
          * definition: extent of a three-dimensional geometrical shape
          * remarks: The volume element in Euclidean space is given by: `dV = dx dy dz` where `dx`, `dy`, and `dz` denote the differentials of the Cartesian coordinates (ISO 80000-2). The symbol `dτ` is also used for the volume element.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : VolumeUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : VolumeUnit[1];
     }
     attribute def volume : VolumeValue nonunique;
     attribute def VolumeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     attribute def AngularMeasureValue :> ScalarQuantityValue {
@@ -1641,8 +1641,8 @@ standard library package ISQSpaceTime {
          * definition: measure of a geometric figure, called plane angle, formed by two rays, called the sides of the plane angle, emanating from a common point, called the vertex of the plane angle
          * remarks: The angular measure is given by: `α = s/r` where `s` denotes the arc length (item 3-1.7) of the included arc of a circle, centred at the vertex of the plane angle, and `r` the radius (item 3-1.6) of that circle. Other symbols are also used.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : AngularMeasureUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : AngularMeasureUnit[1];
     }
     attribute def angularMeasure : AngularMeasureValue nonunique;
     attribute def AngularMeasureUnit :> DimensionOneUnit {
@@ -1692,8 +1692,8 @@ standard library package ISQSpaceTime {
          * definition: measure of a conical geometric figure, called solid angle, formed by all rays, originating from a common point, called the vertex of the solid angle, and passing through the points of a closed, non-self-intersecting curve in space considered as the border of a surface
          * remarks: The differential solid angular measure expressed in spherical coordinates (ISO 80000-2) is given by: `dΩ = A/r^2 * sin(θ * dθ * dφ)` where `A` is area, `r` is radius, `θ` and `φ` are spherical coordinates.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SolidAngularMeasureUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SolidAngularMeasureUnit[1];
     }
     attribute def solidAngularMeasure : SolidAngularMeasureValue nonunique;
     attribute def SolidAngularMeasureUnit :> DimensionOneUnit {
@@ -1714,14 +1714,14 @@ standard library package ISQSpaceTime {
          * definition: vector (ISO 80000-2) quantity giving the rate of change of a position vector (item 3-1.10)
          * remarks: The velocity vector is given by: `vec(v) = (d vec(r)) / (dt)` where `vec(r)` denotes the position vector (item 3-1.10) and `t` the duration (item 3-9). When the general symbol `vec(v)` is not used for the velocity, the symbols `u`, `v`, `w` may be used for the components (ISO 80000-2) of the velocity.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianVelocity3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianVelocity3dCoordinateFrame[1];
     }
     attribute def cartesianVelocity3dVector : CartesianVelocity3dVector;
     attribute def CartesianVelocity3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : SpeedUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : SpeedUnit[3];
     }
     attribute def SpeedValue :> ScalarQuantityValue {
         doc
@@ -1736,21 +1736,21 @@ standard library package ISQSpaceTime {
          * definition: magnitude (ISO 80000-2) of the velocity (item 3-10.1)
          * remarks: None.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpeedUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpeedUnit[1];
     }
     attribute def speed : SpeedValue nonunique;
     attribute def SpeedUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     attribute def AccelerationValue :> ScalarQuantityValue {
@@ -1766,21 +1766,21 @@ standard library package ISQSpaceTime {
          * definition: vector (ISO 80000-2) quantity giving the rate of change of velocity (item 3-10)
          * remarks: The acceleration vector is given by: `vec(a) = (d vec(v))/(dt)` where `vec(v)` denotes the velocity (item 3-10.1) and `t` the duration (item 3-9). The magnitude (ISO 80000-2) of the acceleration of free fall is usually denoted by `g`.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : AccelerationUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : AccelerationUnit[1];
     }
     attribute def acceleration : AccelerationValue nonunique;
     attribute def AccelerationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     attribute def CartesianAcceleration3dVector :> '3dVectorQuantityValue' {
@@ -1796,14 +1796,14 @@ standard library package ISQSpaceTime {
          * definition: vector (ISO 80000-2) quantity giving the rate of change of velocity (item 3-10)
          * remarks: The acceleration vector is given by: `vec(a) = (d vec(v))/(dt)` where `vec(v)` denotes the velocity (item 3-10.1) and `t` the duration (item 3-9). The magnitude (ISO 80000-2) of the acceleration of free fall is usually denoted by `g`.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianAcceleration3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianAcceleration3dCoordinateFrame[1];
     }
     attribute def cartesianAcceleration3dVector : CartesianAcceleration3dVector;
     attribute def CartesianAcceleration3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : AccelerationUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : AccelerationUnit[3];
     }
     attribute def AngularVelocityValue :> ScalarQuantityValue {
         doc
@@ -1818,17 +1818,17 @@ standard library package ISQSpaceTime {
          * definition: vector (ISO 80000-2) quantity giving the rate of change of the rotational displacement (item 3-6) as its magnitude (ISO 80000-2) and with a direction equal to the direction of the axis of rotation
          * remarks: The angular velocity vector is given by: `vec(ω) = (d φ) / (dt) vec(u)` where `φ` denotes the angular displacement (item 3-6), `t` the duration (item 3-9), and `vec(u)` the unit vector (ISO 80000-2) along the axis of rotation in the direction for which the rotation corresponds to a right-hand spiral.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : AngularVelocityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : AngularVelocityUnit[1];
     }
     attribute def angularVelocity : AngularVelocityValue nonunique;
     attribute def AngularVelocityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = durationPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = durationPF;
         }
     }
     attribute def CartesianAngularVelocity3dVector :> '3dVectorQuantityValue' {
@@ -1844,14 +1844,14 @@ standard library package ISQSpaceTime {
          * definition: vector (ISO 80000-2) quantity giving the rate of change of the rotational displacement (item 3-6) as its magnitude (ISO 80000-2) and with a direction equal to the direction of the axis of rotation
          * remarks: The angular velocity vector is given by: `vec(ω) = (d φ) / (dt) vec(u)` where `φ` denotes the angular displacement (item 3-6), `t` the duration (item 3-9), and `vec(u)` the unit vector (ISO 80000-2) along the axis of rotation in the direction for which the rotation corresponds to a right-hand spiral.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianAngularVelocity3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianAngularVelocity3dCoordinateFrame[1];
     }
     attribute def cartesianAngularVelocity3dVector : CartesianAngularVelocity3dVector;
     attribute def CartesianAngularVelocity3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : AngularVelocityUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : AngularVelocityUnit[3];
     }
     attribute def AngularAccelerationValue :> ScalarQuantityValue {
         doc
@@ -1866,17 +1866,17 @@ standard library package ISQSpaceTime {
          * definition: vector (ISO 80000-2) quantity giving the rate of change of angular velocity (item 3-12)
          * remarks: The angular acceleration vector is given by: `vec α = (d vec(ω))/(dt)` Where `vec(ω)` denotes the angular velocity (item 3-12) and `t` the duration (item 3-9).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : AngularAccelerationUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : AngularAccelerationUnit[1];
     }
     attribute def angularAcceleration : AngularAccelerationValue nonunique;
     attribute def AngularAccelerationUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = durationPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = durationPF;
         }
     }
     attribute def CartesianAngularAcceleration3dVector :> '3dVectorQuantityValue' {
@@ -1892,14 +1892,14 @@ standard library package ISQSpaceTime {
          * definition: vector (ISO 80000-2) quantity giving the rate of change of angular velocity (item 3-12)
          * remarks: The angular acceleration vector is given by: `vec α = (d vec(ω))/(dt)` Where `vec(ω)` denotes the angular velocity (item 3-12) and `t` the duration (item 3-9).
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianAngularAcceleration3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianAngularAcceleration3dCoordinateFrame[1];
     }
     attribute def cartesianAngularAcceleration3dVector : CartesianAngularAcceleration3dVector;
     attribute def CartesianAngularAcceleration3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : AngularAccelerationUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : AngularAccelerationUnit[3];
     }
     attribute def periodDuration : DurationValue {
         doc
@@ -1957,17 +1957,17 @@ standard library package ISQSpaceTime {
          * definition: inverse of period duration (item 3-14)
          * remarks: The frequency is given by: `f = 1/T` where `T` denotes the period duration (item 3-14).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : FrequencyUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : FrequencyUnit[1];
     }
     attribute def frequency : FrequencyValue nonunique;
     attribute def FrequencyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = durationPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = durationPF;
         }
     }
     attribute def rotationalFrequency : FrequencyValue {
@@ -1997,17 +1997,17 @@ standard library package ISQSpaceTime {
          * definition: rate of change of the phase angle (item 3-7)
          * remarks: The angular frequency is given by: `ω = 2 π f` where `f` denotes the frequency (item 3-17.1).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : AngularFrequencyUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : AngularFrequencyUnit[1];
     }
     attribute def angularFrequency : AngularFrequencyValue nonunique;
     attribute def AngularFrequencyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = durationPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = durationPF;
         }
     }
     attribute def wavelength : LengthValue {
@@ -2037,17 +2037,17 @@ standard library package ISQSpaceTime {
          * definition: inverse of the wavelength (item 3-19)
          * remarks: The repetency is given by: `σ = 1 / λ` where `λ` denotes the wavelength (item 3-19).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : RepetencyUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : RepetencyUnit[1];
     }
     attribute def repetency : RepetencyValue nonunique;
     attribute def RepetencyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     alias WavenumberUnit for RepetencyUnit;
@@ -2066,14 +2066,14 @@ standard library package ISQSpaceTime {
          * definition: vector normal to the surfaces of constant phase angle (item 3-7) of a wave, with the magnitude (ISO 80000-2) of repetency (item 3-20)
          * remarks: None.
          */
-        attribute  :>> isBound = false;
-        attribute  :>> mRef : CartesianWaveVector3dCoordinateFrame[1];
+        attribute :>> isBound = false;
+        attribute :>> mRef : CartesianWaveVector3dCoordinateFrame[1];
     }
     attribute def cartesianWave3dVector : CartesianWave3dVector;
     attribute def CartesianWaveVector3dCoordinateFrame :> '3dCoordinateFrame' {
-        attribute  :>> isBound = false;
-        attribute  :>> isOrthogonal = true;
-        attribute  :>> mRefs : RepetencyUnit[3];
+        attribute :>> isBound = false;
+        attribute :>> isOrthogonal = true;
+        attribute :>> mRefs : RepetencyUnit[3];
     }
     attribute def AngularRepetencyValue :> ScalarQuantityValue {
         doc
@@ -2088,17 +2088,17 @@ standard library package ISQSpaceTime {
          * definition: magnitude (ISO 80000-2) of the wave vector (item 3-21)
          * remarks: The angular repetency is given by: `κ = (2 π)/λ` where `λ` denotes the wavelength (item 3-19).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : AngularRepetencyUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : AngularRepetencyUnit[1];
     }
     attribute def angularRepetency : AngularRepetencyValue nonunique;
     attribute def AngularRepetencyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     alias AngularWavenumberUnit for AngularRepetencyUnit;
@@ -2117,21 +2117,21 @@ standard library package ISQSpaceTime {
          * definition: speed with which the phase angle (item 3-7) of a wave propagates in space
          * remarks: The phase velocity is given by: `c = ω/κ` where `ω` denotes the angular frequency (item 3-18) and `k` the angular repetency (item 3-22). If phase velocities of electromagnetic waves and other phase velocities are both involved, then `c` should be used for the former and `υ` for the latter. Phase velocity can also be written as `c = λ f`.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhaseVelocityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhaseVelocityUnit[1];
     }
     attribute def phaseVelocity : PhaseVelocityValue nonunique;
     attribute def PhaseVelocityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     alias PhaseSpeedUnit for PhaseVelocityUnit;
@@ -2165,17 +2165,17 @@ standard library package ISQSpaceTime {
          * definition: inverse of the time constant (item 3-15) of an exponentially varying quantity
          * remarks: None.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : DampingCoefficientUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : DampingCoefficientUnit[1];
     }
     attribute def dampingCoefficient : DampingCoefficientValue nonunique;
     attribute def DampingCoefficientUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = durationPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = durationPF;
         }
     }
     attribute def LogarithmicDecrementValue :> DimensionOneValue {
@@ -2206,17 +2206,17 @@ standard library package ISQSpaceTime {
          * definition: gradual decrease in magnitude (ISO 80000-2) of any kind of flux through a medium
          * remarks: If a quantity is a function of distance (item 3-1.8) expressed by: `f(x) prop e^(-α x)` where `x` denotes distance (item 3-1.8), then `α` denotes attenuation. The inverse of attenuation is called attenuation length.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : AttenuationUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : AttenuationUnit[1];
     }
     attribute def attenuation : AttenuationValue nonunique;
     attribute def AttenuationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     alias ExtinctionUnit for AttenuationUnit;
@@ -2235,17 +2235,17 @@ standard library package ISQSpaceTime {
          * definition: change of phase angle (item 3-7) with the length (item 3-1.1) along the path travelled by a plane wave
          * remarks: If a quantity is a function of distance expressed by: `f(x) prop cos(β(x-x_0))` where `x` denotes distance (item 3-1.8), then `β` denotes the phase coefficient.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhaseCoefficientUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhaseCoefficientUnit[1];
     }
     attribute def phaseCoefficient : PhaseCoefficientValue nonunique;
     attribute def PhaseCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     attribute def PropagationCoefficientValue :> ScalarQuantityValue {
@@ -2261,17 +2261,17 @@ standard library package ISQSpaceTime {
          * definition: measure of the change of amplitude and phase angle (item 3-7) of a plane wave propagating in a given direction
          * remarks: The propagation coefficient is given by: `γ = α + iβ` where `α` denotes attenuation (item 3-26.1) and `β` the phase coefficient (item 3-26.2) of a plane wave.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PropagationCoefficientUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PropagationCoefficientUnit[1];
     }
     attribute def propagationCoefficient : PropagationCoefficientValue nonunique;
     attribute def PropagationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
 }

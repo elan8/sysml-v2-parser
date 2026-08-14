@@ -101,7 +101,7 @@ package '10a-Analysis' {
             mass : MassValue;
         }
         part vehicle {
-            attribute  :>> mass : MassValue = sum((vehicle.engine.mass, vehicle.transmission.mass, vehicle.frontAxleAssembly.mass, vehicle.rearAxleAssembly.mass));
+            attribute :>> mass : MassValue = sum((vehicle.engine.mass, vehicle.transmission.mass, vehicle.frontAxleAssembly.mass, vehicle.rearAxleAssembly.mass));
             part engine {
                 mass : MassValue;
             }

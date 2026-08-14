@@ -168,7 +168,13 @@ pub(crate) fn emit_attribute_usage(
     if usage.is_reference {
         w.push_str("ref ");
     }
-    w.push_str("attribute ");
+    // No trailing space for the anonymous target-only forms: the subsetting clause emits its
+    // own leading space (`attribute :>> target;`, previously double-spaced).
+    if usage.short_name.is_none() && usage.name_span.is_none() {
+        w.push_str("attribute");
+    } else {
+        w.push_str("attribute ");
+    }
     if let Some(short) = &usage.short_name {
         w.push_char('<');
         w.push_str(&format_name(short));
@@ -1142,12 +1148,17 @@ pub(crate) fn emit_ref_decl(
     if let Some(dir) = decl.direction {
         emit_direction(w, dir);
     }
-    w.push_str("ref ");
+    w.push_str("ref");
     if let Some(kind) = decl.kind_keyword {
-        w.push_str(kind.as_str());
         w.push_char(' ');
+        w.push_str(kind.as_str());
     }
-    w.push_str(&format_name(&decl.name));
+    // Anonymous `ref :>> target;` / `ref redefines a, b;` declarations have no name; emitting
+    // `''` fabricated a quoted empty name the author never wrote (spec42 Gap 49d fallout).
+    if !decl.name.is_empty() {
+        w.push_char(' ');
+        w.push_str(&format_name(&decl.name));
+    }
     // Typing first, then multiplicity, then the subsetting-family clauses: the one emission
     // order every `RefDecl` parser (`connector::ref_decl`, `part_ref_usage`) accepts, including
     // when a typing and a `:>` subsets clause co-occur (Systems Library `Interfaces.sysml`'s

@@ -63,9 +63,9 @@ package '15_12-Compound Value Type' {
         attribute placement : PositionVector[0..1];
     }
     attribute def frenchTireInfo : TireInfo {
-        attribute  :>> manufacturer = "Michelin";
-        attribute  :>> hubDiameter = 18.0 ['in'];
-        attribute  :>> width = 245;
+        attribute :>> manufacturer = "Michelin";
+        attribute :>> hubDiameter = 18.0 ['in'];
+        attribute :>> width = 245;
     }
 }
 ~~~

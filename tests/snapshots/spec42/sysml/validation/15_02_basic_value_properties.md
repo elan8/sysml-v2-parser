@@ -57,9 +57,9 @@ package '15_02-Basic Value Properties' {
         attribute width : Integer;
     }
     part frenchTire : Tire {
-        attribute  :>> manufacturer = "Michelin";
-        attribute  :>> hubDiameter = 18.0;
-        attribute  :>> width = 245;
+        attribute :>> manufacturer = "Michelin";
+        attribute :>> hubDiameter = 18.0;
+        attribute :>> width = 245;
     }
 }
 ~~~

@@ -24,7 +24,7 @@ interface def Broken {
 # FORMAT
 ~~~sysml
 interface def Broken {
-    ref port '' : Port :>> participant {
+    ref port : Port :>> participant {
         !!not a member;
         protected ref thisParticipant :>> self;
     }

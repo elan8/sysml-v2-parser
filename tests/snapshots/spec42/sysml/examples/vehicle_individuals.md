@@ -141,14 +141,14 @@ package VehicleIndividuals {
             /*
 			 * This is an individual Vehicle with a mass of 1800 kg.
 			 */
-            attribute  :>> mass = 1800 [kg];
+            attribute :>> mass = 1800 [kg];
         }
         individual part def Vehicle2 :> Vehicle {
             doc
             /*
 			 * This is an individual Vehicle with a mass of 1700 kg.
 			 */
-            attribute  :>> mass = 1700 [kg];
+            attribute :>> mass = 1700 [kg];
         }
         individual part def AxleAssembly1 :> AxleAssembly;
         individual part def Wheel1 :> Wheel;
@@ -165,7 +165,7 @@ package VehicleIndividuals {
                 /*
     			 * This is a snapshot of Vehicle1 at time t0;
     			 */
-                attribute  :>> localClock.currentTime = t0;
+                attribute :>> localClock.currentTime = t0;
             }
             succession : HappensJustBefore first vehicle1_t0 then vehicle1_t0_t1;
             timeslice vehicle1_t0_t1 {
@@ -175,7 +175,7 @@ package VehicleIndividuals {
     			 * (time t0) and ending at time t1.
     			 */
                 snapshot  :>> done {
-                    attribute  :>> localClock.currentTime = t1;
+                    attribute :>> localClock.currentTime = t1;
                 }
             }
         }

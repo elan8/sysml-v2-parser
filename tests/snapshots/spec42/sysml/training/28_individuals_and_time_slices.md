@@ -50,10 +50,10 @@ package 'Individuals and Time Slices' {
         timeslice aliceDriving {
             ref individual 'item' : Alice :>> driver;
             snapshot  :>> start {
-                attribute  :>> mass = 2000.0;
+                attribute :>> mass = 2000.0;
             }
             snapshot  :>> done {
-                attribute  :>> mass = 1500.0;
+                attribute :>> mass = 1500.0;
             }
         }
         then timeslice bobDriving {

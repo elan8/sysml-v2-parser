@@ -101,16 +101,16 @@ package '15_13-Discretely Sampled Function Value' {
     private import MeasurementReferences::*;
     private import Time::*;
     attribute def MissionElapsedTimeScale :> TimeScale {
-        attribute  :>> unit = s;
-        attribute  :>> definitionalEpoch {
-            attribute  :>> num = 0;
-            attribute  :>> definition = "time instant zero at launch";
+        attribute :>> unit = s;
+        attribute :>> definitionalEpoch {
+            attribute :>> num = 0;
+            attribute :>> definition = "time instant zero at launch";
         }
         attribute definitionalEpochInUTC : Iso8601DateTime;
-        attribute  :>> transformation : CoordinateFramePlacement {
-            attribute  :>> source = UTC;
-            attribute  :>> origin = definitionalEpochInUTC;
-            attribute  :>> basisDirections = 1 [UTC];
+        attribute :>> transformation : CoordinateFramePlacement {
+            attribute :>> source = UTC;
+            attribute :>> origin = definitionalEpochInUTC;
+            attribute :>> basisDirections = 1 [UTC];
         }
     }
     attribute def mets : MissionElapsedTimeScale {
@@ -118,8 +118,8 @@ package '15_13-Discretely Sampled Function Value' {
         /*
 		 * Define mission elapsed time scale starting at given UTC date time (in microsecond resolution)
 		 */
-        attribute  :>> definitionalEpochInUTC {
-            attribute  :>> val = "2020-08-23T22:42:32.924534Z";
+        attribute :>> definitionalEpochInUTC {
+            attribute :>> val = "2020-08-23T22:42:32.924534Z";
         }
     }
     attribute def MissionElapsedTimeValue :> TimeInstantValue {
@@ -127,7 +127,7 @@ package '15_13-Discretely Sampled Function Value' {
         /*
 		 * Define scalar quantity value type for mission elapsed time
 		 */
-        attribute  :>> mRef = mets;
+        attribute :>> mRef = mets;
     }
     attribute def spatialCF : CartesianSpatial3dCoordinateFrame {
         doc
@@ -135,7 +135,7 @@ package '15_13-Discretely Sampled Function Value' {
 		 * Define Cartesian 3D coordinate systems for position and velocity
 		 * Create a velocity coordinate system from the spatial coordinate system through division by second
 		 */
-        attribute  :>> mRefs = (m, m, m);
+        attribute :>> mRefs = (m, m, m);
     }
     attribute def velocityCF : CartesianVelocity3dCoordinateFrame = spatialCF / s;
     attribute def PositionAndVelocity {
@@ -144,39 +144,39 @@ package '15_13-Discretely Sampled Function Value' {
     }
     attribute def AscentProfile :> SampledFunction {
         attribute def AscentSample :> SamplePair {
-            attribute  :>> domainValue : MissionElapsedTimeValue[1];
-            attribute  :>> rangeValue : PositionAndVelocity[1];
+            attribute :>> domainValue : MissionElapsedTimeValue[1];
+            attribute :>> rangeValue : PositionAndVelocity[1];
         }
-        attribute  :>> samples : AscentSample[*] ordered;
+        attribute :>> samples : AscentSample[*] ordered;
     }
     attribute def ascentProfile1 : AscentProfile {
         doc
         /* Example ascent profile */
         attribute sample1 : AscentSample {
-            attribute  :>> domainValue = 0.0 [mets];
-            attribute  :>> rangeValue = pv1;
+            attribute :>> domainValue = 0.0 [mets];
+            attribute :>> rangeValue = pv1;
             attribute pv1 : PositionAndVelocity {
-                attribute  :>> position[spatialCF] = (0, 0, 0);
-                attribute  :>> velocity[velocityCF] = (0, 0, 0);
+                attribute :>> position[spatialCF] = (0, 0, 0);
+                attribute :>> velocity[velocityCF] = (0, 0, 0);
             }
         }
         attribute sample2 : AscentSample {
-            attribute  :>> domainValue = 2.5 [mets];
-            attribute  :>> rangeValue = pv1;
+            attribute :>> domainValue = 2.5 [mets];
+            attribute :>> rangeValue = pv1;
             attribute pv1 : PositionAndVelocity {
-                attribute  :>> position[spatialCF] = (0.01, 0.03, 8.6);
-                attribute  :>> velocity[velocityCF] = (0, 0, 5.5);
+                attribute :>> position[spatialCF] = (0.01, 0.03, 8.6);
+                attribute :>> velocity[velocityCF] = (0, 0, 5.5);
             }
         }
         attribute sample3 : AscentSample {
-            attribute  :>> domainValue = 5.1 [mets];
-            attribute  :>> rangeValue = pv1;
+            attribute :>> domainValue = 5.1 [mets];
+            attribute :>> rangeValue = pv1;
             attribute pv1 : PositionAndVelocity {
-                attribute  :>> position[spatialCF] = (0.04, 0.12, 18.6);
-                attribute  :>> velocity[velocityCF] = (0.05, 0.03, 25.3);
+                attribute :>> position[spatialCF] = (0.04, 0.12, 18.6);
+                attribute :>> velocity[velocityCF] = (0.05, 0.03, 25.3);
             }
         }
-        attribute  :>> samples = (sample1, sample2, sample3);
+        attribute :>> samples = (sample1, sample2, sample3);
     }
 }
 ~~~

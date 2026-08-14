@@ -255,7 +255,7 @@ package '8-Requirements' {
             }
         }
         part vehicle1_c1 : Vehicle {
-            attribute  :>> mass = 2000 [kg];
+            attribute :>> mass = 2000 [kg];
             perform 'provide power';
             part engine_v1 : Engine {
                 port  :>> drivePwrPort;
@@ -267,7 +267,7 @@ package '8-Requirements' {
             interface engineToTransmission : EngineToTransmissionInterface connect engine_v1.drivePwrPort to transmission.clutchPort;
         }
         part vehicle1_c2 : Vehicle {
-            attribute  :>> mass = 2500 [kg];
+            attribute :>> mass = 2500 [kg];
         }
     }
     package 'Vehicle Requirements' {

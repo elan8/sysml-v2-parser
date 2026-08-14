@@ -71,144 +71,144 @@ standard library package SIPrefixes {
 	 */
     private import MeasurementReferences::*;
     attribute def yocto : UnitPrefix {
-        attribute  :>> longName = "yocto";
-        attribute  :>> symbol = "y";
-        attribute  :>> conversionFactor = 1E-24;
+        attribute :>> longName = "yocto";
+        attribute :>> symbol = "y";
+        attribute :>> conversionFactor = 1E-24;
     }
     attribute def zepto : UnitPrefix {
-        attribute  :>> longName = "zepto";
-        attribute  :>> symbol = "z";
-        attribute  :>> conversionFactor = 1E-21;
+        attribute :>> longName = "zepto";
+        attribute :>> symbol = "z";
+        attribute :>> conversionFactor = 1E-21;
     }
     attribute def atto : UnitPrefix {
-        attribute  :>> longName = "atto";
-        attribute  :>> symbol = "a";
-        attribute  :>> conversionFactor = 1E-18;
+        attribute :>> longName = "atto";
+        attribute :>> symbol = "a";
+        attribute :>> conversionFactor = 1E-18;
     }
     attribute def femto : UnitPrefix {
-        attribute  :>> longName = "femto";
-        attribute  :>> symbol = "f";
-        attribute  :>> conversionFactor = 1E-15;
+        attribute :>> longName = "femto";
+        attribute :>> symbol = "f";
+        attribute :>> conversionFactor = 1E-15;
     }
     attribute def pico : UnitPrefix {
-        attribute  :>> longName = "pico";
-        attribute  :>> symbol = "p";
-        attribute  :>> conversionFactor = 1E-12;
+        attribute :>> longName = "pico";
+        attribute :>> symbol = "p";
+        attribute :>> conversionFactor = 1E-12;
     }
     attribute def nano : UnitPrefix {
-        attribute  :>> longName = "nano";
-        attribute  :>> symbol = "n";
-        attribute  :>> conversionFactor = 1E-9;
+        attribute :>> longName = "nano";
+        attribute :>> symbol = "n";
+        attribute :>> conversionFactor = 1E-9;
     }
     attribute def micro : UnitPrefix {
-        attribute  :>> longName = "micro";
-        attribute  :>> symbol = "μ";
-        attribute  :>> conversionFactor = 1E-6;
+        attribute :>> longName = "micro";
+        attribute :>> symbol = "μ";
+        attribute :>> conversionFactor = 1E-6;
     }
     attribute def milli : UnitPrefix {
-        attribute  :>> longName = "milli";
-        attribute  :>> symbol = "m";
-        attribute  :>> conversionFactor = 1E-3;
+        attribute :>> longName = "milli";
+        attribute :>> symbol = "m";
+        attribute :>> conversionFactor = 1E-3;
     }
     attribute def centi : UnitPrefix {
-        attribute  :>> longName = "centi";
-        attribute  :>> symbol = "c";
-        attribute  :>> conversionFactor = 1E-2;
+        attribute :>> longName = "centi";
+        attribute :>> symbol = "c";
+        attribute :>> conversionFactor = 1E-2;
     }
     attribute def deci : UnitPrefix {
-        attribute  :>> longName = "deci";
-        attribute  :>> symbol = "d";
-        attribute  :>> conversionFactor = 1E-1;
+        attribute :>> longName = "deci";
+        attribute :>> symbol = "d";
+        attribute :>> conversionFactor = 1E-1;
     }
     attribute def deca : UnitPrefix {
-        attribute  :>> longName = "deca";
-        attribute  :>> symbol = "da";
-        attribute  :>> conversionFactor = 1E1;
+        attribute :>> longName = "deca";
+        attribute :>> symbol = "da";
+        attribute :>> conversionFactor = 1E1;
     }
     attribute def hecto : UnitPrefix {
-        attribute  :>> longName = "hecto";
-        attribute  :>> symbol = "h";
-        attribute  :>> conversionFactor = 1E2;
+        attribute :>> longName = "hecto";
+        attribute :>> symbol = "h";
+        attribute :>> conversionFactor = 1E2;
     }
     attribute def kilo : UnitPrefix {
-        attribute  :>> longName = "kilo";
-        attribute  :>> symbol = "k";
-        attribute  :>> conversionFactor = 1E3;
+        attribute :>> longName = "kilo";
+        attribute :>> symbol = "k";
+        attribute :>> conversionFactor = 1E3;
     }
     attribute def mega : UnitPrefix {
-        attribute  :>> longName = "mega";
-        attribute  :>> symbol = "M";
-        attribute  :>> conversionFactor = 1E6;
+        attribute :>> longName = "mega";
+        attribute :>> symbol = "M";
+        attribute :>> conversionFactor = 1E6;
     }
     attribute def giga : UnitPrefix {
-        attribute  :>> longName = "giga";
-        attribute  :>> symbol = "G";
-        attribute  :>> conversionFactor = 1E9;
+        attribute :>> longName = "giga";
+        attribute :>> symbol = "G";
+        attribute :>> conversionFactor = 1E9;
     }
     attribute def tera : UnitPrefix {
-        attribute  :>> longName = "tera";
-        attribute  :>> symbol = "T";
-        attribute  :>> conversionFactor = 1E12;
+        attribute :>> longName = "tera";
+        attribute :>> symbol = "T";
+        attribute :>> conversionFactor = 1E12;
     }
     attribute def peta : UnitPrefix {
-        attribute  :>> longName = "peta";
-        attribute  :>> symbol = "P";
-        attribute  :>> conversionFactor = 1E15;
+        attribute :>> longName = "peta";
+        attribute :>> symbol = "P";
+        attribute :>> conversionFactor = 1E15;
     }
     attribute def exa : UnitPrefix {
-        attribute  :>> longName = "exa";
-        attribute  :>> symbol = "E";
-        attribute  :>> conversionFactor = 1E18;
+        attribute :>> longName = "exa";
+        attribute :>> symbol = "E";
+        attribute :>> conversionFactor = 1E18;
     }
     attribute def zetta : UnitPrefix {
-        attribute  :>> longName = "zetta";
-        attribute  :>> symbol = "Z";
-        attribute  :>> conversionFactor = 1E21;
+        attribute :>> longName = "zetta";
+        attribute :>> symbol = "Z";
+        attribute :>> conversionFactor = 1E21;
     }
     attribute def yotta : UnitPrefix {
-        attribute  :>> longName = "yotta";
-        attribute  :>> symbol = "Y";
-        attribute  :>> conversionFactor = 1E24;
+        attribute :>> longName = "yotta";
+        attribute :>> symbol = "Y";
+        attribute :>> conversionFactor = 1E24;
     }
     attribute def kibi : UnitPrefix {
-        attribute  :>> longName = "kibi";
-        attribute  :>> symbol = "Ki";
-        attribute  :>> conversionFactor = 1024;
+        attribute :>> longName = "kibi";
+        attribute :>> symbol = "Ki";
+        attribute :>> conversionFactor = 1024;
     }
     attribute def mebi : UnitPrefix {
-        attribute  :>> longName = "mebi";
-        attribute  :>> symbol = "Mi";
-        attribute  :>> conversionFactor = 1024 ^ 2;
+        attribute :>> longName = "mebi";
+        attribute :>> symbol = "Mi";
+        attribute :>> conversionFactor = 1024 ^ 2;
     }
     attribute def gibi : UnitPrefix {
-        attribute  :>> longName = "gibi";
-        attribute  :>> symbol = "Gi";
-        attribute  :>> conversionFactor = 1024 ^ 3;
+        attribute :>> longName = "gibi";
+        attribute :>> symbol = "Gi";
+        attribute :>> conversionFactor = 1024 ^ 3;
     }
     attribute def tebi : UnitPrefix {
-        attribute  :>> longName = "tebi";
-        attribute  :>> symbol = "Ti";
-        attribute  :>> conversionFactor = 1024 ^ 4;
+        attribute :>> longName = "tebi";
+        attribute :>> symbol = "Ti";
+        attribute :>> conversionFactor = 1024 ^ 4;
     }
     attribute def pebi : UnitPrefix {
-        attribute  :>> longName = "pebi";
-        attribute  :>> symbol = "Pi";
-        attribute  :>> conversionFactor = 1024 ^ 5;
+        attribute :>> longName = "pebi";
+        attribute :>> symbol = "Pi";
+        attribute :>> conversionFactor = 1024 ^ 5;
     }
     attribute def exbi : UnitPrefix {
-        attribute  :>> longName = "exbi";
-        attribute  :>> symbol = "Ei";
-        attribute  :>> conversionFactor = 1024 ^ 6;
+        attribute :>> longName = "exbi";
+        attribute :>> symbol = "Ei";
+        attribute :>> conversionFactor = 1024 ^ 6;
     }
     attribute def zebi : UnitPrefix {
-        attribute  :>> longName = "zebi";
-        attribute  :>> symbol = "Zi";
-        attribute  :>> conversionFactor = 1024 ^ 7;
+        attribute :>> longName = "zebi";
+        attribute :>> symbol = "Zi";
+        attribute :>> conversionFactor = 1024 ^ 7;
     }
     attribute def yobi : UnitPrefix {
-        attribute  :>> longName = "yobi";
-        attribute  :>> symbol = "Yi";
-        attribute  :>> conversionFactor = 1024 ^ 8;
+        attribute :>> longName = "yobi";
+        attribute :>> symbol = "Yi";
+        attribute :>> conversionFactor = 1024 ^ 8;
     }
 }
 ~~~

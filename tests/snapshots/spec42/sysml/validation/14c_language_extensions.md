@@ -354,13 +354,13 @@ package '14c-Language-Extensions' {
             connect 'battery depleted' to req1;
             #cause;
             occurrence 'battery depleted' {
-                attribute  :>> occurs = 0.005;
+                attribute :>> occurs = 0.005;
             }
             #causation;
             connect 'battery depleted' to 'battery cannot be charged';
             #failure;
             occurrence 'battery cannot be charged' {
-                attribute  :>> detected = 0.013;
+                attribute :>> detected = 0.013;
             }
             #causation;
             connect 'battery cannot be charged' to 'glucose level undetected';
@@ -370,7 +370,7 @@ package '14c-Language-Extensions' {
             connect 'glucose level undetected' to 'therapy delay';
             #effect;
             occurrence 'therapy delay' {
-                attribute  :>> severity = "High";
+                attribute :>> severity = "High";
             }
         }
         #violation;

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 130.** The bare `:>>`/`:>` shorthand (no `attribute` keyword)
+  and its metadata-body twin accept comma-separated multi-target lists like every other
+  redefinition/subsets clause (`SI.kerml`'s `kelvin`; spec42 gap 49b), and `ref` declarations
+  no longer consume the `redefines`/`subsets`/`references`/`crosses` keyword spelling of a
+  relationship clause as their declared name (`Items.kerml`; spec42 gap 49d). Anonymous
+  attribute/ref declarations also stop emitting a double space / a fabricated `''` name.
 - **`PARSE_AST_VERSION` is now 129.** The canonical anonymous flow shorthand `flow from <a> to
   <b>;` (and its `succession flow` sibling) no longer silently misparses the `from` keyword as
   the flow's declared name: such statements now produce `FlowUsage { name: None, .. }`, so

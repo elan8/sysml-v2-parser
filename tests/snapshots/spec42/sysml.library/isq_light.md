@@ -1584,21 +1584,21 @@ standard library package ISQLight {
          * definition: phase speed of an electromagnetic wave at a given point in a medium
          * remarks: See also ISO 80000-3. The value of the speed of light in a medium can depend on the frequency, polarization, and direction. For the definition of the speed of electromagnetic waves in vacuum, `c_0`, see ISO 80000-1.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpeedOfLightInAMediumUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpeedOfLightInAMediumUnit[1];
     }
     attribute def speedOfLightInAMedium : SpeedOfLightInAMediumValue nonunique;
     attribute def SpeedOfLightInAMediumUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     attribute def RefractiveIndexValue :> DimensionOneValue {
@@ -1643,25 +1643,25 @@ standard library package ISQLight {
          * definition: spectral density of radiant energy, expressed by `Q_(e,λ) = (dQ_e) / (dλ)`, where `Q_e` is radiant energy (item 7-2.1) in terms of wavelength `λ` (ISO 80000-3)
          * remarks: The integral of (total) radiant energy is determined by the wavelength interval `(λ_1, λ_2)` under consideration: `Q_e = int_(λ_1)^(λ_2) Q_(e,λ) dλ`
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralRadiantEnergyUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralRadiantEnergyUnit[1];
     }
     attribute def spectralRadiantEnergy : SpectralRadiantEnergyValue nonunique;
     attribute def SpectralRadiantEnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def RadiantEnergyDensityValue :> ScalarQuantityValue {
@@ -1677,25 +1677,25 @@ standard library package ISQLight {
          * definition: volumetric density of radiant energy, expressed by `w = (dQ_e)/(dV)`, where `Q_e` is radiant energy (item 7-2.1) in an elementary three-dimensional domain and `V` is the volume (ISO 80000-3) of that domain
          * remarks: Radiant energy density within a Planckian radiator is given by `w = (4 σ)/(c_0) T^4` where `σ` is the Stefan-Boltzmann constant (ISO 80000-1), `c_0` is speed of light in vacuum (ISO 80000-1) and `T` is thermodynamic temperature (ISO 80000-5).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : RadiantEnergyDensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : RadiantEnergyDensityUnit[1];
     }
     attribute def radiantEnergyDensity : RadiantEnergyDensityValue nonunique;
     attribute def RadiantEnergyDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def SpectralRadiantEnergyDensityInTermsOfWavelengthValue :> ScalarQuantityValue {
@@ -1711,25 +1711,25 @@ standard library package ISQLight {
          * definition: change of radiant energy density with wavelength, expressed by `w_λ = (dw)/(dλ)`, where `w` is radiant energy density (item 7-3.1) as a function of wavelength `λ` (ISO 80000-3)
          * remarks: Spectral radiant energy density within a Planckian radiator is given by `w_λ = 8πhc_0*f(λ, T)`, where `h` is the Planck constant (ISO 80000-1), `c_0` is speed of light in vacuum (ISO 80000-1), `T` is thermodynamic temperature (ISO 80000-5) and `f(λ,T) = (λ^-5)/(exp(c_2 λ^-1 T^-1) - 1)`. For the radiation constant `c_2` in `f(λ,T)`, see ISO 80000-1.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralRadiantEnergyDensityInTermsOfWavelengthUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralRadiantEnergyDensityInTermsOfWavelengthUnit[1];
     }
     attribute def spectralRadiantEnergyDensityInTermsOfWavelength : SpectralRadiantEnergyDensityInTermsOfWavelengthValue nonunique;
     attribute def SpectralRadiantEnergyDensityInTermsOfWavelengthUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def SpectralRadiantEnergyDensityInTermsOfWavenumberValue :> ScalarQuantityValue {
@@ -1745,21 +1745,21 @@ standard library package ISQLight {
          * definition: change of radiant energy density with wavenumber, expressed by `w_ṽ = (dw)/(dṽ)`, where `w` is radiant energy density (item 7-3.1) as a function of wavenumber `ṽ` (ISO 80000-3)
          * remarks: None.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralRadiantEnergyDensityInTermsOfWavenumberUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralRadiantEnergyDensityInTermsOfWavenumberUnit[1];
     }
     attribute def spectralRadiantEnergyDensityInTermsOfWavenumber : SpectralRadiantEnergyDensityInTermsOfWavenumberValue nonunique;
     attribute def SpectralRadiantEnergyDensityInTermsOfWavenumberUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     attribute def RadiantFluxValue :> ScalarQuantityValue {
@@ -1775,25 +1775,25 @@ standard library package ISQLight {
          * definition: change in radiant energy with time, expressed by `Φ_e = (dQ_e)/(dt)`, where `Q_e` is the radiant energy (item 7-2.1) emitted, transferred or received and `t` is time (ISO 80000-3)
          * remarks: The corresponding photometric quantity is "luminous flux" (item 7-13). The corresponding quantity for photons is "photon flux" (item 7-20).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : RadiantFluxUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : RadiantFluxUnit[1];
     }
     attribute def radiantFlux : RadiantFluxValue nonunique;
     attribute def RadiantFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     alias RadiantPowerUnit for RadiantFluxUnit;
@@ -1812,25 +1812,25 @@ standard library package ISQLight {
          * definition: spectral density of radiant flux, expressed by `Φ_(e,λ) = (dQ_e)/(dλ)`, where `Φ_e` is radiant flux (item 7-4.1) in terms of wavelength `λ` (ISO 80000-3)
          * remarks: The integral of (total) radiant flux is determined by the wavelength interval `(λ_1, λ_2)` under consideration: `Φ_e = int_(λ_1)^(λ_2) Φ_(e,λ) dλ` .
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralRadiantFluxUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralRadiantFluxUnit[1];
     }
     attribute def spectralRadiantFlux : SpectralRadiantFluxValue nonunique;
     attribute def SpectralRadiantFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     alias SpectralRadiantPowerUnit for SpectralRadiantFluxUnit;
@@ -1849,25 +1849,25 @@ standard library package ISQLight {
          * definition: density of radiant flux with respect to solid angle in a specified direction, expressed by `I_e = (dΦ_e)/(dΩ)`, where `Φ_e` is the radiant flux (item 7-4.1) emitted in a specified direction, and `Ω` is the solid angle (ISO 80000-3) containing that direction
          * remarks: The definition holds strictly only for a point source. The distribution of the radiant intensities as a function of the direction of emission, e.g. given by the polar angles `(θ,φ)`, is used to determine the radiant flux (item 7-4.1) within a certain solid angle (ISO 80000-3), `Ω`, of a source: `Φ_e = int int_Ω I_e(θ, φ) sin(θ) dφ dθ`. The corresponding photometric quantity is "luminous intensity" (item 7-14). The corresponding quantity for photons is "photon intensity" (item 7-21).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : RadiantIntensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : RadiantIntensityUnit[1];
     }
     attribute def radiantIntensity : RadiantIntensityValue nonunique;
     attribute def RadiantIntensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def SpectralRadiantIntensityValue :> ScalarQuantityValue {
@@ -1883,25 +1883,25 @@ standard library package ISQLight {
          * definition: spectral density of radiant intensity, expressed by `I_(e, λ) = (d I_e)/(dλ)`, where `I_e` is radiant intensity (item 7-5.1) in terms of wavelength `λ` (ISO 80000-3)
          * remarks: The integral of (total) radiant intensity is determined by the wavelength interval `(λ_1, λ_2)` under consideration: `I_e = int_(λ_1)^(λ_2) I_(e,λ) dλ` .
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralRadiantIntensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralRadiantIntensityUnit[1];
     }
     attribute def spectralRadiantIntensity : SpectralRadiantIntensityValue nonunique;
     attribute def SpectralRadiantIntensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def RadianceValue :> ScalarQuantityValue {
@@ -1917,21 +1917,21 @@ standard library package ISQLight {
          * definition: density of radiant intensity with respect to projected area in a specified direction at a specified point on a real or imaginary surface, expressed by `L_e = (d I_e)/(dA) * 1/cos(α)`, where `I_e` is radiant intensity (item 7-5.1), `A` is area (ISO 80000-3), and `α` is the angle between the normal to the surface at the specified point and the specified direction
          * remarks: See also 0.1. For Planckian radiation, `L_e = σ/π T^4` where `T` is thermodynamic temperature (ISO 80000-5) and `σ` is the Stefan-Boltzmann constant (ISO 80000-1). The corresponding photometric quantity is "luminance" (item 7-15). The corresponding quantity for photons is "photon radiance" (item 7-22).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : RadianceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : RadianceUnit[1];
     }
     attribute def radiance : RadianceValue nonunique;
     attribute def RadianceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     attribute def SpectralRadianceValue :> ScalarQuantityValue {
@@ -1947,25 +1947,25 @@ standard library package ISQLight {
          * definition: density of radiance with respect to wavelength, expressed by `L_(e, λ) = (d L_e)/(d λ)` where `L_e` is radiance (item 7-6.1) in terms of wavelength λ(ISO 80000-3)
          * remarks: For Planckian radiation, `L_(e, λ)(λ) = (c(λ))/(4 π) ω_λ(λ) = h c_0^2 * f(λ,T)`, where `c(λ)` is phase speed (ISO 80000-3) of electromagnetic radiation of a wavelength (ISO 80000-3) `λ` in a given medium, `ω_λ(λ)` is spectral radiant energy density in terms of wavelength, `c_0` is speed of light in vacuum (ISO 80000-1), `h` is the Planck constant (ISO 80000-1), and `f(λ,T) = λ^-5/(exp(c_2 λ^-1 T^-1) - 1)`, where the radiation constant `c_2 = (hc)/k`. The integral of (total) radiance is determined by the wavelength interval `(λ_1, λ_2)` under consideration: `L_e = int_(λ_1)^(λ_2) L_(e,λ) dλ` .
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralRadianceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralRadianceUnit[1];
     }
     attribute def spectralRadiance : SpectralRadianceValue nonunique;
     attribute def SpectralRadianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def IrradianceValue :> ScalarQuantityValue {
@@ -1981,21 +1981,21 @@ standard library package ISQLight {
          * definition: density of incident radiant flux with respect to area at a point on a real or imaginary surface, expressed by `E_e = (d Φ_e)/(d A)`, where `Φ_e` is radiant flux (item 7-4.1) and `A` is the area (ISO 80000-3) on which the radiant flux is incident
          * remarks: The corresponding photometric quantity is "illuminance" (item 7-16). The corresponding quantity for photons is "photon irradiance" (item 7-23). The quantity "spherical irradiance" is defined by the mean value of irradiance on the outer curved surface of a very small (real or imaginary) sphere at a point in space. It can be expressed by `E_(e,0) = int_(4 π) L_e d Ω` where `Ω` is solid angle (ISO 80000-3) and `L_e` is radiance (item 7-6.1). (See CIE DIS 017/E:2016, term 17-21-054.) It can be expressed by the quotient of the radiant flux (item 7-4.1) of all the radiation incident on the outer surface of an infinitely small sphere centred at the specified point and the area (ISO 80000-3) of the diametrical cross-section of that sphere. Spherical irradiance is also called "fluence rate" or "radiant fluence rate". The corresponding photometric quantity to spherical irradiance is called "spherical illuminance".
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : IrradianceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : IrradianceUnit[1];
     }
     attribute def irradiance : IrradianceValue nonunique;
     attribute def IrradianceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     attribute def SpectralIrradianceValue :> ScalarQuantityValue {
@@ -2011,25 +2011,25 @@ standard library package ISQLight {
          * definition: density of irradiance with respect to wavelength, expressed by `E_(e,λ) = (d E_e)/(dλ)`, where `E_e` is irradiance (item 7-7.1) in terms of wavelength `λ` (ISO 80000-3)
          * remarks: The integral of (total) irradiance is determined by the wavelength interval `(λ_1, λ_2)` under consideration: `E_e = int_(λ_1)^(λ_2) E_(e,λ) d λ` .
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralIrradianceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralIrradianceUnit[1];
     }
     attribute def spectralIrradiance : SpectralIrradianceValue nonunique;
     attribute def SpectralIrradianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def RadiantExitanceValue :> ScalarQuantityValue {
@@ -2045,21 +2045,21 @@ standard library package ISQLight {
          * definition: density of exiting radiant flux with respect to area at a point on a real or imaginary surface, expressed by `M_e = (d Φ_e)/(dA)`, where `Φ_e` is radiant flux (item 7-4.1) and `A` is the area (ISO 80000-3) from which the radiant flux leaves
          * remarks: For Planckian radiation, `M_e = σT^4`, where `T` is thermodynamic temperature (ISO 80000-5) and `σ` is the Stefan-Boltzmann constant (ISO 80000-1). The corresponding photometric quantity is "luminous exitance" (item 7-17). The corresponding quantity for photons is "photon exitance" (item 7-24).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : RadiantExitanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : RadiantExitanceUnit[1];
     }
     attribute def radiantExitance : RadiantExitanceValue nonunique;
     attribute def RadiantExitanceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     alias RadiantEmittanceUnit for RadiantExitanceUnit;
@@ -2078,25 +2078,25 @@ standard library package ISQLight {
          * definition: density of radiant exitance with respect to wavelength, expressed by `M_(e,λ) = (d M_e)/(dλ)`, where `M_e` is radiant exitance (item 7-8.1) in terms of wavelength `λ` (ISO 80000-3)
          * remarks: The integral of (total) radiant exitance is determined by the wavelength interval `(λ_1, λ_2)` under consideration: `M_e = int_(λ_1)^(λ_2) M_(e,λ) d λ` .
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralRadiantExitanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralRadiantExitanceUnit[1];
     }
     attribute def spectralRadiantExitance : SpectralRadiantExitanceValue nonunique;
     attribute def SpectralRadiantExitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -3;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def RadiantExposureValue :> ScalarQuantityValue {
@@ -2112,21 +2112,21 @@ standard library package ISQLight {
          * definition: density of incident radiant energy with respect to area at a point on a real or imaginary surface, expressed by `H_e = (d Q_e)/(dA)`, where `Q_e` is radiant energy (item 7-2.1) and `A` is the area on which the radiant energy is incident (ISO 80000-3)
          * remarks: The corresponding photometric quantity is "luminous exposure" (item 7-18). The corresponding quantity for photons is "photon exposure" (item 7-25).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : RadiantExposureUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : RadiantExposureUnit[1];
     }
     attribute def radiantExposure : RadiantExposureValue nonunique;
     attribute def RadiantExposureUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (massPF, durationPF);
         }
     }
     attribute def SpectralRadiantExposureValue :> ScalarQuantityValue {
@@ -2142,25 +2142,25 @@ standard library package ISQLight {
          * definition: density of radiant exposure with respect to wavelength, expressed by `H_(e,λ) = (d H_e)/(dλ)`, where `H_e` is radiant exposure (item 7-9.1) in terms of wavelength `λ` (ISO 80000-3)
          * remarks: The integral of (total) radiant exposure is determined by the wavelength interval `(λ_1, λ_2)` under consideration: `H_e = int_(λ_1)^(λ_2) H_(e,λ) d λ` .
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralRadiantExposureUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralRadiantExposureUnit[1];
     }
     attribute def spectralRadiantExposure : SpectralRadiantExposureValue nonunique;
     attribute def SpectralRadiantExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = 1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF);
         }
     }
     attribute def LuminousEfficiencyValue :> DimensionOneValue {
@@ -2206,29 +2206,29 @@ standard library package ISQLight {
          * definition: quotient of luminous flux (item 7-13) and the corresponding radiant flux (item 7-4.1) for a specified photometric condition
          * remarks: Luminous efficacy of radiation for photopic vision is expressed by `K = Φ_V/Φ_e`, where `Φ_v` is luminous flux (item 7-13) and `Φ_e` is radiant flux (item 7-4.1). For scotopic and mesopic vision see 0.4 and 0.5. Symbols for different photometric conditions: `K` for photopic vision; `K'` for scotopic vision; `K_(mes;m)` for mesopic vision; `K_10` for the CIE 10° photopic photometric observer; `K_M` for the CIE 1988 modified 2° spectral luminous efficiency function for photopic vision.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LuminousEfficacyOfRadiationUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LuminousEfficacyOfRadiationUnit[1];
     }
     attribute def luminousEfficacyOfRadiation : LuminousEfficacyOfRadiationValue nonunique;
     attribute def LuminousEfficacyOfRadiationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 3;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
         }
     }
     attribute def SpectralLuminousEfficacyValue :> ScalarQuantityValue {
@@ -2244,29 +2244,29 @@ standard library package ISQLight {
          * definition: product of spectral luminous efficiency (item 7-10.2) and maximum luminous efficacy (item 7-11.3) for a specified photometric condition
          * remarks: Spectral luminous efficacy for photopic vision is expressed by `K(λ) = K_m V(λ)`, where `K_m` is maximum luminous efficacy (item 7-11.3), `V(λ)` is spectral luminous efficiency (item 7-10.2) and `λ` is wavelength. For scotopic and mesopic vision see 0.4 and 0.5. Symbols for different photometric conditions: `K(λ)` for photopic vision>; `K'(λ)` for scotopic vision; `K_(mes;m)(λ)` for mesopic vision; `K_10(λ)` for the CIE 10° photopic photometric observer; `K_M(λ)` for the CIE 1988 modified 2° spectral luminous efficiency function for photopic vision.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : SpectralLuminousEfficacyUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : SpectralLuminousEfficacyUnit[1];
     }
     attribute def spectralLuminousEfficacy : SpectralLuminousEfficacyValue nonunique;
     attribute def SpectralLuminousEfficacyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 3;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
         }
     }
     attribute def MaximumLuminousEfficacyValue :> ScalarQuantityValue {
@@ -2282,29 +2282,29 @@ standard library package ISQLight {
          * definition: maximum value of spectral luminous efficacy for a specified photometric condition
          * remarks: See also 0.4 and 0.5. The value of maximum luminous efficacy for photopic vision is calculated by `K_m = 683 / (V(λ_(cd))) ["cd"*"sr"*"W"^-1] = 683 ["lm"*"W"^-1]` where `V(λ)` is the spectral luminous efficiency for photopic vision and `λ_(cd)` is the wavelength in air corresponding to the frequency `540*10^12 ["Hz"]` specified in the definition of the SI unit candela. Symbols for different photometric conditions: `K_m` for photopic vision; `K'_m` for scotopic vision; `K_(m,mes;m)` for mesopic vision; `K_(m,10)` for the CIE 10° photopic photometric observer; `K_(m,M)` for the CIE 1988 modified 2° spectral luminous efficiency function for photopic vision.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MaximumLuminousEfficacyUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MaximumLuminousEfficacyUnit[1];
     }
     attribute def maximumLuminousEfficacy : MaximumLuminousEfficacyValue nonunique;
     attribute def MaximumLuminousEfficacyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 3;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
         }
     }
     attribute def LuminousEfficacyOfASourceValue :> ScalarQuantityValue {
@@ -2320,29 +2320,29 @@ standard library package ISQLight {
          * definition: quotient of the luminous flux emitted and the power consumed by the source, expressed by `η_v = Φ_v/P`, where `Φ_v` is luminous flux (item 7-13) and `P` is the power (ISO 80000-4) consumed by the source
          * remarks: None.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LuminousEfficacyOfASourceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LuminousEfficacyOfASourceUnit[1];
     }
     attribute def luminousEfficacyOfASource : LuminousEfficacyOfASourceValue nonunique;
     attribute def LuminousEfficacyOfASourceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 3;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 3;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF, durationPF, luminousIntensityPF);
         }
     }
     attribute def LuminousEnergyValue :> ScalarQuantityValue {
@@ -2358,21 +2358,21 @@ standard library package ISQLight {
          * definition: energy of electromagnetic waves weighted by the spectral luminous efficiency (item 7-10.2) multiplied by maximum luminous efficacy (item 7-11.3) of a specified photometric condition
          * remarks: Luminous energy for photopic vision is expressed by `Q_v = K_m int_0^∞ Q_(e,λ)(λ) V(λ) dλ`, where `Q_(e,λ)(λ)` is the spectral radiant energy (item 7-2.2) at wavelength `λ` (ISO 80000-3), `V(λ)` is spectral luminous efficiency (item 7-10.2), and `K_m` is maximum luminous efficacy (7-11.3). Luminous energy can be emitted, transferred or received. Luminous energy can be expressed by the time integral of the luminous flux (item 7-13), `Φ_v`, over a given duration (ISO 80000-3), `Δt`: `Q_v = int_(Δt) Φ_v dt` . The corresponding radiometric quantity is "radiant energy" (item 7-2.1). The corresponding quantity for photons is "photon energy" (item 7-19.2).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LuminousEnergyUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LuminousEnergyUnit[1];
     }
     attribute def luminousEnergy : LuminousEnergyValue nonunique;
     attribute def LuminousEnergyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (durationPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (durationPF, luminousIntensityPF);
         }
     }
     alias QuantityOfLightUnit for LuminousEnergyUnit;
@@ -2391,17 +2391,17 @@ standard library package ISQLight {
          * definition: change in luminous energy with time, expressed by `Φ_v = (d Q_v)/(dt)`, where `Q_v` is the luminous energy (item 7-12) emitted, transferred or received and `t` is time (ISO 80000-3)
          * remarks: Luminous flux is a quantity derived from the radiant flux (item 7-4.1), `Φ_e`, by evaluating the radiation according to its action upon the CIE standard photometric observer. (See CIE S 017/E:2011, term 17-738.) Luminous flux can be derived from the spectral radiant flux distribution by `Φ_v = K_m int_0^oo Φ_(e,λ)(λ) V(λ) dλ`, where `K_m` is maximum luminous efficacy (item 7-11.3), `Φ_(e,λ)(λ)` is spectral radiant flux (item 7-4.2), `V(λ)` is spectral luminous efficiency (item 7-10.2) and `λ` is wavelength (ISO 80000-3). The corresponding radiometric quantity is "radiant flux" (item 7-4.1). The corresponding quantity for photons is "photon flux" (item 7-20).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LuminousFluxUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LuminousFluxUnit[1];
     }
     attribute def luminousFlux : LuminousFluxValue nonunique;
     attribute def LuminousFluxUnit :> DerivedUnit {
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = luminousIntensityPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = luminousIntensityPF;
         }
     }
     attribute def LuminanceValue :> ScalarQuantityValue {
@@ -2417,21 +2417,21 @@ standard library package ISQLight {
          * definition: density of luminous intensity with respect to projected area in a specified direction at a specified point on a real or imaginary surface, expressed by `L_v = (dI_v)/(dA) 1/cos(α)`, where `I_v` is luminous intensity (item 7-14), `A` is area (ISO 80000-3) and `α` is the angle between the normal to the surface at the specified point and the specified direction
          * remarks: Luminance can be derived from the spectral radiance distribution by `L_v = K_m int_0^∞ L_(e,λ)(λ) V(λ) dλ`, where `K_m` is maximum luminous efficacy (item 7-11.3), `L_(e,λ)(λ)` is the spectral radiance (item 7-6.2) at wavelength `λ` (ISO 80000-3), and `V(λ)` is spectral luminous efficiency (item 7-10.2). See also 0.1. Integral limits can be confined depending on the spectral sensitivity of the detectors used as a sensor. The corresponding radiometric quantity is "radiance" (item 7-6.1). The corresponding quantity for photons is "photon radiance" (item 7-22).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LuminanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LuminanceUnit[1];
     }
     attribute def luminance : LuminanceValue nonunique;
     attribute def LuminanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     attribute def IlluminanceValue :> ScalarQuantityValue {
@@ -2447,21 +2447,21 @@ standard library package ISQLight {
          * definition: density of incident luminous flux with respect to area at a point on a real or imaginary surface, expressed by `E_v = (dΦ_v)/(dA)`, where `Φ_v` is luminous flux (item 7-13) and `A` is the area (ISO 80000-3) on which the luminous flux is incident
          * remarks: Illuminance can be derived from the spectral irradiance distribution by `E_v = K_m int_0^∞ E_(e,λ)(λ) V(λ) dλ`, where `K_m` is maximum luminous efficacy (item 7-11.3), `E_(e,λ)(λ)` is the spectral irradiance (item 7-7.2) at wavelength `λ` (ISO 80000-3), and `V(λ)` is spectral luminous efficiency (item 7-10.2). Integral limits can be confined depending on the spectral sensitivity of the detectors used as a sensor. The corresponding radiometric quantity is "irradiance" (item 7-7.1). The corresponding quantity for photons is "photon irradiance" (item 7-23). The quantity "spherical illuminance" is defined by the mean value of illuminance on the outer curved surface of a very small (real or imaginary) sphere at a point in space. It can be expressed by `E_(v,0) = int_(4π) L_v dΩ`, where `Ω` is solid angle (ISO 80000-3) and `L_v` is luminance (item 7-15). It can be expressed by the quotient of the luminous flux (item 7-13) of all the light incident on the outer surface of an infinitely small sphere centred at the given point, and the area (ISO 80000-3) of the diametrical cross-section of that sphere.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : IlluminanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : IlluminanceUnit[1];
     }
     attribute def illuminance : IlluminanceValue nonunique;
     attribute def IlluminanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     attribute def LuminousExitanceValue :> ScalarQuantityValue {
@@ -2477,21 +2477,21 @@ standard library package ISQLight {
          * definition: density of exiting luminous flux with respect to area at a point on a real or imaginary surface, expressed by `M_v = (dΦ_v)/(dA)`, where `Φ_v` is luminous flux (item 7-13) and `A` is the area (ISO 80000-3) from which the luminous flux leaves
          * remarks: Luminous exitance can be derived from the spectral radiant exitance distribution by `M_v = K_m int_0^∞ M_(e,λ)(λ) V(λ) dλ`, where `K_m` is maximum luminous efficacy (item 7-11.3), `M_(e_λ)(λ)` is the spectral radiant exitance (item 7-8.2) at wavelength λ(ISO 80000-3), and `V(λ)` is spectral luminous efficiency (item 7-10.2). Integral limits can be confined depending on the spectral sensitivity of the detectors used as a sensor. The corresponding radiometric quantity is "radiant exitance" (item 7-8.1). The corresponding quantity for photons is "photon exitance" (item 7-24).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LuminousExitanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LuminousExitanceUnit[1];
     }
     attribute def luminousExitance : LuminousExitanceValue nonunique;
     attribute def LuminousExitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     attribute def LuminousExposureValue :> ScalarQuantityValue {
@@ -2507,25 +2507,25 @@ standard library package ISQLight {
          * definition: density of incident luminous energy with respect to area at a point on a real or imaginary surface, expressed by `H_v = (dQ_v)/(dA)`, where `Q_v` is luminous energy (item 7-12) and `A` is the area on which the luminous energy is incident (ISO 80000-3)
          * remarks: Luminous exposure can be derived from the spectral radiant exposure distribution by `H_v = K_m int_0^∞ H_(e,λ)(λ) V(λ) dλ`, where `K_m` is maximum luminous efficacy (item 7-11.3), `H_(e_λ)(λ)` is the spectral radiant exposure (item 7-9.2) at wavelength λ(ISO 80000-3), and `V(λ)` is spectral luminous efficiency (item 7-10.2). Integral limits can be confined depending on the spectral sensitivity of the detectors used as a sensor. The corresponding radiometric quantity is "radiant exposure" (item 7-9.1). The corresponding quantity for photons is "photon exposure" (item 7-25).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LuminousExposureUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LuminousExposureUnit[1];
     }
     attribute def luminousExposure : LuminousExposureValue nonunique;
     attribute def LuminousExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = 1;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF, luminousIntensityPF);
         }
     }
     alias QuantityOfIlluminationUnit for LuminousExposureUnit;
@@ -2577,17 +2577,17 @@ standard library package ISQLight {
          * definition: rate of photon number per time interval, expressed by `Φ_p = (d N_p)/(dt)`, where `N_p` is photon number (e.g. given by item 7-19.1), transmitted or received, and `t` is time (ISO 80000-3)
          * remarks: Photon flux `Φ_p` is related to radiant flux (item 7-4.1), `Φ_e`, of monochromatic radiation, by `Φ_p = Φ_e/(h ν)` where `h` is the Planck constant (ISO 80000-1), and `ν` is the frequency (ISO 80000-3) of the corresponding electromagnetic wave. The corresponding radiometric quantity is "radiant flux" (item 7-4.1). The corresponding photometric quantity is "luminous flux" (item 7-13).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhotonFluxUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhotonFluxUnit[1];
     }
     attribute def photonFlux : PhotonFluxValue nonunique;
     attribute def PhotonFluxUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = durationPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = durationPF;
         }
     }
     attribute def PhotonIntensityValue :> ScalarQuantityValue {
@@ -2603,17 +2603,17 @@ standard library package ISQLight {
          * definition: density of photon flux with respect to solid angle in a specified direction, expressed by `I_p = (dΦ_p)/(dΩ)`, where `Φ_p` is the photon flux (item 7-20) emitted in the given direction, and `Ω` is the solid angle (ISO 80000-3) containing that direction
          * remarks: The distribution of the photon intensities as a function of the direction of emission, e.g. given by the polar angles `(θ,ϕ)` , is used to determine the photon flux (item 7-20) within a certain solid angle (ISO 80000-3) `Ω` of a source: `Φ_p = int int_Ω I_v(θ,ϕ) sin(θ) dϕ dθ`. The corresponding radiometric quantity is "radiant intensity" (item 7-5.1). The corresponding photometric quantity is "luminous intensity" (item 7-14).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhotonIntensityUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhotonIntensityUnit[1];
     }
     attribute def photonIntensity : PhotonIntensityValue nonunique;
     attribute def PhotonIntensityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = durationPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = durationPF;
         }
     }
     attribute def PhotonRadianceValue :> ScalarQuantityValue {
@@ -2629,21 +2629,21 @@ standard library package ISQLight {
          * definition: density of photon intensity with respect to projected area in a specified direction at a specified point on a real or imaginary surface, expressed by `L_p = (dI_p)/(dA) 1/cos(α)`, where `I_p` is photon intensity (item 7-21), `A` is area (ISO 80000-3) and `α` the angle between the normal to the surface at the specified point and the specified direction
          * remarks: The corresponding radiometric quantity is "radiance" (item 7-6.1). The corresponding photometric quantity is "luminance" (item 7-15).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhotonRadianceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhotonRadianceUnit[1];
     }
     attribute def photonRadiance : PhotonRadianceValue nonunique;
     attribute def PhotonRadianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     attribute def PhotonIrradianceValue :> ScalarQuantityValue {
@@ -2659,21 +2659,21 @@ standard library package ISQLight {
          * definition: density of incident photon flux with respect to area at a point on a real or imaginary surface, expressed by `E_p = (dΦ_p)/(dA)`, where `Φ_p` is photon flux (item 7-20) and `A` is the area (ISO 80000-3) on which the photon flux is incident
          * remarks: The corresponding radiometric quantity is "irradiance" (item 7-7.1). The corresponding photometric quantity is "illuminance" (item 7-16).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhotonIrradianceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhotonIrradianceUnit[1];
     }
     attribute def photonIrradiance : PhotonIrradianceValue nonunique;
     attribute def PhotonIrradianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     attribute def PhotonExitanceValue :> ScalarQuantityValue {
@@ -2689,21 +2689,21 @@ standard library package ISQLight {
          * definition: density of exiting photon flux with respect to area at a point on a real or imaginary surface, expressed by `M_p = (dΦ_p)/(dA)`, where `Φ_p` is photon flux (item 7-20) and `A` is the area (ISO 80000-3) from which the photon flux leaves
          * remarks: The corresponding radiometric quantity is "radiant exitance" (item 7-8.1). The corresponding photometric quantity is "luminous exitance" (item 7-17).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhotonExitanceUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhotonExitanceUnit[1];
     }
     attribute def photonExitance : PhotonExitanceValue nonunique;
     attribute def PhotonExitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute durationPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.T;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.T;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, durationPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, durationPF);
         }
     }
     attribute def PhotonExposureValue :> ScalarQuantityValue {
@@ -2719,17 +2719,17 @@ standard library package ISQLight {
          * definition: density of incident photon number with respect to area at a point on a real or imaginary surface, expressed by `H_p = (dN_p)/(dA)`, where `N_p` is photon number (item 7-19.1) and `A` is the area (ISO 80000-3) on which the photons are incident
          * remarks: The corresponding radiometric quantity is "radiant exposure" (item 7-9.1). The corresponding photometric quantity is "luminous exposure" (item 7-18).
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : PhotonExposureUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : PhotonExposureUnit[1];
     }
     attribute def photonExposure : PhotonExposureValue nonunique;
     attribute def PhotonExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     attribute def TristimulusValuesForTheCie1931StandardColorimetricObserverValue :> ScalarQuantityValue {
@@ -2745,21 +2745,21 @@ standard library package ISQLight {
          * definition: amounts of the three reference colour stimuli in the CIE 1931 standard colorimetric system, required to match the colour of the stimulus considered
          * remarks: For a given colour stimulus described by the colour stimulus function `φ_λ(λ)` of a radiometric quantity, `X = k int_0^∞ φ_λ(λ) overline x(λ) dλ`, `Y = k int_0^∞ φ_λ(λ) overline y(λ) dλ`, `Z = k int_0^∞ φ_λ(λ) overline z(λ) dλ`, where `overline x(λ)`, `overline y(λ)`, `overline z(λ)` are the CIE colour-matching functions for the CIE 1931 standard colorimetric observer (2° observer) (item 7-27.1). For sources, `k` may be chosen as `k = K_m` where `K_m` is the maximum luminous efficacy (item 7-11.3) so that `Y = L_v` (item 7-15) and the unit of `X`, `Y`, `Z` is `[cd*m^-2]`. For object colours, `φ_λ(λ)` is given by one of the three products `φ_λ(λ) = S_λ(λ) * {(ρ(λ)), (τ(λ)), (β(λ)):}` where `S_λ(λ)` is the relative spectral distribution of a quantity characterizing the source illuminating the object, `ρ(λ)` is the spectral reflectance, `τ(λ)` is the spectral transmittance, `β(λ)` is the spectral radiance factor, and `k` is chosen to be `k = 100 // int_0^∞ S_λ(λ) overline y(λ) dλ`. Integral limits can be confined depending on the spectral sensitivity of the detectors used as a sensor. In this case, the unit of `X`, `Y`, `Z` is `[1]`.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : TristimulusValuesForTheCie1931StandardColorimetricObserverUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : TristimulusValuesForTheCie1931StandardColorimetricObserverUnit[1];
     }
     attribute def tristimulusValuesForTheCie1931StandardColorimetricObserver : TristimulusValuesForTheCie1931StandardColorimetricObserverValue nonunique;
     attribute def TristimulusValuesForTheCie1931StandardColorimetricObserverUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     attribute def TristimulusValuesForTheCie1964StandardColorimetricObserverValue :> ScalarQuantityValue {
@@ -2775,21 +2775,21 @@ standard library package ISQLight {
          * definition: amounts of the three reference colour stimuli in the CIE 1964 standard colorimetric system, required to match the colour of the stimulus considered
          * remarks: For a given colour stimulus described by the colour stimulus function `φ_λ(λ)` of a radiometric quantity, `X = k int_0^∞ φ_λ(λ) overline x(λ) dλ`, `Y = k int_0^∞ φ_λ(λ) overline y(λ) dλ`, `Z = k int_0^∞ φ_λ(λ) overline z(λ) dλ`, where `overline x(λ)`, `overline y(λ)`, `overline z(λ)` are the CIE colour-matching functions for the CIE 1931 standard colorimetric observer (2° observer) (item 7-27.1). For sources, `k` may be chosen as `k = K_m` where `K_m` is the maximum luminous efficacy (item 7-11.3) so that `Y = L_v` (item 7-15) and the unit of `X`, `Y`, `Z` is `["cd"*"m"^-2]`. For object colours, `φ_λ(λ)` is given by one of the three products `φ_λ(λ) = S_λ(λ) * {(ρ(λ)), (τ(λ)), (β(λ)):}` where `S_λ(λ)` is the relative spectral distribution of a quantity characterizing the source illuminating the object, `ρ(λ)` is the spectral reflectance, `τ(λ)` is the spectral transmittance, `β(λ)` is the spectral radiance factor, and `k` is chosen to be `k = 100 /( int_0^∞ S_λ(λ) overline y(λ) dλ)`. Integral limits can be confined depending on the spectral sensitivity of the detectors used as a sensor. In this case, the unit of `X`, `Y`, `Z` is `[1]`.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : TristimulusValuesForTheCie1964StandardColorimetricObserverUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : TristimulusValuesForTheCie1964StandardColorimetricObserverUnit[1];
     }
     attribute def tristimulusValuesForTheCie1964StandardColorimetricObserver : TristimulusValuesForTheCie1964StandardColorimetricObserverValue nonunique;
     attribute def TristimulusValuesForTheCie1964StandardColorimetricObserverUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -2;
         }
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.J;
-            attribute  :>> exponent = 1;
+            attribute :>> quantity = isq.J;
+            attribute :>> exponent = 1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, luminousIntensityPF);
         }
     }
     attribute def CieColourMatchingFunctionsForTheCie1931StandardColorimetricObserverValue :> DimensionOneValue {
@@ -3091,17 +3091,17 @@ standard library package ISQLight {
          * definition: relative decrease in radiant flux caused by absorption and scattering
          * remarks: This quantity is also defined spectrally in terms of wavelength, in which case, "spectral" is added before this quantity name. The spectral linear attenuation coefficient can be expressed by the relative decrease in the spectral radiant flux, `Φ_(e,λ)(λ)`, with respect to propagation length, `l`, of a collimated beam at a point in an absorbing and scattering medium `μ(λ) = 1/(Φ_(e,λ)(λ)) (d Φ_(e,λ)(λ))/(dl)`. Similarly, luminous and photon quantities can be defined.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LinearAttenuationCoefficientUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LinearAttenuationCoefficientUnit[1];
     }
     attribute def linearAttenuationCoefficient : LinearAttenuationCoefficientValue nonunique;
     attribute def LinearAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     alias LinearExtinctionCoefficientUnit for LinearAttenuationCoefficientUnit;
@@ -3120,17 +3120,17 @@ standard library package ISQLight {
          * definition: relative decrease in radiant flux (item 7-4.1) caused by absorption
          * remarks: This quantity is also defined spectrally in terms of wavelength, in which case, "spectral" is added before this quantity name. The spectral linear absorption coefficient can be expressed by the relative decrease in the spectral radiant flux, `Φ_(e,λ)(λ)`, with respect to propagation length, `l`, of a collimated beam at a point in an absorbing medium `α_l(λ) = 1/(Φ_(e,λ)(λ)) (d Φ_(e,λ)(λ))/(dl)`. It can also be expressed as a function of transmittance (item 7-31.5). `α_l = -ln(τ)/l = A_n/l`. The linear absorption coefficient is that part of the linear attenuation coefficient (item 7-35.1) that is due to absorption. Scattering might also contribute. Similarly, luminous and photon quantities can be defined.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : LinearAbsorptionCoefficientUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : LinearAbsorptionCoefficientUnit[1];
     }
     attribute def linearAbsorptionCoefficient : LinearAbsorptionCoefficientValue nonunique;
     attribute def LinearAbsorptionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = lengthPF;
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = lengthPF;
         }
     }
     attribute def MassAttenuationCoefficientValue :> ScalarQuantityValue {
@@ -3146,21 +3146,21 @@ standard library package ISQLight {
          * definition: quotient of the linear attenuation coefficient (item 7-35.1), `μ`, and the mass density (ISO 80000-4), `ρ`, of the medium
          * remarks: This quantity is also defined spectrally in terms of wavelength, in which case, "spectral" is added before this quantity name, which can be expressed by `μ_m(λ) = (μ(λ))/ρ_m`. Similarly, luminous and photon quantities can be defined.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MassAttenuationCoefficientUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MassAttenuationCoefficientUnit[1];
     }
     attribute def massAttenuationCoefficient : MassAttenuationCoefficientValue nonunique;
     attribute def MassAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF);
         }
     }
     attribute def MassAbsorptionCoefficientValue :> ScalarQuantityValue {
@@ -3176,21 +3176,21 @@ standard library package ISQLight {
          * definition: quotient of the linear absorption coefficient (item 7-35.2), `α`, and the mass density (ISO 80000-4), `ρ`, of the medium
          * remarks: This quantity is also defined spectrally in terms of wavelength, in which case, "spectral" is added before this quantity name, which can be expressed by `α_m(λ) = (α(λ))/ρ_m`. Similarly, luminous and photon quantities can be defined.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MassAbsorptionCoefficientUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MassAbsorptionCoefficientUnit[1];
     }
     attribute def massAbsorptionCoefficient : MassAbsorptionCoefficientValue nonunique;
     attribute def MassAbsorptionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute massPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.M;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.M;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, massPF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, massPF);
         }
     }
     attribute def MolarAbsorptionCoefficientValue :> ScalarQuantityValue {
@@ -3206,21 +3206,21 @@ standard library package ISQLight {
          * definition: product of linear absorption coefficient and molar volume, expressed by `χ = α V_m`, where `α` is linear absorption coefficient (item 7-35.2) and `V_m` is molar volume (ISO 80000-9)
          * remarks: The molar absorption coefficient can also be expressed by `χ = α c` where `c` is amount-of-substance concentration (ISO 80000-9). Similarly, luminous and photon quantities can be defined.
          */
-        attribute  :>> num : Real;
-        attribute  :>> mRef : MolarAbsorptionCoefficientUnit[1];
+        attribute :>> num : Real;
+        attribute :>> mRef : MolarAbsorptionCoefficientUnit[1];
     }
     attribute def molarAbsorptionCoefficient : MolarAbsorptionCoefficientValue nonunique;
     attribute def MolarAbsorptionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.L;
-            attribute  :>> exponent = 2;
+            attribute :>> quantity = isq.L;
+            attribute :>> exponent = 2;
         }
         private attribute amountOfSubstancePF : QuantityPowerFactor[1] {
-            attribute  :>> quantity = isq.N;
-            attribute  :>> exponent = -1;
+            attribute :>> quantity = isq.N;
+            attribute :>> exponent = -1;
         }
-        attribute  :>> quantityDimension {
-            attribute  :>> quantityPowerFactors = (lengthPF, amountOfSubstancePF);
+        attribute :>> quantityDimension {
+            attribute :>> quantityPowerFactors = (lengthPF, amountOfSubstancePF);
         }
     }
 }

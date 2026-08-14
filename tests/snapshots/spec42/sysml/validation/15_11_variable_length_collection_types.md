@@ -58,25 +58,25 @@ package '15_11-Variable Length Collection Types' {
     part def SparePart;
     part def Person;
     attribute def 'Bag<SparePart>' :> Bag {
-        ref part '' : SparePart :>> elements;
+        ref part : SparePart :>> elements;
     }
     attribute def 'List<Integer>' :> List {
-        attribute  :>> elements : Integer;
+        attribute :>> elements : Integer;
     }
     attribute def 'Set<String>' :> Set {
-        attribute  :>> elements : String;
+        attribute :>> elements : String;
     }
     attribute def 'OrderedSet<Person>' :> OrderedSet {
-        ref part '' : Person :>> elements;
+        ref part : Person :>> elements;
     }
     attribute def 'List<Set<Person>>' :> List {
-        attribute  :>> elements : Set {
-            ref part '' : Person :>> elements;
+        attribute :>> elements : Set {
+            ref part : Person :>> elements;
         }
     }
     attribute def 'Array<Real>[4]' :> Array {
-        attribute  :>> elements : Real;
-        attribute  :>> dimensions = 4;
+        attribute :>> elements : Real;
+        attribute :>> dimensions = 4;
     }
 }
 ~~~
