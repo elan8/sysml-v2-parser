@@ -801,6 +801,8 @@ fn kerml_end_member_inner(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    // `const end [1] feature a;` (KerML `associations` fixture; spec42 Gap 36).
+    let (input, is_const) = opt(preceded(tag(&b"const"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"end"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     // The end name is optional: `end [1] feature transferSource references source;`
@@ -836,6 +838,7 @@ fn kerml_end_member_inner(
             start,
             input,
             crate::ast::KermlEndMember {
+                is_const: is_const.is_some(),
                 name: name_str,
                 multiplicity,
                 subsets,
@@ -961,12 +964,15 @@ fn kerml_feature_member_inner(
     )))
     .parse(input)?;
     let (input, is_var) = opt(preceded(tag(&b"var"[..]), ws1)).parse(input)?;
+    // `const end feature b;` (KerML `associations` fixture; spec42 Gap 36).
+    let (input, is_const) = opt(preceded(tag(&b"const"[..]), ws1)).parse(input)?;
     let (input, is_end) = opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
     let had_prefix = is_member.is_some()
         || is_derived.is_some()
         || is_abstract.is_some()
         || composite_or_portion.is_some()
         || is_var.is_some()
+        || is_const.is_some()
         || is_end.is_some();
     // The kind keyword is optional when a prefix already marks this as a feature member:
     // `portion redefines portionOfLife = (that as Occurrence).portionOfLife;`
@@ -1104,6 +1110,7 @@ fn kerml_feature_member_inner(
                 is_composite: composite_or_portion == Some(true),
                 is_portion: composite_or_portion == Some(false),
                 is_var: is_var.is_some(),
+                is_const: is_const.is_some(),
                 is_end: is_end.is_some(),
                 kind,
                 has_kind_keyword,
@@ -1247,14 +1254,20 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             b"bool",
             b"expr",
         ],
-    ) || (starts_with_any_keyword(after_visibility, &[b"abstract", b"end"])
+    ) || (starts_with_any_keyword(after_visibility, &[b"abstract", b"end", b"const"])
         && kerml_feature_member(input).is_ok())
     {
         map(kerml_feature_member, |n| {
             CalcDefBodyElement::KermlFeature(Box::new(n))
         })
         .parse(input)?
-    } else if starts_with_keyword(after_visibility, b"end") {
+    } else if starts_with_keyword(after_visibility, b"end")
+        // `const end [1] feature a;` / `const end feature b;` (KerML `associations` fixture;
+        // spec42 Gap 36): `const` prefixes the end/feature member, so it must not fall through
+        // to the bare-expression fallback as a dangling `const` feature reference.
+        || (starts_with_keyword(after_visibility, b"const")
+            && kerml_end_member(input).is_ok())
+    {
         map(kerml_end_member, |n| {
             CalcDefBodyElement::EndMember(Box::new(n))
         })
@@ -1592,6 +1605,36 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod const_prefix_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 36: `const end [1] feature a;` attaches `const` to the end member instead of
+    /// misparsing it as a dangling feature reference (KerML `associations` fixture).
+    #[test]
+    fn const_prefix_is_retained_on_end_members() {
+        let (rest, node) =
+            kerml_end_member(input("const end [1] feature a;")).expect("const end member");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_const);
+        assert_eq!(node.value.feature.value.name, "a");
+    }
+
+    #[test]
+    fn const_prefix_is_retained_on_feature_members() {
+        let (rest, node) =
+            kerml_feature_member(input("const end feature b;")).expect("const end feature");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_const);
+        assert!(node.value.is_end);
+        assert_eq!(node.value.name, "b");
+    }
 }
 
 #[cfg(test)]

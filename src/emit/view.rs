@@ -261,6 +261,9 @@ pub(crate) fn emit_kerml_feature_member(
     if feature.is_var {
         head.push("var");
     }
+    if feature.is_const {
+        head.push("const");
+    }
     if feature.is_end {
         head.push("end");
     }
@@ -448,6 +451,9 @@ pub(crate) fn emit_kerml_end_member(
     end: &crate::ast::KermlEndMember,
 ) -> Result<(), EmitError> {
     emit_visibility(w, end.membership.visibility);
+    if end.is_const {
+        w.push_str("const ");
+    }
     w.push_str("end ");
     if !end.name.is_empty() {
         w.push_str(&format_name(&end.name));

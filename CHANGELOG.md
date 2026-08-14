@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 127.** `KermlFeatureMember` and `KermlEndMember` gain an
+  `is_const` prefix flag: `const end [1] feature a;` / `const end feature b;` (KerML
+  association bodies) now attach the `const` keyword to the end/feature member instead of
+  misparsing `const` as a dangling bare feature reference followed by an unrelated end member
+  (spec42 gap 36).
 - **`PARSE_AST_VERSION` is now 126.** `UseCaseDefBodyElement` gains a
   `Ref(Box<Node<RefDecl>>)` variant and `RefDeclKind` gains `UseCase`, so full `ref use case
   <name> : <Type> :>> <target>;` declarations inside use-case bodies (pervasive in Systems

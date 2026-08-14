@@ -290,6 +290,8 @@ pub struct KermlFeatureMember {
     pub is_portion: bool,
     /// `var` prefix.
     pub is_var: bool,
+    /// `const` prefix (`const end feature b;`, KerML `associations` fixture; spec42 Gap 36).
+    pub is_const: bool,
     /// `end` prefix.
     pub is_end: bool,
     /// The feature-kind keyword: `feature`, `step`, `expr`, or `bool`. `has_kind_keyword` is
@@ -461,6 +463,9 @@ pub struct KermlSuccessionMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlEndMember {
+    /// `const` prefix (`const end [1] feature a;`, KerML `associations` fixture; spec42
+    /// Gap 36).
+    pub is_const: bool,
     /// End name; empty when the end is anonymous (`end guardedLink [0..1] feature ...` has a
     /// name; none of the library ends are anonymous, but the grammar permits it).
     pub name: String,
