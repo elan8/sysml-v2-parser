@@ -25,6 +25,26 @@ impl Span {
         }
     }
 
+    /// The smallest span containing both `self` and `other`, including any source between them.
+    ///
+    /// Used where one AST fact is written as several separate source fragments -- a
+    /// subsetting-family clause repeated in one usage header, for instance -- so the merged fact
+    /// still points at every byte the author wrote for it rather than at the first fragment only.
+    pub fn covering(&self, other: &Self) -> Self {
+        let (first, second) = if self.offset <= other.offset {
+            (self, other)
+        } else {
+            (other, self)
+        };
+        let end = second.offset.saturating_add(second.len);
+        Self {
+            offset: first.offset,
+            line: first.line,
+            column: first.column,
+            len: end.saturating_sub(first.offset),
+        }
+    }
+
     /// Legacy single-line projection. Prefer [`crate::ast::ParsedDocument::range`], which uses the
     /// canonical document-owned source index and handles multiline spans.
     #[deprecated(note = "use ParsedDocument::range so multiline ranges use canonical source data")]
