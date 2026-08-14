@@ -69,7 +69,6 @@ package JohnIndividualExample {
 (fixture-diagnostics
   (document "john_individual_example.md"
     (diagnostics
-      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 1060) (line 45) (column 7) (len 37)) (message "unexpected keyword `assert` in ref usage body"))
       (diagnostic (code "recovered_occurrence_body_element") (severity error) (category parseerror) (span (offset 1170) (line 50) (column 6) (len 258)) (message "unexpected token in occurrence body"))
     )
   )
@@ -114,7 +113,9 @@ package JohnIndividualExample {
 		 * always has a president who must be at least 35 years old.
 		 */
         ref presidentOfUS[1] :>> presidentOfCountry {
-            assert constraint { age >= 35 }
+            assert constraint {
+                age >= 35;
+            }
         }
     }
     individual UnitedStatesWithJohnAsPresident : UnitedStates {

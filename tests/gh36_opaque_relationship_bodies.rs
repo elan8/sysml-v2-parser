@@ -8,8 +8,8 @@
 
 use sysml_v2_parser::ast::{
     AliasBody, AnnotatingMember, ConnectBody, ConnectionDefBody, ConnectionDefBodyElement,
-    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RefBody, RefBodyElement,
-    RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
+    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBodyElement,
+    RefBody, RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
@@ -162,7 +162,7 @@ fn connection_ref_body_retains_doc_comment() {
     assert!(
         elements.iter().any(|e| matches!(
             &e.value,
-            RefBodyElement::Annotating(AnnotatingMember::Doc(_))
+            PartUsageBodyElement::Annotating(AnnotatingMember::Doc(_))
         )),
         "expected doc comment retained in connection ref body, got: {elements:?}"
     );
@@ -195,7 +195,7 @@ fn part_usage_ref_body_retains_real_member() {
     assert!(
         elements
             .iter()
-            .any(|e| matches!(&e.value, RefBodyElement::PartUsage(_))),
+            .any(|e| matches!(&e.value, PartUsageBodyElement::AttributeUsage(_))),
         "expected real part-usage member (attribute) retained in part-usage ref body, got: {elements:?}"
     );
 }
@@ -255,14 +255,13 @@ fn state_ref_body_retains_real_member() {
     assert!(
         elements
             .iter()
-            .any(|e| matches!(&e.value, RefBodyElement::State(_))),
+            .any(|e| matches!(&e.value, PartUsageBodyElement::AttributeUsage(_))),
         "expected real state member (attribute) retained in state ref body, got: {elements:?}"
     );
 }
 
-/// Confirms the already-real action-context `ref` body (unrelated to this fix, but sharing the
-/// same `RefBody`/`RefBodyElement` type after the redesign) still works: a `ref` nested in an
-/// action body keeps full nested action members, wrapped in `RefBodyElement::Action`.
+/// A `ref` nested in an action body keeps its members. Since `UsageBody = DefinitionBody`, those
+/// are the same usage members every other `ref` body holds, parsed by the same parser.
 #[test]
 fn action_ref_body_still_retains_action_members() {
     let input = "package P {\naction def Act {\nref x {\naction y;\n}\n}\n}";

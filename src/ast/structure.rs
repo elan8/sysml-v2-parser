@@ -1,6 +1,6 @@
 use super::behavior::{
-    ActionDef, ActionDefBodyElement, ActionUsage, ActionUsageBodyElement, Allocate, InOut,
-    InOutDecl, StateDefBody, StateDefBodyElement, StateUsage,
+    ActionDef, ActionUsage, ActionUsageBodyElement, Allocate, InOut, InOutDecl, StateDefBody,
+    StateUsage,
 };
 use super::body::Body;
 use super::common::{
@@ -1339,40 +1339,13 @@ impl RefDeclKind {
 }
 
 /// Body of a ref declaration: `;` or `{` members `}`.
-pub type RefBody = Body<RefBodyElement>;
-
-/// Element of a ref declaration's braced body (`RefBody::Brace`), wrapping whichever member
-/// shape is real for the owning context. BNF `ReferenceUsage` resolves `ref`'s body to a generic
-/// `Usage` body, so its real content follows whatever the owning context allows: full nested
-/// action members inside an action body, part-usage members inside a part usage body, state
-/// members inside a state body. Connection/interface `ref` bodies don't yet have a dedicated
-/// member grammar, so they get the same doc/comment/metadata + recovery baseline as
-/// [`RelationshipBodyElement`].
+/// A `ref` usage body.
 ///
-/// `PartUsageBodyElement`/`ActionDefBodyElement` are inherently larger than the annotation-only
-/// variants (same size-difference tradeoff already accepted for `AttributeUsage` in several
-/// other body-element enums crate-wide); not boxing keeps this variant shape consistent with
-/// those siblings rather than partially addressing the size difference.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RefBodyElement {
-    /// A nested keyword-less `ref` declaration, e.g. the `protected ref thisParticipant :>>
-    /// self;` members inside `ref port :>> participant : Port [2..*] nonunique ordered { ... }`
-    /// (Systems Library `Interfaces.sysml`).
-    Ref(Box<Node<RefDecl>>),
-    /// A nested `attribute` usage, e.g. `attribute :>> Disc::edges::innerSpaceDimension, ...;`
-    /// (Domain Libraries `ShapeItems.sysml`).
-    AttributeUsage(Box<Node<AttributeUsage>>),
-    Action(Node<ActionDefBodyElement>),
-    PartUsage(Node<PartUsageBodyElement>),
-    State(Node<StateDefBodyElement>),
-    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
-    Annotating(AnnotatingMember),
-    Error(Node<ParseErrorNode>),
-    /// Unmodeled body content captured as raw text (used for library parsing).
-    Other(String),
-}
+/// `UsageBody = DefinitionBody` (SysML 8.2.2.6.2), so a `ref` body holds the same members as any
+/// other usage body no matter which declaration owns the `ref`. It previously had its own element
+/// enum whose contents depended on which of five parsers ran -- an encoding of parser provenance
+/// rather than of grammar.
+pub type RefBody = Body<PartUsageBodyElement>;
 
 /// Shared annotation-only body element for KerML `RelationshipBody` contexts -- BNF
 /// `RelationshipBody : Relationship = ';' | '{' (ownedRelationship += OwnedAnnotation)* '}'`,

@@ -40,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `ref` body no longer depends on which declaration owns it.** `UsageBody = DefinitionBody`
+  (SysML 8.2.2.6.2), so a `ref` body holds the general usage-member set wherever it appears -- but
+  five parsers built one, each accepting its own member grammar and wrapping the result in a
+  per-owner variant, so `RefBodyElement` recorded which parser had run rather than what the grammar
+  allows. There is now one parser. A connection-owned `ref` body gains the usage members it was
+  rejecting (`assert constraint { ... }` in `john_individual_example` parses instead of reporting
+  `unexpected keyword 'assert' in ref usage body`), and part-, action-, and state-owned `ref`
+  bodies can be emitted at all -- their members previously failed emission as unsupported
+  constructs. Recovery diagnostics still name the `ref` body scope.
 - **Comment and textual-representation members now parse in usage bodies.** The general
   usage-member scope accepted only two of the four annotating alternatives, so `comment /* ... */`
   and `rep x language "..." /* ... */` were rejected inside a `part p { ... }` body even though the
@@ -72,7 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`PARSE_AST_VERSION` is now 138.** `CommentAnnotation` gains `keyword_span`, and
+- **`PARSE_AST_VERSION` is now 139.** `RefBodyElement` is removed: `RefBody` is now
+  `Body<PartUsageBodyElement>`, the usage-member set the grammar gives it. `CommentAnnotation`
+  gains `keyword_span`, and
   `PartUsageBodyElement` replaces its `Doc` and `MetadataAnnotation` variants with `Annotating`.
   Relationship and `ref` body elements replace their `Doc`,
   `Comment`, `TextualRep`, and `MetadataAnnotation` variants with a single `Annotating` variant

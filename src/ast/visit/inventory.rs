@@ -502,11 +502,6 @@ macro_rules! ast_traversal {
                 walk_ref_body(self, node)
             }
 
-            /// Visits [`RefBodyElement`]; the default implementation walks its children.
-            fn visit_ref_body_element(&mut self, node: &$($mutability)? Node<RefBodyElement>) {
-                walk_ref_body_element(self, node)
-            }
-
             /// Visits [`RelationshipBodyElement`]; the default implementation walks its children.
             fn visit_relationship_body_element(&mut self, node: &$($mutability)? Node<RelationshipBodyElement>) {
                 walk_relationship_body_element(self, node)
@@ -3535,38 +3530,8 @@ macro_rules! ast_traversal {
                 RefBody::Semicolon => {}
                 RefBody::Brace { elements } => {
                     for inner in elements {
-                        visitor.visit_ref_body_element(inner);
+                        visitor.visit_part_usage_body_element(inner);
                     }
-                }
-            }
-        }
-
-        pub fn walk_ref_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RefBodyElement>) {
-            visitor.visit_span(&$($mutability)? node.span);
-            match &$($mutability)? node.value {
-                RefBodyElement::Ref(field_0) => {
-                    visitor.visit_ref_decl(&$($mutability)? **field_0);
-                }
-                RefBodyElement::AttributeUsage(field_0) => {
-                    visitor.visit_attribute_usage(&$($mutability)? **field_0);
-                }
-                RefBodyElement::Action(field_0) => {
-                    visitor.visit_action_def_body_element(field_0);
-                }
-                RefBodyElement::PartUsage(field_0) => {
-                    visitor.visit_part_usage_body_element(field_0);
-                }
-                RefBodyElement::State(field_0) => {
-                    visitor.visit_state_def_body_element(field_0);
-                }
-                RefBodyElement::Annotating(field_0) => {
-                    visitor.visit_annotating_member(field_0);
-                }
-                RefBodyElement::Error(field_0) => {
-                    visitor.visit_parse_error_node(field_0);
-                }
-                RefBodyElement::Other(field_0) => {
-                    visitor.visit_text(field_0);
                 }
             }
         }

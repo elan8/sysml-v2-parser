@@ -346,6 +346,46 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
     Ok((input, PartUsageBody::Brace { elements }))
 }
 
+/// The one `ref` usage body parser.
+///
+/// `ReferenceUsage` completes with a `UsageBody`, and `UsageBody = DefinitionBody`
+/// (SysML 8.2.2.6.2, 8.2.2.5.2), so a `ref` body holds the general usage-member set regardless of
+/// which declaration owns the `ref`. Connection, interface, part, action, and state owners all
+/// call this rather than parsing the same body through their own member grammar and recording
+/// which parser ran in the AST.
+pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, RefBody::Semicolon));
+    }
+    // Same member grammar as any other usage body, reported under this scope's own name so a
+    // diagnostic still tells the author which body they were writing.
+    let (input, elements) = parse_structured_brace_members_with_skip(
+        input,
+        PART_BODY_STARTERS,
+        "ref usage body",
+        "recovered_ref_body_element",
+        part_usage_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                PART_BODY_STARTERS,
+                "ref usage body",
+                "recovered_ref_body_element",
+            );
+            node_from_to(
+                start,
+                end,
+                PartUsageBodyElement::Error(node_from_to(start, end, recovery)),
+            )
+        },
+        BraceMemberSkip::BodyElementRecover,
+    )?;
+    Ok((input, RefBody::Brace { elements }))
+}
+
 fn consume_part_usage_structured_brace(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Vec<Node<PartUsageBodyElement>>> {
@@ -828,7 +868,7 @@ fn interface_usage_ref_redef(
     let (input, target) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
     let (input, value) = preceded(ws_and_comments, expression).parse(input)?;
-    let (input, body) = ref_body_parse(input)?;
+    let (input, body) = ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -841,25 +881,6 @@ fn interface_usage_ref_redef(
             },
         ),
     ))
-}
-
-fn ref_body_parse(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| RefBody::Semicolon),
-        map(consume_part_usage_structured_brace, |elements| {
-            RefBody::Brace {
-                elements: elements
-                    .into_iter()
-                    .map(|e| {
-                        let span = e.span.clone();
-                        Node::new(span, RefBodyElement::PartUsage(e))
-                    })
-                    .collect(),
-            }
-        }),
-    ))
-    .parse(input)
 }
 
 /// Connect body for interface usage (TypedConnect): `;` or `{` body_elements* `}`
@@ -1108,24 +1129,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     ))
     .parse(input)?;
     let value = value.map(crate::parser::feature_value::wrap_bind_expression);
-    let (input, body) = preceded(
-        ws_and_comments,
-        alt((
-            map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(consume_part_usage_structured_brace, |elements| {
-                RefBody::Brace {
-                    elements: elements
-                        .into_iter()
-                        .map(|e| {
-                            let span = e.span.clone();
-                            Node::new(span, RefBodyElement::PartUsage(e))
-                        })
-                        .collect(),
-                }
-            }),
-        )),
-    )
-    .parse(input)?;
+    let (input, body) = ref_body(input)?;
     Ok((
         input,
         node_from_to(

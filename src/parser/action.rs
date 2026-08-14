@@ -177,39 +177,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
         input = next;
     }
 
-    let (input, _) = ws_and_comments(input)?;
-    let (input, body) = if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        (input, crate::ast::RefBody::Semicolon)
-    } else {
-        let (input, elements) = parse_structured_brace_members(
-            input,
-            ACTION_BODY_STARTERS,
-            "action ref body",
-            "recovered_action_ref_body_element",
-            action_def_body_element,
-            |start, end| {
-                let recovery = build_recovery_error_node_from_span(
-                    start,
-                    end,
-                    ACTION_BODY_STARTERS,
-                    "action ref body",
-                    "recovered_action_ref_body_element",
-                );
-                let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-                node_from_to(start, end, ActionDefBodyElement::Error(node))
-            },
-        )?;
-        (
-            input,
-            crate::ast::RefBody::Brace {
-                elements: elements
-                    .into_iter()
-                    .map(|e| Node::new(e.span.clone(), crate::ast::RefBodyElement::Action(e)))
-                    .collect(),
-            },
-        )
-    };
+    let (input, body) = crate::parser::part::ref_body(input)?;
 
     Ok((
         input,

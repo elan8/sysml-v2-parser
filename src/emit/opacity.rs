@@ -9,11 +9,11 @@ use crate::ast::{
     OccurrenceBodyElement, OccurrenceUsageBody, Package, PackageBody, PackageBodyElement,
     PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement, PerformBody,
     PerformBodyElement, PortBody, PortBodyElement, PortDefBody, PortDefBodyElement, RefBody,
-    RefBodyElement, RelationshipBodyElement, RenderingDefBody, RenderingDefBodyElement,
-    RenderingUsageBody, RenderingUsageBodyElement, RequirementDefBody, RequirementDefBodyElement,
-    ReturnRefBody, ReturnRefBodyElement, RootElement, RootNamespace, StateDefBody,
-    StateDefBodyElement, ThenTarget, UseCaseDefBody, UseCaseDefBodyElement, VariantTypedUsage,
-    VariantUsage, ViewBody, ViewBodyElement, ViewDefBody, ViewDefBodyElement,
+    RelationshipBodyElement, RenderingDefBody, RenderingDefBodyElement, RenderingUsageBody,
+    RenderingUsageBodyElement, RequirementDefBody, RequirementDefBodyElement, ReturnRefBody,
+    ReturnRefBodyElement, RootElement, RootNamespace, StateDefBody, StateDefBodyElement,
+    ThenTarget, UseCaseDefBody, UseCaseDefBodyElement, VariantTypedUsage, VariantUsage, ViewBody,
+    ViewBodyElement, ViewDefBody, ViewDefBodyElement,
 };
 
 /// Kind of opaque or recovery content found in an AST.
@@ -1260,25 +1260,7 @@ fn walk_ref_body(report: &mut OpacityReport, path: &str, body: &RefBody) {
     let RefBody::Brace { elements } = body else {
         return;
     };
-    for (i, element) in elements.iter().enumerate() {
-        let p = format!("{path}/body[{i}]");
-        match &element.value {
-            RefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            RefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
-            RefBodyElement::Ref(n) => walk_ref_body(report, &p, &n.value.body),
-            RefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
-            RefBodyElement::Action(action) => {
-                walk_action_def_body_elements(report, &p, std::slice::from_ref(action))
-            }
-            RefBodyElement::PartUsage(part) => {
-                walk_part_usage_body_elements(report, &p, std::slice::from_ref(part))
-            }
-            RefBodyElement::State(state) => {
-                walk_state_def_body_elements(report, &p, std::slice::from_ref(state))
-            }
-            RefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
-        }
-    }
+    walk_part_usage_body_elements(report, path, elements);
 }
 
 /// Only a metadata annotation owns a body that can hide opaque members; documentation, comments,

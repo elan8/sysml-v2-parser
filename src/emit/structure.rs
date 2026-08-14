@@ -1202,7 +1202,7 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
                 w.newline();
                 w.indent();
                 for (i, el) in elements.iter().enumerate() {
-                    emit_ref_body_element(w, &format!("{path}/ref-body[{i}]"), &el.value)?;
+                    emit_part_usage_body_element(w, &format!("{path}/ref-body[{i}]"), &el.value)?;
                     w.newline();
                 }
                 w.dedent();
@@ -1210,30 +1210,6 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
                 Ok(())
             }
         }
-    }
-}
-
-fn emit_ref_body_element(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    el: &crate::ast::RefBodyElement,
-) -> Result<(), EmitError> {
-    use crate::ast::RefBodyElement;
-    match el {
-        RefBodyElement::Annotating(member) => super::root::emit_annotating_member(w, path, member),
-        RefBodyElement::Ref(n) => emit_ref_decl(w, path, &n.value),
-        RefBodyElement::AttributeUsage(n) => emit_attribute_usage(w, path, &n.value),
-        RefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
-        other @ (RefBodyElement::Action(_)
-        | RefBodyElement::PartUsage(_)
-        | RefBodyElement::State(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
     }
 }
 

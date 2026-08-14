@@ -52,11 +52,11 @@ pub use ast::{
     PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, QualifiedDeclarationName,
     QualifiedIdentification, QualifiedReferenceArena, QualifiedReferenceId,
     QualifiedReferenceMetadata, QualifiedReferenceValidationError, QualifiedReferenceView, RefBody,
-    RefBodyElement, RefDecl, ReferenceSegment, ReferenceSeparator, RelationshipBodyElement,
-    RequireConstraint, RequirementDef, RequirementDefBody, RequirementDefBodyElement,
-    RequirementUsage, ReturnRef, ReturnRefBody, ReturnRefBodyElement, RootElement, RootNamespace,
-    SegmentRange, SourceStorage, Span, TextualRepresentation, ThenAction, ThenTarget,
-    TypeCheckKind, VerificationCaseDef, VerificationCaseUsage, Visibility,
+    RefDecl, ReferenceSegment, ReferenceSeparator, RelationshipBodyElement, RequireConstraint,
+    RequirementDef, RequirementDefBody, RequirementDefBodyElement, RequirementUsage, ReturnRef,
+    ReturnRefBody, ReturnRefBodyElement, RootElement, RootNamespace, SegmentRange, SourceStorage,
+    Span, TextualRepresentation, ThenAction, ThenTarget, TypeCheckKind, VerificationCaseDef,
+    VerificationCaseUsage, Visibility,
 };
 pub use emit::{
     emit_recovered_sysml, emit_sysml, emit_sysml_with_options, opacity_report, EmitError,
@@ -66,7 +66,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 138;
+pub const PARSE_AST_VERSION: u32 = 139;
 
 /// The pinned grammar release understood by this build of the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

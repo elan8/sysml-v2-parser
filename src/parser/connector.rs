@@ -27,7 +27,7 @@
 
 use crate::ast::{
     ConnectBody, ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndIdentity,
-    EndNestedUsage, Node, RefBody, RefBodyElement, RefDecl,
+    EndNestedUsage, Node, RefDecl,
 };
 use crate::parser::body::{advance_to_closing_brace, relationship_body_annotations};
 use crate::parser::expr::path_expression;
@@ -277,84 +277,6 @@ pub(crate) fn end_decl(
     ))
 }
 
-/// Starters for a connection/interface `ref` declaration body: the annotation members shared
-/// with `RelationshipBody` contexts plus nested (optionally visibility-prefixed) `ref`
-/// declarations (Systems Library `Interfaces.sysml`).
-const REF_USAGE_BODY_STARTERS: &[&[u8]] = &[
-    b"doc",
-    b"comment",
-    b"rep",
-    b"@",
-    b"ref",
-    b"attribute",
-    b"private",
-    b"protected",
-    b"public",
-];
-
-/// Ref body for a connection/interface `ref` declaration: `;` or `{` (doc/comment/rep/metadata
-/// | nested `ref` declaration)* `}`. A `ref` usage body is a full `UsageBody` per the BNF; the
-/// members with real library evidence are annotations and nested visibility-prefixed `ref`
-/// declarations (`protected ref thisParticipant :>> self;`, Systems Library `Interfaces.sysml`),
-/// with recovery-to-`Error` for anything else.
-pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, RefBody::Semicolon));
-    }
-    let (input, elements) = crate::parser::body::parse_structured_brace_members(
-        input,
-        REF_USAGE_BODY_STARTERS,
-        "ref usage body",
-        "recovered_ref_body_element",
-        ref_body_element,
-        |start, end| {
-            let recovery = crate::parser::build_recovery_error_node_from_span(
-                start,
-                end,
-                REF_USAGE_BODY_STARTERS,
-                "ref usage body",
-                "recovered_ref_body_element",
-            );
-            let node: Node<crate::ast::ParseErrorNode> = node_from_to(start, end, recovery);
-            node_from_to(start, end, RefBodyElement::Error(node))
-        },
-    )?;
-    Ok((input, RefBody::Brace { elements }))
-}
-
-fn ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<RefBodyElement>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    if let Ok((input, nested)) = ref_decl(input) {
-        return Ok((
-            input,
-            node_from_to(start, input, RefBodyElement::Ref(Box::new(nested))),
-        ));
-    }
-    // `attribute :>> Disc::edges::innerSpaceDimension, ...;` (Domain Libraries
-    // `ShapeItems.sysml`).
-    if starts_with_keyword(input.fragment(), b"attribute") {
-        let (input, usage) = crate::parser::attribute::attribute_usage(input)?;
-        return Ok((
-            input,
-            node_from_to(
-                start,
-                input,
-                RefBodyElement::AttributeUsage(Box::new(usage)),
-            ),
-        ));
-    }
-    // Ref bodies and relationship bodies accept the same annotating production, so they share its
-    // parser instead of translating one scope's members into the other's.
-    let (input, member) = crate::parser::body::annotating_member(input)?;
-    Ok((
-        input,
-        node_from_to(start, input, RefBodyElement::Annotating(member)),
-    ))
-}
-
 /// Ref declaration: `ref` (`part`|`port`|`item`)? name? multiplicity? (`:>>` redefines)? (`:`
 /// type)? (`nonunique`|`ordered`)* body.
 ///
@@ -456,7 +378,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // Optional value/default clause, e.g. `ref item :>> localClock : Clock[1] default
     // Time::universalClock { ... }` (Domain Libraries `SpatialItems.sysml`).
     let (input, value) = opt(preceded(ws_and_comments, feature_value_part)).parse(input)?;
-    let (input, body) = ref_body(input)?;
+    let (input, body) = crate::parser::part::ref_body(input)?;
     Ok((
         input,
         node_from_to(

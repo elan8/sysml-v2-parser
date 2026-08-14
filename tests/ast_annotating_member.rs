@@ -6,7 +6,7 @@
 //! accepts the family, and they no longer depend on which emitter path a document happens to take.
 
 use sysml_v2_parser::ast::{
-    AnnotatingMember, ConnectionDefBodyElement, PackageBodyElement, RefBody, RefBodyElement,
+    AnnotatingMember, ConnectionDefBodyElement, PackageBodyElement, PartUsageBodyElement, RefBody,
     RelationshipBodyElement, RootElement,
 };
 use sysml_v2_parser::{emit_sysml, parse};
@@ -100,7 +100,7 @@ fn a_ref_body_owns_the_same_production() {
     };
     assert!(matches!(
         &elements[0].value,
-        RefBodyElement::Annotating(AnnotatingMember::Doc(_))
+        PartUsageBodyElement::Annotating(AnnotatingMember::Doc(_))
     ));
 }
 
