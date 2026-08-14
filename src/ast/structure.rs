@@ -897,6 +897,8 @@ impl PartialEq for AttributeUsage {
             && self.is_derived == other.is_derived
             && self.is_constant == other.is_constant
             && self.is_end == other.is_end
+            && self.is_reference == other.is_reference
+            && self.usage_prefix == other.usage_prefix
             && self.membership == other.membership
     }
 }
@@ -1302,6 +1304,7 @@ pub struct RefDecl {
 impl PartialEq for RefDecl {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
+            && self.direction == other.direction
             && self.kind_keyword == other.kind_keyword
             && self.typing == other.typing
             && self.redefines == other.redefines

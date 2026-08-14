@@ -65,6 +65,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **AST equality compares authored syntax that emission depends on.** Three hand-written
+  `PartialEq` impls excluded fields that are not provenance: `AttributeUsage` ignored the `ref` and
+  `abstract` prefixes, `RefDecl` ignored its direction, and `TypingRelationship` ignored whether the
+  author wrote `:>` or `specializes`. All three drive emitted output, so a formatter that dropped or
+  swapped one would have passed every whole-AST comparison in the suite -- including the round-trip
+  tests whose purpose is to catch exactly that. Span exclusion is unchanged: position is still not
+  identity.
 - **A constraint body accepts a feature declaration.** `constraint c { mass : Real; }` parsed
   `mass` as a bare expression and left `: Real;` for recovery, which the opaque capture then hid.
   A constraint definition body is a `DefinitionBody`, so it owns usages as well as the constraint

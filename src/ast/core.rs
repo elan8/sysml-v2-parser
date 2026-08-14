@@ -678,16 +678,20 @@ pub enum TypingSpelling {
     TypedBy,
 }
 
-/// Equality ignores `span` and `spelling`, matching `Node<T>`'s and `Multiplicity`'s
-/// span-ignoring conventions elsewhere in this crate: hand-built expected ASTs in tests don't
-/// need to reproduce real source spans, and `specializes B` and `:> B` name the same
-/// relationship (the spelling is provenance, faithfully re-emitted but not identity).
+/// Equality ignores `span`, matching `Node<T>`'s span-ignoring convention: where a relationship
+/// was authored is provenance.
+///
+/// `spelling` is compared. `specializes B` and `:> B` do name the same relationship, but the
+/// spelling is what the author wrote and what emission reproduces
+/// ([`crate::emit`] matches on it), so excluding it from equality meant a formatter that swapped
+/// one keyword for the other would pass every whole-AST comparison in the suite.
 impl PartialEq for TypingRelationship {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
             && self.kind == other.kind
             && self.is_conjugated == other.is_conjugated
             && self.is_implied == other.is_implied
+            && self.spelling == other.spelling
     }
 }
 
