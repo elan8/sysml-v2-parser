@@ -40,12 +40,11 @@ package Comments {
     /* Named Comment */
     comment cmt_cmt
     /* Comment about Comment */
-    comment 'about'
     /* Documention Comment on Part Def */
     part def C {
         doc
         /* Documentation in Part Def */
-        comment 'comment'
+        /* Comment in Part Def */
         /* Comment about Package */
     }
 }
@@ -55,6 +54,6 @@ package Comments {
 (parsed-document
   (references
   )
-  (root (package (name "Comments") (body (doc) (doc) (comment) (comment) (comment) (part-def (name "C") (body (doc) (comment))))))
+  (root (package (name "Comments") (body (doc) (doc) (comment) (comment) (comment) (part-def (name "C") (body (doc) (comment) (comment))))))
 )
 ~~~

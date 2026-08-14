@@ -759,7 +759,17 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"comment"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, ident_parsed, locale) = if starts_with_keyword(input.fragment(), b"locale") {
+    let (input, ident_parsed, locale) = if input.fragment().starts_with(b"/*") {
+        // The body follows the keyword directly. Without this guard `identification` below skips
+        // the body as trivia and takes the *next* member's keyword as this comment's name, so
+        // `comment /* a */ doc /* b */` parses as one comment named `doc` and the doc member
+        // disappears with no diagnostic. `doc_comment` guards the same way.
+        (input, None, None)
+    } else if starts_with_keyword(input.fragment(), b"about") {
+        // The `about` clause takes the place of an identification, so it must not be parsed as
+        // one: `comment about BMS /* ... */` names no comment.
+        (input, None, None)
+    } else if starts_with_keyword(input.fragment(), b"locale") {
         // GH-91.1: `comment locale "en_US" /* ... */` (no identification) -- without this
         // guard, `identification` below greedily consumes the bare word `locale` itself as the
         // comment's own name, leaving nothing for the subsequent `locale` keyword check to
@@ -782,8 +792,16 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
         .parse(input)?;
         (input, ident_parsed, locale)
     };
-    let (input, _) = nom::bytes::complete::take_until::<_, _, nom::error::Error<Input>>(&b"/*"[..])
-        .parse(input)?;
+    // `comment about x /* ... */` is grammar-legal (KerML 8.2.3.3.2). Its targets are not modelled
+    // yet, so the clause is skipped -- but only when `about` is actually written. Scanning for the
+    // body unconditionally would let a comment run past the end of its own member.
+    let (peek, _) = ws(input)?;
+    let (input, _) = if starts_with_keyword(peek.fragment(), b"about") {
+        nom::bytes::complete::take_until::<_, _, nom::error::Error<Input>>(&b"/*"[..])
+            .parse(input)?
+    } else {
+        (input, input)
+    };
     // Use ws so we don't consume the comment body as a block comment.
     let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
     let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;

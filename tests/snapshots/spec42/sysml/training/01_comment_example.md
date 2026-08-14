@@ -43,7 +43,6 @@ package 'Comment Example' {
 package 'Comment Example' {
     comment Comment1
     /* This is a named comment. */
-    comment 'about'
     /* This is an unnamed comment, annotating an 
 	 * explicitly specified element. 
 	 */
