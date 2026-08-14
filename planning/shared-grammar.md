@@ -1,6 +1,6 @@
 # Factor shared grammatical concepts
 
-> **Status:** Phase 1 implemented; Phases 2-4 proposed
+> **Status:** Phases 1-2 implemented; Phase 3 partially implemented; Phase 4 proposed
 
 ## Purpose
 
@@ -145,13 +145,17 @@ Two constraints from that work carry forward into the phases below:
 - downstream semantic lowering deliberately keeps its own exhaustive matches. Representation
   changes are therefore felt as required edits there, not absorbed by the visitor.
 
-### Phase 2: Unify the body container
+### Phase 2: one body container — done, except delimiter provenance
 
-Introduce a generic body container for the grammar-common delimiter and ordered-element shape, then
-migrate body aliases one family at a time. Element enums remain distinct during this phase.
+`ast::Body<E>` replaced 27 per-family body enums; the scopes keep their names as aliases, so the
+member set stays typed per scope. `;` and `{}` remain distinct, and `braced_elements` reports the
+semicolon form as `None` so consumers cannot flatten the two by accident.
 
-Candidate migrations include definition, usage, relationship, and feature bodies that currently
-encode the same semicolon/braces alternatives. Before migrating a type, compare:
+What is *not* done is delimiter provenance: the container still records no brace or semicolon
+spans, exactly as the per-family enums did not. The requirements below therefore stand for whenever
+that lands.
+
+Before adding delimiter provenance to the shared container, compare:
 
 - whether a semicolon is legal and what it means;
 - whether an explicitly empty brace body differs from no body;
@@ -177,18 +181,15 @@ downstream consumers cache parse artifacts. Decide and write down: enum tagging;
 serializes generically or through scope-specific records; how a recovered delimiter is encoded; how
 per-scope legality of members is validated on the way in; and what a version or shape mismatch does.
 
-Deliverables:
+Remaining deliverables:
 
-- a single `Body<E>`-style type, or a small number of grammar-distinct body container types;
 - a typed representation of delimiter outcome, including recovered and missing closes;
-- a written serialized-shape design, with deserialization validation and rejection behavior;
-- shared borrowed iteration and delimiter access;
-- shared streaming-format and snapshot handling for container structure; and
-- removal of superseded per-family body containers.
+- a written serialized-shape design, with deserialization validation and rejection behavior; and
+- delimiter access on the shared container once it has provenance to expose.
 
-Completion criteria:
+Completion criteria for that work:
 
-- migrated scopes retain their original element enums and accepted language;
+- scopes retain their element enums and accepted language;
 - semicolon, empty braces, populated braces, malformed members, and incomplete bodies have focused
   tests;
 - parse/format/reparse behavior and recovery sibling preservation remain stable; and
