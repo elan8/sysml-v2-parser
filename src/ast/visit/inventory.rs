@@ -1807,7 +1807,10 @@ macro_rules! ast_traversal {
 
         pub fn walk_comment_annotation<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CommentAnnotation>) {
             visitor.visit_span(&$($mutability)? node.span);
-            let CommentAnnotation { identification, locale, text } = &$($mutability)? node.value;
+            let CommentAnnotation { keyword_span, identification, locale, text } = &$($mutability)? node.value;
+            if let Some(inner) = keyword_span {
+                visitor.visit_span(inner);
+            }
             if let Some(inner) = identification {
                 visitor.visit_identification(inner);
             }
@@ -2838,8 +2841,8 @@ macro_rules! ast_traversal {
                 PartUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                PartUsageBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                PartUsageBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 PartUsageBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
@@ -2894,9 +2897,6 @@ macro_rules! ast_traversal {
                 }
                 PartUsageBodyElement::ActionUsage(field_0) => {
                     visitor.visit_action_usage(&$($mutability)? **field_0);
-                }
-                PartUsageBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 PartUsageBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);

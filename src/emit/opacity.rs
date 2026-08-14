@@ -591,9 +591,7 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::Allocate(n) => walk_connect_body(report, &p, &n.value.body),
             PartUsageBodyElement::Satisfy(n) => walk_satisfy(report, &p, &n.value),
             PartUsageBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
-            PartUsageBodyElement::MetadataAnnotation(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
-            }
+            PartUsageBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             PartUsageBodyElement::MetadataKeywordUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }
@@ -655,9 +653,7 @@ fn walk_part_usage_body_elements(
                     walk_relationship_body_elements(report, &p, elements);
                 }
             }
-            PartUsageBodyElement::Doc(_)
-            | PartUsageBodyElement::DefaultReferenceUsage(_)
-            | PartUsageBodyElement::EnumDef(_) => {}
+            PartUsageBodyElement::DefaultReferenceUsage(_) | PartUsageBodyElement::EnumDef(_) => {}
         }
     }
 }

@@ -498,8 +498,8 @@ pub(crate) fn emit_annotating_member(
         AnnotatingMember::Doc(d) => emit_doc(w, &d.value),
         AnnotatingMember::Comment(c) => emit_comment(w, &c.value),
         AnnotatingMember::TextualRep(r) => emit_textual_rep(w, &r.value),
-        AnnotatingMember::MetadataAnnotation(_) => {
-            w.unsupported(path, "metadata annotation member")
+        AnnotatingMember::MetadataAnnotation(annotation) => {
+            super::structure::emit_metadata_annotation(w, path, &annotation.value)
         }
     }
 }
@@ -561,14 +561,24 @@ pub(crate) fn emit_comment(
     if !w.emit_comments() {
         return Ok(());
     }
-    if comment.identification.is_some() || comment.locale.is_some() {
-        w.push_str("comment");
+    // The `comment` keyword is optional in the grammar, but a member that omits it emits as a bare
+    // block comment, which reparses as trivia rather than as a member. Reproduce what was authored.
+    let has_keyword = comment.keyword_span.is_some();
+    if has_keyword || comment.locale.is_some() {
+        if has_keyword {
+            w.push_str("comment");
+        }
         if let Some(id) = &comment.identification {
-            w.push_char(' ');
+            if has_keyword {
+                w.push_char(' ');
+            }
             emit_identification(w, id);
         }
         if let Some(locale) = &comment.locale {
-            w.push_str(" locale \"");
+            if has_keyword || comment.identification.is_some() {
+                w.push_char(' ');
+            }
+            w.push_str("locale \"");
             w.push_str(locale);
             w.push_char('"');
         }

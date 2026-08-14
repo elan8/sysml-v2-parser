@@ -490,6 +490,13 @@ pub struct DocComment {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CommentAnnotation {
+    /// Span of the authored `comment` keyword, or `None` for the keyword-less spelling.
+    ///
+    /// The grammar makes the keyword optional, so whether it was written is a grammatical fact
+    /// and not a formatting choice: without it the member cannot be re-emitted as a member at
+    /// all, because a bare `/* ... */` reparses as trivia. Presence is what emission depends on;
+    /// the span keeps the provenance rather than reducing the fact to a boolean.
+    pub keyword_span: Option<Span>,
     pub identification: Option<Identification>,
     pub locale: Option<String>,
     pub text: String,

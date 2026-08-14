@@ -61,7 +61,7 @@ package CommentTest {
 # FORMAT
 ~~~sysml
 package CommentTest {
-    comment locale "en_US"
+    locale "en_US"
     /*
  * AAAA
  * BBBB
@@ -73,11 +73,14 @@ package CommentTest {
     /* Named Comment */
     comment cmt_cmt
     /* Comment about Comment */
+    comment
     /* Documention Comment about Part Def */
     part def C {
         doc
         /* Documentation in Part Def */
+        comment
         /* Comment in Part Def */
+        comment
         /* Comment about Package */
     }
     part def A;

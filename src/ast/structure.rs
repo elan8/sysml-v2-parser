@@ -590,7 +590,8 @@ pub enum AnnotationHead {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartUsageBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
     AttributeUsage(Node<AttributeUsage>),
     /// Bare `name : Type;` without a kind keyword (SysML DefaultReferenceUsage).
@@ -616,7 +617,6 @@ pub enum PartUsageBodyElement {
     StateUsage(Node<StateUsage>),
     /// `action` / `ref action` usage inside a part usage body.
     ActionUsage(Box<Node<ActionUsage>>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// `variant` name `;` inside a variation part usage body.
     VariantUsage(Node<VariantUsage>),

@@ -746,6 +746,7 @@ pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<C
             start,
             input,
             CommentAnnotation {
+                keyword_span: None,
                 identification: None,
                 locale: Some(locale),
                 text,
@@ -757,7 +758,10 @@ pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<C
 /// KerML Comment: ( 'comment' Identification? )? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"comment"[..])).parse(input)?;
+    let (keyword_start, _) = ws_and_comments(input)?;
+    let (input, keyword) = tag(&b"comment"[..]).parse(keyword_start)?;
+    let keyword_span = node_from_to(keyword_start, input, ()).span;
+    let _ = keyword;
     let (input, _) = ws1(input)?;
     let (input, ident_parsed, locale) = if input.fragment().starts_with(b"/*") {
         // The body follows the keyword directly. Without this guard `identification` below skips
@@ -814,6 +818,7 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
             start,
             input,
             CommentAnnotation {
+                keyword_span: Some(keyword_span),
                 identification: ident,
                 locale,
                 text,

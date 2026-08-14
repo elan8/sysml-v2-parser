@@ -1300,14 +1300,13 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
     let (input, elem) = alt((
         alt((
             alt((
-                map(doc_comment, PartUsageBodyElement::Doc),
+                map(
+                    crate::parser::body::annotating_member,
+                    PartUsageBodyElement::Annotating,
+                ),
                 map(
                     crate::parser::metadata_annotation::metadata_keyword_usage,
                     PartUsageBodyElement::MetadataKeywordUsage,
-                ),
-                map(
-                    metadata_annotation,
-                    PartUsageBodyElement::MetadataAnnotation,
                 ),
                 map(annotation, PartUsageBodyElement::Annotation),
             )),

@@ -421,7 +421,9 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::KermlClassifier(n) => {
             super::root::emit_kerml_classifier_decl(w, path, &n.value)
         }
-        PartUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PartUsageBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         PartUsageBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PartUsageBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
         PartUsageBodyElement::Import(i) => emit_import(w, &i.value),
@@ -476,7 +478,6 @@ fn emit_part_usage_body_element(
             super::requirement::emit_enumeration_usage(w, path, &e.value)
         }
         PartUsageBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
-        PartUsageBodyElement::MetadataAnnotation(m) => emit_metadata_annotation(w, path, &m.value),
         PartUsageBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }

@@ -40,6 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Comment and textual-representation members now parse in usage bodies.** The general
+  usage-member scope accepted only two of the four annotating alternatives, so `comment /* ... */`
+  and `rep x language "..." /* ... */` were rejected inside a `part p { ... }` body even though the
+  grammar admits the whole `AnnotatingElement` production wherever a definition body is legal. It
+  now uses [`AnnotatingMember`], which brings all four. `#Name` prefix metadata stays a separate
+  member, as the grammar has it.
+- **An anonymous `comment` member survives format and reparse.** `CommentAnnotation` did not record
+  whether the optional `comment` keyword was authored, so emission omitted it whenever the member
+  had no name or locale -- and a bare `/* ... */` reparses as trivia, losing the member. The
+  keyword's span is now retained and reproduced. The keyword-less spelling
+  (`locale "en" /* ... */`) is no longer given a keyword it never had, either.
 - **A `rep` member now emits from every scope that accepts one.** Three copies of the same match
   handled annotating members in relationship bodies and disagreed: a textual representation
   emitted from an import body but failed as an unsupported construct from alias, dependency, and
@@ -61,7 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`PARSE_AST_VERSION` is now 137.** Relationship and `ref` body elements replace their `Doc`,
+- **`PARSE_AST_VERSION` is now 138.** `CommentAnnotation` gains `keyword_span`, and
+  `PartUsageBodyElement` replaces its `Doc` and `MetadataAnnotation` variants with `Annotating`.
+  Relationship and `ref` body elements replace their `Doc`,
   `Comment`, `TextualRep`, and `MetadataAnnotation` variants with a single `Annotating` variant
   wrapping [`AnnotatingMember`]. `EnumerationBody`'s brace members move from `values` to
   `elements`, matching every other body. That is the only wire change from the body-container
