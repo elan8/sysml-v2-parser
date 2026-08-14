@@ -203,6 +203,45 @@ and recovery behavior. Start with the narrowest, highest-confidence families:
 2. annotating members such as documentation, comments, textual representations, and applicable
    metadata forms.
 
+#### Audit results
+
+Both candidate families were audited across all 29 body scopes before extraction. The results
+changed what is worth doing.
+
+**Annotating members: grammar-backed, adopted where exact.** `AnnotatingElement = Comment |
+Documentation | TextualRepresentation | MetadataFeature` is one production in both layers (KerML
+8.2.3.3.1, SysML 8.2.2.4.1), reachable from every definition body through `DefinitionBodyItem ->
+DefinitionMember -> DefinitionElement`. The AST accepted it unevenly -- documentation in 26 scopes,
+metadata annotations in 13, textual representations in 6, comments in 4, in ten distinct
+combinations. That spread is parser coverage, not language.
+
+`AnnotatingMember` therefore exists, and relationship and `ref` bodies -- the scopes whose member
+set is exactly the production -- use it. The others keep their own variants: adopting the family
+where the parser cannot produce every member would make the type, and the deserialized contract,
+claim coverage that does not exist. Closing each gap is now a variant swap plus dispatch instead of
+four of each, which is the point of having the family.
+
+**Recovery members: not adopted.** `Malformed` and `Unsupported` are parser states rather than
+grammar productions, which the "deliberately defined syntax-layer concept" clause permits -- but
+only 3 of 29 scopes carry both today, because the parser emits an unsupported node in exactly those
+three. Wrapping the other 22 in a two-variant family would add a representable state the parser
+cannot reach in those scopes, for a wrapper around what is already a single shared node type per
+state. The traversal boundary from Phase 1 already gives recovery handling one owner. Revisit only
+if unsupported-member support becomes general.
+
+#### Follow-up work this audit surfaced
+
+- Annotating-member coverage gaps: 22 scopes accept less than the grammar allows. Each is a
+  conformance fix (parser dispatch plus the family variant), and each changes accepted language, so
+  they are separate reviewed changes rather than part of a representation refactor.
+- `Other(String)` remains in 11 scopes, where unrecognized members are kept as text instead of as a
+  malformed node with a diagnostic. Two more scopes had the variant with no producer at all and
+  have been removed. The rest need the same treatment as a behavior change: recovery nodes report,
+  opaque text does not.
+- `ref` body dispatch depends on its owner: a `doc` in a connection-definition `ref` body reaches
+  the annotating family, while the same member in a part-definition `ref` body is captured as a
+  nested part-usage member. Two parsers with different alternative order, one grammar production.
+
 Scope-specific enums opt into these families explicitly:
 
 ```rust
