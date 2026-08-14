@@ -2,6 +2,7 @@ use super::behavior::{
     ActionDef, ActionDefBodyElement, ActionUsage, ActionUsageBodyElement, Allocate, InOut,
     InOutDecl, StateDefBody, StateDefBodyElement, StateUsage,
 };
+use super::body::Body;
 use super::common::{
     CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode,
     TextualRepresentation,
@@ -73,14 +74,7 @@ pub enum DefinitionPrefix {
 }
 
 /// Body of a part definition: `;` or `{` PartDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PartDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PartDefBodyElement>>,
-    },
-}
+pub type PartDefBody = Body<PartDefBodyElement>;
 
 /// Element inside a part definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -336,14 +330,7 @@ impl PartialEq for AttributeDef {
 }
 
 /// Body of an attribute (def or usage): `;` or `{` AttributeBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum AttributeBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<AttributeBodyElement>>,
-    },
-}
+pub type AttributeBody = Body<AttributeBodyElement>;
 
 // See `RequirementDefBodyElement`'s `#[allow(clippy::large_enum_variant)]` doc comment --
 // `AttributeUsage`'s size relative to `Doc`/`Error` is an accepted, crate-wide tradeoff, not
@@ -527,14 +514,7 @@ impl PartialEq for PartUsage {
 }
 
 /// Body of a part usage: `;` or `{` PartUsageBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PartUsageBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PartUsageBodyElement>>,
-    },
-}
+pub type PartUsageBody = Body<PartUsageBodyElement>;
 
 /// Metadata annotation on usage: `@` Name (`:` Type)? (`about` targets)? MetadataBody.
 #[derive(Debug, Clone, Eq)]
@@ -796,14 +776,7 @@ pub struct Perform {
 }
 
 /// Body of a perform: `;` or `{` PerformBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PerformBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PerformBodyElement>>,
-    },
-}
+pub type PerformBody = Body<PerformBodyElement>;
 
 /// Element inside a perform body: doc comment, in/out binding, or variant member.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1012,14 +985,7 @@ pub struct PortDef {
 }
 
 /// Body of a port definition: `;` or `{` PortDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PortDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PortDefBodyElement>>,
-    },
-}
+pub type PortDefBody = Body<PortDefBodyElement>;
 
 /// Element inside a port definition body (in/out declarations or nested port usages).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1116,14 +1082,7 @@ impl PartialEq for PortUsage {
 }
 
 /// Body of a port usage: `;` or `{` PortBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PortBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PortBodyElement>>,
-    },
-}
+pub type PortBody = Body<PortBodyElement>;
 
 /// Element inside a port usage body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1174,14 +1133,7 @@ pub struct InterfaceDef {
 }
 
 /// Body of an interface definition: `;` or `{` InterfaceDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum InterfaceDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<InterfaceDefBodyElement>>,
-    },
-}
+pub type InterfaceDefBody = Body<InterfaceDefBodyElement>;
 
 /// Element inside an interface definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1389,12 +1341,7 @@ impl RefDeclKind {
 }
 
 /// Body of a ref declaration: `;` or `{` members `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RefBody {
-    Semicolon,
-    Brace { elements: Vec<Node<RefBodyElement>> },
-}
+pub type RefBody = Body<RefBodyElement>;
 
 /// Element of a ref declaration's braced body (`RefBody::Brace`), wrapping whichever member
 /// shape is real for the owning context. BNF `ReferenceUsage` resolves `ref`'s body to a generic
@@ -1484,14 +1431,7 @@ pub struct ConnectionDef {
 }
 
 /// Body of a connection definition: `;` or `{` end/ref/connect* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ConnectionDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ConnectionDefBodyElement>>,
-    },
-}
+pub type ConnectionDefBody = Body<ConnectionDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -1567,12 +1507,7 @@ pub struct EnumDef {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum EnumerationBody {
-    Semicolon,
-    Brace { values: Vec<Node<EnumeratedValue>> },
-}
+pub type EnumerationBody = Body<EnumeratedValue>;
 
 /// One enumerated value inside an `enum def { ... }` body: optional `enum` keyword + name, with
 /// an optional inline body or `= expr` initializer that the parser discards (BNF
@@ -1658,14 +1593,7 @@ pub enum OccurrencePortionKind {
     Timeslice,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum OccurrenceUsageBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<OccurrenceBodyElement>>,
-    },
-}
+pub type OccurrenceUsageBody = Body<OccurrenceBodyElement>;
 
 /// Occurrence-level assert member: `assert constraint` body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1760,14 +1688,7 @@ pub struct SuccessionUsage {
 // ---------------------------------------------------------------------------
 
 /// Generic definition body: `;` or `{` DefinitionBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum DefinitionBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<DefinitionBodyElement>>,
-    },
-}
+pub type DefinitionBody = Body<DefinitionBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -1944,11 +1865,4 @@ pub struct AliasDef {
 }
 
 /// Body of an alias definition: `;` or `{` ... `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum AliasBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<RelationshipBodyElement>>,
-    },
-}
+pub type AliasBody = Body<RelationshipBodyElement>;

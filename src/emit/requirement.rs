@@ -368,11 +368,11 @@ fn emit_require_constraint(
         w.push_qualified_reference(&format!("{path}/target"), target)?;
     }
     match &req.body {
-        crate::ast::RequireConstraintBody::Semicolon => {
+        crate::ast::ConstraintDefBody::Semicolon => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RequireConstraintBody::Brace { elements } => {
+        crate::ast::ConstraintDefBody::Brace { elements } => {
             w.push_str(" {");
             w.newline();
             w.indent();

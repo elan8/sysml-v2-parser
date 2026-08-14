@@ -53,10 +53,10 @@ pub use ast::{
     QualifiedIdentification, QualifiedReferenceArena, QualifiedReferenceId,
     QualifiedReferenceMetadata, QualifiedReferenceValidationError, QualifiedReferenceView, RefBody,
     RefBodyElement, RefDecl, ReferenceSegment, ReferenceSeparator, RelationshipBodyElement,
-    RequireConstraint, RequireConstraintBody, RequirementDef, RequirementDefBody,
-    RequirementDefBodyElement, RequirementUsage, ReturnRef, ReturnRefBody, ReturnRefBodyElement,
-    RootElement, RootNamespace, SegmentRange, SourceStorage, Span, TextualRepresentation,
-    ThenAction, ThenTarget, TypeCheckKind, VerificationCaseDef, VerificationCaseUsage, Visibility,
+    RequireConstraint, RequirementDef, RequirementDefBody, RequirementDefBodyElement,
+    RequirementUsage, ReturnRef, ReturnRefBody, ReturnRefBodyElement, RootElement, RootNamespace,
+    SegmentRange, SourceStorage, Span, TextualRepresentation, ThenAction, ThenTarget,
+    TypeCheckKind, VerificationCaseDef, VerificationCaseUsage, Visibility,
 };
 pub use emit::{
     emit_recovered_sysml, emit_sysml, emit_sysml_with_options, opacity_report, EmitError,
@@ -66,7 +66,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 135;
+pub const PARSE_AST_VERSION: u32 = 136;
 
 /// The pinned grammar release understood by this build of the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

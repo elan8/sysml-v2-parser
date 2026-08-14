@@ -3,7 +3,7 @@
 //! and optional `;` between body items does not break multi-clause constraints.
 
 use sysml_v2_parser::ast::{
-    ConstraintDefBodyElement, Expression, PackageBody, PackageBodyElement, RequireConstraintBody,
+    ConstraintDefBody, ConstraintDefBodyElement, Expression, PackageBody, PackageBodyElement,
     RequirementDefBody, RequirementDefBodyElement, RootElement,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
@@ -22,8 +22,8 @@ fn compact_whitespace(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn joined_constraint_expression_text(src: &str, body: &RequireConstraintBody) -> Option<String> {
-    let RequireConstraintBody::Brace { elements } = body else {
+fn joined_constraint_expression_text(src: &str, body: &ConstraintDefBody) -> Option<String> {
+    let ConstraintDefBody::Brace { elements } = body else {
         return None;
     };
     let mut frags = Vec::new();
@@ -42,9 +42,7 @@ fn joined_constraint_expression_text(src: &str, body: &RequireConstraintBody) ->
     }
 }
 
-fn first_require_constraint_body(
-    root: &sysml_v2_parser::ast::RootNamespace,
-) -> &RequireConstraintBody {
+fn first_require_constraint_body(root: &sysml_v2_parser::ast::RootNamespace) -> &ConstraintDefBody {
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
@@ -75,7 +73,7 @@ fn first_require_constraint_body(
 fn assert_no_other_in_constraint(src: &str) {
     let root = parse(src).expect("parse");
     let body = first_require_constraint_body(&root);
-    let RequireConstraintBody::Brace { elements } = body else {
+    let ConstraintDefBody::Brace { elements } = body else {
         panic!("brace body");
     };
     assert!(

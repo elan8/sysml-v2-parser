@@ -1619,7 +1619,7 @@ pub(crate) fn emit_enum_def(
             w.push_char(';');
             Ok(())
         }
-        crate::ast::EnumerationBody::Brace { values } => {
+        crate::ast::EnumerationBody::Brace { elements: values } => {
             w.push_str(" {");
             w.newline();
             w.indent();

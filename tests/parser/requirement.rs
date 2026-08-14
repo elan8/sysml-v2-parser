@@ -505,7 +505,7 @@ fn test_parse_require_constraint_keeps_inner_members() {
         })
         .expect("require constraint should be present");
     let constraint_elements = match &require_constraint.body {
-        sysml_v2_parser::ast::RequireConstraintBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements } => elements,
         _ => panic!("expected structured require constraint body"),
     };
     assert!(

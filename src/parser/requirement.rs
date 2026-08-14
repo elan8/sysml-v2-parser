@@ -1,14 +1,12 @@
 use crate::ast::{
-    CommentAnnotation, ConcernUsage, DocComment, FrameMember, Node, PurposeMember,
-    RequireConstraint, RequireConstraintBody, RequirementActorDecl, RequirementDef,
-    RequirementDefBody, RequirementDefBodyElement, RequirementUsage, Satisfy, StakeholderMember,
-    SubjectDecl, SubjectRef, TextualRepresentation, VerifyRequirementMember,
+    CommentAnnotation, ConcernUsage, ConstraintDefBody, DocComment, FrameMember, Node,
+    PurposeMember, RequireConstraint, RequirementActorDecl, RequirementDef, RequirementDefBody,
+    RequirementDefBodyElement, RequirementUsage, Satisfy, StakeholderMember, SubjectDecl,
+    SubjectRef, TextualRepresentation, VerifyRequirementMember,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage, redefinition_feature_binding};
 use crate::parser::body::parse_structured_brace_members;
-use crate::parser::constraint::{
-    constraint_usage, structured_constraint_body, StructuredConstraintBody,
-};
+use crate::parser::constraint::{constraint_def_body, constraint_usage};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
@@ -523,7 +521,7 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
     // `subject vehicle : Vehicle { doc … }`).
     let (input, _) = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
-        map(structured_constraint_body, |_| ()),
+        map(constraint_def_body, |_| ()),
     ))
     .parse(input)?;
     if n.is_empty() && type_name.is_none() && value.is_none() && redefines.is_none() {
@@ -589,7 +587,7 @@ fn requirement_parameter_decl<'a>(
     let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     let (input, _) = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
-        map(structured_constraint_body, |_| ()),
+        map(constraint_def_body, |_| ()),
     ))
     .parse(input)?;
     Ok((
@@ -637,7 +635,7 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
             let (input, reference) = qualified_reference(input)?;
             (input, None, Some(reference))
         };
-    let (input, body) = require_constraint_body(input)?;
+    let (input, body) = constraint_def_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -652,17 +650,6 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
             },
         ),
     ))
-}
-
-pub(crate) fn require_constraint_body(
-    input: Input<'_>,
-) -> IResult<Input<'_>, RequireConstraintBody> {
-    let (input, body) = structured_constraint_body(input)?;
-    let body = match body {
-        StructuredConstraintBody::Semicolon => RequireConstraintBody::Semicolon,
-        StructuredConstraintBody::Brace { elements } => RequireConstraintBody::Brace { elements },
-    };
-    Ok((input, body))
 }
 
 /// KerML STRING_VALUE: double-quoted string, returns the inner string.
@@ -946,9 +933,9 @@ fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
             (crate::ast::ConnectBody::Semicolon, None)
         }),
-        map(structured_constraint_body, |structured| match structured {
-            StructuredConstraintBody::Semicolon => (crate::ast::ConnectBody::Semicolon, None),
-            StructuredConstraintBody::Brace { elements } => {
+        map(constraint_def_body, |body| match body {
+            ConstraintDefBody::Semicolon => (crate::ast::ConnectBody::Semicolon, None),
+            ConstraintDefBody::Brace { elements } => {
                 (crate::ast::ConnectBody::Brace, Some(elements))
             }
         }),

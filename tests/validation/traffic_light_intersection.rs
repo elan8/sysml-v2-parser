@@ -128,7 +128,7 @@ fn test_requirement_constraints_keep_doc_members() {
         })
         .expect("fixture requirement should contain a require constraint");
     let constraint_elements = match &require_constraint.body {
-        sysml_v2_parser::ast::RequireConstraintBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements } => elements,
         _ => panic!("expected structured require constraint body"),
     };
 

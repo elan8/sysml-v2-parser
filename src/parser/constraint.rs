@@ -109,22 +109,6 @@ pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Cons
     ))
 }
 
-fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody> {
-    let (input, body) = structured_constraint_body(input)?;
-    let body = match body {
-        StructuredConstraintBody::Semicolon => ConstraintDefBody::Semicolon,
-        StructuredConstraintBody::Brace { elements } => ConstraintDefBody::Brace { elements },
-    };
-    Ok((input, body))
-}
-
-pub(crate) enum StructuredConstraintBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ConstraintDefBodyElement>>,
-    },
-}
-
 fn constraint_body_recovery_element(
     start: Input<'_>,
     end: Input<'_>,
@@ -146,13 +130,12 @@ fn constraint_body_recovery_element(
     node_from_to(start, end, ConstraintDefBodyElement::Other(preview))
 }
 
-pub(crate) fn structured_constraint_body(
-    input: Input<'_>,
-) -> IResult<Input<'_>, StructuredConstraintBody> {
+/// A constraint body in any scope that accepts one: `;` or brace-delimited constraint members.
+pub(crate) fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, StructuredConstraintBody::Semicolon));
+        return Ok((input, ConstraintDefBody::Semicolon));
     }
     let (input, elements) = parse_structured_brace_members(
         input,
@@ -162,7 +145,7 @@ pub(crate) fn structured_constraint_body(
         constraint_def_body_element,
         constraint_body_recovery_element,
     )?;
-    Ok((input, StructuredConstraintBody::Brace { elements }))
+    Ok((input, ConstraintDefBody::Brace { elements }))
 }
 
 pub(crate) fn constraint_def_body_element(

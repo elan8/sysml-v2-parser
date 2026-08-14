@@ -927,11 +927,6 @@ macro_rules! ast_traversal {
                 walk_verify_requirement_member(self, node)
             }
 
-            /// Visits [`RequireConstraintBody`]; the default implementation walks its children.
-            fn visit_require_constraint_body(&mut self, node: &$($mutability)? RequireConstraintBody) {
-                walk_require_constraint_body(self, node)
-            }
-
             /// Visits [`Satisfy`]; the default implementation walks its children.
             fn visit_satisfy(&mut self, node: &$($mutability)? Node<Satisfy>) {
                 walk_satisfy(self, node)
@@ -3717,7 +3712,7 @@ macro_rules! ast_traversal {
         pub fn walk_enumeration_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EnumerationBody) {
             match node {
                 EnumerationBody::Semicolon => {}
-                EnumerationBody::Brace { values } => {
+                EnumerationBody::Brace { elements: values } => {
                     for inner in values {
                         visitor.visit_enumerated_value(inner);
                     }
@@ -5203,7 +5198,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = target {
                 visitor.visit_qualified_reference(inner);
             }
-            visitor.visit_require_constraint_body(body);
+            visitor.visit_constraint_def_body(body);
         }
 
         pub fn walk_verify_requirement_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<VerifyRequirementMember>) {
@@ -5218,17 +5213,6 @@ macro_rules! ast_traversal {
             }
             if let Some(inner) = redefines {
                 visitor.visit_qualified_reference(inner);
-            }
-        }
-
-        pub fn walk_require_constraint_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? RequireConstraintBody) {
-            match node {
-                RequireConstraintBody::Semicolon => {}
-                RequireConstraintBody::Brace { elements } => {
-                    for inner in elements {
-                        visitor.visit_constraint_def_body_element(inner);
-                    }
-                }
             }
         }
 

@@ -964,7 +964,7 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
                 }
             }
             RequirementDefBodyElement::RequireConstraint(n) => {
-                if let crate::ast::RequireConstraintBody::Brace { elements } = &n.value.body {
+                if let crate::ast::ConstraintDefBody::Brace { elements } = &n.value.body {
                     walk_constraint_body_elements(report, &p, elements);
                 }
             }

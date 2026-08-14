@@ -1,3 +1,4 @@
+use super::body::Body;
 use super::common::{
     ConnectBody, DocComment, Identification, ParseErrorNode, TextualRepresentation,
 };
@@ -31,14 +32,7 @@ pub struct ActionDef {
 }
 
 /// Body of an action definition: `;` or `{` ActionDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ActionDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ActionDefBodyElement>>,
-    },
-}
+pub type ActionDefBody = Body<ActionDefBodyElement>;
 
 /// Element inside an action definition body.
 // Body-element variants intentionally preserve their direct `Node<T>` AST shape. Boxing only
@@ -445,14 +439,7 @@ impl PartialEq for ActionUsage {
 }
 
 /// Body of an action usage: `;` or `{` ActionUsageBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ActionUsageBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ActionUsageBodyElement>>,
-    },
-}
+pub type ActionUsageBody = Body<ActionUsageBodyElement>;
 
 /// Element inside an action usage body.
 // Keep the same direct-node representation as `ActionDefBodyElement`; see its size rationale.
@@ -849,14 +836,7 @@ pub struct StateDef {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum StateDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<StateDefBodyElement>>,
-    },
-}
+pub type StateDefBody = Body<StateDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

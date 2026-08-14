@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`ast::Body<E>`, one container for every declaration body.** Twenty-seven per-family body
+  enums -- `PackageBody`, `PartDefBody`, `ActionDefBody`, and the rest -- were the same two
+  alternatives written out again for each scope: `;` or `{ member* }`. They are now type
+  aliases for one generic container, so the shape is stated once while the member set stays
+  typed per scope: `Body<PartDefBodyElement>` and `Body<ActionDefBodyElement>` remain different
+  types and a member still cannot appear in a scope whose grammar does not accept it. The
+  container carries shared accessors (`is_semicolon`, `braced_elements`, `members`), and
+  `braced_elements` returns `None` for a semicolon body so the `;`/`{}` distinction stays
+  visible rather than flattening to an empty list.
 - **One owning AST traversal boundary: `ast::visit`.** `ast::visit::Visitor` (borrowing) and
   `ast::visit::mutable::VisitorMut` (in-place transformation) cover every node reachable from
   `RootNamespace`. Both expand from a single inventory that destructures every struct without
@@ -19,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 136.** `EnumerationBody`'s brace members move from `values` to
+  `elements`, matching every other body. That is the only wire change from the body-container
+  work: the shared container keeps the variant and field names the other twenty-six bodies
+  already used, so their serialized shape is unchanged. Two duplicate container names collapse
+  into the type they were always equal to -- the public `RequireConstraintBody` and a
+  parser-internal `StructuredConstraintBody`, both `Body<ConstraintDefBodyElement>`, are now
+  `ConstraintDefBody`, which also removes two conversion functions that existed only to move
+  members between identical types.
 - **Whole-tree walks now go through `ast::visit` instead of hand-maintained recursion.** Test
   span normalization (`RootNamespace::normalize_for_test_comparison`), recovery-diagnostic
   collection, deserialization provenance validation, and qualified-reference-identity

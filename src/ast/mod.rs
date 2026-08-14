@@ -6,6 +6,7 @@ mod kerml_fallback;
 pub use core::*;
 pub use kerml_fallback::*;
 mod behavior;
+mod body;
 mod common;
 mod feature_value;
 mod membership;
@@ -21,6 +22,7 @@ mod view;
 pub mod visit;
 
 pub use behavior::*;
+pub use body::*;
 pub use common::*;
 pub use feature_value::*;
 pub use membership::*;

@@ -1,4 +1,5 @@
 use super::behavior::{AssignStmt, ForLoop, InOut, ThenAction};
+use super::body::Body;
 use super::common::TextualRepresentation;
 use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
 use super::feature_value::FeatureValue;
@@ -8,7 +9,7 @@ use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
     MetadataKeywordUsage, VariantUsage,
 };
-use super::view::{CalcUsage, ConstraintDefBodyElement, ConstraintUsage};
+use super::view::{CalcUsage, ConstraintDefBody, ConstraintDefBodyElement, ConstraintUsage};
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
@@ -33,14 +34,7 @@ pub struct RequirementDef {
 }
 
 /// Body of an requirement definition: `;` or `{` RequirementDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RequirementDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<RequirementDefBodyElement>>,
-    },
-}
+pub type RequirementDefBody = Body<RequirementDefBodyElement>;
 
 // `AttributeUsage` carries a `Membership` plus several relationship nodes, making it inherently
 // larger than sibling variants like `Doc`/`Error`; boxing just this one variant in just this one
@@ -153,7 +147,7 @@ pub struct RequireConstraint {
     /// document's qualified-reference table. `None` for the `constraint`-keyword declaration
     /// form, whose `name` declares rather than references.
     pub target: Option<crate::ast::QualifiedReferenceId>,
-    pub body: RequireConstraintBody,
+    pub body: ConstraintDefBody,
 }
 
 /// Requirement verification usage in requirement/objective bodies:
@@ -169,16 +163,6 @@ pub struct VerifyRequirementMember {
     pub target: Option<QualifiedReferenceId>,
     /// Redefinition target after `:>>` (`verify vehicleMassRequirement :>> massRequirement;`).
     pub redefines: Option<QualifiedReferenceId>,
-}
-
-/// Require constraint body: `;` or `{` ConstraintDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RequireConstraintBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ConstraintDefBodyElement>>,
-    },
 }
 
 /// Requirement usage / Satisfy. Example: `satisfy EnduranceReq by droneInstance;`
@@ -475,14 +459,7 @@ pub struct UseCaseDef {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum UseCaseDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<UseCaseDefBodyElement>>,
-    },
-}
+pub type UseCaseDefBody = Body<UseCaseDefBodyElement>;
 
 /// `first <name>;` inside a case/use-case body (used in SysML v2 release fixtures).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -592,14 +569,7 @@ pub struct ReturnRef {
     pub body: Node<ReturnRefBody>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ReturnRefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ReturnRefBodyElement>>,
-    },
-}
+pub type ReturnRefBody = Body<ReturnRefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

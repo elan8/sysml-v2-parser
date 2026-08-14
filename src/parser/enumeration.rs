@@ -57,7 +57,7 @@ fn enumeration_body(input: Input<'_>) -> IResult<Input<'_>, EnumerationBody> {
         input = next;
         if input.fragment().starts_with(b"}") {
             let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, EnumerationBody::Brace { values }));
+            return Ok((input, EnumerationBody::Brace { elements: values }));
         }
         if let Ok((next, _)) = doc_comment(input) {
             input = next;
@@ -75,7 +75,7 @@ fn enumeration_body(input: Input<'_>) -> IResult<Input<'_>, EnumerationBody> {
             Err(_) => {
                 let (input, _) = advance_to_closing_brace(input)?;
                 let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                return Ok((input, EnumerationBody::Brace { values }));
+                return Ok((input, EnumerationBody::Brace { elements: values }));
             }
         }
     }
@@ -246,7 +246,7 @@ mod enumerated_value_tests {
         let (rest, body) =
             enumeration_body(input("{ active; inactive = 1; degraded { } }")).expect("body");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let EnumerationBody::Brace { values } = body else {
+        let EnumerationBody::Brace { elements: values } = body else {
             panic!("expected brace body");
         };
         let names: Vec<_> = values.iter().map(|v| v.value.name.as_str()).collect();

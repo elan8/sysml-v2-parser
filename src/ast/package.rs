@@ -2,6 +2,7 @@ use super::behavior::{
     ActionDef, ActionUsage, AllocationDef, AllocationUsage, FirstStmt, FlowDef, FlowUsage,
     StateDef, StateUsage,
 };
+use super::body::Body;
 use super::common::FilterMember;
 use super::common::{
     CommentAnnotation, DocComment, Import, ParseErrorNode, TextualRepresentation,
@@ -96,16 +97,7 @@ pub struct Package {
     pub body: PackageBody,
 }
 /// Package body: either `;` or `{` PackageBodyElement* `}`
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PackageBody {
-    /// Semicolon form: no body elements.
-    Semicolon,
-    /// Brace form: list of body elements (may be empty).
-    Brace {
-        elements: Vec<Node<PackageBodyElement>>,
-    },
-}
+pub type PackageBody = Body<PackageBodyElement>;
 /// Library package: `library` (optional `standard`) `package` Identification PackageBody (BNF LibraryPackage).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

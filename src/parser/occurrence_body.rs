@@ -1,15 +1,14 @@
 //! Shared occurrence-style body parsing for occurrence defs and generic `DefinitionBody` users.
 
 use crate::ast::{
-    AssertConstraintMember, ConstraintDefBody, DefinitionBody, DefinitionBodyElement, Membership,
-    Node, OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode,
-    SuccessionUsage,
+    AssertConstraintMember, DefinitionBody, DefinitionBodyElement, Membership, Node,
+    OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode, SuccessionUsage,
 };
 use crate::parser::attribute::attribute_usage;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::connect_body;
-use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
+use crate::parser::constraint::constraint_def_body;
 use crate::parser::expr::path_expression;
 use crate::parser::flow::flow_usage_member;
 use crate::parser::lex::{
@@ -738,11 +737,7 @@ fn assert_constraint_member_inner(
         preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
-    let (input, body) = structured_constraint_body(input)?;
-    let body = match body {
-        StructuredConstraintBody::Semicolon => ConstraintDefBody::Semicolon,
-        StructuredConstraintBody::Brace { elements } => ConstraintDefBody::Brace { elements },
-    };
+    let (input, body) = constraint_def_body(input)?;
     Ok((
         input,
         node_from_to(
