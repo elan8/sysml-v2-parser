@@ -1307,6 +1307,12 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
             None => self.writer.write_str("none")?,
         }
+        self.writer.write_str(") (def ")?;
+        self.writer.write_str(if definition.has_def_keyword {
+            "true"
+        } else {
+            "false"
+        })?;
         self.writer.write_str(") (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
         self.writer.write_str(") (specializes ")?;

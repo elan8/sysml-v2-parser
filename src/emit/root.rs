@@ -74,7 +74,9 @@ fn emit_extended_definition(
         w.push_str(&keyword.value.keyword);
         w.push_char(' ');
     }
-    w.push_str("def ");
+    if def.has_def_keyword {
+        w.push_str("def ");
+    }
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
         structure::emit_typing_clause(w, &spec.value)?;

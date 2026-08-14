@@ -54,6 +54,10 @@ pub struct ExtendedDefinition {
     /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix), which may precede
     /// the `#`-prefix keywords (`abstract #situation def AbstractFailure;`).
     pub definition_prefix: Option<DefinitionPrefix>,
+    /// Whether the `def` keyword was authored: `true` for the `ExtendedDefinition` form
+    /// (`#situation def Failure;`), `false` for the bare extended-usage shorthand
+    /// (`#clouddd ArrowheadCore { ... }`, spec42 Gap 39).
+    pub has_def_keyword: bool,
     pub identification: Identification,
     /// Supertype after `:>`.
     pub specializes: Option<Node<TypingRelationship>>,

@@ -188,9 +188,25 @@ fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Extend
     .parse(input)?;
     let (input, prefix_keywords) =
         many1(preceded(ws_and_comments, extended_definition_prefix_tag)).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"def"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // `def` is optional: the bare extended-usage shorthand `#clouddd ArrowheadCore { ... }`
+    // (spec42 Gap 39) has no declaration keyword at all. The keyword guard below keeps the
+    // `#fmeaspec requirement req1 { ... }` `PrefixMetadataMember` shape on
+    // `metadata_keyword_prefix`.
+    let (input, def_kw) =
+        opt(preceded(preceded(ws_and_comments, tag(&b"def"[..])), ws1)).parse(input)?;
     let (input, ident) = identification(input)?;
+    if def_kw.is_none() {
+        let name_is_usable = ident
+            .name
+            .as_deref()
+            .is_some_and(|n| !crate::parser::lex::is_reserved_keyword(n.as_bytes()));
+        if !name_is_usable {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     let (input, specializes) = parse_optional_definition_specialization(input)?;
     let (input, body) = package_body(input)?;
     Ok((
@@ -201,6 +217,7 @@ fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Extend
             ExtendedDefinition {
                 prefix_keywords,
                 definition_prefix,
+                has_def_keyword: def_kw.is_some(),
                 identification: ident,
                 specializes,
                 body,
@@ -336,6 +353,34 @@ mod tests {
     use super::*;
     use crate::ast::SourceStorage;
     use crate::parser::span::ParseContext;
+
+    /// Spec42 Gap 39: the bare extended-usage shorthand (`#clouddd ArrowheadCore { ... }`) has
+    /// no `def` keyword; the keyword guard keeps `#tag <keyword-led member>` shapes on
+    /// `metadata_keyword_prefix`.
+    #[test]
+    fn extended_definition_accepts_the_def_less_usage_shorthand() {
+        let context = ParseContext::new();
+        let input = context.input(b"#clouddd ArrowheadCore { part x; }");
+        let (rest, node) = extended_definition(input).expect("extended usage shorthand");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(!node.value.has_def_keyword);
+        assert_eq!(
+            node.value.identification.name.as_deref(),
+            Some("ArrowheadCore")
+        );
+
+        let context = ParseContext::new();
+        let input = context.input(b"#situation def Failure;");
+        let (_, node) = extended_definition(input).expect("extended definition");
+        assert!(node.value.has_def_keyword);
+
+        let context = ParseContext::new();
+        let input = context.input(b"#fmeaspec requirement req1 { }");
+        assert!(
+            extended_definition(input).is_err(),
+            "keyword-led members stay on metadata_keyword_prefix"
+        );
+    }
 
     #[test]
     fn metadata_annotation_keeps_source_backed_reference_fields() {

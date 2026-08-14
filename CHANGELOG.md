@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 128.** `ExtendedDefinition` gains `has_def_keyword`: the bare
+  `#<keyword>+ <Name> { ... }` extended-usage shorthand (no `def` keyword at all, e.g.
+  `#clouddd ArrowheadCore { ... }`) now parses into the same typed node as its `def`-suffixed
+  sibling instead of dropping the rest of the package body into unrecovered error-token
+  consumption (spec42 gap 39). Keyword-led `#tag <member>` prefix shapes stay on
+  `metadata_keyword_prefix`.
 - **`PARSE_AST_VERSION` is now 127.** `KermlFeatureMember` and `KermlEndMember` gain an
   `is_const` prefix flag: `const end [1] feature a;` / `const end feature b;` (KerML
   association bodies) now attach the `const` keyword to the end/feature member instead of
