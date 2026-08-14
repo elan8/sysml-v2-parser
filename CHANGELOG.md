@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 119.** Package-level KerML declarations are unified onto their
+  typed nodes (spec42 gaps 13/14/22/23):
+  - New `KermlRelationshipDecl` (`PackageBodyElement::KermlRelationship`) models the KerML
+    explicit relationship declarations (BNF §8.2.4): `subtype`/`subclassifier`/`typing`/
+    `subset`/`redefinition` with an optional `specialization <ident>` (or doubled-keyword)
+    prefix, `disjoining? disjoint a from b`, `inverting? inverse a of b`, and `featuring (I
+    of)? a by b`, each with the annotation-only `RelationshipBody`.
+  - `KermlClassifierKeyword` gains `Type` (`type UnionType unions A, B;`) and the spelled-out
+    `Association`; `subclassifier` moved from the classifier keywords to the relationship
+    family (it declares a relationship, not a classifier). `KermlTypeRelationshipKeyword`
+    gains `Differences`.
+  - Bare forward declarations of classifier keywords (`classifier X;`, `datatype D;`, ...)
+    now parse as `KermlClassifierDecl` with a `;` body -- a resolvable named declaration --
+    instead of the span-only `KermlBareDeclaration`.
+  - Plain `feature`-keyword package members route through `KermlFeatureMember`; the
+    superseded `DefaultReferenceUsage`-shaped `feature_usage_member` production and its
+    `FeatureBodyElement::Expr`/`ExprMember`/`ExprMemberElement` machinery are removed
+    (`expr s { ... }` members parse as feature members of kind `expr`).
+  - Keyword-less implicit-feature package members parse (`causeA;`, `y = expr;`,
+    `z : Type;`) as `DefaultReferenceUsage`; bare *reserved keywords* (`then;`) still get
+    their targeted recovery diagnostic.
+  - Expression grammar: KerML dot shorthands `x.{...}` (collect) and `x.?{...}` (select)
+    parse as `CollectionOp` with a new authored-spelling `dot_shorthand` flag.
 - **`PARSE_AST_VERSION` is now 118.** KerML type-body members reach attribute-shaped bodies
   (the body grammar `class_def`'s KerML `class`/`struct`/`datatype` definitions share with
   SysML attribute/item bodies): `AttributeBodyElement` gains `KermlFeature`, `Invariant`,

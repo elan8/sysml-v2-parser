@@ -26,6 +26,6 @@ package ScratchClassifier {
 (parsed-document
   (references
   )
-  (root (package (name "ScratchClassifier") (body (kerml-bare-declaration (keyword "classifier") (name "SpatialFrame") (multiplicity none)))))
+  (root (package (name "ScratchClassifier") (body (kerml-classifier (keyword classifier) (abstract false) (name "SpatialFrame") (specializes none)))))
 )
 ~~~

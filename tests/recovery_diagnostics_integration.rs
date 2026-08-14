@@ -999,8 +999,9 @@ fn far_field_comment_does_not_poison_missing_expression_diagnostic() {
 fn unrecognized_identifier_is_not_reported_as_a_keyword() {
     // GH-18 (Problem 2): `test` is an ordinary identifier, not a SysML keyword, so it must not be
     // reported as "unexpected keyword" -- that would wrongly imply it's valid-but-unsupported
-    // syntax rather than an input defect.
-    let input = "package P { test; }";
+    // syntax rather than an input defect. (Bare `test;` alone is now the legal implicit-feature
+    // shorthand -- spec42 gap 23 -- so the malformed member here adds a second token.)
+    let input = "package P { test junk!; }";
     let result = parse_with_diagnostics(input);
 
     assert_eq!(

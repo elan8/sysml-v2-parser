@@ -107,6 +107,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::KermlFeatureDecl(_) => hit(report, path, OpacityKind::KermlFeatureDecl),
         PackageBodyElement::KermlClassifier(n) => walk_calc_def_body(report, path, &n.value.body),
         PackageBodyElement::KermlConnector(n) => walk_calc_def_body(report, path, &n.value.body),
+        PackageBodyElement::KermlRelationship(_) => {}
         PackageBodyElement::KermlInvariant(n) => walk_calc_def_body(report, path, &n.value.body),
         PackageBodyElement::KermlFeatureMember(n) => {
             walk_calc_def_body(report, path, &n.value.body)

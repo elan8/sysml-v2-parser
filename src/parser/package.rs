@@ -275,6 +275,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::KermlFeatureDecl(_)
         | PackageBodyElement::KermlClassifier(_)
         | PackageBodyElement::KermlConnector(_)
+        | PackageBodyElement::KermlRelationship(_)
         | PackageBodyElement::KermlInvariant(_)
         | PackageBodyElement::KermlFeatureMember(_)
         | PackageBodyElement::KermlBareDeclaration(_)
@@ -666,6 +667,183 @@ fn kerml_bare_declaration(
 /// [`classifier_decl`]/[`kerml_semantic_decl`] fallbacks so these get a typed node; bare
 /// `keyword Name;` forward declarations stay on [`kerml_bare_declaration`], which is tried
 /// first.
+/// KerML explicit relationship declaration (BNF §8.2.4): `specialization S? subtype a
+/// specializes b;`, `specialization? subclassifier a specializes b;`, `specialization? typing a
+/// typed by b;`, `specialization? subset a subsets b;`, `specialization? redefinition a
+/// redefines b;`, `disjoining d? disjoint a from b;`, `inverting i? inverse a of b;`,
+/// `featuring (F of)? a by b;` -- each with an annotation-only `RelationshipBody`.
+fn kerml_relationship_decl(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlRelationshipDecl>> {
+    crate::parser::span::reference_transaction(input, kerml_relationship_decl_inner)
+}
+
+fn kerml_relationship_decl_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlRelationshipDecl>> {
+    use crate::ast::KermlRelationshipKeyword as Kw;
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+
+    // Optional declaration-prefix keyword with its identification.
+    let (input, prefixed_identification) =
+        if starts_with_keyword(input.fragment(), b"specialization") {
+            let (input, _) = tag(&b"specialization"[..]).parse(input)?;
+            let (input, _) = ws1(input)?;
+            let (input, identification) = crate::parser::lex::identification(input)?;
+            (input, Some(identification))
+        } else if starts_with_keyword(input.fragment(), b"disjoining") {
+            let (input, _) = tag(&b"disjoining"[..]).parse(input)?;
+            let (input, _) = ws1(input)?;
+            let (input, identification) = crate::parser::lex::identification(input)?;
+            (input, Some(identification))
+        } else if starts_with_keyword(input.fragment(), b"inverting") {
+            let (input, _) = tag(&b"inverting"[..]).parse(input)?;
+            let (input, _) = ws1(input)?;
+            let (input, identification) = crate::parser::lex::identification(input)?;
+            (input, Some(identification))
+        } else {
+            (input, None)
+        };
+    let (input, _) = ws_and_comments(input)?;
+
+    // The relationship keyword and its fixed connective.
+    let (input, keyword) = if starts_with_keyword(input.fragment(), b"subtype") {
+        let (input, _) = tag(&b"subtype"[..]).parse(input)?;
+        (input, Kw::Subtype)
+    } else if starts_with_keyword(input.fragment(), b"subclassifier") {
+        let (input, _) = tag(&b"subclassifier"[..]).parse(input)?;
+        (input, Kw::Subclassifier)
+    } else if starts_with_keyword(input.fragment(), b"typing") {
+        let (input, _) = tag(&b"typing"[..]).parse(input)?;
+        (input, Kw::Typing)
+    } else if starts_with_keyword(input.fragment(), b"subset") {
+        let (input, _) = tag(&b"subset"[..]).parse(input)?;
+        (input, Kw::Subset)
+    } else if starts_with_keyword(input.fragment(), b"redefinition") {
+        let (input, _) = tag(&b"redefinition"[..]).parse(input)?;
+        (input, Kw::Redefinition)
+    } else if starts_with_keyword(input.fragment(), b"disjoint") {
+        let (input, _) = tag(&b"disjoint"[..]).parse(input)?;
+        (input, Kw::Disjoint)
+    } else if starts_with_keyword(input.fragment(), b"inverse") {
+        let (input, _) = tag(&b"inverse"[..]).parse(input)?;
+        (input, Kw::Inverse)
+    } else if starts_with_keyword(input.fragment(), b"featuring") {
+        let (input, _) = tag(&b"featuring"[..]).parse(input)?;
+        (input, Kw::Featuring)
+    } else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    };
+    let (input, _) = ws1(input)?;
+
+    // The specialization-family declarations may also spell their identification with the
+    // relationship's own keyword doubled: `typing t1 typing f typed by B;`, `subset s1 subset
+    // parent subsets f;` (spec42 `kerml/coverage_relationships.md`).
+    let (input, doubled_identification) = if prefixed_identification.is_none()
+        && matches!(
+            keyword,
+            Kw::Subtype | Kw::Subclassifier | Kw::Typing | Kw::Subset | Kw::Redefinition
+        ) {
+        let keyword_bytes: &[u8] = match keyword {
+            Kw::Subtype => b"subtype",
+            Kw::Subclassifier => b"subclassifier",
+            Kw::Typing => b"typing",
+            Kw::Subset => b"subset",
+            Kw::Redefinition => b"redefinition",
+            Kw::Disjoint | Kw::Inverse | Kw::Featuring => unreachable!(),
+        };
+        let (input, doubled) = opt(map(
+            (
+                crate::parser::lex::identification,
+                ws_and_comments,
+                tag(keyword_bytes),
+                ws1,
+            ),
+            |(identification, _, _, _)| identification,
+        ))
+        .parse(input)?;
+        (input, doubled)
+    } else {
+        (input, None)
+    };
+    let prefixed_identification = prefixed_identification.or(doubled_identification);
+    // `featuring (Identification of)? a by b` names its identification *after* the keyword.
+    let (input, identification) = if keyword == Kw::Featuring && prefixed_identification.is_none() {
+        let (input, named) = opt(map(
+            (
+                crate::parser::lex::identification,
+                preceded(ws_and_comments, tag(&b"of"[..])),
+                ws1,
+            ),
+            |(identification, _, _)| identification,
+        ))
+        .parse(input)?;
+        (input, named)
+    } else {
+        (input, prefixed_identification)
+    };
+
+    let (input, source) =
+        preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let input = match keyword {
+        Kw::Subtype | Kw::Subclassifier => {
+            let (input, _) = crate::parser::lex::specialization_operator(input)?;
+            input
+        }
+        Kw::Typing => {
+            let (input, _) = crate::parser::lex::typed_by_operator(input)?;
+            input
+        }
+        Kw::Subset => {
+            let (input, _) = crate::parser::lex::subset_operator(input)?;
+            input
+        }
+        Kw::Redefinition => {
+            let (input, _) = crate::parser::lex::redefine_operator(input)?;
+            input
+        }
+        Kw::Disjoint => {
+            let (input, _) = tag(&b"from"[..]).parse(input)?;
+            let (input, _) = ws1(input)?;
+            input
+        }
+        Kw::Inverse => {
+            let (input, _) = tag(&b"of"[..]).parse(input)?;
+            let (input, _) = ws1(input)?;
+            input
+        }
+        Kw::Featuring => {
+            let (input, _) = tag(&b"by"[..]).parse(input)?;
+            let (input, _) = ws1(input)?;
+            input
+        }
+    };
+    let (input, target) =
+        preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
+    let (input, body) = crate::parser::body::relationship_body_annotations(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::KermlRelationshipDecl {
+                keyword,
+                identification,
+                source,
+                target,
+                body,
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
+            },
+        ),
+    ))
+}
+
 pub(crate) fn kerml_classifier_structured(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlClassifierDecl>> {
@@ -680,6 +858,10 @@ const KERML_CLASSIFIER_KEYWORDS: &[(&[u8], crate::ast::KermlClassifierKeyword)] 
     (b"datatype", crate::ast::KermlClassifierKeyword::Datatype),
     (b"metaclass", crate::ast::KermlClassifierKeyword::Metaclass),
     (b"struct", crate::ast::KermlClassifierKeyword::Struct),
+    (
+        b"association",
+        crate::ast::KermlClassifierKeyword::Association,
+    ),
     (b"assoc", crate::ast::KermlClassifierKeyword::Assoc),
     (b"behavior", crate::ast::KermlClassifierKeyword::Behavior),
     (
@@ -691,10 +873,7 @@ const KERML_CLASSIFIER_KEYWORDS: &[(&[u8], crate::ast::KermlClassifierKeyword)] 
         b"multiplicity",
         crate::ast::KermlClassifierKeyword::Multiplicity,
     ),
-    (
-        b"subclassifier",
-        crate::ast::KermlClassifierKeyword::Subclassifier,
-    ),
+    (b"type", crate::ast::KermlClassifierKeyword::Type),
     (
         b"classifier",
         crate::ast::KermlClassifierKeyword::Classifier,
@@ -726,6 +905,10 @@ pub(crate) fn kerml_type_relationship_clauses(
             let (rest, _) = tag(&b"intersects"[..]).parse(after_ws)?;
             let (rest, _) = ws1(rest)?;
             (rest, crate::ast::KermlTypeRelationshipKeyword::Intersects)
+        } else if starts_with_keyword(after_ws.fragment(), b"differences") {
+            let (rest, _) = tag(&b"differences"[..]).parse(after_ws)?;
+            let (rest, _) = ws1(rest)?;
+            (rest, crate::ast::KermlTypeRelationshipKeyword::Differences)
         } else {
             return Ok((input, out));
         };
@@ -943,161 +1126,12 @@ fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>>
     ))
 }
 
-/// KerML bare `feature` usage declaration: `feature` name (`:` type | `:>` target | `:>>`
-/// target)? (`=` value)? `;`. Reuses the same `DefaultReferenceUsage` shape the keyword-less
-/// `name;` / `name = expr;` form already produces (see `feature_value_binding`/
-/// `bare_or_valued_feature_binding` in `attribute.rs`), just with the explicit leading `feature`
-/// keyword consumed first and `:` typing additionally supported (those two helpers only handle
-/// `:>`/`:>>`, never a plain `:` type since the keyword-less form can't tell a type from an
-/// expression there).
-fn feature_usage_member(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
-    crate::parser::span::reference_transaction(input, feature_usage_member_inner)
-}
-
-fn feature_usage_member_inner(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"feature"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, (name_span, name_str)) = crate::parser::span::with_span(name).parse(input)?;
-    let (input, typing_result) = crate::parser::usage::optional_typings(input)?;
-    let (typing_span, typing) = typing_result
-        .map(|(span, is_conj, targets, spelling)| {
-            (
-                Some(span.clone()),
-                Some(crate::parser::usage::typing_node(
-                    span, is_conj, targets, spelling,
-                )),
-            )
-        })
-        .unwrap_or((None, None));
-    let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
-    let leading_value = spec.subsets.as_ref().and_then(|(_, v)| v.clone());
-    let (input, value) =
-        opt(preceded(ws_and_comments, crate::parser::feature_value_part)).parse(input)?;
-    let value = value.or(leading_value.map(crate::parser::feature_value::wrap_bind_expression));
-    let (ws_input, _) = ws_and_comments(input)?;
-    let (input, body) = if ws_input.fragment().starts_with(b"{") {
-        let (input, elements) = feature_body_brace(ws_input)?;
-        (input, Some(elements))
-    } else {
-        let (input, _) = tag(&b";"[..]).parse(ws_input)?;
-        (input, None)
-    };
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::DefaultReferenceUsage {
-                name: name_str,
-                typing,
-                subsets: spec.subsets.map(|(target, _value)| target),
-                redefines: spec.redefines,
-                multiplicity: None,
-                value,
-                name_span: Some(name_span),
-                typing_span,
-                membership: crate::ast::Membership::feature(None, crate::ast::Span::dummy()),
-                has_feature_keyword: true,
-                body,
-            },
-        ),
-    ))
-}
-
-/// `feature NAME { ... }`'s block body: zero or more nested members, currently just a nested
-/// owned `expr NAME { ... }` (the only shape the pinned KerML fixtures exercise, see
-/// `DefaultReferenceUsage::body`'s doc comment). Not registered with `parse_structured_brace_members`
-/// (no recovery-element/starter-list machinery yet needed for this narrow shape) -- add that
-/// machinery if/when a second member kind needs it.
-fn feature_body_brace(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Vec<Node<crate::ast::FeatureBodyElement>>> {
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = tag(&b"}"[..]).parse(input)?;
-            return Ok((input, elements));
-        }
-        let (next, element) = feature_body_element(input)?;
-        elements.push(element);
-        input = next;
-    }
-}
-
-fn feature_body_element(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::FeatureBodyElement>> {
-    let start = input;
-    let (input, member) = expr_member(input)?;
-    Ok((
-        input,
-        node_from_to(start, input, crate::ast::FeatureBodyElement::Expr(member)),
-    ))
-}
-
-/// Nested owned expression feature: `expr` name `{` (`in`/`out`/`inout` parameter | `return`
-/// declaration)* `}`. Reuses the same parameter-list machinery `calc`/`constraint` bodies already
-/// share (`crate::parser::action::in_out_decl`, `crate::parser::constraint::return_decl`) rather
-/// than reimplementing `in`/`return` parsing for this nested shape.
-fn expr_member(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ExprMember>> {
-    let start = input;
-    let (input, _) = tag(&b"expr"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, (name_span, name_str)) = crate::parser::span::with_span(name).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
-    let mut input = input;
-    let mut members = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = tag(&b"}"[..]).parse(input)?;
-            return Ok((
-                input,
-                node_from_to(
-                    start,
-                    input,
-                    crate::ast::ExprMember {
-                        name: name_str,
-                        name_span: Some(name_span),
-                        body: members,
-                    },
-                ),
-            ));
-        }
-        let (next, member) = expr_member_element(input)?;
-        members.push(member);
-        input = next;
-    }
-}
-
-fn expr_member_element(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::ExprMemberElement>> {
-    let start = input;
-    let (input, elem) = if starts_with_keyword(input.fragment(), b"return") {
-        map(crate::parser::constraint::return_decl, |n| {
-            crate::ast::ExprMemberElement::ReturnDecl(Box::new(n))
-        })
-        .parse(input)?
-    } else {
-        map(crate::parser::action::in_out_decl, |n| {
-            crate::ast::ExprMemberElement::InOutDecl(Box::new(n))
-        })
-        .parse(input)?
-    };
-    Ok((input, node_from_to(start, input, elem)))
-}
-
+// The bare-`feature` package member (`feature x : Integer;`, `feature f { expr s { ... } }`)
+// now parses through `kerml_feature_member` -- one typed representation for every
+// `feature`-keyword-led member across package and type-body scopes (spec42 gap 14). The
+// previous `DefaultReferenceUsage`-shaped `feature_usage_member` production and its
+// `FeatureBodyElement::Expr`/`ExprMember` body machinery were removed with it; `expr s { ... }`
+// members now parse as feature members of kind `expr` inside the shared type-body grammar.
 fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLibraryDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[
@@ -1781,8 +1815,8 @@ fn try_package_body_behavior<'a>(
         start,
         starter,
         Feature,
-        feature_usage_member,
-        PackageBodyElement::DefaultReferenceUsage
+        crate::parser::constraint::kerml_feature_member,
+        |n| { PackageBodyElement::KermlFeatureMember(Box::new(n)) }
     );
     try_package_body_dispatch!(
         input,
@@ -1997,22 +2031,31 @@ fn try_package_body_view<'a>(
     // Bare `classifier`/`class` forward declarations (e.g. `classifier SpatialFrame;`, `class
     // B;`) are tried before the opaque `classifier_decl` fallback so this common shape gets a
     // structured node -- see `kerml_bare_declaration`'s doc comment.
-    try_package_body_dispatch!(
-        input,
-        start,
-        kerml_bare_declaration,
-        PackageBodyElement::KermlBareDeclaration
-    );
+    try_package_body_dispatch!(input, start, kerml_relationship_decl, |n| {
+        PackageBodyElement::KermlRelationship(Box::new(n))
+    });
+    // Classifier declarations (incl. bare `classifier X;`-style forward declarations, which get
+    // the same typed node with a `;` body) before the bare-declaration fallback, so every
+    // keyword the structured production covers becomes a resolvable named declaration
+    // (spec42 gap 13).
+    try_package_body_dispatch!(input, start, kerml_classifier_structured, |n| {
+        PackageBodyElement::KermlClassifier(Box::new(n))
+    });
     try_package_body_dispatch!(
         input,
         start,
         crate::parser::constraint::kerml_feature_member,
         |n| { PackageBodyElement::KermlFeatureMember(Box::new(n)) }
     );
+    // Bare forward declarations for the keywords the structured productions above do not
+    // cover (`inv x;`, `occurrence o;`, `succession s;`, ...).
+    try_package_body_dispatch!(
+        input,
+        start,
+        kerml_bare_declaration,
+        PackageBodyElement::KermlBareDeclaration
+    );
     try_package_body_dispatch!(input, start, feature_decl, PackageBodyElement::FeatureDecl);
-    try_package_body_dispatch!(input, start, kerml_classifier_structured, |n| {
-        PackageBodyElement::KermlClassifier(Box::new(n))
-    });
     try_package_body_dispatch!(
         input,
         start,
@@ -2037,10 +2080,91 @@ fn try_package_body_view<'a>(
         kerml_semantic_decl,
         PackageBodyElement::KermlSemanticDecl
     );
+    // Keyword-less implicit-feature shorthand, last so every keyword-led production keeps
+    // priority: bare `x;`, `y = expr;`, `z : Type;` package members (spec42 gap 23).
+    try_package_body_dispatch!(input, start, package_bare_binding, |n| {
+        PackageBodyElement::DefaultReferenceUsage(n)
+    });
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,
     )))
+}
+
+/// Keyword-less implicit-feature member at package/namespace scope: `x;`, `y = expr;`,
+/// `z : Type;` (spec42 gap 23; e.g. `causeA;` members in the Cause-and-Effect examples).
+/// Reuses [`crate::ast::DefaultReferenceUsage`], the same shape the keyword-less binding takes
+/// in attribute/action bodies.
+fn package_bare_binding(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    crate::parser::span::reference_transaction(input, package_bare_binding_inner)
+}
+
+fn package_bare_binding_inner(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, (name_span, name_str)) = crate::parser::with_span(name).parse(input)?;
+    // A bare *reserved keyword* (`then;`) is a misused keyword, not an implicit feature --
+    // keep it on the targeted recovery diagnostic (GH-87.2).
+    if crate::parser::lex::is_reserved_keyword(name_str.as_bytes()) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Verify,
+        )));
+    }
+    let (input, typing) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
+            let before = input;
+            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
+            let (input, target) =
+                preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
+            let span = crate::parser::span_from_to(before, input);
+            (
+                input,
+                Some(Node::new(
+                    span.clone(),
+                    crate::ast::TypingRelationship {
+                        target: vec![target],
+                        kind: crate::ast::TypingKind::Typing,
+                        span,
+                        is_conjugated: false,
+                        is_implied: false,
+                        spelling: crate::ast::TypingSpelling::Operator,
+                    },
+                )),
+            )
+        } else {
+            (input, None)
+        }
+    };
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let typing_span = typing.as_ref().map(|t| t.span.clone());
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            crate::ast::DefaultReferenceUsage {
+                name: name_str,
+                typing,
+                subsets: None,
+                redefines: None,
+                value,
+                multiplicity: None,
+                name_span: Some(name_span),
+                typing_span,
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
+                has_feature_keyword: false,
+                body: None,
+            },
+        ),
+    ))
 }
 
 /// PackageBodyElement: Package | Import | PartDef | PartUsage | PortDef | InterfaceDef | AliasDef | ActionDef | ActionUsage

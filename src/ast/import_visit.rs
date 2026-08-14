@@ -142,6 +142,7 @@ impl ProvenanceValidator<'_> {
             PackageBodyElement::ExtendedDefinition(n) => self.package_body(&n.value.body),
             PackageBodyElement::KermlClassifier(_)
             | PackageBodyElement::KermlConnector(_)
+            | PackageBodyElement::KermlRelationship(_)
             | PackageBodyElement::KermlInvariant(_)
             | PackageBodyElement::KermlFeatureMember(_) => Ok(()),
             PackageBodyElement::Error(_)

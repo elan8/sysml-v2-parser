@@ -1484,6 +1484,7 @@ fn collect_package_body_element_errors(
         PackageBodyElement::KermlConnector(n) => {
             collect_calc_body_errors(&n.value.body, errors);
         }
+        PackageBodyElement::KermlRelationship(_) => {}
         PackageBodyElement::KermlInvariant(n) => {
             collect_calc_body_errors(&n.value.body, errors);
         }

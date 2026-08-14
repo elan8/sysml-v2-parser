@@ -329,6 +329,9 @@ pub enum Expression {
         /// Structured BodyExpression form `->forAll { in ref item : T; predicate }`.
         /// Parenthesized invocation leaves this `None`.
         brace_body: Option<Box<Node<CollectionOperatorBody>>>,
+        /// True for the KerML dot shorthand spellings `x.{...}` (collect) and `x.?{...}`
+        /// (select), so emission renders the authored form instead of `->collect`/`->select`.
+        dot_shorthand: bool,
     },
     /// Metadata-access expression: `expr.metadata` (KerML `MetadataAccessExpression`, BNF
     /// 8.2.5.8.3: `ElementReferenceMember '.' 'metadata'`). Distinct from [`Expression::Classification`]

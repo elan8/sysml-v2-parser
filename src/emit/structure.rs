@@ -948,7 +948,7 @@ fn emit_connect_stmt_body(
     }
 }
 
-fn emit_relationship_body_element_local(
+pub(crate) fn emit_relationship_body_element_local(
     w: &mut EmitWriter<'_>,
     path: &str,
     el: &crate::ast::RelationshipBodyElement,
@@ -1525,43 +1525,10 @@ fn emit_feature_body_element(
     el: &crate::ast::FeatureBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        crate::ast::FeatureBodyElement::Expr(e) => emit_expr_member(w, path, &e.value),
         crate::ast::FeatureBodyElement::Binding(b) => {
             emit_default_reference_usage(w, path, &b.value)
         }
         crate::ast::FeatureBodyElement::Doc(d) => super::root::emit_doc(w, &d.value),
-    }
-}
-
-fn emit_expr_member(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    member: &crate::ast::ExprMember,
-) -> Result<(), EmitError> {
-    w.push_str("expr ");
-    w.push_str(&format_name(&member.name));
-    w.push_str(" {");
-    w.newline();
-    w.indent();
-    for (i, el) in member.body.iter().enumerate() {
-        emit_expr_member_element(w, &format!("{path}/expr-body[{i}]"), &el.value)?;
-        w.newline();
-    }
-    w.dedent();
-    w.push_char('}');
-    Ok(())
-}
-
-fn emit_expr_member_element(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    el: &crate::ast::ExprMemberElement,
-) -> Result<(), EmitError> {
-    match el {
-        crate::ast::ExprMemberElement::InOutDecl(d) => {
-            super::behavior::emit_inout_decl(w, path, &d.value)
-        }
-        crate::ast::ExprMemberElement::ReturnDecl(r) => super::view::emit_return_decl(w, &r.value),
     }
 }
 

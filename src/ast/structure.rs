@@ -9,7 +9,6 @@ use super::common::{
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
-use super::view::ReturnDecl;
 use super::view::{CalcUsage, ConstraintDef, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
@@ -948,34 +947,12 @@ impl PartialEq for DefaultReferenceUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FeatureBodyElement {
-    /// A nested owned expression feature, e.g. `expr s { in x; return : Boolean; }`.
-    Expr(Node<ExprMember>),
     /// A nested keyword-less binding, e.g. `:>> dimensions = sourceVector.mRef.dimensions;`
     /// inside `:>> mRef = transformation.target { ... }` (Domain Libraries
     /// `VectorCalculations.sysml`).
     Binding(Box<Node<DefaultReferenceUsage>>),
     /// Documentation inside a feature body.
     Doc(Node<DocComment>),
-}
-
-/// Nested `expr NAME { ... }` member inside a [`FeatureBodyElement::Expr`]. Its own body reuses
-/// the same `in`/`out`/`return` parameter-list machinery already shared by `calc`/`constraint`
-/// bodies (`crate::parser::action::in_out_decl`, `crate::parser::constraint::return_decl`).
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ExprMember {
-    pub name: String,
-    pub name_span: Option<Span>,
-    pub body: Vec<Node<ExprMemberElement>>,
-}
-
-/// A single member of an [`ExprMember`]'s `{ ... }` body: a parameter (`in`/`out`/`inout`) or a
-/// `return` declaration -- the only shapes the pinned fixture (`in x; return : Boolean;`) needs.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ExprMemberElement {
-    InOutDecl(Box<Node<InOutDecl>>),
-    ReturnDecl(Box<Node<ReturnDecl>>),
 }
 
 // ---------------------------------------------------------------------------

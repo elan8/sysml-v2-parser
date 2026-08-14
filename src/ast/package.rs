@@ -182,6 +182,9 @@ pub enum PackageBodyElement {
     /// Package-level KerML connector member (`connector a2 from x.s to y.t;`); see
     /// [`crate::ast::KermlConnectorMember`].
     KermlConnector(Box<Node<crate::ast::KermlConnectorMember>>),
+    /// KerML explicit relationship declaration (`specialization S subclassifier A specializes
+    /// B;`, `typing t typed x by T;`, ...); see [`crate::ast::KermlRelationshipDecl`].
+    KermlRelationship(Box<Node<crate::ast::KermlRelationshipDecl>>),
     /// Package-level KerML feature member with the full feature-member surface (`feature i:
     /// Complex[1] = rect(0.0, 1.0);`, Kernel Function Library `ComplexFunctions.kerml`); see
     /// [`crate::ast::KermlFeatureMember`].

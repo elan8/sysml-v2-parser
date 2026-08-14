@@ -187,6 +187,8 @@ pub enum KermlClassifierKeyword {
     Struct,
     /// `assoc` (KerML `Association`, short spelling).
     Assoc,
+    /// `association` (KerML `Association`, spelled out).
+    Association,
     /// `behavior` (KerML `Behavior`).
     Behavior,
     /// `interaction` (KerML `Interaction`).
@@ -196,8 +198,8 @@ pub enum KermlClassifierKeyword {
     /// `multiplicity` (KerML `Multiplicity`), the bodied form (`multiplicity zeroOrOne [0..1]
     /// { ... }`); the bare `;` form stays on [`KermlBareDeclaration`].
     Multiplicity,
-    /// `subclassifier` (KerML dialect shorthand used by `Links.kerml`).
-    Subclassifier,
+    /// `type` (KerML `Type`, the general type declaration: `type UnionType unions A, B;`).
+    Type,
     /// `classifier` (KerML `Classifier`), the bodied form (`abstract classifier Anything
     /// { ... }`); bare forward declarations stay on [`KermlBareDeclaration`].
     Classifier,
@@ -219,11 +221,12 @@ impl KermlClassifierKeyword {
             Self::Metaclass => "metaclass",
             Self::Struct => "struct",
             Self::Assoc => "assoc",
+            Self::Association => "association",
             Self::Behavior => "behavior",
             Self::Interaction => "interaction",
             Self::Predicate => "predicate",
             Self::Multiplicity => "multiplicity",
-            Self::Subclassifier => "subclassifier",
+            Self::Type => "type",
             Self::Classifier => "classifier",
             Self::Class => "class",
             Self::AssocStruct => "assoc struct",
@@ -252,6 +255,8 @@ pub enum KermlTypeRelationshipKeyword {
     Unions,
     /// `intersects`.
     Intersects,
+    /// `differences`.
+    Differences,
 }
 
 impl KermlTypeRelationshipKeyword {
@@ -261,6 +266,7 @@ impl KermlTypeRelationshipKeyword {
             Self::DisjointFrom => "disjoint from",
             Self::Unions => "unions",
             Self::Intersects => "intersects",
+            Self::Differences => "differences",
         }
     }
 }
@@ -460,4 +466,68 @@ pub struct KermlEndMember {
     /// The owned cross feature.
     pub feature: Box<Node<KermlFeatureMember>>,
     pub membership: crate::ast::Membership,
+}
+
+/// KerML explicit relationship declaration (BNF §8.2.4: `Specialization`,
+/// `Subclassification`, `FeatureTyping`, `Subsetting`, `Redefinition`, `Disjoining`,
+/// `FeatureInverting`, `TypeFeaturing`), e.g. `specialization S subclassifier A specializes
+/// B;`, `typing t typed x by T;`, `subset parent subsets f;`, `disjoining d1 disjoint A from
+/// B;`, `featuring F of y by C;` (spec42 gap 22).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KermlRelationshipDecl {
+    /// The declaration-introducer keyword pair.
+    pub keyword: KermlRelationshipKeyword,
+    /// Optional declared identification (`specialization S ...`, `disjoining d1 ...`,
+    /// `inverting i ...`, `featuring F of ...`).
+    pub identification: Option<crate::ast::Identification>,
+    /// The specific/typed/subsetting/disjoined/inverted/featured element (a possibly dotted
+    /// feature chain).
+    pub source: crate::ast::QualifiedReferenceId,
+    /// The general/type/subsetted/disjoining/inverting/featuring element.
+    pub target: crate::ast::QualifiedReferenceId,
+    /// `;` or the annotation-only `RelationshipBody`.
+    pub body: Option<Vec<Node<crate::ast::RelationshipBodyElement>>>,
+    pub membership: crate::ast::Membership,
+}
+
+/// Which explicit relationship a [`KermlRelationshipDecl`] declares. Variants carry the
+/// authored introducer keyword; the connective between source and target is fixed per variant
+/// (`specializes`/`:>`, `typed by`/`:`, `subsets`/`:>`, `redefines`/`:>>`, `from`, `of`,
+/// `by`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum KermlRelationshipKeyword {
+    /// `subtype a specializes b` (`Specialization`).
+    Subtype,
+    /// `subclassifier a specializes b` (`Subclassification`).
+    Subclassifier,
+    /// `typing a typed by b` (`FeatureTyping`).
+    Typing,
+    /// `subset a subsets b` (`Subsetting`).
+    Subset,
+    /// `redefinition a redefines b` (`Redefinition`).
+    Redefinition,
+    /// `disjoint a from b` (`Disjoining`).
+    Disjoint,
+    /// `inverse a of b` (`FeatureInverting`).
+    Inverse,
+    /// `featuring (I of)? a by b` (`TypeFeaturing`).
+    Featuring,
+}
+
+impl KermlRelationshipKeyword {
+    /// The authored introducer keyword spelling.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Subtype => "subtype",
+            Self::Subclassifier => "subclassifier",
+            Self::Typing => "typing",
+            Self::Subset => "subset",
+            Self::Redefinition => "redefinition",
+            Self::Disjoint => "disjoint",
+            Self::Inverse => "inverse",
+            Self::Featuring => "featuring",
+        }
+    }
 }

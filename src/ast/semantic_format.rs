@@ -294,6 +294,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 base,
                 args,
                 brace_body,
+                dot_shorthand: _,
             } => {
                 self.writer.write_str("(collection-op (operator ")?;
                 write_quoted(self.writer, collection_operator_name(op))?;
@@ -2324,6 +2325,16 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::KermlConnector(_connector) => {
                 self.write_marker(first, "kerml-connector")
+            }
+            PackageBodyElement::KermlRelationship(relationship) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(kerml-relationship (keyword ")?;
+                self.writer.write_str(relationship.value.keyword.as_str())?;
+                self.writer.write_str(") (source ")?;
+                self.write_reference(relationship.value.source)?;
+                self.writer.write_str(") (target ")?;
+                self.write_reference(relationship.value.target)?;
+                self.writer.write_str("))")
             }
             PackageBodyElement::KermlInvariant(invariant) => {
                 self.write_item_prefix(first)?;

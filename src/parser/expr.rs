@@ -955,6 +955,7 @@ fn build_frame_node<'a>(frame: Frame<'a>, end: Input<'a>) -> Node<Expression> {
                 base: Box::new(base),
                 args: items,
                 brace_body: None,
+                dot_shorthand: false,
             },
         ),
         FrameKind::Constructor { type_name } => node_from_to(
@@ -1133,6 +1134,29 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                 input = next;
                 continue;
             }
+            // KerML dot shorthands for body-expression operators: `x.{in xx; xx + 1}` is the
+            // `collect` sugar and `x.?{in xx; cond}` the `select` sugar (spec42
+            // `kerml/expressions.md`). Checked before plain member access, whose `.` + name
+            // parse would otherwise fail on the `{`.
+            if next.fragment().starts_with(b".{") || next.fragment().starts_with(b".?{") {
+                let select = next.fragment().starts_with(b".?{");
+                let (next, _) = if select {
+                    tag(&b".?"[..]).parse(next)?
+                } else {
+                    tag(&b"."[..]).parse(next)?
+                };
+                let (after_brace, body) = collection_operator_body(next)?;
+                let expr = Expression::CollectionOp {
+                    op: CollectionOperator::from_name(if select { "select" } else { "collect" }),
+                    base: Box::new(atom),
+                    args: Vec::new(),
+                    brace_body: Some(Box::new(body)),
+                    dot_shorthand: true,
+                };
+                atom = node_from_to(primary_start, after_brace, expr);
+                input = after_brace;
+                continue;
+            }
             if next.fragment().starts_with(b".") && !next.fragment().starts_with(b"..") {
                 let (next, _) = tag(&b"."[..]).parse(next)?;
                 let (next, _) = ws_and_comments(next)?;
@@ -1169,6 +1193,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                         base: Box::new(atom),
                         args: Vec::new(),
                         brace_body: Some(Box::new(body)),
+                        dot_shorthand: false,
                     };
                     atom = node_from_to(primary_start, after_brace, expr);
                     input = after_brace;
@@ -1185,6 +1210,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                             base: Box::new(atom),
                             args: Vec::new(),
                             brace_body: None,
+                            dot_shorthand: false,
                         };
                         atom = node_from_to(primary_start, after_close, expr);
                         input = after_close;
@@ -1233,6 +1259,7 @@ fn expression_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
                                 value: Node::new(span, Expression::FeatureRef(func_ref)),
                             }],
                             brace_body: None,
+                            dot_shorthand: false,
                         };
                         atom = node_from_to(primary_start, after_ref, expr);
                         input = after_ref;

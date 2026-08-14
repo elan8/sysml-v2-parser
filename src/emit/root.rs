@@ -127,6 +127,81 @@ fn emit_package_body_node(
     emit_package_body_element(w, path, &node.value)
 }
 
+fn emit_kerml_relationship_decl(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    decl: &crate::ast::KermlRelationshipDecl,
+) -> Result<(), EmitError> {
+    use crate::ast::KermlRelationshipKeyword as Kw;
+    emit_visibility(w, decl.membership.visibility);
+    // The prefix keyword and identification placement depend on the relationship family.
+    match decl.keyword {
+        Kw::Subtype | Kw::Subclassifier | Kw::Typing | Kw::Subset | Kw::Redefinition => {
+            if let Some(identification) = &decl.identification {
+                w.push_str("specialization ");
+                emit_identification(w, identification);
+                w.push_char(' ');
+            }
+        }
+        Kw::Disjoint => {
+            if let Some(identification) = &decl.identification {
+                w.push_str("disjoining ");
+                emit_identification(w, identification);
+                w.push_char(' ');
+            }
+        }
+        Kw::Inverse => {
+            if let Some(identification) = &decl.identification {
+                w.push_str("inverting ");
+                emit_identification(w, identification);
+                w.push_char(' ');
+            }
+        }
+        Kw::Featuring => {}
+    }
+    w.push_str(decl.keyword.as_str());
+    w.push_char(' ');
+    if decl.keyword == Kw::Featuring {
+        if let Some(identification) = &decl.identification {
+            emit_identification(w, identification);
+            w.push_str(" of ");
+        }
+    }
+    w.push_qualified_reference(&format!("{path}/source"), decl.source)?;
+    w.push_str(match decl.keyword {
+        Kw::Subtype | Kw::Subclassifier => " specializes ",
+        Kw::Typing => " typed by ",
+        Kw::Subset => " subsets ",
+        Kw::Redefinition => " redefines ",
+        Kw::Disjoint => " from ",
+        Kw::Inverse => " of ",
+        Kw::Featuring => " by ",
+    });
+    w.push_qualified_reference(&format!("{path}/target"), decl.target)?;
+    // Annotation-only RelationshipBody; `None` is the `;` form. Annotations inside the brace
+    // form are rare and re-emitted via the shared relationship-body element emitter.
+    match &decl.body {
+        None => w.push_char(';'),
+        Some(elements) if elements.is_empty() => w.push_str(" {}"),
+        Some(elements) => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                super::structure::emit_relationship_body_element_local(
+                    w,
+                    &format!("{path}/body[{i}]"),
+                    &el.value,
+                )?;
+                w.newline();
+            }
+            w.dedent();
+            w.push_char('}');
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn emit_kerml_classifier_decl(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -307,6 +382,9 @@ pub(crate) fn emit_package_body_element(
         }
         PackageBodyElement::KermlConnector(connector) => {
             super::view::emit_kerml_connector_member(w, path, &connector.value)
+        }
+        PackageBodyElement::KermlRelationship(relationship) => {
+            emit_kerml_relationship_decl(w, path, &relationship.value)
         }
         PackageBodyElement::KermlInvariant(invariant) => {
             super::view::emit_kerml_invariant_member(w, path, &invariant.value)

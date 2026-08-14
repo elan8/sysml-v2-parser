@@ -119,6 +119,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::KermlConnector(n) => {
             PackageBodyElement::KermlConnector(Box::new(dummy_node(n, n.value.clone())))
         }
+        PackageBodyElement::KermlRelationship(n) => {
+            PackageBodyElement::KermlRelationship(Box::new(dummy_node(n, n.value.clone())))
+        }
         PackageBodyElement::KermlInvariant(n) => {
             PackageBodyElement::KermlInvariant(Box::new(dummy_node(n, n.value.clone())))
         }
@@ -828,10 +831,12 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
             base,
             args,
             brace_body,
+            dot_shorthand,
         } => Expression::CollectionOp {
             op: op.clone(),
             base: Box::new(normalize_expression_node(base)),
             args: args.iter().map(normalize_argument).collect(),
+            dot_shorthand: *dot_shorthand,
             brace_body: brace_body.as_ref().map(|body| {
                 Box::new(dummy_node(
                     body,

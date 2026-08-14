@@ -162,14 +162,34 @@ pub(crate) fn emit_expression(w: &mut EmitWriter<'_>, expr: &Expression) -> Resu
             base,
             args,
             brace_body,
+            dot_shorthand,
         } => {
             emit_expression(w, &base.value)?;
-            w.push_str("->");
-            w.push_str(collection_op_str(op));
-            if let Some(body) = brace_body {
-                emit_collection_operator_body(w, &body.value)?;
+            if *dot_shorthand {
+                // KerML dot sugar: `x.{...}` (collect) / `x.?{...}` (select). Only those two
+                // operators have a dot spelling; anything else could not have parsed with the
+                // flag set and falls back to the arrow form.
+                if matches!(op, CollectionOperator::Select) {
+                    w.push_str(".?");
+                } else if matches!(op, CollectionOperator::Collect) {
+                    w.push_str(".");
+                } else {
+                    w.push_str("->");
+                    w.push_str(collection_op_str(op));
+                }
+                if let Some(body) = brace_body {
+                    emit_body_expression_bare(w, &body.value)?;
+                } else {
+                    emit_args(w, args)?;
+                }
             } else {
-                emit_args(w, args)?;
+                w.push_str("->");
+                w.push_str(collection_op_str(op));
+                if let Some(body) = brace_body {
+                    emit_collection_operator_body(w, &body.value)?;
+                } else {
+                    emit_args(w, args)?;
+                }
             }
         }
         Expression::Conditional {
