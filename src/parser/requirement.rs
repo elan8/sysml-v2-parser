@@ -151,7 +151,7 @@ fn requirement_body_recovery_element(
         node_from_to(
             start,
             end,
-            RequirementDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+            RequirementDefBodyElement::Error(node_from_to(start, end, recovery)),
         )
     } else {
         let frag = start.fragment();

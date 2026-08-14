@@ -13,8 +13,7 @@ use super::lex;
 use super::package;
 use super::span::{node_from_to, ParseContext};
 use crate::ast::{
-    Node, PackageBodyElement, ParseErrorNode, ParsedDocument, RootElement, RootNamespace,
-    SourceStorage, Span,
+    PackageBodyElement, ParseErrorNode, ParsedDocument, RootElement, RootNamespace, SourceStorage,
 };
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
@@ -272,7 +271,7 @@ fn parse_with_diagnostics_document(
                                 category: pe.category,
                             };
                             let error =
-                                PackageBodyElement::Error(Node::new(Span::dummy(), recovery));
+                                PackageBodyElement::Error(node_from_to(input, rest, recovery));
                             let member = node_from_to(input, rest, error);
                             elements.push(node_from_to(
                                 input,
@@ -321,7 +320,8 @@ fn parse_with_diagnostics_document(
                             suggestion: pe.suggestion,
                             category: pe.category,
                         };
-                        let error = PackageBodyElement::Error(Node::new(Span::dummy(), recovery));
+                        let error =
+                            PackageBodyElement::Error(node_from_to(recovery_start, rest, recovery));
                         let member = node_from_to(recovery_start, rest, error);
                         elements.push(node_from_to(
                             recovery_start,

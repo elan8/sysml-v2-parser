@@ -87,7 +87,7 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
                 node_from_to(
                     start,
                     end,
-                    StateDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                    StateDefBodyElement::Error(node_from_to(start, end, recovery)),
                 )
             } else {
                 let frag = start.fragment();
@@ -128,7 +128,7 @@ fn consume_state_structured_brace(
                 node_from_to(
                     start,
                     end,
-                    StateDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                    StateDefBodyElement::Error(node_from_to(start, end, recovery)),
                 )
             } else {
                 let frag = start.fragment();

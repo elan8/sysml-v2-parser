@@ -28,7 +28,7 @@ package P {
         entry;
         then off;
         state off;
-
+        transition t first
     }
 }
 ~~~

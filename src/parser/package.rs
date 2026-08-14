@@ -1254,7 +1254,7 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                     elements.push(node_from_to(
                         input,
                         next,
-                        PackageBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                        PackageBodyElement::Error(node_from_to(input, next, recovery)),
                     ));
                     input = next;
                     continue;
@@ -1281,7 +1281,7 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                 elements.push(node_from_to(
                     input,
                     next,
-                    PackageBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                    PackageBodyElement::Error(node_from_to(input, next, recovery)),
                 ));
                 input = next;
             }
@@ -1315,7 +1315,7 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                 elements.push(node_from_to(
                     input,
                     next,
-                    PackageBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                    PackageBodyElement::Error(node_from_to(input, next, recovery)),
                 ));
                 input = next;
             }
