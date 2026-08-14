@@ -140,11 +140,11 @@ package '3a-Function-based Behavior-2' {
             action 'generate torque' : 'Generate Torque' {
                 in fuelCmd = 'provide power'::fuelCmd;
             }
-            flow  'generate torque'.engineTorque to 'amplify torque'.engineTorque;
+            flow from 'generate torque'.engineTorque to 'amplify torque'.engineTorque;
             action 'amplify torque' : 'Amplify Torque';
-            flow  'amplify torque'.transmissionTorque to 'transfer torque'.transmissionTorque;
+            flow from 'amplify torque'.transmissionTorque to 'transfer torque'.transmissionTorque;
             action 'transfer torque' : 'Transfer Torque';
-            flow  'transfer torque'.driveshaftTorque to 'distribute torque'.driveShaftTorque;
+            flow from 'transfer torque'.driveshaftTorque to 'distribute torque'.driveShaftTorque;
             action 'distribute torque' : 'Distribute Torque';
             first start;
             then merge continue;

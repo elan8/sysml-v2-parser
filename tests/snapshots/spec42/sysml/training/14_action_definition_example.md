@@ -57,7 +57,7 @@ package 'Action Definition Example' {
             in scene;
             out image;
         }
-        flow 'from' from focus.image to shoot.image;
+        flow from focus.image to shoot.image;
         action shoot : Shoot {
             in image;
             out picture;

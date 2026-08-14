@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 129.** The canonical anonymous flow shorthand `flow from <a> to
+  <b>;` (and its `succession flow` sibling) no longer silently misparses the `from` keyword as
+  the flow's declared name: such statements now produce `FlowUsage { name: None, .. }`, so
+  cached parses from earlier versions are invalidated even though the serialized shape is
+  unchanged (spec42 gap 47). Anonymous flows also emit the `from`-keyword spelling instead of
+  the double-spaced endpoint shorthand.
 - **`PARSE_AST_VERSION` is now 128.** `ExtendedDefinition` gains `has_def_keyword`: the bare
   `#<keyword>+ <Name> { ... }` extended-usage shorthand (no `def` keyword at all, e.g.
   `#clouddd ArrowheadCore { ... }`) now parses into the same typed node as its `def`-suffixed

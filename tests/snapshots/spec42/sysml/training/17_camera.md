@@ -55,7 +55,7 @@ package Camera {
             in ref item scene : Scene = camera::scene;		
 			out ref item realImage : Image;
         }
-        flow  autoFocus.realImage to imager.focusedImage;
+        flow from autoFocus.realImage to imager.focusedImage;
         part imager {
             in item focusedImage : Image;		
 			out item photo : Picture :> photos;

@@ -44,8 +44,8 @@ package 'Flow Interface Example' {
     interface def FuelInterface {
         end supplierPort : FuelOutPort;
         end consumerPort : FuelInPort;
-        flow  supplierPort.fuelSupply to consumerPort.fuelSupply;
-        flow  consumerPort.fuelReturn to supplierPort.fuelReturn;
+        flow from supplierPort.fuelSupply to consumerPort.fuelSupply;
+        flow from consumerPort.fuelReturn to supplierPort.fuelReturn;
     }
     part vehicle : Vehicle {
         part tankAssy : FuelTankAssembly;

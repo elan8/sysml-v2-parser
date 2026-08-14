@@ -192,11 +192,11 @@ package '3a-Function-based Behavior-1' {
             bind 'generate torque'.fuelCmd = fuelCmd {}
             action 'generate torque' : 'Generate Torque' {
             }
-            flow  'generate torque'.engineTorque to 'amplify torque'.engineTorque {}
+            flow from 'generate torque'.engineTorque to 'amplify torque'.engineTorque {}
             action 'amplify torque' : 'Amplify Torque';
-            flow  'amplify torque'.transmissionTorque to 'transfer torque'.transmissionTorque;
+            flow from 'amplify torque'.transmissionTorque to 'transfer torque'.transmissionTorque;
             action 'transfer torque' : 'Transfer Torque';
-            flow  'transfer torque'.driveshaftTorque to 'distribute torque'.driveShaftTorque;
+            flow from 'transfer torque'.driveshaftTorque to 'distribute torque'.driveShaftTorque;
             action 'distribute torque' : 'Distribute Torque';
             bind wheelTorque1 = 'distribute torque'.wheelTorque1;
             bind wheelTorque2 = 'distribute torque'.wheelTorque2;

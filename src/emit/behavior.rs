@@ -849,7 +849,12 @@ pub(crate) fn emit_flow_usage(
         w.push_qualified_reference(path, ty)?;
     }
     if let Some(payload) = &flow.payload {
-        w.push_str(" of ");
+        // The kind keyword already ends with a space when nothing was emitted since.
+        if flow.name.is_some() || flow.type_name.is_some() {
+            w.push_str(" of ");
+        } else {
+            w.push_str("of ");
+        }
         if let Some(n) = &payload.value.name {
             w.push_str(&format_name(n));
             if payload.value.type_name.is_some() || payload.value.multiplicity.is_some() {
@@ -867,11 +872,13 @@ pub(crate) fn emit_flow_usage(
         }
     }
     if let Some(from) = &flow.from {
-        // Unnamed flows use shorthand `flow <from> to <to>` so `from` is not reparsed as a name.
+        // Anonymous flows keep the canonical `flow from <a> to <b>` keyword spelling: the
+        // parser recognizes `from` as the endpoint keyword rather than a declared name
+        // (spec42 Gap 47).
         if flow.name.is_some() || flow.payload.is_some() || flow.type_name.is_some() {
             w.push_str(" from ");
         } else {
-            w.push_char(' ');
+            w.push_str("from ");
         }
         super::view::emit_kerml_connector_end(w, path, &from.value)?;
     }

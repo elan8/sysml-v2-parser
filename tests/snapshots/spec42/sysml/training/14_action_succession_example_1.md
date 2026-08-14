@@ -62,7 +62,7 @@ package 'Action Succession Example-1' {
             in scene;
             out image;
         }
-        flow 'from' from focus.image to shoot.image;
+        flow from focus.image to shoot.image;
         first focus then shoot;
         action shoot : Shoot {
             in image;

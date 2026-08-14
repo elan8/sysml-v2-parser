@@ -67,7 +67,7 @@ package 'Action Decomposition' {
             in item scene = takePicture::scene;
             out item image;
         }
-        flow 'from' from focus.image to shoot.image;
+        flow from focus.image to shoot.image;
         action shoot : Shoot {
             in item;
             out item picture = takePicture::picture;

@@ -80,17 +80,17 @@ package 'Merge Example' {
         then action trigger {
             out item scene : Scene;
         }
-        flow 'from' from trigger.scene to focus.scene;
+        flow from trigger.scene to focus.scene;
         then action focus : Focus {
             in item scene;
             out item image;
         }
-        flow 'from' from focus.image to shoot.image;
+        flow from focus.image to shoot.image;
         then action shoot : Shoot {
             in item image;
             out item picture;
         }
-        flow 'from' from shoot.picture to display.picture;
+        flow from shoot.picture to display.picture;
         then action display : Display {
             in item picture;
         }

@@ -250,12 +250,18 @@ pub(crate) fn flow_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<Flo
             flow_usage_payload_first(peek)?
         } else {
             match name(peek) {
-                Ok((after_name, _name_str)) => {
+                Ok((after_name, name_str)) => {
                     let (after_name, _) = ws_and_comments(after_name)?;
                     let fragment = after_name.fragment();
-                    let is_anonymous =
-                        fragment.starts_with(b".") || starts_with_keyword(fragment, b"to");
-                    if is_anonymous {
+                    // The canonical anonymous shorthand `flow from a to b;` (OMG spec Annex A's
+                    // preferred spelling) starts directly at the `from` keyword; `name()` would
+                    // otherwise consume `from` itself as a declared name and silently misparse
+                    // the statement as a flow named "from" (spec42 Gap 47). `flow_endpoints`
+                    // owns the `from`-keyword spelling, so route through the payload-first
+                    // production with no payload.
+                    if name_str == "from" {
+                        flow_usage_payload_first(peek)?
+                    } else if fragment.starts_with(b".") || starts_with_keyword(fragment, b"to") {
                         flow_usage_anonymous(peek)?
                     } else {
                         flow_usage_named(peek)?
@@ -281,6 +287,29 @@ mod payload_first_gap_tests {
 
     fn input(text: &str) -> Input<'_> {
         crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 47: `flow from a to b;` is the canonical anonymous shorthand — `from` is the
+    /// endpoint keyword, not a declared flow name. Genuinely named flows keep their name.
+    #[test]
+    fn from_keyword_is_not_a_flow_name() {
+        let (rest, node) =
+            flow_usage_member(input("flow from focus.image to shoot.image;")).expect("anonymous");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, None);
+        assert!(node.value.from.is_some());
+        assert!(node.value.to.is_some());
+
+        let (rest, node) =
+            flow_usage_member(input("succession flow from focus.image to shoot.image;"))
+                .expect("anonymous succession flow");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, None);
+        assert_eq!(node.value.kind, crate::ast::FlowUsageKind::SuccessionFlow);
+
+        let (_, node) = flow_usage_member(input("succession flow lightFlow from a.x to b.y;"))
+            .expect("named succession flow");
+        assert_eq!(node.value.name.as_deref(), Some("lightFlow"));
     }
 
     /// PARSER_BACKLOG_ROADMAP.md §6, G12: the payload clause may precede the endpoints, with no

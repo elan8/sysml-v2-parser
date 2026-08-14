@@ -79,7 +79,7 @@ package Q {
         part c :> b.f {
             part aa :> a;
         }
-        flow  b.f.a to c.aa;
+        flow from b.f.a to c.aa;
     }
     part e1 {
         attribute x : E;

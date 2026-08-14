@@ -60,7 +60,7 @@ package 'Action Definition Example' {
             in scene;
             out image;
         }
-        succession flow 'from' from focus.image to shoot.image;
+        succession flow from focus.image to shoot.image;
         action shoot : Shoot {
             in image;
             out picture;

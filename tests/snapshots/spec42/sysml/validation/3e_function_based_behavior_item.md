@@ -101,7 +101,7 @@ package '3e-Function-based Behavior-item' {
                         }
                     }
                 }
-                flow  'assemble transmission into vehicle'.'vehicle assy without engine' to 'assemble engine into vehicle'.'vehicle assy without engine';
+                flow from 'assemble transmission into vehicle'.'vehicle assy without engine' to 'assemble engine into vehicle'.'vehicle assy without engine';
                 action 'assemble engine into vehicle' {
                     in item 'vehicle assy without engine' : VehicleAssembly {
                         part transmission : Transmission;
