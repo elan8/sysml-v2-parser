@@ -1,10 +1,14 @@
-use crate::ast::{Expression, FlowDef, FlowUsage, FlowUsageKind, Membership, Node, PayloadFeature};
+use crate::ast::{FlowDef, FlowUsage, FlowUsageKind, Membership, Node, PayloadFeature};
 
-type FlowEndpoints<'a> =
-    nom::IResult<Input<'a>, (Option<Node<Expression>>, Option<Node<Expression>>)>;
+type FlowEndpoints<'a> = nom::IResult<
+    Input<'a>,
+    (
+        Option<Node<crate::ast::KermlConnectorEnd>>,
+        Option<Node<crate::ast::KermlConnectorEnd>>,
+    ),
+>;
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::expression;
 use crate::parser::lex::{name, starts_with_keyword, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::{
@@ -133,20 +137,25 @@ fn flow_endpoints(input: Input<'_>) -> FlowEndpoints<'_> {
     }
     if starts_with_keyword(peek.fragment(), b"from") {
         let (input, _) = preceded(ws_and_comments, tag(&b"from"[..])).parse(input)?;
-        let (input, from) = preceded(ws1, expression).parse(input)?;
+        let (input, from) =
+            preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to) = preceded(ws1, expression).parse(input)?;
+        let (input, to) =
+            preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         return Ok((input, (Some(from), Some(to))));
     }
-    // Shorthand: expr `to` expr (no `from` keyword).
-    let (input, from) = expression(input)?;
+    // Shorthand: end `to` end (no `from` keyword).
+    let start = input;
+    let (input, from) = crate::parser::constraint::kerml_connector_end(input)?;
     let (peek, _) = ws_and_comments(input)?;
     if starts_with_keyword(peek.fragment(), b"to") {
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-        let (input, to) = preceded(ws1, expression).parse(input)?;
+        let (input, to) =
+            preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
         Ok((input, (Some(from), Some(to))))
     } else {
-        Ok((input, (None, None)))
+        // No `to`: this member has no endpoints; leave the input untouched.
+        Ok((start, (None, None)))
     }
 }
 
@@ -164,6 +173,8 @@ fn flow_usage_named(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
             name: Some(name_str),
             type_name: header.type_reference,
             type_is_conjugated: header.type_is_conjugated,
+            subsets: header.subsets,
+            redefines: header.redefines,
             payload,
             from,
             to,
@@ -186,6 +197,8 @@ fn flow_usage_payload_first(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
             name: None,
             type_name: None,
             type_is_conjugated: false,
+            subsets: None,
+            redefines: None,
             payload,
             from,
             to,
@@ -196,9 +209,9 @@ fn flow_usage_payload_first(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
 }
 
 fn flow_usage_anonymous(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
-    let (input, from) = expression(input)?;
+    let (input, from) = crate::parser::constraint::kerml_connector_end(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-    let (input, to) = preceded(ws1, expression).parse(input)?;
+    let (input, to) = preceded(ws1, crate::parser::constraint::kerml_connector_end).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
@@ -208,6 +221,8 @@ fn flow_usage_anonymous(input: Input<'_>) -> IResult<Input<'_>, FlowUsage> {
             name: None,
             type_name: None,
             type_is_conjugated: false,
+            subsets: None,
+            redefines: None,
             payload: None,
             from: Some(from),
             to: Some(to),

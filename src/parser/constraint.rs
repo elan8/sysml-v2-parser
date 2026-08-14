@@ -523,7 +523,7 @@ fn typed_parameter_member_inner(
 }
 
 /// One end of a connector/binding/succession member: `[mult]?` feature chain.
-fn kerml_connector_end(
+pub(crate) fn kerml_connector_end(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorEnd>> {
     let start = input;

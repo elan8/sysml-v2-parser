@@ -547,9 +547,17 @@ pub struct FlowUsage {
     pub name: Option<String>,
     pub type_name: Option<QualifiedReferenceId>,
     pub type_is_conjugated: bool,
+    /// `:>` subsets clause (spec42 gap 28), previously parsed by the shared usage header and
+    /// discarded.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// `:>>` redefines clause. See `subsets`.
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub payload: Option<Node<PayloadFeature>>,
-    pub from: Option<Node<Expression>>,
-    pub to: Option<Node<Expression>>,
+    /// Typed `from <end> to <end>` ends (spec42 gap 28), the same connector-end shape
+    /// `AllocationUsage` and the KerML connector members use -- previously opaque `Expression`
+    /// nodes.
+    pub from: Option<Node<crate::ast::KermlConnectorEnd>>,
+    pub to: Option<Node<crate::ast::KermlConnectorEnd>>,
     pub body: DefinitionBody,
     pub membership: Membership,
 }
@@ -797,8 +805,17 @@ pub struct AllocationUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
     pub type_is_conjugated: bool,
-    pub source: Option<Node<Expression>>,
-    pub target: Option<Node<Expression>>,
+    /// `:>` subsets clause (spec42 gap 27), previously parsed by the shared usage header and
+    /// discarded.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// `:>>` redefines clause. See `subsets`.
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Typed `allocate <end> to <end>` ends (spec42 gap 27): each end is an optional
+    /// multiplicity plus an arena-backed feature chain with an optional `::>`/`references`
+    /// end-name split, the same shape connector members use -- previously opaque
+    /// `Expression` nodes with the authored end name discarded.
+    pub source: Option<Node<crate::ast::KermlConnectorEnd>>,
+    pub target: Option<Node<crate::ast::KermlConnectorEnd>>,
     pub body: DefinitionBody,
     pub membership: Membership,
 }

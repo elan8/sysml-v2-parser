@@ -114,7 +114,7 @@ package '12b-Allocation-1' {
         end logical : LogicalElement;
         end physical : PhysicalElement;
     }
-    allocation torqueGenAlloc : LogicalToPhysical allocate torqueGenerator to powerTrain {
+    allocation torqueGenAlloc : LogicalToPhysical allocate logical references torqueGenerator to physical references powerTrain {
         allocate torqueGenerator.generateTorque to powerTrain.engine.generateTorque;
     }
 }

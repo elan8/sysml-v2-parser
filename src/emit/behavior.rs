@@ -800,9 +800,9 @@ pub(crate) fn emit_allocation_usage(
         let (Some(source), Some(target)) = (&usage.source, &usage.target) else {
             return w.unsupported(path, "allocate shorthand without ends");
         };
-        emit_expression(w, &source.value)?;
+        super::view::emit_kerml_connector_end(w, path, &source.value)?;
         w.push_str(" to ");
-        emit_expression(w, &target.value)?;
+        super::view::emit_kerml_connector_end(w, path, &target.value)?;
         return emit_definition_body(w, path, &usage.body);
     }
     w.push_str("allocation ");
@@ -818,9 +818,9 @@ pub(crate) fn emit_allocation_usage(
     }
     if let (Some(source), Some(target)) = (&usage.source, &usage.target) {
         w.push_str(" allocate ");
-        emit_expression(w, &source.value)?;
+        super::view::emit_kerml_connector_end(w, path, &source.value)?;
         w.push_str(" to ");
-        emit_expression(w, &target.value)?;
+        super::view::emit_kerml_connector_end(w, path, &target.value)?;
     }
     emit_definition_body(w, path, &usage.body)
 }
@@ -871,11 +871,11 @@ pub(crate) fn emit_flow_usage(
         } else {
             w.push_char(' ');
         }
-        emit_expression(w, &from.value)?;
+        super::view::emit_kerml_connector_end(w, path, &from.value)?;
     }
     if let Some(to) = &flow.to {
         w.push_str(" to ");
-        emit_expression(w, &to.value)?;
+        super::view::emit_kerml_connector_end(w, path, &to.value)?;
     }
     emit_definition_body(w, path, &flow.body)
 }

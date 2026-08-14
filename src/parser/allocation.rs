@@ -1,7 +1,6 @@
-use crate::ast::{AllocationDef, AllocationUsage, Expression, Membership, Node};
+use crate::ast::{AllocationDef, AllocationUsage, Membership, Node};
 use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::expression;
 use crate::parser::lex::{name, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::feature_usage_header;
@@ -13,14 +12,10 @@ use nom::IResult;
 use nom::Parser;
 
 /// Allocate end: optional `endName ::>` then an expression (`logical ::> torqueGenerator`).
-fn allocation_end_expr(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
-    let (input, _) = opt((
-        name,
-        preceded(ws_and_comments, tag(&b"::>"[..])),
-        ws_and_comments,
-    ))
-    .parse(input)?;
-    expression(input)
+fn allocation_end_expr(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<crate::ast::KermlConnectorEnd>> {
+    crate::parser::constraint::kerml_connector_end(input)
 }
 
 pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<AllocationDef>> {
@@ -84,6 +79,8 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
                 name: name_str,
                 type_name,
                 type_is_conjugated: header.type_is_conjugated,
+                subsets: header.subsets,
+                redefines: header.redefines,
                 source,
                 target,
                 body,
@@ -111,6 +108,8 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
                 name: String::new(),
                 type_name: None,
                 type_is_conjugated: false,
+                subsets: None,
+                redefines: None,
                 source: Some(source),
                 target: Some(target),
                 body,

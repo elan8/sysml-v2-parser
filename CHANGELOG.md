@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 121.** `AllocationUsage` and `FlowUsage` gain
+  `subsets`/`redefines` (previously parsed by the shared usage header and discarded) and typed
+  connector ends: `source`/`target` and `from`/`to` are now
+  `Option<Node<KermlConnectorEnd>>` (optional multiplicity + arena-backed feature chain +
+  optional `::>`/`references` end-name split) instead of opaque `Expression` nodes, so the
+  authored allocate end names (`allocate logical ::> torqueGenerator to physical ::>
+  powerTrain`) are retained rather than discarded (spec42 gaps 27/28).
 - **`PARSE_AST_VERSION` is now 120.** Typed-field gaps from the spec42 audit:
   `ThenTarget` gains a `Send(Box<Node<ActionUsage>>)` variant (`then send new S() to b;`,
   spec42 gap 30); `KermlFeatureMember` gains a `crosses` cross-subsetting clause (gap 32);
