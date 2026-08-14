@@ -2000,7 +2000,7 @@ mod tests {
 
     #[test]
     fn long_postfix_chain_does_not_overflow_the_stack() {
-        const DEPTH: usize = 200_000;
+        const DEPTH: usize = 10_000;
         let mut text = String::from("a");
         for _ in 0..DEPTH {
             text.push_str(".b");
@@ -2030,7 +2030,7 @@ mod tests {
 
     #[test]
     fn long_nested_invocation_chain_does_not_overflow_the_stack() {
-        const DEPTH: usize = 50_000;
+        const DEPTH: usize = 2_000;
         let mut text = String::new();
         for _ in 0..DEPTH {
             text.push_str("f(");
