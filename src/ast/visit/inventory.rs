@@ -4077,6 +4077,9 @@ macro_rules! ast_traversal {
                 OccurrenceBodyElement::StateUsage(field_0) => {
                     visitor.visit_state_usage(field_0);
                 }
+                OccurrenceBodyElement::RefDecl(field_0) => {
+                    visitor.visit_ref_decl(field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }

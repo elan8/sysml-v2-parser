@@ -104,7 +104,16 @@ fn occurrence_definition_body_with_labels<'a>(
         recovery_code,
         |input| {
             let start = input;
+            // Structured first, opaque capture only as the fallback -- the order every other
+            // body uses. Reversed, the capture claimed every member whose first token is one of
+            // the opaque starters, so `private attribute seBeforeNum : Natural[1] = ...;`
+            // (`sysml.library/Systems Library/Flows.sysml`) was captured whole even though
+            // `attribute_usage` parses a visibility prefix perfectly well.
             let (input, element) = nom::branch::alt((
+                nom::combinator::map(
+                    occurrence_body_element,
+                    DefinitionBodyElement::OccurrenceMember,
+                ),
                 nom::combinator::map(
                     |i| {
                         crate::parser::recovery::unsupported_member(
@@ -114,10 +123,6 @@ fn occurrence_definition_body_with_labels<'a>(
                         )
                     },
                     DefinitionBodyElement::Unsupported,
-                ),
-                nom::combinator::map(
-                    occurrence_body_element,
-                    DefinitionBodyElement::OccurrenceMember,
                 ),
             ))
             .parse(input)?;
@@ -636,6 +641,12 @@ pub(crate) fn occurrence_body_element(
         map(
             exhibit_state_as_state_usage,
             OccurrenceBodyElement::StateUsage,
+        ),
+        // Last of the structured arms: `ref_decl` accepts a bare `ref` with no kind keyword, so
+        // trying it earlier would claim members the kinded parsers above own.
+        map(
+            crate::parser::connector::ref_decl,
+            OccurrenceBodyElement::RefDecl,
         ),
     ))
     .parse(input)?;

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Occurrence-style definition bodies no longer swallow members behind a visibility prefix.**
+  `DefinitionBody` -- shared by `flow def`, `occurrence def`, `allocation def` and the rest --
+  tried its opaque unsupported-member capture *before* the structured dispatch, the reverse of
+  every other body. Any member starting with `private`, `ref`, `abstract`, `in` or `connection`
+  was captured whole even when the parser directly below handled it, so `private attribute
+  seBeforeNum : Natural[1] = ...;` (`sysml.library/Systems Library/Flows.sysml`) was
+  unsupported grammar while the same line without `private` parsed. These bodies also now
+  dispatch `ref` members. **AST version 143 -> 144.**
+
 - **`ref` members are accepted in every body whose grammar allows them.** Five scopes never
   dispatched `connector::ref_decl` at all -- port definitions, requirement definitions, view
   definitions, rendering definitions and view usages -- so `ref self : Port :>> Object::self;`

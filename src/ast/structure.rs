@@ -1657,6 +1657,10 @@ pub enum OccurrenceBodyElement {
     /// exhibits states just as a part usage does -- real usage: `exhibit vehicleStates.on { ... }`
     /// in the OMG spec Annex `6-Individual and Snapshots.sysml`.
     StateUsage(Node<StateUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `ref self : SuccessionFlow :>> Flow::self,
+    /// FlowTransfer::self;` and `private ref action thisConnection = self;` (Systems Library
+    /// `Flows.sysml`). Occurrence bodies accepted no `ref` member at all.
+    RefDecl(Node<RefDecl>),
 }
 
 /// Standalone succession usage directly in a definition/occurrence body (distinct from the

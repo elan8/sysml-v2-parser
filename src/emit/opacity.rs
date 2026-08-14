@@ -1241,6 +1241,7 @@ fn walk_occurrence_body_element(
         OccurrenceBodyElement::Allocate(n) => walk_connect_body(report, path, &n.value.body),
         OccurrenceBodyElement::EndDecl(n) => walk_end_decl(report, path, &n.value),
         OccurrenceBodyElement::StateUsage(n) => walk_state_def_body(report, path, &n.value.body),
+        OccurrenceBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
         OccurrenceBodyElement::Doc(_) => {}
     }
 }
