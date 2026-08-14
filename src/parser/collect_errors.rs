@@ -692,6 +692,9 @@ fn collect_attribute_body_errors(body: &AttributeBody, errors: &mut Vec<ParseErr
                     AttributeBodyElement::Error(n) => {
                         errors.push(parse_error_from_recovery_node(&element.span, &n.value));
                     }
+                    AttributeBodyElement::KermlClassifier(n) => {
+                        collect_calc_body_errors(&n.value.body, errors);
+                    }
                     AttributeBodyElement::KermlFeature(n) => {
                         collect_calc_body_errors(&n.value.body, errors)
                     }
@@ -875,6 +878,9 @@ fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>
                 match &element.value {
                     PartDefBodyElement::Error(n) => {
                         errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+                    }
+                    PartDefBodyElement::KermlClassifier(n) => {
+                        collect_calc_body_errors(&n.value.body, errors);
                     }
                     PartDefBodyElement::UnsupportedMember(n) => {
                         errors.push(parse_error_from_recovery_node(
@@ -1115,6 +1121,9 @@ fn collect_part_usage_body_element_errors(
     match &element.value {
         PartUsageBodyElement::Error(n) => {
             errors.push(parse_error_from_recovery_node(&element.span, &n.value));
+        }
+        PartUsageBodyElement::KermlClassifier(n) => {
+            collect_calc_body_errors(&n.value.body, errors);
         }
         PartUsageBodyElement::AttributeUsage(n) => {
             collect_attribute_body_errors(&n.value.body, errors)

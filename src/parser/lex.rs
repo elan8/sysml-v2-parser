@@ -56,6 +56,21 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"variation",
     b"analysis",
     b"metadata",
+    // KerML classifier-keyword family dispatched via `kerml_classifier_structured`
+    // (spec42 Gap 38).
+    b"classifier",
+    b"struct",
+    b"datatype",
+    b"association",
+    b"assoc",
+    b"behavior",
+    b"interaction",
+    b"predicate",
+    b"metaclass",
+    b"function",
+    b"multiplicity",
+    b"type",
+    b"class",
 ];
 
 pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[

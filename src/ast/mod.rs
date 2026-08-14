@@ -402,6 +402,9 @@ fn normalize_part_def_body(b: &PartDefBody) -> PartDefBody {
 fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<PartDefBodyElement> {
     let value = match &el.value {
         PartDefBodyElement::Error(n) => PartDefBodyElement::Error(dummy_node(n, n.value.clone())),
+        PartDefBodyElement::KermlClassifier(n) => {
+            PartDefBodyElement::KermlClassifier(Box::new(dummy_node(n, n.value.clone())))
+        }
         PartDefBodyElement::Doc(n) => PartDefBodyElement::Doc(dummy_node(n, n.value.clone())),
         PartDefBodyElement::Comment(n) => {
             PartDefBodyElement::Comment(dummy_node(n, n.value.clone()))
@@ -925,6 +928,9 @@ fn normalize_part_usage_body_element_node(
     let value = match &el.value {
         PartUsageBodyElement::Error(n) => {
             PartUsageBodyElement::Error(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::KermlClassifier(n) => {
+            PartUsageBodyElement::KermlClassifier(Box::new(dummy_node(n, n.value.clone())))
         }
         PartUsageBodyElement::Doc(n) => PartUsageBodyElement::Doc(dummy_node(n, n.value.clone())),
         PartUsageBodyElement::Annotation(n) => {

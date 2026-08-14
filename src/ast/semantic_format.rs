@@ -996,6 +996,17 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
+                        PartDefBodyElement::KermlClassifier(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(kerml-classifier (keyword ")?;
+                            self.writer.write_str(declaration.value.keyword.as_str())?;
+                            self.writer.write_str(") (name ")?;
+                            write_optional_quoted(
+                                self.writer,
+                                declaration.value.identification.name.as_deref(),
+                            )?;
+                            self.writer.write_str("))")?;
+                        }
                         PartDefBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
                         PartDefBodyElement::Comment(_comment) => {
                             self.write_marker(&mut first, "comment")?;

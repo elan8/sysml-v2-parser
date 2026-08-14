@@ -58,6 +58,20 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"connector",
     b"class",
     b"end",
+    // KerML classifier-keyword family dispatched via `kerml_classifier_structured`
+    // (spec42 Gap 38).
+    b"classifier",
+    b"struct",
+    b"datatype",
+    b"association",
+    b"assoc",
+    b"behavior",
+    b"interaction",
+    b"predicate",
+    b"metaclass",
+    b"function",
+    b"multiplicity",
+    b"type",
 ];
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
@@ -225,6 +239,12 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         }),
         map(crate::parser::package::class_def, |n| {
             AttributeBodyElement::ClassDef(Box::new(n))
+        }),
+        // The rest of the KerML classifier-keyword family (`struct`, `classifier`, `datatype`,
+        // `assoc`, `behavior`, ...) nested in a type body (spec42 Gap 38); `class` stays on the
+        // `class_def` arm above.
+        map(crate::parser::package::kerml_classifier_structured, |n| {
+            AttributeBodyElement::KermlClassifier(Box::new(n))
         }),
         map(value_keyword_binding, AttributeBodyElement::AttributeUsage),
         map(
@@ -1309,6 +1329,24 @@ mod attribute_body_tests {
             .iter()
             .map(|id| crate::parser::usage::reference_text(source, *id).expect("reference text"))
             .collect()
+    }
+
+    /// Spec42 Gap 38: KerML classifier-keyword declarations (other than `class`, which stays on
+    /// `class_def`) nested inside an attribute-shaped body dispatch to the typed
+    /// `KermlClassifierDecl` production.
+    #[test]
+    fn attribute_body_dispatches_nested_kerml_classifiers() {
+        let (rest, node) =
+            attribute_body_element(input("classifier C1;")).expect("nested classifier");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let AttributeBodyElement::KermlClassifier(decl) = node.value else {
+            panic!("expected KermlClassifier");
+        };
+        assert_eq!(
+            decl.value.keyword,
+            crate::ast::KermlClassifierKeyword::Classifier
+        );
+        assert_eq!(decl.value.identification.name.as_deref(), Some("C1"));
     }
 
     #[test]

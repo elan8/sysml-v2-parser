@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 123.** `PartDefBodyElement`, `PartUsageBodyElement`, and
+  `AttributeBodyElement` gain a `KermlClassifier(Box<Node<KermlClassifierDecl>>)` variant so
+  KerML classifier-keyword declarations (`struct`, `classifier`, `datatype`, `assoc`,
+  `behavior`, ...) nested inside part/attribute-shaped bodies parse into the same typed node
+  they already get at package scope instead of falling to error recovery (spec42 gap 38;
+  `class` keeps its dedicated `ClassDef` shape).
 - **`PARSE_AST_VERSION` is now 122.** The opaque `ActionBodyDecl` node (an unparsed
   keyword + text blob for `attribute`/`calc`/`event` declarations and nested `action def`s in
   action bodies) is retired: `ActionDefBodyElement`/`ActionUsageBodyElement` lose their `Decl`

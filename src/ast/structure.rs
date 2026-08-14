@@ -183,6 +183,10 @@ pub enum PartDefBodyElement {
     ViewpointUsage(Node<crate::ast::view::ViewpointUsage>),
     RenderingDef(Node<crate::ast::view::RenderingDef>),
     RenderingUsage(Node<crate::ast::view::RenderingUsage>),
+    /// Nested KerML classifier declaration (`struct`, `classifier`, `datatype`, `assoc`,
+    /// `behavior`, ...) inside a part definition body (spec42 Gap 38); see
+    /// [`crate::ast::KermlClassifierDecl`].
+    KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
     CaseDef(Node<crate::ast::requirement::CaseDef>),
     CaseUsage(Node<crate::ast::requirement::CaseUsage>),
     UseCaseDef(Node<crate::ast::requirement::UseCaseDef>),
@@ -386,6 +390,10 @@ pub enum AttributeBodyElement {
     /// Nested KerML `class` definition (`class Outer { class Inner { ... } }`); see
     /// [`ClassDef`].
     ClassDef(Box<Node<ClassDef>>),
+    /// Nested KerML classifier declaration for the rest of the keyword family (`struct`,
+    /// `classifier`, `datatype`, `assoc`, `behavior`, ...; spec42 Gap 38); see
+    /// [`crate::ast::KermlClassifierDecl`].
+    KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
     Other(String),
 }
 
@@ -693,6 +701,10 @@ pub enum PartUsageBodyElement {
     /// }` (Simple Tests/VerificationTest.sysml:35). Already dispatched in `PartDefBodyElement`,
     /// just not here.
     VerificationCaseUsage(Node<crate::ast::requirement::VerificationCaseUsage>),
+    /// Nested KerML classifier declaration (`struct Car1_ { ... }` inside a `part` usage body,
+    /// KerML `time_varying_car_driver`; spec42 Gap 38); see
+    /// [`crate::ast::KermlClassifierDecl`].
+    KermlClassifier(Box<Node<crate::ast::KermlClassifierDecl>>),
 }
 
 /// Variant member inside a variation part usage/def body: either an untyped reference to a

@@ -417,6 +417,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
         let p = format!("{path}/body[{i}]");
         match &el.value {
             PartDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
+            PartDefBodyElement::KermlClassifier(n) => walk_calc_def_body(report, &p, &n.value.body),
             PartDefBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
             PartDefBodyElement::UnsupportedMember(_) => {
                 hit(report, &p, OpacityKind::UnsupportedGrammar)
@@ -560,6 +561,9 @@ fn walk_part_usage_body_elements(
         let p = format!("{path}/body[{i}]");
         match &el.value {
             PartUsageBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
+            PartUsageBodyElement::KermlClassifier(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
+            }
             PartUsageBodyElement::Connect(c) => walk_connect_body(report, &p, &c.value.body),
             PartUsageBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             PartUsageBodyElement::AttributeUsage(n) => {
@@ -674,6 +678,9 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
                 walk_calc_def_body(report, &p, &n.value.body)
             }
             AttributeBodyElement::ClassDef(n) => walk_attribute_body(report, &p, &n.value.body),
+            AttributeBodyElement::KermlClassifier(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
+            }
             AttributeBodyElement::Connect(c) => walk_connect_body(report, &p, &c.value.body),
             AttributeBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::AttributeUsage(n) => {

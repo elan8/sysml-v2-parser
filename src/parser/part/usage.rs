@@ -1359,6 +1359,12 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             ),
             // `metadata_usage` before `metadata_def` so bare `metadata Name { … }` does not misfire
             // (metadata_def is def_required-guarded, but keep def/usage pairing explicit).
+            // Nested KerML classifier declarations (`struct Car1_ { ... }` inside a `part`
+            // usage body, KerML `time_varying_car_driver`; spec42 Gap 38), keyword-gated so no
+            // other member shape is affected.
+            map(crate::parser::package::kerml_classifier_structured, |n| {
+                PartUsageBodyElement::KermlClassifier(Box::new(n))
+            }),
             map(metadata_usage, PartUsageBodyElement::MetadataUsage),
             map(metadata_def, PartUsageBodyElement::MetadataDef),
             map(requirement_def, PartUsageBodyElement::RequirementDef),
@@ -1479,6 +1485,24 @@ mod par_002_nested_def_tests {
 
     fn input(text: &str) -> Input<'_> {
         crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 38: KerML classifier-keyword declarations nested inside a part usage body
+    /// dispatch to the typed `KermlClassifierDecl` production (`struct Car1_ { ... }` inside
+    /// `part c { ... }`, KerML `time_varying_car_driver`).
+    #[test]
+    fn part_usage_body_dispatches_nested_kerml_classifiers() {
+        let (rest, node) = part_usage_body_element(input("struct Car1_ { feature wheels; }"))
+            .expect("nested struct");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PartUsageBodyElement::KermlClassifier(decl) = node.value else {
+            panic!("expected KermlClassifier");
+        };
+        assert_eq!(
+            decl.value.keyword,
+            crate::ast::KermlClassifierKeyword::Struct
+        );
+        assert_eq!(decl.value.identification.name.as_deref(), Some("Car1_"));
     }
 
     #[test]

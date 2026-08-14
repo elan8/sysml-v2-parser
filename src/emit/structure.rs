@@ -275,6 +275,9 @@ fn emit_part_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         PartDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        PartDefBodyElement::KermlClassifier(n) => {
+            super::root::emit_kerml_classifier_decl(w, path, &n.value)
+        }
         PartDefBodyElement::Other(_) => Err(EmitError::Opaque {
             path: path.to_string(),
             kind: super::OpacityKind::Other,
@@ -413,6 +416,9 @@ fn emit_part_usage_body_element(
 ) -> Result<(), EmitError> {
     match el {
         PartUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
+        PartUsageBodyElement::KermlClassifier(n) => {
+            super::root::emit_kerml_classifier_decl(w, path, &n.value)
+        }
         PartUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
         PartUsageBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PartUsageBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
@@ -547,6 +553,9 @@ fn emit_attribute_body_element(
             super::view::emit_kerml_connector_member(w, path, &n.value)
         }
         AttributeBodyElement::ClassDef(n) => emit_class_def(w, path, &n.value),
+        AttributeBodyElement::KermlClassifier(n) => {
+            super::root::emit_kerml_classifier_decl(w, path, &n.value)
+        }
         AttributeBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         AttributeBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         AttributeBodyElement::OccurrenceUsage(o) => {

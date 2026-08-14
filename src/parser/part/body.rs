@@ -237,6 +237,11 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 PartDefBodyElement::FlowUsage,
             ),
             map(part_def, PartDefBodyElement::PartDef),
+            // Nested KerML classifier declarations (`struct`/`classifier`/`datatype`/...,
+            // spec42 Gap 38), keyword-gated so no other member shape is affected.
+            map(crate::parser::package::kerml_classifier_structured, |n| {
+                PartDefBodyElement::KermlClassifier(Box::new(n))
+            }),
             map(variant_usage, PartDefBodyElement::VariantUsage),
             map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
             map(individual_usage, |n| {

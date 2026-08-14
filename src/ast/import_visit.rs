@@ -489,6 +489,7 @@ impl ProvenanceValidator<'_> {
                 | PartDefBodyElement::RenderingDef(_)
                 | PartDefBodyElement::RenderingUsage(_)
                 | PartDefBodyElement::Bind(_)
+                | PartDefBodyElement::KermlClassifier(_)
                 | PartDefBodyElement::AliasDef(_) => {}
             }
         }
@@ -552,6 +553,7 @@ impl ProvenanceValidator<'_> {
                 | PartUsageBodyElement::ItemUsage(_)
                 | PartUsageBodyElement::MetadataUsage(_)
                 | PartUsageBodyElement::AliasDef(_)
+                | PartUsageBodyElement::KermlClassifier(_)
                 | PartUsageBodyElement::IncludeUseCase(_) => {}
             }
         }
