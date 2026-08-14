@@ -33,7 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hand-rolled reconstruction of those positions (arithmetic over consumed lengths, in the
   `first`/`merge` body) is gone, and the shared brace-member routine now returns the delimiters
   along with the members, so no scope has to consume `{` and `}` correctly on its own. There is
-  deliberately no state for a missing closing brace: an unterminated body does not currently
+  Deserialization validates them: a delimiter span must still slice to the token it claims and a
+  body's open brace must precede its close, so a tampered wire document is rejected rather than
+  trusted. There is deliberately no state for a missing closing brace: an unterminated body does not currently
   produce a body at all -- the enclosing declaration becomes a recovery node -- so a typed close
   outcome would be an unreachable variant until recovery can retain the members it read.
 - **`ast::AnnotatingMember`, the grammar's annotating production as one type.** `AnnotatingElement

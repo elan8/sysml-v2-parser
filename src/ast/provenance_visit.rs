@@ -34,6 +34,19 @@ impl ProvenanceValidator<'_> {
             self.error = result.err();
         }
     }
+
+    /// A delimiter span must lie inside the source, land on character boundaries, and contain
+    /// exactly the token it claims.
+    fn delimiter(&self, span: &Span, token: &str, role: &str) -> Result<(), String> {
+        match self.document.source.slice(span) {
+            Some(text) if text == token => Ok(()),
+            Some(text) => Err(format!("{role} span covers {text:?} rather than {token:?}")),
+            None => Err(format!(
+                "{role} span at offset {} is not a valid slice of the document source",
+                span.offset
+            )),
+        }
+    }
 }
 
 impl Visitor for ProvenanceValidator<'_> {
@@ -50,6 +63,30 @@ impl Visitor for ProvenanceValidator<'_> {
                 .to_string(),
             );
         }
+    }
+
+    /// A brace body claims two delimiter tokens. A deserialized document is data, so check that
+    /// the spans still slice to the tokens they claim and that the body is not inside out.
+    fn visit_body_braces(&mut self, open: &Span, close: &Span) {
+        if self.error.is_some() {
+            return;
+        }
+        self.check(self.delimiter(open, "{", "body open brace"));
+        self.check(self.delimiter(close, "}", "body close brace"));
+        if self.error.is_none() && open.offset >= close.offset {
+            self.error = Some(format!(
+                "body open brace at {} does not precede its close brace at {}",
+                open.offset, close.offset
+            ));
+        }
+    }
+
+    /// The semicolon form claims one token; the same reasoning applies.
+    fn visit_body_semicolon(&mut self, semicolon: &Span) {
+        if self.error.is_some() {
+            return;
+        }
+        self.check(self.delimiter(semicolon, ";", "body semicolon"));
     }
 
     /// Import targets own ordered separator, wildcard, and recursion spans that must still line up

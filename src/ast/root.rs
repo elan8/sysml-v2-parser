@@ -242,6 +242,49 @@ mod serde_tests {
     }
 
     #[test]
+    fn parsed_document_rejects_a_tampered_body_delimiter() {
+        let document = crate::parse_for_editor("package P { part def A; }").document;
+        let mut encoded = serde_json::to_value(&document).expect("serialize document");
+        // Point the package body's open brace at the wrong token.
+        let body = encoded
+            .pointer_mut("/root/elements/0/value/Package/value/body/Brace/open_span/offset")
+            .expect("open brace span in the wire document");
+        *body = serde_json::json!(0);
+        let error = serde_json::from_value::<ParsedDocument>(encoded)
+            .expect_err("a delimiter span that no longer covers its token must be rejected");
+        assert!(
+            error.to_string().contains("open brace"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn parsed_document_rejects_an_inside_out_body() {
+        let document = crate::parse_for_editor("package P { part def A; }").document;
+        let mut encoded = serde_json::to_value(&document).expect("serialize document");
+        let open = encoded
+            .pointer("/root/elements/0/value/Package/value/body/Brace/open_span")
+            .cloned()
+            .expect("open brace span");
+        let close = encoded
+            .pointer("/root/elements/0/value/Package/value/body/Brace/close_span")
+            .cloned()
+            .expect("close brace span");
+        *encoded
+            .pointer_mut("/root/elements/0/value/Package/value/body/Brace/open_span")
+            .expect("open brace span") = close;
+        *encoded
+            .pointer_mut("/root/elements/0/value/Package/value/body/Brace/close_span")
+            .expect("close brace span") = open;
+        let error = serde_json::from_value::<ParsedDocument>(encoded)
+            .expect_err("a body whose close precedes its open must be rejected");
+        assert!(
+            error.to_string().contains("brace"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
     fn parsed_document_rejects_a_dangling_ast_identity() {
         let mut encoded =
             serde_json::to_value(document_with_reference()).expect("serialize document");
