@@ -454,7 +454,7 @@ pub struct KermlSuccessionMember {
 }
 
 /// KerML end member with an owned cross feature: `end` name? multiplicity? (`subsets` targets)?
-/// `feature` <feature member>, e.g. `end happensDuring [1..*] feature longerOccurrence:
+/// `feature` feature-member, e.g. `end happensDuring [1..*] feature longerOccurrence:
 /// Occurrence redefines targetOccurrence;` (Kernel Semantic Library `Occurrences.kerml`).
 /// Distinct from a plain `end feature ...` member, which stays on [`KermlFeatureMember`] with
 /// `is_end` -- here the end itself is named/constrained and owns the nested feature.

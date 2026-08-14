@@ -335,6 +335,7 @@ impl ProvenanceValidator<'_> {
             ActionDefBodyElement::ForkStmt(n) => self.first_merge_body(&n.value.body),
             ActionDefBodyElement::Perform(n) => self.perform_body(&n.value.body),
             ActionDefBodyElement::ThenAction(n) => self.then_action(&n.value),
+            ActionDefBodyElement::ActionDef(n) => self.action_def_body(&n.value.body),
             ActionDefBodyElement::Error(_)
             | ActionDefBodyElement::InOutDecl(_)
             | ActionDefBodyElement::Doc(_)
@@ -352,7 +353,8 @@ impl ProvenanceValidator<'_> {
             | ActionDefBodyElement::AssertConstraint(_)
             | ActionDefBodyElement::OccurrenceUsage(_)
             | ActionDefBodyElement::Assign(_)
-            | ActionDefBodyElement::Decl(_)
+            | ActionDefBodyElement::AttributeUsage(_)
+            | ActionDefBodyElement::CalcUsage(_)
             | ActionDefBodyElement::DefaultReferenceUsage(_) => Ok(()),
         }
     }
@@ -387,6 +389,7 @@ impl ProvenanceValidator<'_> {
             ActionUsageBodyElement::JoinStmt(n) => self.first_merge_body(&n.value.body),
             ActionUsageBodyElement::ForkStmt(n) => self.first_merge_body(&n.value.body),
             ActionUsageBodyElement::ThenAction(n) => self.then_action(&n.value),
+            ActionUsageBodyElement::ActionDef(n) => self.action_def_body(&n.value.body),
             ActionUsageBodyElement::VariantUsage(n) => self.variant_usage(&n.value),
             ActionUsageBodyElement::Error(_)
             | ActionUsageBodyElement::Doc(_)
@@ -405,7 +408,8 @@ impl ProvenanceValidator<'_> {
             | ActionUsageBodyElement::AssertConstraint(_)
             | ActionUsageBodyElement::OccurrenceUsage(_)
             | ActionUsageBodyElement::Assign(_)
-            | ActionUsageBodyElement::Decl(_)
+            | ActionUsageBodyElement::AttributeUsage(_)
+            | ActionUsageBodyElement::CalcUsage(_)
             | ActionUsageBodyElement::DefaultReferenceUsage(_) => Ok(()),
         }
     }

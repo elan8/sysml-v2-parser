@@ -370,6 +370,12 @@ fn occurrence_usage_tail(
         let (input, name) = name(input)?;
         (input, name, None)
     };
+    // BNF puts the multiplicity directly after the identification, before the typing part:
+    // `event occurrence zeroCrossingEvents[0..*] : ZeroCrossingEventDef { ... }` (Domain
+    // Libraries/Analysis/StateSpaceRepresentation.sysml). The emitter canonicalizes it to the
+    // after-type position, which reparses below into the same AST.
+    let (input, early_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, type_name) = optional_typings(input)?;
     let type_is_conjugated = type_name
@@ -378,7 +384,9 @@ fn occurrence_usage_tail(
     let type_name = type_name.and_then(|(_, _, targets, _)| targets.first().copied());
     // GH-51: real usage carries a multiplicity here (`causes[1..*]`); see `OccurrenceUsage::
     // multiplicity`'s doc comment.
-    let (input, multiplicity) = opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    let (input, late_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
+    let multiplicity = early_multiplicity.or(late_multiplicity);
     // `#73`: `abstract occurrence situations : Situation[*] nonunique;` — feature modifiers after
     // multiplicity; without skipping them the usage fails and becomes `KermlFeatureDecl`.
     let (input, _) = crate::parser::usage::skip_usage_feature_modifiers(input)?;
@@ -936,6 +944,20 @@ mod membership_tests {
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Public)
         );
+    }
+
+    /// BNF places the multiplicity directly after the identification, before the typing part:
+    /// `event occurrence zeroCrossingEvents[0..*] : ZeroCrossingEventDef` (Domain Libraries/
+    /// Analysis/StateSpaceRepresentation.sysml). Surfaced by spec42 Gap 33 once action bodies
+    /// dispatched `event` members through `occurrence_usage`.
+    #[test]
+    fn occurrence_usage_retains_multiplicity_authored_before_the_typing() {
+        let (rest, node) = occurrence_usage(input("event occurrence z[0..*] : Z;"))
+            .expect("event occurrence with early multiplicity");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(node.value.is_event);
+        assert!(node.value.multiplicity.is_some());
+        assert!(node.value.type_name.is_some());
     }
 
     #[test]

@@ -221,11 +221,15 @@ fn collect_action_def_body_element_errors(
         ActionDefBodyElement::JoinStmt(n) => collect_first_merge_body_errors(&n.value.body, errors),
         ActionDefBodyElement::ForkStmt(n) => collect_first_merge_body_errors(&n.value.body, errors),
         ActionDefBodyElement::InOutDecl(n) => collect_in_out_decl_errors(&n.value, errors),
+        ActionDefBodyElement::AttributeUsage(n) => {
+            collect_attribute_body_errors(&n.value.body, errors)
+        }
+        ActionDefBodyElement::CalcUsage(n) => collect_calc_body_errors(&n.value.body, errors),
+        ActionDefBodyElement::ActionDef(n) => collect_action_def_body_errors(&n.value.body, errors),
         ActionDefBodyElement::Doc(_)
         | ActionDefBodyElement::Annotation(_)
         | ActionDefBodyElement::TerminateStmt(_)
         | ActionDefBodyElement::Assign(_)
-        | ActionDefBodyElement::Decl(_)
         | ActionDefBodyElement::DefaultReferenceUsage(_) => {}
     }
 }
@@ -402,11 +406,17 @@ fn collect_action_usage_body_element_errors(
             collect_first_merge_body_errors(&n.value.body, errors)
         }
         ActionUsageBodyElement::InOutDecl(n) => collect_in_out_decl_errors(&n.value, errors),
+        ActionUsageBodyElement::AttributeUsage(n) => {
+            collect_attribute_body_errors(&n.value.body, errors)
+        }
+        ActionUsageBodyElement::CalcUsage(n) => collect_calc_body_errors(&n.value.body, errors),
+        ActionUsageBodyElement::ActionDef(n) => {
+            collect_action_def_body_errors(&n.value.body, errors)
+        }
         ActionUsageBodyElement::Doc(_)
         | ActionUsageBodyElement::Annotation(_)
         | ActionUsageBodyElement::TerminateStmt(_)
         | ActionUsageBodyElement::Assign(_)
-        | ActionUsageBodyElement::Decl(_)
         | ActionUsageBodyElement::DefaultReferenceUsage(_) => {}
     }
 }

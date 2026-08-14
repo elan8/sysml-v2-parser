@@ -1,7 +1,7 @@
 //! Action definition and action usage parsing (function-based behavior).
 
 use crate::ast::{
-    ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
+    ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
     ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstMergeBodyElement,
     FirstMergeBraceBody, FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt,
     LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget,
@@ -292,7 +292,9 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         // all use the same `ActionBody` production as a plain action definition body, so a
         // `first`/`merge` brace body legitimately accepts any action-body declaration (e.g. `calc
         // opaque;`), not just the narrower allow-list this used to downgrade to `Unsupported`.
-        value @ (ActionDefBodyElement::Decl(_)
+        value @ (ActionDefBodyElement::AttributeUsage(_)
+        | ActionDefBodyElement::CalcUsage(_)
+        | ActionDefBodyElement::ActionDef(_)
         | ActionDefBodyElement::Error(_)
         | ActionDefBodyElement::InOutDecl(_)
         | ActionDefBodyElement::Doc(_)
@@ -736,7 +738,21 @@ fn action_def_body_element(
         map(assign_stmt, ActionDefBodyElement::Assign),
         map(for_loop, ActionDefBodyElement::ForLoop),
         map(then_action, ActionDefBodyElement::ThenAction),
-        map(action_body_decl, ActionDefBodyElement::Decl),
+        // Gap 33: `attribute`/`calc`/`event` declarations dispatch through their typed
+        // productions (the opaque `ActionBodyDecl` fallback is retired). Before `in_out_decl`
+        // so these keywords never read as parameter names; `occurrence_usage` covers the
+        // `event`/`event occurrence` forms.
+        nom::branch::alt((
+            map(crate::parser::attribute::attribute_usage, |a| {
+                ActionDefBodyElement::AttributeUsage(Box::new(a))
+            }),
+            map(crate::parser::constraint::calc_usage, |c| {
+                ActionDefBodyElement::CalcUsage(Box::new(c))
+            }),
+            map(crate::parser::occurrence_body::occurrence_usage, |n| {
+                ActionDefBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+        )),
         map(in_out_decl, ActionDefBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionDefBodyElement::Doc),
         map(
@@ -784,7 +800,7 @@ fn action_def_body_element(
             ),
             // Nested `action def` must win over `action_usage` (which would otherwise treat
             // `def` as a usage name).
-            map(nested_action_def_decl, ActionDefBodyElement::Decl),
+            map(action_def, |d| ActionDefBodyElement::ActionDef(Box::new(d))),
             map(control_node_action_usage, |a| {
                 ActionDefBodyElement::ActionUsage(Box::new(a))
             }),
@@ -1265,7 +1281,19 @@ pub(crate) fn action_usage_body_element(
         map(assign_stmt, ActionUsageBodyElement::Assign),
         map(for_loop, ActionUsageBodyElement::ForLoop),
         map(then_action, ActionUsageBodyElement::ThenAction),
-        map(action_body_decl, ActionUsageBodyElement::Decl),
+        // Gap 33: typed dispatch replacing the retired opaque `ActionBodyDecl`; see the
+        // matching branch in `action_def_body_element`.
+        nom::branch::alt((
+            map(crate::parser::attribute::attribute_usage, |a| {
+                ActionUsageBodyElement::AttributeUsage(Box::new(a))
+            }),
+            map(crate::parser::constraint::calc_usage, |c| {
+                ActionUsageBodyElement::CalcUsage(Box::new(c))
+            }),
+            map(crate::parser::occurrence_body::occurrence_usage, |n| {
+                ActionUsageBodyElement::OccurrenceUsage(Box::new(n))
+            }),
+        )),
         map(in_out_decl, ActionUsageBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionUsageBodyElement::Doc),
         map(
@@ -1310,7 +1338,9 @@ pub(crate) fn action_usage_body_element(
                 crate::parser::requirement::textual_representation,
                 ActionUsageBodyElement::TextualRep,
             ),
-            map(nested_action_def_decl, ActionUsageBodyElement::Decl),
+            map(action_def, |d| {
+                ActionUsageBodyElement::ActionDef(Box::new(d))
+            }),
             map(control_node_action_usage, |a| {
                 ActionUsageBodyElement::ActionUsage(Box::new(a))
             }),
@@ -1368,61 +1398,6 @@ pub(crate) fn action_usage_body_element(
 fn visibility_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
     // `action_usage` already captures visibility / abstract / ref.
     action_usage(input)
-}
-
-/// Nested `action def …` inside an action body. Kept as a lightweight Decl so we do not bump
-/// AST shape for this recovery/parity fix; Spec42 already ignores `Decl`.
-fn nested_action_def_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>> {
-    let start = input;
-    let (input, def) = action_def(input)?;
-    let name = def
-        .value
-        .identification
-        .name
-        .clone()
-        .unwrap_or_else(|| "action".to_string());
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            ActionBodyDecl {
-                keyword: "action".to_string(),
-                text: format!("def {name}"),
-            },
-        ),
-    ))
-}
-
-fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(alt((
-        preceded(tag(&b"public"[..]), ws1),
-        preceded(tag(&b"private"[..]), ws1),
-        preceded(tag(&b"protected"[..]), ws1),
-    )))
-    .parse(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, keyword) = alt((
-        map(tag(&b"attribute"[..]), |_| "attribute".to_string()),
-        map(tag(&b"calc"[..]), |_| "calc".to_string()),
-        map(tag(&b"event"[..]), |_| "event".to_string()),
-    ))
-    .parse(input)?;
-
-    let (input, text) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = alt((
-        map(tag(&b";"[..]), |_| ()),
-        map(consume_action_structured_brace, |_| ()),
-    ))
-    .parse(input)?;
-
-    Ok((
-        input,
-        node_from_to(start, input, ActionBodyDecl { keyword, text }),
-    ))
 }
 
 /// True when `action` is followed by an `accept`/`send` *payload* clause rather than a usage named
@@ -1865,7 +1840,7 @@ mod control_node_gap_tests {
     fn first_merge_body_keeps_structured_decl_and_malformed_members_then_resumes() {
         // BNF `MergeNode`/`DecisionNode`/`JoinNode`/`ForkNode` (SysML-textual-bnf.kebnf
         // §8.2.2.17.3) all use the same `ActionBody` production as a plain action definition
-        // body, so `calc opaque;` here is a structured `ActionDefBodyElement::Decl` member, not
+        // body, so `calc opaque;` here is a typed `ActionDefBodyElement::CalcUsage` member, not
         // an unsupported one.
         let source = "first start then finish { calc opaque; bogus ???; in resumed; }";
         let (rest, node) = action_def_body_element(input(source)).expect("first/merge body");
@@ -1880,7 +1855,7 @@ mod control_node_gap_tests {
         assert!(matches!(
             &body.value.elements[0].value,
             FirstMergeBodyElement::Member(member)
-                if matches!(member.value, ActionDefBodyElement::Decl(_))
+                if matches!(member.value, ActionDefBodyElement::CalcUsage(_))
         ));
         assert!(matches!(
             body.value.elements[1].value,
@@ -1909,6 +1884,78 @@ mod control_node_gap_tests {
             action_usage_body_element(input("loop { action x; }")).expect("loop stmt");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, ActionUsageBodyElement::LoopStmt(_)));
+    }
+
+    /// Spec42 Gap 33: `attribute`/`calc`/`event`/nested `action def` members in action bodies
+    /// dispatch through their typed productions instead of the retired opaque `ActionBodyDecl`.
+    #[test]
+    fn action_def_body_dispatches_declarations_to_typed_productions() {
+        let parse = |source| {
+            let (rest, node) = action_def_body_element(input(source)).expect(source);
+            assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+            node.value
+        };
+        assert!(matches!(
+            parse("attribute mass = 5;"),
+            ActionDefBodyElement::AttributeUsage(_)
+        ));
+        assert!(matches!(
+            parse("calc estimate : Estimate;"),
+            ActionDefBodyElement::CalcUsage(_)
+        ));
+        assert!(matches!(
+            parse("event occurrence crossings[0..*] : Crossing;"),
+            ActionDefBodyElement::OccurrenceUsage(_)
+        ));
+        assert!(matches!(
+            parse("action def Nested { in signal; }"),
+            ActionDefBodyElement::ActionDef(_)
+        ));
+    }
+
+    #[test]
+    fn action_usage_body_dispatches_declarations_to_typed_productions() {
+        let parse = |source| {
+            let (rest, node) = action_usage_body_element(input(source)).expect(source);
+            assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+            node.value
+        };
+        assert!(matches!(
+            parse("attribute duration = 10;"),
+            ActionUsageBodyElement::AttributeUsage(_)
+        ));
+        assert!(matches!(
+            parse("calc estimate : Estimate;"),
+            ActionUsageBodyElement::CalcUsage(_)
+        ));
+        assert!(matches!(
+            parse("event marker;"),
+            ActionUsageBodyElement::OccurrenceUsage(_)
+        ));
+        assert!(matches!(
+            parse("action def Nested { in signal; }"),
+            ActionUsageBodyElement::ActionDef(_)
+        ));
+    }
+
+    /// Spec42 Gap 33: the nested `action def`'s full declaration is retained (formerly flattened
+    /// to an opaque keyword/text pair).
+    #[test]
+    fn nested_action_def_retains_its_declaration() {
+        let (rest, node) =
+            action_def_body_element(input("action def Nested { in signal; }")).expect("action def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let ActionDefBodyElement::ActionDef(def) = node.value else {
+            panic!("expected ActionDef");
+        };
+        assert_eq!(def.value.identification.name.as_deref(), Some("Nested"));
+        let ActionDefBody::Brace { elements, .. } = &def.value.body else {
+            panic!("expected brace body");
+        };
+        assert!(matches!(
+            elements[0].value,
+            ActionDefBodyElement::InOutDecl(_)
+        ));
     }
 
     /// §6 G23 (found while fixing G13): only `then action ...` was accepted, so the two other

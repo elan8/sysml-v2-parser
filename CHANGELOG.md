@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 122.** The opaque `ActionBodyDecl` node (an unparsed
+  keyword + text blob for `attribute`/`calc`/`event` declarations and nested `action def`s in
+  action bodies) is retired: `ActionDefBodyElement`/`ActionUsageBodyElement` lose their `Decl`
+  variant and gain typed `AttributeUsage`, `CalcUsage`, and `ActionDef` variants, with `event`
+  forms dispatching through the existing typed `OccurrenceUsage` (spec42 gap 33).
+  `OpacityKind::ActionBodyDecl` is removed alongside. `OccurrenceUsage` additionally accepts a
+  multiplicity authored between the name and the typing (`event occurrence
+  zeroCrossingEvents[0..*] : ZeroCrossingEventDef`), per the BNF's declaration ordering.
 - **`PARSE_AST_VERSION` is now 121.** `AllocationUsage` and `FlowUsage` gain
   `subsets`/`redefines` (previously parsed by the shared usage header and discarded) and typed
   connector ends: `source`/`target` and `from`/`to` are now

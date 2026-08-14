@@ -1515,7 +1515,15 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::ThenAction(n) => {
             ActionDefBodyElement::ThenAction(dummy_node(n, n.value.clone()))
         }
-        ActionDefBodyElement::Decl(n) => ActionDefBodyElement::Decl(dummy_node(n, n.value.clone())),
+        ActionDefBodyElement::AttributeUsage(n) => ActionDefBodyElement::AttributeUsage(Box::new(
+            dummy_node(n, normalize_attribute_usage(&n.value)),
+        )),
+        ActionDefBodyElement::CalcUsage(n) => {
+            ActionDefBodyElement::CalcUsage(Box::new(dummy_node(n, n.value.clone())))
+        }
+        ActionDefBodyElement::ActionDef(n) => {
+            ActionDefBodyElement::ActionDef(Box::new(dummy_node(n, normalize_action_def(&n.value))))
+        }
         ActionDefBodyElement::DefaultReferenceUsage(n) => {
             ActionDefBodyElement::DefaultReferenceUsage(dummy_node(
                 n,
@@ -1855,9 +1863,15 @@ fn normalize_action_usage_body_element_node(
         ActionUsageBodyElement::ThenAction(n) => {
             ActionUsageBodyElement::ThenAction(dummy_node(n, n.value.clone()))
         }
-        ActionUsageBodyElement::Decl(n) => {
-            ActionUsageBodyElement::Decl(dummy_node(n, n.value.clone()))
+        ActionUsageBodyElement::AttributeUsage(n) => ActionUsageBodyElement::AttributeUsage(
+            Box::new(dummy_node(n, normalize_attribute_usage(&n.value))),
+        ),
+        ActionUsageBodyElement::CalcUsage(n) => {
+            ActionUsageBodyElement::CalcUsage(Box::new(dummy_node(n, n.value.clone())))
         }
+        ActionUsageBodyElement::ActionDef(n) => ActionUsageBodyElement::ActionDef(Box::new(
+            dummy_node(n, normalize_action_def(&n.value)),
+        )),
         ActionUsageBodyElement::DefaultReferenceUsage(n) => {
             ActionUsageBodyElement::DefaultReferenceUsage(dummy_node(
                 n,

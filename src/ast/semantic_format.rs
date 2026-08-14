@@ -1490,7 +1490,11 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::Assign(_assign) => self.writer.write_str("(assign)"),
             ActionDefBodyElement::ForLoop(for_loop) => self.write_for_loop(&for_loop.value),
             ActionDefBodyElement::ThenAction(_then) => self.writer.write_str("(then-action)"),
-            ActionDefBodyElement::Decl(_declaration) => self.writer.write_str("(declaration)"),
+            ActionDefBodyElement::AttributeUsage(_usage) => {
+                self.writer.write_str("(attribute-usage)")
+            }
+            ActionDefBodyElement::CalcUsage(_usage) => self.writer.write_str("(calc-usage)"),
+            ActionDefBodyElement::ActionDef(_def) => self.writer.write_str("(action-def)"),
             ActionDefBodyElement::DefaultReferenceUsage(_usage) => {
                 self.writer.write_str("(default-reference-usage)")
             }

@@ -249,10 +249,11 @@ fn emit_action_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         ActionDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        ActionDefBodyElement::Decl(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ActionBodyDecl,
-        }),
+        ActionDefBodyElement::AttributeUsage(a) => {
+            structure::emit_attribute_usage(w, path, &a.value)
+        }
+        ActionDefBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
+        ActionDefBodyElement::ActionDef(d) => emit_action_def(w, path, &d.value),
         ActionDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         ActionDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ActionDefBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
@@ -352,10 +353,11 @@ pub(crate) fn emit_action_usage_body_element(
 ) -> Result<(), EmitError> {
     match el {
         ActionUsageBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        ActionUsageBodyElement::Decl(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::ActionBodyDecl,
-        }),
+        ActionUsageBodyElement::AttributeUsage(a) => {
+            structure::emit_attribute_usage(w, path, &a.value)
+        }
+        ActionUsageBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
+        ActionUsageBodyElement::ActionDef(d) => emit_action_def(w, path, &d.value),
         ActionUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
         ActionUsageBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ActionUsageBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),

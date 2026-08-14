@@ -25,7 +25,6 @@ pub enum OpacityKind {
     KermlFeatureDecl,
     FeatureDecl,
     ClassifierDecl,
-    ActionBodyDecl,
     RawRhsString,
     OpaqueConnectBrace,
     ParseError,
@@ -764,7 +763,11 @@ fn walk_action_def_body_elements(
         let p = format!("{path}/body[{i}]");
         match &el.value {
             ActionDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            ActionDefBodyElement::Decl(_) => hit(report, &p, OpacityKind::ActionBodyDecl),
+            ActionDefBodyElement::AttributeUsage(n) => {
+                walk_attribute_body(report, &p, &n.value.body)
+            }
+            ActionDefBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
+            ActionDefBodyElement::ActionDef(n) => walk_action_def_body(report, &p, &n.value.body),
             ActionDefBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             ActionDefBodyElement::MetadataAnnotation(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -842,7 +845,11 @@ fn walk_action_usage_body_elements(
         let p = format!("{path}/body[{i}]");
         match &el.value {
             ActionUsageBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            ActionUsageBodyElement::Decl(_) => hit(report, &p, OpacityKind::ActionBodyDecl),
+            ActionUsageBodyElement::AttributeUsage(n) => {
+                walk_attribute_body(report, &p, &n.value.body)
+            }
+            ActionUsageBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
+            ActionUsageBodyElement::ActionDef(n) => walk_action_def_body(report, &p, &n.value.body),
             ActionUsageBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             ActionUsageBodyElement::MetadataAnnotation(n) => {
                 walk_attribute_body(report, &p, &n.value.body)

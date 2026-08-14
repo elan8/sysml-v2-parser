@@ -89,7 +89,16 @@ pub enum ActionDefBodyElement {
     Assign(Node<AssignStmt>),
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),
-    Decl(Node<ActionBodyDecl>),
+    /// `attribute` usage declared inside an action body (BNF `ActionBodyItem` →
+    /// `NonBehaviorBodyItem` → `StructureUsageMember`), e.g. `attribute mass = 5;` as a sibling
+    /// of ordinary action statements (spec42 Gap 33; formerly the opaque `ActionBodyDecl`).
+    AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
+    /// `calc` usage declared inside an action body (spec42 Gap 33; formerly the opaque
+    /// `ActionBodyDecl`).
+    CalcUsage(Box<Node<crate::ast::CalcUsage>>),
+    /// Nested `action def` declaration (spec42 Gap 33; formerly flattened to the opaque
+    /// `ActionBodyDecl` keeping only the definition's name).
+    ActionDef(Box<Node<ActionDef>>),
     /// Keyword-less `name = expr;` feature binding (§6 G26), e.g. `measurement =
     /// testVehicle.mass;` in the OMG spec Annex `9-Verification-simplified.sysml`.
     DefaultReferenceUsage(Node<crate::ast::DefaultReferenceUsage>),
@@ -488,7 +497,15 @@ pub enum ActionUsageBodyElement {
     Assign(Node<AssignStmt>),
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),
-    Decl(Node<ActionBodyDecl>),
+    /// `attribute` usage declared inside an action body (spec42 Gap 33); see
+    /// [`ActionDefBodyElement::AttributeUsage`].
+    AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
+    /// `calc` usage declared inside an action body (spec42 Gap 33); see
+    /// [`ActionDefBodyElement::CalcUsage`].
+    CalcUsage(Box<Node<crate::ast::CalcUsage>>),
+    /// Nested `action def` declaration (spec42 Gap 33); see
+    /// [`ActionDefBodyElement::ActionDef`].
+    ActionDef(Box<Node<ActionDef>>),
     /// Keyword-less `name = expr;` feature binding (§6 G26), e.g. `measurement =
     /// testVehicle.mass;` in the OMG spec Annex `9-Verification-simplified.sysml`.
     DefaultReferenceUsage(Node<crate::ast::DefaultReferenceUsage>),
@@ -497,14 +514,6 @@ pub enum ActionUsageBodyElement {
     /// generateTorque : GenerateTorque { variant generateTorque4Cyl; ... } ... }`
     /// (`Variability Examples/VehicleVariabilityModel.sysml:128`).
     VariantUsage(Node<crate::ast::VariantUsage>),
-}
-
-/// A minimally-modeled declaration inside an action/behavior body (e.g. `attribute ...;`, `calc ...;`).
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ActionBodyDecl {
-    pub keyword: String,
-    pub text: String,
 }
 
 /// Flow definition: `flow def` Identification body.
