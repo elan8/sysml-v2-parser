@@ -1226,6 +1226,23 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
             ),
         ));
     }
+    // `variant requirement r1;` inside a `variation requirement r { ... }` body (spec42
+    // Gap 44), mirroring the five kind keywords above.
+    if let Ok((next, usage)) = requirement_usage(input) {
+        return Ok((
+            next,
+            node_from_to(
+                start,
+                next,
+                VariantUsage {
+                    reference: None,
+                    typed: Some(VariantTypedUsage::Requirement(Box::new(usage))),
+                    body: None,
+                    membership,
+                },
+            ),
+        ));
+    }
     // §6 G5: `variant perform doX;` inside a `variation perform action ... { ... }` body.
     // `perform_action_decl` first, for the same bare-keyword reason as the dispatchers above.
     if let Ok((next, usage)) = alt((perform_action_decl, perform_usage)).parse(input) {

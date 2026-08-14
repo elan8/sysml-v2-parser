@@ -503,6 +503,9 @@ fn collect_use_case_body_errors(body: &UseCaseDefBody, errors: &mut Vec<ParseErr
                     UseCaseDefBodyElement::Ref(n) => {
                         collect_ref_body_errors(&n.value.body, errors);
                     }
+                    UseCaseDefBodyElement::InOutDecl(n) => {
+                        collect_in_out_decl_errors(&n.value, errors);
+                    }
                     UseCaseDefBodyElement::ReturnRef(return_ref) => {
                         collect_return_ref_body_errors(&return_ref.value.body.value, errors)
                     }
@@ -1361,6 +1364,9 @@ fn collect_variant_usage_errors(variant: &crate::ast::VariantUsage, errors: &mut
         match typed {
             crate::ast::VariantTypedUsage::Part(n) => {
                 collect_part_usage_body_errors(&n.value.body, errors)
+            }
+            crate::ast::VariantTypedUsage::Requirement(n) => {
+                collect_requirement_body_errors(&n.value.body, errors)
             }
             crate::ast::VariantTypedUsage::Attribute(n) => {
                 collect_attribute_body_errors(&n.value.body, errors)

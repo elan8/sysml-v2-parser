@@ -1011,6 +1011,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
                 walk_use_case_def_body(report, &p, &n.value.body.value)
             }
             UseCaseDefBodyElement::Ref(n) => walk_ref_body(report, &p, &n.value.body),
+            UseCaseDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             UseCaseDefBodyElement::AssertConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
@@ -1351,6 +1352,9 @@ fn walk_variant_usage(report: &mut OpacityReport, path: &str, variant: &VariantU
         }
         Some(VariantTypedUsage::Item(item)) => walk_attribute_body(report, path, &item.value.body),
         Some(VariantTypedUsage::Port(port)) => walk_port_body(report, path, &port.value.body),
+        Some(VariantTypedUsage::Requirement(requirement)) => {
+            walk_requirement_def_body(report, path, &requirement.value.body)
+        }
         Some(VariantTypedUsage::Perform(perform)) => {
             walk_perform_body(report, path, &perform.value.body)
         }

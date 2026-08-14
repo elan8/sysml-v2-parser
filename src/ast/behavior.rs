@@ -176,6 +176,9 @@ pub struct InOutDecl {
     pub is_var: bool,
     /// Declared parameter name. Empty for the leading `:>> target` redefinition form.
     pub name: String,
+    /// `:>` subsets clause (`out voltage :> ISQ::electricPotential = ...;`, spec42 evsample;
+    /// Gap 45 fallout). Previously the `:>` spelling was silently folded into `type_name`.
+    pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Multiplicity clause (BNF `MultiplicityPart`). May precede the typing (`in
     /// transitionLinkSource[1]: StateAction :>> ...`, Systems Library `States.sysml`) or follow

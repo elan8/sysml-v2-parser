@@ -25,6 +25,44 @@ use nom::combinator::{map, opt};
 use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
+#[cfg(test)]
+mod use_case_member_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 46: the typing on an actor declaration is optional (`actor environment;`,
+    /// `actor passenger [0..4];`, OMG spec Annex A).
+    #[test]
+    fn actor_usage_accepts_the_untyped_form() {
+        let (rest, node) = actor_usage(input("actor environment;")).expect("bare actor");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(node.value.name, "environment");
+        assert!(node.value.type_name.is_none());
+
+        let (_, node) = actor_usage(input("actor passenger [0..4];")).expect("actor with mult");
+        assert!(node.value.type_name.is_none());
+        assert!(node.value.multiplicity.is_some());
+
+        assert!(
+            actor_usage(input("actor ;")).is_err(),
+            "bare actor; must not parse"
+        );
+    }
+
+    /// Spec42 Gap 45: the directed parameter shorthand dispatches inside use-case-family
+    /// bodies (`in scenario = cityScenario;`).
+    #[test]
+    fn use_case_body_dispatches_directed_parameters() {
+        let (rest, node) =
+            use_case_def_body_element(input("in scenario = cityScenario;")).expect("in shorthand");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, UseCaseDefBodyElement::InOutDecl(_)));
+    }
+}
+
 fn subject_ref(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectRef>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
@@ -570,11 +608,16 @@ pub(crate) fn use_case_def_body_element(
             // Full `ref` declarations (`ref use case self : UseCase :>> Case::self;`, Systems
             // Library `UseCases.sysml`; spec42 Gap 34). `ref_redefinition` first so the bare
             // `ref :>> target { ... }` shorthand keeps its dedicated node; nested in a sub-alt
-            // to stay under nom's 21-branch limit.
+            // to stay under nom's 21-branch limit. The directed parameter-member shorthand
+            // (`in scenario = cityScenario;`, `out voltage :> ... = ...;`; spec42 Gap 45)
+            // rides in the same sub-alt, mirroring `CalcDefBodyElement`'s wiring.
             nom::branch::alt((
                 map(ref_redefinition, UseCaseDefBodyElement::RefRedefinition),
                 map(crate::parser::connector::ref_decl, |n| {
                     UseCaseDefBodyElement::Ref(Box::new(n))
+                }),
+                map(crate::parser::action::in_out_decl, |n| {
+                    UseCaseDefBodyElement::InOutDecl(Box::new(n))
                 }),
             )),
             map(
@@ -703,8 +746,19 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
         let (input, n) = name(input)?;
         (input, n)
     };
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+    // The typing is optional: `actor environment;` / `actor passenger [0..4];` (OMG spec
+    // Annex A; spec42 Gap 46). A bare `actor;` still fails (no name and no type).
+    let (input, type_name) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_reference),
+    ))
+    .parse(input)?;
+    if n.is_empty() && type_name.is_none() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
     Ok((

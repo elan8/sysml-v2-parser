@@ -1661,6 +1661,9 @@ pub(crate) fn emit_variant_usage(
         Some(crate::ast::VariantTypedUsage::Perform(p)) => {
             super::behavior::emit_perform(w, path, &p.value)
         }
+        Some(crate::ast::VariantTypedUsage::Requirement(r)) => {
+            super::requirement::emit_requirement_usage(w, path, &r.value)
+        }
     }
 }
 

@@ -2418,7 +2418,10 @@ port def AirPort {
         sysml_v2_parser::ast::PortDefBodyElement::InOutDecl(decl) => {
             assert_eq!(decl.value.name, "volume");
             assert_eq!(decl.value.direction, sysml_v2_parser::ast::InOut::Out);
-            assert!(decl.value.type_name.is_some());
+            // Spec42 Gap 45 fallout: the authored `:>` is a subsets clause, no longer folded
+            // into `type_name`.
+            assert!(decl.value.type_name.is_none());
+            assert!(decl.value.subsets.is_some());
         }
         other => panic!("expected InOutDecl, got {:?}", other),
     }

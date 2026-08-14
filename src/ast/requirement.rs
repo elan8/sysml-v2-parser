@@ -639,6 +639,10 @@ pub enum UseCaseDefBodyElement {
     /// `UseCases.sysml`; spec42 Gap 34). The bare `ref :>> target { ... }` shorthand stays on
     /// [`RefRedefinition`].
     Ref(Box<Node<crate::ast::RefDecl>>),
+    /// Directed parameter-member shorthand with no kind keyword (`in scenario = cityScenario;`,
+    /// `out voltage :> ISQ::electricPotential = ...;`), mirroring
+    /// `ConstraintDefBodyElement`/`CalcDefBodyElement`'s existing wiring (spec42 Gap 45).
+    InOutDecl(Box<Node<crate::ast::InOutDecl>>),
     AssertConstraint(Node<crate::ast::AssertConstraintMember>),
     ReturnRef(Node<ReturnRef>),
     CaseReturnDecl(Node<CaseReturnDecl>),
@@ -667,7 +671,9 @@ pub enum UseCaseDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActorUsage {
     pub name: String,
-    pub type_name: QualifiedReferenceId,
+    /// `None` for the bare untyped form `actor environment;` / `actor passenger [0..4];`
+    /// (OMG spec Annex A; spec42 Gap 46).
+    pub type_name: Option<QualifiedReferenceId>,
     /// Optional multiplicity after the type, e.g. `[0..4]` in `actor passengers : Person[0..4];`
     /// (validation `18-Use Case`).
     pub multiplicity: Option<Node<Multiplicity>>,

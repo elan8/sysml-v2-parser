@@ -754,7 +754,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.writer.write_str("(actor (name ")?;
                             write_quoted(self.writer, &actor.value.name)?;
                             self.writer.write_str(") (type ")?;
-                            self.write_reference(actor.value.type_name)?;
+                            match actor.value.type_name {
+                                Some(reference) => self.write_reference(reference)?,
+                                None => self.writer.write_str("none")?,
+                            }
                             self.writer.write_str("))")?;
                         }
                         UseCaseDefBodyElement::ActorRedefinitionAssignment(actor) => {
@@ -794,6 +797,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         }
                         UseCaseDefBodyElement::Ref(_reference) => {
                             self.write_marker(&mut first, "ref")?;
+                        }
+                        UseCaseDefBodyElement::InOutDecl(_declaration) => {
+                            self.write_marker(&mut first, "in-out")?;
                         }
                         UseCaseDefBodyElement::RefRedefinition(reference) => {
                             self.write_item_prefix(&mut first)?;
@@ -1406,6 +1412,11 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 })?;
                 self.writer.write_str(") (declaration ")?;
                 self.write_usage_declaration_name(&declaration.value.name)?;
+                self.writer.write_str(") (subsets ")?;
+                match &declaration.value.subsets {
+                    Some(subsets) => self.write_subsetting(&subsets.value)?,
+                    None => self.writer.write_str("none")?,
+                }
                 self.writer.write_str(") (type ")?;
                 if let Some(reference) = declaration.value.type_name {
                     self.write_reference(reference)?;

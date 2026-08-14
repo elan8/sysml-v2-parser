@@ -761,10 +761,15 @@ fn emit_use_case_body_element(
         }
         UseCaseDefBodyElement::ActorUsage(a) => {
             emit_visibility(w, a.value.membership.visibility);
-            w.push_str("actor ");
-            w.push_str(&format_name(&a.value.name));
-            w.push_str(" : ");
-            w.push_qualified_reference(&format!("{path}/actor/type"), a.value.type_name)?;
+            w.push_str("actor");
+            if !a.value.name.is_empty() {
+                w.push_char(' ');
+                w.push_str(&format_name(&a.value.name));
+            }
+            if let Some(type_name) = a.value.type_name {
+                w.push_str(" : ");
+                w.push_qualified_reference(&format!("{path}/actor/type"), type_name)?;
+            }
             if let Some(mult) = &a.value.multiplicity {
                 emit_multiplicity(w, &mult.value)?;
             }
@@ -865,6 +870,7 @@ fn emit_use_case_body_element(
             emit_use_case_body(w, path, &r.value.body.value)
         }
         UseCaseDefBodyElement::Ref(r) => super::structure::emit_ref_decl(w, path, &r.value),
+        UseCaseDefBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         UseCaseDefBodyElement::AssertConstraint(assert) => {
             crate::emit::view::emit_assert_constraint(w, path, &assert.value)
         }

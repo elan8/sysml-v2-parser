@@ -96,13 +96,13 @@ package VehicleDefinitions {
         attribute tighteningTorque :> ISQ::torque;
     }
     port def DriveIF {
-        in driveTorque : ISQ::torque;
+        in driveTorque :> ISQ::torque;
     }
     port def AxleMountIF {
-        out transferredTorque : ISQ::torque;
+        out transferredTorque :> ISQ::torque;
     }
     port def WheelHubIF {
-        in appliedTorque : ISQ::torque;
+        in appliedTorque :> ISQ::torque;
     }
     interface def Mounting {
         doc

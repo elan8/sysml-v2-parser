@@ -176,14 +176,14 @@ package '9-Verification-simplified' {
             }
             action collectData {
                 in part testVehicle : Vehicle = vehicleMassTest.testVehicle;
-                out massMeasured : ISQ::mass;
+                out massMeasured :> ISQ::mass;
             }
             action processData {
-                in massMeasured : ISQ::mass = collectData.massMeasured;
-                out massProcessed : ISQ::mass;
+                in massMeasured :> ISQ::mass = collectData.massMeasured;
+                out massProcessed :> ISQ::mass;
             }
             action evaluateData {
-                in massProcessed : ISQ::mass = processData.massProcessed;
+                in massProcessed :> ISQ::mass = processData.massProcessed;
                 out verdict : VerdictKind = PassIf(vehicleMassRequirement(vehicle = new testVehicle(mass = massProcessed)));
             }
             return verdict : VerdictKind = evaluateData.verdict;

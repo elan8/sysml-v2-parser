@@ -747,6 +747,9 @@ pub enum VariantTypedUsage {
     Port(Box<Node<PortUsage>>),
     /// `variant perform doX;` inside a `variation perform action ... { ... }` body (§6 G5).
     Perform(Box<Node<Perform>>),
+    /// `variant requirement r1;` inside a `variation requirement r { ... }` body (spec42
+    /// Gap 44).
+    Requirement(Box<Node<crate::ast::RequirementUsage>>),
 }
 
 /// Enacted performance: `perform` action_path `{` body `}` inside a part usage.

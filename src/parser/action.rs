@@ -396,6 +396,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                     is_reference: false,
                     is_var: false,
                     name: String::new(),
+                    subsets: None,
                     type_name,
                     multiplicity,
                     ordered,
@@ -434,22 +435,41 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // to reference the corresponding typed parameter on the referenced action definition.
         // Action definitions generally include the type (e.g. `out videoStream : String;`),
         // but accepting the shorthand here prevents recovery errors in common models.
-        let (input, type_name) = nom::combinator::opt(alt((
-            map(
-                (
-                    preceded(ws_and_comments, tag(&b":>"[..])),
-                    preceded(ws_and_comments, qualified_reference),
-                ),
-                |(_, tn)| tn,
+        // `:>` is a subsets clause, retained as such (`out voltage :> ISQ::electricPotential =
+        // ...;`, spec42 evsample); it was previously folded into `type_name`, erasing the
+        // authored relationship kind. Parsed inline (not via `usage::subsetting`) so the `=`
+        // value stays on the declaration's own `FeatureValue` clause below.
+        let subsets_start = input;
+        let subsets_attempt =
+            (|| -> IResult<Input<'_>, Node<crate::ast::SubsettingRelationship>> {
+                let (i, _) = preceded(ws_and_comments, crate::parser::lex::subset_operator)
+                    .parse(subsets_start)?;
+                let (i, targets) = preceded(
+                    ws_and_comments,
+                    crate::parser::usage::specialization_targets,
+                )
+                .parse(i)?;
+                let span = crate::parser::span_from_to(subsets_start, i);
+                Ok((
+                    i,
+                    crate::parser::usage::subsetting_relationship_node(
+                        targets,
+                        crate::ast::SubsettingKind::Subsets,
+                        span,
+                    ),
+                ))
+            })();
+        let (input, subsets) = match subsets_attempt {
+            Ok((i, node)) => (i, Some(node)),
+            Err(_) => (input, None),
+        };
+        let (input, type_name) = nom::combinator::opt(map(
+            (
+                preceded(ws_and_comments, tag(&b":"[..])),
+                preceded(ws_and_comments, qualified_reference),
             ),
-            map(
-                (
-                    preceded(ws_and_comments, tag(&b":"[..])),
-                    preceded(ws_and_comments, qualified_reference),
-                ),
-                |(_, tn)| tn,
-            ),
-        )))
+            |(_, tn)| tn,
+        ))
         .parse(input)?;
         let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
             opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?
@@ -508,6 +528,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                 is_reference: is_reference.is_some(),
                 is_var: is_var.is_some(),
                 name: param_name,
+                subsets,
                 type_name,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
                 ordered: leading_ordered || trailing_ordered,

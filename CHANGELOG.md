@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 132.** Use-case-family and variant member widening (spec42 gaps
+  44/45/46): `VariantTypedUsage` gains a `Requirement` kind (`variant requirement r1;`);
+  `UseCaseDefBodyElement` gains `InOutDecl` for the directed parameter shorthand (`in scenario
+  = cityScenario;`); `ActorUsage.type_name` becomes optional for the bare untyped actor form
+  (`actor environment;`, `actor passenger [0..4];`, OMG spec Annex A). `InOutDecl` additionally
+  gains a typed `subsets` clause: the authored `:>` spelling on a directed parameter (`out
+  voltage :> ISQ::electricPotential = ...;`) is retained as a subsetting relationship instead
+  of being silently folded into `type_name`; `ConstraintDefBodyElement::InOutDecl` is boxed
+  (wire-format neutral).
 - **`PARSE_AST_VERSION` is now 131.** The `[unit]` annotation now applies to parenthesized
   tuples, invocation/constructor results, and feature references in expression position
   (`(0, shape.width/2, 0)[source]`, the Domain Geometry coordinate-frame idiom; spec42 gap

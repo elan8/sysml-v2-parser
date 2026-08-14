@@ -55,7 +55,7 @@ pub enum ConstraintDefBody {
 pub enum ConstraintDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
-    InOutDecl(Node<InOutDecl>),
+    InOutDecl(Box<Node<InOutDecl>>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
     /// A `constraint` member nested inside a `constraint def { ... }` body (e.g. the Systems

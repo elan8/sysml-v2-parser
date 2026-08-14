@@ -83,6 +83,9 @@ impl ProvenanceValidator<'_> {
             match typed {
                 VariantTypedUsage::Part(part) => self.part_usage_body(&part.value.body)?,
                 VariantTypedUsage::Perform(perform) => self.perform_body(&perform.value.body)?,
+                VariantTypedUsage::Requirement(requirement) => {
+                    self.requirement_body(&requirement.value.body)?
+                }
                 VariantTypedUsage::Attribute(_)
                 | VariantTypedUsage::Item(_)
                 | VariantTypedUsage::Port(_) => {}
@@ -272,7 +275,7 @@ impl ProvenanceValidator<'_> {
                 UseCaseDefBodyElement::RefRedefinition(n) => {
                     self.use_case_body(&n.value.body.value)?
                 }
-                UseCaseDefBodyElement::Ref(_) => {}
+                UseCaseDefBodyElement::Ref(_) | UseCaseDefBodyElement::InOutDecl(_) => {}
                 UseCaseDefBodyElement::ForLoop(n) => self.action_def_body(&n.value.body)?,
                 UseCaseDefBodyElement::ThenAction(n) => self.then_action(&n.value)?,
                 UseCaseDefBodyElement::Error(_)

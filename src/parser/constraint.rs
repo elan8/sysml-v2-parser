@@ -183,7 +183,10 @@ pub(crate) fn constraint_def_body_element(
                 nom::error::ErrorKind::Tag,
             )));
         }
-        map(in_out_decl, ConstraintDefBodyElement::InOutDecl).parse(input)?
+        map(in_out_decl, |n| {
+            ConstraintDefBodyElement::InOutDecl(Box::new(n))
+        })
+        .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"constraint") {
         map(constraint_usage, ConstraintDefBodyElement::Constraint).parse(input)?
     } else if input.fragment().starts_with(b":>>") || input.fragment().starts_with(b":>") {

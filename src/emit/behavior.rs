@@ -35,6 +35,9 @@ pub(crate) fn emit_inout_decl(
     } else {
         w.push_str(&format_name(&decl.name));
     }
+    if let Some(subsets) = &decl.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
     if let Some(type_name) = decl.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(path, type_name)?;
