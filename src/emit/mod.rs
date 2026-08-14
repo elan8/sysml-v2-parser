@@ -159,6 +159,8 @@ mod tests {
                     Package {
                         identification: package_identification("P"),
                         body: PackageBody::Brace {
+                            open_span: Span::dummy(),
+                            close_span: Span::dummy(),
                             elements: vec![Node::new(
                                 Span::dummy(),
                                 PackageBodyElement::PartDef(Node::new(
@@ -171,7 +173,9 @@ mod tests {
                                             name: Some("Vehicle".into()),
                                         },
                                         specializes: None,
-                                        body: PartDefBody::Semicolon,
+                                        body: PartDefBody::Semicolon {
+                                            semicolon_span: Span::dummy(),
+                                        },
                                         membership: owning(),
                                     },
                                 )),
@@ -195,6 +199,8 @@ mod tests {
                     Package {
                         identification: package_identification("P"),
                         body: PackageBody::Brace {
+                            open_span: Span::dummy(),
+                            close_span: Span::dummy(),
                             elements: vec![Node::new(
                                 Span::dummy(),
                                 PackageBodyElement::PartDef(Node::new(
@@ -208,6 +214,8 @@ mod tests {
                                         },
                                         specializes: None,
                                         body: PartDefBody::Brace {
+                                            open_span: Span::dummy(),
+                                            close_span: Span::dummy(),
                                             elements: vec![Node::new(
                                                 Span::dummy(),
                                                 PartDefBodyElement::AttributeDef(Node::new(
@@ -218,6 +226,8 @@ mod tests {
                                                         typing: None,
                                                         value: None,
                                                         body: AttributeBody::Brace {
+                                                            open_span: Span::dummy(),
+                                                            close_span: Span::dummy(),
                                                             elements: vec![Node::new(
                                                                 Span::dummy(),
                                                                 AttributeBodyElement::Other(
@@ -286,6 +296,8 @@ action def A {
                     Package {
                         identification: package_identification("P"),
                         body: PackageBody::Brace {
+                            open_span: Span::dummy(),
+                            close_span: Span::dummy(),
                             elements: vec![Node::new(
                                 Span::dummy(),
                                 PackageBodyElement::PartDef(Node::new(
@@ -299,6 +311,8 @@ action def A {
                                         },
                                         specializes: None,
                                         body: PartDefBody::Brace {
+                                            open_span: Span::dummy(),
+                                            close_span: Span::dummy(),
                                             elements: vec![Node::new(
                                                 Span::dummy(),
                                                 PartDefBodyElement::AttributeDef(Node::new(
@@ -309,6 +323,8 @@ action def A {
                                                         typing: None,
                                                         value: None,
                                                         body: AttributeBody::Brace {
+                                                            open_span: Span::dummy(),
+                                                            close_span: Span::dummy(),
                                                             elements: vec![Node::new(
                                                                 Span::dummy(),
                                                                 AttributeBodyElement::Other(

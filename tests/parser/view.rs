@@ -21,14 +21,16 @@ fn test_view_def_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(elements.len(), 1);
     match &elements[0].value {
         PackageBodyElement::ViewDef(vd) => {
             assert_eq!(vd.identification.name.as_deref(), Some("Name"));
-            assert!(matches!(&vd.body, ViewDefBody::Brace { ref elements } if elements.is_empty()));
+            assert!(
+                matches!(&vd.body, ViewDefBody::Brace { ref elements, .. } if elements.is_empty())
+            );
         }
         _ => panic!("expected ViewDef"),
     }
@@ -43,7 +45,7 @@ fn test_viewpoint_def_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(elements.len(), 1);
@@ -64,14 +66,14 @@ fn test_rendering_def_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(elements.len(), 1);
     match &elements[0].value {
         PackageBodyElement::RenderingDef(rd) => {
             assert_eq!(rd.identification.name.as_deref(), Some("Name"));
-            assert!(matches!(rd.body, RenderingDefBody::Semicolon));
+            assert!(matches!(rd.body, RenderingDefBody::Semicolon { .. }));
         }
         _ => panic!("expected RenderingDef"),
     }
@@ -86,7 +88,7 @@ fn test_view_usage_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(elements.len(), 1);
@@ -94,7 +96,9 @@ fn test_view_usage_parse() {
         PackageBodyElement::ViewUsage(vu) => {
             assert_eq!(vu.name, "name");
             assert_eq!(reference_text(&result, vu.type_name), Some("ViewType"));
-            assert!(matches!(&vu.body, ViewBody::Brace { ref elements } if elements.is_empty()));
+            assert!(
+                matches!(&vu.body, ViewBody::Brace { ref elements, .. } if elements.is_empty())
+            );
         }
         _ => panic!("expected ViewUsage"),
     }
@@ -109,26 +113,26 @@ fn test_view_and_connection_bodies_parse_members() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let view_def = match &elements[0].value {
         PackageBodyElement::ViewDef(vd) => &vd.value,
         _ => panic!("expected ViewDef"),
     };
-    assert!(matches!(&view_def.body, ViewDefBody::Brace { elements } if !elements.is_empty()));
+    assert!(matches!(&view_def.body, ViewDefBody::Brace { elements, .. } if !elements.is_empty()));
     let view_usage = match &elements[1].value {
         PackageBodyElement::ViewUsage(v) => &v.value,
         _ => panic!("expected ViewUsage"),
     };
-    assert!(matches!(&view_usage.body, ViewBody::Brace { elements } if !elements.is_empty()));
+    assert!(matches!(&view_usage.body, ViewBody::Brace { elements, .. } if !elements.is_empty()));
     let connection_def = match &elements[2].value {
         PackageBodyElement::ConnectionDef(c) => &c.value,
         _ => panic!("expected ConnectionDef"),
     };
     assert!(matches!(
         &connection_def.body,
-        sysml_v2_parser::ast::ConnectionDefBody::Brace { elements } if !elements.is_empty()
+        sysml_v2_parser::ast::ConnectionDefBody::Brace { elements, .. } if !elements.is_empty()
     ));
 }
 
@@ -143,7 +147,7 @@ viewpoint safety defined by Mission::SafetyViewpoint { }
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let viewpoint = match &elements[0].value {
@@ -169,7 +173,7 @@ view dashboard typed by Mission::DashboardView;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
 
@@ -212,7 +216,7 @@ rendering skin typed by Mission::Renderer;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let rendering_usage = match &elements[0].value {

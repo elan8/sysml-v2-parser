@@ -12,7 +12,7 @@ fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let view = elements
@@ -22,7 +22,7 @@ fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
             _ => None,
         })
         .expect("view def should be present");
-    let ViewDefBody::Brace { elements } = &view.body else {
+    let ViewDefBody::Brace { elements, .. } = &view.body else {
         panic!("expected view def body");
     };
     assert!(
@@ -47,7 +47,7 @@ fn view_usage_recovery_inserts_error_node_and_keeps_later_satisfy() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let view = elements
@@ -57,7 +57,7 @@ fn view_usage_recovery_inserts_error_node_and_keeps_later_satisfy() {
             _ => None,
         })
         .expect("view usage should be present");
-    let ViewBody::Brace { elements } = &view.body else {
+    let ViewBody::Brace { elements, .. } = &view.body else {
         panic!("expected view body");
     };
     assert!(

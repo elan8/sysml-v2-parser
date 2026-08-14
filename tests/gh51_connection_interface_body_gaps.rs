@@ -22,7 +22,7 @@ fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement
         other => panic!("expected package, got {other:?}"),
     };
     match &pkg.body {
-        PackageBody::Brace { elements } => elements.clone(),
+        PackageBody::Brace { elements, .. } => elements.clone(),
         _ => panic!("expected brace package body"),
     }
 }
@@ -38,7 +38,7 @@ fn connection_def_elements(
         })
         .expect("expected connection def");
     match &connection.body {
-        ConnectionDefBody::Brace { elements } => elements.clone(),
+        ConnectionDefBody::Brace { elements, .. } => elements.clone(),
         _ => panic!("expected connection def brace body"),
     }
 }
@@ -172,7 +172,7 @@ fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() 
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let interface = elements
@@ -182,7 +182,7 @@ fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() 
             _ => None,
         })
         .expect("expected interface def");
-    let InterfaceDefBody::Brace { elements } = &interface.body else {
+    let InterfaceDefBody::Brace { elements, .. } = &interface.body else {
         panic!("expected interface def brace body");
     };
     let ref_decl = elements

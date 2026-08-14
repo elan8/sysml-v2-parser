@@ -223,17 +223,33 @@ fn emit_send_payload(
     }
 }
 
+/// Emits either spelling of an `if` branch: a braced body, or the brace-less shorthand member.
+pub(crate) fn emit_action_branch_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    branch: &crate::ast::ActionBranchBody,
+) -> Result<(), EmitError> {
+    match branch {
+        crate::ast::ActionBranchBody::Braced(body) => emit_action_def_body(w, path, body),
+        crate::ast::ActionBranchBody::Shorthand(member) => {
+            w.push_char(' ');
+            emit_action_def_body_element(w, path, &member.value)
+        }
+    }
+}
+
 pub(crate) fn emit_action_def_body(
     w: &mut EmitWriter<'_>,
     path: &str,
     body: &ActionDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        ActionDefBody::Semicolon => {
+        ActionDefBody::Absent => Ok(()),
+        ActionDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        ActionDefBody::Brace { elements } => {
+        ActionDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -298,11 +314,10 @@ fn emit_action_def_body_element(
         ActionDefBodyElement::IfStmt(i) => {
             w.push_str("if ");
             emit_expression(w, &i.value.condition.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &i.value.then_body)?;
+            emit_action_branch_body(w, path, &i.value.then_body)?;
             if let Some(else_body) = &i.value.else_body {
-                w.push_str(" else ");
-                emit_action_def_body(w, path, else_body)?;
+                w.push_str(" else");
+                emit_action_branch_body(w, path, else_body)?;
             }
             Ok(())
         }
@@ -333,11 +348,12 @@ fn emit_action_usage_body(
     body: &ActionUsageBody,
 ) -> Result<(), EmitError> {
     match body {
-        ActionUsageBody::Semicolon => {
+        ActionUsageBody::Absent => Ok(()),
+        ActionUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        ActionUsageBody::Brace { elements } => {
+        ActionUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -401,11 +417,10 @@ pub(crate) fn emit_action_usage_body_element(
         ActionUsageBodyElement::IfStmt(i) => {
             w.push_str("if ");
             emit_expression(w, &i.value.condition.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &i.value.then_body)?;
+            emit_action_branch_body(w, path, &i.value.then_body)?;
             if let Some(else_body) = &i.value.else_body {
-                w.push_str(" else ");
-                emit_action_def_body(w, path, else_body)?;
+                w.push_str(" else");
+                emit_action_branch_body(w, path, else_body)?;
             }
             Ok(())
         }
@@ -510,11 +525,12 @@ fn emit_perform_body(
     body: &PerformBody,
 ) -> Result<(), EmitError> {
     match body {
-        PerformBody::Semicolon => {
+        PerformBody::Absent => Ok(()),
+        PerformBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PerformBody::Brace { elements } => {
+        PerformBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -669,11 +685,12 @@ fn emit_state_def_body(
     body: &StateDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        StateDefBody::Semicolon => {
+        StateDefBody::Absent => Ok(()),
+        StateDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        StateDefBody::Brace { elements } => {
+        StateDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1030,11 +1047,12 @@ fn emit_definition_body(
     body: &crate::ast::DefinitionBody,
 ) -> Result<(), EmitError> {
     match body {
-        crate::ast::DefinitionBody::Semicolon => {
+        crate::ast::DefinitionBody::Absent => Ok(()),
+        crate::ast::DefinitionBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::DefinitionBody::Brace { elements } => {
+        crate::ast::DefinitionBody::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())
@@ -1363,11 +1381,12 @@ pub(crate) fn emit_occurrence_usage(
         emit_feature_value(w, value)?;
     }
     match &usage.body {
-        crate::ast::OccurrenceUsageBody::Semicolon => {
+        crate::ast::OccurrenceUsageBody::Absent => Ok(()),
+        crate::ast::OccurrenceUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::OccurrenceUsageBody::Brace { elements } => {
+        crate::ast::OccurrenceUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();

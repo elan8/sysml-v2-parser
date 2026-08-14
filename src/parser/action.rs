@@ -17,17 +17,17 @@ use crate::parser::lex::{
     ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
+use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::usage::{multiplicity_node, redefinition, usage_feature_modifier_flags};
 use crate::parser::with_span;
 use crate::parser::Input;
-use crate::parser::{node_from_to, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded};
+use nom::IResult;
 use nom::Parser;
-use nom::{IResult, Input as _};
 
 const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"in",
@@ -216,7 +216,7 @@ fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
 
 fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
     let start = input;
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
         "first/merge body",
@@ -234,19 +234,15 @@ fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody
             node_from_to(start, end, FirstMergeBodyElement::Error(node))
         },
     )?;
-    let consumed_len = start.fragment().len() - input.fragment().len();
-    debug_assert!(consumed_len >= 2);
-    let (after_open, _) = start.take_split(1);
-    let (close_start, _) = start.take_split(consumed_len - 1);
     Ok((
         input,
         FirstMergeBody::Brace(node_from_to(
             start,
             input,
             FirstMergeBraceBody {
-                open_brace_span: span_from_to(start, after_open),
-                elements,
-                close_brace_span: span_from_to(close_start, input),
+                open_brace_span: members.open_span,
+                elements: members.elements,
+                close_brace_span: members.close_span,
             },
         )),
     ))
@@ -485,7 +481,9 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             ws_and_comments,
             alt((
                 map(tag(&b";"[..]), |_| None),
-                map(consume_action_structured_brace, Some),
+                map(consume_action_structured_brace, |members| {
+                    Some(members.elements)
+                }),
             )),
         )
         .parse(input)?;
@@ -516,15 +514,11 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
 /// Action def body: `;` or `{` ActionDefBodyElement* `}`
 fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| ActionDefBody::Semicolon),
-        action_def_body_brace,
-    ))
-    .parse(input)
+    alt((crate::parser::body::semicolon_body, action_def_body_brace)).parse(input)
 }
 
 pub(crate) fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
         "action body",
@@ -542,14 +536,14 @@ pub(crate) fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Acti
             node_from_to(start, end, ActionDefBodyElement::Error(node))
         },
     )?;
-    Ok((input, ActionDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Parse a `{` action-body `}`, returning the parsed member elements. The enclosing span stays
 /// available at the caller.
 fn consume_action_structured_brace(
     input: Input<'_>,
-) -> IResult<Input<'_>, Vec<Node<ActionDefBodyElement>>> {
+) -> IResult<Input<'_>, crate::parser::body::ParsedBraceMembers<ActionDefBodyElement>> {
     parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
@@ -1102,23 +1096,24 @@ fn loop_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
     Ok((input, node_from_to(start, input, LoopStmt { body })))
 }
 
-/// Wraps a single `then <target>;`/`else <target>;` shorthand statement (GH-86, no `{ }`) into
-/// the same one-element `ActionDefBody::Brace` shape the braced spelling `{ then <target>; }`
-/// already produces, so both forms are indistinguishable in the AST from here on.
-fn wrap_then_action_as_body(node: Node<ThenAction>) -> ActionDefBody {
+/// A single `then <target>;`/`else <target>;` shorthand statement (GH-86): a branch member with
+/// no braces of its own.
+fn then_action_branch(node: Node<ThenAction>) -> crate::ast::ActionBranchBody {
     let span = node.span.clone();
-    ActionDefBody::Brace {
-        elements: vec![Node::new(span, ActionDefBodyElement::ThenAction(node))],
-    }
+    crate::ast::ActionBranchBody::Shorthand(Box::new(Node::new(
+        span,
+        ActionDefBodyElement::ThenAction(node),
+    )))
 }
 
-/// Wraps a nested `else if ...` (BNF `IfNode`'s `IfNodeParameterMember` else-alternative, GH-86)
-/// into the same one-element `ActionDefBody::Brace` shape `else { if ... }` already produces.
-fn wrap_if_stmt_as_body(node: Node<IfStmt>) -> ActionDefBody {
+/// A nested `else if ...` (BNF `IfNode`'s `IfNodeParameterMember` else-alternative, GH-86),
+/// likewise written without braces.
+fn if_stmt_branch(node: Node<IfStmt>) -> crate::ast::ActionBranchBody {
     let span = node.span.clone();
-    ActionDefBody::Brace {
-        elements: vec![Node::new(span, ActionDefBodyElement::IfStmt(node))],
-    }
+    crate::ast::ActionBranchBody::Shorthand(Box::new(Node::new(
+        span,
+        ActionDefBodyElement::IfStmt(node),
+    )))
 }
 
 /// If control node: `if` condition (`{` thenBody `}` | `then` target `;`) (`else` (`{` elseBody
@@ -1139,8 +1134,8 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
     let (input, then_body) = preceded(
         ws_and_comments,
         alt((
-            action_def_body_brace,
-            map(then_action, wrap_then_action_as_body),
+            map(action_def_body_brace, crate::ast::ActionBranchBody::Braced),
+            map(then_action, then_action_branch),
         )),
     )
     .parse(input)?;
@@ -1149,9 +1144,9 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
         preceded(
             ws_and_comments,
             alt((
-                action_def_body_brace,
-                map(if_stmt, wrap_if_stmt_as_body),
-                map(else_target_shorthand, wrap_then_action_as_body),
+                map(action_def_body_brace, crate::ast::ActionBranchBody::Braced),
+                map(if_stmt, if_stmt_branch),
+                map(else_target_shorthand, then_action_branch),
             )),
         ),
     ))
@@ -1175,10 +1170,10 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
 pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b";"[..]), |_| ActionUsageBody::Semicolon),
+        crate::parser::body::semicolon_body,
         action_usage_body_brace,
         map(peek_implicit_action_usage_body_end, |_| {
-            ActionUsageBody::Semicolon
+            ActionUsageBody::Absent
         }),
     ))
     .parse(input)
@@ -1237,7 +1232,7 @@ fn peek_implicit_action_usage_body_end(input: Input<'_>) -> IResult<Input<'_>, (
 }
 
 fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
         "action body",
@@ -1255,7 +1250,7 @@ fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBo
             node_from_to(start, end, ActionUsageBodyElement::Error(node))
         },
     )?;
-    Ok((input, ActionUsageBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Action usage body element: InOutDecl | Bind | Flow | FirstStmt | MergeStmt | ActionUsage

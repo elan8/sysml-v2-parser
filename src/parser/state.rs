@@ -52,17 +52,11 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
 }
 
 pub(crate) fn state_def_body(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
-    alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            StateDefBody::Semicolon
-        }),
-        state_def_body_brace,
-    ))
-    .parse(input)
+    alt((crate::parser::body::semicolon_body, state_def_body_brace)).parse(input)
 }
 
 fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         STATE_BODY_STARTERS,
         "state body",
@@ -96,7 +90,7 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
             }
         },
     )?;
-    Ok((input, StateDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Shared `entry`/`do`/`exit` header: optional `action` keyword plus an optional source-backed
@@ -926,7 +920,7 @@ mod membership_tests {
         );
         assert!(!node.value.has_action_keyword);
         match &node.value.body {
-            crate::ast::StateDefBody::Brace { elements } => {
+            crate::ast::StateDefBody::Brace { elements, .. } => {
                 assert!(matches!(
                     elements[0].value,
                     crate::ast::StateDefBodyElement::InOutDecl(_)

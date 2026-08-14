@@ -48,19 +48,19 @@ fn count_packages_and_elements(root: &RootNamespace) -> (usize, usize) {
         match &el.value {
             RootElement::Package(p) => {
                 n_pkgs += 1;
-                if let PackageBody::Brace { elements } = &p.value.body {
+                if let PackageBody::Brace { elements, .. } = &p.value.body {
                     n_elements += elements.len();
                 }
             }
             RootElement::LibraryPackage(lp) => {
                 n_pkgs += 1;
-                if let PackageBody::Brace { elements } = &lp.value.body {
+                if let PackageBody::Brace { elements, .. } = &lp.value.body {
                     n_elements += elements.len();
                 }
             }
             RootElement::Namespace(n) => {
                 n_pkgs += 1;
-                if let PackageBody::Brace { elements } = &n.value.body {
+                if let PackageBody::Brace { elements, .. } = &n.value.body {
                     n_elements += elements.len();
                 }
             }

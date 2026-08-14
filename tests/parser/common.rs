@@ -52,7 +52,9 @@ pub(crate) fn expected_package_foo_semicolon() -> RootNamespace {
                 12,
                 Package {
                     identification: package_id("Foo"),
-                    body: PackageBody::Semicolon,
+                    body: PackageBody::Semicolon {
+                        semicolon_span: Span::dummy(),
+                    },
                 },
             )),
         )],
@@ -68,7 +70,11 @@ pub(crate) fn expected_package_bar_brace() -> RootNamespace {
                 15,
                 Package {
                     identification: package_id("Bar"),
-                    body: PackageBody::Brace { elements: vec![] },
+                    body: PackageBody::Brace {
+                        open_span: Span::dummy(),
+                        close_span: Span::dummy(),
+                        elements: vec![],
+                    },
                 },
             )),
         )],

@@ -12,14 +12,14 @@ fn parse_package(input: &str) -> Package {
 
 fn brace_package_elements(pkg: &Package) -> &[Node<PackageBodyElement>] {
     match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace package body"),
     }
 }
 
 fn brace_definition_elements(body: &DefinitionBody) -> &[Node<DefinitionBodyElement>] {
     match body {
-        DefinitionBody::Brace { elements } => elements,
+        DefinitionBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace definition body"),
     }
 }

@@ -86,11 +86,12 @@ fn emit_requirement_body(
     body: &RequirementDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        RequirementDefBody::Semicolon => {
+        RequirementDefBody::Absent => Ok(()),
+        RequirementDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        RequirementDefBody::Brace { elements } => {
+        RequirementDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -368,11 +369,12 @@ fn emit_require_constraint(
         w.push_qualified_reference(&format!("{path}/target"), target)?;
     }
     match &req.body {
-        crate::ast::ConstraintDefBody::Semicolon => {
+        crate::ast::ConstraintDefBody::Absent => Ok(()),
+        crate::ast::ConstraintDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ConstraintDefBody::Brace { elements } => {
+        crate::ast::ConstraintDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -719,11 +721,12 @@ pub(crate) fn emit_use_case_body(
     body: &UseCaseDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        UseCaseDefBody::Semicolon => {
+        UseCaseDefBody::Absent => Ok(()),
+        UseCaseDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        UseCaseDefBody::Brace { elements } => {
+        UseCaseDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -900,10 +903,11 @@ fn emit_return_ref(
         emit_multiplicity(w, &multiplicity.value)?;
     }
     match &return_ref.body.value {
-        ReturnRefBody::Semicolon => {
+        ReturnRefBody::Absent => {}
+        ReturnRefBody::Semicolon { .. } => {
             w.push_char(';');
         }
-        ReturnRefBody::Brace { elements } => {
+        ReturnRefBody::Brace { elements, .. } => {
             w.push_str(" {");
             if !elements.is_empty() {
                 w.newline();

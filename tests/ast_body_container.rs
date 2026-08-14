@@ -6,7 +6,7 @@
 //! authored order, and each scope still accepts only its own members.
 
 use sysml_v2_parser::ast::{
-    Body, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RootElement,
+    Body, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RootElement, Span,
 };
 use sysml_v2_parser::{emit_sysml, parse};
 
@@ -87,9 +87,13 @@ fn members_keep_their_authored_order() {
 #[test]
 fn scopes_keep_their_own_member_types() {
     let package: PackageBody = Body::Brace {
+        open_span: Span::dummy(),
+        close_span: Span::dummy(),
         elements: Vec::new(),
     };
     let part_def: PartDefBody = Body::Brace {
+        open_span: Span::dummy(),
+        close_span: Span::dummy(),
         elements: Vec::new(),
     };
     assert_eq!(package.braced_elements().map(<[_]>::len), Some(0));
@@ -100,18 +104,100 @@ fn scopes_keep_their_own_member_types() {
 
 #[cfg(feature = "serde")]
 #[test]
-fn the_serialized_body_shape_is_the_variant_and_its_members() {
-    let semicolon: PartDefBody = Body::Semicolon;
+fn the_serialized_body_shape_carries_its_delimiters() {
+    let semicolon: PartDefBody = Body::Semicolon {
+        semicolon_span: Span::dummy(),
+    };
     assert_eq!(
         serde_json::to_value(&semicolon).expect("serialize"),
-        serde_json::json!("Semicolon")
+        serde_json::json!({
+            "Semicolon": {
+                "semicolon_span": {"offset": 0, "line": 1, "column": 1, "len": 0}
+            }
+        })
     );
 
     let empty: PartDefBody = Body::Brace {
+        open_span: Span::dummy(),
         elements: Vec::new(),
+        close_span: Span::dummy(),
     };
     assert_eq!(
         serde_json::to_value(&empty).expect("serialize"),
-        serde_json::json!({"Brace": {"elements": []}})
+        serde_json::json!({
+            "Brace": {
+                "open_span": {"offset": 0, "line": 1, "column": 1, "len": 0},
+                "elements": [],
+                "close_span": {"offset": 0, "line": 1, "column": 1, "len": 0}
+            }
+        })
+    );
+}
+
+/// The delimiters are the authored tokens, not derived positions: each one slices back to itself.
+#[test]
+fn the_delimiters_slice_to_the_tokens_they_came_from() {
+    let source = "package P {
+  part def A {
+    attribute x : Real;
+  }
+  part def B;
+}
+";
+    let document = sysml_v2_parser::parse_for_editor(source);
+    let RootElement::Package(package) = &document.document.root.elements[0].value else {
+        panic!("expected a package");
+    };
+    let PackageBody::Brace {
+        open_span,
+        elements,
+        close_span,
+    } = &package.value.body
+    else {
+        panic!("expected a brace package body");
+    };
+    assert_eq!(
+        &source[open_span.offset..open_span.offset + open_span.len],
+        "{"
+    );
+    assert_eq!(
+        &source[close_span.offset..close_span.offset + close_span.len],
+        "}"
+    );
+    assert!(open_span.offset < close_span.offset);
+
+    let PackageBodyElement::PartDef(part_def) = &elements[0].value else {
+        panic!("expected a part def");
+    };
+    let PartDefBody::Brace {
+        open_span: inner_open,
+        close_span: inner_close,
+        ..
+    } = &part_def.value.body
+    else {
+        panic!("expected a brace part def body");
+    };
+    assert_eq!(
+        &source[inner_open.offset..inner_open.offset + inner_open.len],
+        "{"
+    );
+    assert_eq!(
+        &source[inner_close.offset..inner_close.offset + inner_close.len],
+        "}"
+    );
+    assert!(
+        open_span.offset < inner_open.offset && inner_close.offset < close_span.offset,
+        "the nested body's delimiters must sit inside the enclosing one's"
+    );
+
+    let PackageBodyElement::PartDef(semicolon_def) = &elements[1].value else {
+        panic!("expected a second part def");
+    };
+    let PartDefBody::Semicolon { semicolon_span } = &semicolon_def.value.body else {
+        panic!("expected a semicolon body");
+    };
+    assert_eq!(
+        &source[semicolon_span.offset..semicolon_span.offset + semicolon_span.len],
+        ";"
     );
 }

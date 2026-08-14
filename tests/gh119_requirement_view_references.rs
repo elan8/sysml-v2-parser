@@ -12,7 +12,7 @@ fn package_elements(
         other => panic!("expected package, got {other:?}"),
     };
     match &package.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected package body, got {other:?}"),
     }
 }
@@ -53,7 +53,7 @@ fn requirement_and_dependency_references_use_document_local_ids() {
         PackageBodyElement::RequirementDef(requirement) => &requirement.value,
         other => panic!("expected requirement definition, got {other:?}"),
     };
-    let RequirementDefBody::Brace { elements } = &requirement.body else {
+    let RequirementDefBody::Brace { elements, .. } = &requirement.body else {
         panic!("expected requirement body");
     };
     let subject = match &elements[0].value {
@@ -117,7 +117,7 @@ fn view_type_and_satisfy_target_use_source_backed_ids() {
     assert!(view_type.metadata.is_absolute);
 
     let satisfy = match &view.body {
-        ViewBody::Brace { elements } => match &elements[0].value {
+        ViewBody::Brace { elements, .. } => match &elements[0].value {
             ViewBodyElement::Satisfy(satisfy) => &satisfy.value,
             other => panic!("expected satisfy member, got {other:?}"),
         },

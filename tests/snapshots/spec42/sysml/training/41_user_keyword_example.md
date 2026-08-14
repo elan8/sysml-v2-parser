@@ -63,14 +63,14 @@ package 'User Keyword Example' {
         #cause 'battery old' {
             '' :>> probability = 0.01;
         }
-        #causation;
+        #causation
         connect 'battery old' to 'power low';
         #situation 'power low' {
             constraint {
                 device.battery.power < minPower;
             }
         }
-        #causation;
+        #causation
         connect 'power low' to 'device shutoff';
         #failure 'device shutoff' {
             '' :>> severity = LevelEnum::high;

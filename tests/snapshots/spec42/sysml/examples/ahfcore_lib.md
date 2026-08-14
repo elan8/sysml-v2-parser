@@ -77,26 +77,26 @@ library package AHFCoreLib {
     private import AHFProfileLib::*;
     private import ScalarValues::*;
     private import AHFProfileMetadata::*;
-    #service;
+    #service
     port def ServiceDiscovery {
     }
-    #service;
+    #service
     port def ServiceDiscoveryDD :> ServiceDiscovery {
     }
-    #service;
+    #service
     port def Authorisation {
         attribute publickey : String;
     }
-    #service;
+    #service
     port def AuthorisationDD :> Authorisation {
     }
     #clouddd ArrowheadCore {
         #system service_registry {
-            #service;
+            #service
             serviceDiscovery : ServiceDiscovery;
         }
         #system authorization {
-            #service;
+            #service
             authorisation : Authorisation;
             attribute def protocol : String = "HTTP";
         }

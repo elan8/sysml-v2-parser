@@ -80,10 +80,16 @@ fn interface_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<Interfa
 fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, InterfaceDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            InterfaceDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         INTERFACE_DEF_BODY_STARTERS,
         "interface definition body",
@@ -91,7 +97,7 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
         interface_def_body_element,
         interface_def_body_recovery,
     )?;
-    Ok((input, InterfaceDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Interface definition: `interface` `def` Identification body

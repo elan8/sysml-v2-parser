@@ -86,10 +86,16 @@ fn connection_def_body_recovery(
 pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, ConnectionDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, ConnectionDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            ConnectionDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         CONNECTION_DEF_BODY_STARTERS,
         "connection definition body",
@@ -97,7 +103,7 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
         connection_def_body_element,
         connection_def_body_recovery,
     )?;
-    Ok((input, ConnectionDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Connection definition: `connection def` Identification body.

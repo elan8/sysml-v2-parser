@@ -28,7 +28,7 @@ fn test_parse_2a_parts_interconnection() {
         Some("2a-Parts Interconnection")
     );
 
-    let PackageBody::Brace { elements } = &package.body else {
+    let PackageBody::Brace { elements, .. } = &package.body else {
         panic!("expected package brace body");
     };
     let imports: Vec<_> = elements

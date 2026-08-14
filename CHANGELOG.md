@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Body delimiters are retained.** `Body::Semicolon` keeps the `;` span and `Body::Brace` keeps
+  both brace spans, captured where the parser consumes them rather than recomputed. The one
+  hand-rolled reconstruction of those positions (arithmetic over consumed lengths, in the
+  `first`/`merge` body) is gone, and the shared brace-member routine now returns the delimiters
+  along with the members, so no scope has to consume `{` and `}` correctly on its own. There is
+  deliberately no state for a missing closing brace: an unterminated body does not currently
+  produce a body at all -- the enclosing declaration becomes a recovery node -- so a typed close
+  outcome would be an unreachable variant until recovery can retain the members it read.
 - **`ast::AnnotatingMember`, the grammar's annotating production as one type.** `AnnotatingElement
   = Comment | Documentation | TextualRepresentation | MetadataFeature` is a single production in
   both the KerML and SysML grammars, so the scopes that accept all of it -- relationship bodies
@@ -40,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Emission no longer invents a `;` for a body that was never written.** A `#Name` prefix on a
+  declaration and an action usage whose terminator the parser infers both stored their absent body
+  as the semicolon form, so formatting wrote a `;` the author never typed -- splitting
+  `#situation x : T;` into two members and `action a accept M via v;` into a member plus a stray
+  clause. `Body::Absent` keeps "no body was written" distinct from "a semicolon was written".
+- **The brace-less `if` branch keeps its authored spelling.** `if x then y;` was stored as a
+  one-member brace body and re-emitted as `if x  { then y; }` -- braces the author never wrote,
+  plus a doubled space. `ActionBranchBody` distinguishes the two spellings the grammar offers, so
+  each is emitted as authored.
 - **A `ref` body no longer depends on which declaration owns it.** `UsageBody = DefinitionBody`
   (SysML 8.2.2.6.2), so a `ref` body holds the general usage-member set wherever it appears -- but
   five parsers built one, each accepting its own member grammar and wrapping the result in a
@@ -81,7 +98,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`PARSE_AST_VERSION` is now 139.** `RefBodyElement` is removed: `RefBody` is now
+- **`PARSE_AST_VERSION` is now 140.** `Body` carries its delimiters: `Semicolon` holds the `;`
+  span, `Brace` holds both brace spans, and a new `Absent` variant covers a declaration that
+  never had a body to write. `IfStmt`'s branches become `ActionBranchBody`. `RefBodyElement` is
+  removed: `RefBody` is now
   `Body<PartUsageBodyElement>`, the usage-member set the grammar gives it. `CommentAnnotation`
   gains `keyword_span`, and
   `PartUsageBodyElement` replaces its `Doc` and `MetadataAnnotation` variants with `Annotating`.

@@ -11,7 +11,7 @@ const APOLLO_EXECUTION_FILE: &str =
     r"C:\Git\apollo-11-sysml-v2\Execution\Apollo11MissionExecutionPackage.sysml";
 
 fn walk_occurrence(body: &OccurrenceUsageBody, structured_assert_count: &mut usize) {
-    let OccurrenceUsageBody::Brace { elements } = body else {
+    let OccurrenceUsageBody::Brace { elements, .. } = body else {
         return;
     };
 
@@ -53,13 +53,13 @@ fn apollo_execution_file_preserves_assert_constraints_structurally() {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package root, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &package.body else {
+    let PackageBody::Brace { elements, .. } = &package.body else {
         panic!("expected package brace body");
     };
     for element in elements {
         match &element.value {
             PackageBodyElement::PartUsage(part_usage) => {
-                if let PartUsageBody::Brace { elements } = &part_usage.value.body {
+                if let PartUsageBody::Brace { elements, .. } = &part_usage.value.body {
                     for body_element in elements {
                         if let PartUsageBodyElement::OccurrenceUsage(occurrence) =
                             &body_element.value
@@ -70,7 +70,7 @@ fn apollo_execution_file_preserves_assert_constraints_structurally() {
                 }
             }
             PackageBodyElement::PartDef(part_def) => {
-                if let PartDefBody::Brace { elements } = &part_def.value.body {
+                if let PartDefBody::Brace { elements, .. } = &part_def.value.body {
                     for body_element in elements {
                         if let PartDefBodyElement::OccurrenceUsage(occurrence) = &body_element.value
                         {

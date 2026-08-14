@@ -18,7 +18,7 @@ fn package_recovery_inserts_error_node_and_keeps_later_sibling() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     assert!(

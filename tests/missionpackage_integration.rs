@@ -35,14 +35,14 @@ fn missionpackage_structures_connection_and_comment_members() {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package root, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &package.body else {
+    let PackageBody::Brace { elements, .. } = &package.body else {
         panic!("expected package brace body");
     };
     for element in elements {
         let PackageBodyElement::PartDef(part_def) = &element.value else {
             continue;
         };
-        let PartDefBody::Brace { elements } = &part_def.value.body else {
+        let PartDefBody::Brace { elements, .. } = &part_def.value.body else {
             continue;
         };
         for member in elements {

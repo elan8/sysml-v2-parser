@@ -133,7 +133,7 @@ fn collect_bnf_decl_counts(root: &RootNamespace, counts: &mut BTreeMap<String, u
 }
 
 fn collect_bnf_decl_counts_in_body(body: &PackageBody, counts: &mut BTreeMap<String, usize>) {
-    let PackageBody::Brace { elements } = body else {
+    let PackageBody::Brace { elements, .. } = body else {
         return;
     };
     for element in elements {
@@ -187,7 +187,7 @@ fn collect_package_body_type_counts(root: &RootNamespace, counts: &mut BTreeMap<
 }
 
 fn collect_body_type_counts(body: &PackageBody, counts: &mut BTreeMap<String, usize>) {
-    let PackageBody::Brace { elements } = body else {
+    let PackageBody::Brace { elements, .. } = body else {
         return;
     };
     for element in elements {
@@ -235,7 +235,7 @@ fn env_threshold(name: &str) -> Option<usize> {
 }
 
 fn collect_extended_texts(body: &PackageBody, out: &mut Vec<String>) {
-    let PackageBody::Brace { elements } = body else {
+    let PackageBody::Brace { elements, .. } = body else {
         return;
     };
     for element in elements {

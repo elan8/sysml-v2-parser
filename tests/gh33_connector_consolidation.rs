@@ -27,7 +27,7 @@ fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement
         other => panic!("expected package, got {other:?}"),
     };
     match &pkg.body {
-        PackageBody::Brace { elements } => elements.clone(),
+        PackageBody::Brace { elements, .. } => elements.clone(),
         _ => panic!("expected brace package body"),
     }
 }
@@ -50,6 +50,7 @@ fn conjugated_end_type_works_in_both_connection_and_interface_defs() {
         .expect("expected connection def");
     let ConnectionDefBody::Brace {
         elements: connection_elements,
+        ..
     } = &connection.body
     else {
         panic!("expected connection def brace body");
@@ -74,6 +75,7 @@ fn conjugated_end_type_works_in_both_connection_and_interface_defs() {
         .expect("expected interface def");
     let InterfaceDefBody::Brace {
         elements: interface_elements,
+        ..
     } = &interface.body
     else {
         panic!("expected interface def brace body");
@@ -109,6 +111,7 @@ fn per_endpoint_multiplicity_on_connect_works_in_both_connection_and_interface_d
         .expect("expected connection def");
     let ConnectionDefBody::Brace {
         elements: connection_elements,
+        ..
     } = &connection.body
     else {
         panic!("expected connection def brace body");
@@ -132,6 +135,7 @@ fn per_endpoint_multiplicity_on_connect_works_in_both_connection_and_interface_d
         .expect("expected interface def");
     let InterfaceDefBody::Brace {
         elements: interface_elements,
+        ..
     } = &interface.body
     else {
         panic!("expected interface def brace body");
@@ -161,7 +165,7 @@ fn derivation_end_role_is_connection_only_by_design() {
             _ => None,
         })
         .expect("expected derivation connection def");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection def brace body");
     };
     assert!(elements.iter().any(|e| matches!(

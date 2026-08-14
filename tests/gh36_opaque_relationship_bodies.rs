@@ -24,7 +24,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     elements.iter().map(|e| e.value.clone()).collect()
@@ -41,7 +41,7 @@ fn alias_body_retains_doc_comment() {
             _ => None,
         })
         .expect("expected alias def");
-    let AliasBody::Brace { elements } = &alias.body else {
+    let AliasBody::Brace { elements, .. } = &alias.body else {
         panic!("expected brace alias body");
     };
     assert!(
@@ -113,7 +113,7 @@ fn plain_connect_statement_retains_doc_comment() {
             _ => None,
         })
         .expect("expected connection def");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected brace connection def body");
     };
     let connect_stmt = elements
@@ -146,7 +146,7 @@ fn connection_ref_body_retains_doc_comment() {
             _ => None,
         })
         .expect("expected connection def");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected brace connection def body");
     };
     let ref_decl = elements
@@ -156,7 +156,7 @@ fn connection_ref_body_retains_doc_comment() {
             _ => None,
         })
         .expect("expected ref declaration");
-    let RefBody::Brace { elements } = &ref_decl.body else {
+    let RefBody::Brace { elements, .. } = &ref_decl.body else {
         panic!("expected brace ref body");
     };
     assert!(
@@ -179,7 +179,7 @@ fn part_usage_ref_body_retains_real_member() {
             _ => None,
         })
         .expect("expected part def");
-    let PartDefBody::Brace { elements } = &part_def.body else {
+    let PartDefBody::Brace { elements, .. } = &part_def.body else {
         panic!("expected brace part def body");
     };
     let ref_decl = elements
@@ -189,7 +189,7 @@ fn part_usage_ref_body_retains_real_member() {
             _ => None,
         })
         .expect("expected ref declaration");
-    let RefBody::Brace { elements } = &ref_decl.body else {
+    let RefBody::Brace { elements, .. } = &ref_decl.body else {
         panic!("expected brace ref body");
     };
     assert!(
@@ -211,7 +211,7 @@ fn bind_trailing_body_retains_real_member() {
             _ => None,
         })
         .expect("expected part def");
-    let PartDefBody::Brace { elements } = &part_def.body else {
+    let PartDefBody::Brace { elements, .. } = &part_def.body else {
         panic!("expected brace part def body");
     };
     let bind = elements
@@ -239,7 +239,7 @@ fn state_ref_body_retains_real_member() {
             _ => None,
         })
         .expect("expected state def");
-    let StateDefBody::Brace { elements } = &state_def.body else {
+    let StateDefBody::Brace { elements, .. } = &state_def.body else {
         panic!("expected brace state def body");
     };
     let ref_decl = elements
@@ -249,7 +249,7 @@ fn state_ref_body_retains_real_member() {
             _ => None,
         })
         .expect("expected ref declaration");
-    let RefBody::Brace { elements } = &ref_decl.body else {
+    let RefBody::Brace { elements, .. } = &ref_decl.body else {
         panic!("expected brace ref body");
     };
     assert!(

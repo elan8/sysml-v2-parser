@@ -72,9 +72,7 @@ package 'Conditional Succession Example-2' {
             in item scene = takePicture::scene;
             out item image;
         }
-        if focus.image.isWellFocused  {
-            then shoot;
-        }
+        if focus.image.isWellFocused then shoot;
         flow from focus.image to shoot.image;
         action shoot : Shoot {
             in item image;

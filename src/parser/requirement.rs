@@ -103,16 +103,14 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
 
 pub(crate) fn requirement_def_body(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
     alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            RequirementDefBody::Semicolon
-        }),
+        crate::parser::body::semicolon_body,
         requirement_def_body_brace,
     ))
     .parse(input)
 }
 
 fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         REQUIREMENT_BODY_STARTERS,
         "requirement body",
@@ -120,7 +118,7 @@ fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Requiremen
         requirement_def_body_element,
         requirement_body_recovery_element,
     )?;
-    Ok((input, RequirementDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 fn requirement_body_recovery_element(
@@ -957,8 +955,10 @@ fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
             (crate::ast::ConnectBody::Semicolon, None)
         }),
         map(constraint_def_body, |body| match body {
-            ConstraintDefBody::Semicolon => (crate::ast::ConnectBody::Semicolon, None),
-            ConstraintDefBody::Brace { elements } => {
+            ConstraintDefBody::Semicolon { .. } | ConstraintDefBody::Absent => {
+                (crate::ast::ConnectBody::Semicolon, None)
+            }
+            ConstraintDefBody::Brace { elements, .. } => {
                 (crate::ast::ConnectBody::Brace, Some(elements))
             }
         }),

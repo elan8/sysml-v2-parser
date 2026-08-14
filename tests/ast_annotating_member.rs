@@ -95,7 +95,7 @@ fn a_ref_body_owns_the_same_production() {
             _ => None,
         })
         .expect("expected a ref declaration");
-    let RefBody::Brace { elements } = &ref_decl.body else {
+    let RefBody::Brace { elements, .. } = &ref_decl.body else {
         panic!("expected a brace ref body");
     };
     assert!(matches!(

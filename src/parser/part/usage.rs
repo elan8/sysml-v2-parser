@@ -300,11 +300,7 @@ fn part_usage_body(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
         "part_usage_body: first 40 bytes: {:?}",
         frag.get(..40.min(frag.len())).unwrap_or(frag),
     );
-    let result = alt((
-        map(tag(&b";"[..]), |_| PartUsageBody::Semicolon),
-        part_usage_body_brace,
-    ))
-    .parse(input);
+    let result = alt((crate::parser::body::semicolon_body, part_usage_body_brace)).parse(input);
     if result.is_err() {
         log::debug!(
             "part_usage_body: failed at: {:?}",
@@ -333,7 +329,7 @@ fn part_usage_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PartUsageB
 }
 
 fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> {
-    let (input, elements) = parse_structured_brace_members_with_skip(
+    let (input, members) = parse_structured_brace_members_with_skip(
         input,
         PART_BODY_STARTERS,
         "part usage body",
@@ -342,8 +338,11 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
         part_usage_body_recovery,
         BraceMemberSkip::BodyElementRecover,
     )?;
-    log::debug!("part_usage_body: brace ok, {} elements", elements.len());
-    Ok((input, PartUsageBody::Brace { elements }))
+    log::debug!(
+        "part_usage_body: brace ok, {} elements",
+        members.elements.len()
+    );
+    Ok((input, members.into_body()))
 }
 
 /// The one `ref` usage body parser.
@@ -356,12 +355,18 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
 pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, RefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            RefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
     // Same member grammar as any other usage body, reported under this scope's own name so a
     // diagnostic still tells the author which body they were writing.
-    let (input, elements) = parse_structured_brace_members_with_skip(
+    let (input, members) = parse_structured_brace_members_with_skip(
         input,
         PART_BODY_STARTERS,
         "ref usage body",
@@ -383,12 +388,12 @@ pub(crate) fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
         },
         BraceMemberSkip::BodyElementRecover,
     )?;
-    Ok((input, RefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 fn consume_part_usage_structured_brace(
     input: Input<'_>,
-) -> IResult<Input<'_>, Vec<Node<PartUsageBodyElement>>> {
+) -> IResult<Input<'_>, crate::parser::body::ParsedBraceMembers<PartUsageBodyElement>> {
     parse_structured_brace_members_with_skip(
         input,
         PART_BODY_STARTERS,
@@ -467,16 +472,24 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
 /// Perform body: `{` PerformBodyElement* `}`.
 fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     let (input, _) = ws_and_comments(input)?;
-    let (input, elements) = nom::sequence::delimited(
-        tag(&b"{"[..]),
-        preceded(
-            ws_and_comments,
-            many0(preceded(ws_and_comments, perform_body_element)),
-        ),
-        preceded(ws_and_comments, tag(&b"}"[..])),
+    let open_start = input;
+    let (input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
+    let (input, elements) = preceded(
+        ws_and_comments,
+        many0(preceded(ws_and_comments, perform_body_element)),
     )
     .parse(input)?;
-    Ok((input, PerformBody::Brace { elements }))
+    let (close_start, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+    Ok((
+        input,
+        PerformBody::Brace {
+            open_span,
+            elements,
+            close_span: crate::parser::span::span_from_to(close_start, input),
+        },
+    ))
 }
 
 /// Optional `abstract` / `variation` prefix before `perform` (§6 G5). Mirrors `part_usage`'s
@@ -501,10 +514,7 @@ fn perform_value(input: Input<'_>) -> IResult<Input<'_>, Option<Node<crate::ast:
 fn perform_body_or_semicolon(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     preceded(
         ws_and_comments,
-        alt((
-            map(tag(&b";"[..]), |_| PerformBody::Semicolon),
-            perform_body,
-        )),
+        alt((crate::parser::body::semicolon_body, perform_body)),
     )
     .parse(input)
 }
@@ -730,8 +740,8 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
             (Some(ConnectBody::Semicolon), Vec::new())
         }),
-        map(consume_part_usage_structured_brace, |elements| {
-            (Some(ConnectBody::Brace), elements)
+        map(consume_part_usage_structured_brace, |members| {
+            (Some(ConnectBody::Brace), members.elements)
         }),
     ));
     let (input, (body, body_elements)) = body_parser.parse(input)?;
@@ -1273,7 +1283,7 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
     let (input, reference) = reference_path(input)?;
     let (input, body) = preceded(ws_and_comments, part_usage_body).parse(input)?;
     let body = match body {
-        PartUsageBody::Semicolon => None,
+        PartUsageBody::Semicolon { .. } | PartUsageBody::Absent => None,
         brace @ PartUsageBody::Brace { .. } => Some(brace),
     };
     Ok((
@@ -1732,7 +1742,7 @@ mod par_002_nested_def_tests {
         let crate::parser::part::PartDefOrUsage::Def(def_node) = def_node else {
             panic!("expected a part def");
         };
-        let crate::ast::PartDefBody::Brace { elements } = &def_node.value.body else {
+        let crate::ast::PartDefBody::Brace { elements, .. } = &def_node.value.body else {
             panic!("expected brace body");
         };
         assert_eq!(elements.len(), 1);
@@ -1771,7 +1781,7 @@ mod perform_semicolon_and_redefine_tests {
         assert!(node.value.action_name.is_empty());
         assert!(node.value.action_reference.is_some());
         assert_eq!(node.value.redefines, None);
-        assert!(matches!(node.value.body, PerformBody::Semicolon));
+        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
     }
 
     #[test]
@@ -1779,7 +1789,7 @@ mod perform_semicolon_and_redefine_tests {
         let node = perform("perform providePower.generateTorque;");
         assert!(node.value.action_name.is_empty());
         assert!(node.value.action_reference.is_some());
-        assert!(matches!(node.value.body, PerformBody::Semicolon));
+        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
     }
 
     #[test]
@@ -1787,7 +1797,7 @@ mod perform_semicolon_and_redefine_tests {
         let node = perform("perform 'provide power';");
         assert!(node.value.action_name.is_empty());
         assert!(node.value.action_reference.is_some());
-        assert!(matches!(node.value.body, PerformBody::Semicolon));
+        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
     }
 
     #[test]
@@ -1801,7 +1811,7 @@ mod perform_semicolon_and_redefine_tests {
                 .map(|relationship| relationship.value.target.len()),
             Some(1)
         );
-        assert!(matches!(node.value.body, PerformBody::Semicolon));
+        assert!(matches!(node.value.body, PerformBody::Semicolon { .. }));
     }
 
     #[test]
@@ -1840,7 +1850,7 @@ mod perform_semicolon_and_redefine_tests {
     #[test]
     fn perform_body_accepts_directed_part_and_item_usages() {
         let node = perform("perform vehicleMassTest { in part :>> testVehicle = vehicleUnderTest; in item 'mass sample' : MassSample { } }");
-        let PerformBody::Brace { elements } = node.value.body else {
+        let PerformBody::Brace { elements, .. } = node.value.body else {
             panic!("expected brace body");
         };
         assert!(matches!(

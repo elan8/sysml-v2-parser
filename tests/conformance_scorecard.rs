@@ -95,7 +95,7 @@ fn collect_package_body_type_counts(root: &RootNamespace, counts: &mut BTreeMap<
 }
 
 fn collect_body_type_counts(body: &PackageBody, counts: &mut BTreeMap<String, usize>) {
-    let PackageBody::Brace { elements } = body else {
+    let PackageBody::Brace { elements, .. } = body else {
         return;
     };
     for element in elements {

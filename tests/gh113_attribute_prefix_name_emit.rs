@@ -22,13 +22,13 @@ fn part_def_attribute(src: &str) -> sysml_v2_parser::ast::AttributeUsage {
     let RootElement::Package(pkg) = &ast.elements[0].value else {
         panic!("expected Package");
     };
-    let PackageBody::Brace { elements } = &pkg.value.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.value.body else {
         panic!("expected brace package body");
     };
     let PackageBodyElement::PartDef(q) = &elements[0].value else {
         panic!("expected PartDef");
     };
-    let PartDefBody::Brace { elements } = &q.value.body else {
+    let PartDefBody::Brace { elements, .. } = &q.value.body else {
         panic!("expected brace part def body");
     };
     elements

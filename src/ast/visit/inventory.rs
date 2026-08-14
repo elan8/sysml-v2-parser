@@ -637,6 +637,11 @@ macro_rules! ast_traversal {
                 walk_action_def(self, node)
             }
 
+            /// Visits [`ActionBranchBody`]; the default implementation walks its children.
+            fn visit_action_branch_body(&mut self, node: &$($mutability)? ActionBranchBody) {
+                walk_action_branch_body(self, node)
+            }
+
             /// Visits [`ActionDefBody`]; the default implementation walks its children.
             fn visit_action_def_body(&mut self, node: &$($mutability)? ActionDefBody) {
                 walk_action_def_body(self, node)
@@ -1966,11 +1971,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_package_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PackageBody) {
             match node {
-                PackageBody::Semicolon => {}
-                PackageBody::Brace { elements } => {
+                PackageBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                PackageBody::Absent => {}
+                PackageBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_package_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -2282,11 +2292,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_part_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PartDefBody) {
             match node {
-                PartDefBody::Semicolon => {}
-                PartDefBody::Brace { elements } => {
+                PartDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                PartDefBody::Absent => {}
+                PartDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_part_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -2593,11 +2608,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_attribute_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? AttributeBody) {
             match node {
-                AttributeBody::Semicolon => {}
-                AttributeBody::Brace { elements } => {
+                AttributeBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                AttributeBody::Absent => {}
+                AttributeBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_attribute_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -2757,11 +2777,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_part_usage_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PartUsageBody) {
             match node {
-                PartUsageBody::Semicolon => {}
-                PartUsageBody::Brace { elements } => {
+                PartUsageBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                PartUsageBody::Absent => {}
+                PartUsageBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_part_usage_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -3048,11 +3073,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_perform_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PerformBody) {
             match node {
-                PerformBody::Semicolon => {}
-                PerformBody::Brace { elements } => {
+                PerformBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                PerformBody::Absent => {}
+                PerformBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_perform_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -3207,11 +3237,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_port_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PortDefBody) {
             match node {
-                PortDefBody::Semicolon => {}
-                PortDefBody::Brace { elements } => {
+                PortDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                PortDefBody::Absent => {}
+                PortDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_port_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -3309,11 +3344,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_port_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? PortBody) {
             match node {
-                PortBody::Semicolon => {}
-                PortBody::Brace { elements } => {
+                PortBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                PortBody::Absent => {}
+                PortBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_port_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -3369,11 +3409,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_interface_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? InterfaceDefBody) {
             match node {
-                InterfaceDefBody::Semicolon => {}
-                InterfaceDefBody::Brace { elements } => {
+                InterfaceDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                InterfaceDefBody::Absent => {}
+                InterfaceDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_interface_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -3527,11 +3572,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_ref_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? RefBody) {
             match node {
-                RefBody::Semicolon => {}
-                RefBody::Brace { elements } => {
+                RefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                RefBody::Absent => {}
+                RefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_part_usage_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -3578,11 +3628,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_connection_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ConnectionDefBody) {
             match node {
-                ConnectionDefBody::Semicolon => {}
-                ConnectionDefBody::Brace { elements } => {
+                ConnectionDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                ConnectionDefBody::Absent => {}
+                ConnectionDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_connection_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -3677,11 +3732,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_enumeration_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EnumerationBody) {
             match node {
-                EnumerationBody::Semicolon => {}
-                EnumerationBody::Brace { elements: values } => {
+                EnumerationBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                EnumerationBody::Absent => {}
+                EnumerationBody::Brace { open_span, elements: values, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in values {
                         visitor.visit_enumerated_value(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -3763,11 +3823,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_occurrence_usage_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? OccurrenceUsageBody) {
             match node {
-                OccurrenceUsageBody::Semicolon => {}
-                OccurrenceUsageBody::Brace { elements } => {
+                OccurrenceUsageBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                OccurrenceUsageBody::Absent => {}
+                OccurrenceUsageBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_occurrence_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -3863,11 +3928,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_definition_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? DefinitionBody) {
             match node {
-                DefinitionBody::Semicolon => {}
-                DefinitionBody::Brace { elements } => {
+                DefinitionBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                DefinitionBody::Absent => {}
+                DefinitionBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_definition_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -4034,11 +4104,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_alias_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? AliasBody) {
             match node {
-                AliasBody::Semicolon => {}
-                AliasBody::Brace { elements } => {
+                AliasBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                AliasBody::Absent => {}
+                AliasBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_relationship_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -4055,13 +4130,29 @@ macro_rules! ast_traversal {
             visitor.visit_membership(membership);
         }
 
+        pub fn walk_action_branch_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ActionBranchBody) {
+            match node {
+                ActionBranchBody::Braced(field_0) => {
+                    visitor.visit_action_def_body(field_0);
+                }
+                ActionBranchBody::Shorthand(field_0) => {
+                    visitor.visit_action_def_body_element(&$($mutability)? **field_0);
+                }
+            }
+        }
+
         pub fn walk_action_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ActionDefBody) {
             match node {
-                ActionDefBody::Semicolon => {}
-                ActionDefBody::Brace { elements } => {
+                ActionDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                ActionDefBody::Absent => {}
+                ActionDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_action_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -4448,11 +4539,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_action_usage_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ActionUsageBody) {
             match node {
-                ActionUsageBody::Semicolon => {}
-                ActionUsageBody::Brace { elements } => {
+                ActionUsageBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                ActionUsageBody::Absent => {}
+                ActionUsageBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_action_usage_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -4741,9 +4837,9 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let IfStmt { condition, then_body, else_body } = &$($mutability)? node.value;
             visitor.visit_expression(condition);
-            visitor.visit_action_def_body(then_body);
+            visitor.visit_action_branch_body(then_body);
             if let Some(inner) = else_body {
-                visitor.visit_action_def_body(inner);
+                visitor.visit_action_branch_body(inner);
             }
         }
 
@@ -4804,11 +4900,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_state_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? StateDefBody) {
             match node {
-                StateDefBody::Semicolon => {}
-                StateDefBody::Brace { elements } => {
+                StateDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                StateDefBody::Absent => {}
+                StateDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_state_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -5028,11 +5129,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_requirement_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? RequirementDefBody) {
             match node {
-                RequirementDefBody::Semicolon => {}
-                RequirementDefBody::Brace { elements } => {
+                RequirementDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                RequirementDefBody::Absent => {}
+                RequirementDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_requirement_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -5448,11 +5554,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_use_case_def_body_value<V: $Visitor>(visitor: &mut V, node: &$($mutability)? UseCaseDefBody) {
             match node {
-                UseCaseDefBody::Semicolon => {}
-                UseCaseDefBody::Brace { elements } => {
+                UseCaseDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                UseCaseDefBody::Absent => {}
+                UseCaseDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_use_case_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -5554,11 +5665,16 @@ macro_rules! ast_traversal {
         pub fn walk_return_ref_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ReturnRefBody>) {
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                ReturnRefBody::Semicolon => {}
-                ReturnRefBody::Brace { elements } => {
+                ReturnRefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                ReturnRefBody::Absent => {}
+                ReturnRefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_return_ref_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -5738,11 +5854,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_constraint_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ConstraintDefBody) {
             match node {
-                ConstraintDefBody::Semicolon => {}
-                ConstraintDefBody::Brace { elements } => {
+                ConstraintDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                ConstraintDefBody::Absent => {}
+                ConstraintDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_constraint_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -5812,11 +5933,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_calc_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? CalcDefBody) {
             match node {
-                CalcDefBody::Semicolon => {}
-                CalcDefBody::Brace { elements } => {
+                CalcDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                CalcDefBody::Absent => {}
+                CalcDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_calc_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -5939,11 +6065,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_view_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ViewDefBody) {
             match node {
-                ViewDefBody::Semicolon => {}
-                ViewDefBody::Brace { elements } => {
+                ViewDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                ViewDefBody::Absent => {}
+                ViewDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_view_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -5985,11 +6116,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_rendering_usage_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? RenderingUsageBody) {
             match node {
-                RenderingUsageBody::Semicolon => {}
-                RenderingUsageBody::Brace { elements } => {
+                RenderingUsageBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                RenderingUsageBody::Absent => {}
+                RenderingUsageBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_rendering_usage_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -6036,11 +6172,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_rendering_def_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? RenderingDefBody) {
             match node {
-                RenderingDefBody::Semicolon => {}
-                RenderingDefBody::Brace { elements } => {
+                RenderingDefBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                RenderingDefBody::Absent => {}
+                RenderingDefBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_rendering_def_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }
@@ -6090,11 +6231,16 @@ macro_rules! ast_traversal {
 
         pub fn walk_view_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? ViewBody) {
             match node {
-                ViewBody::Semicolon => {}
-                ViewBody::Brace { elements } => {
+                ViewBody::Semicolon { semicolon_span } => {
+                    visitor.visit_span(semicolon_span);
+                }
+                ViewBody::Absent => {}
+                ViewBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_span(open_span);
                     for inner in elements {
                         visitor.visit_view_body_element(inner);
                     }
+                    visitor.visit_span(close_span);
                 }
             }
         }

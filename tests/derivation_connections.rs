@@ -18,7 +18,7 @@ fn derivation_connection_parses_without_recovery_diagnostics() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let connection = elements
@@ -38,7 +38,7 @@ fn derivation_connection_parses_without_recovery_diagnostics() {
         Some("#derivation")
     );
 
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection body");
     };
     for (expected_role, expected_marker, expected_target) in [
@@ -112,7 +112,7 @@ fn unknown_derivation_end_role_recovers_and_retains_following_end() {
         RootElement::Package(package) => &package.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &package.body else {
+    let PackageBody::Brace { elements, .. } = &package.body else {
         panic!("expected package body");
     };
     let connection = elements
@@ -122,7 +122,7 @@ fn unknown_derivation_end_role_recovers_and_retains_following_end() {
             _ => None,
         })
         .expect("recovered connection");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection body");
     };
 

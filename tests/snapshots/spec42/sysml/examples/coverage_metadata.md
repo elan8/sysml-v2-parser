@@ -40,10 +40,10 @@ package Annotated {
     part def Vehicle;
     part def Engine;
     metadata m : Classified about Vehicle, Engine;
-    #Classified;
+    #Classified
     part def AnnotatedPart;
-    #Approval;
-    #Classified;
+    #Approval
+    #Classified
     part def MultiAnnotated;
 }
 ~~~

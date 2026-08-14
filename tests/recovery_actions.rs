@@ -16,7 +16,7 @@ action def A {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let action = elements
@@ -26,7 +26,7 @@ action def A {
             _ => None,
         })
         .expect("action def should be present");
-    let ActionDefBody::Brace { elements } = &action.body else {
+    let ActionDefBody::Brace { elements, .. } = &action.body else {
         panic!("expected action body");
     };
     assert!(
@@ -71,7 +71,7 @@ action def ComputeBatteryInfo {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let action = elements
@@ -81,7 +81,7 @@ action def ComputeBatteryInfo {
             _ => None,
         })
         .expect("action def should be present");
-    let ActionDefBody::Brace { elements } = &action.body else {
+    let ActionDefBody::Brace { elements, .. } = &action.body else {
         panic!("expected action body");
     };
     assert!(elements

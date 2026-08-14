@@ -86,7 +86,7 @@ fn walk_library_package(report: &mut OpacityReport, path: &str, pkg: &LibraryPac
 }
 
 fn walk_package_body(report: &mut OpacityReport, path: &str, body: &PackageBody) {
-    let PackageBody::Brace { elements } = body else {
+    let PackageBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -231,7 +231,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
             walk_optional_relationship_body(report, path, d.value.body_elements.as_deref())
         }
         PackageBodyElement::AliasDef(a) => {
-            if let crate::ast::AliasBody::Brace { elements } = &a.value.body {
+            if let crate::ast::AliasBody::Brace { elements, .. } = &a.value.body {
                 walk_relationship_body_elements(report, path, elements);
             }
         }
@@ -246,7 +246,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
 }
 
 fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &InterfaceDefBody) {
-    let InterfaceDefBody::Brace { elements } = body else {
+    let InterfaceDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, element) in elements.iter().enumerate() {
@@ -283,7 +283,7 @@ fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &Interf
 }
 
 fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &ConstraintDefBody) {
-    let ConstraintDefBody::Brace { elements } = body else {
+    let ConstraintDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, element) in elements.iter().enumerate() {
@@ -307,7 +307,7 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
 }
 
 fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody) {
-    let CalcDefBody::Brace { elements } = body else {
+    let CalcDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, element) in elements.iter().enumerate() {
@@ -345,7 +345,7 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
 }
 
 fn walk_rendering_def_body(report: &mut OpacityReport, path: &str, body: &RenderingDefBody) {
-    let RenderingDefBody::Brace { elements } = body else {
+    let RenderingDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, element) in elements.iter().enumerate() {
@@ -362,7 +362,7 @@ fn walk_rendering_def_body(report: &mut OpacityReport, path: &str, body: &Render
 }
 
 fn walk_connection_def_body(report: &mut OpacityReport, path: &str, body: &ConnectionDefBody) {
-    let ConnectionDefBody::Brace { elements } = body else {
+    let ConnectionDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, element) in elements.iter().enumerate() {
@@ -410,7 +410,7 @@ fn walk_connection_def_body(report: &mut OpacityReport, path: &str, body: &Conne
 }
 
 fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody) {
-    let PartDefBody::Brace { elements } = body else {
+    let PartDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -529,7 +529,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
                 walk_optional_relationship_body(report, &p, import.value.body_elements.as_deref())
             }
             PartDefBodyElement::AliasDef(alias) => {
-                if let crate::ast::AliasBody::Brace { elements } = &alias.value.body {
+                if let crate::ast::AliasBody::Brace { elements, .. } = &alias.value.body {
                     walk_relationship_body_elements(report, &p, elements);
                 }
             }
@@ -545,7 +545,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
 }
 
 fn walk_part_usage_body(report: &mut OpacityReport, path: &str, body: &PartUsageBody) {
-    let PartUsageBody::Brace { elements } = body else {
+    let PartUsageBody::Brace { elements, .. } = body else {
         return;
     };
     walk_part_usage_body_elements(report, path, elements);
@@ -649,7 +649,7 @@ fn walk_part_usage_body_elements(
                 walk_optional_relationship_body(report, &p, import.value.body_elements.as_deref())
             }
             PartUsageBodyElement::AliasDef(alias) => {
-                if let crate::ast::AliasBody::Brace { elements } = &alias.value.body {
+                if let crate::ast::AliasBody::Brace { elements, .. } = &alias.value.body {
                     walk_relationship_body_elements(report, &p, elements);
                 }
             }
@@ -659,7 +659,7 @@ fn walk_part_usage_body_elements(
 }
 
 fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeBody) {
-    let AttributeBody::Brace { elements } = body else {
+    let AttributeBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -708,7 +708,7 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
 }
 
 fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody) {
-    let PortDefBody::Brace { elements } = body else {
+    let PortDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -734,7 +734,7 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
 }
 
 fn walk_port_body(report: &mut OpacityReport, path: &str, body: &PortBody) {
-    let PortBody::Brace { elements } = body else {
+    let PortBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, element) in elements.iter().enumerate() {
@@ -750,8 +750,21 @@ fn walk_port_body(report: &mut OpacityReport, path: &str, body: &PortBody) {
     }
 }
 
+fn walk_action_branch_body(
+    report: &mut OpacityReport,
+    path: &str,
+    branch: &crate::ast::ActionBranchBody,
+) {
+    match branch {
+        crate::ast::ActionBranchBody::Braced(body) => walk_action_def_body(report, path, body),
+        crate::ast::ActionBranchBody::Shorthand(member) => {
+            walk_action_def_body_elements(report, path, std::slice::from_ref(member))
+        }
+    }
+}
+
 fn walk_action_def_body(report: &mut OpacityReport, path: &str, body: &ActionDefBody) {
-    let ActionDefBody::Brace { elements } = body else {
+    let ActionDefBody::Brace { elements, .. } = body else {
         return;
     };
     walk_action_def_body_elements(report, path, elements);
@@ -796,9 +809,9 @@ fn walk_action_def_body_elements(
             ActionDefBodyElement::WhileStmt(n) => walk_action_def_body(report, &p, &n.value.body),
             ActionDefBodyElement::LoopStmt(n) => walk_action_def_body(report, &p, &n.value.body),
             ActionDefBodyElement::IfStmt(n) => {
-                walk_action_def_body(report, &format!("{p}/then"), &n.value.then_body);
+                walk_action_branch_body(report, &format!("{p}/then"), &n.value.then_body);
                 if let Some(body) = &n.value.else_body {
-                    walk_action_def_body(report, &format!("{p}/else"), body);
+                    walk_action_branch_body(report, &format!("{p}/else"), body);
                 }
             }
             ActionDefBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
@@ -841,7 +854,7 @@ fn walk_action_def_body_elements(
 }
 
 fn walk_action_usage_body(report: &mut OpacityReport, path: &str, body: &ActionUsageBody) {
-    let ActionUsageBody::Brace { elements } = body else {
+    let ActionUsageBody::Brace { elements, .. } = body else {
         return;
     };
     walk_action_usage_body_elements(report, path, elements);
@@ -877,9 +890,9 @@ fn walk_action_usage_body_elements(
             ActionUsageBodyElement::WhileStmt(n) => walk_action_def_body(report, &p, &n.value.body),
             ActionUsageBodyElement::LoopStmt(n) => walk_action_def_body(report, &p, &n.value.body),
             ActionUsageBodyElement::IfStmt(n) => {
-                walk_action_def_body(report, &format!("{p}/then"), &n.value.then_body);
+                walk_action_branch_body(report, &format!("{p}/then"), &n.value.then_body);
                 if let Some(body) = &n.value.else_body {
-                    walk_action_def_body(report, &format!("{p}/else"), body);
+                    walk_action_branch_body(report, &format!("{p}/else"), body);
                 }
             }
             ActionUsageBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
@@ -923,7 +936,7 @@ fn walk_action_usage_body_elements(
 }
 
 fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &RequirementDefBody) {
-    let RequirementDefBody::Brace { elements } = body else {
+    let RequirementDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -959,7 +972,7 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
                 }
             }
             RequirementDefBodyElement::RequireConstraint(n) => {
-                if let crate::ast::ConstraintDefBody::Brace { elements } = &n.value.body {
+                if let crate::ast::ConstraintDefBody::Brace { elements, .. } = &n.value.body {
                     walk_constraint_body_elements(report, &p, elements);
                 }
             }
@@ -981,7 +994,7 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
 }
 
 fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCaseDefBody) {
-    let UseCaseDefBody::Brace { elements } = body else {
+    let UseCaseDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -1054,7 +1067,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
 }
 
 fn walk_state_def_body(report: &mut OpacityReport, path: &str, body: &StateDefBody) {
-    let StateDefBody::Brace { elements } = body else {
+    let StateDefBody::Brace { elements, .. } = body else {
         return;
     };
     walk_state_def_body_elements(report, path, elements);
@@ -1105,7 +1118,7 @@ fn walk_state_def_body_elements(
 }
 
 fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody) {
-    let ViewDefBody::Brace { elements } = body else {
+    let ViewDefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -1125,7 +1138,7 @@ fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody
 }
 
 fn walk_view_body(report: &mut OpacityReport, path: &str, body: &ViewBody) {
-    let ViewBody::Brace { elements } = body else {
+    let ViewBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -1145,7 +1158,7 @@ fn walk_view_body_element(report: &mut OpacityReport, path: &str, el: &ViewBodyE
 }
 
 fn walk_definition_body(report: &mut OpacityReport, path: &str, body: &DefinitionBody) {
-    let DefinitionBody::Brace { elements } = body else {
+    let DefinitionBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -1162,7 +1175,7 @@ fn walk_definition_body(report: &mut OpacityReport, path: &str, body: &Definitio
 }
 
 fn walk_occurrence_usage_body(report: &mut OpacityReport, path: &str, body: &OccurrenceUsageBody) {
-    let OccurrenceUsageBody::Brace { elements } = body else {
+    let OccurrenceUsageBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, el) in elements.iter().enumerate() {
@@ -1200,7 +1213,7 @@ fn walk_occurrence_body_element(
 }
 
 fn walk_rendering_usage_body(report: &mut OpacityReport, path: &str, body: &RenderingUsageBody) {
-    let RenderingUsageBody::Brace { elements } = body else {
+    let RenderingUsageBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, element) in elements.iter().enumerate() {
@@ -1219,7 +1232,7 @@ fn walk_rendering_usage_body(report: &mut OpacityReport, path: &str, body: &Rend
 }
 
 fn walk_return_ref_body(report: &mut OpacityReport, path: &str, body: &ReturnRefBody) {
-    let ReturnRefBody::Brace { elements } = body else {
+    let ReturnRefBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, element) in elements.iter().enumerate() {
@@ -1257,7 +1270,7 @@ fn walk_constraint_body_elements(
 }
 
 fn walk_ref_body(report: &mut OpacityReport, path: &str, body: &RefBody) {
-    let RefBody::Brace { elements } = body else {
+    let RefBody::Brace { elements, .. } = body else {
         return;
     };
     walk_part_usage_body_elements(report, path, elements);
@@ -1368,7 +1381,7 @@ fn walk_variant_usage(report: &mut OpacityReport, path: &str, variant: &VariantU
 }
 
 fn walk_perform_body(report: &mut OpacityReport, path: &str, body: &PerformBody) {
-    let PerformBody::Brace { elements } = body else {
+    let PerformBody::Brace { elements, .. } = body else {
         return;
     };
     for (i, element) in elements.iter().enumerate() {

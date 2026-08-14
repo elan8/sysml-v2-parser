@@ -90,11 +90,12 @@ pub(crate) fn emit_package_body(
     body: &PackageBody,
 ) -> Result<(), EmitError> {
     match body {
-        PackageBody::Semicolon => {
+        PackageBody::Absent => Ok(()),
+        PackageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PackageBody::Brace { elements } => {
+        PackageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();

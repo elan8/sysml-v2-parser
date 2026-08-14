@@ -14,7 +14,7 @@ fn package_elements(input: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElement
         other => panic!("expected package, got {other:?}"),
     };
     match &pkg.body {
-        PackageBody::Brace { elements } => elements.clone(),
+        PackageBody::Brace { elements, .. } => elements.clone(),
         _ => panic!("expected brace package body"),
     }
 }
@@ -58,7 +58,7 @@ fn requirement_usage_supports_trailing_subsets_after_body() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let part = elements
@@ -72,7 +72,7 @@ fn requirement_usage_supports_trailing_subsets_after_body() {
             _ => None,
         })
         .expect("ApolloMission part def should be present");
-    let PartDefBody::Brace { elements } = &part.body else {
+    let PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     let req = elements.iter().find_map(|e| match &e.value {
@@ -97,7 +97,7 @@ fn exhibit_state_body_supports_unnamed_and_accepting_transitions() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = elements
@@ -111,7 +111,7 @@ fn exhibit_state_body_supports_unnamed_and_accepting_transitions() {
             _ => None,
         })
         .expect("expected Mission part def");
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let exhibit = elements
@@ -121,7 +121,7 @@ fn exhibit_state_body_supports_unnamed_and_accepting_transitions() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    let StateDefBody::Brace { elements } = &exhibit.body else {
+    let StateDefBody::Brace { elements, .. } = &exhibit.body else {
         panic!("expected exhibit state body");
     };
     let transitions: Vec<_> = elements
@@ -150,7 +150,7 @@ fn transition_name_with_do_prefix_is_not_confused_with_do_keyword() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let machine = elements
@@ -164,7 +164,7 @@ fn transition_name_with_do_prefix_is_not_confused_with_do_keyword() {
             _ => None,
         })
         .expect("expected state def M");
-    let StateDefBody::Brace { elements } = &machine.body else {
+    let StateDefBody::Brace { elements, .. } = &machine.body else {
         panic!("expected state body");
     };
     let transition = elements
@@ -191,14 +191,14 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let usage = match &elements[1].value {
         PackageBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected part usage"),
     };
-    let PartUsageBody::Brace { elements } = &usage.body else {
+    let PartUsageBody::Brace { elements, .. } = &usage.body else {
         panic!("expected part usage body");
     };
     let timeslice = elements
@@ -212,7 +212,7 @@ fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
         timeslice.portion_kind,
         Some(sysml_v2_parser::OccurrencePortionKind::Timeslice)
     );
-    let OccurrenceUsageBody::Brace { elements } = &timeslice.body else {
+    let OccurrenceUsageBody::Brace { elements, .. } = &timeslice.body else {
         panic!("expected timeslice body");
     };
     let snapshot = elements
@@ -242,14 +242,14 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let usage = match &elements[1].value {
         PackageBodyElement::PartUsage(usage) => &usage.value,
         _ => panic!("expected part usage"),
     };
-    let PartUsageBody::Brace { elements } = &usage.body else {
+    let PartUsageBody::Brace { elements, .. } = &usage.body else {
         panic!("expected part usage body");
     };
     let occurrences: Vec<_> = elements
@@ -272,6 +272,7 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
 
     let OccurrenceUsageBody::Brace {
         elements: ingress_elements,
+        ..
     } = &occurrences[0].body
     else {
         panic!("expected ingress timeslice body");
@@ -287,6 +288,7 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         .expect("assert constraint should parse as a structured occurrence member");
     let ConstraintDefBody::Brace {
         elements: assert_elements,
+        ..
     } = &assert_constraint.body
     else {
         panic!("expected assert constraint body");
@@ -303,7 +305,7 @@ fn then_timeslice_and_specialized_snapshot_parse_inside_individual_part() {
         "assert constraint body should preserve the `ready` expression"
     );
 
-    let OccurrenceUsageBody::Brace { elements } = &occurrences[1].body else {
+    let OccurrenceUsageBody::Brace { elements, .. } = &occurrences[1].body else {
         panic!("expected timeslice body");
     };
     let snapshot = elements
@@ -331,7 +333,7 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let program = elements
@@ -343,7 +345,7 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
             _ => None,
         })
         .expect("expected program part usage");
-    let PartUsageBody::Brace { elements } = &program.body else {
+    let PartUsageBody::Brace { elements, .. } = &program.body else {
         panic!("expected program body");
     };
     let apollo1 = match &elements[0].value {
@@ -352,7 +354,7 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
     };
     assert!(apollo1.subsets.is_some());
 
-    let PartUsageBody::Brace { elements } = &apollo1.body else {
+    let PartUsageBody::Brace { elements, .. } = &apollo1.body else {
         panic!("expected nested mission body");
     };
     let crew_members: Vec<_> = elements
@@ -384,7 +386,7 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = elements
@@ -398,7 +400,7 @@ fn exhibit_state_supports_trailing_redefinition_after_body() {
             _ => None,
         })
         .expect("expected Mission part def");
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let exhibit = elements
@@ -428,7 +430,7 @@ fn exhibit_state_supports_parallel_modifier() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let vehicle = elements
@@ -442,7 +444,7 @@ fn exhibit_state_supports_parallel_modifier() {
             _ => None,
         })
         .expect("expected Vehicle part def");
-    let PartDefBody::Brace { elements } = &vehicle.body else {
+    let PartDefBody::Brace { elements, .. } = &vehicle.body else {
         panic!("expected part body");
     };
     let exhibit = elements
@@ -453,7 +455,7 @@ fn exhibit_state_supports_parallel_modifier() {
         })
         .expect("exhibit state should be present");
     assert_eq!(exhibit.name, "vehicleStates");
-    let StateDefBody::Brace { elements } = &exhibit.body else {
+    let StateDefBody::Brace { elements, .. } = &exhibit.body else {
         panic!("expected exhibit state body");
     };
     assert_eq!(elements.len(), 2);
@@ -479,7 +481,7 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let vehicle = elements
@@ -493,7 +495,7 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
             _ => None,
         })
         .expect("expected Vehicle part def");
-    let PartDefBody::Brace { elements } = &vehicle.body else {
+    let PartDefBody::Brace { elements, .. } = &vehicle.body else {
         panic!("expected part body");
     };
     let exhibits: Vec<_> = elements
@@ -536,7 +538,7 @@ fn exhibit_state_supports_occurrence_usage_prefix_modifiers() {
         .iter()
         .find(|e| e.name == "orderedStates")
         .expect("orderedStates");
-    let StateDefBody::Brace { elements } = &ordered_states.body else {
+    let StateDefBody::Brace { elements, .. } = &ordered_states.body else {
         panic!("expected exhibit state body");
     };
     assert_eq!(elements.len(), 1);
@@ -561,7 +563,7 @@ fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let vehicle = elements
@@ -575,7 +577,7 @@ fn state_and_exhibit_state_support_direction_derived_individual_prefixes() {
             _ => None,
         })
         .expect("expected Vehicle part def");
-    let PartDefBody::Brace { elements } = &vehicle.body else {
+    let PartDefBody::Brace { elements, .. } = &vehicle.body else {
         panic!("expected part body");
     };
 
@@ -640,7 +642,7 @@ fn exhibit_state_body_accepts_requirement_usage_members() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = elements
@@ -654,7 +656,7 @@ fn exhibit_state_body_accepts_requirement_usage_members() {
             _ => None,
         })
         .expect("expected Mission part def");
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let exhibit = elements
@@ -664,7 +666,7 @@ fn exhibit_state_body_accepts_requirement_usage_members() {
             _ => None,
         })
         .expect("exhibit state should be present");
-    let StateDefBody::Brace { elements } = &exhibit.body else {
+    let StateDefBody::Brace { elements, .. } = &exhibit.body else {
         panic!("expected exhibit state body");
     };
     assert!(elements
@@ -689,14 +691,14 @@ fn part_usage_accepts_multiplicity_before_type() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let system = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &system.body else {
+    let PartDefBody::Brace { elements, .. } = &system.body else {
         panic!("expected part body");
     };
     let suit = match &elements[0].value {
@@ -723,12 +725,12 @@ fn rationale_and_refinement_annotations_stay_localized() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     match &elements[0].value {
         PackageBodyElement::ActionDef(action) => {
-            let ActionDefBody::Brace { elements } = &action.value.body else {
+            let ActionDefBody::Brace { elements, .. } = &action.value.body else {
                 panic!("expected action body");
             };
             assert!(elements.iter().any(|e| matches!(
@@ -740,7 +742,7 @@ fn rationale_and_refinement_annotations_stay_localized() {
     }
     match &elements[1].value {
         PackageBodyElement::RequirementDef(req) => {
-            let RequirementDefBody::Brace { elements } = &req.value.body else {
+            let RequirementDefBody::Brace { elements, .. } = &req.value.body else {
                 panic!("expected requirement body");
             };
             assert!(elements
@@ -784,14 +786,14 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let connection = elements
@@ -803,7 +805,7 @@ fn mission_capability_connections_with_trailing_subsets_parse() {
         .expect("expected structured connection member in part body");
     assert!(connection.type_reference.is_some());
     assert!(connection.subsets.is_some());
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection body");
     };
     assert_eq!(
@@ -830,14 +832,14 @@ fn part_definition_comment_members_parse_structurally() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let mission = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &mission.body else {
+    let PartDefBody::Brace { elements, .. } = &mission.body else {
         panic!("expected part body");
     };
     let comment = elements
@@ -871,14 +873,14 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let system = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &system.body else {
+    let PartDefBody::Brace { elements, .. } = &system.body else {
         panic!("expected part body");
     };
     let spacecraft = match &elements[1].value {
@@ -887,6 +889,7 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
     };
     let PartUsageBody::Brace {
         elements: spacecraft_elements,
+        ..
     } = &spacecraft.body
     else {
         panic!("expected nested part body");
@@ -918,7 +921,7 @@ fn part_defs_accept_multiple_specialization_targets() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     assert!(matches!(elements[0].value, PackageBodyElement::PartDef(_)));
@@ -939,14 +942,14 @@ fn part_redefinition_value_parses_parenthesized_tuple_of_engines() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let sii = match &elements[0].value {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &sii.body else {
+    let PartDefBody::Brace { elements, .. } = &sii.body else {
         panic!("expected part body");
     };
     let engines = elements
@@ -994,7 +997,7 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let sic = elements
@@ -1008,7 +1011,7 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
             _ => None,
         })
         .expect("expected S_IC part def");
-    let PartDefBody::Brace { elements } = &sic.body else {
+    let PartDefBody::Brace { elements, .. } = &sic.body else {
         panic!("expected part body");
     };
 
@@ -1064,7 +1067,7 @@ fn part_usage_ordered_before_colon_parses_without_recovery() {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &stage.body else {
+    let PartDefBody::Brace { elements, .. } = &stage.body else {
         panic!("expected brace body");
     };
     let engines = elements
@@ -1103,7 +1106,7 @@ fn part_def_body_item_usage_parses() {
         PackageBodyElement::PartDef(def) => &def.value,
         _ => panic!("expected part def"),
     };
-    let PartDefBody::Brace { elements } = &stakeholder.body else {
+    let PartDefBody::Brace { elements, .. } = &stakeholder.body else {
         panic!("expected brace body");
     };
     let item = elements

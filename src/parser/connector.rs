@@ -411,7 +411,9 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
 pub(crate) fn connect_body(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b";"[..]), |_| ConnectBody::Semicolon),
+        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
+            ConnectBody::Semicolon
+        }),
         map(
             nom::sequence::delimited(
                 tag(&b"{"[..]),

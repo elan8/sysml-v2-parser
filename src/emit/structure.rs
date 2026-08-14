@@ -250,11 +250,12 @@ fn emit_part_def_body(
     body: &PartDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        PartDefBody::Semicolon => {
+        PartDefBody::Absent => Ok(()),
+        PartDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PartDefBody::Brace { elements } => {
+        PartDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -392,11 +393,12 @@ fn emit_part_usage_body(
     body: &PartUsageBody,
 ) -> Result<(), EmitError> {
     match body {
-        PartUsageBody::Semicolon => {
+        PartUsageBody::Absent => Ok(()),
+        PartUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PartUsageBody::Brace { elements } => {
+        PartUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -515,11 +517,12 @@ pub(crate) fn emit_attribute_body(
     body: &AttributeBody,
 ) -> Result<(), EmitError> {
     match body {
-        AttributeBody::Semicolon => {
+        AttributeBody::Absent => Ok(()),
+        AttributeBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        AttributeBody::Brace { elements } => {
+        AttributeBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -680,11 +683,12 @@ fn emit_port_def_body(
     body: &PortDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        PortDefBody::Semicolon => {
+        PortDefBody::Absent => Ok(()),
+        PortDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PortDefBody::Brace { elements } => {
+        PortDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -728,11 +732,12 @@ fn emit_port_def_body_element(
 
 fn emit_port_body(w: &mut EmitWriter<'_>, path: &str, body: &PortBody) -> Result<(), EmitError> {
     match body {
-        PortBody::Semicolon => {
+        PortBody::Absent => Ok(()),
+        PortBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PortBody::Brace { elements } => {
+        PortBody::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())
@@ -828,11 +833,12 @@ fn emit_interface_def_body(
     body: &InterfaceDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        InterfaceDefBody::Semicolon => {
+        InterfaceDefBody::Absent => Ok(()),
+        InterfaceDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        InterfaceDefBody::Brace { elements } => {
+        InterfaceDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1189,11 +1195,12 @@ pub(crate) fn emit_ref_decl(
 
 fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(), EmitError> {
     match body {
-        RefBody::Semicolon => {
+        RefBody::Absent => Ok(()),
+        RefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        RefBody::Brace { elements } => {
+        RefBody::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())
@@ -1397,11 +1404,12 @@ pub(crate) fn emit_alias_def(
     w.push_str(" for ");
     w.push_qualified_reference("alias target", alias.target)?;
     match &alias.body {
-        crate::ast::AliasBody::Semicolon => {
+        crate::ast::AliasBody::Absent => Ok(()),
+        crate::ast::AliasBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::AliasBody::Brace { elements } => {
+        crate::ast::AliasBody::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())
@@ -1581,11 +1589,14 @@ pub(crate) fn emit_enum_def(
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::EnumerationBody::Semicolon => {
+        crate::ast::EnumerationBody::Absent => Ok(()),
+        crate::ast::EnumerationBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::EnumerationBody::Brace { elements: values } => {
+        crate::ast::EnumerationBody::Brace {
+            elements: values, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1752,11 +1763,12 @@ fn emit_connection_def_body(
     body: &crate::ast::ConnectionDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        crate::ast::ConnectionDefBody::Semicolon => {
+        crate::ast::ConnectionDefBody::Absent => Ok(()),
+        crate::ast::ConnectionDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ConnectionDefBody::Brace { elements } => {
+        crate::ast::ConnectionDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();

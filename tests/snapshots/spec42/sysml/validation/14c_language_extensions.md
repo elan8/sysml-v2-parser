@@ -329,17 +329,17 @@ package '14c-Language-Extensions' {
     package FMEAUserModel {
         private import FMEALibrary::*;
         private import FMEAMetadata::*;
-        #fmeaspec;
+        #fmeaspec
         requirement req1 {
             doc
             /* Meter designed according to ISO00124 */
         }
-        #fmeaspec;
+        #fmeaspec
         requirement req2 {
             doc
             /* Device working for 1 week without the need to replace batteries */
         }
-        #fmeaspec;
+        #fmeaspec
         requirement req3 : RequirementWithSIL {
             @StatusHolder {
                 attribute status = Status::Approved;
@@ -348,36 +348,36 @@ package '14c-Language-Extensions' {
             /* Alarm when battery has sank */
             :>> sil = SIL::A;
         }
-        #fmea;
+        #fmea
         item def 'Glucose FMEA Item' {
-            #prevention;
+            #prevention
             connect 'battery depleted' to req1;
-            #cause;
+            #cause
             occurrence 'battery depleted' {
                 attribute :>> occurs = 0.005;
             }
-            #causation;
+            #causation
             connect 'battery depleted' to 'battery cannot be charged';
-            #failure;
+            #failure
             occurrence 'battery cannot be charged' {
                 attribute :>> detected = 0.013;
             }
-            #causation;
+            #causation
             connect 'battery cannot be charged' to 'glucose level undetected';
-            #effect;
+            #effect
             occurrence 'glucose level undetected';
-            #causation;
+            #causation
             connect 'glucose level undetected' to 'therapy delay';
-            #effect;
+            #effect
             occurrence 'therapy delay' {
                 attribute :>> severity = "High";
             }
         }
-        #violation;
+        #violation
         connect 'Glucose Meter in Use' to req2;
-        #mitigation;
+        #mitigation
         connect 'Glucose Meter in Use' to req3;
-        #fmea;
+        #fmea
         item 'Glucose Meter in Use' : 'Glucose FMEA Item' {
             part 'glucose meter' {
                 event 'glucose level undetected'[*];

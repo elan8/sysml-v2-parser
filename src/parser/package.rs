@@ -306,13 +306,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
 /// PackageBody: ';' | '{' PackageBodyElement* '}'
 /// Brace form is tried first so that ws before '{' is not consumed by the semicolon branch.
 pub(crate) fn package_body(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
-    alt((
-        package_body_brace,
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            PackageBody::Semicolon
-        }),
-    ))
-    .parse(input)
+    alt((package_body_brace, crate::parser::body::semicolon_body)).parse(input)
 }
 
 fn package_body_element_fallback(input: Input<'_>) -> IResult<Input<'_>, Node<PackageBodyElement>> {
@@ -1179,7 +1173,9 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
 }
 
 fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
-    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
+    let (open_start, _) = ws_and_comments(input)?;
+    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
         let (next, _) = ws_and_comments(input)?;
@@ -1191,8 +1187,16 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
             )));
         }
         if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, PackageBody::Brace { elements }));
+            let (close_start, _) = ws_and_comments(input)?;
+            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+            return Ok((
+                input,
+                PackageBody::Brace {
+                    open_span,
+                    elements,
+                    close_span: crate::parser::span::span_from_to(close_start, input),
+                },
+            ));
         }
         match package_body_element(input) {
             Ok((next, element)) => {
@@ -2588,7 +2592,7 @@ mod tests {
         ));
         let part_text = format!("{{ {text} }}");
         let (_, body) = part_def_body(parse_input(&part_text)).expect("nested attribute usage");
-        let crate::ast::PartDefBody::Brace { elements } = body else {
+        let crate::ast::PartDefBody::Brace { elements, .. } = body else {
             panic!("expected brace body");
         };
         assert_eq!(elements.len(), 1);

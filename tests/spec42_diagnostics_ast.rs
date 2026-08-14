@@ -23,7 +23,7 @@ fn first_package(root: &RootNamespace) -> &Package {
 
 fn package_body_elements(pkg: &Package) -> &[Node<PackageBodyElement>] {
     match &pkg.body {
-        PackageBody::Brace { elements } => elements.as_slice(),
+        PackageBody::Brace { elements, .. } => elements.as_slice(),
         _ => panic!("expected brace package body"),
     }
 }
@@ -37,7 +37,7 @@ fn transition_accept_retained_with_spans() {
         other => panic!("expected state def, got {other:?}"),
     };
     let transitions: Vec<&Transition> = match &state_def.body {
-        StateDefBody::Brace { elements } => elements
+        StateDefBody::Brace { elements, .. } => elements
             .iter()
             .filter_map(|e| match &e.value {
                 StateDefBodyElement::Transition(t) => Some(&t.value),
@@ -82,7 +82,7 @@ fn final_state_members_parsed() {
         other => panic!("expected state def, got {other:?}"),
     };
     let finals: Vec<&FinalState> = match &state_def.body {
-        StateDefBody::Brace { elements } => elements
+        StateDefBody::Brace { elements, .. } => elements
             .iter()
             .filter_map(|e| match &e.value {
                 StateDefBodyElement::FinalState(f) => Some(&f.value),
@@ -106,7 +106,7 @@ fn send_payload_on_control_node_action() {
         other => panic!("expected action def, got {other:?}"),
     };
     let send_usage = match &action_def.body {
-        ActionDefBody::Brace { elements } => elements
+        ActionDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 ActionDefBodyElement::ActionUsage(a) => Some(&a.value),
@@ -137,7 +137,7 @@ fn viewpoint_stakeholder_and_purpose_members() {
         other => panic!("expected viewpoint def, got {other:?}"),
     };
     let body = match &vp.body {
-        RequirementDefBody::Brace { elements } => elements,
+        RequirementDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace viewpoint body"),
     };
     assert!(body
@@ -160,7 +160,7 @@ fn metadata_keyword_usage_in_part_body() {
         })
         .expect("part def");
     let keyword = match &part_def.body {
-        PartDefBody::Brace { elements } => elements
+        PartDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 PartDefBodyElement::MetadataKeywordUsage(k) => Some(&k.value),
@@ -182,7 +182,7 @@ fn verification_local_attribute_has_name_span() {
         other => panic!("expected verification def, got {other:?}"),
     };
     let attr = match &verification.body {
-        UseCaseDefBody::Brace { elements } => elements
+        UseCaseDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 // A bare, `def`-less `attribute count : Integer = 0;` is a usage, not a
@@ -207,7 +207,7 @@ fn requirement_body_rep_language_parsed() {
         other => panic!("expected requirement def, got {other:?}"),
     };
     let rep = match &req.body {
-        RequirementDefBody::Brace { elements } => elements
+        RequirementDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 RequirementDefBodyElement::TextualRep(t) => Some(&t.value),
@@ -242,7 +242,7 @@ fn unnamed_transition_first_sets_is_initial_flag() {
         _ => panic!("expected state def"),
     };
     let transition = match &state_def.body {
-        StateDefBody::Brace { elements } => elements
+        StateDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 StateDefBodyElement::Transition(t) => Some(&t.value),
@@ -265,7 +265,7 @@ fn named_transition_first_source_is_not_initial() {
         _ => panic!("expected state def"),
     };
     let transition = match &state_def.body {
-        StateDefBody::Brace { elements } => elements
+        StateDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 StateDefBodyElement::Transition(t) => Some(&t.value),
@@ -284,7 +284,7 @@ fn named_transition_first_source_is_not_initial() {
 fn filter_conditions(pkg: &Package) -> Vec<&Node<Expression>> {
     for element in package_body_elements(pkg) {
         if let PackageBodyElement::ViewDef(v) = &element.value {
-            if let ViewDefBody::Brace { elements } = &v.value.body {
+            if let ViewDefBody::Brace { elements, .. } = &v.value.body {
                 return elements
                     .iter()
                     .filter_map(|el| match &el.value {
@@ -350,7 +350,7 @@ fn transition_guard_feature_ref_retained() {
         })
         .expect("state def");
     let transition = match &state_def.body {
-        StateDefBody::Brace { elements } => elements
+        StateDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 StateDefBodyElement::Transition(t) => Some(&t.value),
@@ -372,7 +372,7 @@ fn typed_stakeholder_parameter_parsed() {
         other => panic!("expected requirement def, got {other:?}"),
     };
     let body = match &req.body {
-        RequirementDefBody::Brace { elements } => elements,
+        RequirementDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace requirement body"),
     };
     let stakeholders: Vec<&StakeholderMember> = body
@@ -406,7 +406,7 @@ fn constraint_body_metadata_annotation_parsed() {
         other => panic!("expected constraint def, got {other:?}"),
     };
     let meta = match &constraint.body {
-        ConstraintDefBody::Brace { elements } => elements
+        ConstraintDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 ConstraintDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
@@ -442,7 +442,7 @@ fn metadata_annotation_brace_body_parses_shorthand_bindings() {
         })
         .expect("part def");
     let meta = match &part_def.body {
-        PartDefBody::Brace { elements } => elements
+        PartDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 PartDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
@@ -451,7 +451,7 @@ fn metadata_annotation_brace_body_parses_shorthand_bindings() {
             .expect("metadata annotation"),
         _ => panic!("expected brace part body"),
     };
-    let AttributeBody::Brace { elements } = &meta.body else {
+    let AttributeBody::Brace { elements, .. } = &meta.body else {
         panic!("expected brace metadata body");
     };
     assert_eq!(elements.len(), 2);
@@ -506,7 +506,7 @@ fn metadata_annotation_about_clause_parses_targets() {
         })
         .expect("Design part def");
     let meta = match &part_def.body {
-        PartDefBody::Brace { elements } => elements
+        PartDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 PartDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
@@ -538,7 +538,7 @@ fn action_def_body_metadata_keyword_parses() {
         })
         .expect("action def");
     let keyword = match &action_def.body {
-        ActionDefBody::Brace { elements } => elements
+        ActionDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 ActionDefBodyElement::MetadataKeywordUsage(k) => Some(&k.value),
@@ -566,7 +566,7 @@ fn meta_cast_expression_parses_in_attribute_binding() {
         other => panic!("expected metadata def, got {other:?}"),
     };
     let attr = match &metadata_def.body {
-        AttributeBody::Brace { elements } => elements
+        AttributeBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
                 AttributeBodyElement::AttributeUsage(a) => Some(&a.value),
@@ -586,7 +586,7 @@ fn meta_cast_expression_parses_in_attribute_binding() {
 
 fn metadata_def_body_elements(metadata_def: &MetadataDef) -> &[Node<AttributeBodyElement>] {
     match &metadata_def.body {
-        AttributeBody::Brace { elements } => elements.as_slice(),
+        AttributeBody::Brace { elements, .. } => elements.as_slice(),
         _ => panic!("expected brace metadata def body"),
     }
 }
@@ -736,7 +736,7 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         other => panic!("expected use case def, got {other:?}"),
     };
     let uc_body = match &use_case.body {
-        UseCaseDefBody::Brace { elements } => elements,
+        UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let ann = match &uc_body[0].value {
@@ -752,7 +752,7 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         other => panic!("expected view def, got {other:?}"),
     };
     let v_body = match &view.body {
-        ViewDefBody::Brace { elements } => elements,
+        ViewDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let ann = match &v_body[0].value {
@@ -768,7 +768,7 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         other => panic!("expected calc def, got {other:?}"),
     };
     let c_body = match &calc.body {
-        CalcDefBody::Brace { elements } => elements,
+        CalcDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let ann = match &c_body[0].value {
@@ -792,7 +792,7 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         other => panic!("expected verification case def, got {other:?}"),
     };
     let vc_body = match &vcase.body {
-        UseCaseDefBody::Brace { elements } => elements,
+        UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
 
@@ -844,7 +844,7 @@ fn case_return_decl_in_verification_and_analysis_bodies() {
         other => panic!("expected analysis case def, got {other:?}"),
     };
     let ac_body = match &acase.body {
-        UseCaseDefBody::Brace { elements } => elements,
+        UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let ret4 = match &ac_body[1].value {

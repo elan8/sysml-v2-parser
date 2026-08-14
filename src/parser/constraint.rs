@@ -134,10 +134,16 @@ fn constraint_body_recovery_element(
 pub(crate) fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, ConstraintDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            ConstraintDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         CONSTRAINT_DEF_BODY_STARTERS,
         "constraint body",
@@ -145,7 +151,7 @@ pub(crate) fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, Constr
         constraint_def_body_element,
         constraint_body_recovery_element,
     )?;
-    Ok((input, ConstraintDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 pub(crate) fn constraint_def_body_element(
@@ -333,10 +339,16 @@ fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefB
 pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, CalcDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            CalcDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         CALC_DEF_BODY_STARTERS,
         "calc body",
@@ -344,7 +356,7 @@ pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody>
         calc_def_body_element,
         calc_body_recovery_element,
     )?;
-    Ok((input, CalcDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Skips an optional `(private|protected|public)?` `abstract`? prefix and reports whether either
@@ -1819,7 +1831,10 @@ mod constraint_usage_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "assumptions");
         assert_eq!(node.value.type_name, None);
-        assert!(matches!(node.value.body, ConstraintDefBody::Semicolon));
+        assert!(matches!(
+            node.value.body,
+            ConstraintDefBody::Semicolon { .. }
+        ));
     }
 
     #[test]

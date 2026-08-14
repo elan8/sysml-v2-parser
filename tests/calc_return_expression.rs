@@ -25,7 +25,7 @@ fn calc_body_parses_return_expression_without_swallowing_siblings() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let calc_defs: Vec<_> = elements
@@ -37,7 +37,7 @@ fn calc_body_parses_return_expression_without_swallowing_siblings() {
         .collect();
     assert_eq!(calc_defs.len(), 2, "expected two calc defs");
     for calc in calc_defs {
-        let CalcDefBody::Brace { elements } = &calc.body else {
+        let CalcDefBody::Brace { elements, .. } = &calc.body else {
             panic!("expected brace calc body");
         };
         let expressions: Vec<_> = elements

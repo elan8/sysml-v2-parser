@@ -57,11 +57,12 @@ pub(crate) fn emit_constraint_body(
     body: &ConstraintDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        ConstraintDefBody::Semicolon => {
+        ConstraintDefBody::Absent => Ok(()),
+        ConstraintDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        ConstraintDefBody::Brace { elements } => {
+        ConstraintDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -179,11 +180,12 @@ pub(crate) fn emit_calc_body(
     body: &CalcDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        CalcDefBody::Semicolon => {
+        CalcDefBody::Absent => Ok(()),
+        CalcDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        CalcDefBody::Brace { elements } => {
+        CalcDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -542,7 +544,8 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
         emit_feature_value(w, value)?;
     }
     match &ret.body {
-        CalcDefBody::Semicolon => w.push_char(';'),
+        CalcDefBody::Absent => {}
+        CalcDefBody::Semicolon { .. } => w.push_char(';'),
         body @ CalcDefBody::Brace { .. } => emit_calc_body(w, "calc-return", body)?,
     }
     Ok(())
@@ -588,11 +591,12 @@ pub(crate) fn emit_view_def(
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::ViewDefBody::Semicolon => {
+        crate::ast::ViewDefBody::Absent => Ok(()),
+        crate::ast::ViewDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ViewDefBody::Brace { elements } => {
+        crate::ast::ViewDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -675,11 +679,12 @@ pub(crate) fn emit_view_usage(
         }
     }
     match &usage.body {
-        crate::ast::ViewBody::Semicolon => {
+        crate::ast::ViewBody::Absent => Ok(()),
+        crate::ast::ViewBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ViewBody::Brace { elements } => {
+        crate::ast::ViewBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -753,15 +758,16 @@ fn emit_view_rendering(
         w.push_qualified_reference(&format!("{path}/render/type"), *ty)?;
     }
     match &r.body {
-        crate::ast::RenderingUsageBody::Semicolon => {
+        crate::ast::RenderingUsageBody::Absent => Ok(()),
+        crate::ast::RenderingUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements } if elements.is_empty() => {
+        crate::ast::RenderingUsageBody::Brace { elements, .. } if elements.is_empty() => {
             w.push_str(" {}");
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements } => {
+        crate::ast::RenderingUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -834,11 +840,12 @@ pub(crate) fn emit_rendering_def(
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::RenderingDefBody::Semicolon => {
+        crate::ast::RenderingDefBody::Absent => Ok(()),
+        crate::ast::RenderingDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingDefBody::Brace { elements } => {
+        crate::ast::RenderingDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -907,11 +914,12 @@ pub(crate) fn emit_rendering_usage(
         emit_feature_value(w, value)?;
     }
     match &usage.body {
-        crate::ast::RenderingUsageBody::Semicolon => {
+        crate::ast::RenderingUsageBody::Absent => Ok(()),
+        crate::ast::RenderingUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements } => {
+        crate::ast::RenderingUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();

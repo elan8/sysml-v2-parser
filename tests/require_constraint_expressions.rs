@@ -23,7 +23,7 @@ fn compact_whitespace(s: &str) -> String {
 }
 
 fn joined_constraint_expression_text(src: &str, body: &ConstraintDefBody) -> Option<String> {
-    let ConstraintDefBody::Brace { elements } = body else {
+    let ConstraintDefBody::Brace { elements, .. } = body else {
         return None;
     };
     let mut frags = Vec::new();
@@ -47,7 +47,7 @@ fn first_require_constraint_body(root: &sysml_v2_parser::ast::RootNamespace) -> 
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     let req = elements
@@ -57,7 +57,7 @@ fn first_require_constraint_body(root: &sysml_v2_parser::ast::RootNamespace) -> 
             _ => None,
         })
         .expect("requirement def");
-    let RequirementDefBody::Brace { elements } = &req.body else {
+    let RequirementDefBody::Brace { elements, .. } = &req.body else {
         panic!("requirement brace body");
     };
     let c = elements
@@ -73,7 +73,7 @@ fn first_require_constraint_body(root: &sysml_v2_parser::ast::RootNamespace) -> 
 fn assert_no_other_in_constraint(src: &str) {
     let root = parse(src).expect("parse");
     let body = first_require_constraint_body(&root);
-    let ConstraintDefBody::Brace { elements } = body else {
+    let ConstraintDefBody::Brace { elements, .. } = body else {
         panic!("brace body");
     };
     assert!(
@@ -147,7 +147,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("brace body");
     };
     let req = elements
@@ -157,7 +157,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
             _ => None,
         })
         .expect("req def");
-    let RequirementDefBody::Brace { elements } = &req.body else {
+    let RequirementDefBody::Brace { elements, .. } = &req.body else {
         panic!("req brace");
     };
     let mut attrs = elements.iter().filter_map(|e| match &e.value {

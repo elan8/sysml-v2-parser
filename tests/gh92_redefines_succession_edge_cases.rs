@@ -15,7 +15,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     elements.iter().map(|e| e.value.clone()).collect()
@@ -43,7 +43,7 @@ fn gh92_1_bare_redefines_keyword_standalone_body_member() {
     let PackageBodyElement::PartUsage(c) = &elements[1] else {
         panic!("expected PartUsage, got {:?}", elements[1]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &c.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &c.value.body else {
         panic!("expected brace part usage body");
     };
     let attr = elements.iter().find_map(|e| match &e.value {
@@ -80,7 +80,7 @@ fn gh92_2_part_redefines_with_explicit_type_clause() {
     let PackageBodyElement::PartUsage(chs) = &elements[2] else {
         panic!("expected PartUsage, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &chs.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &chs.value.body else {
         panic!("expected brace part usage body");
     };
     let rb = elements.iter().find_map(|e| match &e.value {
@@ -123,7 +123,7 @@ fn gh92_3_unnamed_typed_succession_in_part_usage_body() {
     let PackageBodyElement::PartUsage(vehicle1) = &elements[2] else {
         panic!("expected PartUsage, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &vehicle1.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &vehicle1.value.body else {
         panic!("expected brace part usage body");
     };
     let succ = elements.iter().find_map(|e| match &e.value {

@@ -15,7 +15,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     elements.iter().map(|e| e.value.clone()).collect()
@@ -91,7 +91,7 @@ fn gh91_2_quoted_calc_usage_name_and_type() {
     let PackageBodyElement::PartUsage(inlet_gas) = &elements[2] else {
         panic!("expected PartUsage, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &inlet_gas.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &inlet_gas.value.body else {
         panic!("expected brace part usage body");
     };
     let calc = elements.iter().find_map(|e| match &e.value {

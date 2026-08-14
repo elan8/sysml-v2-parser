@@ -1,6 +1,7 @@
 //! Parser tests: package
 
 use super::common::*;
+use sysml_v2_parser::ast::Span;
 use sysml_v2_parser::ast::*;
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
@@ -10,7 +11,8 @@ fn test_package_with_semicolon_body() {
     let result = parse(input).expect("parse should succeed");
     let expected = expected_package_foo_semicolon();
     assert_eq!(
-        result.root, expected,
+        result.root.normalize_for_test_comparison(),
+        expected.normalize_for_test_comparison(),
         "AST should match expected for package Foo;"
     );
 }
@@ -21,7 +23,8 @@ fn test_package_with_brace_body() {
     let result = parse(input).expect("parse should succeed");
     let expected = expected_package_bar_brace();
     assert_eq!(
-        result.root, expected,
+        result.root.normalize_for_test_comparison(),
+        expected.normalize_for_test_comparison(),
         "AST should match expected for package Bar {{ }}"
     );
 }
@@ -36,7 +39,7 @@ fn test_standard_library_package_header_parses() {
             assert!(lp.value.is_standard);
             assert_eq!(lp.value.identification.simple_name(), Some("SysML"));
             assert!(
-                matches!(lp.value.body, PackageBody::Brace { ref elements } if elements.is_empty())
+                matches!(lp.value.body, PackageBody::Brace { ref elements, .. } if elements.is_empty())
             );
         }
         other => panic!("expected library package, got {:?}", other),
@@ -48,7 +51,7 @@ fn test_legacy_library_standard_package_header_still_parses() {
     let input = "library standard package LegacyStd;";
     let result = parse(input).expect("parse should succeed");
     assert_eq!(
-        result.root,
+        result.root.normalize_for_test_comparison(),
         RootNamespace {
             elements: vec![n_len(
                 input.len(),
@@ -57,7 +60,9 @@ fn test_legacy_library_standard_package_header_still_parses() {
                     LibraryPackage {
                         is_standard: true,
                         identification: package_id("LegacyStd"),
-                        body: PackageBody::Semicolon,
+                        body: PackageBody::Semicolon {
+                            semicolon_span: Span::dummy(),
+                        },
                     }
                 ))
             )]
@@ -132,7 +137,7 @@ fn test_stdlib_requirement_usecase_enum_map_to_dedicated_nodes() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(matches!(
@@ -173,7 +178,7 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(matches!(elements[0].value, PackageBodyElement::PartDef(_)));
@@ -226,7 +231,7 @@ fn test_quantities_abstract_attribute_def_maps_dedicated() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(matches!(

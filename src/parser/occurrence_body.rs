@@ -88,10 +88,16 @@ fn occurrence_definition_body_with_labels<'a>(
 ) -> IResult<Input<'a>, DefinitionBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, DefinitionBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            DefinitionBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         OCCURRENCE_BODY_STARTERS,
         scope_label,
@@ -126,7 +132,7 @@ fn occurrence_definition_body_with_labels<'a>(
             )
         },
     )?;
-    Ok((input, DefinitionBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Everything an occurrence usage's leading keywords contribute to the node it builds. Grouped
@@ -468,14 +474,16 @@ fn starts_specialization_or_body(input: Input<'_>) -> bool {
 fn occurrence_usage_body(input: Input<'_>) -> IResult<Input<'_>, OccurrenceUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b";"[..]), |_| OccurrenceUsageBody::Semicolon),
+        crate::parser::body::semicolon_body,
         occurrence_usage_body_brace,
     ))
     .parse(input)
 }
 
 fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, OccurrenceUsageBody> {
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let open_start = input;
+    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
         let (next, _) = ws_and_comments(input)?;
@@ -487,8 +495,16 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
             )));
         }
         if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, OccurrenceUsageBody::Brace { elements }));
+            let (close_start, _) = ws_and_comments(input)?;
+            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+            return Ok((
+                input,
+                OccurrenceUsageBody::Brace {
+                    open_span,
+                    elements,
+                    close_span: crate::parser::span::span_from_to(close_start, input),
+                },
+            ));
         }
         let reference_checkpoint = input.extra.reference_checkpoint();
         match occurrence_body_element(input) {
@@ -522,8 +538,16 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
                         closing,
                         OccurrenceBodyElement::Error(node),
                     ));
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
-                    return Ok((input, OccurrenceUsageBody::Brace { elements }));
+                    let (close_start, _) = ws_and_comments(closing)?;
+                    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+                    return Ok((
+                        input,
+                        OccurrenceUsageBody::Brace {
+                            open_span,
+                            elements,
+                            close_span: crate::parser::span::span_from_to(close_start, input),
+                        },
+                    ));
                 }
                 let recovery = build_recovery_error_node_from_span(
                     start_unknown,

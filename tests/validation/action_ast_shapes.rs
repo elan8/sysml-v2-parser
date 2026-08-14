@@ -22,7 +22,7 @@ fn fixture_path() -> PathBuf {
 }
 
 fn scan_package(pkg: &Package, for_loops: &mut usize, then_assigns: &mut usize) {
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         return;
     };
 
@@ -47,7 +47,7 @@ fn scan_package(pkg: &Package, for_loops: &mut usize, then_assigns: &mut usize) 
 }
 
 fn scan_action_def_body(body: &ActionDefBody, for_loops: &mut usize, then_assigns: &mut usize) {
-    let ActionDefBody::Brace { elements } = body else {
+    let ActionDefBody::Brace { elements, .. } = body else {
         return;
     };
     for el in elements {
@@ -63,7 +63,7 @@ fn scan_action_def_body(body: &ActionDefBody, for_loops: &mut usize, then_assign
 }
 
 fn scan_action_usage_body(body: &ActionUsageBody, for_loops: &mut usize, then_assigns: &mut usize) {
-    let ActionUsageBody::Brace { elements } = body else {
+    let ActionUsageBody::Brace { elements, .. } = body else {
         return;
     };
     for el in elements {
@@ -79,7 +79,7 @@ fn scan_action_usage_body(body: &ActionUsageBody, for_loops: &mut usize, then_as
 }
 
 fn scan_use_case_body(body: &UseCaseDefBody, for_loops: &mut usize, then_assigns: &mut usize) {
-    let UseCaseDefBody::Brace { elements } = body else {
+    let UseCaseDefBody::Brace { elements, .. } = body else {
         return;
     };
     for el in elements {

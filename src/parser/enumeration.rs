@@ -47,17 +47,33 @@ fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue
 fn enumeration_body(input: Input<'_>) -> IResult<Input<'_>, EnumerationBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, EnumerationBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            EnumerationBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let open_start = input;
+    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut values = Vec::new();
     loop {
         let (next, _) = ws_and_comments(input)?;
         input = next;
         if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, EnumerationBody::Brace { elements: values }));
+            let (close_start, _) = ws_and_comments(input)?;
+            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+            return Ok((
+                input,
+                EnumerationBody::Brace {
+                    open_span,
+                    elements: values,
+                    close_span: crate::parser::span::span_from_to(close_start, input),
+                },
+            ));
         }
         if let Ok((next, _)) = doc_comment(input) {
             input = next;
@@ -73,9 +89,17 @@ fn enumeration_body(input: Input<'_>) -> IResult<Input<'_>, EnumerationBody> {
                 input = next;
             }
             Err(_) => {
-                let (input, _) = advance_to_closing_brace(input)?;
-                let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                return Ok((input, EnumerationBody::Brace { elements: values }));
+                let (closing, _) = advance_to_closing_brace(input)?;
+                let (close_start, _) = ws_and_comments(closing)?;
+                let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+                return Ok((
+                    input,
+                    EnumerationBody::Brace {
+                        open_span,
+                        elements: values,
+                        close_span: crate::parser::span::span_from_to(close_start, input),
+                    },
+                ));
             }
         }
     }
@@ -246,7 +270,10 @@ mod enumerated_value_tests {
         let (rest, body) =
             enumeration_body(input("{ active; inactive = 1; degraded { } }")).expect("body");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let EnumerationBody::Brace { elements: values } = body else {
+        let EnumerationBody::Brace {
+            elements: values, ..
+        } = body
+        else {
             panic!("expected brace body");
         };
         let names: Vec<_> = values.iter().map(|v| v.value.name.as_str()).collect();

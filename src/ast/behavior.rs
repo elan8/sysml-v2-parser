@@ -770,8 +770,24 @@ pub struct LoopStmt {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IfStmt {
     pub condition: Node<Expression>,
-    pub then_body: ActionDefBody,
-    pub else_body: Option<ActionDefBody>,
+    pub then_body: ActionBranchBody,
+    pub else_body: Option<ActionBranchBody>,
+}
+
+/// The `then` or `else` branch of an `if` control node.
+///
+/// The grammar offers two spellings (BNF `IfNode`, SysML 8.2.2.17.3): a braced action body, or a
+/// single member written without braces (`if x then y;`, `else if ...`). They are different
+/// authored syntax, so they are different states here -- a shorthand branch has no delimiters to
+/// record, and treating it as a one-member brace body meant re-emitting it with braces the author
+/// never wrote.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ActionBranchBody {
+    /// `{ ... }` exactly as authored, including its delimiters.
+    Braced(ActionDefBody),
+    /// A single member written without braces.
+    Shorthand(Box<Node<ActionDefBodyElement>>),
 }
 
 // ---------------------------------------------------------------------------
