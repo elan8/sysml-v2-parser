@@ -511,6 +511,28 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
         map(state_usage, |n| {
             node_from_to(start, input, StateDefBodyElement::StateUsage(n))
         }),
+        // spec42 Gap 42: general usage members legal in a state body (Systems Library
+        // `States.sysml`): `attribute :>> isTriggerDuring;`, `action :>> subactions :> middle
+        // { ... }`, `succession stateSequencing first [0..1] ... then [0..1] ...`, and
+        // `assert constraint { ... }` -- dispatched to the same typed productions sibling body
+        // enums already use instead of falling to opaque recovery.
+        map(crate::parser::attribute::attribute_usage, |n| {
+            node_from_to(
+                start,
+                input,
+                StateDefBodyElement::AttributeUsage(Box::new(n)),
+            )
+        }),
+        map(crate::parser::action::action_usage, |n| {
+            node_from_to(start, input, StateDefBodyElement::ActionUsage(Box::new(n)))
+        }),
+        map(crate::parser::occurrence_body::succession_usage, |n| {
+            node_from_to(start, input, StateDefBodyElement::SuccessionUsage(n))
+        }),
+        map(
+            crate::parser::occurrence_body::assert_constraint_member,
+            |n| node_from_to(start, input, StateDefBodyElement::AssertConstraint(n)),
+        ),
         map(crate::parser::action::in_out_decl, |n| {
             node_from_to(start, input, StateDefBodyElement::InOutDecl(n))
         }),
@@ -978,5 +1000,72 @@ mod membership_tests {
         assert!(node.value.accept.is_some());
         assert!(node.value.name.is_none());
         assert!(node.value.source.is_none());
+    }
+}
+
+#[cfg(test)]
+mod state_body_member_tests {
+    use super::*;
+
+    fn input(text: &str) -> Input<'_> {
+        crate::parser::span::test_input(text)
+    }
+
+    /// Spec42 Gap 42: `attribute :>> isTriggerDuring;` (Systems Library `States.sysml`) is a
+    /// typed attribute-usage member of a state body, not opaque recovery text.
+    #[test]
+    fn state_body_dispatches_an_attribute_redefinition_member() {
+        let (rest, node) = state_def_body_element(input("attribute :>> isTriggerDuring;"))
+            .expect("attribute member");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let StateDefBodyElement::AttributeUsage(usage) = node.value else {
+            panic!("expected AttributeUsage, got {:?}", node.value);
+        };
+        assert!(usage.value.redefines.is_some());
+        assert!(usage.value.name.is_empty());
+    }
+
+    /// Spec42 Gap 42: `action :>> subactions :> middle { }` declares an anonymous action usage
+    /// whose leading specialization clauses stand in for the name.
+    #[test]
+    fn state_body_dispatches_an_anonymous_action_redefinition_member() {
+        let (rest, node) = state_def_body_element(input("action :>> subactions :> middle { }"))
+            .expect("action member");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let StateDefBodyElement::ActionUsage(usage) = node.value else {
+            panic!("expected ActionUsage, got {:?}", node.value);
+        };
+        assert!(usage.value.redefines.is_some());
+        assert!(usage.value.subsets.is_some());
+        assert!(usage.value.name.is_empty());
+    }
+
+    /// Spec42 Gap 42: the Systems Library's per-end-multiplicity succession spelling.
+    #[test]
+    fn state_body_dispatches_a_succession_member() {
+        let (rest, node) = state_def_body_element(input(
+            "succession stateSequencing first [0..1] exclusiveStates then [0..1] exclusiveStates;",
+        ))
+        .expect("succession member");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let StateDefBodyElement::SuccessionUsage(usage) = node.value else {
+            panic!("expected SuccessionUsage, got {:?}", node.value);
+        };
+        assert_eq!(usage.value.name.as_deref(), Some("stateSequencing"));
+        assert!(usage.value.source_multiplicity.is_some());
+        assert!(usage.value.target_multiplicity.is_some());
+    }
+
+    /// Spec42 Gap 42: `assert constraint { ... }` is a typed member of a state body.
+    #[test]
+    fn state_body_dispatches_an_assert_constraint_member() {
+        let (rest, node) =
+            state_def_body_element(input("assert constraint { notEmpty(exclusiveStates) }"))
+                .expect("assert constraint member");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(
+            node.value,
+            StateDefBodyElement::AssertConstraint(_)
+        ));
     }
 }

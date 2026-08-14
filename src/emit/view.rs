@@ -561,9 +561,12 @@ pub(crate) fn emit_assert_constraint(
     if let Some(target) = assert.target {
         w.push_qualified_reference(&format!("{path}/target"), target)?;
     } else {
-        w.push_str("constraint ");
+        // No trailing space for the anonymous form (`assert constraint { ... }`) -- the body
+        // emitter supplies its own leading space.
+        w.push_str("constraint");
     }
     if let Some(name) = &assert.declaration_name {
+        w.push_char(' ');
         w.push_str(&format_name(name));
     }
     if let Some(ty) = assert.type_name {

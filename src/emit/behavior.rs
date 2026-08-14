@@ -158,8 +158,11 @@ pub(crate) fn emit_action_usage(
         }
         return emit_action_usage_body(w, path, &usage.body);
     }
-    w.push_str("action ");
+    // Anonymous usages (`action :>> subactions;`, `action { ... }`) get no trailing space
+    // after the keyword -- the clause emitters below supply their own leading space.
+    w.push_str("action");
     if !usage.name.is_empty() {
+        w.push_char(' ');
         w.push_str(&format_name(&usage.name));
     }
     if let Some(typing) = &usage.typing {
@@ -809,6 +812,14 @@ fn emit_state_def_body_element(
             super::requirement::emit_requirement_usage(w, path, &r.value)
         }
         StateDefBodyElement::Transition(t) => emit_transition(w, path, &t.value),
+        StateDefBodyElement::AttributeUsage(a) => {
+            structure::emit_attribute_usage(w, path, &a.value)
+        }
+        StateDefBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
+        StateDefBodyElement::SuccessionUsage(s) => emit_succession_usage(w, &s.value),
+        StateDefBodyElement::AssertConstraint(a) => {
+            super::view::emit_assert_constraint(w, path, &a.value)
+        }
         other @ (StateDefBodyElement::Annotation(_)
         | StateDefBodyElement::MetadataAnnotation(_)
         | StateDefBodyElement::MetadataKeywordUsage(_)) => w.unsupported(

@@ -458,11 +458,21 @@ fn collect_state_body_element_errors(
             collect_attribute_body_errors(&n.value.body, errors)
         }
         StateDefBodyElement::InOutDecl(n) => collect_in_out_decl_errors(&n.value, errors),
+        StateDefBodyElement::AttributeUsage(n) => {
+            collect_attribute_body_errors(&n.value.body, errors)
+        }
+        StateDefBodyElement::ActionUsage(n) => {
+            collect_action_usage_body_errors(&n.value.body, errors)
+        }
+        StateDefBodyElement::AssertConstraint(n) => {
+            collect_constraint_body_errors(&n.value.body, errors)
+        }
         StateDefBodyElement::Doc(_)
         | StateDefBodyElement::Annotation(_)
         | StateDefBodyElement::Other(_)
         | StateDefBodyElement::Then(_)
         | StateDefBodyElement::FinalState(_)
+        | StateDefBodyElement::SuccessionUsage(_)
         | StateDefBodyElement::Transition(_) => {}
     }
 }

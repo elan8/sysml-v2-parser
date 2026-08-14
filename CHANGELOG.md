@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 135.** `StateDefBodyElement` gains `AttributeUsage`,
+  `ActionUsage`, `SuccessionUsage`, and `AssertConstraint` variants: the Systems Library's
+  `States.sysml` state-body members (`attribute :>> isTriggerDuring;`, `action :>> subactions
+  :> middle { ... }`, `succession stateSequencing first [0..1] exclusiveStates then [0..1]
+  exclusiveStates { ... }`, `assert constraint { ... }`) now dispatch to their existing typed
+  productions instead of opaque recovery (spec42 gap 42, state-def half). `action_usage`
+  additionally accepts a leading `:>`/`:>>` specialization clause standing in for the name
+  (mirroring `attribute_usage`'s prefix heads), which also fixes the same form inside
+  part/action bodies. Emitters no longer print a double space in anonymous `action {`/`action
+  :>>`/`assert constraint {` spellings; five more release example files roundtrip.
 - **`PARSE_AST_VERSION` is now 134.** `EntryAction`/`DoAction`/`ExitAction` gain
   `declared_name`/`type_name`/`redefines` for declaring a *new* nested action (`entry action
   entryAction :>> 'entry';`, `do action doAction : Action :>> 'do';`, Systems Library

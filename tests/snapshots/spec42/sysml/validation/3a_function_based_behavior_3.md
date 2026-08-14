@@ -127,7 +127,7 @@ package '3a-Function-based Behavior-5' {
             out wheelTorque2 : Torque;
             loop  {
                 accept engineStart : EngineStart;
-                then action  {
+                then action {
                     action 'generate torque' : 'Generate Torque' {
                         in fuelCmd = 'provide power'::fuelCmd;
                         out engineTorque : Torque;
@@ -149,7 +149,7 @@ package '3a-Function-based Behavior-5' {
                         out wheelTorque2 : Torque;
                     }
                 }
-                then action  accept engineOff : EngineOff;
+                then action accept engineOff : EngineOff;
             }
         }
     }

@@ -46,7 +46,7 @@ package 'Derivation Constraints' {
     private import 'Constraints Example-1'::*;
     part vehicle1 : Vehicle {
         attribute totalMass : MassValue;
-        assert constraint  {
+        assert constraint {
             totalMass == chassisMass + engine.mass + transmission.mass;
         }
     }

@@ -53,7 +53,7 @@ package 'Variation Usages' {
             variant manualTransmission;
             variant automaticTransmission;
         }
-        assert constraint  {
+        assert constraint {
             (engine == engine::'4cylEngine' && transmission == transmission::manualTransmission) xor (engine == engine::'6cylEngine' && transmission == transmission::automaticTransmission);
         }
     }

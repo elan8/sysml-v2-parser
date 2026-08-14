@@ -1495,9 +1495,11 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     // (`then action accept engineOff : EngineOff;` in `3a-Function-based Behavior-3.sysml`).
     // But `action send typed by T;` names the usage `send` — only treat accept/send as payload
     // starters when the following token is not a usage-declaration continuation.
-    let (input, (name_span, name_str)) = if (after_gap.fragment().starts_with(b":")
-        && !after_gap.fragment().starts_with(b":>")
-        && !after_gap.fragment().starts_with(b":>>"))
+    // spec42 Gap 42: a leading `:>`/`:>>` specialization clause also stands in for the name
+    // (`action :>> subactions :> middle { ... }`, Systems Library `States.sysml`) -- the
+    // clauses themselves are picked up by `specialization_clauses` below, mirroring
+    // `attribute_usage`'s `PrefixRedefines`/`PrefixSubsets` heads.
+    let (input, (name_span, name_str)) = if after_gap.fragment().starts_with(b":")
         || after_gap.fragment().starts_with(b"{")
         || after_gap.fragment().starts_with(b";")
         || starts_with_keyword(after_gap.fragment(), b"defined")

@@ -98,7 +98,7 @@ package '7a-Variant Configuration - General Concept' {
                 part  :>> part6;
             }
         }
-        assert constraint  {
+        assert constraint {
             subsystemA != subsystemA::subsystem2 | subsystemB == subsystemB::subsystem3;
         }
     }

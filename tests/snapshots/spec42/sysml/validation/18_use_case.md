@@ -126,7 +126,7 @@ package '18-Use Case' {
         ref :>> start {
             doc
             /* Mock-up of a pre-condition. */
-            assert constraint  {
+            assert constraint {
                 doc
                 /* Vehicle at starting location */
             }
@@ -162,7 +162,7 @@ package '18-Use Case' {
         ref :>> done {
             doc
             /* Mock-up of a post-condition. */
-            assert constraint  {
+            assert constraint {
                 doc
                 /* Vehicle at ending location */
             }

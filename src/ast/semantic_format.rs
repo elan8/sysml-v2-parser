@@ -982,6 +982,19 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         StateDefBodyElement::Transition(_transition) => {
                             self.write_marker(&mut first, "transition")?;
                         }
+                        StateDefBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        StateDefBodyElement::ActionUsage(_usage) => {
+                            self.write_marker(&mut first, "action-usage")?;
+                        }
+                        StateDefBodyElement::SuccessionUsage(_usage) => {
+                            self.write_marker(&mut first, "succession-usage")?;
+                        }
+                        StateDefBodyElement::AssertConstraint(_member) => {
+                            self.write_marker(&mut first, "assert-constraint")?;
+                        }
                     }
                 }
                 self.writer.write_char(')')

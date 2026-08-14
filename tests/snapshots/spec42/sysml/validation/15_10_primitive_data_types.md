@@ -129,7 +129,7 @@ package '15.10-Primitive Data Types' {
 		 * Example of restriction of the base Real datatype.
 		 */
         attribute x : Real :>> self;
-        assert constraint  {
+        assert constraint {
             x >= 0.0;
         }
     }

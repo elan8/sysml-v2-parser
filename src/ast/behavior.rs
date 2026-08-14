@@ -885,6 +885,17 @@ pub enum StateDefBodyElement {
     RequirementUsage(Node<RequirementUsage>),
     StateUsage(Node<StateUsage>),
     Transition(Box<Node<Transition>>),
+    /// `attribute` usage member (`attribute :>> isTriggerDuring;`, Systems Library
+    /// `States.sysml`; spec42 Gap 42).
+    AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
+    /// `action` usage member (`action :>> subactions :> middle { ... }`, `action substates:
+    /// StateAction[0..*] :> stateActions;`; spec42 Gap 42).
+    ActionUsage(Box<Node<ActionUsage>>),
+    /// Standalone succession usage (`succession stateSequencing first [0..1] exclusiveStates
+    /// then [0..1] exclusiveStates { ... }`; spec42 Gap 42).
+    SuccessionUsage(Node<crate::ast::SuccessionUsage>),
+    /// `assert constraint { ... }` member (spec42 Gap 42).
+    AssertConstraint(Node<crate::ast::AssertConstraintMember>),
 }
 
 /// Entry action: `entry` (`;` or body).

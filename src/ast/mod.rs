@@ -1756,6 +1756,18 @@ fn normalize_state_def_body_element_node(
         StateDefBodyElement::Transition(node) => {
             StateDefBodyElement::Transition(Box::new(dummy_node(node, node.value.clone())))
         }
+        StateDefBodyElement::AttributeUsage(node) => StateDefBodyElement::AttributeUsage(Box::new(
+            dummy_node(node, normalize_attribute_usage(&node.value)),
+        )),
+        StateDefBodyElement::ActionUsage(node) => StateDefBodyElement::ActionUsage(Box::new(
+            dummy_node(node, normalize_action_usage(&node.value)),
+        )),
+        StateDefBodyElement::SuccessionUsage(node) => {
+            StateDefBodyElement::SuccessionUsage(dummy_node(node, node.value.clone()))
+        }
+        StateDefBodyElement::AssertConstraint(node) => {
+            StateDefBodyElement::AssertConstraint(dummy_node(node, node.value.clone()))
+        }
     };
     dummy_node(element, value)
 }

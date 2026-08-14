@@ -1092,6 +1092,16 @@ fn walk_state_def_body_elements(
             }
             StateDefBodyElement::Transition(n) => walk_connect_body(report, &p, &n.value.body),
             StateDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
+            StateDefBodyElement::AttributeUsage(n) => {
+                walk_attribute_body(report, &p, &n.value.body)
+            }
+            StateDefBodyElement::ActionUsage(n) => {
+                walk_action_usage_body(report, &p, &n.value.body)
+            }
+            StateDefBodyElement::SuccessionUsage(n) => walk_connect_body(report, &p, &n.value.body),
+            StateDefBodyElement::AssertConstraint(n) => {
+                walk_constraint_def_body(report, &p, &n.value.body)
+            }
             StateDefBodyElement::Doc(_)
             | StateDefBodyElement::Then(_)
             | StateDefBodyElement::FinalState(_) => {}

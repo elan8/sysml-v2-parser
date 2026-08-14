@@ -153,7 +153,7 @@ package MassConstraintExample {
         }
     }
     part def Vehicle2 {
-        assert constraint  {
+        assert constraint {
             m == eng.m + trans.m;
         }
         attribute m : MassValue;

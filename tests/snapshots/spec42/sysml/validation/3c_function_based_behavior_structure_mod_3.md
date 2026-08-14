@@ -68,7 +68,7 @@ package '3c-Function-based Behavior-structure mod-3' {
             }
         }
     }
-    action  {
+    action {
         action 'connect trailer to vehicle';
         assign trailer.trailerFrame.coupler.hitch := vehicle.vehicleFrame.hitch;
         then action 'disconnect trailer from vehicle';
