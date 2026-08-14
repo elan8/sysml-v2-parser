@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 120.** Typed-field gaps from the spec42 audit:
+  `ThenTarget` gains a `Send(Box<Node<ActionUsage>>)` variant (`then send new S() to b;`,
+  spec42 gap 30); `KermlFeatureMember` gains a `crosses` cross-subsetting clause (gap 32);
+  `ViewpointUsage` gains `subsets`/`redefines` mirroring `ViewUsage` (gap 25); and
+  `RequireConstraint` gains an arena-backed `target: Option<QualifiedReferenceId>` for the
+  keyword-less reference shorthand `require <qualified.name>;` (`name` now only carries the
+  `constraint`-keyword form's declared name; gap 29).
 - **`PARSE_AST_VERSION` is now 119.** Package-level KerML declarations are unified onto their
   typed nodes (spec42 gaps 13/14/22/23):
   - New `KermlRelationshipDecl` (`PackageBodyElement::KermlRelationship`) models the KerML

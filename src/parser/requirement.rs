@@ -631,15 +631,20 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
         opt(preceded(tag(&b"constraint"[..]), ws_and_comments)).parse(input)?;
     let has_constraint_keyword = has_constraint_keyword.is_some();
     let (input, _) = ws_and_comments(input)?;
-    // `#73` / validation `08`: `assume constraint fuelConstraint { … }` — optional name before body.
-    // Also `require name;` / `require name { … }` without the `constraint` keyword.
-    let (input, name) = if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";")
-    {
-        (input, None)
-    } else {
-        let (input, n) = name(input)?;
-        (input, Some(n))
-    };
+    // `#73` / validation `08`: `assume constraint fuelConstraint { … }` — optional name before
+    // body. The keyword-less `require <name>;` form instead *references* an existing
+    // constraint, so it captures an arena-backed qualified reference (spec42 gap 29); the
+    // `constraint`-keyword form declares a fresh name.
+    let (input, name, target) =
+        if input.fragment().starts_with(b"{") || input.fragment().starts_with(b";") {
+            (input, None, None)
+        } else if has_constraint_keyword {
+            let (input, n) = name(input)?;
+            (input, Some(n), None)
+        } else {
+            let (input, reference) = qualified_reference(input)?;
+            (input, None, Some(reference))
+        };
     let (input, body) = require_constraint_body(input)?;
     Ok((
         input,
@@ -650,6 +655,7 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
                 is_assume: assume_kw,
                 has_constraint_keyword,
                 name,
+                target,
                 body,
             },
         ),

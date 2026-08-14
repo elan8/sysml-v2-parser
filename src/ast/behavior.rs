@@ -146,6 +146,10 @@ pub enum ThenTarget {
     /// time-trigger forms already supported after a state `transition` (GH-86, Simple Tests/
     /// ActionTest.sysml).
     Accept(Node<TransitionAccept>),
+    /// `then send new S() to b;` — an inline send action (spec42 gap 30, Simple Tests/
+    /// ActionTest.sysml). Carries the same `ActionUsage` shape (with `send`/`via`/`to`
+    /// clauses) the standalone `send ...;` statement produces.
+    Send(Box<Node<ActionUsage>>),
     /// `then continue;` — a reference to an already-declared node.
     Feature(Node<Expression>),
 }

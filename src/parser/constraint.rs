@@ -1047,6 +1047,7 @@ fn kerml_feature_member_inner(
     let subsets = clauses.subsets.map(|(target, _value)| target);
     let redefines = leading_redefines.or(clauses.redefines);
     let references = clauses.references;
+    let crosses = clauses.crosses;
     // `chains <chain>`: `feature self: Anything[1] subsets things chains things.that { ... }`
     // (`Base.kerml`).
     let (input, chains) = opt(preceded(
@@ -1115,6 +1116,7 @@ fn kerml_feature_member_inner(
                 subsets,
                 redefines,
                 references,
+                crosses,
                 chains,
                 inverse_of,
                 type_relationships,

@@ -415,6 +415,11 @@ pub struct SatisfyViewMember {
 pub struct ViewpointUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// `:>` subsets clause (spec42 gap 25), mirroring [`ViewUsage::subsets`]. Previously parsed
+    /// by the shared usage header and discarded.
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// `:>>` redefines clause, mirroring [`ViewUsage::redefines`].
+    pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: RequirementDefBody,
     pub membership: Membership,
 }

@@ -1323,6 +1323,7 @@ fn collect_then_action_errors(action: &crate::ast::ThenAction, errors: &mut Vec<
         crate::ast::ThenTarget::Merge(n) => collect_first_merge_body_errors(&n.value.body, errors),
         crate::ast::ThenTarget::Fork(n) => collect_first_merge_body_errors(&n.value.body, errors),
         crate::ast::ThenTarget::Decide(n) => collect_first_merge_body_errors(&n.value.body, errors),
+        crate::ast::ThenTarget::Send(n) => collect_action_usage_body_errors(&n.value.body, errors),
         crate::ast::ThenTarget::Accept(_) | crate::ast::ThenTarget::Feature(_) => {}
     }
 }

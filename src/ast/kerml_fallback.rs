@@ -318,6 +318,10 @@ pub struct KermlFeatureMember {
     pub redefines: Option<Node<crate::ast::SubsettingRelationship>>,
     /// `references`/`::>` clause.
     pub references: Option<Node<crate::ast::SubsettingRelationship>>,
+    /// `crosses` cross-subsetting clause, e.g. `end feature shorterOccurrence: Occurrence
+    /// redefines sourceOccurrence crosses longerOccurrence.timeEnclosedOccurrences;`
+    /// (spec42 gap 32). Mirrors `ConnectionEnd`/`EndDecl`/`OccurrenceUsage`.
+    pub crosses: Option<Node<crate::ast::SubsettingRelationship>>,
     /// `chains` clause target, e.g. `feature self: Anything[1] subsets things chains
     /// things.that { ... }` (Kernel Semantic Library `Base.kerml`).
     pub chains: Option<crate::ast::QualifiedReferenceId>,

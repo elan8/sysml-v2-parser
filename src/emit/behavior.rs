@@ -454,6 +454,7 @@ pub(crate) fn emit_then_action_pub(
             w.push_char(';');
             Ok(())
         }
+        ThenTarget::Send(a) => emit_action_usage(w, path, &a.value),
         ThenTarget::Feature(f) => {
             emit_expression(w, &f.value)?;
             w.push_char(';');

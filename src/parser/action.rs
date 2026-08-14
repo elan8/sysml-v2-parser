@@ -647,6 +647,10 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
             }),
             |(span, accept)| ThenTarget::Accept(Node::new(span, accept)),
         ),
+        // `then send new S() to b;` (spec42 gap 30): the same control-node parse the
+        // standalone `send ...;` statement uses, kept as its own variant so the send shape is
+        // distinguishable from a bare feature reference.
+        map(then_send_target, |a| ThenTarget::Send(Box::new(a))),
         // `perform action …` before bare `perform …`; both before `action_usage`.
         map(crate::parser::part::perform_action_decl, |perform| {
             ThenTarget::Perform(Box::new(perform))
@@ -662,6 +666,19 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
         ),
     ))
     .parse(input)
+}
+
+/// `send ...` as a `then` succession target -- only the `send` control-node form, so the other
+/// control keywords keep their own arms.
+fn then_send_target(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
+    let (peek, _) = ws_and_comments(input)?;
+    if !starts_with_keyword(peek.fragment(), b"send") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    control_node_action_usage(input)
 }
 
 pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenAction>> {

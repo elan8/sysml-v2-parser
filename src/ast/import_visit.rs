@@ -52,6 +52,7 @@ impl ProvenanceValidator<'_> {
             ThenTarget::Merge(merge) => self.first_merge_body(&merge.value.body),
             ThenTarget::Fork(fork) => self.first_merge_body(&fork.value.body),
             ThenTarget::Decide(decision) => self.first_merge_body(&decision.value.body),
+            ThenTarget::Send(action) => self.action_usage_body(&action.value.body),
             ThenTarget::Accept(_) | ThenTarget::Feature(_) => Ok(()),
         }
     }

@@ -360,6 +360,10 @@ fn emit_require_constraint(
         w.push_char(' ');
         w.push_str(&format_name(name));
     }
+    if let Some(target) = req.target {
+        w.push_char(' ');
+        w.push_qualified_reference(&format!("{path}/target"), target)?;
+    }
     match &req.body {
         crate::ast::RequireConstraintBody::Semicolon => {
             w.push_char(';');

@@ -139,8 +139,14 @@ pub struct RequireConstraint {
     /// True when the `constraint` keyword follows `require`/`assume`.
     /// False for `require name;` / `require name { … }` (validation `08`).
     pub has_constraint_keyword: bool,
-    /// Optional usage name (`assume constraint fuelConstraint { … }`).
+    /// Optional usage name (`assume constraint fuelConstraint { … }`) -- the *declared* name of
+    /// the `constraint`-keyword form.
     pub name: Option<String>,
+    /// Arena-backed target of the keyword-less reference shorthand `require <qualified.name>;`
+    /// / `assume <name>;` (spec42 gap 29): the referenced constraint, resolvable through the
+    /// document's qualified-reference table. `None` for the `constraint`-keyword declaration
+    /// form, whose `name` declares rather than references.
+    pub target: Option<crate::ast::QualifiedReferenceId>,
     pub body: RequireConstraintBody,
 }
 

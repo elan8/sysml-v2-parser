@@ -296,6 +296,9 @@ pub(crate) fn emit_kerml_feature_member(
     if let Some(references) = &feature.references {
         emit_subsetting_clause(w, &references.value)?;
     }
+    if let Some(crosses) = &feature.crosses {
+        emit_subsetting_clause(w, &crosses.value)?;
+    }
     if let Some(chains) = feature.chains {
         w.push_str(" chains ");
         w.push_qualified_reference(&format!("{path}/chains"), chains)?;
@@ -797,6 +800,12 @@ pub(crate) fn emit_viewpoint_usage(
     if let Some(type_name) = usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), type_name)?;
+    }
+    if let Some(redefines) = &usage.redefines {
+        super::structure::emit_subsetting_clause(w, &redefines.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
     }
     super::requirement::emit_requirement_body_pub(w, path, &usage.body)
 }
