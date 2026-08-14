@@ -1,6 +1,6 @@
 # Factor shared grammatical concepts
 
-> **Status:** Phases 1-2 implemented; Phase 3 partially implemented; Phase 4 proposed
+> **Status:** Phases 1-2 implemented; Phase 3 in progress; Phase 4 proposed
 
 ## Purpose
 
@@ -145,55 +145,29 @@ Two constraints from that work carry forward into the phases below:
 - downstream semantic lowering deliberately keeps its own exhaustive matches. Representation
   changes are therefore felt as required edits there, not absorbed by the visitor.
 
-### Phase 2: one body container — done, except delimiter provenance
+### Phase 2: one body container — done
 
 `ast::Body<E>` replaced 27 per-family body enums; the scopes keep their names as aliases, so the
 member set stays typed per scope. `;` and `{}` remain distinct, and `braced_elements` reports the
 semicolon form as `None` so consumers cannot flatten the two by accident.
 
-What is *not* done is delimiter provenance: the container still records no brace or semicolon
-spans, exactly as the per-family enums did not. The requirements below therefore stand for whenever
-that lands.
+Delimiters are retained: the semicolon form keeps its `;` span, the brace form keeps both brace
+spans, captured where the shared brace-member routine consumes them. Deserialization checks that
+each span still slices to its token and that a body is not inside out.
 
-Before adding delimiter provenance to the shared container, compare:
+Two states that provenance forced into the open:
 
-- whether a semicolon is legal and what it means;
-- whether an explicitly empty brace body differs from no body;
-- open- and close-delimiter provenance;
-- incomplete or recovered close delimiters;
-- trivia and recovery adjacency requirements; and
-- aggregate span conventions.
+- `Absent` — no body was authored at all. A `#Name` prefix and an inferred action-usage terminator
+  had been storing the semicolon form, so emission wrote a `;` nobody typed.
+- `ActionBranchBody` — the brace-less `if x then y;` is not a one-member brace body, and is no
+  longer re-emitted as one.
 
-If two bodies differ on any of these facts, either parameterize the shared concept with an explicit
-typed policy or leave them separate. Do not encode these differences using sentinel spans, empty
-vectors, or undocumented booleans.
-
-The illustrative `Brace { open_span, elements, close_span }` in this document assumes a closing
-delimiter that was actually authored, which is not a state the parser can promise. The real type
-must represent an incomplete or recovered close explicitly -- a typed delimiter outcome, not
-`Span::dummy()`, not a bare `Option<Span>` with the meaning left to the reader, and not an
-end-of-input span fabricated to fill the field. Phase 1 removed exactly this class of sentinel from
-eight recovery sites, where a dummy span made the emitter silently drop authored text; the shared
-container must not reintroduce it as a type-level default.
-
-The serialized shape must be designed before the first migration, not discovered during it, because
-downstream consumers cache parse artifacts. Decide and write down: enum tagging; whether `Body<E>`
-serializes generically or through scope-specific records; how a recovered delimiter is encoded; how
-per-scope legality of members is validated on the way in; and what a version or shape mismatch does.
-
-Remaining deliverables:
-
-- a typed representation of delimiter outcome, including recovered and missing closes;
-- a written serialized-shape design, with deserialization validation and rejection behavior; and
-- delimiter access on the shared container once it has provenance to expose.
-
-Completion criteria for that work:
-
-- scopes retain their element enums and accepted language;
-- semicolon, empty braces, populated braces, malformed members, and incomplete bodies have focused
-  tests;
-- parse/format/reparse behavior and recovery sibling preservation remain stable; and
-- no temporary dual body representation remains.
+There is deliberately no state for a missing closing brace. An unterminated body does not produce a
+body today: the enclosing declaration's parse fails and the scope above keeps the text as recovery.
+A typed close outcome (`Authored | Recovered | Missing`) belongs with the recovery change that
+makes such bodies representable, and adding it earlier would mean shipping unreachable variants.
+That recovery change is worth doing: an unterminated body currently loses every member it
+contained.
 
 ### Phase 3: Extract low-risk shared member families
 
@@ -239,9 +213,14 @@ if unsupported-member support becomes general.
   malformed node with a diagnostic. Two more scopes had the variant with no producer at all and
   have been removed. The rest need the same treatment as a behavior change: recovery nodes report,
   opaque text does not.
-- `ref` body dispatch depends on its owner: a `doc` in a connection-definition `ref` body reaches
-  the annotating family, while the same member in a part-definition `ref` body is captured as a
-  nested part-usage member. Two parsers with different alternative order, one grammar production.
+- ~~`ref` body dispatch depends on its owner~~ — done. `UsageBody = DefinitionBody`, so there is
+  now one `ref` body parser for all five owners and `RefBodyElement`, whose variants recorded which
+  parser had run, is gone.
+- A `ref` in a state body only dispatches when it is typed: `ref b { ... }` is silently captured as
+  opaque text with no diagnostic, while `ref b : Anything { ... }` parses. Same class as the
+  `Other(String)` work below.
+- Annotating coverage: the general usage-member scope now accepts the whole production. The
+  remaining scopes are one commit each, with all four members plus a `#Name` prefix test.
 
 Scope-specific enums opt into these families explicitly:
 
