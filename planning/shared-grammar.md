@@ -209,16 +209,16 @@ if unsupported-member support becomes general.
 - Annotating-member coverage gaps: 22 scopes accept less than the grammar allows. Each is a
   conformance fix (parser dispatch plus the family variant), and each changes accepted language, so
   they are separate reviewed changes rather than part of a representation refactor.
-- `Other(String)` remains in 11 scopes, where unrecognized members are kept as text instead of as a
-  malformed node with a diagnostic. Two more scopes had the variant with no producer at all and
-  have been removed. The rest need the same treatment as a behavior change: recovery nodes report,
-  opaque text does not.
+- ~~`Other(String)` remains in 11 scopes~~ — done. Unrecognized content is a recovery node with an
+  authored span and a report; a spec-valid member the scope does not model is an explicit
+  `Unsupported` node with a warning. The two states exist only in the scopes that produce them, and
+  `capture_opaque_member` is gone. Surfacing what it hid also closed two parse gaps.
 - ~~`ref` body dispatch depends on its owner~~ — done. `UsageBody = DefinitionBody`, so there is
   now one `ref` body parser for all five owners and `RefBodyElement`, whose variants recorded which
   parser had run, is gone.
-- A `ref` in a state body only dispatches when it is typed: `ref b { ... }` is silently captured as
-  opaque text with no diagnostic, while `ref b : Anything { ... }` parses. Same class as the
-  `Other(String)` work below.
+- A `ref` in a state body only dispatches when it is typed: `ref b { ... }` reaches recovery while
+  `ref b : Anything { ... }` parses. It is now reported rather than silently captured, but the
+  dispatch gap itself remains.
 - Annotating coverage: the general usage-member scope now accepts the whole production. The
   remaining scopes are one commit each, with all four members plus a `#Name` prefix test.
 
