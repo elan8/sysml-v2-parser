@@ -116,6 +116,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::KermlClassifier(n) => {
             PackageBodyElement::KermlClassifier(Box::new(dummy_node(n, n.value.clone())))
         }
+        PackageBodyElement::KermlConnector(n) => {
+            PackageBodyElement::KermlConnector(Box::new(dummy_node(n, n.value.clone())))
+        }
         PackageBodyElement::KermlInvariant(n) => {
             PackageBodyElement::KermlInvariant(Box::new(dummy_node(n, n.value.clone())))
         }

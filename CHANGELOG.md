@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PARSE_AST_VERSION` is now 118.** KerML type-body members reach attribute-shaped bodies
+  (the body grammar `class_def`'s KerML `class`/`struct`/`datatype` definitions share with
+  SysML attribute/item bodies): `AttributeBodyElement` gains `KermlFeature`, `Invariant`,
+  `KermlConnector`, and nested `ClassDef` variants, so `feature x : Natural[1];`, `member
+  feature ...`, `composite feature ... subsets ...`, `portion feature all ...`, `var x : T;`,
+  `step`/`expr`/`bool` kinds, `inv name { ... }`, `connector a ::> a.x to b;`, and nested
+  `class` definitions parse instead of `unrecognized_declaration_in_scope` (spec42 gaps
+  15/16/17/18/19/21/24). Package bodies gain a `PackageBodyElement::KermlConnector` member
+  (`connector a2 from x.s to y.t;`, spec42 gap 16); connector ends accept the `::>` operator
+  spelling and an end-name-led binary shorthand; `InOutDecl` gains `is_var` (`out var y1;`,
+  spec42 gap 18). Resolves the `connector all` fixture wholesale.
 - **`PARSE_AST_VERSION` is now 117.** `TypingRelationship` gains a `spelling:
   TypingSpelling` field recording whether the author wrote the symbolic operator (`:`/`:>`) or
   the keyword form (`specializes`, `defined by`, `typed by`), and emission renders the authored

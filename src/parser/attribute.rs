@@ -46,6 +46,18 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"connection",
     b"value",
     b"occurrence",
+    b"feature",
+    b"member",
+    b"var",
+    b"composite",
+    b"portion",
+    b"step",
+    b"expr",
+    b"bool",
+    b"inv",
+    b"connector",
+    b"class",
+    b"end",
 ];
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
@@ -198,6 +210,22 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
             AttributeBodyElement::AttributeDef,
         ),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
+        // KerML type-body members: this body grammar also serves KerML `class`/`struct`/
+        // `datatype` bodies via `class_def`, whose members are feature members (`feature x :
+        // Natural[1];`, `member`/`derived`/`composite`/`portion`/`var` prefixed, `step`/`expr`/
+        // `bool` kinds), invariants, connectors, and nested class definitions.
+        map(crate::parser::constraint::kerml_feature_member, |n| {
+            AttributeBodyElement::KermlFeature(Box::new(n))
+        }),
+        map(crate::parser::constraint::kerml_invariant_member, |n| {
+            AttributeBodyElement::Invariant(Box::new(n))
+        }),
+        map(crate::parser::constraint::kerml_connector_member, |n| {
+            AttributeBodyElement::KermlConnector(Box::new(n))
+        }),
+        map(crate::parser::package::class_def, |n| {
+            AttributeBodyElement::ClassDef(Box::new(n))
+        }),
         map(value_keyword_binding, AttributeBodyElement::AttributeUsage),
         map(
             attribute_feature_binding,

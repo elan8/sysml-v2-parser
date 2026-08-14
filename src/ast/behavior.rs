@@ -159,6 +159,8 @@ pub struct InOutDecl {
     pub direction: InOut,
     /// Whether the declaration used the `ref` feature prefix (`in ref name : Type`).
     pub is_reference: bool,
+    /// Whether the declaration used the KerML `var` time-varying prefix (`out var y1;`).
+    pub is_var: bool,
     /// Declared parameter name. Empty for the leading `:>> target` redefinition form.
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,

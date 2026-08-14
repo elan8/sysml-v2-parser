@@ -373,6 +373,20 @@ pub enum AttributeBodyElement {
     /// 21_messaging_with_ports.md`). Reuses the same `item_usage` parser `PartDefBodyElement`/
     /// `PartUsageBodyElement` already dispatch to.
     ItemUsage(Box<Node<ItemUsage>>),
+    /// KerML feature member (`feature x : Natural[1];`, `member feature ...`, `composite
+    /// feature ...`, `portion feature all ...`, `var x : Integer;`, `step s : S;`, `expr e
+    /// { ... }`) nested in a KerML `class`/`struct`/`datatype` body, which shares this body
+    /// grammar via `class_def`; see [`crate::ast::KermlFeatureMember`].
+    KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// KerML invariant member (`inv checkIt { ... }`) nested in a KerML type body; see
+    /// [`crate::ast::KermlInvariantMember`].
+    Invariant(Box<Node<crate::ast::KermlInvariantMember>>),
+    /// KerML connector member (`connector a ::> a.x to b;`) nested in a KerML type body; see
+    /// [`crate::ast::KermlConnectorMember`].
+    KermlConnector(Box<Node<crate::ast::KermlConnectorMember>>),
+    /// Nested KerML `class` definition (`class Outer { class Inner { ... } }`); see
+    /// [`ClassDef`].
+    ClassDef(Box<Node<ClassDef>>),
     Other(String),
 }
 

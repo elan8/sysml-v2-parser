@@ -274,6 +274,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::KermlSemanticDecl(_)
         | PackageBodyElement::KermlFeatureDecl(_)
         | PackageBodyElement::KermlClassifier(_)
+        | PackageBodyElement::KermlConnector(_)
         | PackageBodyElement::KermlInvariant(_)
         | PackageBodyElement::KermlFeatureMember(_)
         | PackageBodyElement::KermlBareDeclaration(_)
@@ -899,7 +900,7 @@ fn feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureDecl>> {
 /// KerML `class` classifier definition: `class` Identification (`:>`|`specializes`) type? body.
 /// Mirrors `individual_def` exactly (same `def`-optional, `no_abstract`, captured-visibility
 /// shape) -- see `crate::ast::ClassDef`'s doc comment.
-fn class_def(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ClassDef>> {
+pub(crate) fn class_def(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ClassDef>> {
     let start = input;
     let (input, prefix) = crate::parser::definition_prefix::parse_definition_prefix(
         input,
@@ -2012,6 +2013,12 @@ fn try_package_body_view<'a>(
     try_package_body_dispatch!(input, start, kerml_classifier_structured, |n| {
         PackageBodyElement::KermlClassifier(Box::new(n))
     });
+    try_package_body_dispatch!(
+        input,
+        start,
+        crate::parser::constraint::kerml_connector_member,
+        |n| { PackageBodyElement::KermlConnector(Box::new(n)) }
+    );
     try_package_body_dispatch!(
         input,
         start,

@@ -2322,6 +2322,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::KermlSemanticDecl(_declaration) => {
                 self.write_marker(first, "kerml-semantic-declaration")
             }
+            PackageBodyElement::KermlConnector(_connector) => {
+                self.write_marker(first, "kerml-connector")
+            }
             PackageBodyElement::KermlInvariant(invariant) => {
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(kerml-invariant (negated ")?;

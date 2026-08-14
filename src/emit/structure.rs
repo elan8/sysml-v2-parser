@@ -537,6 +537,16 @@ fn emit_attribute_body_element(
             kind: super::OpacityKind::Other,
         }),
         AttributeBodyElement::Doc(d) => emit_doc(w, &d.value),
+        AttributeBodyElement::KermlFeature(n) => {
+            super::view::emit_kerml_feature_member(w, path, &n.value)
+        }
+        AttributeBodyElement::Invariant(n) => {
+            super::view::emit_kerml_invariant_member(w, path, &n.value)
+        }
+        AttributeBodyElement::KermlConnector(n) => {
+            super::view::emit_kerml_connector_member(w, path, &n.value)
+        }
+        AttributeBodyElement::ClassDef(n) => emit_class_def(w, path, &n.value),
         AttributeBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         AttributeBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         AttributeBodyElement::OccurrenceUsage(o) => {

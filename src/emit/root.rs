@@ -305,6 +305,9 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::KermlClassifier(declaration) => {
             emit_kerml_classifier_decl(w, path, &declaration.value)
         }
+        PackageBodyElement::KermlConnector(connector) => {
+            super::view::emit_kerml_connector_member(w, path, &connector.value)
+        }
         PackageBodyElement::KermlInvariant(invariant) => {
             super::view::emit_kerml_invariant_member(w, path, &invariant.value)
         }

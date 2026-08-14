@@ -392,6 +392,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
                 InOutDecl {
                     direction,
                     is_reference: false,
+                    is_var: false,
                     name: String::new(),
                     type_name,
                     multiplicity,
@@ -408,6 +409,8 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
         // Library shorthand: `in action body { ... }` (treat as name `body` typed as `action`)
         let (input, action_typed_name) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
         let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
+        // `out var y1;` (KerML `var` time-varying prefix on a directed parameter).
+        let (input, is_var) = opt(preceded(tag(&b"var"[..]), ws1)).parse(input)?;
         // Anonymous typed parameter: `in : TensorQuantityValue[1];` (Domain Libraries
         // `TensorCalculations.sysml`). The name is legally omitted when the typing follows
         // directly.
@@ -501,6 +504,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             InOutDecl {
                 direction,
                 is_reference: is_reference.is_some(),
+                is_var: is_var.is_some(),
                 name: param_name,
                 type_name,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),

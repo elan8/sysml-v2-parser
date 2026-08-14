@@ -535,10 +535,14 @@ fn kerml_connector_end(
     .parse(input)?;
     let (input, target) =
         preceded(ws_and_comments, crate::parser::lex::reference_path).parse(input)?;
-    // `references <chain>` on the end itself: `from [0..*] separateOccurrenceToo references
-    // elements.notIntersection to ...` (`Occurrences.kerml`).
+    // `references <chain>` / `::> <chain>` on the end itself: `from [0..*]
+    // separateOccurrenceToo references elements.notIntersection to ...` (`Occurrences.kerml`),
+    // `connector a ::> a.x to b;` (KerML class bodies).
     let (input, references) = opt(preceded(
-        (ws_and_comments, tag(&b"references"[..]), ws1),
+        alt((
+            map((ws_and_comments, tag(&b"references"[..]), ws1), |_| ()),
+            map((ws_and_comments, tag(&b"::>"[..]), ws_and_comments), |_| ()),
+        )),
         crate::parser::lex::reference_path,
     ))
     .parse(input)?;
@@ -574,17 +578,57 @@ fn kerml_connector_member_inner(
     let (input, _) = tag(&b"connector"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
+    // Binary shorthand with no declaration at all: `connector [0..1] transitionLink to [1..*]
+    // trigger;` (`TransitionPerformances.kerml`), `connector a ::> a.x to b;` (KerML class
+    // bodies) -- the leading token is the first *end*, not the connector's name. Tried before
+    // the named/typed declaration so an end name followed by `::>`/`to` is not misread as the
+    // connector's own name.
+    let (after_all_ws, _) = ws_and_comments(input)?;
+    let from_keyword_next = starts_with_keyword(after_all_ws.fragment(), b"from");
+    if let (false, Ok((rest, (from, to)))) = (
+        from_keyword_next,
+        map(
+            (
+                kerml_connector_end,
+                preceded(ws_and_comments, tag(&b"to"[..])),
+                ws1,
+                kerml_connector_end,
+            ),
+            |(from, _, _, to)| (from, to),
+        )
+        .parse(input),
+    ) {
+        let (rest, body) = calc_def_body(rest)?;
+        return Ok((
+            rest,
+            node_from_to(
+                start,
+                rest,
+                crate::ast::KermlConnectorMember {
+                    is_all: is_all.is_some(),
+                    name: String::new(),
+                    typing: None,
+                    multiplicity: None,
+                    from: Some(from),
+                    to: Some(to),
+                    body,
+                    membership: Membership::feature(visibility, visibility_span),
+                },
+            ),
+        ));
+    }
     // Name is optional: the common library shapes are the anonymous `connector :Type` and the
-    // `from`-less `connector [0..1] transitionLink to [1..*] trigger;`
-    // (`TransitionPerformances.kerml`).
+    // declaration-less `connector (all)? from a to b;`.
     let (peek, _) = ws_and_comments(input)?;
-    let (input, name_str) =
-        if peek.fragment().starts_with(b":") || peek.fragment().starts_with(b"[") {
-            (input, String::new())
-        } else {
-            let (input, n) = preceded(ws_and_comments, name).parse(input)?;
-            (input, n)
-        };
+    let (input, name_str) = if peek.fragment().starts_with(b":")
+        || peek.fragment().starts_with(b"[")
+        || from_keyword_next
+    {
+        (input, String::new())
+    } else {
+        let (input, n) = preceded(ws_and_comments, name).parse(input)?;
+        (input, n)
+    };
     let (input, typing) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
         preceded(ws_and_comments, qualified_reference),
@@ -597,25 +641,15 @@ fn kerml_connector_member_inner(
     .parse(input)?;
     // Ends: `from end to end`, or the `from`-less binary shorthand `connector [0..1]
     // transitionLink to [1..*] trigger;` (`TransitionPerformances.kerml`).
-    let (input, ends) = opt(alt((
-        map(
-            (
-                preceded(ws_and_comments, tag(&b"from"[..])),
-                kerml_connector_end,
-                preceded(ws_and_comments, tag(&b"to"[..])),
-                kerml_connector_end,
-            ),
-            |(_, from, _, to)| (from, to),
+    let (input, ends) = opt(map(
+        (
+            preceded(ws_and_comments, tag(&b"from"[..])),
+            kerml_connector_end,
+            preceded(ws_and_comments, tag(&b"to"[..])),
+            kerml_connector_end,
         ),
-        map(
-            (
-                kerml_connector_end,
-                preceded(ws_and_comments, tag(&b"to"[..])),
-                kerml_connector_end,
-            ),
-            |(from, _, to)| (from, to),
-        ),
-    )))
+        |(_, from, _, to)| (from, to),
+    ))
     .parse(input)?;
     let (from, to) = match ends {
         Some((from, to)) => (Some(from), Some(to)),

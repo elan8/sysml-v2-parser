@@ -682,6 +682,18 @@ fn collect_attribute_body_errors(body: &AttributeBody, errors: &mut Vec<ParseErr
                     AttributeBodyElement::Error(n) => {
                         errors.push(parse_error_from_recovery_node(&element.span, &n.value));
                     }
+                    AttributeBodyElement::KermlFeature(n) => {
+                        collect_calc_body_errors(&n.value.body, errors)
+                    }
+                    AttributeBodyElement::Invariant(n) => {
+                        collect_calc_body_errors(&n.value.body, errors)
+                    }
+                    AttributeBodyElement::KermlConnector(n) => {
+                        collect_calc_body_errors(&n.value.body, errors)
+                    }
+                    AttributeBodyElement::ClassDef(n) => {
+                        collect_attribute_body_errors(&n.value.body, errors)
+                    }
                     AttributeBodyElement::AttributeDef(n) => {
                         collect_attribute_body_errors(&n.value.body, errors)
                     }
@@ -1467,6 +1479,9 @@ fn collect_package_body_element_errors(
             errors.push(parse_error_from_recovery_node(&element.span, &n.value));
         }
         PackageBodyElement::KermlClassifier(n) => {
+            collect_calc_body_errors(&n.value.body, errors);
+        }
+        PackageBodyElement::KermlConnector(n) => {
             collect_calc_body_errors(&n.value.body, errors);
         }
         PackageBodyElement::KermlInvariant(n) => {

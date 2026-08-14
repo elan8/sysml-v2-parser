@@ -87,9 +87,6 @@ package Expressions {
     (diagnostics
       (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 139) (line 6) (column 2) (len 1309)) (message "unrecognized declaration `a` in package body"))
       (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 1503) (line 56) (column 2) (len 26)) (message "unrecognized declaration `bb` in package body"))
-      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 1541) (line 59) (column 3) (len 41)) (message "unrecognized declaration `var` in attribute body"))
-      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 1686) (line 69) (column 3) (len 20)) (message "unrecognized declaration `feature` in attribute body"))
-      (diagnostic (code "unrecognized_declaration_in_scope") (severity error) (category parseerror) (span (offset 1706) (line 70) (column 3) (len 55)) (message "unrecognized declaration `feature` in attribute body"))
     )
   )
 )
@@ -161,7 +158,7 @@ package Expressions {
     test2 = x !== obj2;
     class def L {
         feature c : C[*];
-        feature count : ScalarValues::Integer =  c#(1).count;
+        feature count : ScalarValues::Integer = c#(1).count;
     }
     feature l = new L();
     feature w1 = w(xx);

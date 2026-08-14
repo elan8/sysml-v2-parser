@@ -106,6 +106,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         }
         PackageBodyElement::KermlFeatureDecl(_) => hit(report, path, OpacityKind::KermlFeatureDecl),
         PackageBodyElement::KermlClassifier(n) => walk_calc_def_body(report, path, &n.value.body),
+        PackageBodyElement::KermlConnector(n) => walk_calc_def_body(report, path, &n.value.body),
         PackageBodyElement::KermlInvariant(n) => walk_calc_def_body(report, path, &n.value.body),
         PackageBodyElement::KermlFeatureMember(n) => {
             walk_calc_def_body(report, path, &n.value.body)
@@ -667,6 +668,12 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
         match &el.value {
             AttributeBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             AttributeBodyElement::Other(_) => hit(report, &p, OpacityKind::Other),
+            AttributeBodyElement::KermlFeature(n) => walk_calc_def_body(report, &p, &n.value.body),
+            AttributeBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
+            AttributeBodyElement::KermlConnector(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
+            }
+            AttributeBodyElement::ClassDef(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::Connect(c) => walk_connect_body(report, &p, &c.value.body),
             AttributeBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::AttributeUsage(n) => {

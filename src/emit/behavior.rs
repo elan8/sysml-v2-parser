@@ -24,6 +24,9 @@ pub(crate) fn emit_inout_decl(
     if decl.is_reference {
         w.push_str("ref ");
     }
+    if decl.is_var {
+        w.push_str("var ");
+    }
     let leading_redefinition = decl.name.is_empty();
     if leading_redefinition {
         if let Some(redefines) = &decl.redefines {
