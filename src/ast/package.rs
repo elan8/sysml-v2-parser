@@ -39,7 +39,10 @@ use crate::ast::QualifiedReferenceId;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct QualifiedDeclarationName {
-    reference: QualifiedReferenceId,
+    /// Crate-visible so the owning traversal in [`crate::ast::visit`] can reach the identity.
+    /// It stays private to callers outside the crate: a declaration label is not a reference,
+    /// and its storage must be resolved through the owning document.
+    pub(crate) reference: QualifiedReferenceId,
 }
 
 impl QualifiedDeclarationName {
