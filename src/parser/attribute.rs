@@ -103,6 +103,10 @@ const METADATA_BODY_STARTERS: &[&[u8]] = &[
     b"derived",
     b"item",
     b"abstract",
+    // Structured members shared with `attribute_body_element` (spec42 Gap 40).
+    b"part",
+    b"connect",
+    b"assert",
 ];
 
 const METADATA_OPAQUE_STARTERS: &[&[u8]] = &[b"derived", b"item", b"abstract", b"ref"];
@@ -1213,6 +1217,25 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
         ),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
         map(metadata_binding, AttributeBodyElement::AttributeUsage),
+        // The same structured members `attribute_body_element` already dispatches (spec42
+        // Gap 40): previously this narrower grammar dropped e.g. `ref self : MetadataItem
+        // redefines Metaobject::self, Item::self;` (Systems Library `Metadata.sysml`) to
+        // opaque capture. Before the opaque fallback so they get structured nodes.
+        map(
+            crate::parser::connector::ref_decl,
+            AttributeBodyElement::RefDecl,
+        ),
+        map(crate::parser::part::part_usage, |n| {
+            AttributeBodyElement::PartUsage(Box::new(n))
+        }),
+        map(crate::parser::item::item_usage, |n| {
+            AttributeBodyElement::ItemUsage(Box::new(n))
+        }),
+        map(crate::parser::part::connect_, AttributeBodyElement::Connect),
+        map(
+            crate::parser::occurrence_body::assert_constraint_member,
+            AttributeBodyElement::AssertConstraint,
+        ),
         map(
             |i| capture_opaque_member(i, METADATA_OPAQUE_STARTERS),
             AttributeBodyElement::Other,
@@ -1329,6 +1352,29 @@ mod attribute_body_tests {
             .iter()
             .map(|id| crate::parser::usage::reference_text(source, *id).expect("reference text"))
             .collect()
+    }
+
+    /// Spec42 Gap 40: `metadata def` bodies dispatch the same structured members as other
+    /// attribute-shaped bodies instead of dropping them to opaque capture (`ref self :
+    /// MetadataItem redefines Metaobject::self, Item::self;`, Systems Library `Metadata.sysml`).
+    #[test]
+    fn metadata_body_dispatches_structured_members() {
+        let (rest, body) = metadata_body(input(
+            "{ ref self : M redefines Metaobject::self, Item::self; item picture : Picture; }",
+        ))
+        .expect("metadata body");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let AttributeBody::Brace { elements } = body else {
+            panic!("expected brace body");
+        };
+        assert!(matches!(
+            elements[0].value,
+            AttributeBodyElement::RefDecl(_)
+        ));
+        assert!(matches!(
+            elements[1].value,
+            AttributeBodyElement::ItemUsage(_)
+        ));
     }
 
     /// Spec42 Gap 38: KerML classifier-keyword declarations (other than `class`, which stays on
