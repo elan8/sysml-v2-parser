@@ -15,7 +15,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     elements.iter().map(|e| e.value.clone()).collect()
@@ -126,6 +126,7 @@ fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
     };
     let sysml_v2_parser::ast::DefinitionBody::Brace {
         elements: occ_elements,
+        ..
     } = &occ_def.value.body
     else {
         panic!("expected brace occurrence def body");
@@ -145,6 +146,7 @@ fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
     };
     let sysml_v2_parser::ast::ActionDefBody::Brace {
         elements: action_elements,
+        ..
     } = &action_def.value.body
     else {
         panic!("expected brace action def body");
@@ -201,7 +203,7 @@ fn gh90_2_timeslice_usage_inside_item_def_body() {
     let PackageBodyElement::ItemDef(person) = &elements[0] else {
         panic!("expected ItemDef, got {:?}", elements[0]);
     };
-    let sysml_v2_parser::ast::AttributeBody::Brace { elements } = &person.value.body else {
+    let sysml_v2_parser::ast::AttributeBody::Brace { elements, .. } = &person.value.body else {
         panic!("expected brace item def body");
     };
     let timeslice = elements.iter().find_map(|e| match &e.value {

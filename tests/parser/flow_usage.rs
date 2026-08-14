@@ -11,7 +11,7 @@ fn package_body(input: &str) -> Vec<sysml_v2_parser::ast::Node<PackageBodyElemen
     let result = parse(input).expect("parse");
     match &result.elements[0].value {
         RootElement::Package(p) => match &p.value.body {
-            PackageBody::Brace { elements } => elements.clone(),
+            PackageBody::Brace { elements, .. } => elements.clone(),
             _ => panic!("expected brace package body"),
         },
         _ => panic!("expected package"),
@@ -23,12 +23,12 @@ fn part_def_body(input: &str) -> Vec<sysml_v2_parser::ast::Node<PartDefBodyEleme
     match &result.elements[0].value {
         RootElement::Package(p) => {
             let elements = match &p.value.body {
-                PackageBody::Brace { elements } => elements,
+                PackageBody::Brace { elements, .. } => elements,
                 _ => panic!("expected brace package body"),
             };
             match &elements[0].value {
                 PackageBodyElement::PartDef(part) => match &part.value.body {
-                    PartDefBody::Brace { elements } => elements.clone(),
+                    PartDefBody::Brace { elements, .. } => elements.clone(),
                     _ => panic!("expected part def brace body"),
                 },
                 _ => panic!("expected part def"),
@@ -151,14 +151,14 @@ fn flow_in_occurrence_def_body() {
         _ => panic!("expected package"),
     };
     let part = match &pkg.body {
-        PackageBody::Brace { elements } => match &elements[0].value {
+        PackageBody::Brace { elements, .. } => match &elements[0].value {
             PackageBodyElement::OccurrenceDef(occ) => occ,
             other => panic!("expected occurrence def, got {other:?}"),
         },
         _ => panic!("expected brace body"),
     };
     match &part.body {
-        DefinitionBody::Brace { elements } => {
+        DefinitionBody::Brace { elements, .. } => {
             assert!(elements.iter().any(|e| matches!(
                 &e.value,
                 sysml_v2_parser::ast::DefinitionBodyElement::OccurrenceMember(member)
@@ -176,7 +176,7 @@ fn succession_flow_in_action_def() {
             .expect("parse");
     let action = match &result.elements[0].value {
         RootElement::Package(p) => match &p.value.body {
-            PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBody::Brace { elements, .. } => match &elements[0].value {
                 PackageBodyElement::ActionDef(a) => a,
                 other => panic!("expected action def, got {other:?}"),
             },
@@ -185,7 +185,7 @@ fn succession_flow_in_action_def() {
         _ => panic!("expected package"),
     };
     match &action.value.body {
-        ActionDefBody::Brace { elements } => {
+        ActionDefBody::Brace { elements, .. } => {
             assert!(elements.iter().any(|e| matches!(
                 &e.value,
                 ActionDefBodyElement::FlowUsage(flow)
@@ -212,7 +212,7 @@ fn flow_in_use_case_def() {
         parse("package P { use case def UC { flow actor.msg to system.inbox; } }").expect("parse");
     let uc = match &result.elements[0].value {
         RootElement::Package(p) => match &p.value.body {
-            PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBody::Brace { elements, .. } => match &elements[0].value {
                 PackageBodyElement::UseCaseDef(u) => u,
                 other => panic!("expected use case def, got {other:?}"),
             },
@@ -221,7 +221,7 @@ fn flow_in_use_case_def() {
         _ => panic!("expected package"),
     };
     match &uc.value.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => {
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => {
             assert!(elements
                 .iter()
                 .any(|e| matches!(e.value, UseCaseDefBodyElement::FlowUsage(_))));
@@ -235,7 +235,7 @@ fn flow_in_part_usage_body() {
     let result = parse("package P { part p : P { flow a to b; } }").expect("parse");
     let part = match &result.elements[0].value {
         RootElement::Package(p) => match &p.value.body {
-            PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBody::Brace { elements, .. } => match &elements[0].value {
                 PackageBodyElement::PartUsage(part) => part,
                 other => panic!("expected part usage, got {other:?}"),
             },
@@ -244,7 +244,7 @@ fn flow_in_part_usage_body() {
         _ => panic!("expected package"),
     };
     match &part.value.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => {
+        sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } => {
             assert!(elements
                 .iter()
                 .any(|e| matches!(e.value, PartUsageBodyElement::FlowUsage(_))));

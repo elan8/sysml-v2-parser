@@ -22,7 +22,7 @@ fn test_parse_minimal_package_one_attribute() {
         other => panic!("expected Package, got {:?}", other),
     };
     let body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(body.len(), 1, "expected one body element");
@@ -53,7 +53,7 @@ fn test_parse_package_with_doc_and_line_comment() {
         other => panic!("expected Package, got {:?}", other),
     };
     let body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(
@@ -97,7 +97,7 @@ fn test_parse_fixture_exact_start() {
         other => panic!("expected Package, got {:?}", other),
     };
     let body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(!body.is_empty(), "expected at least one body element");
@@ -135,7 +135,7 @@ fn test_perform_body_doc_comment_parsed_as_element() {
         _ => panic!("expected package"),
     };
     let pkg_body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let part_usage = pkg_body
@@ -146,7 +146,7 @@ fn test_perform_body_doc_comment_parsed_as_element() {
         })
         .expect("expected part usage p");
     let part_body = match &part_usage.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } => elements,
         _ => panic!("expected part brace body"),
     };
     let perform = part_body
@@ -157,7 +157,7 @@ fn test_perform_body_doc_comment_parsed_as_element() {
         })
         .expect("expected perform");
     let perform_body = match &perform.body {
-        sysml_v2_parser::ast::PerformBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PerformBody::Brace { elements, .. } => elements,
         _ => panic!("expected perform brace body"),
     };
     assert_eq!(
@@ -205,7 +205,7 @@ fn test_import_filter_package() {
         _ => panic!("expected Package"),
     };
     let body = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let imp = match &body[0].value {
@@ -247,7 +247,7 @@ fn test_namespace_declaration() {
     };
     assert_eq!(ns.identification.simple_name(), Some("N"));
     let body = match &ns.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(body.len(), 1);

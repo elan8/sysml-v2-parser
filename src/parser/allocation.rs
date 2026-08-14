@@ -136,7 +136,7 @@ mod membership_tests {
         ))
         .expect("allocation def with ends");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let crate::ast::DefinitionBody::Brace { elements } = &node.value.body else {
+        let crate::ast::DefinitionBody::Brace { elements, .. } = &node.value.body else {
             panic!("expected brace body");
         };
         assert_eq!(elements.len(), 2);

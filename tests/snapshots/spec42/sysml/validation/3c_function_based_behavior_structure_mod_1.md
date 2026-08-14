@@ -90,13 +90,13 @@ package '3c-Function-based Behavior-structure mod-1' {
                 part coupler : TrailerCoupler;
             }
         }
-        action  {
-            action 'connect trailer to vehicle';
+        action {
+            action 'connect trailer to vehicle'
             assign 'vehicle-trailer system'.trailerHitch := new TrailerHitch();
             then action 'destroy connection of trailer to vehicle' : OccurrenceFunctions::destroy {
                 inout occ = 'vehicle-trailer system'.trailerHitch;
             }
-            then action 'disconnect trailer from vehicle';
+            then action 'disconnect trailer from vehicle'
             assign 'vehicle-trailer system'.trailerHitch := null;
         }
     }

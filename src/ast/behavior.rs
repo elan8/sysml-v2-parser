@@ -1,3 +1,4 @@
+use super::body::Body;
 use super::common::{
     ConnectBody, DocComment, Identification, ParseErrorNode, TextualRepresentation,
 };
@@ -31,14 +32,7 @@ pub struct ActionDef {
 }
 
 /// Body of an action definition: `;` or `{` ActionDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ActionDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ActionDefBodyElement>>,
-    },
-}
+pub type ActionDefBody = Body<ActionDefBodyElement>;
 
 /// Element inside an action definition body.
 // Body-element variants intentionally preserve their direct `Node<T>` AST shape. Boxing only
@@ -410,7 +404,10 @@ pub struct ActionUsage {
     /// Optional trailing `to <expr>` clause on a standalone `send` statement (BNF
     /// `SenderReceiverPart`, GH-86), e.g. `then send new S() to b;` (Simple Tests/ActionTest.sysml).
     pub to: Option<Node<Expression>>,
-    pub body: ActionUsageBody,
+    /// `None` when no terminator was authored and the following statement implies the end of
+    /// this usage (Systems Library `LoopAction` style). The grammar requires `;` or `{ ... }`,
+    /// so this records that neither was written rather than pretending a `;` was.
+    pub body: Option<ActionUsageBody>,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
     /// Span of the type reference after `:` (for semantic tokens).
@@ -445,14 +442,7 @@ impl PartialEq for ActionUsage {
 }
 
 /// Body of an action usage: `;` or `{` ActionUsageBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ActionUsageBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ActionUsageBodyElement>>,
-    },
-}
+pub type ActionUsageBody = Body<ActionUsageBodyElement>;
 
 /// Element inside an action usage body.
 // Keep the same direct-node representation as `ActionDefBodyElement`; see its size rationale.
@@ -783,8 +773,24 @@ pub struct LoopStmt {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IfStmt {
     pub condition: Node<Expression>,
-    pub then_body: ActionDefBody,
-    pub else_body: Option<ActionDefBody>,
+    pub then_body: ActionBranchBody,
+    pub else_body: Option<ActionBranchBody>,
+}
+
+/// The `then` or `else` branch of an `if` control node.
+///
+/// The grammar offers two spellings (BNF `IfNode`, SysML 8.2.2.17.3): a braced action body, or a
+/// single member written without braces (`if x then y;`, `else if ...`). They are different
+/// authored syntax, so they are different states here -- a shorthand branch has no delimiters to
+/// record, and treating it as a one-member brace body meant re-emitting it with braces the author
+/// never wrote.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ActionBranchBody {
+    /// `{ ... }` exactly as authored, including its delimiters.
+    Braced(ActionDefBody),
+    /// A single member written without braces.
+    Shorthand(Box<Node<ActionDefBodyElement>>),
 }
 
 // ---------------------------------------------------------------------------
@@ -849,14 +855,7 @@ pub struct StateDef {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum StateDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<StateDefBodyElement>>,
-    },
-}
+pub type StateDefBody = Body<StateDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -866,7 +865,6 @@ pub enum StateDefBodyElement {
     Annotation(Node<Annotation>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
-    Other(String),
     /// `in`/`out`/`inout` parameter redecl inside `entry`/`do`/`exit` action bodies
     /// (e.g. `do 'sense temperature' { out temp; }`, validation `05`).
     InOutDecl(Node<InOutDecl>),
@@ -885,6 +883,17 @@ pub enum StateDefBodyElement {
     RequirementUsage(Node<RequirementUsage>),
     StateUsage(Node<StateUsage>),
     Transition(Box<Node<Transition>>),
+    /// `attribute` usage member (`attribute :>> isTriggerDuring;`, Systems Library
+    /// `States.sysml`; spec42 Gap 42).
+    AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
+    /// `action` usage member (`action :>> subactions :> middle { ... }`, `action substates:
+    /// StateAction[0..*] :> stateActions;`; spec42 Gap 42).
+    ActionUsage(Box<Node<ActionUsage>>),
+    /// Standalone succession usage (`succession stateSequencing first [0..1] exclusiveStates
+    /// then [0..1] exclusiveStates { ... }`; spec42 Gap 42).
+    SuccessionUsage(Node<crate::ast::SuccessionUsage>),
+    /// `assert constraint { ... }` member (spec42 Gap 42).
+    AssertConstraint(Node<crate::ast::AssertConstraintMember>),
 }
 
 /// Entry action: `entry` (`;` or body).

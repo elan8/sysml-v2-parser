@@ -1,10 +1,10 @@
 use super::behavior::{
-    ActionDef, ActionDefBodyElement, ActionUsage, ActionUsageBodyElement, Allocate, InOut,
-    InOutDecl, StateDefBody, StateDefBodyElement, StateUsage,
+    ActionDef, ActionUsage, ActionUsageBodyElement, Allocate, InOut, InOutDecl, StateDefBody,
+    StateUsage,
 };
+use super::body::Body;
 use super::common::{
-    CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode,
-    TextualRepresentation,
+    AnnotatingMember, CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode,
 };
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
@@ -73,14 +73,7 @@ pub enum DefinitionPrefix {
 }
 
 /// Body of a part definition: `;` or `{` PartDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PartDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PartDefBodyElement>>,
-    },
-}
+pub type PartDefBody = Body<PartDefBodyElement>;
 
 /// Element inside a part definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,7 +87,6 @@ pub enum PartDefBodyElement {
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// A dependency owned by this definition (BNF `DefinitionMember`).
     Dependency(Node<Dependency>),
-    Other(String),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     /// Bare `name : Type;` / `name = expr;` without a kind keyword (SysML DefaultReferenceUsage).
@@ -336,14 +328,7 @@ impl PartialEq for AttributeDef {
 }
 
 /// Body of an attribute (def or usage): `;` or `{` AttributeBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum AttributeBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<AttributeBodyElement>>,
-    },
-}
+pub type AttributeBody = Body<AttributeBodyElement>;
 
 // See `RequirementDefBodyElement`'s `#[allow(clippy::large_enum_variant)]` doc comment --
 // `AttributeUsage`'s size relative to `Doc`/`Error` is an accepted, crate-wide tradeoff, not
@@ -352,6 +337,9 @@ pub enum AttributeBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AttributeBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     AttributeDef(Node<AttributeDef>),
@@ -414,7 +402,6 @@ pub enum AttributeBodyElement {
     /// constraint checkedConstraints : ConstraintCheck[0..*] :> ... { ... }`, Systems Library
     /// `Items.sysml`; spec42 Gap 49a).
     ConstraintUsage(Box<Node<ConstraintUsage>>),
-    Other(String),
 }
 
 /// Item definition: `item def` Identification body (for events, etc.).
@@ -527,14 +514,7 @@ impl PartialEq for PartUsage {
 }
 
 /// Body of a part usage: `;` or `{` PartUsageBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PartUsageBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PartUsageBodyElement>>,
-    },
-}
+pub type PartUsageBody = Body<PartUsageBodyElement>;
 
 /// Metadata annotation on usage: `@` Name (`:` Type)? (`about` targets)? MetadataBody.
 #[derive(Debug, Clone, Eq)]
@@ -564,7 +544,10 @@ pub struct MetadataKeywordUsage {
     pub keyword: String,
     pub type_reference: Option<QualifiedReferenceId>,
     pub about_targets: Vec<QualifiedReferenceId>,
-    pub body: AttributeBody,
+    /// `None` for the prefix spelling (`#safety part def X`), which annotates the declaration
+    /// that follows it and has no body of its own to write. The member spelling (`#safety;`,
+    /// `#safety { ... }`) always has one.
+    pub body: Option<AttributeBody>,
     pub keyword_span: Span,
     pub type_span: Option<Span>,
 }
@@ -612,7 +595,8 @@ pub enum AnnotationHead {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartUsageBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
     AttributeUsage(Node<AttributeUsage>),
     /// Bare `name : Type;` without a kind keyword (SysML DefaultReferenceUsage).
@@ -638,7 +622,6 @@ pub enum PartUsageBodyElement {
     StateUsage(Node<StateUsage>),
     /// `action` / `ref action` usage inside a part usage body.
     ActionUsage(Box<Node<ActionUsage>>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// `variant` name `;` inside a variation part usage body.
     VariantUsage(Node<VariantUsage>),
@@ -796,14 +779,7 @@ pub struct Perform {
 }
 
 /// Body of a perform: `;` or `{` PerformBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PerformBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PerformBodyElement>>,
-    },
-}
+pub type PerformBody = Body<PerformBodyElement>;
 
 /// Element inside a perform body: doc comment, in/out binding, or variant member.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1012,19 +988,15 @@ pub struct PortDef {
 }
 
 /// Body of a port definition: `;` or `{` PortDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PortDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PortDefBodyElement>>,
-    },
-}
+pub type PortDefBody = Body<PortDefBodyElement>;
 
 /// Element inside a port definition body (in/out declarations or nested port usages).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PortDefBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     InOutDecl(Node<InOutDecl>),
     Doc(Node<DocComment>),
     Error(Node<ParseErrorNode>),
@@ -1042,7 +1014,6 @@ pub enum PortDefBodyElement {
     /// APIS_HTTP { ... }`) -- previously port definition bodies had no `#`/`@` annotation support
     /// at all, unlike part/item/action/etc. bodies. See `PackageBodyElement::MetadataKeywordUsage`.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
-    Other(String),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
@@ -1116,14 +1087,7 @@ impl PartialEq for PortUsage {
 }
 
 /// Body of a port usage: `;` or `{` PortBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PortBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<PortBodyElement>>,
-    },
-}
+pub type PortBody = Body<PortBodyElement>;
 
 /// Element inside a port usage body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1174,14 +1138,7 @@ pub struct InterfaceDef {
 }
 
 /// Body of an interface definition: `;` or `{` InterfaceDefBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum InterfaceDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<InterfaceDefBodyElement>>,
-    },
-}
+pub type InterfaceDefBody = Body<InterfaceDefBodyElement>;
 
 /// Element inside an interface definition body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1389,47 +1346,13 @@ impl RefDeclKind {
 }
 
 /// Body of a ref declaration: `;` or `{` members `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RefBody {
-    Semicolon,
-    Brace { elements: Vec<Node<RefBodyElement>> },
-}
-
-/// Element of a ref declaration's braced body (`RefBody::Brace`), wrapping whichever member
-/// shape is real for the owning context. BNF `ReferenceUsage` resolves `ref`'s body to a generic
-/// `Usage` body, so its real content follows whatever the owning context allows: full nested
-/// action members inside an action body, part-usage members inside a part usage body, state
-/// members inside a state body. Connection/interface `ref` bodies don't yet have a dedicated
-/// member grammar, so they get the same doc/comment/metadata + recovery baseline as
-/// [`RelationshipBodyElement`].
+/// A `ref` usage body.
 ///
-/// `PartUsageBodyElement`/`ActionDefBodyElement` are inherently larger than the annotation-only
-/// variants (same size-difference tradeoff already accepted for `AttributeUsage` in several
-/// other body-element enums crate-wide); not boxing keeps this variant shape consistent with
-/// those siblings rather than partially addressing the size difference.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RefBodyElement {
-    /// A nested keyword-less `ref` declaration, e.g. the `protected ref thisParticipant :>>
-    /// self;` members inside `ref port :>> participant : Port [2..*] nonunique ordered { ... }`
-    /// (Systems Library `Interfaces.sysml`).
-    Ref(Box<Node<RefDecl>>),
-    /// A nested `attribute` usage, e.g. `attribute :>> Disc::edges::innerSpaceDimension, ...;`
-    /// (Domain Libraries `ShapeItems.sysml`).
-    AttributeUsage(Box<Node<AttributeUsage>>),
-    Action(Node<ActionDefBodyElement>),
-    PartUsage(Node<PartUsageBodyElement>),
-    State(Node<StateDefBodyElement>),
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
-    TextualRep(Node<TextualRepresentation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
-    Error(Node<ParseErrorNode>),
-    /// Unmodeled body content captured as raw text (used for library parsing).
-    Other(String),
-}
+/// `UsageBody = DefinitionBody` (SysML 8.2.2.6.2), so a `ref` body holds the same members as any
+/// other usage body no matter which declaration owns the `ref`. It previously had its own element
+/// enum whose contents depended on which of five parsers ran -- an encoding of parser provenance
+/// rather than of grammar.
+pub type RefBody = Body<PartUsageBodyElement>;
 
 /// Shared annotation-only body element for KerML `RelationshipBody` contexts -- BNF
 /// `RelationshipBody : Relationship = ';' | '{' (ownedRelationship += OwnedAnnotation)* '}'`,
@@ -1440,16 +1363,12 @@ pub enum RefBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RelationshipBodyElement {
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
-    TextualRep(Node<TextualRepresentation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     /// Owned feature member (`dependency z to x, y { feature e; }`; BNF `RelationshipBody`'s
     /// `ownedRelatedElement`, spec42 Gap 37); see [`crate::ast::KermlFeatureMember`].
     KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
     Error(Node<ParseErrorNode>),
-    /// Unmodeled body content captured as raw text (used for library parsing).
-    Other(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -1484,14 +1403,7 @@ pub struct ConnectionDef {
 }
 
 /// Body of a connection definition: `;` or `{` end/ref/connect* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ConnectionDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ConnectionDefBodyElement>>,
-    },
-}
+pub type ConnectionDefBody = Body<ConnectionDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -1567,12 +1479,7 @@ pub struct EnumDef {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum EnumerationBody {
-    Semicolon,
-    Brace { values: Vec<Node<EnumeratedValue>> },
-}
+pub type EnumerationBody = Body<EnumeratedValue>;
 
 /// One enumerated value inside an `enum def { ... }` body: optional `enum` keyword + name, with
 /// an optional inline body or `= expr` initializer that the parser discards (BNF
@@ -1658,14 +1565,7 @@ pub enum OccurrencePortionKind {
     Timeslice,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum OccurrenceUsageBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<OccurrenceBodyElement>>,
-    },
-}
+pub type OccurrenceUsageBody = Body<OccurrenceBodyElement>;
 
 /// Occurrence-level assert member: `assert constraint` body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1698,7 +1598,6 @@ pub enum OccurrenceBodyElement {
     Doc(Node<DocComment>),
     Annotation(Node<Annotation>),
     AssertConstraint(Node<AssertConstraintMember>),
-    Other(String),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
     AttributeUsage(Node<AttributeUsage>),
     PartUsage(Box<Node<PartUsage>>),
@@ -1760,23 +1659,18 @@ pub struct SuccessionUsage {
 // ---------------------------------------------------------------------------
 
 /// Generic definition body: `;` or `{` DefinitionBodyElement* `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum DefinitionBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<DefinitionBodyElement>>,
-    },
-}
+pub type DefinitionBody = Body<DefinitionBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::large_enum_variant)]
 pub enum DefinitionBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     OccurrenceMember(Node<OccurrenceBodyElement>),
-    Other(String),
 }
 // ---------------------------------------------------------------------------
 // Part usage body: bind, interface usage, connect
@@ -1944,11 +1838,4 @@ pub struct AliasDef {
 }
 
 /// Body of an alias definition: `;` or `{` ... `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum AliasBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<RelationshipBodyElement>>,
-    },
-}
+pub type AliasBody = Body<RelationshipBodyElement>;

@@ -37,9 +37,9 @@ package ExtendedExamples {
         part p;
     }
     #situation batteryLow;
-    #situation;
+    #situation
     x : T;
-    #situation;
+    #situation
     x : T { }
     variation #situation def V;
 }

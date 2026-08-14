@@ -1,4 +1,5 @@
 use super::behavior::InOutDecl;
+use super::body::Body;
 use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::common::{FilterMember, ImportTarget};
 use super::feature_value::FeatureValue;
@@ -41,14 +42,7 @@ pub struct ConstraintUsage {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ConstraintDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ConstraintDefBodyElement>>,
-    },
-}
+pub type ConstraintDefBody = Body<ConstraintDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -65,8 +59,9 @@ pub enum ConstraintDefBodyElement {
     Constraint(Node<ConstraintUsage>),
     /// Keyword-less `:>> name = …` binding inside `require name { … }` (validation `10c`).
     AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
-    /// Unmodeled constraint-body element captured as raw text (used for library parsing).
-    Other(String),
+    /// Keyword-less feature declaration (`mass : Real;`): a constraint definition body is a
+    /// `DefinitionBody`, so it owns usages as well as the constraint expression.
+    FeatureDecl(Box<Node<crate::ast::DefaultReferenceUsage>>),
 }
 
 /// constraint body {}
@@ -105,14 +100,7 @@ pub struct CalcUsage {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum CalcDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<CalcDefBodyElement>>,
-    },
-}
+pub type CalcDefBody = Body<CalcDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -242,21 +230,15 @@ pub struct ViewDef {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ViewDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ViewDefBodyElement>>,
-    },
-}
+pub type ViewDefBody = Body<ViewDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewDefBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    /// Unmodeled view-definition body element captured as raw text (used for library parsing).
-    Other(String),
     Doc(Node<DocComment>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     Filter(Node<FilterMember>),
@@ -281,14 +263,7 @@ pub struct ViewRenderingUsage {
 /// `sysml-v2-release/sysml/src/training/42. Views/Views Example.sysml` and
 /// `.../validation/11-View and Viewpoint/11a-View-Viewpoint.sysml`) -- not just a `;`/opaque
 /// `{...}` the way the previous `ConnectBody` field type treated it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RenderingUsageBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<RenderingUsageBodyElement>>,
-    },
-}
+pub type RenderingUsageBody = Body<RenderingUsageBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -323,23 +298,18 @@ pub struct RenderingDef {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RenderingDefBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<RenderingDefBodyElement>>,
-    },
-}
+pub type RenderingDefBody = Body<RenderingDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderingDefBodyElement {
+    /// A spec-valid member of this body that the parser does not model yet, retained with
+    /// its authored span and a diagnostic.
+    Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
-    Other(String),
 }
 
 /// View usage: `view` name `:` type? ViewBody, or the anonymous redefinition form `view :>>
@@ -371,21 +341,12 @@ pub struct ViewUsage {
     pub membership: Membership,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ViewBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ViewBodyElement>>,
-    },
-}
+pub type ViewBody = Body<ViewBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBodyElement {
     Error(Node<ParseErrorNode>),
-    /// Unmodeled view body element captured as raw text (used for library parsing).
-    Other(String),
     Doc(Node<DocComment>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),

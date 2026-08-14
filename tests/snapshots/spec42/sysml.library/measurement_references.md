@@ -683,7 +683,7 @@ standard library package MeasurementReferences {
         assert constraint validOriginDimensions {
             origin.dimensions == source.dimensions;
         }
-        assert constraint  {
+        assert constraint {
             size(basisDirections) == 0 || size(basisDirections) == source.dimensions#(1);
         }
         assert constraint validateBasisDirections {

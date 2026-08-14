@@ -7,8 +7,187 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`ast::Body<E>`, one container for every declaration body.** Twenty-seven per-family body
+  enums -- `PackageBody`, `PartDefBody`, `ActionDefBody`, and the rest -- were the same two
+  alternatives written out again for each scope: `;` or `{ member* }`. They are now type
+  aliases for one generic container, so the shape is stated once while the member set stays
+  typed per scope: `Body<PartDefBodyElement>` and `Body<ActionDefBodyElement>` remain different
+  types and a member still cannot appear in a scope whose grammar does not accept it. The
+  container carries shared accessors (`is_semicolon`, `braced_elements`, `members`), and
+  `braced_elements` returns `None` for a semicolon body so the `;`/`{}` distinction stays
+  visible rather than flattening to an empty list.
+- **One owning AST traversal boundary: `ast::visit`.** `ast::visit::Visitor` (borrowing) and
+  `ast::visit::mutable::VisitorMut` (in-place transformation) cover every node reachable from
+  `RootNamespace`. Both expand from a single inventory that destructures every struct without
+  `..` and matches every enum without `_`, so a new field or variant is a compile error at the
+  traversal until a deliberate decision is made about it -- and neither traversal direction can
+  drift from the other. Consumers implement only the node kinds they have a rule for; the
+  default methods walk children.
+
+### Added
+
+- **Body delimiters are retained.** `Body::Semicolon` keeps the `;` span and `Body::Brace` keeps
+  both brace spans, captured where the parser consumes them rather than recomputed. The one
+  hand-rolled reconstruction of those positions (arithmetic over consumed lengths, in the
+  `first`/`merge` body) is gone, and the shared brace-member routine now returns the delimiters
+  along with the members, so no scope has to consume `{` and `}` correctly on its own. There is
+  Deserialization validates them against the tree, not just against themselves: a delimiter must
+  slice to the token it claims, lie inside the declaration that owns it, and -- for a brace pair --
+  wrap that body's own members in order. Pointing a body's delimiters at another well-formed
+  `{ ... }` pair elsewhere in the document is therefore rejected. The traversal grew `enter_node`
+  and `leave_node` hooks so a consumer can tell which declaration it is inside. Both alternatives require an authored token, so the container cannot represent a
+  declaration with no body at all; the two places that accept one -- a `#Name` metadata keyword
+  used as a prefix, and an action usage whose terminator is inferred -- hold `Option<Body<_>>`,
+  which confines that state to them instead of offering it to every scope. There is deliberately
+  no state for a missing closing brace: an unterminated body does not currently
+  produce a body at all -- the enclosing declaration becomes a recovery node -- so a typed close
+  outcome would be an unreachable variant until recovery can retain the members it read.
+- **`ast::AnnotatingMember`, the grammar's annotating production as one type.** `AnnotatingElement
+  = Comment | Documentation | TextualRepresentation | MetadataFeature` is a single production in
+  both the KerML and SysML grammars, so the scopes that accept all of it -- relationship bodies
+  and `ref` bodies -- now hold one `Annotating(AnnotatingMember)` variant instead of four parallel
+  ones. One parser dispatches the production, one emitter renders it, and a `ref` body reuses both
+  directly rather than translating relationship-body members into its own. Scopes that accept only
+  part of the production keep their own variants until the parser supports the rest, so the type
+  never claims coverage the parser lacks. `#Name` prefix metadata stays separate: it is
+  `PrefixMetadataMember`, a prefix on a declaration rather than a body member.
+
 ### Changed
 
+- **`ref` declarations project their structure in semantic snapshots.** Every scope rendered one
+  as a bare `(ref)` marker, so the snapshot could not show which members a `ref` body held, in what
+  order, or with what typing -- the invariant that one `ref` body parser exists to guarantee. One
+  projection now serves every owner, recursing into nested `ref` declarations, and reference
+  labels appear for the identities inside them, which were previously absent from the snapshot's
+  reference list entirely.
+
+### Fixed
+
+- **A constraint body accepts a feature declaration.** `constraint c { mass : Real; }` parsed
+  `mass` as a bare expression and left `: Real;` for recovery, which the opaque capture then hid.
+  A constraint definition body is a `DefinitionBody`, so it owns usages as well as the constraint
+  expression. Two more release examples now round-trip: `Analysis Examples/Dynamics.sysml` and
+  `Simple Tests/ConstraintTest.sysml`.
+- **A redundant `;` between body members is separator punctuation.** It reached the member parser
+  and was reported as unrecognized content; it is now consumed where members are collected.
+- **An import with a braced body could not be serialized.** Its target span ran past the reference
+  to wherever suffix parsing stopped, swallowing the whitespace before `{`, so the document failed
+  the crate's own provenance validation -- `15_10_primitive_data_types` in the snapshot corpus was
+  one. The target now ends at its last authored token. A new corpus test serializes and
+  round-trips every snapshot document, so provenance is checked against every construct the parser
+  handles rather than a handful of fixtures.
+- **Emission no longer invents a `;` for a body that was never written.** A `#Name` prefix on a
+  declaration and an action usage whose terminator the parser infers both stored their absent body
+  as the semicolon form, so formatting wrote a `;` the author never typed -- splitting
+  `#situation x : T;` into two members and `action a accept M via v;` into a member plus a stray
+  clause. `MetadataKeywordUsage::body` and `ActionUsage::body` are now `Option`, keeping "no body
+  was written" distinct from "a semicolon was written" without adding that state to every scope.
+- **The brace-less `if` branch keeps its authored spelling.** `if x then y;` was stored as a
+  one-member brace body and re-emitted as `if x  { then y; }` -- braces the author never wrote,
+  plus a doubled space. `ActionBranchBody` distinguishes the two spellings the grammar offers, so
+  each is emitted as authored.
+- **A `ref` body no longer depends on which declaration owns it.** `UsageBody = DefinitionBody`
+  (SysML 8.2.2.6.2), so a `ref` body holds the general usage-member set wherever it appears -- but
+  five parsers built one, each accepting its own member grammar and wrapping the result in a
+  per-owner variant, so `RefBodyElement` recorded which parser had run rather than what the grammar
+  allows. There is now one parser. A connection-owned `ref` body gains the usage members it was
+  rejecting (`assert constraint { ... }` in `john_individual_example` parses instead of reporting
+  `unexpected keyword 'assert' in ref usage body`), and part-, action-, and state-owned `ref`
+  bodies can be emitted at all -- their members previously failed emission as unsupported
+  constructs. Recovery diagnostics still name the `ref` body scope.
+- **Comment and textual-representation members now parse in usage bodies.** The general
+  usage-member scope accepted only two of the four annotating alternatives, so `comment /* ... */`
+  and `rep x language "..." /* ... */` were rejected inside a `part p { ... }` body even though the
+  grammar admits the whole `AnnotatingElement` production wherever a definition body is legal. It
+  now uses [`AnnotatingMember`], which brings all four. `#Name` prefix metadata stays a separate
+  member, as the grammar has it.
+- **An anonymous `comment` member survives format and reparse.** `CommentAnnotation` did not record
+  whether the optional `comment` keyword was authored, so emission omitted it whenever the member
+  had no name or locale -- and a bare `/* ... */` reparses as trivia, losing the member. The
+  keyword's span is now retained and reproduced. The keyword-less spelling
+  (`locale "en" /* ... */`) is no longer given a keyword it never had, either.
+- **A `rep` member now emits from every scope that accepts one.** Three copies of the same match
+  handled annotating members in relationship bodies and disagreed: a textual representation
+  emitted from an import body but failed as an unsupported construct from alias, dependency, and
+  `connect` bodies, so whether a document could be formatted depended on which construct owned the
+  body. One production now means one emitter.
+
+### Removed
+
+- **`Other(String)` is gone from every body scope.** Eleven scopes carried a member that held a
+  copy of the source with no span, no structure, and -- deliberately -- no diagnostic. It fired
+  along two different paths, and both were backwards: unrecognized text was swallowed silently
+  while *recognized* keywords got a diagnostic, and one path decided by sniffing the raw text for
+  `:>>` or a leading `ref`/`abstract`/`return`. Content the scope cannot parse is now a recovery
+  node with its authored span and a report; a spec-valid member the scope does not model is an
+  explicit `Unsupported` node carrying a warning. The two states stay distinct, and each exists
+  only in the scopes that can produce it. `capture_opaque_member` and `OpacityKind::Other` are
+  removed with the last producer.
+
+- **Two opaque body-member fallbacks the parser cannot produce.** `PartDefBodyElement::Other`
+  and `OccurrenceBodyElement::Other` retained unrecognized member text as a string, but no
+  parser path constructed either one: recovery in those scopes already produces a malformed or
+  unsupported node with its authored span. The variants only widened the type -- and its
+  deserialized contract -- with a state that could not occur, so the emitter and opacity report
+  carried policy for it, and two integration tests asserted members had not "degraded" into it.
+  Removing them makes that guarantee structural. Token-level `BinaryOperator::Other` and
+  `UnaryOperator::Other` are deliberately kept: they classify an authored operator spelling and
+  back a total `from_token` constructor, which is narrowly scoped opaque syntax rather than an
+  untyped scope member.
+
+### Changed
+
+- **`PARSE_AST_VERSION` is now 141.** `Body` carries its delimiters: `Semicolon` holds the `;`
+  span, `Brace` holds both brace spans, and a new `Absent` variant covers a declaration that
+  never had a body to write. `IfStmt`'s branches become `ActionBranchBody`. `RefBodyElement` is
+  removed: `RefBody` is now
+  `Body<PartUsageBodyElement>`, the usage-member set the grammar gives it. `CommentAnnotation`
+  gains `keyword_span`, and
+  `PartUsageBodyElement` replaces its `Doc` and `MetadataAnnotation` variants with `Annotating`.
+  Relationship and `ref` body elements replace their `Doc`,
+  `Comment`, `TextualRep`, and `MetadataAnnotation` variants with a single `Annotating` variant
+  wrapping [`AnnotatingMember`]. `EnumerationBody`'s brace members move from `values` to
+  `elements`, matching every other body. That is the only wire change from the body-container
+  work: the shared container keeps the variant and field names the other twenty-six bodies
+  already used, so their serialized shape is unchanged. Two duplicate container names collapse
+  into the type they were always equal to -- the public `RequireConstraintBody` and a
+  parser-internal `StructuredConstraintBody`, both `Body<ConstraintDefBodyElement>`, are now
+  `ConstraintDefBody`, which also removes two conversion functions that existed only to move
+  members between identical types.
+- **Whole-tree walks now go through `ast::visit` instead of hand-maintained recursion.** Test
+  span normalization (`RootNamespace::normalize_for_test_comparison`), recovery-diagnostic
+  collection, deserialization provenance validation, and qualified-reference-identity
+  validation were four independent traversals -- roughly 4,700 lines -- that each had to be
+  edited when a member could appear somewhere new, and each of which could silently miss a
+  scope. They are now four small policies over the shared traversal (under 300 lines in total), with
+  identical diagnostics across the snapshot and fixture corpus. Reference-identity validation
+  in particular no longer routes through a no-output `serde::Serializer`; it is a typed visit.
+- **`RootNamespace::normalize_for_test_comparison` now erases every span in the tree** rather
+  than the subset the hand-written copy happened to reach, and it preserves whether an optional
+  span was authored at all. Whether a construct recorded a `language` clause or a declaration
+  name is grammar and still compares; where it was authored is provenance and does not.
+
+### Fixed
+
+- **Recovered text is no longer dropped when formatting eight recovery forms.** Malformed
+  package-body, state-body, and requirement-body members, and root-level recovery, wrapped
+  their `ParseErrorNode` in a `Span::dummy()` sentinel while the enclosing member node held the
+  real span, so the emitter had no slice to stream and silently omitted the authored text.
+  Those nodes now carry their exact authored span, and formatting a recovered document emits
+  the malformed slice at its tree position.
+
+- **`PARSE_AST_VERSION` is now 135.** `StateDefBodyElement` gains `AttributeUsage`,
+  `ActionUsage`, `SuccessionUsage`, and `AssertConstraint` variants: the Systems Library's
+  `States.sysml` state-body members (`attribute :>> isTriggerDuring;`, `action :>> subactions
+  :> middle { ... }`, `succession stateSequencing first [0..1] exclusiveStates then [0..1]
+  exclusiveStates { ... }`, `assert constraint { ... }`) now dispatch to their existing typed
+  productions instead of opaque recovery (spec42 gap 42, state-def half). `action_usage`
+  additionally accepts a leading `:>`/`:>>` specialization clause standing in for the name
+  (mirroring `attribute_usage`'s prefix heads), which also fixes the same form inside
+  part/action bodies. Emitters no longer print a double space in anonymous `action {`/`action
+  :>>`/`assert constraint {` spellings; five more release example files roundtrip.
 - **`PARSE_AST_VERSION` is now 134.** `EntryAction`/`DoAction`/`ExitAction` gain
   `declared_name`/`type_name`/`redefines` for declaring a *new* nested action (`entry action
   entryAction :>> 'entry';`, `do action doAction : Action :>> 'do';`, Systems Library

@@ -61,7 +61,7 @@ fn test_parse_surveillance_drone() {
     );
 
     let body = match &package.body {
-        sysml_v2_parser::ast::PackageBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected package body to be brace form"),
     };
 

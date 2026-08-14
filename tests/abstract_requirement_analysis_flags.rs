@@ -15,7 +15,7 @@ fn package_elements(source: &str) -> Vec<sysml_v2_parser::Node<PackageBodyElemen
         })
         .expect("top-level package should be present");
     match &package.body {
-        PackageBody::Brace { elements } => elements.clone(),
+        PackageBody::Brace { elements, .. } => elements.clone(),
         other => panic!("expected brace body, got {other:?}"),
     }
 }

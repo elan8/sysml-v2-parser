@@ -90,11 +90,11 @@ pub(crate) fn emit_package_body(
     body: &PackageBody,
 ) -> Result<(), EmitError> {
     match body {
-        PackageBody::Semicolon => {
+        PackageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PackageBody::Brace { elements } => {
+        PackageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -474,21 +474,29 @@ fn emit_relationship_body_element(
 ) -> Result<(), EmitError> {
     use crate::ast::RelationshipBodyElement;
     match el {
-        RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::Annotating(member) => emit_annotating_member(w, path, member),
         RelationshipBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
-        RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
-        RelationshipBodyElement::TextualRep(r) => emit_textual_rep(w, &r.value),
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
-        other @ RelationshipBodyElement::MetadataAnnotation(_) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+    }
+}
+
+/// The annotating members are one grammar production, so they emit the same way wherever a scope
+/// accepts them.
+pub(crate) fn emit_annotating_member(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    member: &crate::ast::AnnotatingMember,
+) -> Result<(), EmitError> {
+    use crate::ast::AnnotatingMember;
+    match member {
+        AnnotatingMember::Doc(d) => emit_doc(w, &d.value),
+        AnnotatingMember::Comment(c) => emit_comment(w, &c.value),
+        AnnotatingMember::TextualRep(r) => emit_textual_rep(w, &r.value),
+        AnnotatingMember::MetadataAnnotation(annotation) => {
+            super::structure::emit_metadata_annotation(w, path, &annotation.value)
+        }
     }
 }
 
@@ -549,14 +557,24 @@ pub(crate) fn emit_comment(
     if !w.emit_comments() {
         return Ok(());
     }
-    if comment.identification.is_some() || comment.locale.is_some() {
-        w.push_str("comment");
+    // The `comment` keyword is optional in the grammar, but a member that omits it emits as a bare
+    // block comment, which reparses as trivia rather than as a member. Reproduce what was authored.
+    let has_keyword = comment.keyword_span.is_some();
+    if has_keyword || comment.locale.is_some() {
+        if has_keyword {
+            w.push_str("comment");
+        }
         if let Some(id) = &comment.identification {
-            w.push_char(' ');
+            if has_keyword {
+                w.push_char(' ');
+            }
             emit_identification(w, id);
         }
         if let Some(locale) = &comment.locale {
-            w.push_str(" locale \"");
+            if has_keyword || comment.identification.is_some() {
+                w.push_char(' ');
+            }
+            w.push_str("locale \"");
             w.push_str(locale);
             w.push_char('"');
         }

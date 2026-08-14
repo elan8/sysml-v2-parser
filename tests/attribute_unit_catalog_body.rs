@@ -29,7 +29,7 @@ fn first_package_attribute_def(
         })
         .expect("package");
     let attr = match &package.value.body {
-        sysml_v2_parser::ast::PackageBody::Brace { elements } => {
+        sysml_v2_parser::ast::PackageBody::Brace { elements, .. } => {
             match &elements.first().expect("member").value {
                 PackageBodyElement::AttributeDef(def) => def,
                 other => panic!("expected attribute def, got {other:?}"),
@@ -41,7 +41,7 @@ fn first_package_attribute_def(
 }
 
 fn attribute_body_usages(body: &AttributeBody) -> Vec<&AttributeUsage> {
-    let AttributeBody::Brace { elements } = body else {
+    let AttributeBody::Brace { elements, .. } = body else {
         return Vec::new();
     };
     elements
@@ -84,7 +84,7 @@ fn parses_conversion_by_prefix_in_attribute_body() {
             .map(|n| targets_text(&root, &n.value.target)),
         Some("ConversionByPrefix".to_string())
     );
-    let AttributeBody::Brace { elements } = &conversion.body else {
+    let AttributeBody::Brace { elements, .. } = &conversion.body else {
         panic!("expected nested brace body");
     };
     assert_eq!(
@@ -131,7 +131,7 @@ fn parses_conversion_by_convention_in_attribute_body() {
             .map(|n| targets_text(&root, &n.value.target)),
         Some("ConversionByConvention".to_string())
     );
-    let AttributeBody::Brace { elements } = &conversion.body else {
+    let AttributeBody::Brace { elements, .. } = &conversion.body else {
         panic!("expected nested brace body");
     };
     assert_eq!(elements.len(), 2);

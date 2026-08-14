@@ -741,31 +741,6 @@ pub(crate) fn recover_body_element<'a>(
     skip_to_next_body_element_or_end(input, starters)
 }
 
-/// Capture an opaque body member as a `String` without producing an error node.
-///
-/// Checks that the input starts with one of `keywords`, then consumes the entire statement
-/// (up to `;`) or block (`{ … }`) and returns the captured text. Use this as a last-resort
-/// parser before error recovery to handle syntax forms we recognise but don't fully model.
-pub(crate) fn capture_opaque_member<'a>(
-    input: Input<'a>,
-    keywords: &[&[u8]],
-) -> IResult<Input<'a>, String> {
-    let (input, _) = ws_and_comments(input)?;
-    if !starts_with_any_keyword(input.fragment(), keywords) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let start = input;
-    let (input, _) = skip_statement_or_block(input)?;
-    let len = input.location_offset() - start.location_offset();
-    let text = String::from_utf8_lossy(&start.fragment()[..len])
-        .trim()
-        .to_string();
-    Ok((input, text))
-}
-
 /// NAME: BASIC_NAME (identifier) or UNRESTRICTED_NAME (single-quoted string).
 pub(crate) fn name(input: Input<'_>) -> IResult<Input<'_>, String> {
     alt((quoted_name, basic_name)).parse(input)

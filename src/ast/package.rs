@@ -2,6 +2,7 @@ use super::behavior::{
     ActionDef, ActionUsage, AllocationDef, AllocationUsage, FirstStmt, FlowDef, FlowUsage,
     StateDef, StateUsage,
 };
+use super::body::Body;
 use super::common::FilterMember;
 use super::common::{
     CommentAnnotation, DocComment, Import, ParseErrorNode, TextualRepresentation,
@@ -39,7 +40,10 @@ use crate::ast::QualifiedReferenceId;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct QualifiedDeclarationName {
-    reference: QualifiedReferenceId,
+    /// Crate-visible so the owning traversal in [`crate::ast::visit`] can reach the identity.
+    /// It stays private to callers outside the crate: a declaration label is not a reference,
+    /// and its storage must be resolved through the owning document.
+    pub(crate) reference: QualifiedReferenceId,
 }
 
 impl QualifiedDeclarationName {
@@ -93,16 +97,7 @@ pub struct Package {
     pub body: PackageBody,
 }
 /// Package body: either `;` or `{` PackageBodyElement* `}`
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PackageBody {
-    /// Semicolon form: no body elements.
-    Semicolon,
-    /// Brace form: list of body elements (may be empty).
-    Brace {
-        elements: Vec<Node<PackageBodyElement>>,
-    },
-}
+pub type PackageBody = Body<PackageBodyElement>;
 /// Library package: `library` (optional `standard`) `package` Identification PackageBody (BNF LibraryPackage).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

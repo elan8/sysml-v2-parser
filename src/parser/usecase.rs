@@ -344,11 +344,21 @@ fn return_ref_body(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRefBody>> 
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, node_from_to(start, input, ReturnRefBody::Semicolon)));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            node_from_to(
+                start,
+                input,
+                ReturnRefBody::Semicolon {
+                    semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+                },
+            ),
+        ));
     }
     let starters: &[&[u8]] = &[b"doc", b"return"];
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         starters,
         "return reference body",
@@ -366,10 +376,7 @@ fn return_ref_body(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRefBody>> 
             node_from_to(start, end, ReturnRefBodyElement::Error(error))
         },
     )?;
-    Ok((
-        input,
-        node_from_to(start, input, ReturnRefBody::Brace { elements }),
-    ))
+    Ok((input, node_from_to(start, input, members.into_body())))
 }
 
 fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
@@ -401,8 +408,6 @@ fn return_ref_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
 }
 
 fn map_use_case_body_recovery(start: Input<'_>, end: Input<'_>) -> UseCaseDefBodyElement {
-    let trimmed = start.fragment();
-    let is_redefinition = trimmed.windows(3).any(|w| w == b":>>");
     let recovery = build_recovery_error_node_from_span(
         start,
         end,
@@ -410,17 +415,8 @@ fn map_use_case_body_recovery(start: Input<'_>, end: Input<'_>) -> UseCaseDefBod
         "use case body",
         "recovered_use_case_body_element",
     );
-    let should_error =
-        matches!(recovery.code.as_str(), "missing_type_reference") && !is_redefinition;
-    if should_error {
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        UseCaseDefBodyElement::Error(node)
-    } else {
-        let frag = start.fragment();
-        let take = frag.len().min(80);
-        let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-        UseCaseDefBodyElement::Other(preview)
-    }
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    UseCaseDefBodyElement::Error(node)
 }
 
 fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBodyElement> {
@@ -459,10 +455,17 @@ fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDe
             nom::error::ErrorKind::Many0,
         )));
     }
-    let frag = start_after_ws.fragment();
-    let take = frag.len().min(80);
-    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    Ok((input, UseCaseDefBodyElement::Other(preview)))
+    let recovery = build_recovery_error_node_from_span(
+        start_after_ws,
+        input,
+        USE_CASE_BODY_STARTERS,
+        "use case body",
+        "recovered_use_case_body_element",
+    );
+    Ok((
+        input,
+        UseCaseDefBodyElement::Error(node_from_to(start_after_ws, input, recovery)),
+    ))
 }
 
 pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActorDecl>> {
@@ -534,17 +537,11 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
 }
 
 pub(crate) fn use_case_def_body(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBody> {
-    alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            UseCaseDefBody::Semicolon
-        }),
-        use_case_def_body_brace,
-    ))
-    .parse(input)
+    alt((crate::parser::body::semicolon_body, use_case_def_body_brace)).parse(input)
 }
 
 fn use_case_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBody> {
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         USE_CASE_BODY_STARTERS,
         "use case body",
@@ -552,7 +549,7 @@ fn use_case_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBod
         use_case_def_body_element,
         |start, end| node_from_to(start, end, map_use_case_body_recovery(start, end)),
     )?;
-    Ok((input, UseCaseDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 pub(crate) fn use_case_def_body_element(

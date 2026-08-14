@@ -31,7 +31,7 @@ fn package_elements(
             RootElement::Package(p) => &p.value,
             _ => panic!("expected package"),
         };
-        let PackageBody::Brace { elements } = &pkg.body else {
+        let PackageBody::Brace { elements, .. } = &pkg.body else {
             panic!("expected brace body");
         };
         elements.clone()
@@ -68,7 +68,7 @@ fn fixture_missing_semicolon_reports_specific_diagnostic_and_keeps_siblings() {
             _ => None,
         })
         .expect("expected part definition A");
-    let PartDefBody::Brace { elements } = &part.body else {
+    let PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part definition brace body");
     };
     assert!(elements
@@ -96,7 +96,7 @@ fn fixture_anonymous_actor_in_use_case_parses_without_missing_member_name() {
             _ => None,
         })
         .expect("expected use case definition");
-    let UseCaseDefBody::Brace { elements } = &use_case.body else {
+    let UseCaseDefBody::Brace { elements, .. } = &use_case.body else {
         panic!("expected use case brace body");
     };
     assert!(elements
@@ -129,7 +129,7 @@ fn fixture_missing_type_does_not_fall_back_to_missing_semicolon() {
             _ => None,
         })
         .expect("expected requirement definition");
-    let RequirementDefBody::Brace { elements } = &requirement.body else {
+    let RequirementDefBody::Brace { elements, .. } = &requirement.body else {
         panic!("expected requirement brace body");
     };
     assert!(elements
@@ -195,7 +195,7 @@ fn fixture_nested_bad_block_recovers_inside_part_and_keeps_outer_siblings() {
             _ => None,
         })
         .expect("expected Broken part");
-    let PartDefBody::Brace { elements } = &broken.body else {
+    let PartDefBody::Brace { elements, .. } = &broken.body else {
         panic!("expected Broken brace body");
     };
     assert!(elements
@@ -262,7 +262,7 @@ fn fixture_expose_feature_chain_parses_without_separator_diagnostic() {
         .expect("view usage");
     let expose_target = match &view_usage.value {
         PackageBodyElement::ViewUsage(view) => match &view.value.body {
-            ViewBody::Brace { elements } => elements
+            ViewBody::Brace { elements, .. } => elements
                 .iter()
                 .find_map(|member| match &member.value {
                     ViewBodyElement::Expose(expose) => Some(expose.value.target.clone()),
@@ -550,7 +550,7 @@ fn fixture_unexpected_keyword_in_requirement_body_reports_scope_specific_error()
             _ => None,
         })
         .expect("expected requirement definition");
-    let RequirementDefBody::Brace { elements } = &requirement.body else {
+    let RequirementDefBody::Brace { elements, .. } = &requirement.body else {
         panic!("expected requirement brace body");
     };
     assert!(elements
@@ -617,7 +617,7 @@ fn invalid_unit_reference_reports_specific_diagnostic() {
             _ => None,
         })
         .expect("expected action definition Evaluate");
-    let sysml_v2_parser::ast::ActionDefBody::Brace { elements } = &action.body else {
+    let sysml_v2_parser::ast::ActionDefBody::Brace { elements, .. } = &action.body else {
         panic!("expected action definition brace body");
     };
     assert!(elements.iter().any(|e| matches!(
@@ -664,7 +664,7 @@ fn fixture_reference_usage_in_part_def_parses_without_bare_feature_diagnostic() 
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -674,7 +674,7 @@ fn fixture_reference_usage_in_part_def_parses_without_bare_feature_diagnostic() 
             _ => None,
         })
         .expect("part def");
-    let PartDefBody::Brace { elements } = &part.body else {
+    let PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     assert!(
@@ -753,6 +753,7 @@ fn state_ref_brace_body_recovers_without_aborting_siblings() {
     };
     let PackageBody::Brace {
         elements: pkg_elements,
+        ..
     } = &pkg.body
     else {
         panic!("expected brace body");
@@ -764,7 +765,7 @@ fn state_ref_brace_body_recovers_without_aborting_siblings() {
             _ => None,
         })
         .expect("state def should be present");
-    let StateDefBody::Brace { elements } = &state_def.body else {
+    let StateDefBody::Brace { elements, .. } = &state_def.body else {
         panic!("expected state brace body");
     };
     assert!(
@@ -801,7 +802,7 @@ fn part_usage_bind_brace_body_recovers_without_aborting_siblings() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     assert!(
@@ -864,7 +865,7 @@ fn view_def_recovery_inserts_error_node_and_keeps_later_render() {
         other => panic!("expected view def, got {other:?}"),
     };
     let view_body = match &view.body {
-        sysml_v2_parser::ast::ViewDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ViewDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
 
@@ -910,7 +911,7 @@ fn constraint_def_recovery_inserts_error_node_and_keeps_later_sibling() {
         other => panic!("expected constraint def, got {other:?}"),
     };
     let c_body = match &constraint.body {
-        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
 

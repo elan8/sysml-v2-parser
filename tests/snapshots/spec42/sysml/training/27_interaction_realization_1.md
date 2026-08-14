@@ -83,9 +83,9 @@ package 'Interaction Realization-1' {
     part vehicle_a : Vehicle {
         part cruiseController_a : CruiseController {
             action controllerBehavior {
-                action receiveSetSpeed;
+                action receiveSetSpeed
                 accept SetSpeed via vehicle_a;
-                then action receiveSensedSpeed;
+                then action receiveSensedSpeed
                 accept SensedSpeed via cruiseController_a;
                 then action sendFuelCommand send new FuelCommand() to engine_a;
             }
@@ -97,7 +97,7 @@ package 'Interaction Realization-1' {
         }
         part engine_a : Engine {
             action engineBehavior {
-                action receiveFuelCommand;
+                action receiveFuelCommand
                 accept FuelCommand via engine_a;
             }
         }

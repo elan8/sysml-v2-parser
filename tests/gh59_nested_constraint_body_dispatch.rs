@@ -24,7 +24,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     elements.iter().map(|e| e.value.clone()).collect()
@@ -55,7 +55,7 @@ fn constraint_def_body_dispatches_nested_constraint_members() {
         Some("RequirementConstraintCheck")
     );
 
-    let ConstraintDefBody::Brace { elements } = &constraint_def.body else {
+    let ConstraintDefBody::Brace { elements, .. } = &constraint_def.body else {
         panic!("expected brace constraint def body");
     };
     let nested_names: Vec<&str> = elements
@@ -98,7 +98,7 @@ fn requirement_def_body_dispatches_nested_constraint_members() {
         Some("RequirementCheck")
     );
 
-    let RequirementDefBody::Brace { elements } = &requirement_def.body else {
+    let RequirementDefBody::Brace { elements, .. } = &requirement_def.body else {
         panic!("expected brace requirement def body");
     };
     let nested_names: Vec<&str> = elements
@@ -131,7 +131,7 @@ fn requirement_def_body_keeps_prefixed_require_constraint_distinct() {
             _ => None,
         })
         .expect("expected requirement def");
-    let RequirementDefBody::Brace { elements } = &requirement_def.body else {
+    let RequirementDefBody::Brace { elements, .. } = &requirement_def.body else {
         panic!("expected brace requirement def body");
     };
     assert!(

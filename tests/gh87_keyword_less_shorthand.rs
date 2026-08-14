@@ -17,7 +17,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     elements.iter().map(|e| e.value.clone()).collect()
@@ -44,7 +44,7 @@ fn gh87_1_bare_name_feature_declaration_in_part_def_body() {
     let PackageBodyElement::PartDef(part_def) = &elements[0] else {
         panic!("expected PartDef, got {:?}", elements[0]);
     };
-    let PartDefBody::Brace { elements } = &part_def.value.body else {
+    let PartDefBody::Brace { elements, .. } = &part_def.value.body else {
         panic!("expected brace part def body");
     };
     let default_ref = elements.iter().find_map(|e| match &e.value {
@@ -159,7 +159,7 @@ fn gh87_3_shorthand_with_subsets_clause_and_value() {
     let PackageBodyElement::PartDef(motor) = &elements[2] else {
         panic!("expected PartDef, got {:?}", elements[2]);
     };
-    let PartDefBody::Brace { elements } = &motor.value.body else {
+    let PartDefBody::Brace { elements, .. } = &motor.value.body else {
         panic!("expected brace part def body");
     };
     let default_ref = elements.iter().find_map(|e| match &e.value {
@@ -194,7 +194,7 @@ fn gh87_3_shorthand_with_subsets_clause_and_no_value() {
     let PackageBodyElement::PartDef(assembly) = &elements[1] else {
         panic!("expected PartDef, got {:?}", elements[1]);
     };
-    let PartDefBody::Brace { elements } = &assembly.value.body else {
+    let PartDefBody::Brace { elements, .. } = &assembly.value.body else {
         panic!("expected brace part def body");
     };
     let default_ref = elements.iter().find_map(|e| match &e.value {
@@ -229,7 +229,7 @@ fn gh87_4_bare_item_usage_in_occurrence_def_body() {
     let PackageBodyElement::OccurrenceDef(occ) = &elements[0] else {
         panic!("expected OccurrenceDef, got {:?}", elements[0]);
     };
-    let sysml_v2_parser::ast::DefinitionBody::Brace { elements } = &occ.value.body else {
+    let sysml_v2_parser::ast::DefinitionBody::Brace { elements, .. } = &occ.value.body else {
         panic!("expected brace occurrence def body");
     };
     let elements: Vec<_> = elements

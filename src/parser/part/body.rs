@@ -9,11 +9,7 @@ use crate::parser::lex::skip_statement_or_block;
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
 pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| PartDefBody::Semicolon),
-        part_def_body_brace,
-    ))
-    .parse(input)
+    alt((crate::parser::body::semicolon_body, part_def_body_brace)).parse(input)
 }
 
 fn try_part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
@@ -75,7 +71,7 @@ fn part_def_succession_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<crate::
 }
 
 fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
-    let (input, elements) = parse_structured_brace_members_with_skip(
+    let (input, members) = parse_structured_brace_members_with_skip(
         input,
         PART_BODY_STARTERS,
         "part definition body",
@@ -84,7 +80,7 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
         part_def_body_recovery,
         BraceMemberSkip::BodyElementRecover,
     )?;
-    Ok((input, PartDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Exhibit state usage: `OccurrenceUsagePrefix` subset `exhibit` (`state`)? name (`:` type)?

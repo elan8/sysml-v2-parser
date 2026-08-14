@@ -61,7 +61,7 @@ package CommentTest {
 # FORMAT
 ~~~sysml
 package CommentTest {
-    comment locale "en_US"
+    locale "en_US"
     /*
  * AAAA
  * BBBB
@@ -73,12 +73,14 @@ package CommentTest {
     /* Named Comment */
     comment cmt_cmt
     /* Comment about Comment */
-    comment 'about'
+    comment
     /* Documention Comment about Part Def */
     part def C {
         doc
         /* Documentation in Part Def */
-        comment 'comment'
+        comment
+        /* Comment in Part Def */
+        comment
         /* Comment about Package */
     }
     part def A;
@@ -89,6 +91,6 @@ package CommentTest {
 (parsed-document
   (references
   )
-  (root (package (name "CommentTest") (body (comment) (doc) (comment) (comment) (comment) (part-def (name "C") (body (doc) (comment))) (part-def (name "A") (body semicolon)))))
+  (root (package (name "CommentTest") (body (comment) (doc) (comment) (comment) (comment) (part-def (name "C") (body (doc) (comment) (comment))) (part-def (name "A") (body semicolon)))))
 )
 ~~~

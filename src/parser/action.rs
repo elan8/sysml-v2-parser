@@ -17,17 +17,17 @@ use crate::parser::lex::{
     ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
+use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::usage::{multiplicity_node, redefinition, usage_feature_modifier_flags};
 use crate::parser::with_span;
 use crate::parser::Input;
-use crate::parser::{node_from_to, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded};
+use nom::IResult;
 use nom::Parser;
-use nom::{IResult, Input as _};
 
 const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"in",
@@ -177,39 +177,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
         input = next;
     }
 
-    let (input, _) = ws_and_comments(input)?;
-    let (input, body) = if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        (input, crate::ast::RefBody::Semicolon)
-    } else {
-        let (input, elements) = parse_structured_brace_members(
-            input,
-            ACTION_BODY_STARTERS,
-            "action ref body",
-            "recovered_action_ref_body_element",
-            action_def_body_element,
-            |start, end| {
-                let recovery = build_recovery_error_node_from_span(
-                    start,
-                    end,
-                    ACTION_BODY_STARTERS,
-                    "action ref body",
-                    "recovered_action_ref_body_element",
-                );
-                let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-                node_from_to(start, end, ActionDefBodyElement::Error(node))
-            },
-        )?;
-        (
-            input,
-            crate::ast::RefBody::Brace {
-                elements: elements
-                    .into_iter()
-                    .map(|e| Node::new(e.span.clone(), crate::ast::RefBodyElement::Action(e)))
-                    .collect(),
-            },
-        )
-    };
+    let (input, body) = crate::parser::part::ref_body(input)?;
 
     Ok((
         input,
@@ -248,7 +216,7 @@ fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
 
 fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
     let start = input;
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
         "first/merge body",
@@ -266,19 +234,15 @@ fn first_merge_brace_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody
             node_from_to(start, end, FirstMergeBodyElement::Error(node))
         },
     )?;
-    let consumed_len = start.fragment().len() - input.fragment().len();
-    debug_assert!(consumed_len >= 2);
-    let (after_open, _) = start.take_split(1);
-    let (close_start, _) = start.take_split(consumed_len - 1);
     Ok((
         input,
         FirstMergeBody::Brace(node_from_to(
             start,
             input,
             FirstMergeBraceBody {
-                open_brace_span: span_from_to(start, after_open),
-                elements,
-                close_brace_span: span_from_to(close_start, input),
+                open_brace_span: members.open_span,
+                elements: members.elements,
+                close_brace_span: members.close_span,
             },
         )),
     ))
@@ -517,7 +481,9 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
             ws_and_comments,
             alt((
                 map(tag(&b";"[..]), |_| None),
-                map(consume_action_structured_brace, Some),
+                map(consume_action_structured_brace, |members| {
+                    Some(members.elements)
+                }),
             )),
         )
         .parse(input)?;
@@ -548,15 +514,11 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
 /// Action def body: `;` or `{` ActionDefBodyElement* `}`
 fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| ActionDefBody::Semicolon),
-        action_def_body_brace,
-    ))
-    .parse(input)
+    alt((crate::parser::body::semicolon_body, action_def_body_brace)).parse(input)
 }
 
 pub(crate) fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
         "action body",
@@ -574,14 +536,14 @@ pub(crate) fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Acti
             node_from_to(start, end, ActionDefBodyElement::Error(node))
         },
     )?;
-    Ok((input, ActionDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Parse a `{` action-body `}`, returning the parsed member elements. The enclosing span stays
 /// available at the caller.
 fn consume_action_structured_brace(
     input: Input<'_>,
-) -> IResult<Input<'_>, Vec<Node<ActionDefBodyElement>>> {
+) -> IResult<Input<'_>, crate::parser::body::ParsedBraceMembers<ActionDefBodyElement>> {
     parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
@@ -1134,23 +1096,24 @@ fn loop_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<LoopStmt>> {
     Ok((input, node_from_to(start, input, LoopStmt { body })))
 }
 
-/// Wraps a single `then <target>;`/`else <target>;` shorthand statement (GH-86, no `{ }`) into
-/// the same one-element `ActionDefBody::Brace` shape the braced spelling `{ then <target>; }`
-/// already produces, so both forms are indistinguishable in the AST from here on.
-fn wrap_then_action_as_body(node: Node<ThenAction>) -> ActionDefBody {
+/// A single `then <target>;`/`else <target>;` shorthand statement (GH-86): a branch member with
+/// no braces of its own.
+fn then_action_branch(node: Node<ThenAction>) -> crate::ast::ActionBranchBody {
     let span = node.span.clone();
-    ActionDefBody::Brace {
-        elements: vec![Node::new(span, ActionDefBodyElement::ThenAction(node))],
-    }
+    crate::ast::ActionBranchBody::Shorthand(Box::new(Node::new(
+        span,
+        ActionDefBodyElement::ThenAction(node),
+    )))
 }
 
-/// Wraps a nested `else if ...` (BNF `IfNode`'s `IfNodeParameterMember` else-alternative, GH-86)
-/// into the same one-element `ActionDefBody::Brace` shape `else { if ... }` already produces.
-fn wrap_if_stmt_as_body(node: Node<IfStmt>) -> ActionDefBody {
+/// A nested `else if ...` (BNF `IfNode`'s `IfNodeParameterMember` else-alternative, GH-86),
+/// likewise written without braces.
+fn if_stmt_branch(node: Node<IfStmt>) -> crate::ast::ActionBranchBody {
     let span = node.span.clone();
-    ActionDefBody::Brace {
-        elements: vec![Node::new(span, ActionDefBodyElement::IfStmt(node))],
-    }
+    crate::ast::ActionBranchBody::Shorthand(Box::new(Node::new(
+        span,
+        ActionDefBodyElement::IfStmt(node),
+    )))
 }
 
 /// If control node: `if` condition (`{` thenBody `}` | `then` target `;`) (`else` (`{` elseBody
@@ -1171,8 +1134,8 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
     let (input, then_body) = preceded(
         ws_and_comments,
         alt((
-            action_def_body_brace,
-            map(then_action, wrap_then_action_as_body),
+            map(action_def_body_brace, crate::ast::ActionBranchBody::Braced),
+            map(then_action, then_action_branch),
         )),
     )
     .parse(input)?;
@@ -1181,9 +1144,9 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
         preceded(
             ws_and_comments,
             alt((
-                action_def_body_brace,
-                map(if_stmt, wrap_if_stmt_as_body),
-                map(else_target_shorthand, wrap_then_action_as_body),
+                map(action_def_body_brace, crate::ast::ActionBranchBody::Braced),
+                map(if_stmt, if_stmt_branch),
+                map(else_target_shorthand, then_action_branch),
             )),
         ),
     ))
@@ -1202,16 +1165,17 @@ fn if_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<IfStmt>> {
     ))
 }
 
-/// Action usage body: `;`, `{` … `}`, or an implicit empty body when the next token starts
-/// another statement/succession (Systems Library `LoopAction` style without braces).
-pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
+/// Action usage body: `;`, `{` … `}`, or no body at all when the next token starts another
+/// statement/succession (Systems Library `LoopAction` style without braces).
+///
+/// `None` is that third case. The grammar requires a terminator, so recording its absence keeps
+/// the parser's leniency visible instead of fabricating a `;` nobody wrote.
+pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, Option<ActionUsageBody>> {
     let (input, _) = ws_and_comments(input)?;
     alt((
-        map(tag(&b";"[..]), |_| ActionUsageBody::Semicolon),
-        action_usage_body_brace,
-        map(peek_implicit_action_usage_body_end, |_| {
-            ActionUsageBody::Semicolon
-        }),
+        map(crate::parser::body::semicolon_body, Some),
+        map(action_usage_body_brace, Some),
+        map(peek_implicit_action_usage_body_end, |_| None),
     ))
     .parse(input)
 }
@@ -1269,7 +1233,7 @@ fn peek_implicit_action_usage_body_end(input: Input<'_>) -> IResult<Input<'_>, (
 }
 
 fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         ACTION_BODY_STARTERS,
         "action body",
@@ -1287,7 +1251,7 @@ fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBo
             node_from_to(start, end, ActionUsageBodyElement::Error(node))
         },
     )?;
-    Ok((input, ActionUsageBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Action usage body element: InOutDecl | Bind | Flow | FirstStmt | MergeStmt | ActionUsage
@@ -1495,9 +1459,11 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     // (`then action accept engineOff : EngineOff;` in `3a-Function-based Behavior-3.sysml`).
     // But `action send typed by T;` names the usage `send` — only treat accept/send as payload
     // starters when the following token is not a usage-declaration continuation.
-    let (input, (name_span, name_str)) = if (after_gap.fragment().starts_with(b":")
-        && !after_gap.fragment().starts_with(b":>")
-        && !after_gap.fragment().starts_with(b":>>"))
+    // spec42 Gap 42: a leading `:>`/`:>>` specialization clause also stands in for the name
+    // (`action :>> subactions :> middle { ... }`, Systems Library `States.sysml`) -- the
+    // clauses themselves are picked up by `specialization_clauses` below, mirroring
+    // `attribute_usage`'s `PrefixRedefines`/`PrefixSubsets` heads.
+    let (input, (name_span, name_str)) = if after_gap.fragment().starts_with(b":")
         || after_gap.fragment().starts_with(b"{")
         || after_gap.fragment().starts_with(b";")
         || starts_with_keyword(after_gap.fragment(), b"defined")

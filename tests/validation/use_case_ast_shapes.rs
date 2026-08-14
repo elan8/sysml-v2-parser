@@ -37,7 +37,7 @@ fn test_use_case_validation_fixture_has_typed_succession_nodes() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package root element"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
 
@@ -50,7 +50,7 @@ fn test_use_case_validation_fixture_has_typed_succession_nodes() {
         })
         .expect("expected a use case in validation fixture");
 
-    let sysml_v2_parser::ast::UseCaseDefBody::Brace { elements: body } = use_case_body else {
+    let sysml_v2_parser::ast::UseCaseDefBody::Brace { elements: body, .. } = use_case_body else {
         panic!("expected brace body");
     };
 

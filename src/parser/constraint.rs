@@ -109,52 +109,35 @@ pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Cons
     ))
 }
 
-fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody> {
-    let (input, body) = structured_constraint_body(input)?;
-    let body = match body {
-        StructuredConstraintBody::Semicolon => ConstraintDefBody::Semicolon,
-        StructuredConstraintBody::Brace { elements } => ConstraintDefBody::Brace { elements },
-    };
-    Ok((input, body))
-}
-
-pub(crate) enum StructuredConstraintBody {
-    Semicolon,
-    Brace {
-        elements: Vec<Node<ConstraintDefBodyElement>>,
-    },
-}
-
 fn constraint_body_recovery_element(
     start: Input<'_>,
     end: Input<'_>,
 ) -> Node<ConstraintDefBodyElement> {
-    if starts_with_any_keyword(start.fragment(), CONSTRAINT_DEF_BODY_STARTERS) {
-        let recovery = build_recovery_error_node_from_span(
-            start,
-            end,
-            CONSTRAINT_DEF_BODY_STARTERS,
-            "constraint body",
-            "recovered_constraint_body_element",
-        );
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        return node_from_to(start, end, ConstraintDefBodyElement::Error(node));
-    }
-    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(120)])
-        .trim()
-        .to_string();
-    node_from_to(start, end, ConstraintDefBodyElement::Other(preview))
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        CONSTRAINT_DEF_BODY_STARTERS,
+        "constraint body",
+        "recovered_constraint_body_element",
+    );
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    node_from_to(start, end, ConstraintDefBodyElement::Error(node))
 }
 
-pub(crate) fn structured_constraint_body(
-    input: Input<'_>,
-) -> IResult<Input<'_>, StructuredConstraintBody> {
+/// A constraint body in any scope that accepts one: `;` or brace-delimited constraint members.
+pub(crate) fn constraint_def_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, StructuredConstraintBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            ConstraintDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         CONSTRAINT_DEF_BODY_STARTERS,
         "constraint body",
@@ -162,7 +145,7 @@ pub(crate) fn structured_constraint_body(
         constraint_def_body_element,
         constraint_body_recovery_element,
     )?;
-    Ok((input, StructuredConstraintBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 pub(crate) fn constraint_def_body_element(
@@ -204,6 +187,13 @@ pub(crate) fn constraint_def_body_element(
             |n| ConstraintDefBodyElement::AttributeUsage(Box::new(n)),
         )
         .parse(input)?
+    } else if let Ok((rest, binding)) = calc_named_binding(input) {
+        // A constraint definition body is a `DefinitionBody`, so a keyword-less feature
+        // declaration (`mass : Real;`) is a member of it, not an expression statement.
+        (
+            rest,
+            ConstraintDefBodyElement::FeatureDecl(Box::new(binding)),
+        )
     } else {
         map(expression, ConstraintDefBodyElement::Expression).parse(input)?
     };
@@ -350,10 +340,16 @@ fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefB
 pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, CalcDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            CalcDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         CALC_DEF_BODY_STARTERS,
         "calc body",
@@ -361,7 +357,7 @@ pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody>
         calc_def_body_element,
         calc_body_recovery_element,
     )?;
-    Ok((input, CalcDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Skips an optional `(private|protected|public)?` `abstract`? prefix and reports whether either
@@ -864,8 +860,8 @@ fn kerml_end_member_inner(
 /// Keyword-less named member binding in a type body: (visibility)? name mult? (`:` type)? mult?
 /// (`:>>`/`redefines` targets)? value? `;` -- `private instantNum: Natural[1] = if isInstant? 1
 /// else 0;`, `private thisClock : Clock :>> self;` (Kernel Semantic Library
-/// `Occurrences.kerml`/`Observation.kerml`). Requires a value or a redefinition so plain
-/// expression statements stay on the expression arm.
+/// `Occurrences.kerml`/`Observation.kerml`). Requires a typing clause, a redefinition, or a value,
+/// so plain expression statements stay on the expression arm.
 pub(crate) fn calc_named_binding(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
@@ -920,7 +916,10 @@ fn calc_named_binding_inner(
     };
     let (input, redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    if value.is_none() && redefines.is_none() {
+    // A declaration needs something an expression statement cannot have: a typing clause, a
+    // redefinition, or a value. `mass : Real;` is the type-only form (`constraint c { mass :
+    // Real; }`); a bare `mass` stays on the expression arm.
+    if typing.is_none() && value.is_none() && redefines.is_none() {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Verify,
@@ -1836,7 +1835,10 @@ mod constraint_usage_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "assumptions");
         assert_eq!(node.value.type_name, None);
-        assert!(matches!(node.value.body, ConstraintDefBody::Semicolon));
+        assert!(matches!(
+            node.value.body,
+            ConstraintDefBody::Semicolon { .. }
+        ));
     }
 
     #[test]

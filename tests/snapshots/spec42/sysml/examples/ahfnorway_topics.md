@@ -195,16 +195,16 @@ package AHFNorway {
         attribute :>> intrfce_protocol = "{JSON}";
         attribute :>> serviceURL = "pull";
     }
-    #servicedd;
+    #servicedd
     port def APIS_DD :> APISService {
         doc
         /* Service design description with nested protocol-specific ports */
-        #idd;
+        #idd
         port APIS_HTTP {
             out cll : CallGiveItems;
             in retrn : ResultGiveItems;
         }
-        #idd;
+        #idd
         port APIS_MQTT {
             out pub : Publish;
             out retall : Return_AllItems;
@@ -234,9 +234,9 @@ package AHFNorway {
     }
     #clouddd AHFNorway_LocalCloudDD :> ArrowheadCore {
         #systemdd TellUConsumer {
-            #servicedd;
+            #servicedd
             serviceDiscovery:~ServiceDiscoveryDD ; // communicating with ServiceRegistry
-            #servicedd;
+            #servicedd
             apisp : APIS_DD;
             attribute :>> systemname = "UngerApisClient";
             attribute :>> address = "Unger_network_ip";
@@ -249,11 +249,11 @@ package AHFNorway {
             }
         }
         #systemdd APISProducer {
-            #servicedd;
+            #servicedd
             serviceDiscovery:~ServiceDiscoveryDD ; // communicating with ServiceRegistry
-            #servicedd;
+            #servicedd
             tellu:~APIS_DD; // providing the APISService
-            #servicedd;
+            #servicedd
             apisc : APIS_DD;
             '' :>> systemname = "PrediktorApisServer";
             '' :>> address = "Prediktor_network_ip";
@@ -275,9 +275,9 @@ package AHFNorway {
             }
         }
         #systemdd APISConsumer {
-            #servicedd;
+            #servicedd
             serviceDiscovery:~ServiceDiscovery ; // communicating with ServiceRegistry
-            #servicedd;
+            #servicedd
             apisp:~APIS_DD ;
 			:>> systemname = "TellUClient";
 			:>> address = "Prediktor_network_ip";

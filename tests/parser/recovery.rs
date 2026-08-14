@@ -116,7 +116,7 @@ action def ExecutePatrol {
         sysml_v2_parser::ast::RootElement::Package(p) => &p.value,
         _ => panic!("expected package root element"),
     };
-    let sysml_v2_parser::ast::PackageBody::Brace { elements } = &pkg.body else {
+    let sysml_v2_parser::ast::PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let first = elements.first().expect("expected a body element");
@@ -155,7 +155,7 @@ action def B { }
         sysml_v2_parser::ast::RootElement::Package(p) => &p.value,
         _ => panic!("expected package root element"),
     };
-    let sysml_v2_parser::ast::PackageBody::Brace { elements } = &pkg.body else {
+    let sysml_v2_parser::ast::PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let has_b = elements.iter().any(|e| match &e.value {
@@ -192,7 +192,7 @@ fn test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(
@@ -234,7 +234,7 @@ fn test_package_body_recovery_skips_malformed_abstract_part_and_keeps_next_membe
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert_eq!(
@@ -258,7 +258,7 @@ fn test_part_def_nested_state_and_attribute_siblings() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let part_def = elements
@@ -268,7 +268,7 @@ fn test_part_def_nested_state_and_attribute_siblings() {
             _ => None,
         })
         .expect("part def should be present");
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part_def.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &part_def.body else {
         panic!("expected part def body");
     };
     assert!(
@@ -299,7 +299,7 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let part_def = elements
@@ -309,7 +309,7 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
             _ => None,
         })
         .expect("part def should be present");
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part_def.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &part_def.body else {
         panic!("expected part def body");
     };
     assert!(
@@ -336,7 +336,7 @@ fn test_state_def_recovery_no_longer_truncates_body() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let state_def = elements
@@ -346,14 +346,23 @@ fn test_state_def_recovery_no_longer_truncates_body() {
             _ => None,
         })
         .expect("state def should be present");
-    let sysml_v2_parser::ast::StateDefBody::Brace { elements } = &state_def.body else {
+    let sysml_v2_parser::ast::StateDefBody::Brace { elements, .. } = &state_def.body else {
         panic!("expected state body");
     };
     assert!(
         elements
             .iter()
-            .any(|e| matches!(e.value, sysml_v2_parser::ast::StateDefBodyElement::Other(_))),
-        "unknown state members should be preserved explicitly instead of truncating the body"
+            .any(|e| matches!(e.value, sysml_v2_parser::ast::StateDefBodyElement::Error(_))),
+        "an unknown state member is kept as a diagnosed recovery node at its own position, not \
+         dropped and not swallowed as opaque text"
+    );
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|error| error.found.as_deref() == Some("unknown stuff;")),
+        "and it is reported against the text it could not parse: {:?}",
+        result.errors
     );
     assert!(
         elements.iter().any(|e| matches!(
@@ -478,7 +487,7 @@ fn test_parse_with_diagnostics_reports_missing_attribute_type_in_part_body() {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -488,7 +497,7 @@ fn test_parse_with_diagnostics_reports_missing_attribute_type_in_part_body() {
             _ => None,
         })
         .expect("part usage should survive recovery");
-    let PartUsageBody::Brace { elements } = &part.body else {
+    let PartUsageBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     assert!(
@@ -516,7 +525,7 @@ fn test_parse_with_diagnostics_reports_missing_occurrence_type_and_keeps_sibling
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     assert!(

@@ -156,10 +156,16 @@ pub(crate) fn emit_action_usage(
             w.push_str(" to ");
             emit_expression(w, &to.value)?;
         }
-        return emit_action_usage_body(w, path, &usage.body);
+        return match &usage.body {
+            Some(body) => emit_action_usage_body(w, path, body),
+            None => Ok(()),
+        };
     }
-    w.push_str("action ");
+    // Anonymous usages (`action :>> subactions;`, `action { ... }`) get no trailing space
+    // after the keyword -- the clause emitters below supply their own leading space.
+    w.push_str("action");
     if !usage.name.is_empty() {
+        w.push_char(' ');
         w.push_str(&format_name(&usage.name));
     }
     if let Some(typing) = &usage.typing {
@@ -193,7 +199,10 @@ pub(crate) fn emit_action_usage(
         w.push_str(" to ");
         emit_expression(w, &to.value)?;
     }
-    emit_action_usage_body(w, path, &usage.body)
+    match &usage.body {
+        Some(body) => emit_action_usage_body(w, path, body),
+        None => Ok(()),
+    }
 }
 
 fn emit_payload_clause(
@@ -220,17 +229,32 @@ fn emit_send_payload(
     }
 }
 
+/// Emits either spelling of an `if` branch: a braced body, or the brace-less shorthand member.
+pub(crate) fn emit_action_branch_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    branch: &crate::ast::ActionBranchBody,
+) -> Result<(), EmitError> {
+    match branch {
+        crate::ast::ActionBranchBody::Braced(body) => emit_action_def_body(w, path, body),
+        crate::ast::ActionBranchBody::Shorthand(member) => {
+            w.push_char(' ');
+            emit_action_def_body_element(w, path, &member.value)
+        }
+    }
+}
+
 pub(crate) fn emit_action_def_body(
     w: &mut EmitWriter<'_>,
     path: &str,
     body: &ActionDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        ActionDefBody::Semicolon => {
+        ActionDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        ActionDefBody::Brace { elements } => {
+        ActionDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -295,11 +319,10 @@ fn emit_action_def_body_element(
         ActionDefBodyElement::IfStmt(i) => {
             w.push_str("if ");
             emit_expression(w, &i.value.condition.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &i.value.then_body)?;
+            emit_action_branch_body(w, path, &i.value.then_body)?;
             if let Some(else_body) = &i.value.else_body {
-                w.push_str(" else ");
-                emit_action_def_body(w, path, else_body)?;
+                w.push_str(" else");
+                emit_action_branch_body(w, path, else_body)?;
             }
             Ok(())
         }
@@ -330,11 +353,11 @@ fn emit_action_usage_body(
     body: &ActionUsageBody,
 ) -> Result<(), EmitError> {
     match body {
-        ActionUsageBody::Semicolon => {
+        ActionUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        ActionUsageBody::Brace { elements } => {
+        ActionUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -398,11 +421,10 @@ pub(crate) fn emit_action_usage_body_element(
         ActionUsageBodyElement::IfStmt(i) => {
             w.push_str("if ");
             emit_expression(w, &i.value.condition.value)?;
-            w.push_char(' ');
-            emit_action_def_body(w, path, &i.value.then_body)?;
+            emit_action_branch_body(w, path, &i.value.then_body)?;
             if let Some(else_body) = &i.value.else_body {
-                w.push_str(" else ");
-                emit_action_def_body(w, path, else_body)?;
+                w.push_str(" else");
+                emit_action_branch_body(w, path, else_body)?;
             }
             Ok(())
         }
@@ -507,11 +529,11 @@ fn emit_perform_body(
     body: &PerformBody,
 ) -> Result<(), EmitError> {
     match body {
-        PerformBody::Semicolon => {
+        PerformBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PerformBody::Brace { elements } => {
+        PerformBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -666,11 +688,11 @@ fn emit_state_def_body(
     body: &StateDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        StateDefBody::Semicolon => {
+        StateDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        StateDefBody::Brace { elements } => {
+        StateDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -692,10 +714,6 @@ fn emit_state_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         StateDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        StateDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         StateDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         StateDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         StateDefBodyElement::Entry(e) => {
@@ -809,6 +827,14 @@ fn emit_state_def_body_element(
             super::requirement::emit_requirement_usage(w, path, &r.value)
         }
         StateDefBodyElement::Transition(t) => emit_transition(w, path, &t.value),
+        StateDefBodyElement::AttributeUsage(a) => {
+            structure::emit_attribute_usage(w, path, &a.value)
+        }
+        StateDefBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
+        StateDefBodyElement::SuccessionUsage(s) => emit_succession_usage(w, &s.value),
+        StateDefBodyElement::AssertConstraint(a) => {
+            super::view::emit_assert_constraint(w, path, &a.value)
+        }
         other @ (StateDefBodyElement::Annotation(_)
         | StateDefBodyElement::MetadataAnnotation(_)
         | StateDefBodyElement::MetadataKeywordUsage(_)) => w.unsupported(
@@ -1019,11 +1045,11 @@ fn emit_definition_body(
     body: &crate::ast::DefinitionBody,
 ) -> Result<(), EmitError> {
     match body {
-        crate::ast::DefinitionBody::Semicolon => {
+        crate::ast::DefinitionBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::DefinitionBody::Brace { elements } => {
+        crate::ast::DefinitionBody::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())
@@ -1036,11 +1062,8 @@ fn emit_definition_body(
                         crate::ast::DefinitionBodyElement::Error(error) => {
                             w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                         }
-                        crate::ast::DefinitionBodyElement::Other(_) => {
-                            return Err(EmitError::Opaque {
-                                path: format!("{path}/body[{i}]"),
-                                kind: super::OpacityKind::Other,
-                            });
+                        crate::ast::DefinitionBodyElement::Unsupported(unsupported) => {
+                            w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                         }
                         crate::ast::DefinitionBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                         crate::ast::DefinitionBodyElement::OccurrenceMember(o) => {
@@ -1352,11 +1375,11 @@ pub(crate) fn emit_occurrence_usage(
         emit_feature_value(w, value)?;
     }
     match &usage.body {
-        crate::ast::OccurrenceUsageBody::Semicolon => {
+        crate::ast::OccurrenceUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::OccurrenceUsageBody::Brace { elements } => {
+        crate::ast::OccurrenceUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1378,10 +1401,6 @@ pub(crate) fn emit_occurrence_body_element(
 ) -> Result<(), EmitError> {
     match el {
         crate::ast::OccurrenceBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        crate::ast::OccurrenceBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         crate::ast::OccurrenceBodyElement::Doc(d) => emit_doc(w, &d.value),
         crate::ast::OccurrenceBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)

@@ -1,7 +1,6 @@
 //! Alias definition parsing.
 
 use crate::ast::{AliasBody, AliasDef, Node};
-use crate::parser::body::relationship_body_annotations;
 use crate::parser::lex::{identification, qualified_reference, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::span::reference_transaction;
@@ -13,12 +12,7 @@ use nom::Parser;
 
 /// Alias body: `;` or `{` doc/comment/rep/metadata* `}` (BNF `RelationshipBody`).
 fn alias_body(input: Input<'_>) -> IResult<Input<'_>, AliasBody> {
-    let (input, elements) = relationship_body_annotations(input)?;
-    let body = match elements {
-        None => AliasBody::Semicolon,
-        Some(elements) => AliasBody::Brace { elements },
-    };
-    Ok((input, body))
+    crate::parser::body::relationship_body(input)
 }
 
 /// Alias definition: `alias` Identification `for` qualified_name body

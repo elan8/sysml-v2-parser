@@ -20,9 +20,9 @@ fn failed_state_action_production_does_not_publish_its_target() {
     );
     let live_id = match &result.document.root.elements[0].value {
         RootElement::Package(package) => match &package.value.body {
-            PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBody::Brace { elements, .. } => match &elements[0].value {
                 PackageBodyElement::StateDef(state) => match &state.value.body {
-                    StateDefBody::Brace { elements } => elements.iter().find_map(|element| {
+                    StateDefBody::Brace { elements, .. } => elements.iter().find_map(|element| {
                         if let StateDefBodyElement::Do(action) = &element.value {
                             action.value.action_reference
                         } else {

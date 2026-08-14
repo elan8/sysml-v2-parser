@@ -86,11 +86,11 @@ fn emit_requirement_body(
     body: &RequirementDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        RequirementDefBody::Semicolon => {
+        RequirementDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        RequirementDefBody::Brace { elements } => {
+        RequirementDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -112,10 +112,6 @@ fn emit_requirement_body_element(
 ) -> Result<(), EmitError> {
     match el {
         RequirementDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RequirementDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         RequirementDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         RequirementDefBodyElement::Import(i) => emit_import(w, &i.value),
         RequirementDefBodyElement::AttributeDef(a) => {
@@ -368,11 +364,11 @@ fn emit_require_constraint(
         w.push_qualified_reference(&format!("{path}/target"), target)?;
     }
     match &req.body {
-        crate::ast::RequireConstraintBody::Semicolon => {
+        crate::ast::ConstraintDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RequireConstraintBody::Brace { elements } => {
+        crate::ast::ConstraintDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -452,21 +448,13 @@ fn emit_rel_body(
     el: &RelationshipBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         RelationshipBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
-        RelationshipBodyElement::Comment(c) => super::root::emit_comment(w, &c.value),
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
-        other @ (RelationshipBodyElement::TextualRep(_)
-        | RelationshipBodyElement::MetadataAnnotation(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
     }
 }
 
@@ -723,11 +711,11 @@ pub(crate) fn emit_use_case_body(
     body: &UseCaseDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        UseCaseDefBody::Semicolon => {
+        UseCaseDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        UseCaseDefBody::Brace { elements } => {
+        UseCaseDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -749,10 +737,6 @@ fn emit_use_case_body_element(
 ) -> Result<(), EmitError> {
     match el {
         UseCaseDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        UseCaseDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         UseCaseDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         UseCaseDefBodyElement::SubjectDecl(s) => emit_subject_decl(w, &s.value),
         UseCaseDefBodyElement::SubjectRef(_) => {
@@ -904,10 +888,10 @@ fn emit_return_ref(
         emit_multiplicity(w, &multiplicity.value)?;
     }
     match &return_ref.body.value {
-        ReturnRefBody::Semicolon => {
+        ReturnRefBody::Semicolon { .. } => {
             w.push_char(';');
         }
-        ReturnRefBody::Brace { elements } => {
+        ReturnRefBody::Brace { elements, .. } => {
             w.push_str(" {");
             if !elements.is_empty() {
                 w.newline();

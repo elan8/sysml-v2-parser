@@ -138,13 +138,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         write!(self.writer, "({kind})")
     }
 
-    fn write_opaque(&mut self, first: &mut bool, kind: &str, source: &str) -> io::Result<()> {
-        self.write_item_prefix(first)?;
-        write!(self.writer, "({kind} (source ")?;
-        write_quoted(self.writer, source)?;
-        self.writer.write_str("))")
-    }
-
     fn write_expression(&mut self, expression: &Node<Expression>) -> io::Result<()> {
         self.writer.write_str("(expression ")?;
         write_span(self.writer, &expression.span)?;
@@ -522,6 +515,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 "connection-usage-in-part-definition"
             }
             super::UnsupportedProduction::ActionBodyMember => "action-body-member",
+            super::UnsupportedProduction::UnmodelledBodyMember => "unmodelled-body-member",
         })?;
         self.writer.write_str(") (code ")?;
         write_quoted(self.writer, &unsupported.diagnostic.code)?;
@@ -534,8 +528,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_requirement_body(&mut self, body: &RequirementDefBody) -> io::Result<()> {
         match body {
-            RequirementDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            RequirementDefBody::Brace { elements } => {
+            RequirementDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            RequirementDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {
@@ -543,9 +537,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
-                        }
-                        RequirementDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
                         }
                         RequirementDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
@@ -676,8 +667,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_view_body(&mut self, body: &ViewBody) -> io::Result<()> {
         match body {
-            ViewBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            ViewBody::Brace { elements } => {
+            ViewBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            ViewBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {
@@ -685,9 +676,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         ViewBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
-                        }
-                        ViewBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
                         }
                         ViewBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
                         ViewBodyElement::Filter(_filter) => {
@@ -717,8 +705,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_use_case_body(&mut self, body: &UseCaseDefBody) -> io::Result<()> {
         match body {
-            UseCaseDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            UseCaseDefBody::Brace { elements } => {
+            UseCaseDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            UseCaseDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {
@@ -726,9 +714,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
-                        }
-                        UseCaseDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
                         }
                         UseCaseDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
@@ -795,8 +780,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_reference(include.value.target)?;
                             self.writer.write_str("))")?;
                         }
-                        UseCaseDefBodyElement::Ref(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        UseCaseDefBodyElement::Ref(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         UseCaseDefBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "in-out")?;
@@ -822,10 +808,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             write_span(self.writer, &return_ref.value.body.span)?;
                             self.writer.write_str(") ")?;
                             match &return_ref.value.body.value {
-                                super::ReturnRefBody::Semicolon => {
+                                super::ReturnRefBody::Semicolon { .. } => {
                                     self.writer.write_str("(body semicolon)")?;
                                 }
-                                super::ReturnRefBody::Brace { elements } => {
+                                super::ReturnRefBody::Brace { elements, .. } => {
                                     self.writer.write_str("(body")?;
                                     for element in elements {
                                         self.writer.write_char(' ')?;
@@ -896,8 +882,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_state_body(&mut self, body: &StateDefBody) -> io::Result<()> {
         match body {
-            StateDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            StateDefBody::Brace { elements } => {
+            StateDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            StateDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {
@@ -915,9 +901,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         }
                         StateDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
-                        }
-                        StateDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
                         }
                         StateDefBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "inout-declaration")?;
@@ -970,8 +953,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         StateDefBodyElement::FinalState(_state) => {
                             self.write_marker(&mut first, "final-state")?;
                         }
-                        StateDefBodyElement::Ref(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        StateDefBodyElement::Ref(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         StateDefBodyElement::RequirementUsage(_usage) => {
                             self.write_marker(&mut first, "requirement-usage")?;
@@ -981,6 +965,19 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         }
                         StateDefBodyElement::Transition(_transition) => {
                             self.write_marker(&mut first, "transition")?;
+                        }
+                        StateDefBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        StateDefBodyElement::ActionUsage(_usage) => {
+                            self.write_marker(&mut first, "action-usage")?;
+                        }
+                        StateDefBodyElement::SuccessionUsage(_usage) => {
+                            self.write_marker(&mut first, "succession-usage")?;
+                        }
+                        StateDefBodyElement::AssertConstraint(_member) => {
+                            self.write_marker(&mut first, "assert-constraint")?;
                         }
                     }
                 }
@@ -1029,8 +1026,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_part_body(&mut self, body: &PartDefBody) -> io::Result<()> {
         match body {
-            PartDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            PartDefBody::Brace { elements } => {
+            PartDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            PartDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {
@@ -1067,9 +1064,6 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_dependency(&dependency.value)?;
                         }
-                        PartDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
-                        }
                         PartDefBodyElement::AttributeDef(_definition) => {
                             self.write_marker(&mut first, "attribute-def")?;
                         }
@@ -1089,8 +1083,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::ItemUsage(_usage) => {
                             self.write_marker(&mut first, "item-usage")?;
                         }
-                        PartDefBodyElement::Ref(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        PartDefBodyElement::Ref(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         PartDefBodyElement::PortUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1377,8 +1372,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_action_body(&mut self, body: &super::ActionDefBody) -> io::Result<()> {
         match body {
-            super::ActionDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            super::ActionDefBody::Brace { elements } => {
+            super::ActionDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::ActionDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body")?;
                 for element in elements {
                     self.writer.write_char(' ')?;
@@ -1517,7 +1512,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::TextualRep(_text) => {
                 self.writer.write_str("(textual-representation)")
             }
-            ActionDefBodyElement::RefDecl(_reference) => self.writer.write_str("(ref)"),
+            ActionDefBodyElement::RefDecl(declaration) => {
+                self.write_ref_declaration(&declaration.value)
+            }
             ActionDefBodyElement::Perform(perform) => self.write_perform(&perform.value),
             ActionDefBodyElement::Bind(_bind) => self.writer.write_str("(bind)"),
             ActionDefBodyElement::FlowUsage(_flow) => self.writer.write_str("(flow-usage)"),
@@ -1573,8 +1570,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.write_reference(definition.target)?;
         self.writer.write_str(") (body ")?;
         match &definition.body {
-            super::AliasBody::Semicolon => self.writer.write_str("semicolon")?,
-            super::AliasBody::Brace { elements } => {
+            super::AliasBody::Semicolon { .. } => self.writer.write_str("semicolon")?,
+            super::AliasBody::Brace { elements, .. } => {
                 write!(self.writer, "brace (element-count {})", elements.len())?;
             }
         }
@@ -1623,8 +1620,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_interface_body(&mut self, body: &InterfaceDefBody) -> io::Result<()> {
         match body {
-            InterfaceDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            InterfaceDefBody::Brace { elements } => {
+            InterfaceDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            InterfaceDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {
@@ -1636,8 +1633,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
                         }
-                        InterfaceDefBodyElement::RefDecl(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        InterfaceDefBodyElement::RefDecl(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         InterfaceDefBodyElement::ConnectStmt(_connect) => {
                             self.write_marker(&mut first, "connect")?;
@@ -1679,8 +1677,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_connection_body(&mut self, body: &ConnectionDefBody) -> io::Result<()> {
         match body {
-            ConnectionDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            ConnectionDefBody::Brace { elements } => {
+            ConnectionDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            ConnectionDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {
@@ -1689,8 +1687,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
                         }
-                        ConnectionDefBodyElement::RefDecl(_reference) => {
-                            self.write_marker(&mut first, "ref")?;
+                        ConnectionDefBodyElement::RefDecl(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
                         }
                         ConnectionDefBodyElement::ConnectStmt(_connect) => {
                             self.write_marker(&mut first, "connect")?;
@@ -1735,6 +1734,210 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                     }
                 }
                 self.writer.write_char(')')
+            }
+        }
+    }
+
+    /// One projection for a `ref` declaration, shared by every scope that owns one.
+    ///
+    /// `UsageBody = DefinitionBody`, so a `ref` body holds the same members wherever it appears.
+    /// Rendering it as a bare marker per owner would hide exactly the differences that matter --
+    /// which members parsed, in what order, under which owner -- so every owner uses this.
+    fn write_ref_declaration(&mut self, declaration: &super::RefDecl) -> io::Result<()> {
+        self.writer.write_str("(ref (name ")?;
+        write_quoted(self.writer, &declaration.name)?;
+        self.writer.write_str(") (kind ")?;
+        match declaration.kind_keyword {
+            Some(kind) => self.writer.write_str(kind.as_str())?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &declaration.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("redefines", declaration.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", declaration.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_ref_body(&declaration.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_ref_body(&mut self, body: &super::RefBody) -> io::Result<()> {
+        match body {
+            super::RefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::RefBody::Brace { elements, .. } => {
+                self.writer.write_str("(body ")?;
+                let mut first = true;
+                for element in elements {
+                    match &element.value {
+                        super::PartUsageBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::PartUsageBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::PartUsageBodyElement::Annotation(_member) => {
+                            self.write_marker(&mut first, "annotation")?;
+                        }
+                        super::PartUsageBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        super::PartUsageBodyElement::DefaultReferenceUsage(_member) => {
+                            self.write_marker(&mut first, "default-reference-usage")?;
+                        }
+                        super::PartUsageBodyElement::EnumerationUsage(_member) => {
+                            self.write_marker(&mut first, "enumeration-usage")?;
+                        }
+                        super::PartUsageBodyElement::PartUsage(_member) => {
+                            self.write_marker(&mut first, "part-usage")?;
+                        }
+                        super::PartUsageBodyElement::OccurrenceUsage(_member) => {
+                            self.write_marker(&mut first, "occurrence-usage")?;
+                        }
+                        super::PartUsageBodyElement::PortUsage(_member) => {
+                            self.write_marker(&mut first, "port-usage")?;
+                        }
+                        super::PartUsageBodyElement::Bind(_member) => {
+                            self.write_marker(&mut first, "bind")?;
+                        }
+                        // A nested `ref` projects the same way, so an owner cannot hide what
+                        // its nested declarations hold either.
+                        super::PartUsageBodyElement::Ref(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
+                        }
+                        super::PartUsageBodyElement::InterfaceUsage(_member) => {
+                            self.write_marker(&mut first, "interface-usage")?;
+                        }
+                        super::PartUsageBodyElement::Connect(_member) => {
+                            self.write_marker(&mut first, "connect")?;
+                        }
+                        super::PartUsageBodyElement::FlowUsage(_member) => {
+                            self.write_marker(&mut first, "flow-usage")?;
+                        }
+                        super::PartUsageBodyElement::Perform(_member) => {
+                            self.write_marker(&mut first, "perform")?;
+                        }
+                        super::PartUsageBodyElement::SuccessionUsage(_member) => {
+                            self.write_marker(&mut first, "succession-usage")?;
+                        }
+                        super::PartUsageBodyElement::Allocate(_member) => {
+                            self.write_marker(&mut first, "allocate")?;
+                        }
+                        super::PartUsageBodyElement::Satisfy(_member) => {
+                            self.write_marker(&mut first, "satisfy")?;
+                        }
+                        super::PartUsageBodyElement::StateUsage(_member) => {
+                            self.write_marker(&mut first, "state-usage")?;
+                        }
+                        super::PartUsageBodyElement::ActionUsage(_member) => {
+                            self.write_marker(&mut first, "action-usage")?;
+                        }
+                        super::PartUsageBodyElement::MetadataKeywordUsage(_member) => {
+                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        }
+                        super::PartUsageBodyElement::VariantUsage(_member) => {
+                            self.write_marker(&mut first, "variant-usage")?;
+                        }
+                        super::PartUsageBodyElement::StateDef(_member) => {
+                            self.write_marker(&mut first, "state-def")?;
+                        }
+                        super::PartUsageBodyElement::MetadataDef(_member) => {
+                            self.write_marker(&mut first, "metadata-def")?;
+                        }
+                        super::PartUsageBodyElement::FlowDef(_member) => {
+                            self.write_marker(&mut first, "flow-def")?;
+                        }
+                        super::PartUsageBodyElement::RequirementDef(_member) => {
+                            self.write_marker(&mut first, "requirement-def")?;
+                        }
+                        super::PartUsageBodyElement::OccurrenceDef(_member) => {
+                            self.write_marker(&mut first, "occurrence-def")?;
+                        }
+                        super::PartUsageBodyElement::PortDef(_member) => {
+                            self.write_marker(&mut first, "port-def")?;
+                        }
+                        super::PartUsageBodyElement::CalcDef(_member) => {
+                            self.write_marker(&mut first, "calc-def")?;
+                        }
+                        super::PartUsageBodyElement::ConnectionDef(_member) => {
+                            self.write_marker(&mut first, "connection-def")?;
+                        }
+                        super::PartUsageBodyElement::EnumDef(_member) => {
+                            self.write_marker(&mut first, "enum-def")?;
+                        }
+                        super::PartUsageBodyElement::Connection(_member) => {
+                            self.write_marker(&mut first, "connection")?;
+                        }
+                        super::PartUsageBodyElement::AssertConstraint(_member) => {
+                            self.write_marker(&mut first, "assert-constraint")?;
+                        }
+                        super::PartUsageBodyElement::ConstraintDef(_member) => {
+                            self.write_marker(&mut first, "constraint-def")?;
+                        }
+                        super::PartUsageBodyElement::ConstraintUsage(_member) => {
+                            self.write_marker(&mut first, "constraint-usage")?;
+                        }
+                        super::PartUsageBodyElement::CalcUsage(_member) => {
+                            self.write_marker(&mut first, "calc-usage")?;
+                        }
+                        super::PartUsageBodyElement::Import(_member) => {
+                            self.write_marker(&mut first, "import")?;
+                        }
+                        super::PartUsageBodyElement::RequirementUsage(_member) => {
+                            self.write_marker(&mut first, "requirement-usage")?;
+                        }
+                        super::PartUsageBodyElement::ItemDef(_member) => {
+                            self.write_marker(&mut first, "item-def")?;
+                        }
+                        super::PartUsageBodyElement::ItemUsage(_member) => {
+                            self.write_marker(&mut first, "item-usage")?;
+                        }
+                        super::PartUsageBodyElement::MetadataUsage(_member) => {
+                            self.write_marker(&mut first, "metadata-usage")?;
+                        }
+                        super::PartUsageBodyElement::AnalysisCaseDef(_member) => {
+                            self.write_marker(&mut first, "analysis-case-def")?;
+                        }
+                        super::PartUsageBodyElement::AnalysisCaseUsage(_member) => {
+                            self.write_marker(&mut first, "analysis-case-usage")?;
+                        }
+                        super::PartUsageBodyElement::AliasDef(_member) => {
+                            self.write_marker(&mut first, "alias-def")?;
+                        }
+                        super::PartUsageBodyElement::IncludeUseCase(_member) => {
+                            self.write_marker(&mut first, "include-use-case")?;
+                        }
+                        super::PartUsageBodyElement::UseCaseUsage(_member) => {
+                            self.write_marker(&mut first, "use-case-usage")?;
+                        }
+                        super::PartUsageBodyElement::VerificationCaseUsage(_member) => {
+                            self.write_marker(&mut first, "verification-case-usage")?;
+                        }
+                        super::PartUsageBodyElement::KermlClassifier(_member) => {
+                            self.write_marker(&mut first, "kerml-classifier")?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_annotating_member(&mut self, member: &super::AnnotatingMember) -> io::Result<()> {
+        match member {
+            super::AnnotatingMember::Doc(_) => self.writer.write_str("(doc)"),
+            super::AnnotatingMember::Comment(_) => self.writer.write_str("(comment)"),
+            super::AnnotatingMember::TextualRep(_) => self.writer.write_str("(textual-rep)"),
+            super::AnnotatingMember::MetadataAnnotation(_) => {
+                self.writer.write_str("(metadata-annotation)")
             }
         }
     }
@@ -1916,8 +2119,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_perform_body(&mut self, body: &PerformBody) -> io::Result<()> {
         match body {
-            PerformBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            PerformBody::Brace { elements } => {
+            PerformBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            PerformBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {
@@ -2073,8 +2276,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (body ")?;
         match &usage.body {
-            super::AttributeBody::Semicolon => self.writer.write_str("semicolon")?,
-            super::AttributeBody::Brace { elements } => {
+            super::AttributeBody::Semicolon { .. } => self.writer.write_str("semicolon")?,
+            super::AttributeBody::Brace { elements, .. } => {
                 write!(self.writer, "brace (element-count {})", elements.len())?;
             }
         }
@@ -2122,8 +2325,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (body ")?;
         match &usage.body {
-            super::PortBody::Semicolon => self.writer.write_str("semicolon")?,
-            super::PortBody::Brace { elements } => {
+            super::PortBody::Semicolon { .. } => self.writer.write_str("semicolon")?,
+            super::PortBody::Brace { elements, .. } => {
                 write!(self.writer, "brace (element-count {})", elements.len())?;
             }
         }
@@ -2146,8 +2349,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_port_definition_body(&mut self, body: &PortDefBody) -> io::Result<()> {
         match body {
-            PortDefBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            PortDefBody::Brace { elements } => {
+            PortDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            PortDefBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {
@@ -2185,8 +2388,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         PortDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
                         }
-                        PortDefBodyElement::Other(text) => {
-                            self.write_opaque(&mut first, "other", text)?;
+                        super::PortDefBodyElement::Unsupported(unsupported) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_unsupported(&unsupported.value, &element.span)?;
                         }
                     }
                 }
@@ -2497,7 +2701,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::InterfaceUsage(_usage) => {
                 self.write_marker(first, "interface-usage")
             }
-            PackageBodyElement::Ref(_reference) => self.write_marker(first, "ref"),
+            PackageBodyElement::Ref(declaration) => {
+                self.write_item_prefix(first)?;
+                self.write_ref_declaration(&declaration.value)
+            }
             PackageBodyElement::EnumerationUsage(_usage) => {
                 self.write_marker(first, "enumeration-usage")
             }
@@ -2560,8 +2767,8 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
     fn write_package_body(&mut self, body: &PackageBody) -> io::Result<()> {
         match body {
-            PackageBody::Semicolon => self.writer.write_str("(body semicolon)"),
-            PackageBody::Brace { elements } => {
+            PackageBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            PackageBody::Brace { elements, .. } => {
                 self.writer.write_str("(body ")?;
                 let mut first = true;
                 for element in elements {

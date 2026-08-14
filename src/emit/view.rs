@@ -57,11 +57,11 @@ pub(crate) fn emit_constraint_body(
     body: &ConstraintDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        ConstraintDefBody::Semicolon => {
+        ConstraintDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        ConstraintDefBody::Brace { elements } => {
+        ConstraintDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -83,10 +83,6 @@ pub(crate) fn emit_constraint_body_element(
 ) -> Result<(), EmitError> {
     match el {
         ConstraintDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        ConstraintDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         ConstraintDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         ConstraintDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ConstraintDefBodyElement::Expression(e) => {
@@ -95,6 +91,9 @@ pub(crate) fn emit_constraint_body_element(
             Ok(())
         }
         ConstraintDefBodyElement::Constraint(c) => emit_constraint_usage(w, path, &c.value),
+        ConstraintDefBodyElement::FeatureDecl(declaration) => {
+            super::structure::emit_default_reference_usage(w, path, &declaration.value)
+        }
         ConstraintDefBodyElement::AttributeUsage(a) => {
             // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).
             if a.value.redefines.is_some()
@@ -179,11 +178,11 @@ pub(crate) fn emit_calc_body(
     body: &CalcDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        CalcDefBody::Semicolon => {
+        CalcDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        CalcDefBody::Brace { elements } => {
+        CalcDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -542,7 +541,7 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
         emit_feature_value(w, value)?;
     }
     match &ret.body {
-        CalcDefBody::Semicolon => w.push_char(';'),
+        CalcDefBody::Semicolon { .. } => w.push_char(';'),
         body @ CalcDefBody::Brace { .. } => emit_calc_body(w, "calc-return", body)?,
     }
     Ok(())
@@ -561,9 +560,12 @@ pub(crate) fn emit_assert_constraint(
     if let Some(target) = assert.target {
         w.push_qualified_reference(&format!("{path}/target"), target)?;
     } else {
-        w.push_str("constraint ");
+        // No trailing space for the anonymous form (`assert constraint { ... }`) -- the body
+        // emitter supplies its own leading space.
+        w.push_str("constraint");
     }
     if let Some(name) = &assert.declaration_name {
+        w.push_char(' ');
         w.push_str(&format_name(name));
     }
     if let Some(ty) = assert.type_name {
@@ -585,11 +587,11 @@ pub(crate) fn emit_view_def(
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::ViewDefBody::Semicolon => {
+        crate::ast::ViewDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ViewDefBody::Brace { elements } => {
+        crate::ast::ViewDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -598,11 +600,8 @@ pub(crate) fn emit_view_def(
                     crate::ast::ViewDefBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::ViewDefBodyElement::Other(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::Other,
-                        });
+                    crate::ast::ViewDefBodyElement::Unsupported(unsupported) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
                     crate::ast::ViewDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::ViewDefBodyElement::MetadataAnnotation(m) => {
@@ -672,11 +671,11 @@ pub(crate) fn emit_view_usage(
         }
     }
     match &usage.body {
-        crate::ast::ViewBody::Semicolon => {
+        crate::ast::ViewBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ViewBody::Brace { elements } => {
+        crate::ast::ViewBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -684,12 +683,6 @@ pub(crate) fn emit_view_usage(
                 match &el.value {
                     crate::ast::ViewBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
-                    }
-                    crate::ast::ViewBodyElement::Other(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::Other,
-                        });
                     }
                     crate::ast::ViewBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::ViewBodyElement::Filter(f) => {
@@ -750,15 +743,15 @@ fn emit_view_rendering(
         w.push_qualified_reference(&format!("{path}/render/type"), *ty)?;
     }
     match &r.body {
-        crate::ast::RenderingUsageBody::Semicolon => {
+        crate::ast::RenderingUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements } if elements.is_empty() => {
+        crate::ast::RenderingUsageBody::Brace { elements, .. } if elements.is_empty() => {
             w.push_str(" {}");
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements } => {
+        crate::ast::RenderingUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -831,11 +824,11 @@ pub(crate) fn emit_rendering_def(
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::RenderingDefBody::Semicolon => {
+        crate::ast::RenderingDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingDefBody::Brace { elements } => {
+        crate::ast::RenderingDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -844,11 +837,8 @@ pub(crate) fn emit_rendering_def(
                     crate::ast::RenderingDefBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::RenderingDefBodyElement::Other(_) => {
-                        return Err(EmitError::Opaque {
-                            path: format!("{path}/body[{i}]"),
-                            kind: super::OpacityKind::Other,
-                        });
+                    crate::ast::RenderingDefBodyElement::Unsupported(unsupported) => {
+                        w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
                     crate::ast::RenderingDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::RenderingDefBodyElement::Filter(f) => {
@@ -904,11 +894,11 @@ pub(crate) fn emit_rendering_usage(
         emit_feature_value(w, value)?;
     }
     match &usage.body {
-        crate::ast::RenderingUsageBody::Semicolon => {
+        crate::ast::RenderingUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::RenderingUsageBody::Brace { elements } => {
+        crate::ast::RenderingUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();

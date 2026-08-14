@@ -1,8 +1,8 @@
 //! Metadata/annotation parsing helpers.
 
 use crate::ast::{
-    Annotation, AnnotationHead, AttributeBody, DefinitionPrefix, ExtendedDefinition,
-    MetadataAnnotation, MetadataKeywordUsage, Node,
+    Annotation, AnnotationHead, DefinitionPrefix, ExtendedDefinition, MetadataAnnotation,
+    MetadataKeywordUsage, Node,
 };
 use crate::parser::attribute::metadata_body;
 use crate::parser::connector::connect_body;
@@ -123,7 +123,7 @@ fn metadata_keyword_usage_inner(
                 keyword,
                 type_reference,
                 about_targets,
-                body,
+                body: Some(body),
                 keyword_span,
                 type_span,
             },
@@ -153,7 +153,7 @@ fn extended_definition_prefix_tag(
                 keyword,
                 type_reference: None,
                 about_targets: Vec::new(),
-                body: AttributeBody::Semicolon,
+                body: None,
                 keyword_span,
                 type_span: None,
             },
@@ -277,7 +277,7 @@ pub(crate) fn metadata_keyword_prefix(
                 keyword,
                 type_reference: None,
                 about_targets: Vec::new(),
-                body: AttributeBody::Semicolon,
+                body: None,
                 keyword_span,
                 type_span: None,
             },

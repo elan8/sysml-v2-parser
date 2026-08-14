@@ -58,10 +58,10 @@ package '15_04-Logical Expressions' {
         attribute isHighPerformance : Boolean;
         part engine : Engine[1];
         part transmission : Transmission[1];
-        assert constraint  {
+        assert constraint {
             if isHighPerformance ? engine istype '6CylEngine' else engine istype '4CylEngine';
         }
-        assert constraint  {
+        assert constraint {
             (engine istype '4CylEngine' && transmission istype ManualTransmission) xor (engine istype '6CylEngine' && transmission istype AutomaticTransmission);
         }
     }

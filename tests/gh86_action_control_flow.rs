@@ -2,8 +2,8 @@
 //! Each test below uses the exact (trimmed) real source that motivated the fix.
 
 use sysml_v2_parser::ast::{
-    ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, PackageBody,
-    PackageBodyElement, RootElement, ThenTarget,
+    ActionBranchBody, ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement,
+    PackageBody, PackageBodyElement, RootElement, ThenTarget,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
@@ -18,7 +18,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     elements.iter().map(|e| e.value.clone()).collect()
@@ -46,13 +46,15 @@ fn gh86_6_in_out_decl_redefinition_accepts_trailing_type_clause() {
     let PackageBodyElement::ActionDef(action_def) = &elements[0] else {
         panic!("expected ActionDef, got {:?}", elements[0]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let ActionDefBodyElement::ActionUsage(action_usage) = &elements[0].value else {
         panic!("expected nested ActionUsage, got {:?}", elements[0]);
     };
-    let ActionUsageBody::Brace { elements } = &action_usage.value.body else {
+    let ActionUsageBody::Brace { elements, .. } =
+        action_usage.value.body.as_ref().expect("an authored body")
+    else {
         panic!("expected brace action usage body");
     };
     let in_out_decl = elements.iter().find_map(|e| match &e.value {
@@ -105,7 +107,7 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_def_body() {
     let PackageBodyElement::ActionDef(action_def) = &elements[0] else {
         panic!("expected ActionDef, got {:?}", elements[0]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let metadata_usage = elements.iter().find_map(|e| match &e.value {
@@ -143,7 +145,7 @@ fn gh86_5_bare_language_textual_representation_dispatched_inside_action_def_body
     let PackageBodyElement::ActionDef(action_def) = &elements[1] else {
         panic!("expected ActionDef, got {:?}", elements[1]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let rep = elements.iter().find_map(|e| match &e.value {
@@ -185,7 +187,9 @@ fn gh86_2_then_accept_shorthand_target() {
     let PackageBodyElement::ActionUsage(action_usage) = &elements[1] else {
         panic!("expected ActionUsage, got {:?}", elements[1]);
     };
-    let ActionUsageBody::Brace { elements } = &action_usage.value.body else {
+    let ActionUsageBody::Brace { elements, .. } =
+        action_usage.value.body.as_ref().expect("an authored body")
+    else {
         panic!("expected brace action usage body");
     };
     let then_accept = elements.iter().find_map(|e| match &e.value {
@@ -241,7 +245,7 @@ fn gh86_2_then_fork_target() {
     let PackageBodyElement::ActionDef(action_def) = &elements[0] else {
         panic!("expected ActionDef, got {:?}", elements[0]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let then_fork = elements.iter().find_map(|e| match &e.value {
@@ -281,7 +285,7 @@ fn gh86_3_if_then_non_brace_shorthand_without_else() {
     let PackageBodyElement::ActionDef(action_def) = &elements[0] else {
         panic!("expected ActionDef, got {:?}", elements[0]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let if_stmt = elements.iter().find_map(|e| match &e.value {
@@ -289,15 +293,13 @@ fn gh86_3_if_then_non_brace_shorthand_without_else() {
         _ => None,
     });
     let if_stmt = if_stmt.expect("expected an IfStmt element");
-    let ActionDefBody::Brace {
-        elements: then_elems,
-    } = &if_stmt.then_body
-    else {
-        panic!("expected synthetic one-element then_body");
+    // The brace-less spelling keeps its own state: it is a single member, not a body with
+    // delimiters the author never wrote.
+    let ActionBranchBody::Shorthand(then_member) = &if_stmt.then_body else {
+        panic!("expected a brace-less then branch");
     };
-    assert_eq!(then_elems.len(), 1);
     assert!(matches!(
-        &then_elems[0].value,
+        &then_member.value,
         ActionDefBodyElement::ThenAction(_)
     ));
     assert!(if_stmt.else_body.is_none());
@@ -320,7 +322,7 @@ fn gh86_3_if_then_else_non_brace_shorthand() {
     let PackageBodyElement::ActionDef(action_def) = &elements[0] else {
         panic!("expected ActionDef, got {:?}", elements[0]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let if_stmt = elements.iter().find_map(|e| match &e.value {
@@ -328,15 +330,13 @@ fn gh86_3_if_then_else_non_brace_shorthand() {
         _ => None,
     });
     let if_stmt = if_stmt.expect("expected an IfStmt element");
-    let ActionDefBody::Brace {
-        elements: else_elems,
-    } = if_stmt.else_body.as_ref().expect("expected an else_body")
+    let ActionBranchBody::Shorthand(else_member) =
+        if_stmt.else_body.as_ref().expect("expected an else_body")
     else {
-        panic!("expected synthetic one-element else_body");
+        panic!("expected a brace-less else branch");
     };
-    assert_eq!(else_elems.len(), 1);
     assert!(matches!(
-        &else_elems[0].value,
+        &else_member.value,
         ActionDefBodyElement::ThenAction(_)
     ));
 }
@@ -358,7 +358,9 @@ fn gh86_3_then_decide_target() {
     let PackageBodyElement::ActionUsage(action_usage) = &elements[1] else {
         panic!("expected ActionUsage, got {:?}", elements[1]);
     };
-    let ActionUsageBody::Brace { elements } = &action_usage.value.body else {
+    let ActionUsageBody::Brace { elements, .. } =
+        action_usage.value.body.as_ref().expect("an authored body")
+    else {
         panic!("expected brace action usage body");
     };
     let then_decide = elements.iter().find_map(|e| match &e.value {
@@ -407,7 +409,7 @@ fn gh86_3_else_if_chaining() {
     let PackageBodyElement::ActionDef(action_def) = &elements[0] else {
         panic!("expected ActionDef, got {:?}", elements[0]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let outer_if = elements
@@ -417,17 +419,15 @@ fn gh86_3_else_if_chaining() {
             _ => None,
         })
         .expect("expected outer IfStmt element");
-    let ActionDefBody::Brace {
-        elements: outer_else_elems,
-    } = outer_if
+    // `else if ...` is written without braces, so the branch is the nested `if` itself.
+    let ActionBranchBody::Shorthand(outer_else_member) = outer_if
         .else_body
         .as_ref()
         .expect("expected outer else_body")
     else {
-        panic!("expected synthetic one-element else_body wrapping the nested if");
+        panic!("expected a brace-less else branch wrapping the nested if");
     };
-    assert_eq!(outer_else_elems.len(), 1);
-    let inner_if = match &outer_else_elems[0].value {
+    let inner_if = match &outer_else_member.value {
         ActionDefBodyElement::IfStmt(i) => &i.value,
         other => panic!("expected nested IfStmt in else_body, got {other:?}"),
     };
@@ -454,7 +454,9 @@ fn gh86_4_bare_metadata_keyword_dispatched_inside_action_usage_body() {
     let PackageBodyElement::ActionUsage(action_usage) = &elements[1] else {
         panic!("expected ActionUsage, got {:?}", elements[1]);
     };
-    let ActionUsageBody::Brace { elements } = &action_usage.value.body else {
+    let ActionUsageBody::Brace { elements, .. } =
+        action_usage.value.body.as_ref().expect("an authored body")
+    else {
         panic!("expected brace action usage body");
     };
     let metadata_usage = elements.iter().find_map(|e| match &e.value {
@@ -491,7 +493,7 @@ fn gh86_1_send_expression_payload_with_via() {
     let PackageBodyElement::ActionDef(action_def) = &elements[1] else {
         panic!("expected ActionDef, got {:?}", elements[1]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let publish = elements.iter().find_map(|e| match &e.value {
@@ -542,7 +544,7 @@ fn gh86_1_send_expression_payload_with_to_only() {
     let PackageBodyElement::ActionDef(action_def) = &elements[1] else {
         panic!("expected ActionDef, got {:?}", elements[1]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let subscribe = elements.iter().find_map(|e| match &e.value {
@@ -575,7 +577,7 @@ fn gh86_1_send_typed_payload_still_works() {
     let PackageBodyElement::ActionDef(action_def) = &elements[1] else {
         panic!("expected ActionDef, got {:?}", elements[1]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let a1 = elements.iter().find_map(|e| match &e.value {
@@ -583,7 +585,8 @@ fn gh86_1_send_typed_payload_still_works() {
         _ => None,
     });
     let a1 = a1.expect("expected the `a1` ActionUsage");
-    let ActionUsageBody::Brace { elements } = &a1.body else {
+    let ActionUsageBody::Brace { elements, .. } = a1.body.as_ref().expect("an authored body")
+    else {
         panic!("expected brace action usage body");
     };
     let send = elements.iter().find_map(|e| match &e.value {
@@ -624,7 +627,7 @@ fn gh86_1_send_no_payload_with_via_and_to() {
     let PackageBodyElement::ActionDef(action_def) = &elements[0] else {
         panic!("expected ActionDef, got {:?}", elements[0]);
     };
-    let ActionDefBody::Brace { elements } = &action_def.value.body else {
+    let ActionDefBody::Brace { elements, .. } = &action_def.value.body else {
         panic!("expected brace action def body");
     };
     let snd2 = elements.iter().find_map(|e| match &e.value {

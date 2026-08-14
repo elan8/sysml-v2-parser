@@ -11,8 +11,8 @@ use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::import::import_shape;
 use crate::parser::lex::{
-    capture_opaque_member, name, qualified_reference, reference_path, starts_with_any_keyword,
-    visibility_prefix, ws1, ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    name, qualified_reference, reference_path, visibility_prefix, ws1, ws_and_comments,
+    VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::usage::{multiplicity_node, prefix_redefinition_target};
@@ -38,8 +38,14 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
         map(view_filter_member, ViewDefBodyElement::Filter),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
         map(
-            |i| capture_opaque_member(i, VIEW_DEF_OPAQUE_STARTERS),
-            ViewDefBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    VIEW_DEF_OPAQUE_STARTERS,
+                    "view definition body",
+                )
+            },
+            ViewDefBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -99,10 +105,16 @@ fn rendering_usage_body_recovery(
 fn rendering_usage_body(input: Input<'_>) -> IResult<Input<'_>, RenderingUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, RenderingUsageBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            RenderingUsageBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members(
         input,
         VIEW_DEF_BODY_STARTERS,
         "rendering usage body",
@@ -110,7 +122,7 @@ fn rendering_usage_body(input: Input<'_>) -> IResult<Input<'_>, RenderingUsageBo
         rendering_usage_body_element,
         rendering_usage_body_recovery,
     )?;
-    Ok((input, RenderingUsageBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderingUsage>> {
@@ -143,30 +155,30 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
 }
 
 fn view_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewDefBodyElement> {
-    if starts_with_any_keyword(start.fragment(), VIEW_DEF_BODY_STARTERS) {
-        let recovery = build_recovery_error_node_from_span(
-            start,
-            end,
-            VIEW_DEF_BODY_STARTERS,
-            "view definition body",
-            "recovered_view_def_body_element",
-        );
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        return node_from_to(start, end, ViewDefBodyElement::Error(node));
-    }
-    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(60)])
-        .trim()
-        .to_string();
-    node_from_to(start, end, ViewDefBodyElement::Other(preview))
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        VIEW_DEF_BODY_STARTERS,
+        "view definition body",
+        "recovered_view_def_body_element",
+    );
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    node_from_to(start, end, ViewDefBodyElement::Error(node))
 }
 
 fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, ViewDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            ViewDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members(
         input,
         VIEW_DEF_BODY_STARTERS,
         "view definition body",
@@ -174,7 +186,7 @@ fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
         view_def_body_element,
         view_def_body_recovery,
     )?;
-    Ok((input, ViewDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
@@ -237,8 +249,14 @@ fn rendering_def_body_element(
         map(view_filter_member, RenderingDefBodyElement::Filter),
         map(view_rendering_usage, RenderingDefBodyElement::ViewRendering),
         map(
-            |i| capture_opaque_member(i, RENDERING_DEF_OPAQUE_STARTERS),
-            RenderingDefBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    RENDERING_DEF_OPAQUE_STARTERS,
+                    "rendering definition body",
+                )
+            },
+            RenderingDefBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -263,10 +281,16 @@ fn rendering_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<Renderi
 fn rendering_def_body(input: Input<'_>) -> IResult<Input<'_>, RenderingDefBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, RenderingDefBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            RenderingDefBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members(
         input,
         VIEW_DEF_BODY_STARTERS,
         "rendering definition body",
@@ -274,7 +298,7 @@ fn rendering_def_body(input: Input<'_>) -> IResult<Input<'_>, RenderingDefBody> 
         rendering_def_body_element,
         rendering_def_body_recovery,
     )?;
-    Ok((input, RenderingDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<RenderingDef>> {
@@ -374,30 +398,30 @@ fn satisfy_view_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisf
 }
 
 fn view_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewBodyElement> {
-    if starts_with_any_keyword(start.fragment(), VIEW_BODY_STARTERS) {
-        let recovery = build_recovery_error_node_from_span(
-            start,
-            end,
-            VIEW_BODY_STARTERS,
-            "view body",
-            "recovered_view_body_element",
-        );
-        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
-        return node_from_to(start, end, ViewBodyElement::Error(node));
-    }
-    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(60)])
-        .trim()
-        .to_string();
-    node_from_to(start, end, ViewBodyElement::Other(preview))
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        VIEW_BODY_STARTERS,
+        "view body",
+        "recovered_view_body_element",
+    );
+    let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+    node_from_to(start, end, ViewBodyElement::Error(node))
 }
 
 fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, ViewBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            ViewBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = crate::parser::body::parse_structured_brace_members_with_skip(
+    let (input, members) = crate::parser::body::parse_structured_brace_members_with_skip(
         input,
         VIEW_BODY_STARTERS,
         "view body",
@@ -406,7 +430,7 @@ fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
         view_body_recovery,
         crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
-    Ok((input, ViewBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
@@ -608,14 +632,14 @@ mod expose_diagnostic_tests {
             other => panic!("expected package, got {other:?}"),
         };
         let view_usage = match &pkg.value.body {
-            PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBody::Brace { elements, .. } => match &elements[0].value {
                 PackageBodyElement::ViewUsage(v) => v,
                 other => panic!("expected view usage, got {other:?}"),
             },
             other => panic!("expected brace body, got {other:?}"),
         };
         match &view_usage.value.body {
-            ViewBody::Brace { elements } => match &elements[0].value {
+            ViewBody::Brace { elements, .. } => match &elements[0].value {
                 ViewBodyElement::Expose(e) => &e.value,
                 other => panic!("expected expose member, got {other:?}"),
             },
@@ -739,7 +763,7 @@ mod expose_diagnostic_tests {
             other => panic!("expected package, got {other:?}"),
         };
         let view = match &package.body {
-            PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBody::Brace { elements, .. } => match &elements[0].value {
                 PackageBodyElement::ViewUsage(view) => &view.value,
                 other => panic!("expected view usage, got {other:?}"),
             },
@@ -752,7 +776,7 @@ mod expose_diagnostic_tests {
         assert_eq!(view_type.authored_text(), "$::Views::General");
         assert!(view_type.metadata.is_absolute);
         let satisfy = match &view.body {
-            ViewBody::Brace { elements } => match &elements[0].value {
+            ViewBody::Brace { elements, .. } => match &elements[0].value {
                 ViewBodyElement::Satisfy(satisfy) => &satisfy.value,
                 other => panic!("expected satisfy member, got {other:?}"),
             },
@@ -931,7 +955,7 @@ mod column_view_tests {
         ))
         .expect("rendering usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let RenderingUsageBody::Brace { elements } = &node.value.body else {
+        let RenderingUsageBody::Brace { elements, .. } = &node.value.body else {
             panic!("expected brace body, got {:?}", node.value.body);
         };
         assert_eq!(elements.len(), 1);
@@ -942,6 +966,7 @@ mod column_view_tests {
         assert!(column_view.value.redefines.is_some());
         let ViewBody::Brace {
             elements: nested_elements,
+            ..
         } = &column_view.value.body
         else {
             panic!("expected brace body on nested columnView");
@@ -961,7 +986,7 @@ mod column_view_tests {
         ))
         .expect("view rendering usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let RenderingUsageBody::Brace { elements } = &node.value.body else {
+        let RenderingUsageBody::Brace { elements, .. } = &node.value.body else {
             panic!("expected brace body, got {:?}", node.value.body);
         };
         assert_eq!(elements.len(), 1);

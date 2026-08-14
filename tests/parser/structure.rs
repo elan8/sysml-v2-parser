@@ -13,7 +13,7 @@ fn test_use_case_def_body_parses_members() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let use_case = match &elements[0].value {
@@ -21,7 +21,7 @@ fn test_use_case_def_body_parses_members() {
         _ => panic!("expected UseCaseDef"),
     };
     let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected use case brace body"),
     };
     assert!(body_elements.iter().any(|e| matches!(
@@ -52,7 +52,7 @@ fn test_occurrence_usage_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     match &elements[0].value {
@@ -73,7 +73,7 @@ fn test_flow_and_allocation_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(matches!(
@@ -100,7 +100,7 @@ fn test_flow_and_allocation_brace_bodies_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
 
@@ -139,7 +139,7 @@ fn test_metadata_def_brace_body_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
 
@@ -163,7 +163,7 @@ fn test_case_family_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(matches!(elements[0].value, PackageBodyElement::CaseDef(_)));
@@ -186,7 +186,7 @@ fn test_case_family_bodies_parse_use_case_members() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let case_def = match &elements[0].value {
@@ -194,7 +194,7 @@ fn test_case_family_bodies_parse_use_case_members() {
         _ => panic!("expected CaseDef"),
     };
     assert!(
-        matches!(&case_def.body, sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } if !elements.is_empty())
+        matches!(&case_def.body, sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } if !elements.is_empty())
     );
 }
 
@@ -208,7 +208,7 @@ fn test_enum_def_with_specialization_and_assigned_literals_maps_dedicated() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     assert!(matches!(elements[0].value, PackageBodyElement::EnumDef(_)));
@@ -240,7 +240,7 @@ fn test_expression_precedence_parse() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     match &elements[0].value {
@@ -262,7 +262,7 @@ fn test_expression_allows_qualified_names_and_invocation_arguments() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let attr = match &elements[0].value {
@@ -324,7 +324,7 @@ part def D {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
 
@@ -378,6 +378,7 @@ part def D {
         .expect("expected part def D");
     let PartDefBody::Brace {
         elements: part_elements,
+        ..
     } = &part_def.body
     else {
         panic!("expected part def brace body");
@@ -498,7 +499,7 @@ part def Robot {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -508,7 +509,7 @@ part def Robot {
             _ => None,
         })
         .expect("expected part def");
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     assert!(elements.iter().any(|e| matches!(
@@ -540,7 +541,7 @@ part def Accumulator {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -550,7 +551,7 @@ part def Accumulator {
             _ => None,
         })
         .expect("expected part def");
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     assert!(elements.iter().any(|e| matches!(
@@ -585,7 +586,7 @@ part def Sensor {
     let RootElement::Package(pkg) = &result.document.root.elements[0].value else {
         panic!("expected package");
     };
-    let PackageBody::Brace { elements } = &pkg.value.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.value.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -595,7 +596,7 @@ part def Sensor {
             _ => None,
         })
         .expect("expected part def");
-    let PartDefBody::Brace { elements } = &part.body else {
+    let PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
 
@@ -657,7 +658,7 @@ fn test_part_def_body_never_misclassifies_non_connector_interface_as_definition(
     let RootElement::Package(pkg) = &result.document.root.elements[0].value else {
         panic!("expected package");
     };
-    let PackageBody::Brace { elements } = &pkg.value.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.value.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -667,7 +668,7 @@ fn test_part_def_body_never_misclassifies_non_connector_interface_as_definition(
             _ => None,
         })
         .expect("expected part def");
-    let PartDefBody::Brace { elements } = &part.body else {
+    let PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     assert!(
@@ -703,7 +704,7 @@ part def Accumulator {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -713,7 +714,7 @@ part def Accumulator {
             _ => None,
         })
         .expect("expected part def");
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     assert!(elements.iter().any(|e| matches!(
@@ -731,7 +732,7 @@ fn test_parse_interface_usage_named_with_multiplicity() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let home = elements
@@ -746,7 +747,7 @@ fn test_parse_interface_usage_named_with_multiplicity() {
         })
         .expect("Home part def should be present");
     let home_body = match &home.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected Home part def body"),
     };
     let living_room = home_body
@@ -761,7 +762,7 @@ fn test_parse_interface_usage_named_with_multiplicity() {
         })
         .expect("livingRoom part usage should be present");
     let living_room_body = match &living_room.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } => elements,
         _ => panic!("expected livingRoom part usage body"),
     };
     assert!(
@@ -800,7 +801,7 @@ fn test_parse_use_case_subject_shorthand_without_name() {
         _ => panic!("expected package"),
     };
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected brace body"),
     };
     let use_case = elements
@@ -811,7 +812,7 @@ fn test_parse_use_case_subject_shorthand_without_name() {
         })
         .expect("use case def should be present");
     let body_elements = match &use_case.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected use case brace body"),
     };
     let subject = body_elements
@@ -843,7 +844,7 @@ part def A specializes B;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -875,7 +876,7 @@ part def A :> B, C, D;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -907,7 +908,7 @@ port def ControlPort specializes BasePort;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let port_def = match &elements[0].value {
@@ -935,7 +936,7 @@ port def ControlPort :> BasePort, DiagnosticPort;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let port_def = match &elements[0].value {
@@ -964,7 +965,7 @@ individual def Rover specializes MobileRobot;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let individual_def = match &elements[0].value {
@@ -992,7 +993,7 @@ occurrence rover subsets BaseOccurrence redefines LegacyOccurrence;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let occ = match &elements[0].value {
@@ -1020,7 +1021,7 @@ occurrence event typed by Mission::Event subsets events redefines oldEvent;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let occ = match &elements[0].value {
@@ -1050,7 +1051,7 @@ occurrence rover; subsets BaseOccurrence redefines LegacyOccurrence;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let occ = match &elements[0].value {
@@ -1078,7 +1079,7 @@ use case mission typed by Mission::CaseType subsets BaseCase;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let use_case = match &elements[0].value {
@@ -1101,14 +1102,14 @@ then use case step typed by Mission::StepCase;
         other => panic!("expected package, got {:?}", other),
     };
     let use_case_def = match &pkg.value.body {
-        PackageBody::Brace { elements } => match &elements[0].value {
+        PackageBody::Brace { elements, .. } => match &elements[0].value {
             PackageBodyElement::UseCaseDef(d) => d,
             other => panic!("expected use case def, got {:?}", other),
         },
         other => panic!("expected brace body, got {:?}", other),
     };
     let body_elements = match &use_case_def.value.body {
-        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements, .. } => elements,
         other => panic!("expected use case brace body, got {:?}", other),
     };
     let then_use_case = body_elements
@@ -1136,14 +1137,14 @@ attribute usage : Real;
         other => panic!("expected package, got {:?}", other),
     };
     let attr_def = match &pkg.value.body {
-        PackageBody::Brace { elements } => match &elements[0].value {
+        PackageBody::Brace { elements, .. } => match &elements[0].value {
             PackageBodyElement::AttributeDef(a) => a,
             other => panic!("expected attribute def, got {:?}", other),
         },
         other => panic!("expected brace body, got {:?}", other),
     };
     let members = match &attr_def.value.body {
-        sysml_v2_parser::ast::AttributeBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::AttributeBody::Brace { elements, .. } => elements,
         other => panic!("expected structured attribute body, got {:?}", other),
     };
     assert!(
@@ -1165,14 +1166,14 @@ doc /* tag doc */
         other => panic!("expected package, got {:?}", other),
     };
     let metadata_def = match &pkg.value.body {
-        PackageBody::Brace { elements } => match &elements[0].value {
+        PackageBody::Brace { elements, .. } => match &elements[0].value {
             PackageBodyElement::MetadataDef(m) => m,
             other => panic!("expected metadata def, got {:?}", other),
         },
         other => panic!("expected brace body, got {:?}", other),
     };
     let members = match &metadata_def.value.body {
-        sysml_v2_parser::ast::AttributeBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::AttributeBody::Brace { elements, .. } => elements,
         other => panic!("expected structured metadata body, got {:?}", other),
     };
     assert!(
@@ -1196,14 +1197,14 @@ part wheel : Wheel;
         other => panic!("expected package, got {:?}", other),
     };
     let part_def = match &pkg.value.body {
-        PackageBody::Brace { elements } => match &elements[0].value {
+        PackageBody::Brace { elements, .. } => match &elements[0].value {
             PackageBodyElement::PartDef(d) => d,
             other => panic!("expected part def, got {:?}", other),
         },
         other => panic!("expected brace body, got {:?}", other),
     };
     let members = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected structured part def body, got {:?}", other),
     };
     assert!(
@@ -1226,14 +1227,14 @@ in fuel : Fuel;
         other => panic!("expected package, got {:?}", other),
     };
     let port_def = match &pkg.value.body {
-        PackageBody::Brace { elements } => match &elements[0].value {
+        PackageBody::Brace { elements, .. } => match &elements[0].value {
             PackageBodyElement::PortDef(d) => d,
             other => panic!("expected port def, got {:?}", other),
         },
         other => panic!("expected brace body, got {:?}", other),
     };
     let members = match &port_def.value.body {
-        sysml_v2_parser::ast::PortDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PortDefBody::Brace { elements, .. } => elements,
         other => panic!("expected structured port def body, got {:?}", other),
     };
     assert!(
@@ -1258,14 +1259,14 @@ port rightWheelToRoadPort;
         other => panic!("expected package, got {:?}", other),
     };
     let part_usage = match &pkg.value.body {
-        PackageBody::Brace { elements } => match &elements[0].value {
+        PackageBody::Brace { elements, .. } => match &elements[0].value {
             PackageBodyElement::PartUsage(p) => p,
             other => panic!("expected part usage, got {:?}", other),
         },
         other => panic!("expected brace body, got {:?}", other),
     };
     let port_usage = match &part_usage.value.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements
+        sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|el| match &el.value {
                 PartUsageBodyElement::PortUsage(p) => Some(p),
@@ -1275,7 +1276,7 @@ port rightWheelToRoadPort;
         other => panic!("expected part usage brace body, got {:?}", other),
     };
     let members = match &port_usage.value.body {
-        sysml_v2_parser::ast::PortBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PortBody::Brace { elements, .. } => elements,
         other => panic!("expected structured port body, got {:?}", other),
     };
     assert_eq!(
@@ -1309,14 +1310,14 @@ Addresses: front ToF 0x29, left ToF 0x2A, right ToF 0x2B, IMU 0x68.
         other => panic!("expected package, got {:?}", other),
     };
     let part_def = match &pkg.value.body {
-        PackageBody::Brace { elements } => match &elements[0].value {
+        PackageBody::Brace { elements, .. } => match &elements[0].value {
             PackageBodyElement::PartDef(d) => d,
             other => panic!("expected part def, got {:?}", other),
         },
         other => panic!("expected brace body, got {:?}", other),
     };
     let port_usage = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|el| match &el.value {
                 PartDefBodyElement::PortUsage(p) => Some(p),
@@ -1326,7 +1327,7 @@ Addresses: front ToF 0x29, left ToF 0x2A, right ToF 0x2B, IMU 0x68.
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let members = match &port_usage.value.body {
-        sysml_v2_parser::ast::PortBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PortBody::Brace { elements, .. } => elements,
         other => panic!("expected structured port body, got {:?}", other),
     };
     assert_eq!(
@@ -1364,7 +1365,7 @@ part def Carrier {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -1372,7 +1373,7 @@ part def Carrier {
         other => panic!("expected part def, got {:?}", other),
     };
     let part_body = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let port_usage = match &part_body[0].value {
@@ -1410,7 +1411,7 @@ part def Carrier {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -1418,7 +1419,7 @@ part def Carrier {
         other => panic!("expected part def, got {:?}", other),
     };
     let part_body = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let port_usage = match &part_body[0].value {
@@ -1457,7 +1458,7 @@ part def Carrier {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -1465,7 +1466,7 @@ part def Carrier {
         other => panic!("expected part def, got {:?}", other),
     };
     let part_body = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let port_usage = match &part_body[0].value {
@@ -1505,7 +1506,7 @@ part def Carrier {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -1513,7 +1514,7 @@ part def Carrier {
         other => panic!("expected part def, got {:?}", other),
     };
     let part_body = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let port_usage = match &part_body[0].value {
@@ -1551,7 +1552,7 @@ constraint def C {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let constraint = elements
@@ -1561,7 +1562,7 @@ constraint def C {
             _ => None,
         })
         .expect("expected constraint definition");
-    let sysml_v2_parser::ast::ConstraintDefBody::Brace { elements } = &constraint.body else {
+    let sysml_v2_parser::ast::ConstraintDefBody::Brace { elements, .. } = &constraint.body else {
         panic!("expected constraint body");
     };
     let exprs: Vec<&sysml_v2_parser::ast::Node<sysml_v2_parser::ast::Expression>> = elements
@@ -1598,7 +1599,7 @@ part def Vehicle {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -1608,7 +1609,7 @@ part def Vehicle {
             _ => None,
         })
         .expect("expected part def");
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     let usage = elements
@@ -1651,7 +1652,7 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let robot = elements
@@ -1663,7 +1664,7 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
             _ => None,
         })
         .expect("robot part usage");
-    let PartUsageBody::Brace { elements } = &robot.body else {
+    let PartUsageBody::Brace { elements, .. } = &robot.body else {
         panic!("expected robot part usage body");
     };
     let attribute = elements
@@ -1698,7 +1699,7 @@ fn test_attribute_usage_accepts_defined_by_typing() {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -1708,7 +1709,7 @@ fn test_attribute_usage_accepts_defined_by_typing() {
             _ => None,
         })
         .expect("part usage");
-    let PartUsageBody::Brace { elements } = &part.body else {
+    let PartUsageBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     let attribute = elements
@@ -1742,7 +1743,7 @@ fn test_attribute_usage_accepts_typed_by_default_value() {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -1752,7 +1753,7 @@ fn test_attribute_usage_accepts_typed_by_default_value() {
             _ => None,
         })
         .expect("part usage");
-    let PartUsageBody::Brace { elements } = &part.body else {
+    let PartUsageBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     let attribute = elements
@@ -1787,7 +1788,7 @@ fn test_attribute_usage_prefix_redefines_accepts_defined_by_typing() {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -1797,7 +1798,7 @@ fn test_attribute_usage_prefix_redefines_accepts_defined_by_typing() {
             _ => None,
         })
         .expect("part usage");
-    let PartUsageBody::Brace { elements } = &part.body else {
+    let PartUsageBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     let attribute = elements
@@ -1835,7 +1836,7 @@ fn test_attribute_usage_accepts_subsets_clause_without_ast_field() {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let part = elements
@@ -1845,7 +1846,7 @@ fn test_attribute_usage_accepts_subsets_clause_without_ast_field() {
             _ => None,
         })
         .expect("part usage");
-    let PartUsageBody::Brace { elements } = &part.body else {
+    let PartUsageBody::Brace { elements, .. } = &part.body else {
         panic!("expected part body");
     };
     let attribute = elements
@@ -1877,7 +1878,7 @@ fn test_attribute_def_accepts_multiplicity_and_uniqueness_before_specialization(
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let attribute = elements
@@ -1909,7 +1910,7 @@ fn test_attribute_def_accepts_untyped_multiplicity_uniqueness_brace_body() {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     assert!(
@@ -1935,7 +1936,7 @@ fn test_attribute_def_accepts_default_value_without_equals_after_specialization(
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let attribute = elements
@@ -1969,7 +1970,7 @@ fn test_attribute_def_accepts_multiple_specialization_targets() {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     assert!(
@@ -1996,7 +1997,7 @@ fn test_attribute_def_accepts_constructor_default_value() {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected package body");
     };
     let attribute = elements
@@ -2038,7 +2039,7 @@ fn test_part_usage_body_ref_part_assignments_parse() {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package root element, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &package.body else {
+    let PackageBody::Brace { elements, .. } = &package.body else {
         panic!("expected package body");
     };
     let system = elements
@@ -2048,7 +2049,7 @@ fn test_part_usage_body_ref_part_assignments_parse() {
             _ => None,
         })
         .expect("system part usage");
-    let PartUsageBody::Brace { elements } = &system.body else {
+    let PartUsageBody::Brace { elements, .. } = &system.body else {
         panic!("expected system part usage body");
     };
     let earth_orbit = elements
@@ -2060,7 +2061,7 @@ fn test_part_usage_body_ref_part_assignments_parse() {
             _ => None,
         })
         .expect("earthOrbit part usage");
-    let PartUsageBody::Brace { elements } = &earth_orbit.body else {
+    let PartUsageBody::Brace { elements, .. } = &earth_orbit.body else {
         panic!("expected earthOrbit body");
     };
     let refs: Vec<_> = elements
@@ -2117,7 +2118,7 @@ fn test_ref_part_accepts_subsetting_in_def_and_usage_body() {
         RootElement::Package(package) => &package.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &package.body else {
+    let PackageBody::Brace { elements, .. } = &package.body else {
         panic!("expected package body");
     };
     let w = elements
@@ -2127,7 +2128,7 @@ fn test_ref_part_accepts_subsetting_in_def_and_usage_body() {
             _ => None,
         })
         .expect("part w");
-    let PartUsageBody::Brace { elements } = &w.body else {
+    let PartUsageBody::Brace { elements, .. } = &w.body else {
         panic!("expected w body");
     };
     let origin = elements
@@ -2154,7 +2155,7 @@ part def Carrier {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -2162,7 +2163,7 @@ part def Carrier {
         other => panic!("expected part def, got {:?}", other),
     };
     let body = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let part_usage = match &body[0].value {
@@ -2202,7 +2203,7 @@ part def Carrier {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -2210,7 +2211,7 @@ part def Carrier {
         other => panic!("expected part def, got {:?}", other),
     };
     let body = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let part_usage = match &body[0].value {
@@ -2251,7 +2252,7 @@ part def Carrier {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -2259,7 +2260,7 @@ part def Carrier {
         other => panic!("expected part def, got {:?}", other),
     };
     let body = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let part_usage = match &body[0].value {
@@ -2297,7 +2298,7 @@ part def Carrier {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -2305,7 +2306,7 @@ part def Carrier {
         other => panic!("expected part def, got {:?}", other),
     };
     let body = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let part_usage = match &body[0].value {
@@ -2383,7 +2384,7 @@ port def DebrisPort {
     assert_eq!(item.name, "debris");
     assert_eq!(item.direction, Some(sysml_v2_parser::ast::InOut::InOut));
     match &item.body {
-        sysml_v2_parser::ast::AttributeBody::Brace { elements } => {
+        sysml_v2_parser::ast::AttributeBody::Brace { elements, .. } => {
             assert_eq!(elements.len(), 2);
         }
         other => panic!(
@@ -2403,7 +2404,7 @@ port def AirPort {
     let result = parse(input).expect("out pin with :> typing should parse");
     let pkg = package_from_root(&result);
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let port_def = match &elements[0].value {
@@ -2411,7 +2412,7 @@ port def AirPort {
         other => panic!("expected port def, got {:?}", other),
     };
     let body = match &port_def.value.body {
-        sysml_v2_parser::ast::PortDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PortDefBody::Brace { elements, .. } => elements,
         other => panic!("expected port def brace body, got {:?}", other),
     };
     match &body[0].value {
@@ -2437,7 +2438,7 @@ port def FuelPort {
     let result = parse(input).expect("plain out attribute should parse");
     let pkg = package_from_root(&result);
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let port_def = match &elements[0].value {
@@ -2445,7 +2446,7 @@ port def FuelPort {
         other => panic!("expected port def, got {:?}", other),
     };
     let body = match &port_def.value.body {
-        sysml_v2_parser::ast::PortDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PortDefBody::Brace { elements, .. } => elements,
         other => panic!("expected port def brace body, got {:?}", other),
     };
     match &body[0].value {
@@ -2471,7 +2472,7 @@ fn part_def_body_part_usage(
 ) -> &PartUsage {
     let pkg = package_from_root(root);
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[pkg_part_def_idx].value {
@@ -2479,7 +2480,7 @@ fn part_def_body_part_usage(
         other => panic!("expected part def, got {:?}", other),
     };
     let body = match &part_def.value.body {
-        PartDefBody::Brace { elements } => elements,
+        PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     match &body[part_usage_idx].value {
@@ -2496,7 +2497,7 @@ fn nested_part_usage_in_part_usage(
 ) -> &PartUsage {
     let pkg = package_from_root(root);
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[pkg_part_def_idx].value {
@@ -2504,7 +2505,7 @@ fn nested_part_usage_in_part_usage(
         other => panic!("expected part def, got {:?}", other),
     };
     let def_body = match &part_def.value.body {
-        PartDefBody::Brace { elements } => elements,
+        PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let outer = match &def_body[outer_part_idx].value {
@@ -2512,7 +2513,7 @@ fn nested_part_usage_in_part_usage(
         other => panic!("expected outer part usage, got {:?}", other),
     };
     let outer_body = match &outer.value.body {
-        PartUsageBody::Brace { elements } => elements,
+        PartUsageBody::Brace { elements, .. } => elements,
         other => panic!("expected part usage brace body, got {:?}", other),
     };
     match &outer_body[inner_part_idx].value {
@@ -2529,7 +2530,7 @@ fn nested_port_usage_in_part_usage(
 ) -> &PortUsage {
     let pkg = package_from_root(root);
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_usage_el = match &elements[pkg_part_idx].value {
@@ -2537,7 +2538,7 @@ fn nested_port_usage_in_part_usage(
         other => panic!("expected part usage, got {:?}", other),
     };
     let outer_body = match &part_usage_el.value.body {
-        PartUsageBody::Brace { elements } => elements,
+        PartUsageBody::Brace { elements, .. } => elements,
         other => panic!("expected part usage brace body, got {:?}", other),
     };
     let inner = match &outer_body[outer_part_idx].value {
@@ -2545,7 +2546,7 @@ fn nested_port_usage_in_part_usage(
         other => panic!("expected inner part usage, got {:?}", other),
     };
     let inner_body = match &inner.value.body {
-        PartUsageBody::Brace { elements } => elements,
+        PartUsageBody::Brace { elements, .. } => elements,
         other => panic!("expected inner brace body, got {:?}", other),
     };
     match &inner_body[port_idx].value {
@@ -2561,7 +2562,7 @@ fn port_def_body_item_usage(
 ) -> &sysml_v2_parser::ast::ItemUsage {
     let pkg = package_from_root(root);
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let port_def = match &elements[port_def_idx].value {
@@ -2569,7 +2570,7 @@ fn port_def_body_item_usage(
         other => panic!("expected port def, got {:?}", other),
     };
     let body = match &port_def.value.body {
-        sysml_v2_parser::ast::PortDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PortDefBody::Brace { elements, .. } => elements,
         other => panic!("expected port def brace body, got {:?}", other),
     };
     match &body[item_idx].value {
@@ -2600,7 +2601,7 @@ end b : B;
         other => panic!("expected package, got {:?}", other),
     };
     let connection_def = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements
+        PackageBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|el| match &el.value {
                 PackageBodyElement::ConnectionDef(d) => Some(d),
@@ -2610,7 +2611,7 @@ end b : B;
         other => panic!("expected brace body, got {:?}", other),
     };
     let members = match &connection_def.value.body {
-        sysml_v2_parser::ast::ConnectionDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ConnectionDefBody::Brace { elements, .. } => elements,
         other => panic!("expected structured connection def body, got {:?}", other),
     };
     assert_eq!(
@@ -2672,14 +2673,14 @@ doc /* Addresses: front ToF 0x29, left ToF 0x2A. */
         other => panic!("expected package, got {:?}", other),
     };
     let part_usage = match &pkg.value.body {
-        PackageBody::Brace { elements } => match &elements[2].value {
+        PackageBody::Brace { elements, .. } => match &elements[2].value {
             PackageBodyElement::PartUsage(p) => p,
             other => panic!("expected part usage, got {:?}", other),
         },
         other => panic!("expected brace body, got {:?}", other),
     };
     let interface_usage = match &part_usage.value.body {
-        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements
+        sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|el| match &el.value {
                 PartUsageBodyElement::InterfaceUsage(i) => Some(i),
@@ -2746,7 +2747,7 @@ end b : B;
         other => panic!("expected package, got {:?}", other),
     };
     let connection_def = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements
+        PackageBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|el| match &el.value {
                 PackageBodyElement::ConnectionDef(d) => Some(d),
@@ -2756,7 +2757,7 @@ end b : B;
         other => panic!("expected brace body, got {:?}", other),
     };
     let members = match &connection_def.value.body {
-        sysml_v2_parser::ast::ConnectionDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ConnectionDefBody::Brace { elements, .. } => elements,
         other => panic!("expected structured connection def body, got {:?}", other),
     };
     assert_eq!(
@@ -2818,7 +2819,7 @@ end systemOfInterest references theSystem;
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let connection = elements
@@ -2828,7 +2829,7 @@ end systemOfInterest references theSystem;
             _ => None,
         })
         .expect("expected connection def");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection def brace body");
     };
     let [party_element, system_element] = elements.as_slice() else {
@@ -2880,7 +2881,7 @@ fn test_connection_end_decl_typing_form_unaffected() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let connection = elements
@@ -2890,7 +2891,7 @@ fn test_connection_end_decl_typing_form_unaffected() {
             _ => None,
         })
         .expect("expected connection def");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection def brace body");
     };
     let end = match &elements[0].value {
@@ -2925,7 +2926,7 @@ end consumer references b;
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let interface = elements
@@ -2935,7 +2936,7 @@ end consumer references b;
             _ => None,
         })
         .expect("expected interface def");
-    let InterfaceDefBody::Brace { elements } = &interface.body else {
+    let InterfaceDefBody::Brace { elements, .. } = &interface.body else {
         panic!("expected interface def brace body");
     };
     assert_eq!(
@@ -2980,7 +2981,7 @@ fn test_interface_end_decl_typing_form_unaffected() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let interface = elements
@@ -2990,7 +2991,7 @@ fn test_interface_end_decl_typing_form_unaffected() {
             _ => None,
         })
         .expect("expected interface def");
-    let InterfaceDefBody::Brace { elements } = &interface.body else {
+    let InterfaceDefBody::Brace { elements, .. } = &interface.body else {
         panic!("expected interface def brace body");
     };
     let end = match &elements[0].value {
@@ -3037,7 +3038,7 @@ end part device ::> sensorFeed[1];
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     assert!(
@@ -3069,7 +3070,7 @@ fn test_package_level_bare_abstract_connection_still_dispatches_to_connection_de
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     assert!(
@@ -3092,7 +3093,7 @@ fn test_package_level_explicit_def_typed_connection_stays_connection_def() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     assert!(
@@ -3136,7 +3137,7 @@ end part device ::> sensorFeed[1];
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
 
@@ -3147,7 +3148,7 @@ end part device ::> sensorFeed[1];
                 if d.value.identification.name.as_deref() == Some("DeviceConnection") =>
             {
                 match &d.value.body {
-                    ConnectionDefBody::Brace { elements } => Some(elements),
+                    ConnectionDefBody::Brace { elements, .. } => Some(elements),
                     _ => None,
                 }
             }
@@ -3177,7 +3178,7 @@ end part device ::> sensorFeed[1];
                 if u.value.name.as_deref() == Some("connection1") =>
             {
                 match &u.value.body {
-                    ConnectionDefBody::Brace { elements } => Some(elements),
+                    ConnectionDefBody::Brace { elements, .. } => Some(elements),
                     _ => None,
                 }
             }
@@ -3234,7 +3235,7 @@ fn test_connection_end_decl_name_starting_with_part_or_port_is_not_split() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let connection = elements
@@ -3244,7 +3245,7 @@ fn test_connection_end_decl_name_starting_with_part_or_port_is_not_split() {
             _ => None,
         })
         .expect("expected connection def");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection def brace body");
     };
     let end = match &elements[0].value {
@@ -3277,7 +3278,7 @@ part def Foo {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = elements
@@ -3288,7 +3289,7 @@ part def Foo {
         })
         .expect("expected part def");
     let body_elements = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     assert!(
@@ -3323,7 +3324,7 @@ occurrence def Foo {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let occurrence_def = elements
@@ -3334,7 +3335,7 @@ occurrence def Foo {
         })
         .expect("expected occurrence def");
     let body_elements = match &occurrence_def.value.body {
-        sysml_v2_parser::ast::DefinitionBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::DefinitionBody::Brace { elements, .. } => elements,
         other => panic!("expected occurrence def brace body, got {:?}", other),
     };
     assert!(
@@ -3362,7 +3363,7 @@ satisfy MyReq;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     assert!(
@@ -3389,7 +3390,7 @@ part def RequiredSensor {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected package body, got {:?}", other),
     };
     let required_sensor = elements
@@ -3404,7 +3405,7 @@ part def RequiredSensor {
         })
         .expect("RequiredSensor part definition");
     let body = match &required_sensor.value.body {
-        PartDefBody::Brace { elements } => elements,
+        PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part definition body, got {:?}", other),
     };
 
@@ -3434,7 +3435,7 @@ part def Foo {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = elements
@@ -3445,7 +3446,7 @@ part def Foo {
         })
         .expect("expected part def");
     let body_elements = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let satisfy = body_elements
@@ -3480,7 +3481,7 @@ part def Foo {
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = elements
@@ -3491,7 +3492,7 @@ part def Foo {
         })
         .expect("expected part def");
     let body_elements = match &part_def.value.body {
-        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let satisfy = body_elements
@@ -3603,7 +3604,7 @@ part def Foo {
     );
     let pkg = package_from_root(&diag.document.root);
     let elements = match &pkg.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let part_def = match &elements[0].value {
@@ -3611,7 +3612,7 @@ part def Foo {
         other => panic!("expected part def, got {:?}", other),
     };
     let body = match &part_def.value.body {
-        PartDefBody::Brace { elements } => elements,
+        PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected part def brace body, got {:?}", other),
     };
     let enum_usage = body
@@ -3646,7 +3647,7 @@ alias m for ISQ::mass;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let alias_def = alias_def_target(elements);
@@ -3659,7 +3660,11 @@ alias m for ISQ::mass;
         target.segments[1].separator_before,
         Some(ReferenceSeparator::ColonColon)
     );
-    assert_eq!(alias_def.body, AliasBody::Semicolon);
+    assert!(
+        matches!(alias_def.body, AliasBody::Semicolon { .. }),
+        "expected a semicolon alias body, got {:?}",
+        alias_def.body
+    );
 }
 
 #[test]
@@ -3673,7 +3678,7 @@ alias shortName for LongOriginalName;
         other => panic!("expected package, got {:?}", other),
     };
     let elements = match &pkg.value.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {:?}", other),
     };
     let alias_def = alias_def_target(elements);

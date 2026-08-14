@@ -7,8 +7,8 @@ use crate::ast::{
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::lex::{
-    capture_opaque_member, identification, name, qualified_reference, short_name_prefix,
-    starts_with_keyword, subset_operator, ws1, ws_and_comments,
+    identification, name, qualified_reference, short_name_prefix, starts_with_keyword,
+    subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -329,8 +329,14 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
             AttributeBodyElement::ItemUsage(Box::new(n))
         }),
         map(
-            |i| capture_opaque_member(i, ATTRIBUTE_OPAQUE_STARTERS),
-            AttributeBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    ATTRIBUTE_OPAQUE_STARTERS,
+                    "attribute body",
+                )
+            },
+            AttributeBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -678,10 +684,16 @@ fn attribute_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBo
 pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, AttributeBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            AttributeBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         ATTRIBUTE_BODY_STARTERS,
         "attribute body",
@@ -689,7 +701,7 @@ pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBo
         attribute_body_element,
         attribute_body_recovery,
     )?;
-    Ok((input, AttributeBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// Attribute definition: 'attribute' 'def' name ( ':>' | ':' )? qualified_name? body
@@ -1189,7 +1201,9 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, crate::parser::feature_value_part))
             .parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (semicolon_start, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+    let semicolon_span = crate::parser::span::span_from_to(semicolon_start, input);
     let (subsets, redefines) = match prefix {
         Some(MetadataBindingPrefix::Subsets) => (
             Some(crate::parser::usage::subsetting_relationship_node(
@@ -1224,7 +1238,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 crosses: None,
                 intersects: None,
                 value,
-                body: AttributeBody::Semicolon,
+                body: AttributeBody::Semicolon { semicolon_span },
                 name_span: Some(name_span),
                 typing_span,
                 redefines_span: None,
@@ -1276,8 +1290,14 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
             AttributeBodyElement::AssertConstraint,
         ),
         map(
-            |i| capture_opaque_member(i, METADATA_OPAQUE_STARTERS),
-            AttributeBodyElement::Other,
+            |i| {
+                crate::parser::recovery::unsupported_member(
+                    i,
+                    METADATA_OPAQUE_STARTERS,
+                    "metadata body",
+                )
+            },
+            AttributeBodyElement::Unsupported,
         ),
     ))
     .parse(input)?;
@@ -1303,10 +1323,16 @@ fn metadata_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBod
 pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, AttributeBody::Semicolon));
+        let semicolon_start = input;
+        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
+        return Ok((
+            input,
+            AttributeBody::Semicolon {
+                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
+            },
+        ));
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         METADATA_BODY_STARTERS,
         "metadata body",
@@ -1314,7 +1340,7 @@ pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBod
         metadata_body_element,
         metadata_body_recovery,
     )?;
-    Ok((input, AttributeBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 /// SysML `DefaultReferenceUsage` shorthand: bare `name : Type (= value)?;` without the
@@ -1416,7 +1442,7 @@ mod attribute_body_tests {
         ))
         .expect("metadata body");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let AttributeBody::Brace { elements } = body else {
+        let AttributeBody::Brace { elements, .. } = body else {
             panic!("expected brace body");
         };
         assert!(matches!(
@@ -1482,7 +1508,7 @@ mod attribute_body_tests {
                 .map(|n| target_texts(source, &n.value.target)),
             Some(vec!["ConversionByPrefix".to_string()])
         );
-        let AttributeBody::Brace { elements } = &node.value.body else {
+        let AttributeBody::Brace { elements, .. } = &node.value.body else {
             panic!("expected brace body");
         };
         assert_eq!(elements.len(), 2);

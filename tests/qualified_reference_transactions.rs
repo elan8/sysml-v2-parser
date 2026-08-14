@@ -90,7 +90,7 @@ fn malformed_expose_branch_rolls_back_before_the_next_view_member() {
             _ => None,
         })
         .expect("view usage");
-    let ViewBody::Brace { elements } = &view.body else {
+    let ViewBody::Brace { elements, .. } = &view.body else {
         panic!("view body");
     };
     let expose = elements
@@ -140,14 +140,14 @@ action def Iterate {
         other => panic!("expected package, got {other:?}"),
     };
     let action = match &package.body {
-        sysml_v2_parser::ast::PackageBody::Brace { elements } => match &elements[0].value {
+        sysml_v2_parser::ast::PackageBody::Brace { elements, .. } => match &elements[0].value {
             PackageBodyElement::ActionDef(action) => &action.value,
             other => panic!("expected action def, got {other:?}"),
         },
         other => panic!("expected package body, got {other:?}"),
     };
     let elements = match &action.body {
-        sysml_v2_parser::ast::ActionDefBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ActionDefBody::Brace { elements, .. } => elements,
         other => panic!("expected action body, got {other:?}"),
     };
     assert_eq!(elements.len(), 3, "recovery must keep both valid siblings");

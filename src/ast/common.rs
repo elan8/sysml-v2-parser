@@ -39,6 +39,9 @@ pub enum UnsupportedProduction {
     ReferenceConnectionUsage,
     ConnectionUsageInPartDefinition,
     ActionBodyMember,
+    /// A spec-valid member of a definition or usage body that this scope does not model yet.
+    /// The body it appeared in is identified by the diagnostic's span and message.
+    UnmodelledBodyMember,
 }
 
 /// Explicit AST state for valid grammar that this parser cannot yet model in the current scope.
@@ -490,6 +493,13 @@ pub struct DocComment {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CommentAnnotation {
+    /// Span of the authored `comment` keyword, or `None` for the keyword-less spelling.
+    ///
+    /// The grammar makes the keyword optional, so whether it was written is a grammatical fact
+    /// and not a formatting choice: without it the member cannot be re-emitted as a member at
+    /// all, because a bare `/* ... */` reparses as trivia. Presence is what emission depends on;
+    /// the span keeps the provenance rather than reducing the fact to a boolean.
+    pub keyword_span: Option<Span>,
     pub identification: Option<Identification>,
     pub locale: Option<String>,
     pub text: String,
@@ -518,4 +528,33 @@ impl PartialEq for TextualRepresentation {
 pub enum ConnectBody {
     Semicolon,
     Brace,
+}
+
+/// A member that annotates its owner rather than declaring structure or behavior.
+///
+/// This is the grammar's own `AnnotatingElement` production, which both layers define
+/// identically -- KerML 8.2.3.3.1 and SysML 8.2.2.4.1 -- as
+/// `Comment | Documentation | TextualRepresentation | MetadataFeature`. A scope opts into the
+/// whole production or none of it: the family is not a place to collect members that merely look
+/// alike, and a scope that accepts only some of these members keeps them as its own variants
+/// until the parser supports the rest, so the type never claims coverage the parser lacks.
+///
+/// Two related forms are deliberately *not* here:
+///
+/// - `#Name` prefix metadata is `PrefixMetadataMember` (SysML 8.2.2.20.2), a prefix on a
+///   declaration rather than a member of a body, so it stays a scope-specific variant; and
+/// - `metadata name : Type;`, the other spelling of `MetadataUsage`, is modelled by a separate
+///   AST type whose body and ownership differ, and folding the two spellings together is a
+///   grammar question for the metadata audit rather than something this family should decide.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum AnnotatingMember {
+    /// `doc /* ... */`, optionally named.
+    Doc(Node<DocComment>),
+    /// `comment [about ...] /* ... */`, optionally named and locale-tagged.
+    Comment(Node<CommentAnnotation>),
+    /// `rep [name] language "..." /* ... */`.
+    TextualRep(Node<TextualRepresentation>),
+    /// The `@Name [about ...]` spelling of a metadata feature.
+    MetadataAnnotation(Node<crate::ast::MetadataAnnotation>),
 }

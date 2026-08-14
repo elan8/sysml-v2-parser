@@ -1,14 +1,12 @@
 use crate::ast::{
-    CommentAnnotation, ConcernUsage, DocComment, FrameMember, Node, PurposeMember,
-    RequireConstraint, RequireConstraintBody, RequirementActorDecl, RequirementDef,
-    RequirementDefBody, RequirementDefBodyElement, RequirementUsage, Satisfy, StakeholderMember,
-    SubjectDecl, SubjectRef, TextualRepresentation, VerifyRequirementMember,
+    CommentAnnotation, ConcernUsage, ConstraintDefBody, DocComment, FrameMember, Node,
+    PurposeMember, RequireConstraint, RequirementActorDecl, RequirementDef, RequirementDefBody,
+    RequirementDefBodyElement, RequirementUsage, Satisfy, StakeholderMember, SubjectDecl,
+    SubjectRef, TextualRepresentation, VerifyRequirementMember,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage, redefinition_feature_binding};
 use crate::parser::body::parse_structured_brace_members;
-use crate::parser::constraint::{
-    constraint_usage, structured_constraint_body, StructuredConstraintBody,
-};
+use crate::parser::constraint::{constraint_def_body, constraint_usage};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
@@ -69,10 +67,17 @@ fn other_requirement_body_element(
             nom::error::ErrorKind::Many0,
         )));
     }
-    let frag = start_after_ws.fragment();
-    let take = frag.len().min(80);
-    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-    Ok((input, RequirementDefBodyElement::Other(preview)))
+    let recovery = build_recovery_error_node_from_span(
+        start_after_ws,
+        input,
+        REQUIREMENT_BODY_STARTERS,
+        "requirement body",
+        "recovered_requirement_body_element",
+    );
+    Ok((
+        input,
+        RequirementDefBodyElement::Error(node_from_to(start_after_ws, input, recovery)),
+    ))
 }
 
 pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementDef>> {
@@ -105,16 +110,14 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
 
 pub(crate) fn requirement_def_body(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
     alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            RequirementDefBody::Semicolon
-        }),
+        crate::parser::body::semicolon_body,
         requirement_def_body_brace,
     ))
     .parse(input)
 }
 
 fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         REQUIREMENT_BODY_STARTERS,
         "requirement body",
@@ -122,19 +125,13 @@ fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Requiremen
         requirement_def_body_element,
         requirement_body_recovery_element,
     )?;
-    Ok((input, RequirementDefBody::Brace { elements }))
+    Ok((input, members.into_body()))
 }
 
 fn requirement_body_recovery_element(
     start: Input<'_>,
     end: Input<'_>,
 ) -> Node<RequirementDefBodyElement> {
-    let trimmed = start.fragment();
-    let is_libraryish = trimmed.windows(3).any(|w| w == b":>>")
-        || trimmed.starts_with(b"ref ")
-        || trimmed.starts_with(b"abstract ")
-        || trimmed.starts_with(b"return ")
-        || trimmed.starts_with(b"objective ");
     let recovery = build_recovery_error_node_from_span(
         start,
         end,
@@ -142,23 +139,11 @@ fn requirement_body_recovery_element(
         "requirement body",
         "recovered_requirement_body_element",
     );
-    let should_error = if is_libraryish {
-        matches!(recovery.code.as_str(), "missing_type_reference")
-    } else {
-        true
-    };
-    if should_error {
-        node_from_to(
-            start,
-            end,
-            RequirementDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
-        )
-    } else {
-        let frag = start.fragment();
-        let take = frag.len().min(80);
-        let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-        node_from_to(start, end, RequirementDefBodyElement::Other(preview))
-    }
+    node_from_to(
+        start,
+        end,
+        RequirementDefBodyElement::Error(node_from_to(start, end, recovery)),
+    )
 }
 
 fn requirement_def_body_element(
@@ -523,7 +508,7 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
     // `subject vehicle : Vehicle { doc … }`).
     let (input, _) = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
-        map(structured_constraint_body, |_| ()),
+        map(constraint_def_body, |_| ()),
     ))
     .parse(input)?;
     if n.is_empty() && type_name.is_none() && value.is_none() && redefines.is_none() {
@@ -589,7 +574,7 @@ fn requirement_parameter_decl<'a>(
     let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
     let (input, _) = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
-        map(structured_constraint_body, |_| ()),
+        map(constraint_def_body, |_| ()),
     ))
     .parse(input)?;
     Ok((
@@ -637,7 +622,7 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
             let (input, reference) = qualified_reference(input)?;
             (input, None, Some(reference))
         };
-    let (input, body) = require_constraint_body(input)?;
+    let (input, body) = constraint_def_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -652,17 +637,6 @@ pub(crate) fn require_constraint(input: Input<'_>) -> IResult<Input<'_>, Node<Re
             },
         ),
     ))
-}
-
-pub(crate) fn require_constraint_body(
-    input: Input<'_>,
-) -> IResult<Input<'_>, RequireConstraintBody> {
-    let (input, body) = structured_constraint_body(input)?;
-    let body = match body {
-        StructuredConstraintBody::Semicolon => RequireConstraintBody::Semicolon,
-        StructuredConstraintBody::Brace { elements } => RequireConstraintBody::Brace { elements },
-    };
-    Ok((input, body))
 }
 
 /// KerML STRING_VALUE: double-quoted string, returns the inner string.
@@ -759,6 +733,7 @@ pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<C
             start,
             input,
             CommentAnnotation {
+                keyword_span: None,
                 identification: None,
                 locale: Some(locale),
                 text,
@@ -770,9 +745,22 @@ pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<C
 /// KerML Comment: ( 'comment' Identification? )? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
 pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"comment"[..])).parse(input)?;
+    let (keyword_start, _) = ws_and_comments(input)?;
+    let (input, keyword) = tag(&b"comment"[..]).parse(keyword_start)?;
+    let keyword_span = node_from_to(keyword_start, input, ()).span;
+    let _ = keyword;
     let (input, _) = ws1(input)?;
-    let (input, ident_parsed, locale) = if starts_with_keyword(input.fragment(), b"locale") {
+    let (input, ident_parsed, locale) = if input.fragment().starts_with(b"/*") {
+        // The body follows the keyword directly. Without this guard `identification` below skips
+        // the body as trivia and takes the *next* member's keyword as this comment's name, so
+        // `comment /* a */ doc /* b */` parses as one comment named `doc` and the doc member
+        // disappears with no diagnostic. `doc_comment` guards the same way.
+        (input, None, None)
+    } else if starts_with_keyword(input.fragment(), b"about") {
+        // The `about` clause takes the place of an identification, so it must not be parsed as
+        // one: `comment about BMS /* ... */` names no comment.
+        (input, None, None)
+    } else if starts_with_keyword(input.fragment(), b"locale") {
         // GH-91.1: `comment locale "en_US" /* ... */` (no identification) -- without this
         // guard, `identification` below greedily consumes the bare word `locale` itself as the
         // comment's own name, leaving nothing for the subsequent `locale` keyword check to
@@ -795,8 +783,16 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
         .parse(input)?;
         (input, ident_parsed, locale)
     };
-    let (input, _) = nom::bytes::complete::take_until::<_, _, nom::error::Error<Input>>(&b"/*"[..])
-        .parse(input)?;
+    // `comment about x /* ... */` is grammar-legal (KerML 8.2.3.3.2). Its targets are not modelled
+    // yet, so the clause is skipped -- but only when `about` is actually written. Scanning for the
+    // body unconditionally would let a comment run past the end of its own member.
+    let (peek, _) = ws(input)?;
+    let (input, _) = if starts_with_keyword(peek.fragment(), b"about") {
+        nom::bytes::complete::take_until::<_, _, nom::error::Error<Input>>(&b"/*"[..])
+            .parse(input)?
+    } else {
+        (input, input)
+    };
     // Use ws so we don't consume the comment body as a block comment.
     let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
     let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
@@ -809,6 +805,7 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
             start,
             input,
             CommentAnnotation {
+                keyword_span: Some(keyword_span),
                 identification: ident,
                 locale,
                 text,
@@ -946,9 +943,9 @@ fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
             (crate::ast::ConnectBody::Semicolon, None)
         }),
-        map(structured_constraint_body, |structured| match structured {
-            StructuredConstraintBody::Semicolon => (crate::ast::ConnectBody::Semicolon, None),
-            StructuredConstraintBody::Brace { elements } => {
+        map(constraint_def_body, |body| match body {
+            ConstraintDefBody::Semicolon { .. } => (crate::ast::ConnectBody::Semicolon, None),
+            ConstraintDefBody::Brace { elements, .. } => {
                 (crate::ast::ConnectBody::Brace, Some(elements))
             }
         }),

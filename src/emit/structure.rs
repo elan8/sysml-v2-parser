@@ -250,11 +250,11 @@ fn emit_part_def_body(
     body: &PartDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        PartDefBody::Semicolon => {
+        PartDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PartDefBody::Brace { elements } => {
+        PartDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -284,10 +284,6 @@ fn emit_part_def_body_element(
         PartDefBodyElement::KermlClassifier(n) => {
             super::root::emit_kerml_classifier_decl(w, path, &n.value)
         }
-        PartDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
         PartDefBodyElement::UnsupportedMember(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }
@@ -396,11 +392,11 @@ fn emit_part_usage_body(
     body: &PartUsageBody,
 ) -> Result<(), EmitError> {
     match body {
-        PartUsageBody::Semicolon => {
+        PartUsageBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PartUsageBody::Brace { elements } => {
+        PartUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -425,7 +421,9 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::KermlClassifier(n) => {
             super::root::emit_kerml_classifier_decl(w, path, &n.value)
         }
-        PartUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PartUsageBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         PartUsageBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PartUsageBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
         PartUsageBodyElement::Import(i) => emit_import(w, &i.value),
@@ -480,7 +478,6 @@ fn emit_part_usage_body_element(
             super::requirement::emit_enumeration_usage(w, path, &e.value)
         }
         PartUsageBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
-        PartUsageBodyElement::MetadataAnnotation(m) => emit_metadata_annotation(w, path, &m.value),
         PartUsageBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }
@@ -518,11 +515,11 @@ pub(crate) fn emit_attribute_body(
     body: &AttributeBody,
 ) -> Result<(), EmitError> {
     match body {
-        AttributeBody::Semicolon => {
+        AttributeBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        AttributeBody::Brace { elements } => {
+        AttributeBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -544,10 +541,9 @@ fn emit_attribute_body_element(
 ) -> Result<(), EmitError> {
     match el {
         AttributeBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        AttributeBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
+        AttributeBodyElement::Unsupported(unsupported) => {
+            w.push_recovery_span(path, &unsupported.span)
+        }
         AttributeBodyElement::Doc(d) => emit_doc(w, &d.value),
         AttributeBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
@@ -683,11 +679,11 @@ fn emit_port_def_body(
     body: &PortDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        PortDefBody::Semicolon => {
+        PortDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PortDefBody::Brace { elements } => {
+        PortDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -709,10 +705,9 @@ fn emit_port_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         PortDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        PortDefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
+        PortDefBodyElement::Unsupported(unsupported) => {
+            w.push_recovery_span(path, &unsupported.span)
+        }
         PortDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         PortDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PortDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
@@ -731,11 +726,11 @@ fn emit_port_def_body_element(
 
 fn emit_port_body(w: &mut EmitWriter<'_>, path: &str, body: &PortBody) -> Result<(), EmitError> {
     match body {
-        PortBody::Semicolon => {
+        PortBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        PortBody::Brace { elements } => {
+        PortBody::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())
@@ -831,11 +826,11 @@ fn emit_interface_def_body(
     body: &InterfaceDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        InterfaceDefBody::Semicolon => {
+        InterfaceDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        InterfaceDefBody::Brace { elements } => {
+        InterfaceDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -977,21 +972,13 @@ pub(crate) fn emit_relationship_body_element_local(
 ) -> Result<(), EmitError> {
     use crate::ast::RelationshipBodyElement;
     match el {
-        RelationshipBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RelationshipBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         RelationshipBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
-        RelationshipBodyElement::Comment(c) => emit_comment(w, &c.value),
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RelationshipBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
-        other @ (RelationshipBodyElement::TextualRep(_)
-        | RelationshipBodyElement::MetadataAnnotation(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
     }
 }
 
@@ -1196,11 +1183,11 @@ pub(crate) fn emit_ref_decl(
 
 fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(), EmitError> {
     match body {
-        RefBody::Semicolon => {
+        RefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        RefBody::Brace { elements } => {
+        RefBody::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())
@@ -1209,7 +1196,7 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
                 w.newline();
                 w.indent();
                 for (i, el) in elements.iter().enumerate() {
-                    emit_ref_body_element(w, &format!("{path}/ref-body[{i}]"), &el.value)?;
+                    emit_part_usage_body_element(w, &format!("{path}/ref-body[{i}]"), &el.value)?;
                     w.newline();
                 }
                 w.dedent();
@@ -1217,33 +1204,6 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
                 Ok(())
             }
         }
-    }
-}
-
-fn emit_ref_body_element(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    el: &crate::ast::RefBodyElement,
-) -> Result<(), EmitError> {
-    use crate::ast::RefBodyElement;
-    match el {
-        RefBodyElement::Doc(d) => emit_doc(w, &d.value),
-        RefBodyElement::Ref(n) => emit_ref_decl(w, path, &n.value),
-        RefBodyElement::AttributeUsage(n) => emit_attribute_usage(w, path, &n.value),
-        RefBodyElement::Comment(c) => emit_comment(w, &c.value),
-        RefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RefBodyElement::Other(_) => Err(EmitError::Opaque {
-            path: path.to_string(),
-            kind: super::OpacityKind::Other,
-        }),
-        other @ (RefBodyElement::Action(_)
-        | RefBodyElement::PartUsage(_)
-        | RefBodyElement::State(_)
-        | RefBodyElement::TextualRep(_)
-        | RefBodyElement::MetadataAnnotation(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
     }
 }
 
@@ -1431,11 +1391,11 @@ pub(crate) fn emit_alias_def(
     w.push_str(" for ");
     w.push_qualified_reference("alias target", alias.target)?;
     match &alias.body {
-        crate::ast::AliasBody::Semicolon => {
+        crate::ast::AliasBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::AliasBody::Brace { elements } => {
+        crate::ast::AliasBody::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())
@@ -1615,11 +1575,13 @@ pub(crate) fn emit_enum_def(
         emit_typing_clause(w, &spec.value)?;
     }
     match &def.body {
-        crate::ast::EnumerationBody::Semicolon => {
+        crate::ast::EnumerationBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::EnumerationBody::Brace { values } => {
+        crate::ast::EnumerationBody::Brace {
+            elements: values, ..
+        } => {
             w.push_str(" {");
             w.newline();
             w.indent();
@@ -1717,7 +1679,10 @@ pub(crate) fn emit_metadata_keyword_usage(
             w.push_qualified_reference("metadata keyword about target", *target)?;
         }
     }
-    emit_attribute_body(w, path, &usage.body)
+    match &usage.body {
+        Some(body) => emit_attribute_body(w, path, body),
+        None => Ok(()),
+    }
 }
 
 pub(crate) fn emit_connection_def(
@@ -1786,11 +1751,11 @@ fn emit_connection_def_body(
     body: &crate::ast::ConnectionDefBody,
 ) -> Result<(), EmitError> {
     match body {
-        crate::ast::ConnectionDefBody::Semicolon => {
+        crate::ast::ConnectionDefBody::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::ConnectionDefBody::Brace { elements } => {
+        crate::ast::ConnectionDefBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
             w.indent();

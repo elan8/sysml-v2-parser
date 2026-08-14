@@ -16,7 +16,7 @@ fn package_elements(input: &str) -> Vec<PackageBodyElement> {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     elements.iter().map(|e| e.value.clone()).collect()
@@ -47,7 +47,7 @@ fn gh88_1_reference_subsetting_operator_stands_in_for_name() {
     let PackageBodyElement::PartUsage(vehicle) = &elements[2] else {
         panic!("expected PartUsage, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &vehicle.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &vehicle.value.body else {
         panic!("expected brace part usage body");
     };
     let attr = elements.iter().find_map(|e| match &e.value {
@@ -83,7 +83,7 @@ fn gh88_2_derived_constant_ref_attribute_modifier_stack() {
     let PackageBodyElement::PartDef(a) = &elements[0] else {
         panic!("expected PartDef, got {:?}", elements[0]);
     };
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &a.value.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &a.value.body else {
         panic!("expected brace part def body");
     };
     let y = elements
@@ -120,7 +120,7 @@ fn gh88_3_abstract_prefix_on_plain_attribute_usage() {
     let PackageBodyElement::PartUsage(p) = &elements[1] else {
         panic!("expected PartUsage, got {:?}", elements[1]);
     };
-    let sysml_v2_parser::ast::PartUsageBody::Brace { elements } = &p.value.body else {
+    let sysml_v2_parser::ast::PartUsageBody::Brace { elements, .. } = &p.value.body else {
         panic!("expected brace part usage body");
     };
     let attr = elements.iter().find_map(|e| match &e.value {
@@ -157,7 +157,7 @@ fn gh88_4_directed_ref_with_comma_separated_types() {
     let PackageBodyElement::PartDef(c) = &elements[2] else {
         panic!("expected PartDef, got {:?}", elements[2]);
     };
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &c.value.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &c.value.body else {
         panic!("expected brace part def body");
     };
     let y = elements.iter().find_map(|e| match &e.value {
@@ -194,7 +194,7 @@ fn gh88_5_unnamed_attribute_subsets_usage() {
     let PackageBodyElement::PartDef(q) = &elements[0] else {
         panic!("expected PartDef, got {:?}", elements[0]);
     };
-    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &q.value.body else {
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements, .. } = &q.value.body else {
         panic!("expected brace part def body");
     };
     let attr = elements.iter().find_map(|e| match &e.value {

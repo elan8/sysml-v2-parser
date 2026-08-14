@@ -31,7 +31,7 @@ package P {
         .expect("top-level package P should be present");
 
     let elements = match &package.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {other:?}"),
     };
 
@@ -49,7 +49,7 @@ package P {
         .expect("NavigationSensorSuiteChoice part def should be present");
 
     let variant_elements = match &variation.body {
-        PartDefBody::Brace { elements } => elements,
+        PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {other:?}"),
     };
 
@@ -106,7 +106,7 @@ package P {
         .expect("top-level package P should be present");
 
     let elements = match &package.body {
-        PackageBody::Brace { elements } => elements,
+        PackageBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {other:?}"),
     };
 
@@ -123,7 +123,7 @@ package P {
         .expect("TransmissionChoices part def should be present");
 
     let variant_elements = match &variation.body {
-        PartDefBody::Brace { elements } => elements,
+        PartDefBody::Brace { elements, .. } => elements,
         other => panic!("expected brace body, got {other:?}"),
     };
 

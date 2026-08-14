@@ -24,7 +24,7 @@ fn calc_reports_unmodeled_members_as_explicit_recovery() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let calc = elements
@@ -34,7 +34,7 @@ fn calc_reports_unmodeled_members_as_explicit_recovery() {
             _ => None,
         })
         .expect("calc def should be present");
-    let CalcDefBody::Brace { elements } = &calc.body else {
+    let CalcDefBody::Brace { elements, .. } = &calc.body else {
         panic!("expected calc body");
     };
     assert!(

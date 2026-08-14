@@ -13,7 +13,7 @@ fn requirement_recovery_keeps_later_members() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let req = elements
@@ -23,7 +23,7 @@ fn requirement_recovery_keeps_later_members() {
             _ => None,
         })
         .expect("requirement def should be present");
-    let RequirementDefBody::Brace { elements } = &req.body else {
+    let RequirementDefBody::Brace { elements, .. } = &req.body else {
         panic!("expected requirement body");
     };
     assert!(
@@ -48,7 +48,7 @@ fn use_case_recovery_keeps_later_members() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let use_case = elements
@@ -58,7 +58,7 @@ fn use_case_recovery_keeps_later_members() {
             _ => None,
         })
         .expect("use case def should be present");
-    let UseCaseDefBody::Brace { elements } = &use_case.body else {
+    let UseCaseDefBody::Brace { elements, .. } = &use_case.body else {
         panic!("expected use case body");
     };
     assert!(
@@ -84,7 +84,7 @@ fn state_recovery_keeps_later_members() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let state_def = elements
@@ -94,7 +94,7 @@ fn state_recovery_keeps_later_members() {
             _ => None,
         })
         .expect("state def should be present");
-    let StateDefBody::Brace { elements } = &state_def.body else {
+    let StateDefBody::Brace { elements, .. } = &state_def.body else {
         panic!("expected state body");
     };
     assert!(
@@ -134,7 +134,7 @@ fn state_body_bare_identifier_reports_targeted_diagnostic_and_keeps_transition()
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let state_def = elements
@@ -144,7 +144,7 @@ fn state_body_bare_identifier_reports_targeted_diagnostic_and_keeps_transition()
             _ => None,
         })
         .expect("state def should be present");
-    let StateDefBody::Brace { elements } = &state_def.body else {
+    let StateDefBody::Brace { elements, .. } = &state_def.body else {
         panic!("expected state body");
     };
     assert!(elements
@@ -163,7 +163,7 @@ fn part_def_recovery_keeps_later_members() {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace body");
     };
     let part = elements
@@ -173,7 +173,7 @@ fn part_def_recovery_keeps_later_members() {
             _ => None,
         })
         .expect("part def should be present");
-    let PartDefBody::Brace { elements } = &part.body else {
+    let PartDefBody::Brace { elements, .. } = &part.body else {
         panic!("expected part def body");
     };
     assert!(

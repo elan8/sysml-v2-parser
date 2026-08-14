@@ -50,7 +50,7 @@ fn test_parse_traffic_light_intersection() {
     );
 
     let body = match &package.body {
-        sysml_v2_parser::ast::PackageBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected package body to be brace form"),
     };
 
@@ -106,7 +106,7 @@ fn test_requirement_constraints_keep_doc_members() {
         other => panic!("expected root package, got {:?}", other),
     };
     let body = match &package.body {
-        sysml_v2_parser::ast::PackageBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::PackageBody::Brace { elements, .. } => elements,
         _ => panic!("expected package body to be brace form"),
     };
     let requirement = body
@@ -117,7 +117,7 @@ fn test_requirement_constraints_keep_doc_members() {
         })
         .expect("fixture should contain at least one requirement def");
     let requirement_body = match &requirement.body {
-        RequirementDefBody::Brace { elements } => elements,
+        RequirementDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected requirement body to be brace form"),
     };
     let require_constraint = requirement_body
@@ -128,7 +128,7 @@ fn test_requirement_constraints_keep_doc_members() {
         })
         .expect("fixture requirement should contain a require constraint");
     let constraint_elements = match &require_constraint.body {
-        sysml_v2_parser::ast::RequireConstraintBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::ConstraintDefBody::Brace { elements, .. } => elements,
         _ => panic!("expected structured require constraint body"),
     };
 

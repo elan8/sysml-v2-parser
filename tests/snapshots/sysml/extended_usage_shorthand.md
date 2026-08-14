@@ -28,7 +28,7 @@ package ExtendedUsageShorthand {
 package ExtendedUsageShorthand {
     #clouddd ArrowheadCore {
         part registry;
-        #service;
+        #service
         port def Authorisation {
             attribute token : String;
         }

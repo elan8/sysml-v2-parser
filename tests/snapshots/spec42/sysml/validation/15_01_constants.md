@@ -87,12 +87,12 @@ package '15_01-Constants' {
 	     * (The decimal literals here should be interpreted as being fixed point and exact.)
 	     */
         attribute def e : Real {
-            assert constraint  {
+            assert constraint {
                 round(e * 1E20) == 271828182845904523536.0;
             }
         }
         attribute def pi : Real {
-            assert constraint  {
+            assert constraint {
                 round(pi * 1E20) == 314159265358979323846.0;
             }
         }

@@ -1,6 +1,6 @@
 //! Shared definition body terminators (semicolon or structured brace).
 
-use crate::ast::{DefinitionBody, Node, ParseErrorNode, RelationshipBodyElement};
+use crate::ast::{AnnotatingMember, DefinitionBody, Node, ParseErrorNode, RelationshipBodyElement};
 use crate::parser::lex::{
     recover_body_element, skip_statement_or_block, skip_until_brace_end, ws_and_comments,
     RELATIONSHIP_BODY_STARTERS,
@@ -9,10 +9,8 @@ use crate::parser::metadata_annotation::metadata_annotation;
 use crate::parser::occurrence_body::occurrence_definition_body;
 use crate::parser::requirement::{comment_annotation, doc_comment, textual_representation};
 use crate::parser::{build_recovery_error_node_from_span, node_from_to, Input};
-use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::map;
-use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
@@ -21,15 +19,14 @@ use nom::Parser;
 /// silently discarding it (BNF `RelationshipBody : Relationship = ';' | '{' (ownedRelationship
 /// += OwnedAnnotation)* '}'`). Shared by alias/import/dependency bodies and other leaf bodies
 /// with the same annotation-only shape (plain `connect` statement bodies).
-pub(crate) fn relationship_body_annotations(
+pub(crate) fn relationship_body(
     input: Input<'_>,
-) -> IResult<Input<'_>, Option<Vec<Node<RelationshipBodyElement>>>> {
+) -> IResult<Input<'_>, crate::ast::Body<RelationshipBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, None));
+        return semicolon_body(input);
     }
-    let (input, elements) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members(
         input,
         RELATIONSHIP_BODY_STARTERS,
         "relationship body",
@@ -47,7 +44,20 @@ pub(crate) fn relationship_body_annotations(
             node_from_to(start, end, RelationshipBodyElement::Error(node))
         },
     )?;
-    Ok((input, Some(elements)))
+    Ok((input, members.into_body()))
+}
+
+/// The same body, for the callers whose AST field is still an optional member list rather than a
+/// shared [`crate::ast::Body`].
+pub(crate) fn relationship_body_annotations(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<Vec<Node<RelationshipBodyElement>>>> {
+    let (input, body) = relationship_body(input)?;
+    let elements = match body {
+        crate::ast::Body::Semicolon { .. } => None,
+        crate::ast::Body::Brace { elements, .. } => Some(elements),
+    };
+    Ok((input, elements))
 }
 
 /// A full `RelationshipBody` member: the shared annotation subset plus owned related elements
@@ -67,36 +77,31 @@ fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<Relatio
     relationship_body_element(input)
 }
 
+/// The grammar's `AnnotatingElement` production (KerML 8.2.3.3.1, SysML 8.2.2.4.1).
+///
+/// A scope accepts the whole production or none of it, so every scope that owns annotating
+/// members dispatches through here rather than repeating the four alternatives.
+pub(crate) fn annotating_member(input: Input<'_>) -> IResult<Input<'_>, AnnotatingMember> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b"@") {
+        return map(metadata_annotation, AnnotatingMember::MetadataAnnotation).parse(input);
+    }
+    if let Ok(parsed) = map(doc_comment, AnnotatingMember::Doc).parse(input) {
+        return Ok(parsed);
+    }
+    if let Ok(parsed) = map(comment_annotation, AnnotatingMember::Comment).parse(input) {
+        return Ok(parsed);
+    }
+    map(textual_representation, AnnotatingMember::TextualRep).parse(input)
+}
+
 pub(crate) fn relationship_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b"@") {
-        let (input, elem) = map(
-            metadata_annotation,
-            RelationshipBodyElement::MetadataAnnotation,
-        )
-        .parse(input)?;
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(doc_comment, RelationshipBodyElement::Doc).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(comment_annotation, RelationshipBodyElement::Comment).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(textual_representation, RelationshipBodyElement::TextualRep).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    Err(nom::Err::Error(nom::error::Error::new(
-        input,
-        nom::error::ErrorKind::Alt,
-    )))
+    let (input, member) = annotating_member(input)?;
+    let elem = RelationshipBodyElement::Annotating(member);
+    Ok((input, node_from_to(start, input, elem)))
 }
 
 /// How to advance past a member that failed to parse.
@@ -108,6 +113,42 @@ pub(crate) enum BraceMemberSkip {
     BodyElementRecover,
 }
 
+/// The `;` alternative of any body, capturing the exact semicolon token.
+///
+/// Every scope spells this the same way, so no scope needs its own copy of "consume `;` and
+/// remember where it was".
+pub(crate) fn semicolon_body<E>(input: Input<'_>) -> IResult<Input<'_>, crate::ast::Body<E>> {
+    let (start, _) = ws_and_comments(input)?;
+    let (rest, _) = tag(&b";"[..]).parse(start)?;
+    Ok((
+        rest,
+        crate::ast::Body::Semicolon {
+            semicolon_span: crate::parser::span::span_from_to(start, rest),
+        },
+    ))
+}
+
+/// A parsed brace body: its delimiters plus the members between them.
+///
+/// The delimiters are captured where they are consumed, so no caller has to re-find `{` or `}` to
+/// record where the body began and ended.
+pub(crate) struct ParsedBraceMembers<E> {
+    pub(crate) open_span: crate::ast::Span,
+    pub(crate) elements: Vec<Node<E>>,
+    pub(crate) close_span: crate::ast::Span,
+}
+
+impl<E> ParsedBraceMembers<E> {
+    /// The brace alternative of a shared [`crate::ast::Body`], delimiters included.
+    pub(crate) fn into_body(self) -> crate::ast::Body<E> {
+        crate::ast::Body::Brace {
+            open_span: self.open_span,
+            elements: self.elements,
+            close_span: self.close_span,
+        }
+    }
+}
+
 /// Parse `{` element* `}` with recovery for unknown members.
 pub(crate) fn parse_structured_brace_members<'a, E, F, G>(
     input: Input<'a>,
@@ -116,7 +157,7 @@ pub(crate) fn parse_structured_brace_members<'a, E, F, G>(
     _recovery_code: &str,
     parse_element: F,
     map_recovery: G,
-) -> IResult<Input<'a>, Vec<Node<E>>>
+) -> IResult<Input<'a>, ParsedBraceMembers<E>>
 where
     F: FnMut(Input<'a>) -> IResult<Input<'a>, Node<E>>,
     G: FnMut(Input<'a>, Input<'a>) -> Node<E>,
@@ -141,7 +182,7 @@ pub(crate) fn parse_structured_brace_members_with_skip<'a, E, F, G>(
     parse_element: F,
     map_recovery: G,
     skip_mode: BraceMemberSkip,
-) -> IResult<Input<'a>, Vec<Node<E>>>
+) -> IResult<Input<'a>, ParsedBraceMembers<E>>
 where
     F: FnMut(Input<'a>) -> IResult<Input<'a>, Node<E>>,
     G: FnMut(Input<'a>, Input<'a>) -> Node<E>,
@@ -167,12 +208,14 @@ fn parse_structured_brace_members_inner<'a, E, F, G>(
     mut parse_element: F,
     mut map_recovery: G,
     skip_mode: BraceMemberSkip,
-) -> IResult<Input<'a>, Vec<Node<E>>>
+) -> IResult<Input<'a>, ParsedBraceMembers<E>>
 where
     F: FnMut(Input<'a>) -> IResult<Input<'a>, Node<E>>,
     G: FnMut(Input<'a>, Input<'a>) -> Node<E>,
 {
-    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
+    let (open_start, _) = ws_and_comments(input)?;
+    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
         let (next, _) = ws_and_comments(input)?;
@@ -183,9 +226,26 @@ where
                 nom::error::ErrorKind::Eof,
             )));
         }
+        // A redundant `;` between members terminates nothing: it is separator punctuation, not a
+        // member, so it is consumed here rather than reaching the member parser and being reported
+        // as unrecognized content.
+        if input.fragment().starts_with(b";") {
+            let (next, _) = tag(&b";"[..]).parse(input)?;
+            input = next;
+            continue;
+        }
         if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, elements));
+            let (close_start, _) = ws_and_comments(input)?;
+            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+            let close_span = crate::parser::span::span_from_to(close_start, input);
+            return Ok((
+                input,
+                ParsedBraceMembers {
+                    open_span,
+                    elements,
+                    close_span,
+                },
+            ));
         }
         let reference_checkpoint = input.extra.reference_checkpoint();
         match parse_element(input) {
@@ -213,9 +273,17 @@ where
                         let Ok((next, _)) = skip_statement_or_block(input) else {
                             let (closing, _) = advance_to_closing_brace(input)?;
                             elements.push(map_recovery(start_unknown, closing));
-                            let (input, _) =
-                                preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
-                            return Ok((input, elements));
+                            let (close_start, _) = ws_and_comments(closing)?;
+                            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+                            let close_span = crate::parser::span::span_from_to(close_start, input);
+                            return Ok((
+                                input,
+                                ParsedBraceMembers {
+                                    open_span,
+                                    elements,
+                                    close_span,
+                                },
+                            ));
                         };
                         next
                     }
@@ -223,9 +291,17 @@ where
                         let Ok((next, _)) = recover_body_element(input, starters) else {
                             let (closing, _) = advance_to_closing_brace(input)?;
                             elements.push(map_recovery(start_unknown, closing));
-                            let (input, _) =
-                                preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
-                            return Ok((input, elements));
+                            let (close_start, _) = ws_and_comments(closing)?;
+                            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+                            let close_span = crate::parser::span::span_from_to(close_start, input);
+                            return Ok((
+                                input,
+                                ParsedBraceMembers {
+                                    open_span,
+                                    elements,
+                                    close_span,
+                                },
+                            ));
                         };
                         next
                     }
@@ -233,8 +309,17 @@ where
                 if next.location_offset() == start_unknown.location_offset() {
                     let (closing, _) = advance_to_closing_brace(input)?;
                     elements.push(map_recovery(start_unknown, closing));
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(closing)?;
-                    return Ok((input, elements));
+                    let (close_start, _) = ws_and_comments(closing)?;
+                    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+                    let close_span = crate::parser::span::span_from_to(close_start, input);
+                    return Ok((
+                        input,
+                        ParsedBraceMembers {
+                            open_span,
+                            elements,
+                            close_span,
+                        },
+                    ));
                 }
                 let (next, _) = ws_and_comments(next)?;
                 if next.fragment().starts_with(b"}") {
@@ -279,18 +364,23 @@ pub(crate) fn semicolon_or_opaque_brace_body(
     input: Input<'_>,
 ) -> IResult<Input<'_>, DefinitionBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| DefinitionBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                skip_until_brace_end,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| DefinitionBody::Brace { elements: vec![] },
-        ),
+    if input.fragment().starts_with(b";") {
+        return semicolon_body(input);
+    }
+    let open_start = input;
+    let (input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
+    let (input, _) = skip_until_brace_end(input)?;
+    let (close_start, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+    Ok((
+        input,
+        DefinitionBody::Brace {
+            open_span,
+            elements: vec![],
+            close_span: crate::parser::span::span_from_to(close_start, input),
+        },
     ))
-    .parse(input)
 }
 
 #[cfg(test)]
@@ -306,7 +396,7 @@ mod tests {
     fn semicolon_body() {
         let input = span_input(";");
         let (rest, body) = semicolon_or_opaque_brace_body(input).expect("body");
-        assert!(matches!(body, DefinitionBody::Semicolon));
+        assert!(matches!(body, DefinitionBody::Semicolon { .. }));
         assert!(rest.fragment().is_empty());
     }
 
@@ -316,7 +406,7 @@ mod tests {
         let (rest, body) = semicolon_or_structured_definition_body(input).expect("body");
         assert!(matches!(
             body,
-            DefinitionBody::Brace { ref elements } if !elements.is_empty()
+            DefinitionBody::Brace { ref elements, .. } if !elements.is_empty()
         ));
         assert!(rest.fragment().is_empty());
     }
@@ -325,7 +415,7 @@ mod tests {
     fn statement_brace_body_emits_recovery_for_unknown_statements() {
         let input = span_input("{ doc /* note */ x = y; nested { z = q; } }");
         let (rest, body) = semicolon_or_structured_definition_body(input).expect("body");
-        let DefinitionBody::Brace { elements } = body else {
+        let DefinitionBody::Brace { elements, .. } = body else {
             panic!("expected brace body");
         };
         assert!(

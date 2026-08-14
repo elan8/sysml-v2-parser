@@ -49,7 +49,7 @@ package '15_08-Range Restriction' {
 			 * Tilt angle shall be limited to the range between 50 and 80 degrees (inclusive).
 			 */
         }
-        assert constraint  {
+        assert constraint {
             angle >= 50 ['°'] && angle <= 80 ['°'];
         }
     }

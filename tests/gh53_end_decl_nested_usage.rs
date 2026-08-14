@@ -22,7 +22,7 @@ fn connection_def_ends(input: &str) -> Vec<sysml_v2_parser::ast::EndDecl> {
         RootElement::Package(p) => &p.value,
         other => panic!("expected package, got {other:?}"),
     };
-    let PackageBody::Brace { elements } = &pkg.body else {
+    let PackageBody::Brace { elements, .. } = &pkg.body else {
         panic!("expected brace package body");
     };
     let connection = elements
@@ -32,7 +32,7 @@ fn connection_def_ends(input: &str) -> Vec<sysml_v2_parser::ast::EndDecl> {
             _ => None,
         })
         .expect("expected connection def");
-    let ConnectionDefBody::Brace { elements } = &connection.body else {
+    let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected connection def brace body");
     };
     elements

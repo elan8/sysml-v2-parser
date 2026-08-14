@@ -4,8 +4,8 @@ pub(crate) use crate::ast::{
     Allocate, Bind, Connect, ConnectBody, ConnectionEnd, ConnectionUsageMember, DefinitionPrefix,
     ExhibitState, Expression, InOut, InterfaceUsage, InterfaceUsageBodyElement, Membership, Node,
     PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement,
-    Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody, RefBodyElement,
-    RefDecl, VariantTypedUsage, VariantUsage,
+    Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody, RefDecl,
+    VariantTypedUsage, VariantUsage,
 };
 pub(crate) use crate::parser::action::{action_def, action_usage};
 pub(crate) use crate::parser::allocation::{allocation_def, allocation_usage};
@@ -35,7 +35,7 @@ pub(crate) use crate::parser::lex::{
     starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
 };
 pub(crate) use crate::parser::metadata::{metadata_def, metadata_usage};
-pub(crate) use crate::parser::metadata_annotation::{annotation, metadata_annotation};
+pub(crate) use crate::parser::metadata_annotation::annotation;
 pub(crate) use crate::parser::node_from_to;
 pub(crate) use crate::parser::occurrence::{
     individual_usage, occurrence_def, occurrence_usage, snapshot_usage, then_timeslice_usage,
