@@ -85,7 +85,11 @@ not precedent: do not copy or extend them, and do not disguise them with compati
   fallback output in emitters, validators, serializers, normalizers, visitors, or snapshot formatters.
   Adding a variant must produce compile failures at every policy boundary that needs a decision.
 - When several consumers traverse the same structure, provide one owning visitor or typed access API.
-  Do not maintain parallel hand-written lists that can omit new variants independently.
+  Do not maintain parallel hand-written lists that can omit new variants independently. That boundary
+  owns *structural* traversal only: consumers that must produce something for every node, such as
+  emitters and the semantic snapshot projection, keep their own exhaustive matches, because a compile
+  error is a stronger contract for them than a default walk. Never rely on default visitor recursion
+  where a newly added node would require a decision.
 - Parse from the original input and retain its offsets. Never extract text, construct a fresh parser
   input, and then claim its local offsets as document provenance.
 - Parse once. Emitters, validators, serializers, and tests consume typed nodes and borrowed arena

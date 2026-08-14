@@ -1,6 +1,6 @@
 # Factor shared grammatical concepts
 
-> **Status:** Proposed
+> **Status:** Phase 1 implemented; Phases 2-4 proposed
 
 ## Purpose
 
@@ -132,38 +132,18 @@ document are examples rather than pre-approved AST definitions.
 
 ## Refactor phases
 
-### Phase 1: Establish one exhaustive traversal boundary
+### Phase 1: one structural traversal boundary — done
 
-Introduce the owning visitor API used by all read-only AST consumers, plus a folder or equivalent
-transformation API if transformations remain necessary. The APIs must enumerate syntax variants
-exhaustively and must not contain `_` matches or generic fallback behavior.
+Landed as `src/ast/visit`. The enduring rules now live with the code: the traversal contract and
+the distinction between structural traversal and policy-complete consumers are documented in
+`src/ast/visit/mod.rs` and `AGENTS.md`. What changed and why is in the changelog and commits.
 
-Initial migration targets:
+Two constraints from that work carry forward into the phases below:
 
-- semantic snapshot projection;
-- serialized-document provenance and ID validation;
-- emit/format traversal where the same structural walk is repeated; and
-- test comparison normalization.
-
-The immediate objective is to replace the hand-written tree reconstruction used solely to erase
-spans during tests. Prefer changing comparison policy so spans can be handled at the owning
-boundary; if a folder remains necessary, it must be generated from or share its variant inventory
-with the visitor rather than becoming another parallel list.
-
-Deliverables:
-
-- one documented visitor/access API for every AST node reachable from `RootNamespace`;
-- an exhaustive mechanism for transformations that genuinely need to rebuild nodes;
-- migrated normalization, validation, and snapshot consumers; and
-- compile-fail evidence or a focused test showing that an unhandled new variant cannot silently
-  disappear.
-
-Completion criteria:
-
-- no independent whole-tree traversal remains for test normalization;
-- consumers do not discover children through rendered text or parser helpers;
-- malformed and unsupported nodes are visited at their original tree position; and
-- existing semantic snapshots are unchanged unless the old projection was demonstrably wrong.
+- shared families must not weaken the traversal's compile-time exhaustiveness, which is what lets
+  a new production surface as a compile error rather than as silently missing behavior; and
+- downstream semantic lowering deliberately keeps its own exhaustive matches. Representation
+  changes are therefore felt as required edits there, not absorbed by the visitor.
 
 ### Phase 2: Unify the body container
 
@@ -184,9 +164,24 @@ If two bodies differ on any of these facts, either parameterize the shared conce
 typed policy or leave them separate. Do not encode these differences using sentinel spans, empty
 vectors, or undocumented booleans.
 
+The illustrative `Brace { open_span, elements, close_span }` in this document assumes a closing
+delimiter that was actually authored, which is not a state the parser can promise. The real type
+must represent an incomplete or recovered close explicitly -- a typed delimiter outcome, not
+`Span::dummy()`, not a bare `Option<Span>` with the meaning left to the reader, and not an
+end-of-input span fabricated to fill the field. Phase 1 removed exactly this class of sentinel from
+eight recovery sites, where a dummy span made the emitter silently drop authored text; the shared
+container must not reintroduce it as a type-level default.
+
+The serialized shape must be designed before the first migration, not discovered during it, because
+downstream consumers cache parse artifacts. Decide and write down: enum tagging; whether `Body<E>`
+serializes generically or through scope-specific records; how a recovered delimiter is encoded; how
+per-scope legality of members is validated on the way in; and what a version or shape mismatch does.
+
 Deliverables:
 
 - a single `Body<E>`-style type, or a small number of grammar-distinct body container types;
+- a typed representation of delimiter outcome, including recovered and missing closes;
+- a written serialized-shape design, with deserialization validation and rejection behavior;
 - shared borrowed iteration and delimiter access;
 - shared streaming-format and snapshot handling for container structure; and
 - removal of superseded per-family body containers.
@@ -223,6 +218,15 @@ pub enum SomeBodyElement {
 }
 ```
 
+A scope enum keeps a family out of scopes where the family does not belong, but it says nothing
+about which *members* of that family the scope permits. If one scope allows documentation and
+comments but not every metadata form, `Annotating(AnnotatingMember)` makes the type more
+permissive than the grammar, and a public enum plus derived deserialization widens the accepted
+AST contract even when the parser never constructs the illegal value. Resolve this when the family
+is defined, by one of: splitting into narrower grammar-specific families; parameterizing the family
+by scope; or making construction private and requiring deserialization validation that rejects
+members illegal in their scope. Do not defer it to downstream validation.
+
 Do not place all metadata or annotations into one family without checking their different grammar
 roles, ownership, and body forms. Likewise, a recovery wrapper must retain the stable diagnostic,
 exact captured span, and authored malformed slice; it must not turn recovery into generic opaque
@@ -250,6 +254,10 @@ Use the pinned grammar to evaluate broader shared concepts, particularly structu
 behavioral members, declaration headers, and usage headers. This is deliberately last because
 superficially similar declaration types often differ in legal prefixes, specialization clauses,
 membership roles, or body productions.
+
+The matrices and FIRST-set evidence below are a precondition for starting, not a deliverable
+produced alongside the migration. Until they exist for a given family, that family is not ready to
+factor, and each family is evaluated and migrated separately rather than as one broad sweep.
 
 For each proposed family:
 
@@ -294,6 +302,20 @@ Every phase uses focused tests while iterating and the complete repository gates
 - serde round trips and corruption rejection when serialized shapes change
 - parse/format/reparse coverage for affected body families
 - recovery tests with malformed content before, between, and inside valid siblings
+
+Generic containers and nested member families deepen the recursive type proofs the compiler has to
+discharge, and those proofs are paid for by consumers, not by this crate. Each phase therefore also
+gates on type-level cost, checked from an integration test -- which compiles as its own crate at the
+*default* recursion limit, unlike the library, which raises it:
+
+- `ParseResult` and `ParsedDocument` prove `Send` and `Sync` without the consumer raising
+  `recursion_limit`;
+- serde derivation and exhaustive matching still compile downstream;
+- compile time for a representative consumer does not regress materially; and
+- decoding and dropping a deeply nested document remains stack-safe.
+
+Raising a consumer's recursion limit is a workaround, not a resolution: it hides which type cycle
+grew and lets the next phase grow it further.
 
 Snapshot updates must be explicit. A representation-only change should normally preserve semantic
 `AST` and `FORMAT` output. If an output changes, document whether it corrects a lost grammatical

@@ -7,7 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **One owning AST traversal boundary: `ast::visit`.** `ast::visit::Visitor` (borrowing) and
+  `ast::visit::mutable::VisitorMut` (in-place transformation) cover every node reachable from
+  `RootNamespace`. Both expand from a single inventory that destructures every struct without
+  `..` and matches every enum without `_`, so a new field or variant is a compile error at the
+  traversal until a deliberate decision is made about it -- and neither traversal direction can
+  drift from the other. Consumers implement only the node kinds they have a rule for; the
+  default methods walk children.
+
 ### Changed
+
+- **Whole-tree walks now go through `ast::visit` instead of hand-maintained recursion.** Test
+  span normalization (`RootNamespace::normalize_for_test_comparison`), recovery-diagnostic
+  collection, deserialization provenance validation, and qualified-reference-identity
+  validation were four independent traversals -- roughly 4,700 lines -- that each had to be
+  edited when a member could appear somewhere new, and each of which could silently miss a
+  scope. They are now four small policies over the shared traversal (under 300 lines in total), with
+  identical diagnostics across the snapshot and fixture corpus. Reference-identity validation
+  in particular no longer routes through a no-output `serde::Serializer`; it is a typed visit.
+- **`RootNamespace::normalize_for_test_comparison` now erases every span in the tree** rather
+  than the subset the hand-written copy happened to reach, and it preserves whether an optional
+  span was authored at all. Whether a construct recorded a `language` clause or a declaration
+  name is grammar and still compares; where it was authored is provenance and does not.
+
+### Fixed
+
+- **Recovered text is no longer dropped when formatting eight recovery forms.** Malformed
+  package-body, state-body, and requirement-body members, and root-level recovery, wrapped
+  their `ParseErrorNode` in a `Span::dummy()` sentinel while the enclosing member node held the
+  real span, so the emitter had no slice to stream and silently omitted the authored text.
+  Those nodes now carry their exact authored span, and formatting a recovered document emits
+  the malformed slice at its tree position.
 
 - **`PARSE_AST_VERSION` is now 135.** `StateDefBodyElement` gains `AttributeUsage`,
   `ActionUsage`, `SuccessionUsage`, and `AssertConstraint` variants: the Systems Library's
