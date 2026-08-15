@@ -28,6 +28,6 @@ package ExhibitStateUsageExample {
   (references
     (reference r0 (scope relative) (span (offset 47) (line 2) (column 13) (len 2)) (segments (segment 0 (token "s1") (name "s1") (separator none) (span (offset 47) (line 2) (column 13) (len 2)))))
   )
-  (root (package (name "ExhibitStateUsageExample") (body (exhibit (declaration "") (state (ref r0))) (exhibit (declaration "s2") (state none)))))
+  (root (package (name "ExhibitStateUsageExample") (body brace (exhibit (declaration "") (state (ref r0))) (exhibit (declaration "s2") (state none)))))
 )
 ~~~

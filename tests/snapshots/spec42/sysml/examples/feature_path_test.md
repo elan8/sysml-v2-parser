@@ -97,6 +97,6 @@ package Q {
 (parsed-document
   (references
   )
-  (root (package (name "Q") (body (part-def (name "F") (body (part-usage))) (part-usage) (part-def (name "A") (body (part-usage))) (part-def (name "B") (body (part-usage) (part-usage))) (part-def (name "C") (body (part-usage) (part-usage) (flow-usage))) (part-usage) (enum-def) (part-usage))))
+  (root (package (name "Q") (body brace (part-def (name "F") (body brace (part-usage))) (part-usage) (part-def (name "A") (body brace (part-usage))) (part-def (name "B") (body brace (part-usage) (part-usage))) (part-def (name "C") (body brace (part-usage) (part-usage) (flow-usage))) (part-usage) (enum-def) (part-usage))))
 )
 ~~~

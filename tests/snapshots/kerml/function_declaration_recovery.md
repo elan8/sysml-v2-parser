@@ -37,6 +37,6 @@ standard library package Broken {
 (parsed-document
   (references
   )
-  (root (library-package (name "Broken") (standard true) (body (kerml-classifier (keyword function) (abstract false) (name "f") (specializes none)))))
+  (root (library-package (name "Broken") (standard true) (body brace (kerml-classifier (keyword function) (abstract false) (name "f") (specializes none)))))
 )
 ~~~

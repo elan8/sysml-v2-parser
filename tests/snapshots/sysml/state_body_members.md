@@ -43,6 +43,6 @@ package StateBodyMembers {
   (references
     (reference r0 (scope relative) (span (offset 67) (line 3) (column 23) (len 15)) (segments (segment 0 (token "isTriggerDuring") (name "isTriggerDuring") (separator none) (span (offset 67) (line 3) (column 23) (len 15)))))
   )
-  (root (package (name "StateBodyMembers") (body (state-def (name "S") (body (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r0)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (action-usage) (action-usage) (succession-usage) (assert-constraint))))))
+  (root (package (name "StateBodyMembers") (body brace (state-def (name "S") (body brace (attribute-usage (declaration-name none) (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r0)))) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (action-usage) (action-usage) (succession-usage) (assert-constraint))))))
 )
 ~~~

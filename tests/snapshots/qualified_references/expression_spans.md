@@ -28,6 +28,6 @@ package ExpressionSpans {
 (parsed-document
   (references
   )
-  (root (package (name "ExpressionSpans") (body (part-def (name "Container") (body (attribute-usage (declaration-name "answer") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 78) (line 3) (column 28) (len 3)) (integer 100))))) (body semicolon)))))))
+  (root (package (name "ExpressionSpans") (body brace (part-def (name "Container") (body brace (attribute-usage (declaration-name "answer") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 78) (line 3) (column 28) (len 3)) (integer 100))))) (body semicolon)))))))
 )
 ~~~

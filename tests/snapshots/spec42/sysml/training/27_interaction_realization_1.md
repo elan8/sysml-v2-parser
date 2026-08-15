@@ -131,6 +131,6 @@ package 'Interaction Realization-1' {
   (references
     (reference r0 (scope relative) (span (offset 54) (line 2) (column 17) (len 23)) (segments (segment 0 (token "'Interaction Example-1'") (name "Interaction Example-1") (separator none) (span (offset 54) (line 2) (column 17) (len 23)))))
   )
-  (root (package (name "Interaction Realization-1") (body (import (target (span (span (offset 54) (line 2) (column 17) (len 26))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 77) (line 2) (column 40) (len 3))) (separator (span (offset 77) (line 2) (column 40) (len 2))) (marker (span (offset 79) (line 2) (column 42) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-usage) (part-usage) (occurrence (portion none) (declaration "cruiseControlInteraction_a") (target none)))))
+  (root (package (name "Interaction Realization-1") (body brace (import (target (span (span (offset 54) (line 2) (column 17) (len 26))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 77) (line 2) (column 40) (len 3))) (separator (span (offset 77) (line 2) (column 40) (len 2))) (marker (span (offset 79) (line 2) (column 42) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-usage) (part-usage) (occurrence (portion none) (declaration "cruiseControlInteraction_a") (target none)))))
 )
 ~~~

@@ -27,6 +27,6 @@ package P {
 (parsed-document
   (references
   )
-  (root (package (name "P") (body (part-def (name "Engine") (body semicolon)) (part-usage))))
+  (root (package (name "P") (body brace (part-def (name "Engine") (body semicolon)) (part-usage))))
 )
 ~~~

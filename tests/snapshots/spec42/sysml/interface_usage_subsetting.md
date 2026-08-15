@@ -29,6 +29,6 @@ package InterfaceUsageSubsettingExample {
 (parsed-document
   (references
   )
-  (root (package (name "InterfaceUsageSubsettingExample") (body (part-usage) (part-usage) (interface-usage) (interface-usage))))
+  (root (package (name "InterfaceUsageSubsettingExample") (body brace (part-usage) (part-usage) (interface-usage) (interface-usage))))
 )
 ~~~

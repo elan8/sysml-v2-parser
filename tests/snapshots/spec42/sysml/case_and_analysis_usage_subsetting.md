@@ -28,6 +28,6 @@ package CaseAnalysisSubsettingExample {
 (parsed-document
   (references
   )
-  (root (package (name "CaseAnalysisSubsettingExample") (body (analysis-case-usage) (case-usage))))
+  (root (package (name "CaseAnalysisSubsettingExample") (body brace (analysis-case-usage) (case-usage))))
 )
 ~~~

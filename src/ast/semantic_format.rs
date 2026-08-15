@@ -124,6 +124,20 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         write!(self.writer, "(ref r{index})")
     }
 
+    /// Opens a brace body's projection and returns the `first` state its members expect.
+    ///
+    /// `(body brace)` with no members is an element whose body was authored `{}`; `(body
+    /// semicolon)` is an element that owns no body at all. They are different authored syntax, so
+    /// the projection names the form rather than leaving the difference to a trailing space --
+    /// an empty brace body used to read `(body )`, which is indistinguishable from a typo.
+    fn open_brace_body(&mut self) -> io::Result<bool> {
+        self.writer.write_str("(body brace")?;
+        // Members are appended through `write_item_prefix`, which emits a separator for every
+        // item after the first. `false` makes it emit one for the first too, because the keyword
+        // above ends without a space.
+        Ok(false)
+    }
+
     fn write_item_prefix(&mut self, first: &mut bool) -> io::Result<()> {
         if *first {
             *first = false;
@@ -553,8 +567,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             RequirementDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             RequirementDefBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         RequirementDefBodyElement::Error(error) => {
@@ -702,8 +715,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             ViewBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             ViewBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         ViewBodyElement::Error(error) => {
@@ -744,8 +756,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             UseCaseDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             UseCaseDefBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         UseCaseDefBodyElement::Error(error) => {
@@ -879,7 +890,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                                     self.writer.write_str("(body semicolon)")?;
                                 }
                                 super::ReturnRefBody::Brace { elements, .. } => {
-                                    self.writer.write_str("(body")?;
+                                    self.writer.write_str("(body brace")?;
                                     for element in elements {
                                         self.writer.write_char(' ')?;
                                         match &element.value {
@@ -951,8 +962,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             StateDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             StateDefBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         StateDefBodyElement::Error(error) => {
@@ -1095,8 +1105,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             PartDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             PartDefBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         PartDefBodyElement::Error(error) => {
@@ -1364,6 +1373,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (body")?;
         match &dependency.body_elements {
             Some(elements) => {
+                // A dependency body is a `Vec`, not an `ast::Body<E>`, so it has no `;`/`{}`
+                // marker of its own -- but a present one was written with braces, and saying so
+                // keeps it readable the same way every other body is.
+                self.writer.write_str(" brace")?;
                 for element in elements {
                     self.writer.write_char(' ')?;
                     match &element.value {
@@ -1464,7 +1477,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             super::ActionDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             super::ActionDefBody::Brace { elements, .. } => {
-                self.writer.write_str("(body")?;
+                self.writer.write_str("(body brace")?;
                 for element in elements {
                     self.writer.write_char(' ')?;
                     self.write_first_merge_member(&element.value, &element.span)?;
@@ -1577,7 +1590,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 }
                 self.writer.write_str(")")?;
                 if let Some(body) = &declaration.value.body {
-                    self.writer.write_str(" (body")?;
+                    // Like a dependency body this is a `Vec`, not an `ast::Body<E>`, so it has no
+                    // marker of its own -- but a present one was written with braces, and every
+                    // other body in this projection says so.
+                    self.writer.write_str(" (body brace")?;
                     for element in body {
                         self.writer.write_char(' ')?;
                         self.write_first_merge_member(&element.value, &element.span)?;
@@ -1712,8 +1728,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             InterfaceDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             InterfaceDefBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         InterfaceDefBodyElement::Doc(_doc) => {
@@ -1769,8 +1784,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             ConnectionDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             ConnectionDefBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         ConnectionDefBodyElement::EndDecl(end) => {
@@ -1878,8 +1892,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             super::RefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             super::RefBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         super::PartUsageBodyElement::Error(error) => {
@@ -2308,8 +2321,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             PerformBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             PerformBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         PerformBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
@@ -2553,8 +2565,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             PortDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             PortDefBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
                         PortDefBodyElement::InOutDecl(_declaration) => {
@@ -2981,8 +2992,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         match body {
             PackageBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             PackageBody::Brace { elements, .. } => {
-                self.writer.write_str("(body ")?;
-                let mut first = true;
+                let mut first = self.open_brace_body()?;
                 for element in elements {
                     self.write_package_element(element, &mut first)?;
                 }

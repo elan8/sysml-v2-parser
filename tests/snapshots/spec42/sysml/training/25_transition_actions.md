@@ -100,6 +100,6 @@ package 'Transition Actions' {
 (parsed-document
   (references
   )
-  (root (package (name "Transition Actions") (body (attribute-def) (attribute-def) (attribute-def) (attribute-def) (part-def (name "Vehicle") (body (default-reference-usage))) (part-def (name "VehicleController") (body semicolon)) (action-usage) (state-def (name "VehicleStates") (body semicolon)) (state-usage))))
+  (root (package (name "Transition Actions") (body brace (attribute-def) (attribute-def) (attribute-def) (attribute-def) (part-def (name "Vehicle") (body brace (default-reference-usage))) (part-def (name "VehicleController") (body semicolon)) (action-usage) (state-def (name "VehicleStates") (body semicolon)) (state-usage))))
 )
 ~~~

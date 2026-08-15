@@ -28,6 +28,6 @@ package ConcernDefSubsettingExample {
 (parsed-document
   (references
   )
-  (root (package (name "ConcernDefSubsettingExample") (body (concern-usage) (concern-usage))))
+  (root (package (name "ConcernDefSubsettingExample") (body brace (concern-usage) (concern-usage))))
 )
 ~~~

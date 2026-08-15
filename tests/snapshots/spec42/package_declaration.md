@@ -25,6 +25,6 @@ package MyPkg {
 (parsed-document
   (references
   )
-  (root (package (name "MyPkg") (body )))
+  (root (package (name "MyPkg") (body brace)))
 )
 ~~~

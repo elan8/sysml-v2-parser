@@ -74,6 +74,6 @@ package 'Event Occurrence Example' {
 (parsed-document
   (references
   )
-  (root (package (name "Event Occurrence Example") (body (part-def (name "Driver") (body semicolon)) (part-def (name "CruiseController") (body semicolon)) (part-def (name "Speedometer") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Vehicle") (body semicolon)) (part-usage) (part-usage))))
+  (root (package (name "Event Occurrence Example") (body brace (part-def (name "Driver") (body semicolon)) (part-def (name "CruiseController") (body semicolon)) (part-def (name "Speedometer") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Vehicle") (body semicolon)) (part-usage) (part-usage))))
 )
 ~~~

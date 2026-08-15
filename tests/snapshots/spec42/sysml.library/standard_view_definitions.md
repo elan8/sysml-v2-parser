@@ -270,6 +270,6 @@ standard library package StandardViewDefinitions {
   (references
     (reference r0 (scope relative) (span (offset 178) (line 5) (column 19) (len 5)) (segments (segment 0 (token "SysML") (name "SysML") (separator none) (span (offset 178) (line 5) (column 19) (len 5)))))
   )
-  (root (library-package (name "StandardViewDefinitions") (standard true) (body (doc) (import (target (span (span (offset 178) (line 5) (column 19) (len 8))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 183) (line 5) (column 24) (len 3))) (separator (span (offset 183) (line 5) (column 24) (len 2))) (marker (span (offset 185) (line 5) (column 26) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (view-def) (view-def) (view-def) (view-def) (view-def) (view-def) (view-def) (view-def))))
+  (root (library-package (name "StandardViewDefinitions") (standard true) (body brace (doc) (import (target (span (span (offset 178) (line 5) (column 19) (len 8))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 183) (line 5) (column 24) (len 3))) (separator (span (offset 183) (line 5) (column 24) (len 2))) (marker (span (offset 185) (line 5) (column 26) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (view-def) (view-def) (view-def) (view-def) (view-def) (view-def) (view-def) (view-def))))
 )
 ~~~

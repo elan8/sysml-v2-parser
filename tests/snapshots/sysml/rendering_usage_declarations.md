@@ -46,6 +46,6 @@ package Views {
 (parsed-document
   (references
   )
-  (root (package (name "Views") (body (rendering-usage) (rendering-usage))))
+  (root (package (name "Views") (body brace (rendering-usage) (rendering-usage))))
 )
 ~~~

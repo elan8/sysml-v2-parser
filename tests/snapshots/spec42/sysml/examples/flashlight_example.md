@@ -131,6 +131,6 @@ package 'Flashlight Example' {
 (parsed-document
   (references
   )
-  (root (package (name "Flashlight Example") (body (attribute-def) (attribute-def) (port-def (name "OnOffCmdPort") (specializes none) (body (in-out-declaration))) (port-def (name "LightPort") (specializes none) (body (in-out-declaration))) (part-usage) (action-usage))))
+  (root (package (name "Flashlight Example") (body brace (attribute-def) (attribute-def) (port-def (name "OnOffCmdPort") (specializes none) (body brace (in-out-declaration))) (port-def (name "LightPort") (specializes none) (body brace (in-out-declaration))) (part-usage) (action-usage))))
 )
 ~~~

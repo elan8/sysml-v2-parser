@@ -27,6 +27,6 @@ package P {
 (parsed-document
   (references
   )
-  (root (package (name "P") (body (part-usage) (part-usage))))
+  (root (package (name "P") (body brace (part-usage) (part-usage))))
 )
 ~~~

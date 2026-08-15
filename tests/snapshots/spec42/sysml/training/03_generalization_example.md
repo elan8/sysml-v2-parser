@@ -53,6 +53,6 @@ package 'Generalization Example' {
 (parsed-document
   (references
   )
-  (root (package (name "Generalization Example") (body (part-def (name "Vehicle") (body semicolon)) (part-def (name "HumanDrivenVehicle") (body (part-usage))) (part-def (name "PoweredVehicle") (body (part-usage))) (part-def (name "HumanDrivenPoweredVehicle") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Person") (body semicolon)))))
+  (root (package (name "Generalization Example") (body brace (part-def (name "Vehicle") (body semicolon)) (part-def (name "HumanDrivenVehicle") (body brace (part-usage))) (part-def (name "PoweredVehicle") (body brace (part-usage))) (part-def (name "HumanDrivenPoweredVehicle") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Person") (body semicolon)))))
 )
 ~~~

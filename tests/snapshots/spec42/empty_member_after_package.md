@@ -31,6 +31,6 @@ in newX : Real;
 (parsed-document
   (references
   )
-  (root (package (name "MyPkg") (body )) (malformed (code "expected_keyword") (found "; in newX : Real;") (span (offset 17) (line 1) (column 18) (len 1))) (malformed (code "expected_keyword") (found "in newX : Real;") (span (offset 19) (line 1) (column 20) (len 15))))
+  (root (package (name "MyPkg") (body brace)) (malformed (code "expected_keyword") (found "; in newX : Real;") (span (offset 17) (line 1) (column 18) (len 1))) (malformed (code "expected_keyword") (found "in newX : Real;") (span (offset 19) (line 1) (column 20) (len 15))))
 )
 ~~~

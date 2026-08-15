@@ -200,6 +200,6 @@ standard library package RiskMetadata {
   (references
     (reference r0 (scope relative) (span (offset 161) (line 7) (column 17) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 161) (line 7) (column 17) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 175) (line 7) (column 31) (len 4)))))
   )
-  (root (library-package (name "RiskMetadata") (standard true) (body (doc) (import (target (span (span (offset 161) (line 7) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (attribute-def) (enum-def) (attribute-def) (enum-def) (metadata-def))))
+  (root (library-package (name "RiskMetadata") (standard true) (body brace (doc) (import (target (span (span (offset 161) (line 7) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (attribute-def) (enum-def) (attribute-def) (enum-def) (metadata-def))))
 )
 ~~~

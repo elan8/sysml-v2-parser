@@ -167,6 +167,6 @@ package '7a1-Variant Configuration - General Concept-a' {
 (parsed-document
   (references
   )
-  (root (package (name "7a1-Variant Configuration - General Concept-a") (body (action-usage) (action-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-def (name "SubsystemA") (body (part-usage))) (part-def (name "SubsystemB") (body (part-usage))) (part-usage) (part-usage) (part-usage))))
+  (root (package (name "7a1-Variant Configuration - General Concept-a") (body brace (action-usage) (action-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-def (name "SubsystemA") (body brace (part-usage))) (part-def (name "SubsystemB") (body brace (part-usage))) (part-usage) (part-usage) (part-usage))))
 )
 ~~~

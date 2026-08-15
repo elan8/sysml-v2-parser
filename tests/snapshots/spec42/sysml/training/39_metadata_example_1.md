@@ -76,6 +76,6 @@ package 'Metadata Example-1' {
 (parsed-document
   (references
   )
-  (root (package (name "Metadata Example-1") (body (metadata-def) (metadata-def) (metadata-usage) (metadata-usage) (part-usage))))
+  (root (package (name "Metadata Example-1") (body brace (metadata-def) (metadata-def) (metadata-usage) (metadata-usage) (part-usage))))
 )
 ~~~

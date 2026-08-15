@@ -48,6 +48,6 @@ er E specializes C intersects A, B;
 (parsed-document
   (references
   )
-  (root (package (name "ers") (body (malformed (code "unrecognized_declaration_in_scope") (found "specializaaaaaaaaaaaaaaaaaaaaaaaaaaA specializes B;") (span (offset 58) (line 4) (column 2) (len 331))))))
+  (root (package (name "ers") (body brace (malformed (code "unrecognized_declaration_in_scope") (found "specializaaaaaaaaaaaaaaaaaaaaaaaaaaA specializes B;") (span (offset 58) (line 4) (column 2) (len 331))))))
 )
 ~~~

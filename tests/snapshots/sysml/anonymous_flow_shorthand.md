@@ -31,6 +31,6 @@ package AnonymousFlowShorthand {
 (parsed-document
   (references
   )
-  (root (package (name "AnonymousFlowShorthand") (body (action-def (name "Shoot") (specializes none) (body (flow-usage) (flow-usage) (flow-usage) (flow-usage))))))
+  (root (package (name "AnonymousFlowShorthand") (body brace (action-def (name "Shoot") (specializes none) (body brace (flow-usage) (flow-usage) (flow-usage) (flow-usage))))))
 )
 ~~~

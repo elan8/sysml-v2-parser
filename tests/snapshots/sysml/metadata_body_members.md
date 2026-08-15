@@ -36,6 +36,6 @@ package MetadataBodyMembers {
 (parsed-document
   (references
   )
-  (root (package (name "MetadataBodyMembers") (body (metadata-def))))
+  (root (package (name "MetadataBodyMembers") (body brace (metadata-def))))
 )
 ~~~

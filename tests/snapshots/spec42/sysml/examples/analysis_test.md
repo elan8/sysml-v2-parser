@@ -92,6 +92,6 @@ package AnalysisTest {
 (parsed-document
   (references
   )
-  (root (package (name "AnalysisTest") (body (part-def (name "V") (body (default-reference-usage))) (part-usage) (requirement-def (name "AnalysisObjective") (body (doc))) (analysis-case-def) (analysis-case-def) (part-usage))))
+  (root (package (name "AnalysisTest") (body brace (part-def (name "V") (body brace (default-reference-usage))) (part-usage) (requirement-def (name "AnalysisObjective") (body brace (doc))) (analysis-case-def) (analysis-case-def) (part-usage))))
 )
 ~~~

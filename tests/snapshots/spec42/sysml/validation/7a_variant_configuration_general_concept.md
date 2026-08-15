@@ -117,6 +117,6 @@ package '7a-Variant Configuration - General Concept' {
 (parsed-document
   (references
   )
-  (root (package (name "7a-Variant Configuration - General Concept") (body (part-def (name "Vehicle") (body semicolon)) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage))))
+  (root (package (name "7a-Variant Configuration - General Concept") (body brace (part-def (name "Vehicle") (body semicolon)) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage))))
 )
 ~~~

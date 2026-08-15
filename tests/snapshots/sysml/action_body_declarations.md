@@ -61,6 +61,6 @@ package ActionBodyDeclarations {
 (parsed-document
   (references
   )
-  (root (package (name "ActionBodyDeclarations") (body (action-def (name "Dynamics") (specializes none) (body (attribute-usage) (calc-usage) (occurrence-usage (direction none)) (action-def))) (action-usage))))
+  (root (package (name "ActionBodyDeclarations") (body brace (action-def (name "Dynamics") (specializes none) (body brace (attribute-usage) (calc-usage) (occurrence-usage (direction none)) (action-def))) (action-usage))))
 )
 ~~~

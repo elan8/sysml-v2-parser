@@ -27,6 +27,6 @@ package IncludeUseCaseUsageExample {
   (references
     (reference r0 (scope relative) (span (offset 49) (line 2) (column 13) (len 10)) (segments (segment 0 (token "checkTires") (name "checkTires") (separator none) (span (offset 49) (line 2) (column 13) (len 10)))))
   )
-  (root (package (name "IncludeUseCaseUsageExample") (body (include (target (ref r0))))))
+  (root (package (name "IncludeUseCaseUsageExample") (body brace (include (target (ref r0))))))
 )
 ~~~
