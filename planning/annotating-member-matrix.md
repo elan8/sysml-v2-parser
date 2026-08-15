@@ -137,6 +137,21 @@ itself, both fixed with the coverage:
   parser broke `rep x language "text" /* … */` into four invented members with no diagnostic, so
   the document parsed clean and formatted back as something else.
 
+## No annotating form remains valid-but-unsupported
+
+`Unsupported` and `Malformed` stay distinct states, but after this change no *annotating* member
+reaches the first of them, which is why the recovery fixtures have no valid-but-unsupported case
+to show:
+
+- no scope's opaque-starter list (`ATTRIBUTE_OPAQUE_STARTERS`, `METADATA_OPAQUE_STARTERS`,
+  `DEFINITION_BODY_OPAQUE_STARTERS`, `VIEW_DEF_OPAQUE_STARTERS`) contains `doc`, `comment`, `rep`,
+  `language` or `@`, so `unsupported_member` cannot claim one; and
+- no emitter reports an `AnnotatingMember` as unsupported. The one surviving `w.unsupported` arm
+  that mentions an annotation is `OccurrenceBodyElement::Annotation`, which is the legacy
+  `Annotation` type — a `#`-sigil fallback with an `AnnotationHead::Opaque` head — and not an
+  alternative of `AnnotatingElement`. An occurrence-body `@M about A, B;` parses and formats
+  through the shared annotating path.
+
 ## Confirmed remaining gaps
 
 These are annotating-member gaps the matrix found that this change does **not** close. Each is
