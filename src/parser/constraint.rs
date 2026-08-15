@@ -215,10 +215,12 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    // `abstract calc subcalculations: Calculation :> calculations, subactions { ... }` (Systems
-    // Library `Calculations.sysml`); accepted and discarded, matching `RefDecl`'s "don't model
-    // every shorthand" scope for feature modifiers.
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // `BasicUsagePrefix`'s `RefPrefix`: the direction (`in calc eval : EvaluationFunction { ... }`,
+    // `sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:61`) and `abstract` (`abstract
+    // calc subcalculations: Calculation :> calculations, subactions { ... }`, Systems Library
+    // `Calculations.sysml`) are slots of one production. `CalcUsage::direction` existed but was
+    // never populated, and `abstract` was consumed and dropped.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (identification, redefines)) = if input.fragment().starts_with(b":>>") {
@@ -279,7 +281,7 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
                 type_name,
                 redefines,
                 value,
-                direction: None,
+                direction: prefix.direction,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },

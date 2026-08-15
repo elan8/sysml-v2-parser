@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Calc usages take the `RefPrefix` and are requirement-body members.** `in calc eval :
+  EvaluationFunction { ... }` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:61`)
+  had no arm in requirement bodies, and `calc_usage` parsed neither the direction nor `abstract`
+  -- `CalcUsage::direction` existed but nothing ever populated it, and the `abstract` keyword was
+  consumed and dropped. Both now come from the shared `ref_prefix`.
+  **AST version 150 -> 151.**
+
 - **Occurrence bodies accept directed occurrence usages and connection usages.**
   `directed_occurrence_usage` was dispatched only in action bodies, and it required the
   `occurrence` keyword immediately after the direction, so `in event occurrence sourceEvent [1]

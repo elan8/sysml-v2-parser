@@ -1022,6 +1022,9 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::ConcernUsage(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
+            RequirementDefBodyElement::CalcUsage(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
+            }
             RequirementDefBodyElement::Doc(_)
             | RequirementDefBodyElement::SubjectDecl(_)
             | RequirementDefBodyElement::SubjectRef(_)

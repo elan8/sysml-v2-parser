@@ -5503,6 +5503,9 @@ macro_rules! ast_traversal {
                 RequirementDefBodyElement::ConcernUsage(field_0) => {
                     visitor.visit_concern_usage(field_0);
                 }
+                RequirementDefBodyElement::CalcUsage(field_0) => {
+                    visitor.visit_calc_usage(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }

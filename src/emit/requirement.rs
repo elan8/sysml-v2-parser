@@ -114,6 +114,9 @@ fn emit_requirement_body_element(
         RequirementDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RequirementDefBodyElement::Doc(d) => emit_doc(w, &d.value),
         RequirementDefBodyElement::ConcernUsage(c) => emit_concern_usage(w, path, &c.value),
+        RequirementDefBodyElement::CalcUsage(c) => {
+            crate::emit::view::emit_calc_usage(w, path, &c.value)
+        }
         RequirementDefBodyElement::RefDecl(r) => {
             crate::emit::structure::emit_ref_decl(w, path, &r.value)
         }

@@ -83,6 +83,9 @@ pub enum RequirementDefBodyElement {
     /// Nested concern usage, e.g. `abstract concern concerns[0..*] :> concernChecks { ... }`
     /// (`Requirements.sysml`). Previously only reachable at package level.
     ConcernUsage(Node<ConcernUsage>),
+    /// Nested calc usage, e.g. `in calc eval : EvaluationFunction { ... }` and `in calc :>> eval =
+    /// evaluationFunction;` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml`).
+    CalcUsage(Box<Node<CalcUsage>>),
 }
 
 /// Viewpoint stakeholder: typed declaration, shorthand concern reference, or `:>>` redefinition.

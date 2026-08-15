@@ -203,6 +203,9 @@ fn requirement_def_body_element(
             alt((
                 map(doc_comment, RequirementDefBodyElement::Doc),
                 map(concern_usage, RequirementDefBodyElement::ConcernUsage),
+                map(crate::parser::constraint::calc_usage, |n| {
+                    RequirementDefBodyElement::CalcUsage(Box::new(n))
+                }),
             )),
             map(
                 crate::parser::connector::ref_decl,
