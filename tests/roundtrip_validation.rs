@@ -134,6 +134,10 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Mass Roll-up Example/MassConstraintExample.sysml",
     "Mass Roll-up Example/Vehicles.sysml",
     "Metadata Examples/IssueMetadataExample.sysml",
+    // Promoted by the annotating-member coverage: `@` metadata annotations reach the shared
+    // annotating emitter from every scope that owns them instead of being reported as an
+    // unsupported construct, and a comment keeps the elements its `about` clause names.
+    "Metadata Examples/VerificationMetadataExample.sysml",
     "Packet Example/PacketUsage.sysml",
     "Packet Example/Packets.sysml",
     "Requirements Examples/HSUVRequirements.sysml",
@@ -160,6 +164,10 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     // Promoted by spec42 Gap 42 (see Turbojet Stage Analysis above).
     "Simple Tests/StateTest.sysml",
     "Simple Tests/TradeStudyTest.sysml",
+    // Promoted by the annotating-member coverage: a textual representation was not dispatched
+    // in an action body or a KerML type body at all, and the fallback member parser broke
+    // `language "alf" /* ... */` into invented members with no diagnostic.
+    "Simple Tests/TextualRepresentationTest.sysml",
     // Promoted by the nested case-usage members: a `use case` / `case` / `verification` usage
     // inside a case-family body is structured, and its declaration tail (multiplicity, subsets
     // targets) is no longer skipped, so the file reparses to the same AST.

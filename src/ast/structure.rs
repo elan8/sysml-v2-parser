@@ -968,6 +968,11 @@ impl PartialEq for DefaultReferenceUsage {
 /// expression sublanguage; see `DefaultReferenceUsage::body`'s doc comment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// `AnnotatingMember` keeps the same direct representation here as in every other scope that owns
+// it. Boxing it only where the sibling variant happens to be small would make the public shape of
+// one production depend on which body contains it -- the same reason `ActionDefBodyElement` keeps
+// `ThenAction` unboxed.
+#[allow(clippy::large_enum_variant)]
 pub enum FeatureBodyElement {
     /// A nested keyword-less binding, e.g. `:>> dimensions = sourceVector.mRef.dimensions;`
     /// inside `:>> mRef = transformation.target { ... }` (Domain Libraries
