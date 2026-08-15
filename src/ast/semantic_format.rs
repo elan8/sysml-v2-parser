@@ -2004,6 +2004,14 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         } else {
             self.writer.write_str("none")?;
         }
+        // The trailing `:>>` clause is a different fact from `target` (the leading anonymous
+        // form), so it is projected separately rather than folded into it.
+        self.writer.write_str(") (redefines ")?;
+        if let Some(redefines) = &declaration.redefines {
+            self.write_subsetting(&redefines.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
         self.writer.write_str(") (feature-kind ")?;
         match declaration.feature_kind {
             Some(CaseReturnFeatureKind::Part) => self.writer.write_str("part")?,

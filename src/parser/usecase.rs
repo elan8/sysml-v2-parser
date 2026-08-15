@@ -304,6 +304,14 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
         (input, (false, None))
     };
     let (input, multiplicity) = opt(crate::parser::usage::multiplicity_node).parse(input)?;
+    // Trailing `:>>` on a named declaration: `return verdict : VerdictKind :>> result;`
+    // (Systems Library `VerificationCases.sysml:22`). The leading form is handled above, where
+    // the target stands in for the declaration name; here a name was already written.
+    let (input, redefines) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::redefinition,
+    ))
+    .parse(input)?;
     let (input, value) = opt(preceded(
         ws_and_comments,
         crate::parser::feature_value::feature_value_part,
@@ -324,6 +332,7 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
                 is_subsetting,
                 feature_kind,
                 multiplicity,
+                redefines,
             },
         ),
     ))

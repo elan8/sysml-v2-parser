@@ -960,6 +960,9 @@ fn emit_case_return_decl(
     if let Some(mult) = &decl.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
+    if let Some(redefines) = &decl.redefines {
+        crate::emit::structure::emit_subsetting_clause(w, &redefines.value)?;
+    }
     if let Some(value) = &decl.value {
         emit_feature_value(w, value)?;
     }

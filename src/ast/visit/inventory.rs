@@ -5983,13 +5983,16 @@ macro_rules! ast_traversal {
         pub fn walk_case_return_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CaseReturnDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CaseReturnDecl { declaration_name, name_span, target, type_name, value, is_subsetting, feature_kind, multiplicity } = &$($mutability)? node.value;
+            let CaseReturnDecl { declaration_name, name_span, target, type_name, value, is_subsetting, feature_kind, multiplicity, redefines } = &$($mutability)? node.value;
             visitor.visit_text(declaration_name);
             if let Some(inner) = name_span {
                 visitor.visit_span(inner);
             }
             if let Some(inner) = target {
                 visitor.visit_qualified_reference(inner);
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
             }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);

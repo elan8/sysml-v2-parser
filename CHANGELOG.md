@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `return` declaration keeps a `:>>` clause written after its type.** `return verdict :
+  VerdictKind :>> result;` (`sysml.library/Systems Library/VerificationCases.sysml:22`) only had
+  a path for the leading anonymous form (`return :>> result;`), where the target stands in for
+  the declaration name; a trailing clause on a named declaration was recovered text.
+  `CaseReturnDecl` gained a `redefines` field, and the semantic projection shows it, so a
+  regression that dropped it would be visible in the AST rather than only in the emitted string.
+  **AST version 145 -> 146.**
+
 - **Two more members that had nowhere to go.** `RefDeclKind` gained `case` and `verification`
   (`ref case self : Case :>> Calculation::self;`, `sysml.library/Systems Library/Cases.sysml`),
   matched after the two-word `use case` keyword so that form still wins. Part usage bodies gained

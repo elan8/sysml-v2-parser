@@ -557,6 +557,13 @@ pub struct CaseReturnDecl {
     /// Optional `part` / `attribute` keyword after `return`.
     pub feature_kind: Option<CaseReturnFeatureKind>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `:>>` clause written *after* the type on a named declaration, e.g. `return verdict :
+    /// VerdictKind :>> result;` (Systems Library `VerificationCases.sysml:22`). Distinct from
+    /// [`Self::target`], which is the leading anonymous form (`return :>> result;`) where the
+    /// redefinition target stands in for the declaration name. The two are the same relationship
+    /// written in two positions and are candidates for unification with the rest of the
+    /// subsetting family; kept apart here because only `target` substitutes for the name.
+    pub redefines: Option<Node<SubsettingRelationship>>,
 }
 
 impl PartialEq for CaseReturnDecl {
