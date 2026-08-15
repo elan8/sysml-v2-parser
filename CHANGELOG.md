@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Requirement, case, constraint, calculation, view and rendering bodies accept the whole
+  annotating production, and a KerML type body stops shredding a `rep`.** `RequirementBodyItem`
+  extends `DefinitionBodyItem`, `CaseBodyItem` and `CalculationBodyItem` extend `ActionBodyItem`,
+  and `ViewDefinitionBodyItem`/`ViewBodyItem` extend `DefinitionBodyItem`, so all nine scopes own
+  the production; between them they accepted eight of the thirty-six alternative-scope pairs. The
+  worst case was the KerML type body, which shares `CalcDefBodyElement`: `rep x language "text"
+  /* … */` was not dispatched at all, and the fallback member parser broke it into four invented
+  members -- `'rep'; x; 'language'; "text";` -- with no diagnostic, so the document parsed clean
+  and formatted back as something else. A constraint or calculation body containing an `@`
+  metadata annotation parsed but could not be formatted at all. **AST version 155 -> 156.**
+
 - **Action, action-usage, state and control-node bodies accept the whole annotating production,
   and can emit it.** `ActionBodyItem` and `StateBodyItem` both start at `NonBehaviorBodyItem`,
   which reaches `AnnotatingElement` through `DefinitionMember`, so `comment /* ... */` belongs in

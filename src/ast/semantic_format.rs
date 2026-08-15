@@ -627,8 +627,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
                         }
-                        RequirementDefBodyElement::MetadataAnnotation(_annotation) => {
-                            self.write_marker(&mut first, "metadata-annotation")?;
+                        RequirementDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         RequirementDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
@@ -738,12 +739,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Frame(_frame) => {
                             self.write_marker(&mut first, "frame")?;
                         }
-                        RequirementDefBodyElement::TextualRep(_text) => {
-                            self.write_marker(&mut first, "textual-representation")?;
-                        }
-                        RequirementDefBodyElement::Doc(_doc) => {
-                            self.write_marker(&mut first, "doc")?;
-                        }
                         RequirementDefBodyElement::ConcernUsage(_usage) => {
                             self.write_marker(&mut first, "concern-usage")?;
                         }
@@ -772,7 +767,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
-                        ViewBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
+                        ViewBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
                         ViewBodyElement::RefDecl(declaration) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
@@ -816,8 +814,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
                         }
-                        UseCaseDefBodyElement::MetadataAnnotation(_annotation) => {
-                            self.write_marker(&mut first, "metadata-annotation")?;
+                        UseCaseDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         UseCaseDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
@@ -825,7 +824,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::AttributeDef(_definition) => {
                             self.write_marker(&mut first, "attribute-def")?;
                         }
-                        UseCaseDefBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
                         UseCaseDefBodyElement::SubjectDecl(_subject) => {
                             self.write_marker(&mut first, "subject")?;
                         }
@@ -944,8 +942,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                     for element in elements {
                                         self.writer.write_char(' ')?;
                                         match &element.value {
-                                            super::ReturnRefBodyElement::Doc(_) => {
-                                                self.writer.write_str("(doc)")?;
+                                            super::ReturnRefBodyElement::Annotating(member) => {
+                                                self.write_annotating_member(member)?;
                                             }
                                             super::ReturnRefBodyElement::Result(expression) => {
                                                 self.writer.write_str("(result ")?;

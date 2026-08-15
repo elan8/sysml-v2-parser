@@ -1,11 +1,10 @@
 use super::behavior::InOutDecl;
 use super::body::Body;
-use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
+use super::common::{AnnotatingMember, ConnectBody, Identification, ParseErrorNode};
 use super::common::{FilterMember, ImportTarget};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::RequirementDefBody;
-use super::structure::MetadataAnnotation;
 use crate::ast::core::{
     Expression, Multiplicity, Node, SubsettingRelationship, TypingRelationship,
 };
@@ -48,9 +47,9 @@ pub type ConstraintDefBody = Body<ConstraintDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConstraintDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     InOutDecl(Box<Node<InOutDecl>>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
     /// A `constraint` member nested inside a `constraint def { ... }` body (e.g. the Systems
     /// Library's `RequirementConstraintCheck::assumptions`/`::constraints`, redefined/subset
@@ -119,7 +118,8 @@ pub type CalcDefBody = Body<CalcDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CalcDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     InOutDecl(Box<Node<InOutDecl>>),
     /// KerML kinded parameter member: `in expr fn[0..*] { ... }`, `in bool test = expr;`,
     /// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
@@ -143,8 +143,6 @@ pub enum CalcDefBodyElement {
     /// `import` member inside a type body (`private import SequenceFunctions::*;`, Kernel
     /// Function Library `VectorFunctions.kerml`).
     Import(Box<Node<crate::ast::Import>>),
-    /// `comment about a, b ...` annotation member (`Occurrences.kerml`).
-    Comment(Node<crate::ast::CommentAnnotation>),
     /// Nested `attribute` usage member (`private attribute position : Natural[1] = ...;`,
     /// Systems Library `Interfaces.sysml`; previously captured opaquely).
     AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
@@ -159,7 +157,6 @@ pub enum CalcDefBodyElement {
     /// `VectorValues.kerml`).
     DefaultReferenceUsage(Box<Node<crate::ast::DefaultReferenceUsage>>),
     ReturnDecl(Box<Node<ReturnDecl>>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // formula
     /// Nested `calc` usage inside a calc body (validation `10b` rollups).
     CalcUsage(Box<Node<CalcUsage>>),
@@ -261,8 +258,8 @@ pub enum ViewDefBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
     /// `ref`-prefixed feature declaration, e.g. `ref viewpoint :>> self : ViewpointCheck;` and
@@ -302,7 +299,8 @@ pub type RenderingUsageBody = Body<RenderingUsageBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderingUsageBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     /// Nested `view` usage member, e.g. a `columnView` redefinition (`view :>> columnView[1] {
     /// render asTextualNotation; }`).
     ViewUsage(Box<Node<ViewUsage>>),
@@ -349,7 +347,8 @@ pub enum RenderingDefBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
     /// `ref`-prefixed feature declaration, e.g. `ref rendering :>> self : Rendering;` and
@@ -398,7 +397,8 @@ pub type ViewBody = Body<ViewBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
     Expose(Node<ExposeMember>),

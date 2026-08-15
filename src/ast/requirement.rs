@@ -1,14 +1,14 @@
 use super::behavior::{AssignStmt, ForLoop, InOut, ThenAction};
 use super::body::Body;
-use super::common::TextualRepresentation;
-use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
+use super::common::{
+    AnnotatingMember, ConnectBody, Identification, Import, ParseErrorNode, Visibility,
+};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::structure::DefinitionPrefix;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
-    Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
-    MetadataKeywordUsage, VariantUsage,
+    Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataKeywordUsage, VariantUsage,
 };
 use super::view::{CalcUsage, ConstraintDefBody, ConstraintDefBodyElement, ConstraintUsage};
 use crate::ast::core::{
@@ -48,7 +48,8 @@ pub type RequirementDefBody = Body<RequirementDefBodyElement>;
 pub enum RequirementDefBodyElement {
     Error(Node<ParseErrorNode>),
     Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Import(Node<Import>),
     SubjectDecl(Node<SubjectDecl>),
@@ -74,8 +75,6 @@ pub enum RequirementDefBodyElement {
     /// `assumptions`/`constraints` (`constraint assumptions :>> RequirementConstraintCheck::assumptions;`).
     Constraint(Node<ConstraintUsage>),
     Frame(Node<FrameMember>),
-    TextualRep(Node<TextualRepresentation>),
-    Doc(Node<DocComment>),
     /// `ref`-prefixed feature declaration, e.g. `ref concern :>> self: ConcernCheck;` and `ref
     /// part actors : Part[0..*] { ... }` (Systems Library `Requirements.sysml`). This scope
     /// accepted no `ref` member at all.
@@ -621,7 +620,8 @@ pub type ReturnRefBody = Body<ReturnRefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ReturnRefBodyElement {
-    Doc(Node<crate::ast::DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Result(Node<Expression>),
     Error(Node<ParseErrorNode>),
 }
@@ -634,10 +634,10 @@ pub enum ReturnRefBodyElement {
 pub enum UseCaseDefBodyElement {
     Error(Node<ParseErrorNode>),
     Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     AttributeDef(Node<AttributeDef>),
-    Doc(Node<DocComment>),
     SubjectDecl(Node<SubjectDecl>),
     /// `subject;` shorthand.
     SubjectRef(Node<SubjectRef>),

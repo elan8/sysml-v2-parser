@@ -1,7 +1,7 @@
 //! Requirement / use-case / dependency / item usage emission.
 
 use super::expr::{emit_expression, emit_feature_value};
-use super::root::{emit_doc, emit_identification, emit_import};
+use super::root::{emit_identification, emit_import};
 use super::structure::{
     self, emit_attribute_body, emit_direction, emit_multiplicity, emit_subsetting_clause,
     emit_typing_clause,
@@ -112,7 +112,9 @@ fn emit_requirement_body_element(
 ) -> Result<(), EmitError> {
     match el {
         RequirementDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        RequirementDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RequirementDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         RequirementDefBodyElement::ConcernUsage(c) => emit_concern_usage(w, path, &c.value),
         RequirementDefBodyElement::CalcUsage(c) => {
             crate::emit::view::emit_calc_usage(w, path, &c.value)
@@ -197,13 +199,9 @@ fn emit_requirement_body_element(
             emit_verify_requirement(w, path, &v.value)
         }
         RequirementDefBodyElement::Annotation(a) => emit_requirement_annotation(w, &a.value),
-        RequirementDefBodyElement::MetadataAnnotation(a) => {
-            structure::emit_metadata_annotation(w, path, &a.value)
-        }
         RequirementDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
-        RequirementDefBodyElement::TextualRep(t) => emit_requirement_textual_rep(w, &t.value),
     }
 }
 
@@ -226,25 +224,6 @@ fn emit_requirement_annotation(
         ConnectBody::Semicolon => w.push_char(';'),
         ConnectBody::Brace => w.push_str(" {}"),
     }
-    Ok(())
-}
-
-fn emit_requirement_textual_rep(
-    w: &mut EmitWriter<'_>,
-    rep: &crate::ast::TextualRepresentation,
-) -> Result<(), EmitError> {
-    if let Some(id) = &rep.rep_identification {
-        w.push_str("rep ");
-        emit_identification(w, id);
-        w.push_char(' ');
-    }
-    w.push_str("language \"");
-    w.push_str(&rep.language);
-    w.push_char('"');
-    w.newline();
-    w.push_str("/*");
-    w.push_str(&rep.text);
-    w.push_str("*/");
     Ok(())
 }
 
@@ -773,7 +752,9 @@ fn emit_use_case_body_element(
 ) -> Result<(), EmitError> {
     match el {
         UseCaseDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        UseCaseDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        UseCaseDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         UseCaseDefBodyElement::SubjectDecl(s) => emit_subject_decl(w, &s.value),
         UseCaseDefBodyElement::SubjectRef(_) => {
             w.push_str("subject;");
@@ -909,9 +890,6 @@ fn emit_use_case_body_element(
         }
         UseCaseDefBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
         UseCaseDefBodyElement::Annotation(a) => emit_requirement_annotation(w, &a.value),
-        UseCaseDefBodyElement::MetadataAnnotation(a) => {
-            structure::emit_metadata_annotation(w, path, &a.value)
-        }
         UseCaseDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
@@ -939,7 +917,9 @@ fn emit_return_ref(
                 w.indent();
                 for (index, element) in elements.iter().enumerate() {
                     match &element.value {
-                        ReturnRefBodyElement::Doc(doc) => emit_doc(w, &doc.value)?,
+                        ReturnRefBodyElement::Annotating(member) => {
+                            super::root::emit_annotating_member(w, path, member)?
+                        }
                         ReturnRefBodyElement::Result(expression) => {
                             w.push_str("return ");
                             emit_expression(w, &expression.value)?;

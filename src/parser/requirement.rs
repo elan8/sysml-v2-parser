@@ -153,8 +153,8 @@ fn requirement_def_body_element(
     let (rest, elem) = alt((
         alt((
             map(
-                crate::parser::metadata_annotation::metadata_annotation,
-                RequirementDefBodyElement::MetadataAnnotation,
+                crate::parser::body::annotating_member,
+                RequirementDefBodyElement::Annotating,
             ),
             map(
                 crate::parser::metadata_annotation::metadata_keyword_usage,
@@ -195,13 +195,8 @@ fn requirement_def_body_element(
             map(frame_member, RequirementDefBodyElement::Frame),
             map(stakeholder_member, RequirementDefBodyElement::Stakeholder),
             map(purpose_member, RequirementDefBodyElement::Purpose),
-            map(
-                textual_representation,
-                RequirementDefBodyElement::TextualRep,
-            ),
             // Nested in a sub-alt to stay under nom's 21-branch limit.
             alt((
-                map(doc_comment, RequirementDefBodyElement::Doc),
                 map(concern_usage, RequirementDefBodyElement::ConcernUsage),
                 map(crate::parser::constraint::calc_usage, |n| {
                     RequirementDefBodyElement::CalcUsage(Box::new(n))

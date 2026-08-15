@@ -302,14 +302,14 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             // A keyword-less feature declaration owns only an optional binding list, which the
             // opacity report has nothing to walk into.
             ConstraintDefBodyElement::FeatureDecl(_) => {}
-            ConstraintDefBodyElement::MetadataAnnotation(metadata) => {
-                walk_attribute_body(report, &p, &metadata.value.body)
+            ConstraintDefBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
             }
             ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             ConstraintDefBodyElement::RequireConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
-            ConstraintDefBodyElement::Doc(_) | ConstraintDefBodyElement::Expression(_) => {}
+            ConstraintDefBodyElement::Expression(_) => {}
         }
     }
 }
@@ -325,9 +325,7 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             CalcDefBodyElement::CalcUsage(c) => walk_calc_def_body(report, &p, &c.value.body),
             CalcDefBodyElement::CalcDef(c) => walk_calc_def_body(report, &p, &c.value.body),
             CalcDefBodyElement::PartUsage(pu) => walk_part_usage_body(report, &p, &pu.value.body),
-            CalcDefBodyElement::MetadataAnnotation(metadata) => {
-                walk_attribute_body(report, &p, &metadata.value.body)
-            }
+            CalcDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             CalcDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             CalcDefBodyElement::TypedParameter(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::KermlFeature(n) => walk_calc_def_body(report, &p, &n.value.body),
@@ -344,10 +342,9 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             CalcDefBodyElement::Binding(_)
             | CalcDefBodyElement::Succession(_)
             | CalcDefBodyElement::Import(_)
-            | CalcDefBodyElement::Comment(_)
             | CalcDefBodyElement::DefaultReferenceUsage(_) => {}
             CalcDefBodyElement::ReturnDecl(n) => walk_calc_def_body(report, &p, &n.value.body),
-            CalcDefBodyElement::Doc(_) | CalcDefBodyElement::Expression(_) => {}
+            CalcDefBodyElement::Expression(_) => {}
         }
     }
 }
@@ -367,7 +364,10 @@ fn walk_rendering_def_body(report: &mut OpacityReport, path: &str, body: &Render
                 walk_rendering_usage_body(report, &p, &rendering.value.body)
             }
             RenderingDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
-            RenderingDefBodyElement::Doc(_) | RenderingDefBodyElement::Filter(_) => {}
+            RenderingDefBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
+            }
+            RenderingDefBodyElement::Filter(_) => {}
         }
     }
 }
@@ -976,8 +976,8 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::Annotation(n) => {
                 walk_connect_body(report, &p, &n.value.body)
             }
-            RequirementDefBodyElement::MetadataAnnotation(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+            RequirementDefBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
             }
             RequirementDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
@@ -1018,13 +1018,11 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::CalcUsage(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
             }
-            RequirementDefBodyElement::Doc(_)
-            | RequirementDefBodyElement::SubjectDecl(_)
+            RequirementDefBodyElement::SubjectDecl(_)
             | RequirementDefBodyElement::SubjectRef(_)
             | RequirementDefBodyElement::RequirementActorDecl(_)
             | RequirementDefBodyElement::Stakeholder(_)
-            | RequirementDefBodyElement::Purpose(_)
-            | RequirementDefBodyElement::TextualRep(_) => {}
+            | RequirementDefBodyElement::Purpose(_) => {}
         }
     }
 }
@@ -1038,9 +1036,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
         match &el.value {
             UseCaseDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             UseCaseDefBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
-            UseCaseDefBodyElement::MetadataAnnotation(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
-            }
+            UseCaseDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             UseCaseDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
@@ -1096,8 +1092,7 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             }
             UseCaseDefBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             UseCaseDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
-            UseCaseDefBodyElement::Doc(_)
-            | UseCaseDefBodyElement::SubjectDecl(_)
+            UseCaseDefBodyElement::SubjectDecl(_)
             | UseCaseDefBodyElement::SubjectRef(_)
             | UseCaseDefBodyElement::ActorUsage(_)
             | UseCaseDefBodyElement::ActorRedefinitionAssignment(_)
@@ -1165,15 +1160,14 @@ fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody
         match &el.value {
             ViewDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             ViewDefBodyElement::Unsupported(_) => hit(report, &p, OpacityKind::UnsupportedGrammar),
-            ViewDefBodyElement::MetadataAnnotation(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
-            }
+            ViewDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             ViewDefBodyElement::ViewRendering(n) => {
                 walk_rendering_usage_body(report, &p, &n.value.body)
             }
             ViewDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
-            ViewDefBodyElement::ViewpointUsage(_) | ViewDefBodyElement::Satisfy(_) => {}
-            ViewDefBodyElement::Doc(_) | ViewDefBodyElement::Filter(_) => {}
+            ViewDefBodyElement::ViewpointUsage(_)
+            | ViewDefBodyElement::Satisfy(_)
+            | ViewDefBodyElement::Filter(_) => {}
         }
     }
 }
@@ -1194,7 +1188,8 @@ fn walk_view_body_element(report: &mut OpacityReport, path: &str, el: &ViewBodyE
         ViewBodyElement::Expose(n) => walk_connect_body(report, path, &n.value.body),
         ViewBodyElement::Satisfy(n) => walk_connect_body(report, path, &n.value.body),
         ViewBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
-        ViewBodyElement::Doc(_) | ViewBodyElement::Filter(_) => {}
+        ViewBodyElement::Annotating(member) => walk_annotating_member(report, path, member),
+        ViewBodyElement::Filter(_) => {}
     }
 }
 
@@ -1272,7 +1267,9 @@ fn walk_rendering_usage_body(report: &mut OpacityReport, path: &str, body: &Rend
             RenderingUsageBodyElement::Rendering(nested) => {
                 walk_rendering_usage_body(report, &p, &nested.value.body)
             }
-            RenderingUsageBodyElement::Doc(_) => {}
+            RenderingUsageBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
+            }
         }
     }
 }
@@ -1285,7 +1282,8 @@ fn walk_return_ref_body(report: &mut OpacityReport, path: &str, body: &ReturnRef
         let p = format!("{path}/body[{i}]");
         match &element.value {
             ReturnRefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            ReturnRefBodyElement::Doc(_) | ReturnRefBodyElement::Result(_) => {}
+            ReturnRefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
+            ReturnRefBodyElement::Result(_) => {}
         }
     }
 }
@@ -1306,14 +1304,14 @@ fn walk_constraint_body_elements(
             ConstraintDefBodyElement::AttributeUsage(attribute) => {
                 walk_attribute_body(report, &p, &attribute.value.body)
             }
-            ConstraintDefBodyElement::MetadataAnnotation(metadata) => {
-                walk_attribute_body(report, &p, &metadata.value.body)
+            ConstraintDefBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
             }
             ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             ConstraintDefBodyElement::RequireConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
-            ConstraintDefBodyElement::Doc(_) | ConstraintDefBodyElement::Expression(_) => {}
+            ConstraintDefBodyElement::Expression(_) => {}
         }
     }
 }

@@ -2,7 +2,7 @@
 
 use super::behavior::emit_inout_decl;
 use super::expr::{emit_expression, emit_feature_value};
-use super::root::{emit_doc, emit_identification};
+use super::root::emit_identification;
 use super::structure::{emit_multiplicity, emit_subsetting_clause, emit_typing_clause};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
@@ -83,7 +83,9 @@ pub(crate) fn emit_constraint_body_element(
 ) -> Result<(), EmitError> {
     match el {
         ConstraintDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        ConstraintDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        ConstraintDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         ConstraintDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ConstraintDefBodyElement::Expression(e) => {
             emit_expression(w, &e.value)?;
@@ -111,9 +113,6 @@ pub(crate) fn emit_constraint_body_element(
             } else {
                 super::structure::emit_attribute_usage(w, path, &a.value)
             }
-        }
-        ConstraintDefBodyElement::MetadataAnnotation(_) => {
-            w.unsupported(path, "Constraint MetadataAnnotation")
         }
     }
 }
@@ -213,7 +212,9 @@ fn emit_calc_body_element(
 ) -> Result<(), EmitError> {
     match el {
         CalcDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        CalcDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        CalcDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
         CalcDefBodyElement::TypedParameter(p) => emit_typed_parameter(w, path, &p.value),
@@ -228,7 +229,6 @@ fn emit_calc_body_element(
         CalcDefBodyElement::Succession(sc) => emit_kerml_succession_member(w, path, &sc.value),
         CalcDefBodyElement::EndMember(e) => emit_kerml_end_member(w, path, &e.value),
         CalcDefBodyElement::Import(i) => super::root::emit_import(w, &i.value),
-        CalcDefBodyElement::Comment(c) => super::root::emit_comment(w, &c.value),
         CalcDefBodyElement::AttributeUsage(a) => {
             super::structure::emit_attribute_usage(w, path, &a.value)
         }
@@ -243,7 +243,6 @@ fn emit_calc_body_element(
             w.push_char(';');
             Ok(())
         }
-        CalcDefBodyElement::MetadataAnnotation(_) => w.unsupported(path, "Calc MetadataAnnotation"),
     }
 }
 
@@ -615,7 +614,9 @@ pub(crate) fn emit_view_def(
                     crate::ast::ViewDefBodyElement::Unsupported(unsupported) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
-                    crate::ast::ViewDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::ViewDefBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
                     crate::ast::ViewDefBodyElement::RefDecl(r) => {
                         crate::emit::structure::emit_ref_decl(w, path, &r.value)?
                     }
@@ -624,9 +625,6 @@ pub(crate) fn emit_view_def(
                     }
                     crate::ast::ViewDefBodyElement::Satisfy(s) => {
                         crate::emit::requirement::emit_satisfy(w, path, &s.value)?
-                    }
-                    crate::ast::ViewDefBodyElement::MetadataAnnotation(m) => {
-                        super::structure::emit_metadata_annotation(w, path, &m.value)?;
                     }
                     crate::ast::ViewDefBodyElement::Filter(f) => {
                         super::root::emit_filter(w, &f.value)?;
@@ -705,7 +703,9 @@ pub(crate) fn emit_view_usage(
                     crate::ast::ViewBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::ViewBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::ViewBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
                     crate::ast::ViewBodyElement::RefDecl(r) => {
                         crate::emit::structure::emit_ref_decl(w, path, &r.value)?
                     }
@@ -784,7 +784,9 @@ fn emit_view_rendering(
                     crate::ast::RenderingUsageBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/render[{i}]"), &error.span)?
                     }
-                    crate::ast::RenderingUsageBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingUsageBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
                     crate::ast::RenderingUsageBodyElement::ViewUsage(v) => {
                         emit_view_usage(w, path, &v.value)?;
                     }
@@ -867,7 +869,9 @@ pub(crate) fn emit_rendering_def(
                     crate::ast::RenderingDefBodyElement::Unsupported(unsupported) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
-                    crate::ast::RenderingDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingDefBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
                     crate::ast::RenderingDefBodyElement::RefDecl(r) => {
                         crate::emit::structure::emit_ref_decl(w, path, &r.value)?
                     }
@@ -937,7 +941,9 @@ pub(crate) fn emit_rendering_usage(
                     crate::ast::RenderingUsageBodyElement::Error(error) => {
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
-                    crate::ast::RenderingUsageBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingUsageBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
                     crate::ast::RenderingUsageBodyElement::ViewUsage(v) => {
                         emit_view_usage(w, path, &v.value)?;
                     }

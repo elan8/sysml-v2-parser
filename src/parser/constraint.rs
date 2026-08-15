@@ -153,16 +153,15 @@ pub(crate) fn constraint_def_body_element(
 ) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc") {
+    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc")
+        || starts_with_keyword(input.fragment(), b"comment")
+        || starts_with_keyword(input.fragment(), b"rep")
+        || starts_with_keyword(input.fragment(), b"language")
+        || input.fragment().starts_with(b"@")
+    {
         map(
-            crate::parser::requirement::doc_comment,
-            ConstraintDefBodyElement::Doc,
-        )
-        .parse(input)?
-    } else if input.fragment().starts_with(b"@") {
-        map(
-            crate::parser::metadata_annotation::metadata_annotation,
-            ConstraintDefBodyElement::MetadataAnnotation,
+            crate::parser::body::annotating_member,
+            ConstraintDefBodyElement::Annotating,
         )
         .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"in")
@@ -1214,28 +1213,21 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     let after_visibility = crate::parser::lex::visibility_prefix(input)
         .map(|(rest, _)| *rest.fragment())
         .unwrap_or_else(|_| *input.fragment());
-    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc") {
+    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc")
+        || starts_with_keyword(input.fragment(), b"comment")
+        || starts_with_keyword(input.fragment(), b"rep")
+        || starts_with_keyword(input.fragment(), b"language")
+        || input.fragment().starts_with(b"@")
+    {
         map(
-            crate::parser::requirement::doc_comment,
-            CalcDefBodyElement::Doc,
-        )
-        .parse(input)?
-    } else if input.fragment().starts_with(b"@") {
-        map(
-            crate::parser::metadata_annotation::metadata_annotation,
-            CalcDefBodyElement::MetadataAnnotation,
+            crate::parser::body::annotating_member,
+            CalcDefBodyElement::Annotating,
         )
         .parse(input)?
     } else if starts_with_keyword(after_visibility, b"import") {
         map(crate::parser::import::import_, |n| {
             CalcDefBodyElement::Import(Box::new(n))
         })
-        .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"comment") {
-        map(
-            crate::parser::requirement::comment_annotation,
-            CalcDefBodyElement::Comment,
-        )
         .parse(input)?
     } else if starts_with_keyword(after_visibility, b"connector") {
         map(kerml_connector_member, |n| {

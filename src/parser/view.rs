@@ -14,7 +14,7 @@ use crate::parser::lex::{
     name, qualified_reference, reference_path, visibility_prefix, ws1, ws_and_comments,
     VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
-use crate::parser::requirement::{doc_comment, requirement_def_body};
+use crate::parser::requirement::requirement_def_body;
 use crate::parser::usage::{multiplicity_node, prefix_redefinition_target};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to, span_from_to};
@@ -30,14 +30,13 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, ViewDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            ViewDefBodyElement::Annotating,
+        ),
         map(
             crate::parser::connector::ref_decl,
             ViewDefBodyElement::RefDecl,
-        ),
-        map(
-            crate::parser::metadata_annotation::metadata_annotation,
-            ViewDefBodyElement::MetadataAnnotation,
         ),
         map(view_filter_member, ViewDefBodyElement::Filter),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
@@ -79,7 +78,10 @@ fn rendering_usage_body_element(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, RenderingUsageBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            RenderingUsageBodyElement::Annotating,
+        ),
         map(view_usage, |n| {
             RenderingUsageBodyElement::ViewUsage(Box::new(n))
         }),
@@ -255,7 +257,10 @@ fn rendering_def_body_element(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, RenderingDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            RenderingDefBodyElement::Annotating,
+        ),
         map(
             crate::parser::connector::ref_decl,
             RenderingDefBodyElement::RefDecl,
@@ -344,7 +349,10 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, ViewBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            ViewBodyElement::Annotating,
+        ),
         map(crate::parser::connector::ref_decl, ViewBodyElement::RefDecl),
         map(view_filter_member, ViewBodyElement::Filter),
         map(view_rendering_usage, ViewBodyElement::ViewRendering),

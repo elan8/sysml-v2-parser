@@ -34,19 +34,15 @@ package AnnotatingTypeBody {
         /* classifier body */
         comment
         /* classifier aside */
-        'rep';
-        classifierRep;
-        'language';
-        "text";
+        rep classifierRep language "text"
+        /* classifier rendering */
         feature wheels {
             doc
             /* feature body */
             comment
             /* feature aside */
-            'rep';
-            featureRep;
-            'language';
-            "text";
+            rep featureRep language "text"
+            /* feature rendering */
         }
     }
 }

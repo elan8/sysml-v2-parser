@@ -14,7 +14,7 @@ use crate::parser::lex::{
     ws_and_comments, USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
-use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
+use crate::parser::requirement::{parse_requirement_usage_payload, subject_decl};
 use crate::parser::usage::multiplicity_node;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -347,7 +347,10 @@ fn return_ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRe
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, element) = alt((
-        map(doc_comment, ReturnRefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            ReturnRefBodyElement::Annotating,
+        ),
         map(return_expression_stmt, ReturnRefBodyElement::Result),
     ))
     .parse(input)?;
@@ -573,10 +576,9 @@ pub(crate) fn use_case_def_body_element(
     let start = input;
     let (input, elem) = alt((
         alt((
-            map(doc_comment, UseCaseDefBodyElement::Doc),
             map(
-                crate::parser::metadata_annotation::metadata_annotation,
-                UseCaseDefBodyElement::MetadataAnnotation,
+                crate::parser::body::annotating_member,
+                UseCaseDefBodyElement::Annotating,
             ),
             map(
                 crate::parser::metadata_annotation::annotation,
