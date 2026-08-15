@@ -2023,10 +2023,40 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         }
     }
 
+    /// One projection for a comment member, shared by every scope that owns one.
+    fn write_comment_annotation(&mut self, comment: &super::CommentAnnotation) -> io::Result<()> {
+        self.writer.write_str("(comment (keyword ")?;
+        match &comment.keyword_span {
+            Some(span) => write_span(self.writer, span)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (name ")?;
+        match comment
+            .identification
+            .as_ref()
+            .and_then(|i| i.name.as_ref())
+        {
+            Some(name) => write_quoted(self.writer, name)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (locale ")?;
+        match &comment.locale {
+            Some(locale) => write_quoted(self.writer, locale)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str("))")
+    }
+
     fn write_annotating_member(&mut self, member: &super::AnnotatingMember) -> io::Result<()> {
         match member {
             super::AnnotatingMember::Doc(_) => self.writer.write_str("(doc)"),
-            super::AnnotatingMember::Comment(_) => self.writer.write_str("(comment)"),
+            // The keyword and the locale are grammatical facts, not formatting: a comment member
+            // emitted without its authored keyword becomes a bare block comment, which reparses
+            // as trivia and disappears. A bare `(comment)` marker could not tell the two
+            // spellings apart, so it names them.
+            super::AnnotatingMember::Comment(comment) => {
+                self.write_comment_annotation(&comment.value)
+            }
             super::AnnotatingMember::TextualRep(_) => self.writer.write_str("(textual-rep)"),
             super::AnnotatingMember::MetadataAnnotation(_) => {
                 self.writer.write_str("(metadata-annotation)")
@@ -2598,7 +2628,13 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                 self.write_unsupported(&unsupported.value, &element.span)
             }
             PackageBodyElement::Doc(_doc) => self.write_marker(first, "doc"),
-            PackageBodyElement::Comment(_comment) => self.write_marker(first, "comment"),
+            // The keyword and locale are grammatical facts, not formatting: a comment member
+            // emitted without its authored keyword becomes a bare block comment, which reparses
+            // as trivia and vanishes. A bare marker could not tell the spellings apart.
+            PackageBodyElement::Comment(comment) => {
+                self.write_item_prefix(first)?;
+                self.write_comment_annotation(&comment.value)
+            }
             PackageBodyElement::TextualRep(_text) => {
                 self.write_marker(first, "textual-representation")
             }

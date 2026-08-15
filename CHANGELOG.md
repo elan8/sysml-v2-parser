@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two adjacent comment members no longer fuse into one.** A comment's optional `locale`
+  lookahead skipped block comments as trivia, so it walked past the member's own body and found
+  the *next* member's `locale`: `comment named /* two */` followed by `locale "en_US" /* three */`
+  parsed as a single comment named `named`, in locale `en_US`, whose text was ` three `. The
+  second member's text was discarded with no diagnostic. `doc_comment` had the identical
+  lookahead and is fixed with it.
+
 - **An action-body `ref` declaration keeps its kind keyword, multiplicity and `:>` clause.**
   `action_ref_decl_inner` parsed the `action` keyword and the multiplicity only to discard them,
   never parsed a subsetting clause at all, and ended with a skip-to-terminator that swallowed

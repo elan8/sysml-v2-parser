@@ -91,6 +91,6 @@ package CommentTest {
 (parsed-document
   (references
   )
-  (root (package (name "CommentTest") (body (comment) (doc) (comment) (comment) (comment) (part-def (name "C") (body (doc) (comment) (comment))) (part-def (name "A") (body semicolon)))))
+  (root (package (name "CommentTest") (body (comment (keyword none) (name none) (locale "en_US")) (doc) (comment (keyword (span (offset 416) (line 33) (column 2) (len 7))) (name "cmt") (locale none)) (comment (keyword (span (offset 450) (line 34) (column 2) (len 7))) (name "cmt_cmt") (locale none)) (comment (keyword (span (offset 507) (line 36) (column 2) (len 7))) (name none) (locale none)) (part-def (name "C") (body (doc) (comment) (comment))) (part-def (name "A") (body semicolon)))))
 )
 ~~~

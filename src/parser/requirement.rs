@@ -698,8 +698,14 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
         (input, None, Some(locale))
     } else {
         let (input, ident_parsed) = opt(identification).parse(input)?;
+        // `ws`, not `ws_and_comments`: this member's own `/* ... */` body must terminate the
+        // search for an optional `locale`. Skipping comments here walked straight past the body
+        // and found the *next* member's `locale`, fusing two members into one and discarding
+        // this one's text with no diagnostic -- `comment named /* two */` followed by `locale
+        // "en_US" /* three */` became a single comment named `named`, in locale `en_US`, whose
+        // text was ` three `. Same hazard the `/*` guard above and the body scan below document.
         let (input, locale) = opt(preceded(
-            preceded(ws_and_comments, tag(&b"locale"[..])),
+            preceded(ws, tag(&b"locale"[..])),
             preceded(ws1, string_value),
         ))
         .parse(input)?;
@@ -790,8 +796,14 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
         (input, None, Some(locale))
     } else {
         let (input, ident_parsed) = opt(identification).parse(input)?;
+        // `ws`, not `ws_and_comments`: this member's own `/* ... */` body must terminate the
+        // search for an optional `locale`. Skipping comments walked straight past the body and
+        // found the *next* member's `locale`, fusing two members into one and discarding this
+        // one's text with no diagnostic -- `comment named /* two */` followed by `locale "en_US"
+        // /* three */` became a single comment named `named`, in locale `en_US`, whose text was
+        // ` three `. The same hazard the `/*` guard above and the body scan below document.
         let (input, locale) = opt(preceded(
-            preceded(ws_and_comments, tag(&b"locale"[..])),
+            preceded(ws, tag(&b"locale"[..])),
             preceded(ws1, string_value),
         ))
         .parse(input)?;

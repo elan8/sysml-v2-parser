@@ -57,6 +57,6 @@ package Comments {
 (parsed-document
   (references
   )
-  (root (package (name "Comments") (body (doc) (doc) (comment) (comment) (comment) (part-def (name "C") (body (doc) (comment) (comment))))))
+  (root (package (name "Comments") (body (doc) (doc) (comment (keyword (span (offset 94) (line 6) (column 2) (len 7))) (name "cmt") (locale none)) (comment (keyword (span (offset 128) (line 7) (column 2) (len 7))) (name "cmt_cmt") (locale none)) (comment (keyword (span (offset 185) (line 9) (column 2) (len 7))) (name none) (locale none)) (part-def (name "C") (body (doc) (comment) (comment))))))
 )
 ~~~
