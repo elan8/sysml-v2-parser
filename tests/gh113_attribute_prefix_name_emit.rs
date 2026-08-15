@@ -1,99 +1,54 @@
-//! GH-113: `AttributeUsage`'s target-only prefix forms (`attribute :>> target;`,
-//! `attribute ::> target;`, `attribute :> target;` -- no separate name written, per
-//! `AttributeUsageHead::PrefixRedefines`/`PrefixReferences`/`PrefixSubsets` in
-//! `src/parser/attribute.rs`) used to round-trip incorrectly: `emit_attribute_usage`
-//! historically emitted a derived display name *and* the subsets/redefines/references clause,
-//! duplicating the target (`attribute :>> target;` re-emitted as `attribute target :>>
-//! target;`, a structurally different, self-referential construct).
+//! GH-113: an attribute usage written with only a subsetting-family target reparses to itself.
 //!
-//! Each test below parses the original anonymous form, emits it, reparses the emitted text, and
-//! checks the two ASTs are equivalent -- the actual bug was that they weren't.
+//! `attribute :>> target;`, `attribute ::> target;` and `attribute :> target;` declare no name of
+//! their own. `emit_attribute_usage` used to derive a display name from the target *and* emit the
+//! clause, so `attribute :>> differencesOf[1];` came back as `attribute differencesOf :>>
+//! differencesOf;` -- a different, self-referential construct.
+//!
+//! The shapes and the anonymity are pinned by
+//! `tests/snapshots/sysml/attribute_prefix_target_forms.md`, whose AST section shows
+//! `(declaration-name none)` beside each relationship and whose format section is
+//! `(stable-idempotent)` -- the emitted text is byte-identical to the source, which the duplicated
+//! name would break outright.
+//!
+//! This file keeps the check a fixture cannot make: that the emitted text *parses back* to the
+//! same tree. The snapshot tool compares the strict and editor parses of a fixture's source, never
+//! a reparse of its own output.
 
-use sysml_v2_parser::ast::{
-    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RootElement,
-};
 use sysml_v2_parser::{emit_sysml, parse};
 
-/// Digs out the *last* `AttributeUsage` in the first `part def`'s body of a `package P { part def
-/// Q { ... } }`-shaped fixture -- the fixtures below declare a plain named attribute first (so
-/// the redefines/subsets target resolves) and the target-only prefix form second.
-fn part_def_attribute(src: &str) -> sysml_v2_parser::ast::AttributeUsage {
-    let ast = parse(src).expect("parse");
-    let RootElement::Package(pkg) = &ast.elements[0].value else {
-        panic!("expected Package");
-    };
-    let PackageBody::Brace { elements, .. } = &pkg.value.body else {
-        panic!("expected brace package body");
-    };
-    let PackageBodyElement::PartDef(q) = &elements[0].value else {
-        panic!("expected PartDef");
-    };
-    let PartDefBody::Brace { elements, .. } = &q.value.body else {
-        panic!("expected brace part def body");
-    };
-    elements
-        .iter()
-        .filter_map(|e| match &e.value {
-            PartDefBodyElement::AttributeUsage(a) => Some(a.value.clone()),
-            _ => None,
-        })
-        .next_back()
-        .expect("expected an AttributeUsage element")
-}
-
-fn assert_roundtrips(src: &str) {
-    let ast1 = parse(src).expect("parse original");
-    let emitted = emit_sysml(&ast1).expect("emit");
-    let ast2 = parse(&emitted)
-        .unwrap_or_else(|e| panic!("reparse of emitted text failed: {e}\nemitted:\n{emitted}"));
+#[track_caller]
+fn assert_reparses_identically(source: &str) {
+    let parsed = parse(source).expect("parse original");
+    let emitted = emit_sysml(&parsed).expect("emit");
+    let reparsed = parse(&emitted)
+        .unwrap_or_else(|error| panic!("reparse of emitted text failed: {error}\n{emitted}"));
     assert_eq!(
-        ast1.normalize_for_test_comparison(),
-        ast2.normalize_for_test_comparison(),
+        parsed.normalize_for_test_comparison(),
+        reparsed.normalize_for_test_comparison(),
         "roundtrip AST mismatch; emitted:\n{emitted}"
     );
 }
 
-/// `attribute :>> target;` (redefines form) has no declaration name.
 #[test]
-fn gh113_redefines_prefix_name_not_duplicated_on_emit() {
-    let src = r#"package P {
-        part def Q {
-            attribute differencesOf[1];
-            attribute :>> differencesOf[1];
-        }
-    }"#;
-    let attr = part_def_attribute(src);
-    assert!(attr.name.is_empty());
-    assert!(attr.redefines.is_some());
-    assert_roundtrips(src);
+fn a_redefines_prefix_attribute_reparses_identically() {
+    assert_reparses_identically(
+        "package P {\n    part def Q {\n        attribute differencesOf[1];\n        attribute :>> differencesOf[1];\n    }\n}\n",
+    );
 }
 
-/// `attribute ::> target;` (references form), real usage: `Simple Tests/CalculationTest.sysml:14`.
+/// Real usage: `Simple Tests/CalculationTest.sysml:14`.
 #[test]
-fn gh113_references_prefix_name_not_duplicated_on_emit() {
-    let src = r#"package P {
-        part def VehiclePart { attribute m; }
-        part def Vehicle;
-        part vehicle : Vehicle {
-            part ms : VehiclePart;
-            attribute ::> m = ms.m;
-        }
-    }"#;
-    assert_roundtrips(src);
+fn a_references_prefix_attribute_reparses_identically() {
+    assert_reparses_identically(
+        "package P {\n    part def VehiclePart {\n        attribute m;\n    }\n    part def Vehicle;\n    part vehicle : Vehicle {\n        part ms : VehiclePart;\n        attribute ::> m = ms.m;\n    }\n}\n",
+    );
 }
 
-/// `attribute :> target;` (subsets form), real usage: `Geometry Examples/
-/// CarWithShapeAndCSG.sysml:84`.
+/// Real usage: `Geometry Examples/CarWithShapeAndCSG.sysml:84`.
 #[test]
-fn gh113_subsets_prefix_name_not_duplicated_on_emit() {
-    let src = r#"package P {
-        part def Q {
-            attribute differencesOf[1];
-            attribute :> differencesOf[1];
-        }
-    }"#;
-    let attr = part_def_attribute(src);
-    assert!(attr.name.is_empty());
-    assert!(attr.subsets.is_some());
-    assert_roundtrips(src);
+fn a_subsets_prefix_attribute_reparses_identically() {
+    assert_reparses_identically(
+        "package P {\n    part def Q {\n        attribute differencesOf[1];\n        attribute :> differencesOf[1];\n    }\n}\n",
+    );
 }
