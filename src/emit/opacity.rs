@@ -1053,6 +1053,15 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             UseCaseDefBodyElement::ThenUseCaseUsage(n) => {
                 walk_use_case_def_body(report, &p, &n.value.use_case.value.body)
             }
+            UseCaseDefBodyElement::UseCaseUsage(n) => {
+                walk_use_case_def_body(report, &p, &n.value.body)
+            }
+            UseCaseDefBodyElement::CaseUsage(n) => {
+                walk_use_case_def_body(report, &p, &n.value.body)
+            }
+            UseCaseDefBodyElement::VerificationCaseUsage(n) => {
+                walk_use_case_def_body(report, &p, &n.value.body)
+            }
             UseCaseDefBodyElement::IncludeUseCase(n) => {
                 walk_use_case_def_body(report, &p, &n.value.body)
             }

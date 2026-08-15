@@ -571,6 +571,12 @@ pub(crate) fn emit_use_case_usage(
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
+    if let Some(mult) = &usage.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        crate::emit::structure::emit_subsetting_clause(w, &subsets.value)?;
+    }
     emit_use_case_body(w, path, &usage.body)
 }
 
@@ -653,6 +659,12 @@ pub(crate) fn emit_verification_case_usage(
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
+    if let Some(mult) = &usage.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
     emit_use_case_body(w, path, &usage.body)
 }
 
@@ -687,6 +699,9 @@ pub(crate) fn emit_case_usage(
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(mult) = &usage.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -793,6 +808,11 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::ThenUseCaseUsage(t) => {
             w.push_str("then ");
             emit_use_case_usage(w, path, &t.value.use_case.value)
+        }
+        UseCaseDefBodyElement::UseCaseUsage(u) => emit_use_case_usage(w, path, &u.value),
+        UseCaseDefBodyElement::CaseUsage(u) => emit_case_usage(w, path, &u.value),
+        UseCaseDefBodyElement::VerificationCaseUsage(u) => {
+            emit_verification_case_usage(w, path, &u.value)
         }
         UseCaseDefBodyElement::Objective(o) => {
             if let Some(vis) = o.value.visibility {

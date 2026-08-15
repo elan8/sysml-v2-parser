@@ -779,6 +779,36 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::ThenUseCaseUsage(_usage) => {
                             self.write_marker(&mut first, "then-use-case")?;
                         }
+                        UseCaseDefBodyElement::UseCaseUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_case_like_usage(
+                                "use-case-usage",
+                                &usage.value.name,
+                                usage.value.is_abstract,
+                                usage.value.type_name,
+                                usage.value.subsets.as_ref(),
+                            )?;
+                        }
+                        UseCaseDefBodyElement::CaseUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_case_like_usage(
+                                "case-usage",
+                                &usage.value.name,
+                                usage.value.is_abstract,
+                                usage.value.type_name,
+                                usage.value.subsets.as_ref(),
+                            )?;
+                        }
+                        UseCaseDefBodyElement::VerificationCaseUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_case_like_usage(
+                                "verification-case-usage",
+                                &usage.value.name,
+                                usage.value.is_abstract,
+                                usage.value.type_name,
+                                usage.value.subsets.as_ref(),
+                            )?;
+                        }
                         UseCaseDefBodyElement::ThenDone(_done) => {
                             self.write_marker(&mut first, "then-done")?;
                         }
@@ -2056,6 +2086,40 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         for reference in &relationship.target {
             self.writer.write_char(' ')?;
             self.write_reference(*reference)?;
+        }
+        self.writer.write_str("))")
+    }
+
+    /// The three nested case usages (`use case`, `case`, `verification`) are the same declaration
+    /// shape under different keywords, so they project through one writer. The type and subsets
+    /// targets are named rather than reduced to a marker because the declaration's tail used to
+    /// be discarded outright, and a marker could not show that it no longer is.
+    fn write_case_like_usage(
+        &mut self,
+        label: &str,
+        name: &str,
+        is_abstract: bool,
+        type_name: Option<QualifiedReferenceId>,
+        subsets: Option<&Node<SubsettingRelationship>>,
+    ) -> io::Result<()> {
+        self.writer.write_str("(")?;
+        self.writer.write_str(label)?;
+        self.writer.write_str(" (name ")?;
+        write_quoted(self.writer, name)?;
+        self.writer.write_str(") (abstract ")?;
+        self.writer
+            .write_str(if is_abstract { "true" } else { "false" })?;
+        self.writer.write_str(") (type ")?;
+        if let Some(reference) = type_name {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (subsets ")?;
+        if let Some(subsets) = subsets {
+            self.write_subsetting(&subsets.value)?;
+        } else {
+            self.writer.write_str("none")?;
         }
         self.writer.write_str("))")
     }

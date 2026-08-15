@@ -5764,8 +5764,11 @@ macro_rules! ast_traversal {
         pub fn walk_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CaseUsage { name, type_name, subsets, redefines, is_abstract, body, membership } = &$($mutability)? node.value;
+            let CaseUsage { name, type_name, multiplicity, subsets, redefines, is_abstract, body, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }
@@ -5834,8 +5837,14 @@ macro_rules! ast_traversal {
         pub fn walk_verification_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<VerificationCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let VerificationCaseUsage { name, type_name, is_abstract, body, membership } = &$($mutability)? node.value;
+            let VerificationCaseUsage { name, type_name, multiplicity, subsets, is_abstract, body, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }
@@ -5848,8 +5857,14 @@ macro_rules! ast_traversal {
         pub fn walk_use_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<UseCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let UseCaseUsage { name, type_name, is_abstract, body, membership } = &$($mutability)? node.value;
+            let UseCaseUsage { name, type_name, is_abstract, multiplicity, subsets, body, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }
@@ -6104,6 +6119,15 @@ macro_rules! ast_traversal {
                 }
                 UseCaseDefBodyElement::ThenUseCaseUsage(field_0) => {
                     visitor.visit_then_use_case_usage(field_0);
+                }
+                UseCaseDefBodyElement::UseCaseUsage(field_0) => {
+                    visitor.visit_use_case_usage(&$($mutability)? **field_0);
+                }
+                UseCaseDefBodyElement::CaseUsage(field_0) => {
+                    visitor.visit_case_usage(&$($mutability)? **field_0);
+                }
+                UseCaseDefBodyElement::VerificationCaseUsage(field_0) => {
+                    visitor.visit_verification_case_usage(&$($mutability)? **field_0);
                 }
                 UseCaseDefBodyElement::ThenDone(field_0) => {
                     visitor.visit_then_done(field_0);

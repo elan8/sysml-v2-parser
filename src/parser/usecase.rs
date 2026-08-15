@@ -10,12 +10,12 @@ use crate::parser::constraint::return_expression_stmt;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_reference, skip_statement_or_block, take_until_terminator,
-    visibility_prefix, ws1, ws_and_comments, USE_CASE_BODY_STARTERS,
+    identification, name, qualified_reference, skip_statement_or_block, visibility_prefix, ws1,
+    ws_and_comments, USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
-use crate::parser::usage::{multiplicity_node, usage_header};
+use crate::parser::usage::multiplicity_node;
 use crate::parser::with_span;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
@@ -138,8 +138,11 @@ fn use_case_usage_tail(
     is_abstract: bool,
     membership: crate::ast::Membership,
 ) -> IResult<Input<'_>, UseCaseUsage> {
-    let (input, header) = usage_header(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    // `parse_feature_usage_header` rather than `usage_header` + `take_until_terminator`: the
+    // latter skipped whatever stood between the typing and the body, so `abstract case subcases :
+    // Case[0..*] :> cases, subcalculations { ... }` (Systems Library `Cases.sysml:56`) lost its
+    // multiplicity and both subsets targets without a diagnostic.
+    let (input, header) = crate::parser::definition_header::parse_feature_usage_header(input)?;
     let (input, body) = use_case_def_body(input)?;
     Ok((
         input,
@@ -147,6 +150,8 @@ fn use_case_usage_tail(
             name: ident,
             type_name: header.type_reference,
             is_abstract,
+            multiplicity: header.multiplicity,
+            subsets: header.subsets,
             body,
             membership,
         },
@@ -609,7 +614,23 @@ pub(crate) fn use_case_def_body_element(
                 then_include_use_case,
                 UseCaseDefBodyElement::ThenIncludeUseCase,
             ),
-            map(then_use_case_usage, UseCaseDefBodyElement::ThenUseCaseUsage),
+            // Nested in a sub-alt to stay under nom's 21-branch limit. The plain nested case
+            // usage comes after the `then ...` form, which owns the control-flow spelling of the
+            // same keywords.
+            nom::branch::alt((
+                map(then_use_case_usage, UseCaseDefBodyElement::ThenUseCaseUsage),
+                map(use_case_usage, |n| {
+                    UseCaseDefBodyElement::UseCaseUsage(Box::new(n))
+                }),
+                map(crate::parser::case::verification_case_usage, |n| {
+                    UseCaseDefBodyElement::VerificationCaseUsage(Box::new(n))
+                }),
+                // Last of the three: `case` is a prefix of nothing here, but keeping it after
+                // `use case` and `verification` matches the order the keywords are written.
+                map(crate::parser::case::case_usage, |n| {
+                    UseCaseDefBodyElement::CaseUsage(Box::new(n))
+                }),
+            )),
             map(include_use_case, UseCaseDefBodyElement::IncludeUseCase),
             // Full `ref` declarations (`ref use case self : UseCase :>> Case::self;`, Systems
             // Library `UseCases.sysml`; spec42 Gap 34). `ref_redefinition` first so the bare

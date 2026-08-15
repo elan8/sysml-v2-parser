@@ -357,6 +357,10 @@ pub struct CaseDef {
 pub struct CaseUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Multiplicity after the type, e.g. `[0..*]` in `abstract case subcases : Case[0..*] :>
+    /// cases, subcalculations { ... }` (Systems Library `Cases.sysml:56`). The declaration's tail
+    /// used to be skipped wholesale, so this was dropped without a diagnostic.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract case ...`.
@@ -422,6 +426,12 @@ pub struct VerificationCaseDef {
 pub struct VerificationCaseUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Multiplicity after the type, e.g. `[0..*]` in `abstract verification
+    /// subVerificationCases : VerificationCase[0..*] :> verificationCases, subcases { ... }`
+    /// (Systems Library `VerificationCases.sysml:42`). See [`CaseUsage::multiplicity`].
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `:>` subsets clause, which may name several comma-separated targets.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// True for `abstract verification ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -438,6 +448,12 @@ pub struct UseCaseUsage {
     pub type_name: Option<QualifiedReferenceId>,
     /// True for `abstract use case ...`.
     pub is_abstract: bool,
+    /// Multiplicity after the type, e.g. `[0..*]` in `abstract case subcases : Case[0..*] :>
+    /// cases, subcalculations { ... }` (Systems Library `Cases.sysml:56`). Previously the
+    /// declaration's tail was skipped wholesale, so this and `subsets` were dropped.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `:>` subsets clause, which may name several comma-separated targets.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     pub body: UseCaseDefBody,
     /// See [`RequirementUsage::membership`]; captures real visibility at member position
     /// (`use_case_usage`), `visibility: None` at the `then use case ...` control-flow position
@@ -641,6 +657,18 @@ pub enum UseCaseDefBodyElement {
     AnalysisCaseUsage(Box<Node<AnalysisCaseUsage>>),
     /// Nested `calc` usage in analysis case bodies (validation `10b`).
     CalcUsage(Box<Node<CalcUsage>>),
+    /// Nested case usage: `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }`
+    /// (Systems Library `Cases.sysml:56`) and its `use case` / `verification` spellings. The
+    /// scope previously accepted only the `then`/`include` control-flow forms, so a plain nested
+    /// case member was recovered text.
+    UseCaseUsage(Box<Node<UseCaseUsage>>),
+    /// Nested `case` usage, e.g. `abstract case subcases : Case[0..*] :> cases, subcalculations
+    /// { ... }` (Systems Library `Cases.sysml:56`).
+    CaseUsage(Box<Node<CaseUsage>>),
+    /// Nested `verification` usage, e.g. `abstract verification subVerificationCases :
+    /// VerificationCase[0..*] :> verificationCases, subcases { ... }`
+    /// (`VerificationCases.sysml:42`).
+    VerificationCaseUsage(Box<Node<VerificationCaseUsage>>),
     /// `attribute` usage / directed `in attribute …` (validation `10c`/`10d`).
     AttributeUsage(Node<AttributeUsage>),
     /// Directed `in requirement …` parameter (validation `10c`).

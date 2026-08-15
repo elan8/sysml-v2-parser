@@ -160,6 +160,10 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     // Promoted by spec42 Gap 42 (see Turbojet Stage Analysis above).
     "Simple Tests/StateTest.sysml",
     "Simple Tests/TradeStudyTest.sysml",
+    // Promoted by the nested case-usage members: a `use case` / `case` / `verification` usage
+    // inside a case-family body is structured, and its declaration tail (multiplicity, subsets
+    // targets) is no longer skipped, so the file reparses to the same AST.
+    "Simple Tests/VerificationTest.sysml",
     "Vehicle Example/VehicleDefinitions.sysml",
     // Promoted by the KerML declaration-grammar work (see ServerSequenceModelOutside above).
     "v1 Spec Examples/8.4.5 Constraining Decomposition/Vehicle Decomposition - Updated.sysml",

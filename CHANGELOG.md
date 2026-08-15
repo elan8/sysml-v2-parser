@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Nested case usages are members of case-family bodies, and keep their declaration tail.**
+  `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }` (`sysml.library/Systems
+  Library/Cases.sysml:56`) and its `use case` / `verification` siblings had no member arm in these
+  bodies, so they were recovered text. Worse, the parsers that did handle them elsewhere ran
+  `usage_header` and then skipped to the body with `take_until_terminator`, discarding the
+  multiplicity and, for `UseCaseUsage`, the subsets targets. All three now parse a real feature
+  usage header; `CaseUsage`, `VerificationCaseUsage` and `UseCaseUsage` gained the fields to
+  hold it. `Simple Tests/VerificationTest.sysml` round-trips as a result.
+  **AST version 146 -> 147.**
+
 - **A `return` declaration keeps a `:>>` clause written after its type.** `return verdict :
   VerdictKind :>> result;` (`sysml.library/Systems Library/VerificationCases.sysml:22`) only had
   a path for the leading anonymous form (`return :>> result;`), where the target stands in for
