@@ -658,6 +658,9 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Doc(_doc) => {
                             self.write_marker(&mut first, "doc")?;
                         }
+                        RequirementDefBodyElement::ConcernUsage(_usage) => {
+                            self.write_marker(&mut first, "concern-usage")?;
+                        }
                         RequirementDefBodyElement::RefDecl(declaration) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;

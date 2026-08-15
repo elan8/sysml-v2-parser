@@ -1428,6 +1428,9 @@ pub(crate) fn emit_occurrence_body_element(
         crate::ast::OccurrenceBodyElement::RefDecl(r) => {
             crate::emit::structure::emit_ref_decl(w, path, &r.value)
         }
+        crate::ast::OccurrenceBodyElement::ConnectionUsage(c) => {
+            crate::emit::structure::emit_connection_usage(w, path, &c.value)
+        }
         crate::ast::OccurrenceBodyElement::StateUsage(s) => {
             // Occurrence-body `StateUsage` nodes are exhibit usages (§6 G30 / G18).
             emit_occurrence_exhibit(w, path, &s.value)

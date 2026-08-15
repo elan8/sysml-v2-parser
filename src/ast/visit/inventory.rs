@@ -4088,6 +4088,9 @@ macro_rules! ast_traversal {
                 OccurrenceBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
                 }
+                OccurrenceBodyElement::ConnectionUsage(field_0) => {
+                    visitor.visit_connection_usage_member(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5497,6 +5500,9 @@ macro_rules! ast_traversal {
                 RequirementDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
                 }
+                RequirementDefBodyElement::ConcernUsage(field_0) => {
+                    visitor.visit_concern_usage(field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5733,8 +5739,12 @@ macro_rules! ast_traversal {
         pub fn walk_concern_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConcernUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConcernUsage { name, type_name, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
+            let ConcernUsage { name, is_abstract, type_name, multiplicity, subsets, redefines, body, is_definition, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
+            let _ = is_abstract;
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }

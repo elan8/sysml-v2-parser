@@ -72,13 +72,17 @@ fn an_occurrence_body_accepts_ref_members() {
     );
 }
 
-/// The opaque capture is still reachable -- it is the fallback, not the first choice. `connection
-/// :HappensDuring connect a to b;` is a form the parser does not model yet, and it must still be
-/// retained with a diagnostic rather than parsed into something wrong.
+/// The opaque capture is still reachable -- it is the fallback, not the first choice. A
+/// connection usage that redefines rather than types its connector (`connection :>> c connect a to
+/// b;`) is a form the parser does not model yet, and it must still be retained with a diagnostic
+/// rather than parsed into something wrong.
+///
+/// This test used `connection :HappensDuring connect a to b;` until occurrence bodies learned to
+/// dispatch connection usages; that member is now structured, which is why the example moved.
 #[test]
 fn an_unmodelled_member_is_still_captured_with_a_diagnostic() {
     let source =
-        "package P {\n    flow def F {\n        connection :HappensDuring connect a to b;\n    }\n}\n";
+        "package P {\n    flow def F {\n        connection :>> c connect a to b;\n    }\n}\n";
     let parsed = parse_for_editor(source);
     let codes: Vec<_> = parsed
         .errors

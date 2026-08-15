@@ -80,6 +80,9 @@ pub enum RequirementDefBodyElement {
     /// part actors : Part[0..*] { ... }` (Systems Library `Requirements.sysml`). This scope
     /// accepted no `ref` member at all.
     RefDecl(Node<crate::ast::RefDecl>),
+    /// Nested concern usage, e.g. `abstract concern concerns[0..*] :> concernChecks { ... }`
+    /// (`Requirements.sysml`). Previously only reachable at package level.
+    ConcernUsage(Node<ConcernUsage>),
 }
 
 /// Viewpoint stakeholder: typed declaration, shorthand concern reference, or `:>>` redefinition.
@@ -323,7 +326,14 @@ pub struct FrameMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcernUsage {
     pub name: String,
+    /// `abstract` keyword, e.g. `abstract concern concerns[0..*] :> concernChecks { ... }`
+    /// (Systems Library `Requirements.sysml`). The parser has always accepted it; this struct
+    /// had nowhere to put it, so emission dropped the keyword.
+    pub is_abstract: bool,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Multiplicity after the name, e.g. `[0..*]` in `abstract concern concerns[0..*]`. Also
+    /// previously parsed and discarded.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: RequirementDefBody,

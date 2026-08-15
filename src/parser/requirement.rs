@@ -199,7 +199,11 @@ fn requirement_def_body_element(
                 textual_representation,
                 RequirementDefBodyElement::TextualRep,
             ),
-            map(doc_comment, RequirementDefBodyElement::Doc),
+            // Nested in a sub-alt to stay under nom's 21-branch limit.
+            alt((
+                map(doc_comment, RequirementDefBodyElement::Doc),
+                map(concern_usage, RequirementDefBodyElement::ConcernUsage),
+            )),
             map(
                 crate::parser::connector::ref_decl,
                 RequirementDefBodyElement::RefDecl,
@@ -979,7 +983,8 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, abstract_kw) =
+        nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, def_kw) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
@@ -988,7 +993,9 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage {
         name: ident,
+        is_abstract: abstract_kw.is_some(),
         type_name: header.type_reference,
+        multiplicity: header.multiplicity,
         subsets: header.subsets,
         redefines: header.redefines,
         body,

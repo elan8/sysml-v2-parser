@@ -1678,6 +1678,10 @@ pub enum OccurrenceBodyElement {
     /// FlowTransfer::self;` and `private ref action thisConnection = self;` (Systems Library
     /// `Flows.sysml`). Occurrence bodies accepted no `ref` member at all.
     RefDecl(Node<RefDecl>),
+    /// Connection usage, e.g. `connection :HappensDuring connect sourceEvent to [1] self;`
+    /// (Systems Library `Flows.sysml`). Part and attribute bodies already dispatched this
+    /// member; occurrence bodies did not.
+    ConnectionUsage(Box<Node<ConnectionUsageMember>>),
 }
 
 /// Standalone succession usage directly in a definition/occurrence body (distinct from the

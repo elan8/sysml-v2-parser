@@ -1019,6 +1019,9 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
             RequirementDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
+            RequirementDefBodyElement::ConcernUsage(n) => {
+                walk_requirement_def_body(report, &p, &n.value.body)
+            }
             RequirementDefBodyElement::Doc(_)
             | RequirementDefBodyElement::SubjectDecl(_)
             | RequirementDefBodyElement::SubjectRef(_)
@@ -1257,6 +1260,9 @@ fn walk_occurrence_body_element(
         OccurrenceBodyElement::EndDecl(n) => walk_end_decl(report, path, &n.value),
         OccurrenceBodyElement::StateUsage(n) => walk_state_def_body(report, path, &n.value.body),
         OccurrenceBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
+        OccurrenceBodyElement::ConnectionUsage(n) => {
+            walk_connection_def_body(report, path, &n.value.body)
+        }
         OccurrenceBodyElement::Doc(_) => {}
     }
 }

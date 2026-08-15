@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Occurrence bodies accept directed occurrence usages and connection usages.**
+  `directed_occurrence_usage` was dispatched only in action bodies, and it required the
+  `occurrence` keyword immediately after the direction, so `in event occurrence sourceEvent [1]
+  default that.sourceEvent;` (`sysml.library/Systems Library/Flows.sysml`) failed twice over.
+  `connection :HappensDuring connect sourceEvent to [1] self;` had no arm in this scope either.
+- **Concern usages are requirement-body members, and keep their `abstract` and multiplicity.**
+  `abstract concern concerns[0..*] :> concernChecks { ... }` (`Requirements.sysml`) was only
+  reachable at package level, and `ConcernUsage` had no field for either the keyword or the
+  multiplicity, both of which the parser consumed and discarded. **AST version 149 -> 150.**
+
 - **A brace-bodied `require` / `assume` member is a constraint-body member.** The constraint body's
   terminal arm falls through to `expression`, which read `require viewpointSatisfactions` as an
   expression and then could not account for the `{` that followed

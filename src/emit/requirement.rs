@@ -113,6 +113,7 @@ fn emit_requirement_body_element(
     match el {
         RequirementDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RequirementDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RequirementDefBodyElement::ConcernUsage(c) => emit_concern_usage(w, path, &c.value),
         RequirementDefBodyElement::RefDecl(r) => {
             crate::emit::structure::emit_ref_decl(w, path, &r.value)
         }
@@ -524,11 +525,17 @@ pub(crate) fn emit_concern_usage(
     concern: &ConcernUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, concern.membership.visibility);
+    if concern.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str("concern ");
     if concern.is_definition {
         w.push_str("def ");
     }
     w.push_str(&format_name(&concern.name));
+    if let Some(mult) = &concern.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
     if let Some(ty) = &concern.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
