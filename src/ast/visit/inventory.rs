@@ -4397,23 +4397,17 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
                 }
-                ActionDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                ActionDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 ActionDefBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
-                }
-                ActionDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 ActionDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
                 ActionDefBodyElement::MetadataUsage(field_0) => {
                     visitor.visit_metadata_usage(field_0);
-                }
-                ActionDefBodyElement::TextualRep(field_0) => {
-                    visitor.visit_textual_representation(field_0);
                 }
                 ActionDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
@@ -4811,23 +4805,17 @@ macro_rules! ast_traversal {
                 ActionUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                ActionUsageBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                ActionUsageBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 ActionUsageBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
-                }
-                ActionUsageBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 ActionUsageBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
                 ActionUsageBodyElement::MetadataUsage(field_0) => {
                     visitor.visit_metadata_usage(field_0);
-                }
-                ActionUsageBodyElement::TextualRep(field_0) => {
-                    visitor.visit_textual_representation(field_0);
                 }
                 ActionUsageBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
@@ -5211,14 +5199,11 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                StateDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                StateDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 StateDefBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
-                }
-                StateDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 StateDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);

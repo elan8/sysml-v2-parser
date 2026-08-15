@@ -1,7 +1,7 @@
 //! Behavior emission (actions, states, perform, allocate).
 
 use super::expr::{emit_expression, emit_feature_value};
-use super::root::{emit_doc, emit_identification};
+use super::root::emit_identification;
 use super::structure::{
     self, emit_definition_prefix, emit_direction, emit_multiplicity, emit_subsetting_clause,
     emit_typing_clause,
@@ -281,7 +281,9 @@ fn emit_action_def_body_element(
         }
         ActionDefBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
         ActionDefBodyElement::ActionDef(d) => emit_action_def(w, path, &d.value),
-        ActionDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        ActionDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         ActionDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ActionDefBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
         ActionDefBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
@@ -336,10 +338,8 @@ fn emit_action_def_body_element(
         }
         ActionDefBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         other @ (ActionDefBodyElement::Annotation(_)
-        | ActionDefBodyElement::MetadataAnnotation(_)
         | ActionDefBodyElement::MetadataKeywordUsage(_)
         | ActionDefBodyElement::MetadataUsage(_)
-        | ActionDefBodyElement::TextualRep(_)
         | ActionDefBodyElement::TerminateStmt(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -384,7 +384,9 @@ pub(crate) fn emit_action_usage_body_element(
         }
         ActionUsageBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
         ActionUsageBodyElement::ActionDef(d) => emit_action_def(w, path, &d.value),
-        ActionUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
+        ActionUsageBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         ActionUsageBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ActionUsageBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
         ActionUsageBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
@@ -431,10 +433,8 @@ pub(crate) fn emit_action_usage_body_element(
         ActionUsageBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
         ActionUsageBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         other @ (ActionUsageBodyElement::Annotation(_)
-        | ActionUsageBodyElement::MetadataAnnotation(_)
         | ActionUsageBodyElement::MetadataKeywordUsage(_)
         | ActionUsageBodyElement::MetadataUsage(_)
-        | ActionUsageBodyElement::TextualRep(_)
         | ActionUsageBodyElement::TerminateStmt(_)
         | ActionUsageBodyElement::ForLoop(_)) => w.unsupported(
             path,
@@ -717,7 +717,9 @@ fn emit_state_def_body_element(
     match el {
         StateDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         StateDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
-        StateDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        StateDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         StateDefBodyElement::Entry(e) => {
             w.push_str("entry");
             if let Some(effect) = &e.value.effect {
@@ -838,7 +840,6 @@ fn emit_state_def_body_element(
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         other @ (StateDefBodyElement::Annotation(_)
-        | StateDefBodyElement::MetadataAnnotation(_)
         | StateDefBodyElement::MetadataKeywordUsage(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),

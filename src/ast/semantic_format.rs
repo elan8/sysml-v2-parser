@@ -1019,12 +1019,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
-                        StateDefBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
+                        StateDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
                         StateDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
-                        }
-                        StateDefBodyElement::MetadataAnnotation(_annotation) => {
-                            self.write_marker(&mut first, "metadata-annotation")?;
                         }
                         StateDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
@@ -1651,19 +1651,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 write_span(self.writer, span)?;
                 self.writer.write_char(')')
             }
-            ActionDefBodyElement::Doc(_doc) => self.writer.write_str("(doc)"),
+            ActionDefBodyElement::Annotating(member) => self.write_annotating_member(member),
             ActionDefBodyElement::Annotation(_annotation) => self.writer.write_str("(annotation)"),
-            ActionDefBodyElement::MetadataAnnotation(_annotation) => {
-                self.writer.write_str("(metadata-annotation)")
-            }
             ActionDefBodyElement::MetadataKeywordUsage(_usage) => {
                 self.writer.write_str("(metadata-keyword-usage)")
             }
             ActionDefBodyElement::MetadataUsage(_usage) => {
                 self.writer.write_str("(metadata-usage)")
-            }
-            ActionDefBodyElement::TextualRep(_text) => {
-                self.writer.write_str("(textual-representation)")
             }
             ActionDefBodyElement::RefDecl(declaration) => {
                 self.write_ref_declaration(&declaration.value)

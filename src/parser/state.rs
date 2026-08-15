@@ -12,10 +12,10 @@ use crate::parser::lex::{
 };
 
 const UNTIL_BODY: &[u8] = b";{";
-use crate::parser::metadata_annotation::{annotation, metadata_annotation, metadata_keyword_usage};
+use crate::parser::metadata_annotation::{annotation, metadata_keyword_usage};
 use crate::parser::node_from_to;
 use crate::parser::payload::transition_accept;
-use crate::parser::requirement::{doc_comment, requirement_usage};
+use crate::parser::requirement::requirement_usage;
 use crate::parser::usage::multiplicity;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -405,14 +405,11 @@ fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
     let start = input;
     let mut parser = alt((
-        map(doc_comment, |n| {
-            node_from_to(start, input, StateDefBodyElement::Doc(n))
+        map(crate::parser::body::annotating_member, |n| {
+            node_from_to(start, input, StateDefBodyElement::Annotating(n))
         }),
         map(metadata_keyword_usage, |n| {
             node_from_to(start, input, StateDefBodyElement::MetadataKeywordUsage(n))
-        }),
-        map(metadata_annotation, |n| {
-            node_from_to(start, input, StateDefBodyElement::MetadataAnnotation(n))
         }),
         map(annotation, |n| {
             node_from_to(start, input, StateDefBodyElement::Annotation(n))

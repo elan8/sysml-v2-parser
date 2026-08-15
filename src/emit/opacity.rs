@@ -808,9 +808,7 @@ fn walk_action_def_body_elements(
             ActionDefBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
             ActionDefBodyElement::ActionDef(n) => walk_action_def_body(report, &p, &n.value.body),
             ActionDefBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
-            ActionDefBodyElement::MetadataAnnotation(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
-            }
+            ActionDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             ActionDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
@@ -859,9 +857,7 @@ fn walk_action_def_body_elements(
                 walk_first_merge_body(report, &p, &fork.value.body)
             }
             ActionDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
-            ActionDefBodyElement::Doc(_)
-            | ActionDefBodyElement::TextualRep(_)
-            | ActionDefBodyElement::TerminateStmt(_)
+            ActionDefBodyElement::TerminateStmt(_)
             | ActionDefBodyElement::Assign(_)
             | ActionDefBodyElement::DefaultReferenceUsage(_) => {}
         }
@@ -911,8 +907,8 @@ fn walk_action_usage_body_elements(
             ActionUsageBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
             ActionUsageBodyElement::ActionDef(n) => walk_action_def_body(report, &p, &n.value.body),
             ActionUsageBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
-            ActionUsageBodyElement::MetadataAnnotation(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
+            ActionUsageBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
             }
             ActionUsageBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
@@ -962,9 +958,7 @@ fn walk_action_usage_body_elements(
                 walk_first_merge_body(report, &p, &fork.value.body)
             }
             ActionUsageBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
-            ActionUsageBodyElement::Doc(_)
-            | ActionUsageBodyElement::TextualRep(_)
-            | ActionUsageBodyElement::TerminateStmt(_)
+            ActionUsageBodyElement::TerminateStmt(_)
             | ActionUsageBodyElement::Assign(_)
             | ActionUsageBodyElement::DefaultReferenceUsage(_) => {}
         }
@@ -1138,9 +1132,7 @@ fn walk_state_def_body_elements(
             StateDefBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             StateDefBodyElement::Ref(n) => walk_ref_body(report, &p, &n.value.body),
             StateDefBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
-            StateDefBodyElement::MetadataAnnotation(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
-            }
+            StateDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             StateDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
@@ -1159,9 +1151,7 @@ fn walk_state_def_body_elements(
             StateDefBodyElement::AssertConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
-            StateDefBodyElement::Doc(_)
-            | StateDefBodyElement::Then(_)
-            | StateDefBodyElement::FinalState(_) => {}
+            StateDefBodyElement::Then(_) | StateDefBodyElement::FinalState(_) => {}
         }
     }
 }

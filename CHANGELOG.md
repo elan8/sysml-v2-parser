@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Action, action-usage, state and control-node bodies accept the whole annotating production,
+  and can emit it.** `ActionBodyItem` and `StateBodyItem` both start at `NonBehaviorBodyItem`,
+  which reaches `AnnotatingElement` through `DefinitionMember`, so `comment /* ... */` belongs in
+  all of them and was a parse error in all of them. The other three alternatives parsed but could
+  not be formatted: `emit_action_def_body`, `emit_action_usage_body` and `emit_state_def_body`
+  each reported a metadata annotation or a textual representation as an unsupported construct, so
+  a document was parseable and unformattable at the same time. All four now go through the shared
+  annotating emitter. Control-node bodies (`first`, `merge`, `decide`, `join`, `fork`) inherit the
+  change with the action-body member set they already share. **AST version 154 -> 155.**
+
 - **Eleven structural body scopes accept the whole annotating production.** Part, attribute, port,
   connection, interface and occurrence definitions, port, interface and perform usages, KerML
   feature bodies, and metadata bodies each admitted documentation and nothing else -- or, for part

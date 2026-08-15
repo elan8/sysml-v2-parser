@@ -3,7 +3,7 @@
 
 use sysml_v2_parser::ast::{
     ActionBranchBody, ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement,
-    PackageBody, PackageBodyElement, RootElement, ThenTarget,
+    AnnotatingMember, PackageBody, PackageBodyElement, RootElement, ThenTarget,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
@@ -161,7 +161,7 @@ fn gh86_5_bare_language_textual_representation_dispatched_inside_action_def_body
         panic!("expected brace action def body");
     };
     let rep = elements.iter().find_map(|e| match &e.value {
-        ActionDefBodyElement::TextualRep(r) => Some(&r.value),
+        ActionDefBodyElement::Annotating(AnnotatingMember::TextualRep(r)) => Some(&r.value),
         _ => None,
     });
     let rep = rep.expect("expected a TextualRep element");
