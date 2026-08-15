@@ -348,7 +348,7 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
     Ok(())
 }
 
-fn emit_require_constraint(
+pub(crate) fn emit_require_constraint(
     w: &mut EmitWriter<'_>,
     path: &str,
     req: &RequireConstraint,

@@ -595,6 +595,11 @@ pub enum AnnotationHead {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartUsageBodyElement {
     Error(Node<ParseErrorNode>),
+    /// `end name;` / `end ref name;` inside a usage body, e.g. the two ends of the transfer
+    /// constraint in `ref :>> outgoingTransfersFromSelf :> ... { end ref source; end ref
+    /// target; }` (Systems Library `Ports.sysml:37`). Occurrence bodies already modelled this
+    /// member; part usage bodies did not.
+    EndDecl(Node<EndDecl>),
     /// Directed parameter declaration with no kind keyword, e.g. `in :>> MessageTransfer::payload,
     /// MessageAction::payload;` inside a `ref` body (Systems Library `Actions.sysml`). Port and
     /// action bodies already modelled this member; part usage bodies did not, so the same line

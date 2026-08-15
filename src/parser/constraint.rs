@@ -187,6 +187,15 @@ pub(crate) fn constraint_def_body_element(
             |n| ConstraintDefBodyElement::AttributeUsage(Box::new(n)),
         )
         .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"require")
+        || starts_with_keyword(input.fragment(), b"assume")
+    {
+        // Ahead of the terminal `expression` arm below, which would otherwise read `require v`
+        // as an expression and leave a brace body unaccounted for.
+        map(crate::parser::requirement::require_constraint, |n| {
+            ConstraintDefBodyElement::RequireConstraint(Box::new(n))
+        })
+        .parse(input)?
     } else if let Ok((rest, binding)) = calc_named_binding(input) {
         // A constraint definition body is a `DefinitionBody`, so a keyword-less feature
         // declaration (`mass : Real;`) is a member of it, not an expression statement.

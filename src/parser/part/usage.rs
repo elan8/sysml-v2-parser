@@ -1331,6 +1331,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                     PartUsageBodyElement::InOutDecl,
                 ),
                 map(
+                    |i| crate::parser::connector::end_decl(i, true),
+                    PartUsageBodyElement::EndDecl,
+                ),
+                map(
                     crate::parser::metadata_annotation::metadata_keyword_usage,
                     PartUsageBodyElement::MetadataKeywordUsage,
                 ),

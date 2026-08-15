@@ -62,6 +62,11 @@ pub enum ConstraintDefBodyElement {
     /// Keyword-less feature declaration (`mass : Real;`): a constraint definition body is a
     /// `DefinitionBody`, so it owns usages as well as the constraint expression.
     FeatureDecl(Box<Node<crate::ast::DefaultReferenceUsage>>),
+    /// `require` / `assume` member, e.g. `require viewpointSatisfactions { ... }` inside a
+    /// `satisfy requirement ... by that { ... }` body (Systems Library `Views.sysml:43`). The
+    /// brace-bodied form previously fell through to the terminal expression arm, which consumed
+    /// the name and then could not account for the `{`.
+    RequireConstraint(Box<Node<crate::ast::RequireConstraint>>),
 }
 
 /// constraint body {}

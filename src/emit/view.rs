@@ -94,6 +94,9 @@ pub(crate) fn emit_constraint_body_element(
         ConstraintDefBodyElement::FeatureDecl(declaration) => {
             super::structure::emit_default_reference_usage(w, path, &declaration.value)
         }
+        ConstraintDefBodyElement::RequireConstraint(require) => {
+            super::requirement::emit_require_constraint(w, path, &require.value)
+        }
         ConstraintDefBodyElement::AttributeUsage(a) => {
             // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).
             if a.value.redefines.is_some()

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A brace-bodied `require` / `assume` member is a constraint-body member.** The constraint body's
+  terminal arm falls through to `expression`, which read `require viewpointSatisfactions` as an
+  expression and then could not account for the `{` that followed
+  (`sysml.library/Systems Library/Views.sysml:43`). A typed arm now precedes it.
+- **Part usage bodies accept bare end declarations.** `ref :>> outgoingTransfersFromSelf :> ...
+  { end ref source; end ref target; }` (`Ports.sysml:37`) puts connector ends in a usage body;
+  occurrence bodies already modelled the member, part usage bodies did not.
+  **AST version 148 -> 149.**
+
 - **View definition bodies accept viewpoint usages and `satisfy requirement ... by ...`.** Both
   are parsed by the same productions package and part bodies already dispatch; this scope had no
   arm for them (`sysml.library/Systems Library/Views.sysml`).

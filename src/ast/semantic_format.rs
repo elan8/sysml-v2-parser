@@ -1826,6 +1826,10 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "in-out-declaration")?;
                         }
+                        super::PartUsageBodyElement::EndDecl(end) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_end(&end.value)?;
+                        }
                         super::PartUsageBodyElement::AttributeUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_attribute_usage(&usage.value)?;

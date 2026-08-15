@@ -2973,6 +2973,9 @@ macro_rules! ast_traversal {
                 PartUsageBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
                 }
+                PartUsageBodyElement::EndDecl(field_0) => {
+                    visitor.visit_end_decl(field_0);
+                }
                 PartUsageBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(field_0);
                 }
@@ -6292,6 +6295,9 @@ macro_rules! ast_traversal {
                 }
                 ConstraintDefBodyElement::FeatureDecl(field_0) => {
                     visitor.visit_default_reference_usage(&$($mutability)? **field_0);
+                }
+                ConstraintDefBodyElement::RequireConstraint(field_0) => {
+                    visitor.visit_require_constraint(&$($mutability)? **field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);

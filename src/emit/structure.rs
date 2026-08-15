@@ -423,6 +423,7 @@ fn emit_part_usage_body_element(
             super::root::emit_annotating_member(w, path, member)
         }
         PartUsageBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
+        PartUsageBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         PartUsageBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PartUsageBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
         PartUsageBodyElement::Import(i) => emit_import(w, &i.value),
