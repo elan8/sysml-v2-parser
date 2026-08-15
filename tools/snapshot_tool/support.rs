@@ -375,6 +375,103 @@ fn into_utf8(bytes: Vec<u8>, context: &str) -> Result<String, String> {
     String::from_utf8(bytes).map_err(|error| format!("{context} produced invalid UTF-8: {error}"))
 }
 
+fn comparison_projection(
+    document: &sysml_v2_parser::ast::ParsedDocument,
+    context: &str,
+) -> Result<Vec<u8>, String> {
+    let mut projection = Vec::new();
+    document
+        .write_semantic_ast_for_comparison(&mut projection)
+        .map_err(|error| format!("{context}: semantic comparison projection failed: {error}"))?;
+    Ok(projection)
+}
+
+/// Existing formatter debt is pinned to an exact fixture path and SOURCE/FORMAT byte pair. A new
+/// fixture can never inherit an exemption, and any parser, emitter, or fixture change makes the
+/// gate run again. Remove entries as their owning formatter paths are repaired.
+const CANONICAL_OUTPUT_DEBT: &[(&str, u64)] = &[
+    // Derivation ends change semantic shape after emission.
+    (
+        "tests/snapshots/spec42/sysml.library/derivation_connections.md",
+        0x1d27_4982_f49b_e1d8,
+    ),
+    // Containment references change semantic shape after emission.
+    (
+        "tests/snapshots/spec42/sysml/validation/13a_model_containment.md",
+        0x5b3f_9624_f3ce_3342,
+    ),
+    // Ref declarations change semantic shape after emission.
+    (
+        "tests/snapshots/sysml/ref_declaration_scopes.md",
+        0xdf43_bbdf_f9e6_d5be,
+    ),
+    // The emitted KerML type body does not strictly reparse.
+    (
+        "tests/snapshots/kerml/type_body_relationship_members.md",
+        0xa337_2e6d_d744_3f8d,
+    ),
+];
+
+fn canonical_output_fingerprint(source: &str, emitted: &str) -> u64 {
+    let mut fingerprint = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in source
+        .bytes()
+        .chain(std::iter::once(0xff))
+        .chain(emitted.bytes())
+    {
+        fingerprint ^= u64::from(byte);
+        fingerprint = fingerprint.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    fingerprint
+}
+
+fn is_pinned_canonical_output_debt(path: &Path, source: &str, emitted: &str) -> bool {
+    let fingerprint = canonical_output_fingerprint(source, emitted);
+    CANONICAL_OUTPUT_DEBT
+        .iter()
+        .any(|(suffix, expected)| path.ends_with(Path::new(suffix)) && fingerprint == *expected)
+}
+
+fn validate_canonical_output(
+    path: &Path,
+    original: &sysml_v2_parser::ast::ParsedDocument,
+    emitted: &str,
+) -> Result<(), String> {
+    let reparsed = parse(emitted).map_err(|error| {
+        format!(
+            "{}: formatted output failed strict reparse: {error}",
+            path.display()
+        )
+    })?;
+    let original_projection = comparison_projection(original, &path.display().to_string())?;
+    let reparsed_projection = comparison_projection(&reparsed, &path.display().to_string())?;
+    if original_projection != reparsed_projection {
+        return Err(format!(
+            "{}: formatted output changed the semantic AST",
+            path.display()
+        ));
+    }
+
+    let reemitted = emit_sysml(&reparsed).map_err(|error| {
+        format!(
+            "{}: formatted output could not be re-emitted: {error}",
+            path.display()
+        )
+    })?;
+    let reemitted = reemitted.trim_end_matches('\n');
+    ensure_stable_output(path, emitted, reemitted)
+}
+
+fn ensure_stable_output(path: &Path, emitted: &str, reemitted: &str) -> Result<(), String> {
+    if reemitted.as_bytes() != emitted.as_bytes() {
+        return Err(format!(
+            "{}: formatted output is not stable after parse and re-emission",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
 fn actual_snapshot(path: &Path, meta: String, source: String) -> Result<Snapshot, String> {
     let file_name = path
         .file_name()
@@ -384,7 +481,7 @@ fn actual_snapshot(path: &Path, meta: String, source: String) -> Result<Snapshot
     let mut diagnostics = Vec::new();
     write_diagnostics(&mut diagnostics, file_name, &editor.errors)
         .map_err(|error| format!("{}: diagnostics write failed: {error}", path.display()))?;
-    if editor.errors.is_empty() {
+    let strict = if editor.errors.is_empty() {
         let strict = parse(&source)
             .map_err(|error| format!("{}: strict parse failed: {error}", path.display()))?;
         if strict.normalize_for_test_comparison()
@@ -395,18 +492,34 @@ fn actual_snapshot(path: &Path, meta: String, source: String) -> Result<Snapshot
                 path.display()
             ));
         }
-    }
+        Some(strict)
+    } else {
+        None
+    };
     let emitted = if editor.errors.is_empty() {
         emit_sysml(&editor.document)
     } else {
         emit_recovered_sysml(&editor.document)
     };
-    let format = FormatSection::from_emit_result(&source, emitted).map_err(|error| {
-        format!(
-            "{}: parsed document could not be emitted: {error}",
-            path.display()
-        )
-    })?;
+    let format = match emitted {
+        Ok(output) => {
+            let output = output.trim_end_matches('\n').to_owned();
+            if output.as_bytes() != source.as_bytes() {
+                if let Some(strict) = &strict {
+                    if !is_pinned_canonical_output_debt(path, &source, &output) {
+                        validate_canonical_output(path, strict, &output)?;
+                    }
+                }
+            }
+            FormatSection::from_output(&source, output)
+        }
+        Err(error) => FormatSection::from_emit_result(&source, Err(error)).map_err(|error| {
+            format!(
+                "{}: parsed document could not be emitted: {error}",
+                path.display()
+            )
+        })?,
+    };
     let mut ast = Vec::new();
     editor
         .document
@@ -577,6 +690,67 @@ mod tests {
 
         assert_eq!(from_sentinel, from_stale_sysml);
         assert!(from_sentinel.contains("# FORMAT\n~~~sexpr\n(stable-idempotent)\n~~~"));
+    }
+
+    #[test]
+    fn changed_format_must_reparse_to_the_same_semantic_projection() {
+        let original = parse("package P { import A::*; }").expect("parse original");
+        let error = validate_canonical_output(
+            Path::new("semantic-change.md"),
+            &original,
+            "package P {\n    import B::*;\n}",
+        )
+        .expect_err("changed reference must be rejected");
+
+        assert!(error.contains("formatted output changed the semantic AST"));
+    }
+
+    #[test]
+    fn changed_format_may_change_layout_without_changing_meaning() {
+        let original = parse("package P {part x : A;}").expect("parse original");
+        let emitted = emit_sysml(&original).expect("emit canonical output");
+        let emitted = emitted.trim_end_matches('\n');
+
+        validate_canonical_output(Path::new("layout-change.md"), &original, emitted)
+            .expect("canonical output preserves meaning and is stable");
+    }
+
+    #[test]
+    fn second_format_pass_must_be_byte_stable() {
+        let error =
+            ensure_stable_output(Path::new("unstable-format.md"), "package P;", "package P; ")
+                .expect_err("different second output must be rejected");
+
+        assert!(error.contains("formatted output is not stable"));
+    }
+
+    #[test]
+    fn debt_exemption_is_invalidated_by_any_source_or_format_change() {
+        let path = Path::new("tests/snapshots/sysml/ref_declaration_scopes.md");
+        let fixture = fs::read_to_string(path).expect("read pinned fixture");
+        let source = leading_fenced_section(
+            leading_fenced_section(&fixture, "META", "sexpr")
+                .expect("META")
+                .1,
+            "SOURCE",
+            "sysml",
+        )
+        .expect("SOURCE")
+        .0;
+        let format = fixture
+            .split_once("# FORMAT\n~~~sysml\n")
+            .expect("SysML FORMAT")
+            .1
+            .split_once("\n~~~\n")
+            .expect("FORMAT fence")
+            .0;
+
+        assert!(is_pinned_canonical_output_debt(path, &source, format));
+        assert!(!is_pinned_canonical_output_debt(
+            path,
+            &source,
+            &format!("{format} ")
+        ));
     }
 
     #[test]
