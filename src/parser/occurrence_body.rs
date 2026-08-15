@@ -19,7 +19,7 @@ use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::part::exhibit_state_as_state_usage;
 use crate::parser::part::part_usage;
-use crate::parser::requirement::{doc_comment, satisfy};
+use crate::parser::requirement::satisfy;
 use crate::parser::usage::{
     multiplicity_node as multiplicity_parser, optional_typings, specialization_clauses,
 };
@@ -592,7 +592,10 @@ pub(crate) fn occurrence_body_element(
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     let (input, elem) = alt((
-        map(doc_comment, OccurrenceBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            OccurrenceBodyElement::Annotating,
+        ),
         map(annotation, OccurrenceBodyElement::Annotation),
         map(
             assert_constraint_member,

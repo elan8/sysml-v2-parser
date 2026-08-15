@@ -1337,7 +1337,7 @@ Addresses: front ToF 0x29, left ToF 0x2A, right ToF 0x2B, IMU 0x68.
         members
     );
     match &members[0].value {
-        PortBodyElement::Doc(doc) => {
+        PortBodyElement::Annotating(AnnotatingMember::Doc(doc)) => {
             assert!(
                 doc.value.text.contains("Addresses: front ToF 0x29"),
                 "doc text should retain the colon-and-comma-list line verbatim, got {:?}",
@@ -2627,7 +2627,9 @@ end b : B;
         members
     );
     match &members[0].value {
-        sysml_v2_parser::ast::ConnectionDefBodyElement::Doc(doc) => {
+        sysml_v2_parser::ast::ConnectionDefBodyElement::Annotating(
+            sysml_v2_parser::ast::AnnotatingMember::Doc(doc),
+        ) => {
             assert!(
                 doc.value.text.contains("Addresses: front ToF 0x29"),
                 "doc text should retain the colon-and-comma-list line verbatim, got {:?}",
@@ -2706,7 +2708,7 @@ doc /* Addresses: front ToF 0x29, left ToF 0x2A. */
         body_elements
     );
     match &body_elements[0].value {
-        InterfaceUsageBodyElement::Doc(doc) => {
+        InterfaceUsageBodyElement::Annotating(AnnotatingMember::Doc(doc)) => {
             assert!(
                 doc.value.text.contains("Addresses: front ToF 0x29"),
                 "doc text should retain the colon-and-comma-list line verbatim, got {:?}",

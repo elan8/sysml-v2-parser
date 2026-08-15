@@ -278,7 +278,9 @@ fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &Interf
             InterfaceDefBodyElement::FlowUsage(flow) => {
                 walk_definition_body(report, &p, &flow.value.body)
             }
-            InterfaceDefBodyElement::Doc(_) => {}
+            InterfaceDefBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
+            }
         }
     }
 }
@@ -413,7 +415,9 @@ fn walk_connection_def_body(report: &mut OpacityReport, path: &str, body: &Conne
             ConnectionDefBodyElement::SuccessionUsage(succession) => {
                 walk_connect_body(report, &p, &succession.value.body)
             }
-            ConnectionDefBodyElement::Doc(_) => {}
+            ConnectionDefBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
+            }
         }
     }
 }
@@ -439,9 +443,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::ActionUsage(n) => {
                 walk_optional_action_usage_body(report, &p, &n.value.body)
             }
-            PartDefBodyElement::MetadataAnnotation(n) => {
-                walk_attribute_body(report, &p, &n.value.body)
-            }
+            PartDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             PartDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
@@ -547,10 +549,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::FirstStmt(first) => {
                 walk_first_merge_body(report, &p, &first.value.body)
             }
-            PartDefBodyElement::Doc(_)
-            | PartDefBodyElement::Comment(_)
-            | PartDefBodyElement::DefaultReferenceUsage(_)
-            | PartDefBodyElement::EnumDef(_) => {}
+            PartDefBodyElement::DefaultReferenceUsage(_) | PartDefBodyElement::EnumDef(_) => {}
         }
     }
 }
@@ -717,7 +716,7 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             AttributeBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             AttributeBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             AttributeBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
-            AttributeBodyElement::Doc(_) => {}
+            AttributeBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
         }
     }
 }
@@ -744,7 +743,7 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
             PortDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
-            PortDefBodyElement::Doc(_) => {}
+            PortDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
         }
     }
 }
@@ -761,7 +760,7 @@ fn walk_port_body(report: &mut OpacityReport, path: &str, body: &PortBody) {
             PortBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
-            PortBodyElement::Doc(_) => {}
+            PortBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
         }
     }
 }
@@ -1223,7 +1222,6 @@ fn walk_definition_body(report: &mut OpacityReport, path: &str, body: &Definitio
             DefinitionBodyElement::OccurrenceMember(n) => {
                 walk_occurrence_body_element(report, &p, &n.value)
             }
-            DefinitionBodyElement::Doc(_) => {}
         }
     }
 }
@@ -1266,7 +1264,7 @@ fn walk_occurrence_body_element(
         OccurrenceBodyElement::ConnectionUsage(n) => {
             walk_connection_def_body(report, path, &n.value.body)
         }
-        OccurrenceBodyElement::Doc(_) => {}
+        OccurrenceBodyElement::Annotating(member) => walk_annotating_member(report, path, member),
     }
 }
 
@@ -1394,7 +1392,9 @@ fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &Interfac
         match &element.value {
             InterfaceUsageBodyElement::RefRedef { body, .. } => walk_ref_body(report, &p, body),
             InterfaceUsageBodyElement::EndDecl(end) => walk_end_decl(report, &p, &end.value),
-            InterfaceUsageBodyElement::Doc(_) => {}
+            InterfaceUsageBodyElement::Annotating(member) => {
+                walk_annotating_member(report, &p, member)
+            }
         }
     }
 }
@@ -1460,7 +1460,8 @@ fn walk_perform_body(report: &mut OpacityReport, path: &str, body: &PerformBody)
             PerformBodyElement::AttributeUsage(attribute) => {
                 walk_attribute_body(report, &p, &attribute.value.body)
             }
-            PerformBodyElement::Doc(_) | PerformBodyElement::InOut(_) => {}
+            PerformBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
+            PerformBodyElement::InOut(_) => {}
         }
     }
 }

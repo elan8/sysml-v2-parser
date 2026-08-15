@@ -54,3 +54,59 @@ fn the_whole_production_round_trips_from_a_relationship_body() {
         "}\n",
     ));
 }
+
+/// The keyword span is the only fact separating `comment /* x */` from a bare `/* x */`, which
+/// reparses as trivia rather than as a member. Emission reads it, so a wire document that
+/// redirects it changes what the document says while still spelling a real `comment` keyword.
+/// This has no document projection -- the corruption is only reachable through deserialization.
+#[cfg(feature = "serde")]
+#[test]
+fn a_comment_keyword_span_redirected_to_another_comment_is_rejected() {
+    let source = "package P {\n  part def A {\n    comment /* first */\n  }\n  part def B {\n    comment /* second */\n  }\n}\n";
+    let document = sysml_v2_parser::parse_for_editor(source).document;
+    let encoded = serde_json::to_value(&document).expect("the parsed document serializes");
+
+    let body = |index: usize| {
+        format!(
+            "/root/elements/0/value/Package/value/body/Brace/elements/{index}\
+             /value/PartDef/value/body/Brace/elements/0/value/Annotating/Comment"
+        )
+    };
+    let mut tampered = encoded.clone();
+    let sibling = tampered
+        .pointer(&format!("{}/value/keyword_span", body(1)))
+        .cloned()
+        .expect("the second comment's keyword span");
+    *tampered
+        .pointer_mut(&format!("{}/value/keyword_span", body(0)))
+        .expect("the first comment's keyword span") = sibling;
+
+    let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
+        .expect_err("a keyword belonging to another comment must be rejected");
+    let message = error.to_string();
+    assert!(
+        message.contains("comment keyword") && message.contains("outside"),
+        "expected a containment failure naming the keyword, got: {message}"
+    );
+}
+
+/// The same span pointed at text that is not the keyword at all.
+#[cfg(feature = "serde")]
+#[test]
+fn a_comment_keyword_span_covering_other_text_is_rejected() {
+    let source = "package P {\n  part def A {\n    comment /* first */\n  }\n}\n";
+    let document = sysml_v2_parser::parse_for_editor(source).document;
+    let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
+    let keyword = "/root/elements/0/value/Package/value/body/Brace/elements/0\
+                   /value/PartDef/value/body/Brace/elements/0/value/Annotating/Comment/value/keyword_span";
+    *tampered
+        .pointer_mut(&format!("{keyword}/offset"))
+        .expect("the comment's keyword offset") = serde_json::json!(0);
+
+    let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
+        .expect_err("a keyword span that does not cover `comment` must be rejected");
+    assert!(
+        error.to_string().contains("comment keyword"),
+        "expected the keyword check to name itself, got: {error}"
+    );
+}

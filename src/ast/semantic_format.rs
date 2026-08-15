@@ -1173,15 +1173,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             )?;
                             self.writer.write_str("))")?;
                         }
-                        PartDefBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
-                        PartDefBodyElement::Comment(_comment) => {
-                            self.write_marker(&mut first, "comment")?;
+                        PartDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         PartDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
-                        }
-                        PartDefBodyElement::MetadataAnnotation(_annotation) => {
-                            self.write_marker(&mut first, "metadata-annotation")?;
                         }
                         PartDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
@@ -1781,8 +1778,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
-                        InterfaceDefBodyElement::Doc(_doc) => {
-                            self.write_marker(&mut first, "doc")?;
+                        InterfaceDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         InterfaceDefBodyElement::EndDecl(end) => {
                             self.write_item_prefix(&mut first)?;
@@ -1848,8 +1846,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::ConnectStmt(_connect) => {
                             self.write_marker(&mut first, "connect")?;
                         }
-                        ConnectionDefBodyElement::Doc(_doc) => {
-                            self.write_marker(&mut first, "doc")?;
+                        ConnectionDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         ConnectionDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -2374,7 +2373,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
-                        PerformBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
+                        PerformBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
                         PerformBodyElement::InOut(binding) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(binding (direction ")?;
@@ -2625,8 +2627,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
-                        PortDefBodyElement::Doc(_doc) => {
-                            self.write_marker(&mut first, "doc")?;
+                        PortDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         PortDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;

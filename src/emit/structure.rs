@@ -1,7 +1,7 @@
 //! Structure emission: part / attribute (and shared helpers).
 
 use super::expr::{emit_expression, emit_feature_value};
-use super::root::{emit_comment, emit_doc, emit_identification, emit_import};
+use super::root::{emit_identification, emit_import};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
@@ -285,8 +285,9 @@ fn emit_part_def_body_element(
         PartDefBodyElement::UnsupportedMember(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }
-        PartDefBodyElement::Doc(d) => emit_doc(w, &d.value),
-        PartDefBodyElement::Comment(c) => emit_comment(w, &c.value),
+        PartDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         PartDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PartDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PartDefBodyElement::PartDef(p) => emit_part_def(w, path, &p.value),
@@ -346,7 +347,6 @@ fn emit_part_def_body_element(
         PartDefBodyElement::AllocationUsage(a) => {
             super::behavior::emit_allocation_usage(w, path, &a.value)
         }
-        PartDefBodyElement::MetadataAnnotation(m) => emit_metadata_annotation(w, path, &m.value),
         PartDefBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }
@@ -544,7 +544,9 @@ fn emit_attribute_body_element(
         AttributeBodyElement::Unsupported(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }
-        AttributeBodyElement::Doc(d) => emit_doc(w, &d.value),
+        AttributeBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         AttributeBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
@@ -709,7 +711,9 @@ fn emit_port_def_body_element(
         PortDefBodyElement::Unsupported(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }
-        PortDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PortDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         PortDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PortDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
@@ -759,7 +763,7 @@ fn emit_port_body_element(
 ) -> Result<(), EmitError> {
     match el {
         PortBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        PortBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PortBodyElement::Annotating(member) => super::root::emit_annotating_member(w, path, member),
         PortBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
         PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
@@ -854,7 +858,9 @@ fn emit_interface_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         InterfaceDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        InterfaceDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        InterfaceDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         InterfaceDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         InterfaceDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         InterfaceDefBodyElement::ConnectStmt(c) => emit_connect_stmt(w, path, &c.value),
@@ -1119,7 +1125,9 @@ fn emit_interface_usage_body_element(
     el: &InterfaceUsageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        InterfaceUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
+        InterfaceUsageBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         InterfaceUsageBodyElement::RefRedef {
             target,
             value,
@@ -1547,7 +1555,9 @@ fn emit_feature_body_element(
         crate::ast::FeatureBodyElement::Binding(b) => {
             emit_default_reference_usage(w, path, &b.value)
         }
-        crate::ast::FeatureBodyElement::Doc(d) => super::root::emit_doc(w, &d.value),
+        crate::ast::FeatureBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
     }
 }
 
@@ -1814,7 +1824,9 @@ fn emit_connection_def_body_element(
         crate::ast::ConnectionDefBodyElement::Error(error) => {
             w.push_recovery_span(path, &error.span)
         }
-        crate::ast::ConnectionDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        crate::ast::ConnectionDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         crate::ast::ConnectionDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         crate::ast::ConnectionDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         crate::ast::ConnectionDefBodyElement::ConnectStmt(c) => {

@@ -17,7 +17,6 @@ use crate::parser::lex::{
     PORT_DEF_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
-use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
     multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
 };
@@ -42,7 +41,10 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
     let (input, elem) = alt((
         map(port_usage, PortBodyElement::PortUsage),
         map(in_out_decl, PortBodyElement::InOutDecl),
-        map(doc_comment, PortBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            PortBodyElement::Annotating,
+        ),
         // PAR-002 widening: this body previously had no attribute/item coverage at all.
         map(attribute_usage, PortBodyElement::AttributeUsage),
         // A port body may redefine an inherited feature without repeating its kind keyword, e.g.
@@ -245,7 +247,10 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         map(directed_item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),
         map(in_out_decl, PortDefBodyElement::InOutDecl),
-        map(doc_comment, PortDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            PortDefBodyElement::Annotating,
+        ),
         map(|i| attribute_def(i, true), PortDefBodyElement::AttributeDef),
         map(attribute_usage, PortDefBodyElement::AttributeUsage),
         map(

@@ -42,9 +42,7 @@ pub(crate) use crate::parser::occurrence::{
     timeslice_usage,
 };
 pub(crate) use crate::parser::port::{port_def_required, port_usage};
-pub(crate) use crate::parser::requirement::{
-    comment_annotation, doc_comment, requirement_def, requirement_usage, satisfy,
-};
+pub(crate) use crate::parser::requirement::{requirement_def, requirement_usage, satisfy};
 pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
 pub(crate) use crate::parser::state::{state_def, state_usage};
 pub(crate) use crate::parser::usage::{

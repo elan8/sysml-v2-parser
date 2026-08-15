@@ -7,7 +7,9 @@
 //! new AST position that carries an identity or a delimiter span is covered the moment the
 //! traversal knows about it -- there is no separate list here to keep in step.
 
-use super::visit::{walk_first_merge_brace_body, walk_import_target, Visitor};
+use super::visit::{
+    walk_comment_annotation, walk_first_merge_brace_body, walk_import_target, Visitor,
+};
 use super::*;
 
 fn span_end(span: &Span) -> usize {
@@ -153,6 +155,33 @@ impl Visitor for ProvenanceValidator<'_> {
             .map_err(|error| error.to_string());
         self.check(result);
         walk_import_target(self, target);
+    }
+
+    /// A comment's keyword span is a delimiter in everything but name. `comment` is optional in
+    /// the production, and its presence is the only thing separating a member from a bare block
+    /// comment, which reparses as trivia and disappears -- so emission reads this span and a wire
+    /// document that points it at other text silently changes what the document says. It is
+    /// checked against its own node rather than the enclosing declaration, which is what makes
+    /// "the keyword of *this* comment" a stronger claim than "somewhere in this part def".
+    fn visit_comment_annotation(&mut self, node: &Node<CommentAnnotation>) {
+        if self.error.is_some() {
+            return;
+        }
+        if let Some(keyword) = &node.value.keyword_span {
+            self.check(self.delimiter(keyword, "comment", "comment keyword"));
+            if self.error.is_none()
+                && (keyword.offset < node.span.offset || span_end(keyword) > span_end(&node.span))
+            {
+                self.error = Some(format!(
+                    "comment keyword at {} lies outside the comment that owns it, {}..{}",
+                    keyword.offset,
+                    node.span.offset,
+                    span_end(&node.span)
+                ));
+                return;
+            }
+        }
+        walk_comment_annotation(self, node);
     }
 
     /// A `first`/`merge`/`decide`/`join`/`fork` brace body records both delimiters explicitly.

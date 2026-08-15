@@ -166,7 +166,9 @@ fn test_perform_body_doc_comment_parsed_as_element() {
         "perform body must have Doc then InOut (doc comments are not skipped)"
     );
     match &perform_body[0].value {
-        sysml_v2_parser::ast::PerformBodyElement::Doc(d) => assert!(
+        sysml_v2_parser::ast::PerformBodyElement::Annotating(
+            sysml_v2_parser::ast::AnnotatingMember::Doc(d),
+        ) => assert!(
             d.value.text.contains("allocation comment"),
             "doc text should contain the comment content, got {:?}",
             d.value.text

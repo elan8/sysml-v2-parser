@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Eleven structural body scopes accept the whole annotating production.** Part, attribute, port,
+  connection, interface and occurrence definitions, port, interface and perform usages, KerML
+  feature bodies, and metadata bodies each admitted documentation and nothing else -- or, for part
+  definitions, everything but a textual representation -- while the grammar reaches
+  `AnnotatingElement` in all of them through `DefinitionBodyItem -> DefinitionMember ->
+  DefinitionElement` (`NonFeatureMember -> MemberElement` on the KerML side). They now carry
+  `Annotating(AnnotatingMember)` and dispatch through the one parser, so `comment`, `rep` and the
+  `@` metadata spelling parse, emit and traverse identically wherever the production is legal. The
+  derived evidence is `planning/annotating-member-matrix.md`. **AST version 153 -> 154.**
+
+- **A comment's keyword span is validated on deserialization.** `comment` is optional in the
+  production and its presence is the only thing separating a member from a bare block comment,
+  which reparses as trivia and disappears -- so emission reads the span, and a wire document could
+  redirect it at another comment's keyword and silently change what the document says. It is now
+  checked like a delimiter: it must slice to `comment`, and it must lie inside the comment that
+  owns it rather than merely inside the enclosing declaration.
+
+### Removed
+
+- **`DefinitionBodyElement::Doc`, which the parser could not build.** Documentation in a flow,
+  allocation or message body has always arrived as
+  `OccurrenceMember(OccurrenceBodyElement::Doc)`; the sibling variant had no construction site
+  anywhere, so it was an unreachable state in a public enum and a second representation of the
+  same syntactic fact.
+
 ### Fixed
 
 - **An anonymous connection definition no longer emits a doubled space.** The trailing space was

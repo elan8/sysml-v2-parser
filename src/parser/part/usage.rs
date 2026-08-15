@@ -447,7 +447,10 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, PerformBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            PerformBodyElement::Annotating,
+        ),
         map(perform_in_out_binding, PerformBodyElement::InOut),
         // §6 G6: parameter-direction usage members (`in part :>> name = value;`, `in item 'n' :
         // Type { }`, …) reuse the same directed/usage parsers as port-def bodies rather than
@@ -854,10 +857,18 @@ fn interface_usage_body_element(
             let span = end.span.clone();
             Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))
         }),
-        map(doc_comment, |doc| {
-            let span = doc.span.clone();
-            Node::new(span, InterfaceUsageBodyElement::Doc(doc))
-        }),
+        |input| {
+            let start = input;
+            let (input, member) = crate::parser::body::annotating_member(input)?;
+            Ok((
+                input,
+                crate::parser::node_from_to(
+                    start,
+                    input,
+                    InterfaceUsageBodyElement::Annotating(member),
+                ),
+            ))
+        },
     ))
     .parse(input)
 }

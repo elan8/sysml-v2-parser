@@ -554,7 +554,9 @@ fn emit_perform_body_element(
     el: &PerformBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        PerformBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PerformBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         PerformBodyElement::InOut(b) => emit_perform_inout(w, path, &b.value),
         PerformBodyElement::Variant(v) => structure::emit_variant_usage(w, path, &v.value),
         PerformBodyElement::Action(a) => emit_action_usage_body_element(w, path, &a.value),
@@ -1065,7 +1067,6 @@ fn emit_definition_body(
                         crate::ast::DefinitionBodyElement::Unsupported(unsupported) => {
                             w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                         }
-                        crate::ast::DefinitionBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                         crate::ast::DefinitionBodyElement::OccurrenceMember(o) => {
                             emit_occurrence_body_element(
                                 w,
@@ -1401,7 +1402,9 @@ pub(crate) fn emit_occurrence_body_element(
 ) -> Result<(), EmitError> {
     match el {
         crate::ast::OccurrenceBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        crate::ast::OccurrenceBodyElement::Doc(d) => emit_doc(w, &d.value),
+        crate::ast::OccurrenceBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         crate::ast::OccurrenceBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }

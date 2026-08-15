@@ -33,7 +33,6 @@ package AnnotatingMemberRecovery {
     (diagnostics
       (diagnostic (code "missing_semicolon") (severity error) (category parseerror) (span (offset 66) (line 3) (column 9) (len 19)) (message "missing semicolon before next declaration"))
       (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 207) (line 8) (column 9) (len 21)) (message "unexpected keyword `rep` in part definition body"))
-      (diagnostic (code "unexpected_keyword_in_scope") (severity error) (category parseerror) (span (offset 487) (line 19) (column 9) (len 76)) (message "unexpected keyword `rep` in part definition body"))
     )
   )
 )
@@ -58,7 +57,8 @@ package AnnotatingMemberRecovery {
         /* an annotated element list is part of the production */
     }
     part def Later {
-        rep laterRep language "text" /* the declaration after every recovery */
+        rep laterRep language "text"
+        /* the declaration after every recovery */
     }
 }
 ~~~
@@ -67,6 +67,6 @@ package AnnotatingMemberRecovery {
 (parsed-document
   (references
   )
-  (root (package (name "AnnotatingMemberRecovery") (body brace (part-def (name "Leading") (body brace (malformed (code "missing_semicolon") (found "doc locale") (span (offset 66) (line 3) (column 9) (len 19))) (doc))) (part-def (name "Between") (body brace (doc) (malformed (code "unexpected_keyword_in_scope") (found "rep language") (span (offset 207) (line 8) (column 9) (len 21))) (comment))) (part-def (name "Trailing") (body brace (comment))) (part-def (name "Later") (body brace (malformed (code "unexpected_keyword_in_scope") (found "rep laterRep language \"text\" /* the declaration after every") (span (offset 487) (line 19) (column 9) (len 76))))))))
+  (root (package (name "AnnotatingMemberRecovery") (body brace (part-def (name "Leading") (body brace (malformed (code "missing_semicolon") (found "doc locale") (span (offset 66) (line 3) (column 9) (len 19))) (doc))) (part-def (name "Between") (body brace (doc) (malformed (code "unexpected_keyword_in_scope") (found "rep language") (span (offset 207) (line 8) (column 9) (len 21))) (comment (keyword (span (offset 228) (line 9) (column 9) (len 7))) (name none) (locale none)))) (part-def (name "Trailing") (body brace (comment (keyword (span (offset 286) (line 12) (column 9) (len 7))) (name none) (locale none)))) (part-def (name "Later") (body brace (textual-rep))))))
 )
 ~~~

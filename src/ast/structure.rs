@@ -3,9 +3,7 @@ use super::behavior::{
     StateUsage,
 };
 use super::body::Body;
-use super::common::{
-    AnnotatingMember, CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode,
-};
+use super::common::{AnnotatingMember, ConnectBody, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
@@ -80,10 +78,9 @@ pub type PartDefBody = Body<PartDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// A dependency owned by this definition (BNF `DefinitionMember`).
     Dependency(Node<Dependency>),
@@ -341,7 +338,8 @@ pub enum AttributeBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     /// `occurrence ...` usage (§6 G27). `AttributeBody` is shared with `item def` / `item` usage
@@ -795,7 +793,8 @@ pub type PerformBody = Body<PerformBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PerformBodyElement {
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     InOut(Node<PerformInOutBinding>),
     /// `variant perform doX;` inside a `variation perform action ... { ... }` body (§6 G5).
     Variant(Node<VariantUsage>),
@@ -974,8 +973,8 @@ pub enum FeatureBodyElement {
     /// inside `:>> mRef = transformation.target { ... }` (Domain Libraries
     /// `VectorCalculations.sysml`).
     Binding(Box<Node<DefaultReferenceUsage>>),
-    /// Documentation inside a feature body.
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
 }
 
 // ---------------------------------------------------------------------------
@@ -1010,7 +1009,8 @@ pub enum PortDefBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     InOutDecl(Node<InOutDecl>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Error(Node<ParseErrorNode>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
@@ -1114,7 +1114,8 @@ pub enum PortBodyElement {
     Error(Node<ParseErrorNode>),
     InOutDecl(Node<InOutDecl>),
     PortUsage(Node<PortUsage>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     /// Attribute usage nested inside a port usage body (PAR-002 widening; this enum previously
     /// had no attribute/item coverage at all).
     AttributeUsage(Node<AttributeUsage>),
@@ -1161,7 +1162,8 @@ pub type InterfaceDefBody = Body<InterfaceDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceDefBodyElement {
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
@@ -1465,7 +1467,8 @@ pub enum ConnectionDefBodyElement {
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Error(Node<ParseErrorNode>),
     /// PAR-002 widening: this enum previously had no attribute/item/port coverage at all.
     AttributeDef(Node<AttributeDef>),
@@ -1649,7 +1652,8 @@ pub struct AssertConstraintMember {
 #[allow(clippy::large_enum_variant)]
 pub enum OccurrenceBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
     AssertConstraint(Node<AssertConstraintMember>),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
@@ -1731,7 +1735,11 @@ pub enum DefinitionBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// Every recognized member of this body, including the annotating ones. This scope shares
+    /// the occurrence-body member set rather than restating it, so it has no annotating variant
+    /// of its own: a `Doc` variant here had no construction site in the parser at all --
+    /// documentation in a flow, allocation or message body has always arrived as
+    /// `OccurrenceMember(OccurrenceBodyElement::Annotating(..))`.
     OccurrenceMember(Node<OccurrenceBodyElement>),
 }
 // ---------------------------------------------------------------------------
@@ -1822,7 +1830,8 @@ pub enum InterfaceUsageBodyElement {
         value: Node<Expression>,
         body: RefBody,
     },
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     /// GH-85: `end` member inside a typed, non-`connect` interface usage's body, e.g. `interface
     /// i: I { end port p3: P ::> p.p1; end port p4: ~P ::> p.p2; }` (`Simple Tests/
     /// ConjugationTest.sysml`), parallel to the already-supported `connection a: A { end port

@@ -445,7 +445,9 @@ fn metadata_annotation_brace_body_parses_shorthand_bindings() {
         PartDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
-                PartDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
+                PartDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(m)) => {
+                    Some(&m.value)
+                }
                 _ => None,
             })
             .expect("metadata annotation"),
@@ -509,7 +511,9 @@ fn metadata_annotation_about_clause_parses_targets() {
         PartDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
-                PartDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
+                PartDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(m)) => {
+                    Some(&m.value)
+                }
                 _ => None,
             })
             .expect("metadata annotation"),

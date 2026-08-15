@@ -57,7 +57,10 @@ fn has_occurrence_doc_member(elements: &[Node<DefinitionBodyElement>]) -> bool {
         matches!(
             &element.value,
             DefinitionBodyElement::OccurrenceMember(member)
-                if matches!(&member.value, OccurrenceBodyElement::Doc(_))
+                if matches!(
+                    &member.value,
+                    OccurrenceBodyElement::Annotating(AnnotatingMember::Doc(_))
+                )
         )
     })
 }

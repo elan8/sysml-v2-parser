@@ -189,15 +189,13 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
     let start = input;
     let (input, elem) = alt((
         alt((
-            map(doc_comment, PartDefBodyElement::Doc),
-            map(comment_annotation, PartDefBodyElement::Comment),
+            map(
+                crate::parser::body::annotating_member,
+                PartDefBodyElement::Annotating,
+            ),
             map(
                 crate::parser::metadata_annotation::metadata_keyword_usage,
                 PartDefBodyElement::MetadataKeywordUsage,
-            ),
-            map(
-                crate::parser::metadata_annotation::metadata_annotation,
-                PartDefBodyElement::MetadataAnnotation,
             ),
             map(annotation, PartDefBodyElement::Annotation),
             map(exhibit_state, PartDefBodyElement::ExhibitState),
