@@ -327,6 +327,11 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             map((tag(&b"action"[..]), ws1), |_| {
                 crate::ast::RefDeclKind::Action
             }),
+            // After the `use case` arm above, so `use case` is never read as a bare `case`.
+            map((tag(&b"case"[..]), ws1), |_| crate::ast::RefDeclKind::Case),
+            map((tag(&b"verification"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Verification
+            }),
         )),
     ))
     .parse(input)?;

@@ -573,6 +573,7 @@ fn walk_part_usage_body_elements(
             }
             PartUsageBodyElement::Connect(c) => walk_connect_body(report, &p, &c.value.body),
             PartUsageBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
+            PartUsageBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             PartUsageBodyElement::AttributeUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }

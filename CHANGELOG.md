@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two more members that had nowhere to go.** `RefDeclKind` gained `case` and `verification`
+  (`ref case self : Case :>> Calculation::self;`, `sysml.library/Systems Library/Cases.sysml`),
+  matched after the two-word `use case` keyword so that form still wins. Part usage bodies gained
+  the `InOutDecl` member that port and action bodies already had, so the keyword-less `in :>>
+  MessageTransfer::payload, MessageAction::payload;` inside a `ref` body
+  (`Actions.sysml`) is structured rather than an unexpected keyword. **AST version 144 -> 145.**
+
 - **The `in`/`out`/`inout` direction is part of the shared `RefPrefix`.** BNF
   `RefPrefix = FeatureDirection? 'derived'? ('abstract' | 'variation')? 'constant'?` puts the
   direction first, but it was parsed ad hoc by a few callers, so `in ref alternatives :

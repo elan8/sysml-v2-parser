@@ -2970,6 +2970,9 @@ macro_rules! ast_traversal {
                 PartUsageBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
                 }
+                PartUsageBodyElement::InOutDecl(field_0) => {
+                    visitor.visit_in_out_decl(field_0);
+                }
                 PartUsageBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(field_0);
                 }
@@ -3722,6 +3725,8 @@ macro_rules! ast_traversal {
                 RefDeclKind::Rendering => {}
                 RefDeclKind::View => {}
                 RefDeclKind::Action => {}
+                RefDeclKind::Case => {}
+                RefDeclKind::Verification => {}
             }
         }
 

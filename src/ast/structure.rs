@@ -595,6 +595,11 @@ pub enum AnnotationHead {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartUsageBodyElement {
     Error(Node<ParseErrorNode>),
+    /// Directed parameter declaration with no kind keyword, e.g. `in :>> MessageTransfer::payload,
+    /// MessageAction::payload;` inside a `ref` body (Systems Library `Actions.sysml`). Port and
+    /// action bodies already modelled this member; part usage bodies did not, so the same line
+    /// was an unexpected keyword here.
+    InOutDecl(Node<InOutDecl>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
@@ -1362,6 +1367,11 @@ pub enum RefDeclKind {
     View,
     /// `action` (`private ref action thisConnection = self;`, Systems Library `Flows.sysml`).
     Action,
+    /// `case` (`ref case self : Case :>> Calculation::self;`, Systems Library `Cases.sysml`).
+    Case,
+    /// `verification` (`ref verification self : VerificationCase :>> Case::self;`, Systems
+    /// Library `VerificationCases.sysml`).
+    Verification,
 }
 
 impl RefDeclKind {
@@ -1378,6 +1388,8 @@ impl RefDeclKind {
             Self::Rendering => "rendering",
             Self::View => "view",
             Self::Action => "action",
+            Self::Case => "case",
+            Self::Verification => "verification",
         }
     }
 }

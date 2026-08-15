@@ -1323,6 +1323,13 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                     crate::parser::body::annotating_member,
                     PartUsageBodyElement::Annotating,
                 ),
+                // `in :>> target;` and friends. `in_out_decl` rejects the kinded forms
+                // (`in item`, `in part`, `in occurrence`, ...) itself, so the arms below still
+                // see them.
+                map(
+                    crate::parser::action::in_out_decl,
+                    PartUsageBodyElement::InOutDecl,
+                ),
                 map(
                     crate::parser::metadata_annotation::metadata_keyword_usage,
                     PartUsageBodyElement::MetadataKeywordUsage,
