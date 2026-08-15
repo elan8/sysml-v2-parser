@@ -1,6 +1,6 @@
 # Factor shared grammatical concepts
 
-> **Status:** Phases 1-2 implemented; Phase 3 in progress; Phase 4 proposed
+> **Status:** Phases 1-3 implemented; Phase 4 proposed
 
 ## Purpose
 
@@ -169,7 +169,7 @@ makes such bodies representable, and adding it earlier would mean shipping unrea
 That recovery change is worth doing: an unterminated body currently loses every member it
 contained.
 
-### Phase 3: Extract low-risk shared member families
+### Phase 3: Extract low-risk shared member families — done
 
 Extract member categories that are already common grammar concepts and have compatible provenance
 and recovery behavior. Start with the narrowest, highest-confidence families:
@@ -206,9 +206,20 @@ if unsupported-member support becomes general.
 
 #### Follow-up work this audit surfaced
 
-- Annotating-member coverage gaps: 22 scopes accept less than the grammar allows. Each is a
-  conformance fix (parser dispatch plus the family variant), and each changes accepted language, so
-  they are separate reviewed changes rather than part of a representation refactor.
+- ~~Annotating-member coverage gaps: 22 scopes accept less than the grammar allows~~ — done.
+  `planning/annotating-member-matrix.md` re-derives the inventory from the pinned grammar: every
+  route into a body (`DefinitionMember`, `PackageMember`, `OwnedAnnotation`, `EnumerationBody`'s
+  named `AnnotatingMember`, KerML's `NonFeatureMember`) ends at the whole production, and no
+  production admits a proper subset. That resolves the open question below about a family being
+  more permissive than its scope: there is no scope to be more permissive than, so `AnnotatingMember`
+  is exact everywhere and needs neither scope parameterization nor scope-keyed deserialization.
+  All 28 body scopes now carry it, and the two that do not (`DefinitionBodyElement`,
+  `FirstMergeBodyElement`) reach it through the member set they already share. Auditing the
+  alternatives rather than the scopes also fixed two defects inside the production: a comment's
+  `about` clause was skipped with an unbounded substring scan that discarded the annotated elements
+  and consumed later siblings, and a `rep` in a KerML type body was shredded into four invented
+  members with no diagnostic. An `enum def` body recognised `doc` and `comment` only to throw them
+  away.
 - ~~`Other(String)` remains in 11 scopes~~ — done. Unrecognized content is a recovery node with an
   authored span and a report; a spec-valid member the scope does not model is an explicit
   `Unsupported` node with a warning. The two states exist only in the scopes that produce them, and
@@ -219,8 +230,10 @@ if unsupported-member support becomes general.
 - A `ref` in a state body only dispatches when it is typed: `ref b { ... }` reaches recovery while
   `ref b : Anything { ... }` parses. It is now reported rather than silently captured, but the
   dispatch gap itself remains.
-- Annotating coverage: the general usage-member scope now accepts the whole production. The
-  remaining scopes are one commit each, with all four members plus a `#Name` prefix test.
+- Adjacent dispatch gaps the annotating fixtures ran into, listed with their grammar evidence in
+  `planning/annotating-member-matrix.md`: an untyped `interface i { ... }` and a `rendering rr
+  { ... }` in a part usage body, a `first f { ... }` in a calculation body, and a `flow def` that
+  parses but cannot be emitted.
 
 Scope-specific enums opt into these families explicitly:
 
@@ -238,13 +251,20 @@ pub enum SomeBodyElement {
 ```
 
 A scope enum keeps a family out of scopes where the family does not belong, but it says nothing
-about which *members* of that family the scope permits. If one scope allows documentation and
-comments but not every metadata form, `Annotating(AnnotatingMember)` makes the type more
+about which *members* of that family the scope permits. If one scope allowed documentation and
+comments but not every metadata form, `Annotating(AnnotatingMember)` would make the type more
 permissive than the grammar, and a public enum plus derived deserialization widens the accepted
-AST contract even when the parser never constructs the illegal value. Resolve this when the family
-is defined, by one of: splitting into narrower grammar-specific families; parameterizing the family
-by scope; or making construction private and requiring deserialization validation that rejects
-members illegal in their scope. Do not defer it to downstream validation.
+AST contract even when the parser never constructs the illegal value. That had to be resolved when
+the family was defined, by one of: splitting into narrower grammar-specific families;
+parameterizing the family by scope; or making construction private and requiring deserialization
+validation that rejects members illegal in their scope. Deferring it to downstream validation was
+not an option.
+
+For this family the matrix resolved it by removing the premise. No production in either layer
+admits a proper subset of `AnnotatingElement`, so the family is exact in every scope that has one
+and none of the three mechanisms is warranted. A future grammar release that restricts one becomes
+a split at the family, not a wildcard at the consumers. A different family must answer the question
+again on its own evidence.
 
 Do not place all metadata or annotations into one family without checking their different grammar
 roles, ownership, and body forms. Likewise, a recovery wrapper must retain the stable diagnostic,
@@ -258,14 +278,21 @@ Deliverables:
 - exhaustive visitor, formatter, validator, serde, and snapshot support; and
 - deletion of superseded repeated variants and their duplicated handling.
 
-Completion criteria:
+Completion criteria, all met:
 
 - each scope accepts exactly the same member set as before, except for separately reviewed grammar
-  fixes;
-- recovery continues after malformed content without consuming valid later siblings;
+  fixes — the coverage commits are exactly those fixes, one per scope family, each with the pinned
+  production it closes;
+- recovery continues after malformed content without consuming valid later siblings — the `about`
+  scan was the one place that did not, and it is gone;
 - snapshots show shared members at their language-level role rather than exposing the Rust wrapper;
   and
 - no `Other(String)` or opaque fallback is introduced to make the family fit.
+
+What is deliberately not done here: recovery members remain unextracted, for the reason recorded in
+the audit above, and the `ConnectBody` marker bodies keep their gap because closing it needs the
+Phase-2 body container per owner rather than a variant swap. Both are recorded with grammar
+evidence in `planning/annotating-member-matrix.md`.
 
 ### Phase 4: Audit and factor broader grammar families
 

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Two more `examples/` files round-trip.** `Simple Tests/TextualRepresentationTest.sysml` and
+  `Metadata Examples/VerificationMetadataExample.sysml` are promoted into
+  `EXAMPLES_ROUNDTRIP_PASS`: the first needed a textual representation to be dispatched in action
+  and KerML type bodies at all, the second needed `@` metadata annotations to emit from the scopes
+  that own them and a comment to keep the elements its `about` clause names.
+
 - **A comment's `about` clause is parsed instead of scanned past.**
   `Comment = ( 'comment' Identification ( 'about' Annotation ( ',' Annotation )* )? )? …`, and the
   clause was skipped with `take_until("/*")` -- a raw substring search with no bound. It ran past

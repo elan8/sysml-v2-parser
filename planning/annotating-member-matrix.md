@@ -121,6 +121,22 @@ the parser. Documentation in that scope arrives as
 unreachable state in a public enum and a second representation of the same syntactic fact, so it
 is removed rather than migrated.
 
+## What the clause-level audit added
+
+Auditing the alternatives rather than only the scopes turned up two defects inside the production
+itself, both fixed with the coverage:
+
+- **`Comment`'s `about` clause was skipped, not parsed.** `Comment = ( 'comment' Identification
+  ( 'about' Annotation ( ',' Annotation )* )? )? ( 'locale' STRING_VALUE )? body`. The clause was
+  consumed by `take_until("/*")` — an unbounded substring search — so the annotated elements were
+  discarded, a `locale` written after them was discarded, and the scan ran past the member, past
+  its enclosing `}`, and through however many later declarations it took to find a block comment.
+  `CommentAnnotation::about_targets` now holds them as qualified references, in the same shape
+  `MetadataAnnotation` already used for the same clause.
+- **`TextualRepresentation` was not dispatched in KerML type bodies at all.** The fallback member
+  parser broke `rep x language "text" /* … */` into four invented members with no diagnostic, so
+  the document parsed clean and formatted back as something else.
+
 ## Confirmed remaining gaps
 
 These are annotating-member gaps the matrix found that this change does **not** close. Each is
@@ -143,3 +159,19 @@ recorded with the grammar evidence and the reason it is a different seam.
   through `relationship_body`. Annotating members are complete there — that is why the scope
   appears as row 1 rather than as a gap — but the non-annotating members of that body are missing.
   That is definition/usage body coverage, not this seam.
+
+## Adjacent gaps this audit ran into
+
+Not annotating-member gaps. They are recorded because writing the coverage fixtures found them,
+and each is a member-dispatch or emission gap of the same class as the already-recorded "`ref` in
+a state body only dispatches when it is typed".
+
+- An untyped `interface i { … }` in a part usage body reaches recovery; `interface i : I { … }`
+  parses. `InterfaceUsage` does not require the typing.
+- A `rendering rr { … }` member in a part usage body reaches recovery, though `render r { … }`
+  parses inside a view usage.
+- A `first f { … }` member in a calculation body reaches recovery.
+  `CalculationBodyItem = ActionBodyItem | ReturnParameterMember`, and `ActionBodyItem` includes
+  `InitialNodeMember`, so it is legal there.
+- A `flow def` parses in a part definition body and at package level, but the emitter reports it
+  as an unsupported construct in both, so such a document cannot be formatted.
