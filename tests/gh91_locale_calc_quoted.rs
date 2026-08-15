@@ -1,7 +1,7 @@
 //! GH-91: standalone `locale` package member and quoted `calc` usage name/type.
 //! Each test below uses the exact (trimmed) real source that motivated the fix.
 
-use sysml_v2_parser::ast::{PackageBody, PackageBodyElement, RootElement};
+use sysml_v2_parser::ast::{AnnotatingMember, PackageBody, PackageBodyElement, RootElement};
 use sysml_v2_parser::parse_with_diagnostics;
 
 fn package_elements(input: &str) -> Vec<PackageBodyElement> {
@@ -38,7 +38,7 @@ fn gh91_1_bare_locale_package_member() {
             locale "en_US" /* AAAA */
         }"#,
     );
-    let PackageBodyElement::Comment(c) = &elements[0] else {
+    let PackageBodyElement::Annotating(AnnotatingMember::Comment(c)) = &elements[0] else {
         panic!("expected Comment, got {:?}", elements[0]);
     };
     assert!(c.value.identification.is_none());
@@ -60,7 +60,7 @@ fn gh91_1_doc_locale_without_identification() {
             doc locale "en_US" /* Documentation about Package */
         }"#,
     );
-    let PackageBodyElement::Doc(d) = &elements[0] else {
+    let PackageBodyElement::Annotating(AnnotatingMember::Doc(d)) = &elements[0] else {
         panic!("expected Doc, got {:?}", elements[0]);
     };
     assert!(d.value.identification.is_none());

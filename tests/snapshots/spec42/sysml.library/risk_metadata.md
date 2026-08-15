@@ -132,6 +132,10 @@ standard library package RiskMetadata {
         }
     }
     enum def LevelEnum :> Level {
+        doc
+        /*
+		 * LevelEnum provides standard probability Levels for low, medium and high risks.
+		 */
         low;
         medium;
         high;
@@ -157,6 +161,11 @@ standard library package RiskMetadata {
         }
     }
     enum def RiskLevelEnum :> RiskLevel {
+        doc
+        /*
+		 * RiskLevelEnum enumerates standard RiskLevels for low, medium and high risks
+		 * (without including impact).
+		 */
         low;
         medium;
         high;
@@ -200,6 +209,6 @@ standard library package RiskMetadata {
   (references
     (reference r0 (scope relative) (span (offset 161) (line 7) (column 17) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 161) (line 7) (column 17) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 175) (line 7) (column 31) (len 4)))))
   )
-  (root (library-package (name "RiskMetadata") (standard true) (body brace (doc) (import (target (span (span (offset 161) (line 7) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (attribute-def) (enum-def) (attribute-def) (enum-def) (metadata-def))))
+  (root (library-package (name "RiskMetadata") (standard true) (body brace (doc) (import (target (span (span (offset 161) (line 7) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (attribute-def) (enum-def (name "LevelEnum") (body brace (doc) (enum-value (name "low") (span (offset 495) (line 24) (column 3) (len 3))) (enum-value (name "medium") (span (offset 509) (line 25) (column 3) (len 6))) (enum-value (name "high") (span (offset 526) (line 26) (column 3) (len 4))))) (attribute-def) (enum-def (name "RiskLevelEnum") (body brace (doc) (enum-value (name "low") (span (offset 1158) (line 59) (column 3) (len 3))) (enum-value (name "medium") (span (offset 1211) (line 60) (column 3) (len 6))) (enum-value (name "high") (span (offset 1270) (line 61) (column 3) (len 4))))) (metadata-def))))
 )
 ~~~

@@ -201,9 +201,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::MetadataKeywordUsage(m) => {
             walk_optional_attribute_body(report, path, &m.value.body)
         }
-        PackageBodyElement::MetadataAnnotation(m) => {
-            walk_attribute_body(report, path, &m.value.body)
-        }
+        PackageBodyElement::Annotating(member) => walk_annotating_member(report, path, member),
         PackageBodyElement::AssertConstraint(a) => {
             walk_constraint_def_body(report, path, &a.value.body)
         }
@@ -236,10 +234,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
                 walk_relationship_body_elements(report, path, elements);
             }
         }
-        PackageBodyElement::Doc(_)
-        | PackageBodyElement::Comment(_)
-        | PackageBodyElement::TextualRep(_)
-        | PackageBodyElement::Filter(_)
+        PackageBodyElement::Filter(_)
         | PackageBodyElement::Actor(_)
         | PackageBodyElement::EnumDef(_)
         | PackageBodyElement::DefaultReferenceUsage(_) => {}

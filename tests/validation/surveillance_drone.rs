@@ -1,7 +1,7 @@
 //! Parser tests for `tests/fixtures/SurveillanceDrone*.sysml`.
 
 use std::path::Path;
-use sysml_v2_parser::ast::{PackageBodyElement, PartDef, RootElement};
+use sysml_v2_parser::ast::{AnnotatingMember, PackageBodyElement, PartDef, RootElement};
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
 /// Path to the SurveillanceDrone fixture (project-local, not sysml-v2-release).
@@ -87,9 +87,12 @@ fn test_parse_surveillance_drone() {
     let has_satisfy = body
         .iter()
         .any(|e| matches!(&e.value, PackageBodyElement::Satisfy(_)));
-    let has_doc = body
-        .iter()
-        .any(|e| matches!(&e.value, PackageBodyElement::Doc(_)));
+    let has_doc = body.iter().any(|e| {
+        matches!(
+            &e.value,
+            PackageBodyElement::Annotating(AnnotatingMember::Doc(_))
+        )
+    });
 
     assert!(
         has_doc,

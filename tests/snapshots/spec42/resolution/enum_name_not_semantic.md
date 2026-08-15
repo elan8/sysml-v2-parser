@@ -49,6 +49,6 @@ package Demo {
   (references
     (reference r0 (scope relative) (span (offset 145) (line 7) (column 27) (len 15)) (segments (segment 0 (token "StatusNamedType") (name "StatusNamedType") (separator none) (span (offset 145) (line 7) (column 27) (len 15)))))
   )
-  (root (package (name "Demo") (body brace (enum-def) (part-def (name "StatusNamedType") (body semicolon)) (part-def (name "Base") (body brace (attribute-usage (declaration-name "value") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (part-def (name "Derived") (body semicolon)) (part-usage))))
+  (root (package (name "Demo") (body brace (enum-def (name "StateCode") (body brace (enum-value (name "approved") (span (offset 53) (line 3) (column 14) (len 8))))) (part-def (name "StatusNamedType") (body semicolon)) (part-def (name "Base") (body brace (attribute-usage (declaration-name "value") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (part-def (name "Derived") (body semicolon)) (part-usage))))
 )
 ~~~

@@ -1536,7 +1536,26 @@ pub struct EnumDef {
     pub membership: Membership,
 }
 
-pub type EnumerationBody = Body<EnumeratedValue>;
+pub type EnumerationBody = Body<EnumerationBodyElement>;
+
+/// A member of an `enum def { ... }` body.
+///
+/// `EnumerationBody` is the one production that names the membership directly --
+/// `';' | '{' ( ownedRelationship += AnnotatingMember | ownedRelationship += EnumerationUsageMember )* '}'`
+/// (SysML 8.2.2.8) -- so this scope's member set is the annotating production plus enumerated
+/// values, and nothing else.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum EnumerationBodyElement {
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
+    /// `EnumerationUsageMember`, one enumerated value.
+    Value(Node<EnumeratedValue>),
+    /// Malformed syntax retained by the structured recovery parser. This body had no recovery
+    /// representation at all: an unparseable member sent it to the closing brace, discarding
+    /// everything in between with no node and no diagnostic.
+    Error(Node<ParseErrorNode>),
+}
 
 /// One enumerated value inside an `enum def { ... }` body: optional `enum` keyword + name, with
 /// an optional inline body or `= expr` initializer that the parser discards (BNF

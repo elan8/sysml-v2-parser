@@ -1604,7 +1604,7 @@ pub(crate) fn emit_metadata_usage(
 
 pub(crate) fn emit_enum_def(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     def: &crate::ast::EnumDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
@@ -1624,9 +1624,19 @@ pub(crate) fn emit_enum_def(
             w.push_str(" {");
             w.newline();
             w.indent();
-            for v in values {
-                w.push_str(&format_name(&v.value.name));
-                w.push_char(';');
+            for element in values {
+                match &element.value {
+                    crate::ast::EnumerationBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
+                    crate::ast::EnumerationBodyElement::Value(value) => {
+                        w.push_str(&format_name(&value.value.name));
+                        w.push_char(';');
+                    }
+                    crate::ast::EnumerationBodyElement::Error(error) => {
+                        w.push_recovery_span(path, &error.span)?;
+                    }
+                }
                 w.newline();
             }
             w.dedent();

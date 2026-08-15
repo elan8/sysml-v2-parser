@@ -2,7 +2,9 @@
 //! See plan: fix_surveillancedrone_test — step 1.
 
 use std::path::Path;
-use sysml_v2_parser::ast::{ImportShape, PackageBody, PackageBodyElement, RootElement};
+use sysml_v2_parser::ast::{
+    AnnotatingMember, ImportShape, PackageBody, PackageBodyElement, RootElement,
+};
 use sysml_v2_parser::parse;
 
 /// Parses "package SurveillanceDrone { attribute def Real; }" (no doc/comment before first element).
@@ -62,7 +64,7 @@ fn test_parse_package_with_doc_and_line_comment() {
     );
     // First element is doc comment, second is attribute def Real
     match &body[0].value {
-        PackageBodyElement::Doc(_) => {}
+        PackageBodyElement::Annotating(AnnotatingMember::Doc(_)) => {}
         other => panic!("expected first element Doc, got {:?}", other),
     }
     let attr = body

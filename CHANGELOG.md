@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **An `enum def` body keeps its annotating members instead of silently dropping them.**
+  `EnumerationBody` is the one production that names the membership directly -- `';' | '{'
+  ( ownedRelationship += AnnotatingMember | ownedRelationship += EnumerationUsageMember )* '}'` --
+  and the body parser recognised `doc` and `comment` only to discard them: no node, no span, no
+  diagnostic. `rep` and `@` were not recognised at all, and on any member it could not parse it
+  ran to the closing brace and dropped everything in between, still with no diagnostic. A body
+  with four annotating members and three values parsed clean and kept two values. It now goes
+  through the shared brace-member routine, so annotating members are retained in authored order
+  beside the values and a malformed member becomes an `Error` node with an exact span that later
+  values survive. Documentation reappears in the checked-in library fixtures that had it --
+  `RiskMetadata`, `15.10-Primitive Data Types`, `documentation_in_bodies`. `EnumerationBody` is
+  now `Body<EnumerationBodyElement>` rather than `Body<EnumeratedValue>`, and the semantic
+  projection names each member instead of the definition as a whole. **AST version 156 -> 157.**
+
+- **Package bodies use the shared annotating family.** No new syntax -- this scope already
+  accepted all four -- but its four variants collapse into `Annotating(AnnotatingMember)`, so the
+  emitter, the projection and the traversal reach the production through one path here too. The
+  per-production FIRST-set guards are kept: each alternative still dispatches under its own
+  `PackageProduction` tag, so scope drift is still detected per alternative.
+
 - **Requirement, case, constraint, calculation, view and rendering bodies accept the whole
   annotating production, and a KerML type body stops shredding a `rep`.** `RequirementBodyItem`
   extends `DefinitionBodyItem`, `CaseBodyItem` and `CalculationBodyItem` extend `ActionBodyItem`,

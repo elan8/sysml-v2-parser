@@ -58,6 +58,8 @@ package DocTests {
         /* Named documentation. */
     }
     enum def Color {
+        doc
+        /* Enum def documentation. */
         red;
     }
     part vehicle : Vehicle {
@@ -80,6 +82,6 @@ package DocTests {
   (references
     (reference r0 (scope relative) (span (offset 552) (line 26) (column 19) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 552) (line 26) (column 19) (len 7)))))
   )
-  (root (package (name "DocTests") (body brace (doc) (part-def (name "Vehicle") (body brace (doc) (attribute-usage (declaration-name "speed") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-def) (enum-def) (part-usage) (item-def) (alias (name "Car") (target (ref r0)) (body brace (element-count 1))))))
+  (root (package (name "DocTests") (body brace (doc) (part-def (name "Vehicle") (body brace (doc) (attribute-usage (declaration-name "speed") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-def) (enum-def (name "Color") (body brace (doc) (enum-value (name "red") (span (offset 316) (line 15) (column 14) (len 3))))) (part-usage) (item-def) (alias (name "Car") (target (ref r0)) (body brace (element-count 1))))))
 )
 ~~~

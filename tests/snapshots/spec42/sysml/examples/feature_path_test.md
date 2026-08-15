@@ -97,6 +97,6 @@ package Q {
 (parsed-document
   (references
   )
-  (root (package (name "Q") (body brace (part-def (name "F") (body brace (part-usage))) (part-usage) (part-def (name "A") (body brace (part-usage))) (part-def (name "B") (body brace (part-usage) (part-usage))) (part-def (name "C") (body brace (part-usage) (part-usage) (flow-usage))) (part-usage) (enum-def) (part-usage))))
+  (root (package (name "Q") (body brace (part-def (name "F") (body brace (part-usage))) (part-usage) (part-def (name "A") (body brace (part-usage))) (part-def (name "B") (body brace (part-usage) (part-usage))) (part-def (name "C") (body brace (part-usage) (part-usage) (flow-usage))) (part-usage) (enum-def (name "E") (body brace (enum-value (name "e1") (span (offset 440) (line 37) (column 9) (len 2))) (enum-value (name "e2") (span (offset 452) (line 38) (column 9) (len 2))))) (part-usage))))
 )
 ~~~

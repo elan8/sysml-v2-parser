@@ -7,7 +7,7 @@
 //! a single comment named `doc`, and the doc member disappeared with no diagnostic on a strict
 //! parse. These tests pin the boundary.
 
-use sysml_v2_parser::ast::{PackageBodyElement, RootElement};
+use sysml_v2_parser::ast::{AnnotatingMember, PackageBodyElement, RootElement};
 use sysml_v2_parser::{parse, parse_for_editor};
 
 fn package_members(source: &str) -> Vec<PackageBodyElement> {
@@ -27,9 +27,9 @@ fn kinds(members: &[PackageBodyElement]) -> Vec<&'static str> {
     members
         .iter()
         .map(|member| match member {
-            PackageBodyElement::Doc(_) => "doc",
-            PackageBodyElement::Comment(_) => "comment",
-            PackageBodyElement::TextualRep(_) => "rep",
+            PackageBodyElement::Annotating(AnnotatingMember::Doc(_)) => "doc",
+            PackageBodyElement::Annotating(AnnotatingMember::Comment(_)) => "comment",
+            PackageBodyElement::Annotating(AnnotatingMember::TextualRep(_)) => "rep",
             other => panic!("expected an annotating member, got {other:?}"),
         })
         .collect()
@@ -65,7 +65,9 @@ fn an_anonymous_comment_keeps_its_own_text() {
     let texts: Vec<String> = members
         .iter()
         .map(|member| match member {
-            PackageBodyElement::Comment(comment) => comment.value.text.trim().to_owned(),
+            PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) => {
+                comment.value.text.trim().to_owned()
+            }
             other => panic!("expected a comment, got {other:?}"),
         })
         .collect();
@@ -76,7 +78,7 @@ fn an_anonymous_comment_keeps_its_own_text() {
 #[test]
 fn the_optional_clauses_still_parse() {
     let named = package_members(&body("  comment named /* text */\n"));
-    let PackageBodyElement::Comment(comment) = &named[0] else {
+    let PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) = &named[0] else {
         panic!("expected a comment");
     };
     assert_eq!(
@@ -89,7 +91,7 @@ fn the_optional_clauses_still_parse() {
     );
 
     let localized = package_members(&body("  comment locale \"en_US\" /* text */\n"));
-    let PackageBodyElement::Comment(comment) = &localized[0] else {
+    let PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) = &localized[0] else {
         panic!("expected a comment");
     };
     assert_eq!(comment.value.locale.as_deref(), Some("en_US"));
@@ -100,7 +102,7 @@ fn the_optional_clauses_still_parse() {
 
     // `about` names annotated elements, not the comment, so it must not become an identification.
     let about = package_members(&body("  comment about a /* text */\n"));
-    let PackageBodyElement::Comment(comment) = &about[0] else {
+    let PackageBodyElement::Annotating(AnnotatingMember::Comment(comment)) = &about[0] else {
         panic!("expected a comment");
     };
     assert!(

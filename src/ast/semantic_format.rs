@@ -2464,6 +2464,48 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_enumeration_definition(&mut self, definition: &super::EnumDef) -> io::Result<()> {
+        self.writer.write_str("(enum-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") ")?;
+        self.write_enumeration_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// `EnumerationBody` is the one production that names `AnnotatingMember` directly, so its
+    /// members are projected rather than counted: this scope discarded annotating members
+    /// entirely, and a count alone could not show that they are retained in authored order
+    /// between the values.
+    fn write_enumeration_body(&mut self, body: &super::EnumerationBody) -> io::Result<()> {
+        match body {
+            super::EnumerationBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::EnumerationBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::EnumerationBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::EnumerationBodyElement::Value(value) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(enum-value (name ")?;
+                            write_quoted(self.writer, &value.value.name)?;
+                            self.writer.write_str(") ")?;
+                            write_span(self.writer, &value.span)?;
+                            self.writer.write_char(')')?;
+                        }
+                        super::EnumerationBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
     fn write_part_definition(&mut self, definition: &super::PartDef) -> io::Result<()> {
         self.writer.write_str("(part-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
@@ -2706,16 +2748,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_unsupported(&unsupported.value, &element.span)
             }
-            PackageBodyElement::Doc(_doc) => self.write_marker(first, "doc"),
-            // The keyword and locale are grammatical facts, not formatting: a comment member
-            // emitted without its authored keyword becomes a bare block comment, which reparses
-            // as trivia and vanishes. A bare marker could not tell the spellings apart.
-            PackageBodyElement::Comment(comment) => {
+            PackageBodyElement::Annotating(member) => {
                 self.write_item_prefix(first)?;
-                self.write_comment_annotation(&comment.value)
-            }
-            PackageBodyElement::TextualRep(_text) => {
-                self.write_marker(first, "textual-representation")
+                self.write_annotating_member(member)
             }
             PackageBodyElement::Filter(_filter) => self.write_marker(first, "filter"),
             PackageBodyElement::Package(package) => {
@@ -2811,7 +2846,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_marker(first, "metadata-def")
             }
             PackageBodyElement::MetadataUsage(_usage) => self.write_marker(first, "metadata-usage"),
-            PackageBodyElement::EnumDef(_definition) => self.write_marker(first, "enum-def"),
+            PackageBodyElement::EnumDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_enumeration_definition(&definition.value)
+            }
             PackageBodyElement::OccurrenceDef(_definition) => {
                 self.write_marker(first, "occurrence-def")
             }
@@ -2982,9 +3020,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ExtendedDefinition(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_extended_definition(&definition.value)
-            }
-            PackageBodyElement::MetadataAnnotation(_annotation) => {
-                self.write_marker(first, "metadata-annotation")
             }
             PackageBodyElement::Connect(connect) => {
                 self.write_item_prefix(first)?;

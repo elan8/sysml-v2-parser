@@ -269,9 +269,7 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::Unsupported(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }
-        PackageBodyElement::Doc(d) => emit_doc(w, &d.value),
-        PackageBodyElement::Comment(c) => emit_comment(w, &c.value),
-        PackageBodyElement::TextualRep(t) => emit_textual_rep(w, &t.value),
+        PackageBodyElement::Annotating(member) => emit_annotating_member(w, path, member),
         PackageBodyElement::Filter(f) => emit_filter(w, &f.value),
         PackageBodyElement::Package(p) => emit_package(w, path, &p.value),
         PackageBodyElement::LibraryPackage(p) => emit_library_package(w, path, &p.value),
@@ -348,9 +346,6 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::RenderingUsage(r) => view::emit_rendering_usage(w, path, &r.value),
         PackageBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
-        }
-        PackageBodyElement::MetadataAnnotation(m) => {
-            structure::emit_metadata_annotation(w, path, &m.value)
         }
         PackageBodyElement::Ref(r) => structure::emit_ref_decl(w, path, &r.value),
         PackageBodyElement::DefaultReferenceUsage(d) => {

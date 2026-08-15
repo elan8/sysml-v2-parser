@@ -582,6 +582,11 @@ macro_rules! ast_traversal {
                 walk_enumerated_value(self, node)
             }
 
+            /// Visits [`EnumerationBodyElement`]; the default implementation walks its children.
+            fn visit_enumeration_body_element(&mut self, node: &$($mutability)? Node<EnumerationBodyElement>) {
+                walk_enumeration_body_element(self, node)
+            }
+
             /// Visits [`OccurrenceDef`]; the default implementation walks its children.
             fn visit_occurrence_def(&mut self, node: &$($mutability)? Node<OccurrenceDef>) {
                 walk_occurrence_def(self, node)
@@ -2095,14 +2100,8 @@ macro_rules! ast_traversal {
                 PackageBodyElement::Unsupported(field_0) => {
                     visitor.visit_unsupported_grammar_node(field_0);
                 }
-                PackageBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
-                }
-                PackageBodyElement::Comment(field_0) => {
-                    visitor.visit_comment_annotation(field_0);
-                }
-                PackageBodyElement::TextualRep(field_0) => {
-                    visitor.visit_textual_representation(field_0);
+                PackageBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 PackageBodyElement::Filter(field_0) => {
                     visitor.visit_filter_member(field_0);
@@ -2307,9 +2306,6 @@ macro_rules! ast_traversal {
                 }
                 PackageBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
-                }
-                PackageBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 PackageBodyElement::Connect(field_0) => {
                     visitor.visit_connect(field_0);
@@ -3931,14 +3927,32 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                EnumerationBody::Brace { open_span, elements: values, close_span } => {
+                EnumerationBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
                     visitor.visit_span(open_span);
-                    for inner in values {
-                        visitor.visit_enumerated_value(inner);
+                    for inner in elements {
+                        visitor.visit_enumeration_body_element(inner);
                     }
                     visitor.visit_span(close_span);
                 }
             }
+        }
+
+        pub fn walk_enumeration_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumerationBodyElement>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            match &$($mutability)? node.value {
+                EnumerationBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
+                }
+                EnumerationBodyElement::Value(field_0) => {
+                    visitor.visit_enumerated_value(field_0);
+                }
+                EnumerationBodyElement::Error(field_0) => {
+                    visitor.visit_parse_error_node(field_0);
+                }
+            }
+            visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_enumerated_value<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumeratedValue>) {

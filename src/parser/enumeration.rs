@@ -1,12 +1,15 @@
 //! Enumeration definition parsing (BNF EnumerationDefinition).
 
-use crate::ast::{EnumDef, EnumeratedValue, EnumerationBody, EnumerationUsage, Membership, Node};
+use crate::ast::{
+    EnumDef, EnumeratedValue, EnumerationBody, EnumerationBodyElement, EnumerationUsage,
+    Membership, Node,
+};
 use crate::parser::attribute::attribute_body;
-use crate::parser::body::advance_to_closing_brace;
+use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
+use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{name, take_until_terminator, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::requirement::{comment_annotation, doc_comment};
 use crate::parser::usage::{feature_usage_header, multiplicity_node};
 use crate::parser::Input;
 use nom::bytes::complete::tag;
@@ -44,65 +47,58 @@ fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue
     }
 }
 
+/// `EnumerationBody : EnumerationDefinition = ';' | '{' ( ownedRelationship += AnnotatingMember |
+/// ownedRelationship += EnumerationUsageMember )* '}'` (SysML 8.2.2.8).
+///
+/// This body used to run its own brace loop, which recognized `doc` and `comment` only to drop
+/// them -- no node, no span, no diagnostic -- accepted neither of the production's other two
+/// alternatives, and on any unparseable member ran to the closing brace discarding everything in
+/// between. It now goes through the shared brace-member routine like every other scope, so a
+/// malformed member becomes an `Error` node at its authored position and the values after it
+/// still parse.
 fn enumeration_body(input: Input<'_>) -> IResult<Input<'_>, EnumerationBody> {
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
-        let semicolon_start = input;
-        let (input, _) = tag(&b";"[..]).parse(semicolon_start)?;
-        return Ok((
-            input,
-            EnumerationBody::Semicolon {
-                semicolon_span: crate::parser::span::span_from_to(semicolon_start, input),
-            },
-        ));
+        return crate::parser::body::semicolon_body(input);
     }
-    let open_start = input;
-    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
-    let open_span = crate::parser::span::span_from_to(open_start, input);
-    let mut values = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (close_start, _) = ws_and_comments(input)?;
-            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
-            return Ok((
-                input,
-                EnumerationBody::Brace {
-                    open_span,
-                    elements: values,
-                    close_span: crate::parser::span::span_from_to(close_start, input),
-                },
-            ));
-        }
-        if let Ok((next, _)) = doc_comment(input) {
-            input = next;
-            continue;
-        }
-        if let Ok((next, _)) = comment_annotation(input) {
-            input = next;
-            continue;
-        }
-        match enumerated_value(input) {
-            Ok((next, value)) => {
-                values.push(value);
-                input = next;
-            }
-            Err(_) => {
-                let (closing, _) = advance_to_closing_brace(input)?;
-                let (close_start, _) = ws_and_comments(closing)?;
-                let (input, _) = tag(&b"}"[..]).parse(close_start)?;
-                return Ok((
-                    input,
-                    EnumerationBody::Brace {
-                        open_span,
-                        elements: values,
-                        close_span: crate::parser::span::span_from_to(close_start, input),
-                    },
-                ));
-            }
-        }
-    }
+    let (input, members) = parse_structured_brace_members(
+        input,
+        ENUMERATION_BODY_STARTERS,
+        "enumeration body",
+        "recovered_enumeration_body_element",
+        enumeration_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                ENUMERATION_BODY_STARTERS,
+                "enumeration body",
+                "recovered_enumeration_body_element",
+            );
+            node_from_to(
+                start,
+                end,
+                EnumerationBodyElement::Error(node_from_to(start, end, recovery)),
+            )
+        },
+    )?;
+    Ok((input, members.into_body()))
+}
+
+const ENUMERATION_BODY_STARTERS: &[&[u8]] = &[b"enum", b"doc", b"comment", b"rep", b"language"];
+
+fn enumeration_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<EnumerationBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, element) = nom::branch::alt((
+        nom::combinator::map(
+            crate::parser::body::annotating_member,
+            EnumerationBodyElement::Annotating,
+        ),
+        nom::combinator::map(enumerated_value, EnumerationBodyElement::Value),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, element)))
 }
 
 /// Enumeration definition: `enum def` Identification EnumerationBody.
@@ -276,7 +272,13 @@ mod enumerated_value_tests {
         else {
             panic!("expected brace body");
         };
-        let names: Vec<_> = values.iter().map(|v| v.value.name.as_str()).collect();
+        let names: Vec<_> = values
+            .iter()
+            .map(|element| match &element.value {
+                EnumerationBodyElement::Value(value) => value.value.name.as_str(),
+                other => panic!("expected an enumerated value, got {other:?}"),
+            })
+            .collect();
         assert_eq!(names, ["active", "inactive", "degraded"]);
     }
 }
