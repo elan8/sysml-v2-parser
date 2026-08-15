@@ -1728,8 +1728,14 @@ pub(crate) fn emit_connection_def(
     if def.is_individual {
         w.push_str("individual ");
     }
-    w.push_str("connection def ");
-    emit_identification(w, &def.identification);
+    // The trailing space belongs to the identification, not the keyword: an anonymous
+    // `#derivation connection { ... }` has none, and writing it unconditionally produced
+    // `connection def  {` with a doubled space.
+    w.push_str("connection def");
+    if def.identification.short_name.is_some() || def.identification.name.is_some() {
+        w.push_char(' ');
+        emit_identification(w, &def.identification);
+    }
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
     }

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An anonymous connection definition no longer emits a doubled space.** The trailing space was
+  written with the `connection def` keyword rather than with the identification, so
+  `#derivation connection { ... }` formatted as `#derivation connection def  {`.
+
 - **Two adjacent comment members no longer fuse into one.** A comment's optional `locale`
   lookahead skipped block comments as trivia, so it walked past the member's own body and found
   the *next* member's `locale`: `comment named /* two */` followed by `locale "en_US" /* three */`

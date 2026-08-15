@@ -27,7 +27,7 @@ package DerivationCoverage {
 package DerivationCoverage {
     requirement def ParentRequirement;
     requirement def ChildRequirement;
-    #derivation connection def  {
+    #derivation connection def {
         end #original ::> ParentRequirement;
         end #derive ::> ChildRequirement;
     }

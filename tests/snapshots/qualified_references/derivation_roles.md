@@ -28,7 +28,7 @@ package DerivationExample {
 package DerivationExample {
     requirement def OriginalReq;
     requirement def DerivedReq;
-    #derivation connection def  {
+    #derivation connection def {
         end #original ::> Requirements::OriginalReq;
         end #derive ::> Requirements::DerivedReq;
     }
