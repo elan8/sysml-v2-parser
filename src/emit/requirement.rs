@@ -332,11 +332,14 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
         w.push_str(" : ");
         w.push_qualified_reference("subject/type", type_name)?;
     }
-    if let Some(redefines) = &subject.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
-    }
+    // Multiplicity before the subsetting clause: it binds to the declared feature, and emitting
+    // it after the target produced `:>> RequirementCheck::subj[1]`, which reparses as a
+    // multiplicity on the *target*.
     if let Some(mult) = &subject.multiplicity {
         emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(redefines) = &subject.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
     }
     if let Some(value) = &subject.value {
         super::expr::emit_feature_value(w, value)?;

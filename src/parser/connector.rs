@@ -227,6 +227,32 @@ pub(crate) fn end_decl(
         ));
     }
 
+    // A bare `end ref source;` (Systems Library `Ports.sysml`) declares the end by name only --
+    // no typing, no reference subsetting, no nested usage. Every branch above and below requires
+    // one of those, so the member had no path at all.
+    {
+        let (after_ws, _) = ws_and_comments(input)?;
+        if after_ws.fragment().starts_with(b";") {
+            let (rest, _) = tag(&b";"[..]).parse(after_ws)?;
+            return Ok((
+                rest,
+                node_from_to(
+                    start,
+                    rest,
+                    EndDecl {
+                        identity,
+                        typing: None,
+                        references: None,
+                        multiplicity: leading_multiplicity,
+                        redefines: None,
+                        crosses: None,
+                        nested_usage: None,
+                        type_ref_span: None,
+                    },
+                ),
+            ));
+        }
+    }
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, (tilde, (type_ref_span, type_reference))) = preceded(
         ws_and_comments,

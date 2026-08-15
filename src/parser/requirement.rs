@@ -498,13 +498,16 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
         preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
+    // Multiplicity binds to the type and so is written before a trailing `:>>`:
+    // `subject subj : View[1] :>> RequirementCheck::subj;` (Systems Library `Views.sysml`).
+    // Parsing the redefinition first left the `[1]` in front of it and the whole member failed.
+    let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, trailing_redefines) = if leading_redefines.is_none() {
         opt(crate::parser::usage::redefinition).parse(input)?
     } else {
         (input, None)
     };
     let redefines = leading_redefines.or(trailing_redefines);
-    let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     // `= expr`, `default expr`, and `default = expr` all land on the shared `FeatureValue`
     // clause (`subject generateTorque default engine1.generateTorque;`, OMG spec Annex A).
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;

@@ -581,6 +581,9 @@ pub(crate) fn emit_view_def(
     def: &crate::ast::ViewDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    if def.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str("view def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -606,6 +609,12 @@ pub(crate) fn emit_view_def(
                     crate::ast::ViewDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                     crate::ast::ViewDefBodyElement::RefDecl(r) => {
                         crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
+                    crate::ast::ViewDefBodyElement::ViewpointUsage(v) => {
+                        emit_viewpoint_usage(w, path, &v.value)?
+                    }
+                    crate::ast::ViewDefBodyElement::Satisfy(s) => {
+                        crate::emit::requirement::emit_satisfy(w, path, &s.value)?
                     }
                     crate::ast::ViewDefBodyElement::MetadataAnnotation(m) => {
                         super::structure::emit_metadata_annotation(w, path, &m.value)?;
@@ -824,6 +833,9 @@ pub(crate) fn emit_rendering_def(
     def: &crate::ast::RenderingDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    if def.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str("rendering def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {

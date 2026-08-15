@@ -1173,6 +1173,7 @@ fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody
                 walk_rendering_usage_body(report, &p, &n.value.body)
             }
             ViewDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
+            ViewDefBodyElement::ViewpointUsage(_) | ViewDefBodyElement::Satisfy(_) => {}
             ViewDefBodyElement::Doc(_) | ViewDefBodyElement::Filter(_) => {}
         }
     }

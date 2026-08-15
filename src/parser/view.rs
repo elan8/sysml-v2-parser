@@ -41,6 +41,11 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
         ),
         map(view_filter_member, ViewDefBodyElement::Filter),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
+        map(viewpoint_usage, ViewDefBodyElement::ViewpointUsage),
+        map(
+            crate::parser::requirement::satisfy,
+            ViewDefBodyElement::Satisfy,
+        ),
         map(
             |i| {
                 crate::parser::recovery::unsupported_member(
@@ -209,6 +214,7 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
             input,
             ViewDef {
                 identification: prefix.identification,
+                is_abstract: prefix.is_abstract,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
@@ -325,6 +331,7 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
             input,
             RenderingDef {
                 identification: prefix.identification,
+                is_abstract: prefix.is_abstract,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),

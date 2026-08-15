@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **View definition bodies accept viewpoint usages and `satisfy requirement ... by ...`.** Both
+  are parsed by the same productions package and part bodies already dispatch; this scope had no
+  arm for them (`sysml.library/Systems Library/Views.sysml`).
+- **`abstract view def` and `abstract rendering def` keep the keyword.** `ViewDef` and
+  `RenderingDef` had no `is_abstract` field, so the definition prefix parser produced the flag
+  and emission dropped it. **AST version 147 -> 148.**
+- **A subject declaration accepts a multiplicity before a trailing `:>>`.** `subject subj :
+  View[1] :>> RequirementCheck::subj;` (`Views.sysml`) failed because the redefinition was
+  parsed first and the `[1]` blocked it. Emission also placed the multiplicity after the
+  redefinition target, where it would reparse as the *target's* multiplicity; it now precedes
+  the clause, as authored.
+- **A connection end may be declared by name alone.** `end ref source;` (`Ports.sysml`) has no
+  typing, reference subsetting or nested usage, and every branch of `end_decl` required one of
+  those.
+
 - **Nested case usages are members of case-family bodies, and keep their declaration tail.**
   `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }` (`sysml.library/Systems
   Library/Cases.sysml:56`) and its `use case` / `verification` siblings had no member arm in these

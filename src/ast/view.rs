@@ -225,6 +225,10 @@ impl ReturnKindKeyword {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewDef {
     pub identification: Identification,
+    /// `abstract` keyword, e.g. `abstract view def View :> Part { ... }` (Systems Library
+    /// `Views.sysml`). The definition prefix parser has always produced it; this struct had
+    /// nowhere to put it, so emission dropped the keyword.
+    pub is_abstract: bool,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ViewDefBody,
     pub membership: Membership,
@@ -252,6 +256,13 @@ pub enum ViewDefBodyElement {
     /// `abstract ref rendering subrenderings : Rendering[0..*] :> renderings;` (Systems Library
     /// `Views.sysml`). This scope accepted no `ref` member at all.
     RefDecl(Node<crate::ast::RefDecl>),
+    /// Nested viewpoint usage, e.g. `viewpoint viewpointSatisfactions : ViewpointCheck[0..*] :>
+    /// ...;` (Systems Library `Views.sysml`). Parsed by the same `viewpoint_usage` that package
+    /// and part bodies already dispatch.
+    ViewpointUsage(Node<ViewpointUsage>),
+    /// `satisfy requirement X by Y;`, e.g. `satisfy requirement viewpointConformance by
+    /// this;` (`Views.sysml`). The same `Satisfy` node part bodies already accept.
+    Satisfy(Node<crate::ast::Satisfy>),
 }
 
 /// View rendering usage: `render` name `:` type (`;` or body).
@@ -302,6 +313,10 @@ pub struct ViewpointDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderingDef {
     pub identification: Identification,
+    /// `abstract` keyword, e.g. `abstract view def View :> Part { ... }` (Systems Library
+    /// `Views.sysml`). The definition prefix parser has always produced it; this struct had
+    /// nowhere to put it, so emission dropped the keyword.
+    pub is_abstract: bool,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RenderingDefBody,
     pub membership: Membership,

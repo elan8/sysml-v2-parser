@@ -6463,8 +6463,9 @@ macro_rules! ast_traversal {
         pub fn walk_view_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewDef { identification, specializes, body, membership } = &$($mutability)? node.value;
+            let ViewDef { identification, is_abstract, specializes, body, membership } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
+            let _ = is_abstract;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
@@ -6505,6 +6506,12 @@ macro_rules! ast_traversal {
                 }
                 ViewDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
+                }
+                ViewDefBodyElement::ViewpointUsage(field_0) => {
+                    visitor.visit_viewpoint_usage(field_0);
+                }
+                ViewDefBodyElement::Satisfy(field_0) => {
+                    visitor.visit_satisfy(field_0);
                 }
                 ViewDefBodyElement::MetadataAnnotation(field_0) => {
                     visitor.visit_metadata_annotation(field_0);
@@ -6585,8 +6592,9 @@ macro_rules! ast_traversal {
         pub fn walk_rendering_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RenderingDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RenderingDef { identification, specializes, body, membership } = &$($mutability)? node.value;
+            let RenderingDef { identification, is_abstract, specializes, body, membership } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
+            let _ = is_abstract;
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
             }
