@@ -187,6 +187,15 @@ pub(crate) fn constraint_def_body_element(
             |n| ConstraintDefBodyElement::AttributeUsage(Box::new(n)),
         )
         .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"require")
+        || starts_with_keyword(input.fragment(), b"assume")
+    {
+        // Ahead of the terminal `expression` arm below, which would otherwise read `require v`
+        // as an expression and leave a brace body unaccounted for.
+        map(crate::parser::requirement::require_constraint, |n| {
+            ConstraintDefBodyElement::RequireConstraint(Box::new(n))
+        })
+        .parse(input)?
     } else if let Ok((rest, binding)) = calc_named_binding(input) {
         // A constraint definition body is a `DefinitionBody`, so a keyword-less feature
         // declaration (`mass : Real;`) is a member of it, not an expression statement.
@@ -206,10 +215,12 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    // `abstract calc subcalculations: Calculation :> calculations, subactions { ... }` (Systems
-    // Library `Calculations.sysml`); accepted and discarded, matching `RefDecl`'s "don't model
-    // every shorthand" scope for feature modifiers.
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // `BasicUsagePrefix`'s `RefPrefix`: the direction (`in calc eval : EvaluationFunction { ... }`,
+    // `sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:61`) and `abstract` (`abstract
+    // calc subcalculations: Calculation :> calculations, subactions { ... }`, Systems Library
+    // `Calculations.sysml`) are slots of one production. `CalcUsage::direction` existed but was
+    // never populated, and `abstract` was consumed and dropped.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (identification, redefines)) = if input.fragment().starts_with(b":>>") {
@@ -249,11 +260,10 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
         (input, redefines)
     };
     // `:>` subsets, independent of `:>>` redefines, e.g. `abstract calc subcalculations:
-    // Calculation :> calculations, subactions { ... }` (Systems Library `Calculations.sysml`);
-    // accepted and discarded -- `CalcUsage` doesn't model subsetting separately from redefines,
-    // matching `RefDecl`'s "don't model every shorthand" scope for feature modifiers.
-    let (input, _) =
-        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    // Calculation :> calculations, subactions { ... }` (Systems Library `Calculations.sysml`).
+    let (input, subsets) = opt(preceded(ws_and_comments, crate::parser::usage::subsetting))
+        .parse(input)
+        .map(|(input, clause)| (input, clause.map(|(relationship, _value)| relationship)))?;
     let (input, value) = opt(preceded(
         ws_and_comments,
         crate::parser::feature_value::feature_value_part,
@@ -267,10 +277,12 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
             input,
             CalcUsage {
                 identification,
+                is_abstract: prefix.usage_prefix == Some(crate::ast::DefinitionPrefix::Abstract),
                 type_name,
+                subsets,
                 redefines,
                 value,
-                direction: None,
+                direction: prefix.direction,
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },

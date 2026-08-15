@@ -25,6 +25,26 @@ impl Span {
         }
     }
 
+    /// The smallest span containing both `self` and `other`, including any source between them.
+    ///
+    /// Used where one AST fact is written as several separate source fragments -- a
+    /// subsetting-family clause repeated in one usage header, for instance -- so the merged fact
+    /// still points at every byte the author wrote for it rather than at the first fragment only.
+    pub fn covering(&self, other: &Self) -> Self {
+        let (first, second) = if self.offset <= other.offset {
+            (self, other)
+        } else {
+            (other, self)
+        };
+        let end = second.offset.saturating_add(second.len);
+        Self {
+            offset: first.offset,
+            line: first.line,
+            column: first.column,
+            len: end.saturating_sub(first.offset),
+        }
+    }
+
     /// Legacy single-line projection. Prefer [`crate::ast::ParsedDocument::range`], which uses the
     /// canonical document-owned source index and handles multiline spans.
     #[deprecated(note = "use ParsedDocument::range so multiline ranges use canonical source data")]
@@ -366,6 +386,11 @@ pub enum Expression {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CollectionOperatorBody {
     pub open_brace_span: Span,
+    /// Documentation written before the parameters, e.g. `alternatives->minimize { doc /* For a
+    /// MinimizeObjective, the best value is the minimum one. */ ... }`
+    /// (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:88`). A body expression is a
+    /// feature body, so it may be documented like any other.
+    pub doc: Option<Box<Node<super::DocComment>>>,
     pub parameters: Vec<Node<CollectionOperatorParameter>>,
     pub result: Option<Box<Node<Expression>>>,
     pub close_brace_span: Span,
@@ -375,15 +400,34 @@ pub struct CollectionOperatorBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CollectionOperatorParameter {
-    /// Direction keyword and its exact authored span.
-    pub direction: Node<super::InOut>,
+    /// Direction keyword and its exact authored span. `None` for the undirected form, e.g. `p2`
+    /// in `vertices->exists{p2 : Point; ...}` (`sysml.library/Domain Libraries/Geometry/
+    /// ShapeItems.sysml:72`) -- a body-expression parameter declares a feature, and a feature
+    /// need not be directed.
+    pub direction: Option<Node<super::InOut>>,
     /// Exact `ref` keyword span when the parameter is a reference feature.
     pub reference_keyword_span: Option<Span>,
     /// Decoded declaration label; `name_span` preserves its authored spelling.
     pub name: String,
     pub name_span: Span,
     pub typing: Option<CollectionOperatorParameterTyping>,
-    pub semicolon_span: Span,
+    /// How the parameter is terminated: `;` or its own brace body. `in ref a { doc /* ... */ }`
+    /// (`TradeStudies.sysml:162`) documents the parameter instead of ending it with `;`.
+    pub terminator: CollectionOperatorParameterTerminator,
+}
+
+/// What closes a [`CollectionOperatorParameter`] declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum CollectionOperatorParameterTerminator {
+    /// `p2 : Point;`
+    Semicolon { span: Span },
+    /// `in ref a { doc /* ... */ }` -- the parameter's own body, holding its documentation.
+    Body {
+        open_brace_span: Span,
+        doc: Option<Box<Node<super::DocComment>>>,
+        close_brace_span: Span,
+    },
 }
 
 /// Exact `:` typing syntax plus its source-backed target identity.
@@ -678,16 +722,20 @@ pub enum TypingSpelling {
     TypedBy,
 }
 
-/// Equality ignores `span` and `spelling`, matching `Node<T>`'s and `Multiplicity`'s
-/// span-ignoring conventions elsewhere in this crate: hand-built expected ASTs in tests don't
-/// need to reproduce real source spans, and `specializes B` and `:> B` name the same
-/// relationship (the spelling is provenance, faithfully re-emitted but not identity).
+/// Equality ignores `span`, matching `Node<T>`'s span-ignoring convention: where a relationship
+/// was authored is provenance.
+///
+/// `spelling` is compared. `specializes B` and `:> B` do name the same relationship, but the
+/// spelling is what the author wrote and what emission reproduces
+/// ([`crate::emit`] matches on it), so excluding it from equality meant a formatter that swapped
+/// one keyword for the other would pass every whole-AST comparison in the suite.
 impl PartialEq for TypingRelationship {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
             && self.kind == other.kind
             && self.is_conjugated == other.is_conjugated
             && self.is_implied == other.is_implied
+            && self.spelling == other.spelling
     }
 }
 

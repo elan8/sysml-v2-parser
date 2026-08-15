@@ -49,6 +49,6 @@ package 'Subsetting Example' {
 (parsed-document
   (references
   )
-  (root (package (name "Subsetting Example") (body (part-def (name "Vehicle") (body (part-usage) (part-usage) (part-usage) (part-usage))) (part-def (name "VehiclePart") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Transmission") (body semicolon)) (part-def (name "Wheel") (body semicolon)))))
+  (root (package (name "Subsetting Example") (body brace (part-def (name "Vehicle") (body brace (part-usage) (part-usage) (part-usage) (part-usage))) (part-def (name "VehiclePart") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Transmission") (body semicolon)) (part-def (name "Wheel") (body semicolon)))))
 )
 ~~~

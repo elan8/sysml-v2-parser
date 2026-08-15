@@ -34,6 +34,6 @@ package IntersectCoverage {
 (parsed-document
   (references
   )
-  (root (package (name "IntersectCoverage") (body (part-def (name "Base") (body semicolon)) (attribute-def) (attribute-def) (attribute-def))))
+  (root (package (name "IntersectCoverage") (body brace (part-def (name "Base") (body semicolon)) (attribute-def) (attribute-def) (attribute-def))))
 )
 ~~~

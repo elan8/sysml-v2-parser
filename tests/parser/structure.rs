@@ -1521,13 +1521,16 @@ part def Carrier {
         sysml_v2_parser::ast::PartDefBodyElement::PortUsage(p) => p,
         other => panic!("expected port usage, got {:?}", other),
     };
+    // Both `subsets` clauses and both `redefines` clauses are kept: repeating a clause kind
+    // names further targets of the same relationship, so overwriting would drop the first
+    // target of each pair without a diagnostic.
     assert_eq!(
         port_usage
             .value
             .subsets
             .as_ref()
             .map(|(relationship, _)| relationship.value.target.len()),
-        Some(1)
+        Some(2)
     );
     assert_eq!(
         port_usage
@@ -1535,7 +1538,7 @@ part def Carrier {
             .redefines
             .as_ref()
             .map(|n| n.value.target.len()),
-        Some(1)
+        Some(2)
     );
 }
 
@@ -2267,13 +2270,16 @@ part def Carrier {
         sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p) => p,
         other => panic!("expected part usage, got {:?}", other),
     };
+    // Both `subsets` clauses and both `redefines` clauses are kept: repeating a clause kind
+    // names further targets of the same relationship, so overwriting would drop the first
+    // target of each pair without a diagnostic.
     assert_eq!(
         part_usage
             .value
             .subsets
             .as_ref()
             .map(|(relationship, _)| relationship.value.target.len()),
-        Some(1)
+        Some(2)
     );
     assert_eq!(
         part_usage
@@ -2281,7 +2287,7 @@ part def Carrier {
             .redefines
             .as_ref()
             .map(|n| n.value.target.len()),
-        Some(1)
+        Some(2)
     );
 }
 

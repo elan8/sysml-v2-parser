@@ -3,9 +3,8 @@ use crate::ast::{
     VerificationCaseUsage,
 };
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, take_until_terminator, ws1, ws_and_comments};
+use crate::parser::lex::{name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::usage::usage_header;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -173,6 +172,8 @@ pub(crate) fn verification_case_usage(
             VerificationCaseUsage {
                 name: usage.name,
                 type_name: usage.type_name,
+                multiplicity: usage.multiplicity,
+                subsets: usage.subsets,
                 is_abstract: usage.is_abstract,
                 body: usage.body,
                 membership: usage.membership,
@@ -187,14 +188,18 @@ fn case_like_usage_body(
     membership: crate::ast::Membership,
 ) -> IResult<Input<'_>, CaseUsage> {
     let (input, name) = name(input)?;
-    let (input, header) = usage_header(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    // `parse_feature_usage_header` rather than `usage_header` + `take_until_terminator`: the
+    // latter skipped whatever stood between the typing and the body, so the multiplicity in
+    // `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }` (Systems Library
+    // `Cases.sysml:56`) was dropped without a diagnostic.
+    let (input, header) = crate::parser::definition_header::parse_feature_usage_header(input)?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,
         CaseUsage {
             name,
             type_name: header.type_reference,
+            multiplicity: header.multiplicity,
             subsets: header.subsets,
             redefines: header.redefines,
             is_abstract,

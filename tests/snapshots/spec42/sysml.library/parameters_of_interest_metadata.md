@@ -96,6 +96,6 @@ standard library package ParametersOfInterestMetadata {
   (references
     (reference r0 (scope relative) (span (offset 271) (line 8) (column 18) (len 29)) (segments (segment 0 (token "Metaobjects") (name "Metaobjects") (separator none) (span (offset 271) (line 8) (column 18) (len 11))) (segment 1 (token "SemanticMetadata") (name "SemanticMetadata") (separator colon-colon) (span (offset 284) (line 8) (column 31) (len 16)))))
   )
-  (root (library-package (name "ParametersOfInterestMetadata") (standard true) (body (doc) (import (target (span (span (offset 271) (line 8) (column 18) (len 29))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (attribute-def) (attribute-def) (metadata-def) (metadata-def))))
+  (root (library-package (name "ParametersOfInterestMetadata") (standard true) (body brace (doc) (import (target (span (span (offset 271) (line 8) (column 18) (len 29))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (attribute-def) (attribute-def) (metadata-def) (metadata-def))))
 )
 ~~~

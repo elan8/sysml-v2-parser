@@ -81,6 +81,6 @@ package '3c-Function-based Behavior-structure mod-3' {
 (parsed-document
   (references
   )
-  (root (package (name "3c-Function-based Behavior-structure mod-3") (body (part-def (name "Vehicle") (body semicolon)) (part-def (name "VehicleFrame") (body semicolon)) (part-def (name "HitchBall") (body semicolon)) (part-def (name "Trailer") (body semicolon)) (part-def (name "TrailerFrame") (body semicolon)) (part-def (name "TrailerCoupler") (body semicolon)) (part-usage) (part-usage) (action-usage))))
+  (root (package (name "3c-Function-based Behavior-structure mod-3") (body brace (part-def (name "Vehicle") (body semicolon)) (part-def (name "VehicleFrame") (body semicolon)) (part-def (name "HitchBall") (body semicolon)) (part-def (name "Trailer") (body semicolon)) (part-def (name "TrailerFrame") (body semicolon)) (part-def (name "TrailerCoupler") (body semicolon)) (part-usage) (part-usage) (action-usage))))
 )
 ~~~

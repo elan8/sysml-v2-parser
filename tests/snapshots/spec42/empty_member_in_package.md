@@ -27,6 +27,6 @@ package MyPkg {
 (parsed-document
   (references
   )
-  (root (package (name "MyPkg") (body (malformed (code "recovered_package_body_element") (found ";") (span (offset 15) (line 1) (column 16) (len 1))))))
+  (root (package (name "MyPkg") (body brace (malformed (code "recovered_package_body_element") (found ";") (span (offset 15) (line 1) (column 16) (len 1))))))
 )
 ~~~

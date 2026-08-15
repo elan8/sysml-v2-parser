@@ -304,6 +304,9 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
                 walk_attribute_body(report, &p, &metadata.value.body)
             }
             ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
+            ConstraintDefBodyElement::RequireConstraint(n) => {
+                walk_constraint_def_body(report, &p, &n.value.body)
+            }
             ConstraintDefBodyElement::Doc(_) | ConstraintDefBodyElement::Expression(_) => {}
         }
     }
@@ -361,6 +364,7 @@ fn walk_rendering_def_body(report: &mut OpacityReport, path: &str, body: &Render
             RenderingDefBodyElement::ViewRendering(rendering) => {
                 walk_rendering_usage_body(report, &p, &rendering.value.body)
             }
+            RenderingDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             RenderingDefBodyElement::Doc(_) | RenderingDefBodyElement::Filter(_) => {}
         }
     }
@@ -572,6 +576,8 @@ fn walk_part_usage_body_elements(
             }
             PartUsageBodyElement::Connect(c) => walk_connect_body(report, &p, &c.value.body),
             PartUsageBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
+            PartUsageBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
+            PartUsageBodyElement::EndDecl(_) => {}
             PartUsageBodyElement::AttributeUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }
@@ -725,6 +731,7 @@ fn walk_port_def_body(report: &mut OpacityReport, path: &str, body: &PortDefBody
         match &el.value {
             PortDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             PortDefBodyElement::Unsupported(_) => hit(report, &p, OpacityKind::UnsupportedGrammar),
+            PortDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             PortDefBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
             PortDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortDefBodyElement::ItemDef(n) => walk_attribute_body(report, &p, &n.value.body),
@@ -1011,6 +1018,13 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::Frame(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
+            RequirementDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
+            RequirementDefBodyElement::ConcernUsage(n) => {
+                walk_requirement_def_body(report, &p, &n.value.body)
+            }
+            RequirementDefBodyElement::CalcUsage(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
+            }
             RequirementDefBodyElement::Doc(_)
             | RequirementDefBodyElement::SubjectDecl(_)
             | RequirementDefBodyElement::SubjectRef(_)
@@ -1048,6 +1062,15 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             }
             UseCaseDefBodyElement::ThenUseCaseUsage(n) => {
                 walk_use_case_def_body(report, &p, &n.value.use_case.value.body)
+            }
+            UseCaseDefBodyElement::UseCaseUsage(n) => {
+                walk_use_case_def_body(report, &p, &n.value.body)
+            }
+            UseCaseDefBodyElement::CaseUsage(n) => {
+                walk_use_case_def_body(report, &p, &n.value.body)
+            }
+            UseCaseDefBodyElement::VerificationCaseUsage(n) => {
+                walk_use_case_def_body(report, &p, &n.value.body)
             }
             UseCaseDefBodyElement::IncludeUseCase(n) => {
                 walk_use_case_def_body(report, &p, &n.value.body)
@@ -1159,6 +1182,8 @@ fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody
             ViewDefBodyElement::ViewRendering(n) => {
                 walk_rendering_usage_body(report, &p, &n.value.body)
             }
+            ViewDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
+            ViewDefBodyElement::ViewpointUsage(_) | ViewDefBodyElement::Satisfy(_) => {}
             ViewDefBodyElement::Doc(_) | ViewDefBodyElement::Filter(_) => {}
         }
     }
@@ -1179,6 +1204,7 @@ fn walk_view_body_element(report: &mut OpacityReport, path: &str, el: &ViewBodyE
         ViewBodyElement::ViewRendering(n) => walk_rendering_usage_body(report, path, &n.value.body),
         ViewBodyElement::Expose(n) => walk_connect_body(report, path, &n.value.body),
         ViewBodyElement::Satisfy(n) => walk_connect_body(report, path, &n.value.body),
+        ViewBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
         ViewBodyElement::Doc(_) | ViewBodyElement::Filter(_) => {}
     }
 }
@@ -1236,6 +1262,10 @@ fn walk_occurrence_body_element(
         OccurrenceBodyElement::Allocate(n) => walk_connect_body(report, path, &n.value.body),
         OccurrenceBodyElement::EndDecl(n) => walk_end_decl(report, path, &n.value),
         OccurrenceBodyElement::StateUsage(n) => walk_state_def_body(report, path, &n.value.body),
+        OccurrenceBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
+        OccurrenceBodyElement::ConnectionUsage(n) => {
+            walk_connection_def_body(report, path, &n.value.body)
+        }
         OccurrenceBodyElement::Doc(_) => {}
     }
 }
@@ -1292,6 +1322,9 @@ fn walk_constraint_body_elements(
                 walk_attribute_body(report, &p, &metadata.value.body)
             }
             ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
+            ConstraintDefBodyElement::RequireConstraint(n) => {
+                walk_constraint_def_body(report, &p, &n.value.body)
+            }
             ConstraintDefBodyElement::Doc(_) | ConstraintDefBodyElement::Expression(_) => {}
         }
     }

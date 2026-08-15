@@ -66,6 +66,6 @@ package '15_06-System of Quantities' {
   (references
     (reference r0 (scope relative) (span (offset 58) (line 2) (column 20) (len 3)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 58) (line 2) (column 20) (len 3)))))
   )
-  (root (package (name "15_06-System of Quantities") (body (import (target (span (span (offset 58) (line 2) (column 20) (len 6))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 61) (line 2) (column 23) (len 3))) (separator (span (offset 61) (line 2) (column 23) (len 2))) (marker (span (offset 63) (line 2) (column 25) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))))))
+  (root (package (name "15_06-System of Quantities") (body brace (import (target (span (span (offset 58) (line 2) (column 20) (len 6))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 61) (line 2) (column 23) (len 3))) (separator (span (offset 61) (line 2) (column 23) (len 2))) (marker (span (offset 63) (line 2) (column 25) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))))))
 )
 ~~~

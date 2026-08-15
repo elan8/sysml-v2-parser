@@ -7,7 +7,7 @@ use crate::ast::{
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     crosses_operator, qualified_reference, redefine_operator, reference_path, references_operator,
-    starts_with_keyword, subset_operator, typed_by_operator, ws_and_comments,
+    starts_with_keyword, subset_operator, typed_by_operator, ws1, ws_and_comments,
 };
 use crate::parser::{span_from_to, Input};
 use nom::bytes::complete::{tag, take_until};
@@ -16,6 +16,48 @@ use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
+
+/// BNF `RefPrefix = FeatureDirection? 'derived'? ('abstract' | 'variation')? 'constant'?`
+/// (§8.2.2.6.2), the modifier chain every usage may carry ahead of its keyword.
+///
+/// Owned here rather than re-spelled per usage parser: each parser that hand-rolled a subset of
+/// the chain accepted only the combinations that happened to be needed at the time, so a legal
+/// prefix was a parse gap in whichever scopes had not adopted it yet.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct RefPrefix {
+    /// `in` / `out` / `inout` -- the production's first slot, so it precedes every keyword below.
+    pub direction: Option<crate::ast::InOut>,
+    pub is_derived: bool,
+    /// `abstract` or `variation` -- one slot, since the BNF makes them alternatives.
+    pub usage_prefix: Option<crate::ast::DefinitionPrefix>,
+    pub is_constant: bool,
+}
+
+/// Parse [`RefPrefix`]. Every part is optional, so this never fails; it consumes nothing when the
+/// next token is the usage keyword itself.
+pub(crate) fn ref_prefix(input: Input<'_>) -> IResult<Input<'_>, RefPrefix> {
+    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
+    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
+    let (input, usage_prefix) = opt(nom::branch::alt((
+        nom::combinator::map(preceded(tag(&b"abstract"[..]), ws1), |_| {
+            crate::ast::DefinitionPrefix::Abstract
+        }),
+        nom::combinator::map(preceded(tag(&b"variation"[..]), ws1), |_| {
+            crate::ast::DefinitionPrefix::Variation
+        }),
+    )))
+    .parse(input)?;
+    let (input, is_constant) = opt(preceded(tag(&b"constant"[..]), ws1)).parse(input)?;
+    Ok((
+        input,
+        RefPrefix {
+            direction,
+            is_derived: is_derived.is_some(),
+            usage_prefix,
+            is_constant: is_constant.is_some(),
+        },
+    ))
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct SpecializationClauses {
@@ -473,33 +515,86 @@ pub(crate) fn intersecting(input: Input<'_>) -> IResult<Input<'_>, Node<Subsetti
     ))
 }
 
+/// Fold `next` into an already-seen clause of the same kind.
+///
+/// `SubsettingRelationship::target` is a list because one clause may name several comma-separated
+/// targets; a clause kind written twice in one header names further targets of the same
+/// relationship, so the two are the same fact and belong in the same list.
+fn merge_clause(existing: &mut Node<SubsettingRelationship>, next: Node<SubsettingRelationship>) {
+    let Node {
+        value: next_value,
+        span: next_span,
+    } = next;
+    existing.value.target.extend(next_value.target);
+    existing.value.span = existing.value.span.covering(&next_value.span);
+    existing.span = existing.span.covering(&next_span);
+}
+
+/// [`merge_clause`] over two optional clauses, keeping `leading`'s source order first.
+fn merge_groups(
+    leading: Option<Node<SubsettingRelationship>>,
+    trailing: Option<Node<SubsettingRelationship>>,
+) -> Option<Node<SubsettingRelationship>> {
+    match (leading, trailing) {
+        (Some(mut leading), Some(trailing)) => {
+            merge_clause(&mut leading, trailing);
+            Some(leading)
+        }
+        (leading, trailing) => leading.or(trailing),
+    }
+}
+
+/// [`merge_clause`] against a slot that may not hold a clause yet.
+pub(crate) fn merge_into(
+    slot: &mut Option<Node<SubsettingRelationship>>,
+    next: Node<SubsettingRelationship>,
+) {
+    match slot {
+        Some(existing) => merge_clause(existing, next),
+        None => *slot = Some(next),
+    }
+}
+
 /// Parse zero or more subsetting/redefinition clauses in any order.
 ///
-/// When multiple clauses of the same kind are present, the last one wins.
+/// Repeating a clause kind is legal and means what writing its targets in one clause would mean:
+/// `subsets step, usage subsets Metadata::metadataItems` (`sysml.library/Systems
+/// Library/SysML.sysml:20`) subsets all three. Clauses of one kind therefore accumulate targets
+/// rather than overwrite -- overwriting dropped every target but the last with no diagnostic, so
+/// that header emitted as `:> Metadata::metadataItems`.
 pub(crate) fn specialization_clauses(
     input: Input<'_>,
 ) -> IResult<Input<'_>, SpecializationClauses> {
     // Clauses accumulate directly: collecting them first would allocate on a path the grammar
-    // re-enters speculatively for every usage and definition header. A later clause of the same
-    // kind overwrites an earlier one, as the fold it replaces did.
+    // re-enters speculatively for every usage and definition header.
     let mut out = SpecializationClauses::default();
     let mut input = input;
     loop {
         let (after_ws, _) = ws_and_comments(input)?;
-        if let Ok((rest, value)) = subsetting(after_ws) {
-            out.subsets = Some(value);
+        if let Ok((rest, (relationship, value))) = subsetting(after_ws) {
+            match &mut out.subsets {
+                Some((existing, existing_value)) => {
+                    merge_clause(existing, relationship);
+                    // A `subsets x = expr` value belongs to the clause that wrote it; keep the
+                    // first, since a second value would be a redefinition of the same feature.
+                    if existing_value.is_none() {
+                        *existing_value = value;
+                    }
+                }
+                slot @ None => *slot = Some((relationship, value)),
+            }
             input = rest;
         } else if let Ok((rest, value)) = redefinition(after_ws) {
-            out.redefines = Some(value);
+            merge_into(&mut out.redefines, value);
             input = rest;
         } else if let Ok((rest, value)) = reference_subsetting(after_ws) {
-            out.references = Some(value);
+            merge_into(&mut out.references, value);
             input = rest;
         } else if let Ok((rest, value)) = cross_subsetting(after_ws) {
-            out.crosses = Some(value);
+            merge_into(&mut out.crosses, value);
             input = rest;
         } else if let Ok((rest, value)) = intersecting(after_ws) {
-            out.intersects = Some(value);
+            merge_into(&mut out.intersects, value);
             input = rest;
         } else {
             // Leave the whitespace before a non-clause unconsumed, as `preceded` did.
@@ -550,14 +645,17 @@ fn merge_usage_header(
     trailing: SpecializationClauses,
     type_result: Option<TypingsResult>,
 ) -> UsageHeader {
-    let subsets = trailing
-        .subsets
-        .or(leading.subsets)
-        .map(|(target, _value)| target);
-    let redefines = trailing.redefines.or(leading.redefines);
-    let references = trailing.references.or(leading.references);
-    let crosses = trailing.crosses.or(leading.crosses);
-    let intersects = trailing.intersects.or(leading.intersects);
+    // Clauses may be written both before and after the typing (`:> a : T :> b`). The two groups
+    // are the same relationship for the same feature, so they merge on the same grounds as a
+    // repeat within one group -- see `specialization_clauses`.
+    let subsets = merge_groups(
+        leading.subsets.map(|(target, _value)| target),
+        trailing.subsets.map(|(target, _value)| target),
+    );
+    let redefines = merge_groups(leading.redefines, trailing.redefines);
+    let references = merge_groups(leading.references, trailing.references);
+    let crosses = merge_groups(leading.crosses, trailing.crosses);
+    let intersects = merge_groups(leading.intersects, trailing.intersects);
     UsageHeader {
         type_is_conjugated: type_result
             .as_ref()
@@ -664,6 +762,10 @@ mod tests {
         assert!(value.is_some());
     }
 
+    /// A clause kind written twice names further targets of the same relationship; both survive,
+    /// in source order. Overwriting instead (what this asserted before) dropped `base` and `old`
+    /// silently, which is what made `sysml.library`'s `subsets step, usage subsets
+    /// Metadata::metadataItems` emit as a single-target `:> Metadata::metadataItems`.
     #[test]
     fn specialization_clauses_accepts_multiple_mixed_clauses() {
         let input = span_input("subsets base redefines old :> latest :>> newest ;");
@@ -673,14 +775,14 @@ mod tests {
                 .subsets
                 .as_ref()
                 .map(|(rel, _)| rel_target_kind(input, rel)),
-            Some(("latest".to_string(), SubsettingKind::Subsets))
+            Some(("base, latest".to_string(), SubsettingKind::Subsets))
         );
         assert_eq!(
             clauses
                 .redefines
                 .as_ref()
                 .map(|rel| rel_target_kind(input, rel)),
-            Some(("newest".to_string(), SubsettingKind::Redefines))
+            Some(("old, newest".to_string(), SubsettingKind::Redefines))
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }

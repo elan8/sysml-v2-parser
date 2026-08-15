@@ -41,6 +41,6 @@ package C {
 (parsed-document
   (references
   )
-  (root (package (name "A") (body (part-def (name "T") (body semicolon)))) (package (name "C") (body (package (name "A") (body (part-def (name "T") (body semicolon)))) (part-usage))))
+  (root (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (package (name "C") (body brace (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (part-usage))))
 )
 ~~~

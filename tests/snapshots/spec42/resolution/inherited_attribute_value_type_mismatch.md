@@ -48,6 +48,6 @@ package Demo {
 (parsed-document
   (references
   )
-  (root (package (name "Demo") (body (enum-def) (requirement-def (name "ManagedRequirement") (body (attribute-usage))) (requirement-def (name "UserRequirement") (body semicolon)) (requirement-def (name "Need") (body semicolon)) (requirement-usage))))
+  (root (package (name "Demo") (body brace (enum-def) (requirement-def (name "ManagedRequirement") (body brace (attribute-usage))) (requirement-def (name "UserRequirement") (body semicolon)) (requirement-def (name "Need") (body semicolon)) (requirement-usage))))
 )
 ~~~

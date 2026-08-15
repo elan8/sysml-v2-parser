@@ -190,6 +190,6 @@ package '18-Use Case' {
 (parsed-document
   (references
   )
-  (root (package (name "18-Use Case") (body (part-def (name "Vehicle") (body semicolon)) (part-def (name "Person") (body semicolon)) (part-def (name "Environment") (body semicolon)) (part-def (name "Fuel Station") (body semicolon)) (use-case-usage) (use-case-usage) (use-case-usage) (use-case-usage))))
+  (root (package (name "18-Use Case") (body brace (part-def (name "Vehicle") (body semicolon)) (part-def (name "Person") (body semicolon)) (part-def (name "Environment") (body semicolon)) (part-def (name "Fuel Station") (body semicolon)) (use-case-usage) (use-case-usage) (use-case-usage) (use-case-usage))))
 )
 ~~~

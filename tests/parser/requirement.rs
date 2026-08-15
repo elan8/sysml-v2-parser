@@ -621,13 +621,16 @@ requirement VehicleReq; subsets BaseReq :> LatestReq;
         PackageBodyElement::RequirementUsage(r) => r,
         other => panic!("expected requirement usage, got {:?}", other),
     };
+    // `subsets BaseReq :> LatestReq` is one relationship with two targets, in source order --
+    // keeping only the last silently dropped `BaseReq`.
     assert_eq!(
-        req.value
-            .subsets
-            .as_ref()
-            .and_then(|n| n.value.first_target())
-            .map(|id| reference_text(&result, id)),
-        Some("LatestReq")
+        req.value.subsets.as_ref().map(|n| n
+            .value
+            .target
+            .iter()
+            .map(|id| reference_text(&result, *id))
+            .collect::<Vec<_>>()),
+        Some(vec!["BaseReq", "LatestReq"])
     );
 }
 

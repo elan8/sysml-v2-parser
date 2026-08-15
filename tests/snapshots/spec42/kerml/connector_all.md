@@ -29,6 +29,6 @@ package ConnectorAll {
 (parsed-document
   (references
   )
-  (root (package (name "ConnectorAll") (body (kerml-connector) (kerml-connector) (kerml-connector) (kerml-connector))))
+  (root (package (name "ConnectorAll") (body brace (kerml-connector) (kerml-connector) (kerml-connector) (kerml-connector))))
 )
 ~~~

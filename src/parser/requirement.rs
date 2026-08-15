@@ -199,7 +199,18 @@ fn requirement_def_body_element(
                 textual_representation,
                 RequirementDefBodyElement::TextualRep,
             ),
-            map(doc_comment, RequirementDefBodyElement::Doc),
+            // Nested in a sub-alt to stay under nom's 21-branch limit.
+            alt((
+                map(doc_comment, RequirementDefBodyElement::Doc),
+                map(concern_usage, RequirementDefBodyElement::ConcernUsage),
+                map(crate::parser::constraint::calc_usage, |n| {
+                    RequirementDefBodyElement::CalcUsage(Box::new(n))
+                }),
+            )),
+            map(
+                crate::parser::connector::ref_decl,
+                RequirementDefBodyElement::RefDecl,
+            ),
         )),
         other_requirement_body_element,
     ))
@@ -494,13 +505,16 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
         preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
+    // Multiplicity binds to the type and so is written before a trailing `:>>`:
+    // `subject subj : View[1] :>> RequirementCheck::subj;` (Systems Library `Views.sysml`).
+    // Parsing the redefinition first left the `[1]` in front of it and the whole member failed.
+    let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     let (input, trailing_redefines) = if leading_redefines.is_none() {
         opt(crate::parser::usage::redefinition).parse(input)?
     } else {
         (input, None)
     };
     let redefines = leading_redefines.or(trailing_redefines);
-    let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     // `= expr`, `default expr`, and `default = expr` all land on the shared `FeatureValue`
     // clause (`subject generateTorque default engine1.generateTorque;`, OMG spec Annex A).
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
@@ -684,8 +698,14 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
         (input, None, Some(locale))
     } else {
         let (input, ident_parsed) = opt(identification).parse(input)?;
+        // `ws`, not `ws_and_comments`: this member's own `/* ... */` body must terminate the
+        // search for an optional `locale`. Skipping comments here walked straight past the body
+        // and found the *next* member's `locale`, fusing two members into one and discarding
+        // this one's text with no diagnostic -- `comment named /* two */` followed by `locale
+        // "en_US" /* three */` became a single comment named `named`, in locale `en_US`, whose
+        // text was ` three `. Same hazard the `/*` guard above and the body scan below document.
         let (input, locale) = opt(preceded(
-            preceded(ws_and_comments, tag(&b"locale"[..])),
+            preceded(ws, tag(&b"locale"[..])),
             preceded(ws1, string_value),
         ))
         .parse(input)?;
@@ -776,8 +796,14 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
         (input, None, Some(locale))
     } else {
         let (input, ident_parsed) = opt(identification).parse(input)?;
+        // `ws`, not `ws_and_comments`: this member's own `/* ... */` body must terminate the
+        // search for an optional `locale`. Skipping comments walked straight past the body and
+        // found the *next* member's `locale`, fusing two members into one and discarding this
+        // one's text with no diagnostic -- `comment named /* two */` followed by `locale "en_US"
+        // /* three */` became a single comment named `named`, in locale `en_US`, whose text was
+        // ` three `. The same hazard the `/*` guard above and the body scan below document.
         let (input, locale) = opt(preceded(
-            preceded(ws_and_comments, tag(&b"locale"[..])),
+            preceded(ws, tag(&b"locale"[..])),
             preceded(ws1, string_value),
         ))
         .parse(input)?;
@@ -972,7 +998,8 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, abstract_kw) =
+        nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"concern"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, def_kw) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
@@ -981,7 +1008,9 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage {
         name: ident,
+        is_abstract: abstract_kw.is_some(),
         type_name: header.type_reference,
+        multiplicity: header.multiplicity,
         subsets: header.subsets,
         redefines: header.redefines,
         body,

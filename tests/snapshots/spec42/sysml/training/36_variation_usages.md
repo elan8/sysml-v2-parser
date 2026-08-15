@@ -65,6 +65,6 @@ package 'Variation Usages' {
   (references
     (reference r0 (scope relative) (span (offset 45) (line 2) (column 17) (len 23)) (segments (segment 0 (token "'Variation Definitions'") (name "Variation Definitions") (separator none) (span (offset 45) (line 2) (column 17) (len 23)))))
   )
-  (root (package (name "Variation Usages") (body (import (target (span (span (offset 45) (line 2) (column 17) (len 26))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 68) (line 2) (column 40) (len 3))) (separator (span (offset 68) (line 2) (column 40) (len 2))) (marker (span (offset 70) (line 2) (column 42) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Transmission") (body semicolon)) (part-usage) (part-usage) (part-usage))))
+  (root (package (name "Variation Usages") (body brace (import (target (span (span (offset 45) (line 2) (column 17) (len 26))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 68) (line 2) (column 40) (len 3))) (separator (span (offset 68) (line 2) (column 40) (len 2))) (marker (span (offset 70) (line 2) (column 42) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Transmission") (body semicolon)) (part-usage) (part-usage) (part-usage))))
 )
 ~~~

@@ -27,6 +27,6 @@ package MessageUsageExample {
 (parsed-document
   (references
   )
-  (root (package (name "MessageUsageExample") (body (flow-usage) (flow-usage))))
+  (root (package (name "MessageUsageExample") (body brace (flow-usage) (flow-usage))))
 )
 ~~~

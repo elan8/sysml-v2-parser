@@ -38,6 +38,6 @@ package BareRedefinitionShorthand {
 (parsed-document
   (references
   )
-  (root (package (name "BareRedefinitionShorthand") (body (attribute-def) (item-def))))
+  (root (package (name "BareRedefinitionShorthand") (body brace (attribute-def) (item-def))))
 )
 ~~~

@@ -113,6 +113,13 @@ fn emit_requirement_body_element(
     match el {
         RequirementDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         RequirementDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        RequirementDefBodyElement::ConcernUsage(c) => emit_concern_usage(w, path, &c.value),
+        RequirementDefBodyElement::CalcUsage(c) => {
+            crate::emit::view::emit_calc_usage(w, path, &c.value)
+        }
+        RequirementDefBodyElement::RefDecl(r) => {
+            crate::emit::structure::emit_ref_decl(w, path, &r.value)
+        }
         RequirementDefBodyElement::Import(i) => emit_import(w, &i.value),
         RequirementDefBodyElement::AttributeDef(a) => {
             structure::emit_attribute_def(w, path, &a.value)
@@ -329,11 +336,14 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
         w.push_str(" : ");
         w.push_qualified_reference("subject/type", type_name)?;
     }
-    if let Some(redefines) = &subject.redefines {
-        emit_subsetting_clause(w, &redefines.value)?;
-    }
+    // Multiplicity before the subsetting clause: it binds to the declared feature, and emitting
+    // it after the target produced `:>> RequirementCheck::subj[1]`, which reparses as a
+    // multiplicity on the *target*.
     if let Some(mult) = &subject.multiplicity {
         emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(redefines) = &subject.redefines {
+        emit_subsetting_clause(w, &redefines.value)?;
     }
     if let Some(value) = &subject.value {
         super::expr::emit_feature_value(w, value)?;
@@ -342,7 +352,7 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
     Ok(())
 }
 
-fn emit_require_constraint(
+pub(crate) fn emit_require_constraint(
     w: &mut EmitWriter<'_>,
     path: &str,
     req: &RequireConstraint,
@@ -467,9 +477,14 @@ pub(crate) fn emit_item_usage(
     if let Some(dir) = usage.direction {
         emit_direction(w, dir);
     }
-    if usage.is_abstract {
-        w.push_str("abstract ");
-    }
+    // `OccurrenceUsagePrefix = BasicUsagePrefix ('individual')?` -- the `RefPrefix` keywords come
+    // before `individual`.
+    crate::emit::structure::emit_ref_prefix(
+        w,
+        usage.is_derived,
+        usage.usage_prefix.as_ref(),
+        usage.is_constant,
+    );
     if usage.is_individual {
         w.push_str("individual ");
     }
@@ -513,11 +528,17 @@ pub(crate) fn emit_concern_usage(
     concern: &ConcernUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, concern.membership.visibility);
+    if concern.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str("concern ");
     if concern.is_definition {
         w.push_str("def ");
     }
     w.push_str(&format_name(&concern.name));
+    if let Some(mult) = &concern.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
     if let Some(ty) = &concern.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
@@ -562,6 +583,12 @@ pub(crate) fn emit_use_case_usage(
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(mult) = &usage.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        crate::emit::structure::emit_subsetting_clause(w, &subsets.value)?;
     }
     emit_use_case_body(w, path, &usage.body)
 }
@@ -645,6 +672,12 @@ pub(crate) fn emit_verification_case_usage(
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
+    if let Some(mult) = &usage.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(subsets) = &usage.subsets {
+        emit_subsetting_clause(w, &subsets.value)?;
+    }
     emit_use_case_body(w, path, &usage.body)
 }
 
@@ -679,6 +712,9 @@ pub(crate) fn emit_case_usage(
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(mult) = &usage.multiplicity {
+        emit_multiplicity(w, &mult.value)?;
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -785,6 +821,11 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::ThenUseCaseUsage(t) => {
             w.push_str("then ");
             emit_use_case_usage(w, path, &t.value.use_case.value)
+        }
+        UseCaseDefBodyElement::UseCaseUsage(u) => emit_use_case_usage(w, path, &u.value),
+        UseCaseDefBodyElement::CaseUsage(u) => emit_case_usage(w, path, &u.value),
+        UseCaseDefBodyElement::VerificationCaseUsage(u) => {
+            emit_verification_case_usage(w, path, &u.value)
         }
         UseCaseDefBodyElement::Objective(o) => {
             if let Some(vis) = o.value.visibility {
@@ -951,6 +992,9 @@ fn emit_case_return_decl(
     }
     if let Some(mult) = &decl.multiplicity {
         emit_multiplicity(w, &mult.value)?;
+    }
+    if let Some(redefines) = &decl.redefines {
+        crate::emit::structure::emit_subsetting_clause(w, &redefines.value)?;
     }
     if let Some(value) = &decl.value {
         emit_feature_value(w, value)?;

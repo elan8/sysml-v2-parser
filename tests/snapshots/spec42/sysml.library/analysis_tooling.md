@@ -85,6 +85,6 @@ standard library package AnalysisTooling {
   (references
     (reference r0 (scope relative) (span (offset 179) (line 8) (column 17) (len 12)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 179) (line 8) (column 17) (len 12)))))
   )
-  (root (library-package (name "AnalysisTooling") (standard true) (body (doc) (import (target (span (span (offset 179) (line 8) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 191) (line 8) (column 29) (len 3))) (separator (span (offset 191) (line 8) (column 29) (len 2))) (marker (span (offset 193) (line 8) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (metadata-def) (metadata-def))))
+  (root (library-package (name "AnalysisTooling") (standard true) (body brace (doc) (import (target (span (span (offset 179) (line 8) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 191) (line 8) (column 29) (len 3))) (separator (span (offset 191) (line 8) (column 29) (len 2))) (marker (span (offset 193) (line 8) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (metadata-def) (metadata-def))))
 )
 ~~~

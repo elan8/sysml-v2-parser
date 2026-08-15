@@ -7,6 +7,159 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An anonymous connection definition no longer emits a doubled space.** The trailing space was
+  written with the `connection def` keyword rather than with the identification, so
+  `#derivation connection { ... }` formatted as `#derivation connection def  {`.
+
+- **Two adjacent comment members no longer fuse into one.** A comment's optional `locale`
+  lookahead skipped block comments as trivia, so it walked past the member's own body and found
+  the *next* member's `locale`: `comment named /* two */` followed by `locale "en_US" /* three */`
+  parsed as a single comment named `named`, in locale `en_US`, whose text was ` three `. The
+  second member's text was discarded with no diagnostic. `doc_comment` had the identical
+  lookahead and is fixed with it.
+
+- **An action-body `ref` declaration keeps its kind keyword, multiplicity and `:>` clause.**
+  `action_ref_decl_inner` parsed the `action` keyword and the multiplicity only to discard them,
+  never parsed a subsetting clause at all, and ended with a skip-to-terminator that swallowed
+  whatever was left -- so `derived ref action deferred : ActionUsage :> Metadata::metadataItems;`
+  formatted back as `derived ref deferred : ActionUsage;`. **AST version 152 -> 153.**
+
+### Changed
+
+- **Ref and attribute usage projections name the `RefPrefix` chain.** The semantic projection
+  recorded neither `derived`/`abstract`/`variation`/`constant` nor the direction, so a snapshot
+  could not distinguish `derived abstract constant ref attribute x` from a bare `attribute x`,
+  and the fields added for those keywords had no structural coverage at all.
+
+- **Body expressions accept undirected parameters, leading documentation, and parameter bodies.**
+  `vertices->exists{p2 : Point; ...}` (`sysml.library/Domain Libraries/Geometry/ShapeItems.sysml`)
+  declares an undirected parameter, which the grammar allows and the parser required a direction
+  for; `alternatives->minimize { doc /* ... */ ... }` opens with documentation; and
+  `selectOne {in ref a { doc /* ... */ } ...}` terminates a parameter with its own documented
+  body instead of `;` (both `TradeStudies.sysml`). `CollectionOperatorParameter::direction`
+  became optional and its `semicolon_span` became a typed `terminator`.
+- **`abstract calc` keeps its keyword and its `:>` clause.** `CalcUsage` had neither field, so
+  `abstract calc subcalculations : Calculation :> calculations, subactions { ... }`
+  (Systems Library `Calculations.sysml`) emitted as `calc subcalculations : Calculation`.
+  **AST version 151 -> 152.**
+
+- **Calc usages take the `RefPrefix` and are requirement-body members.** `in calc eval :
+  EvaluationFunction { ... }` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:61`)
+  had no arm in requirement bodies, and `calc_usage` parsed neither the direction nor `abstract`
+  -- `CalcUsage::direction` existed but nothing ever populated it, and the `abstract` keyword was
+  consumed and dropped. Both now come from the shared `ref_prefix`.
+  **AST version 150 -> 151.**
+
+- **Occurrence bodies accept directed occurrence usages and connection usages.**
+  `directed_occurrence_usage` was dispatched only in action bodies, and it required the
+  `occurrence` keyword immediately after the direction, so `in event occurrence sourceEvent [1]
+  default that.sourceEvent;` (`sysml.library/Systems Library/Flows.sysml`) failed twice over.
+  `connection :HappensDuring connect sourceEvent to [1] self;` had no arm in this scope either.
+- **Concern usages are requirement-body members, and keep their `abstract` and multiplicity.**
+  `abstract concern concerns[0..*] :> concernChecks { ... }` (`Requirements.sysml`) was only
+  reachable at package level, and `ConcernUsage` had no field for either the keyword or the
+  multiplicity, both of which the parser consumed and discarded. **AST version 149 -> 150.**
+
+- **A brace-bodied `require` / `assume` member is a constraint-body member.** The constraint body's
+  terminal arm falls through to `expression`, which read `require viewpointSatisfactions` as an
+  expression and then could not account for the `{` that followed
+  (`sysml.library/Systems Library/Views.sysml:43`). A typed arm now precedes it.
+- **Part usage bodies accept bare end declarations.** `ref :>> outgoingTransfersFromSelf :> ...
+  { end ref source; end ref target; }` (`Ports.sysml:37`) puts connector ends in a usage body;
+  occurrence bodies already modelled the member, part usage bodies did not.
+  **AST version 148 -> 149.**
+
+- **View definition bodies accept viewpoint usages and `satisfy requirement ... by ...`.** Both
+  are parsed by the same productions package and part bodies already dispatch; this scope had no
+  arm for them (`sysml.library/Systems Library/Views.sysml`).
+- **`abstract view def` and `abstract rendering def` keep the keyword.** `ViewDef` and
+  `RenderingDef` had no `is_abstract` field, so the definition prefix parser produced the flag
+  and emission dropped it. **AST version 147 -> 148.**
+- **A subject declaration accepts a multiplicity before a trailing `:>>`.** `subject subj :
+  View[1] :>> RequirementCheck::subj;` (`Views.sysml`) failed because the redefinition was
+  parsed first and the `[1]` blocked it. Emission also placed the multiplicity after the
+  redefinition target, where it would reparse as the *target's* multiplicity; it now precedes
+  the clause, as authored.
+- **A connection end may be declared by name alone.** `end ref source;` (`Ports.sysml`) has no
+  typing, reference subsetting or nested usage, and every branch of `end_decl` required one of
+  those.
+
+- **Nested case usages are members of case-family bodies, and keep their declaration tail.**
+  `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }` (`sysml.library/Systems
+  Library/Cases.sysml:56`) and its `use case` / `verification` siblings had no member arm in these
+  bodies, so they were recovered text. Worse, the parsers that did handle them elsewhere ran
+  `usage_header` and then skipped to the body with `take_until_terminator`, discarding the
+  multiplicity and, for `UseCaseUsage`, the subsets targets. All three now parse a real feature
+  usage header; `CaseUsage`, `VerificationCaseUsage` and `UseCaseUsage` gained the fields to
+  hold it. `Simple Tests/VerificationTest.sysml` round-trips as a result.
+  **AST version 146 -> 147.**
+
+- **A `return` declaration keeps a `:>>` clause written after its type.** `return verdict :
+  VerdictKind :>> result;` (`sysml.library/Systems Library/VerificationCases.sysml:22`) only had
+  a path for the leading anonymous form (`return :>> result;`), where the target stands in for
+  the declaration name; a trailing clause on a named declaration was recovered text.
+  `CaseReturnDecl` gained a `redefines` field, and the semantic projection shows it, so a
+  regression that dropped it would be visible in the AST rather than only in the emitted string.
+  **AST version 145 -> 146.**
+
+- **Two more members that had nowhere to go.** `RefDeclKind` gained `case` and `verification`
+  (`ref case self : Case :>> Calculation::self;`, `sysml.library/Systems Library/Cases.sysml`),
+  matched after the two-word `use case` keyword so that form still wins. Part usage bodies gained
+  the `InOutDecl` member that port and action bodies already had, so the keyword-less `in :>>
+  MessageTransfer::payload, MessageAction::payload;` inside a `ref` body
+  (`Actions.sysml`) is structured rather than an unexpected keyword. **AST version 144 -> 145.**
+
+- **The `in`/`out`/`inout` direction is part of the shared `RefPrefix`.** BNF
+  `RefPrefix = FeatureDirection? 'derived'? ('abstract' | 'variation')? 'constant'?` puts the
+  direction first, but it was parsed ad hoc by a few callers, so `in ref alternatives :
+  Anything[1..*] { ... }` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml`) had no
+  path in the scopes that had not hand-rolled one. It is now a slot of the shared prefix, and
+  `RefDecl` finally records it instead of hardcoding `None`. One consequence: `out attribute
+  :>> a_out : T = v;` is now the `AttributeUsage` its `attribute` keyword says it is, carrying
+  the direction on `AttributeUsage::direction`, rather than an `InOutDecl`; the keyword-less
+  `in x : Real;` is still an `InOutDecl`.
+
+- **Occurrence-style definition bodies no longer swallow members behind a visibility prefix.**
+  `DefinitionBody` -- shared by `flow def`, `occurrence def`, `allocation def` and the rest --
+  tried its opaque unsupported-member capture *before* the structured dispatch, the reverse of
+  every other body. Any member starting with `private`, `ref`, `abstract`, `in` or `connection`
+  was captured whole even when the parser directly below handled it, so `private attribute
+  seBeforeNum : Natural[1] = ...;` (`sysml.library/Systems Library/Flows.sysml`) was
+  unsupported grammar while the same line without `private` parsed. These bodies also now
+  dispatch `ref` members. **AST version 143 -> 144.**
+
+- **`ref` members are accepted in every body whose grammar allows them.** Five scopes never
+  dispatched `connector::ref_decl` at all -- port definitions, requirement definitions, view
+  definitions, rendering definitions and view usages -- so `ref self : Port :>> Object::self;`
+  (`sysml.library/Systems Library/Ports.sysml`) and its siblings were captured as unsupported
+  grammar even though the same member parsed one scope over. `RefDeclKind` also gained the
+  `concern`, `viewpoint`, `rendering`, `view` and `action` keywords, each from a library line
+  that previously had nowhere to go. **AST version 142 -> 143.**
+
+- **The `RefPrefix` modifier chain is accepted on every usage that allows it.** BNF `RefPrefix
+  = 'derived'? ('abstract' | 'variation')? 'constant'?` may precede any usage keyword, but each
+  parser had hand-rolled whichever subset it happened to need, so a legal prefix was a parse gap
+  in the scopes that had not adopted it. `derived ref item receiverArgument : Expression[0..1]
+  subsets Metadata::metadataItems;` (`sysml.library/Systems Library/SysML.sysml`) and every one
+  of its 190 siblings fell through to unsupported-grammar capture. The chain is now parsed in
+  one place (`parser::usage::ref_prefix`) and used by all four `RefDecl` parsers plus
+  `item_usage` and `attribute_usage`. `RefDecl` and `ItemUsage` gained `is_derived`,
+  `usage_prefix` and `is_constant` to hold it; `ItemUsage::is_abstract` became `usage_prefix`,
+  which can also represent the `variation` alternative. **AST version 141 -> 142.**
+- **A repeated specialization clause keeps every target.** Writing a subsetting-family clause
+  kind twice in one header (`subsets parameter, usage subsets Metadata::metadataItems`) kept
+  only the last clause, dropping the earlier targets with no diagnostic. Repeated clauses now
+  accumulate into the one relationship they describe, and its span covers every authored
+  fragment.
+- **The `abstract` prefix on a `ref` declaration survives emission.** It was parsed and
+  discarded because `RefDecl` had nowhere to put it, so `abstract ref :>> trailerHitch[1];`
+  formatted as `ref :>> trailerHitch;`.
+- **One emission order for the `RefPrefix` keywords.** The part, port and attribute emitters
+  each spelled the chain inline and had drifted into three different orders, so `derived
+  abstract x` could come back out as `abstract derived x`.
+
 ### Added
 
 - **`ast::Body<E>`, one container for every declaration body.** Twenty-seven per-family body
@@ -65,6 +218,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **AST equality compares authored syntax that emission depends on.** Three hand-written
+  `PartialEq` impls excluded fields that are not provenance: `AttributeUsage` ignored the `ref` and
+  `abstract` prefixes, `RefDecl` ignored its direction, and `TypingRelationship` ignored whether the
+  author wrote `:>` or `specializes`. All three drive emitted output, so a formatter that dropped or
+  swapped one would have passed every whole-AST comparison in the suite -- including the round-trip
+  tests whose purpose is to catch exactly that. Span exclusion is unchanged: position is still not
+  identity.
 - **A constraint body accepts a feature declaration.** `constraint c { mass : Real; }` parsed
   `mass` as a bare expression and left `: Real;` for recovery, which the opaque capture then hid.
   A constraint definition body is a `DefinitionBody`, so it owns usages as well as the constraint

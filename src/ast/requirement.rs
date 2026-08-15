@@ -4,6 +4,7 @@ use super::common::TextualRepresentation;
 use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
+use super::structure::DefinitionPrefix;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
@@ -75,6 +76,16 @@ pub enum RequirementDefBodyElement {
     Frame(Node<FrameMember>),
     TextualRep(Node<TextualRepresentation>),
     Doc(Node<DocComment>),
+    /// `ref`-prefixed feature declaration, e.g. `ref concern :>> self: ConcernCheck;` and `ref
+    /// part actors : Part[0..*] { ... }` (Systems Library `Requirements.sysml`). This scope
+    /// accepted no `ref` member at all.
+    RefDecl(Node<crate::ast::RefDecl>),
+    /// Nested concern usage, e.g. `abstract concern concerns[0..*] :> concernChecks { ... }`
+    /// (`Requirements.sysml`). Previously only reachable at package level.
+    ConcernUsage(Node<ConcernUsage>),
+    /// Nested calc usage, e.g. `in calc eval : EvaluationFunction { ... }` and `in calc :>> eval =
+    /// evaluationFunction;` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml`).
+    CalcUsage(Box<Node<CalcUsage>>),
 }
 
 /// Viewpoint stakeholder: typed declaration, shorthand concern reference, or `:>>` redefinition.
@@ -228,9 +239,17 @@ pub struct RequirementUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemUsage {
-    /// Leading `abstract` keyword (BNF `RefPrefix`), e.g. the package-level `abstract item
-    /// items : Item[0..*] nonunique :> objects { ... }` (Systems Library `Items.sysml`).
-    pub is_abstract: bool,
+    /// `derived` from BNF `RefPrefix`, e.g. `derived item ownedActorParameter : PartUsage[1..1]
+    /// redefines ownedMemberParameter subsets Metadata::metadataItems;` (`sysml.library/Systems
+    /// Library/SysML.sysml:28`).
+    pub is_derived: bool,
+    /// `abstract` or `variation` from `RefPrefix` -- alternatives there, so one field, matching
+    /// [`crate::ast::AttributeUsage::usage_prefix`]. E.g. the package-level `abstract item items :
+    /// Item[0..*] nonunique :> objects { ... }` (Systems Library `Items.sysml`). Was a bare
+    /// `is_abstract` flag, which could not represent the `variation` alternative at all.
+    pub usage_prefix: Option<DefinitionPrefix>,
+    /// `constant` from `RefPrefix`. See [`crate::ast::AttributeUsage::is_constant`].
+    pub is_constant: bool,
     /// Empty for the anonymous redefinition form (`item :>> shape : Cylinder { ... }`), matching
     /// `PartUsage::name`'s existing convention.
     pub name: String,
@@ -310,7 +329,14 @@ pub struct FrameMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcernUsage {
     pub name: String,
+    /// `abstract` keyword, e.g. `abstract concern concerns[0..*] :> concernChecks { ... }`
+    /// (Systems Library `Requirements.sysml`). The parser has always accepted it; this struct
+    /// had nowhere to put it, so emission dropped the keyword.
+    pub is_abstract: bool,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Multiplicity after the name, e.g. `[0..*]` in `abstract concern concerns[0..*]`. Also
+    /// previously parsed and discarded.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub body: RequirementDefBody,
@@ -344,6 +370,10 @@ pub struct CaseDef {
 pub struct CaseUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Multiplicity after the type, e.g. `[0..*]` in `abstract case subcases : Case[0..*] :>
+    /// cases, subcalculations { ... }` (Systems Library `Cases.sysml:56`). The declaration's tail
+    /// used to be skipped wholesale, so this was dropped without a diagnostic.
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     /// True for `abstract case ...`.
@@ -409,6 +439,12 @@ pub struct VerificationCaseDef {
 pub struct VerificationCaseUsage {
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
+    /// Multiplicity after the type, e.g. `[0..*]` in `abstract verification
+    /// subVerificationCases : VerificationCase[0..*] :> verificationCases, subcases { ... }`
+    /// (Systems Library `VerificationCases.sysml:42`). See [`CaseUsage::multiplicity`].
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `:>` subsets clause, which may name several comma-separated targets.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// True for `abstract verification ...`.
     pub is_abstract: bool,
     pub body: UseCaseDefBody,
@@ -425,6 +461,12 @@ pub struct UseCaseUsage {
     pub type_name: Option<QualifiedReferenceId>,
     /// True for `abstract use case ...`.
     pub is_abstract: bool,
+    /// Multiplicity after the type, e.g. `[0..*]` in `abstract case subcases : Case[0..*] :>
+    /// cases, subcalculations { ... }` (Systems Library `Cases.sysml:56`). Previously the
+    /// declaration's tail was skipped wholesale, so this and `subsets` were dropped.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `:>` subsets clause, which may name several comma-separated targets.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     pub body: UseCaseDefBody,
     /// See [`RequirementUsage::membership`]; captures real visibility at member position
     /// (`use_case_usage`), `visibility: None` at the `then use case ...` control-flow position
@@ -544,6 +586,13 @@ pub struct CaseReturnDecl {
     /// Optional `part` / `attribute` keyword after `return`.
     pub feature_kind: Option<CaseReturnFeatureKind>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `:>>` clause written *after* the type on a named declaration, e.g. `return verdict :
+    /// VerdictKind :>> result;` (Systems Library `VerificationCases.sysml:22`). Distinct from
+    /// [`Self::target`], which is the leading anonymous form (`return :>> result;`) where the
+    /// redefinition target stands in for the declaration name. The two are the same relationship
+    /// written in two positions and are candidates for unification with the rest of the
+    /// subsetting family; kept apart here because only `target` substitutes for the name.
+    pub redefines: Option<Node<SubsettingRelationship>>,
 }
 
 impl PartialEq for CaseReturnDecl {
@@ -621,6 +670,18 @@ pub enum UseCaseDefBodyElement {
     AnalysisCaseUsage(Box<Node<AnalysisCaseUsage>>),
     /// Nested `calc` usage in analysis case bodies (validation `10b`).
     CalcUsage(Box<Node<CalcUsage>>),
+    /// Nested case usage: `abstract case subcases : Case[0..*] :> cases, subcalculations { ... }`
+    /// (Systems Library `Cases.sysml:56`) and its `use case` / `verification` spellings. The
+    /// scope previously accepted only the `then`/`include` control-flow forms, so a plain nested
+    /// case member was recovered text.
+    UseCaseUsage(Box<Node<UseCaseUsage>>),
+    /// Nested `case` usage, e.g. `abstract case subcases : Case[0..*] :> cases, subcalculations
+    /// { ... }` (Systems Library `Cases.sysml:56`).
+    CaseUsage(Box<Node<CaseUsage>>),
+    /// Nested `verification` usage, e.g. `abstract verification subVerificationCases :
+    /// VerificationCase[0..*] :> verificationCases, subcases { ... }`
+    /// (`VerificationCases.sysml:42`).
+    VerificationCaseUsage(Box<Node<VerificationCaseUsage>>),
     /// `attribute` usage / directed `in attribute …` (validation `10c`/`10d`).
     AttributeUsage(Node<AttributeUsage>),
     /// Directed `in requirement …` parameter (validation `10c`).

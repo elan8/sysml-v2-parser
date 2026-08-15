@@ -88,6 +88,6 @@ package 'State Actions' {
 (parsed-document
   (references
   )
-  (root (package (name "State Actions") (body (attribute-def) (attribute-def) (attribute-def) (part-def (name "Vehicle") (body semicolon)) (action-usage) (state-def (name "VehicleStates") (body (inout-declaration))) (state-usage))))
+  (root (package (name "State Actions") (body brace (attribute-def) (attribute-def) (attribute-def) (part-def (name "Vehicle") (body semicolon)) (action-usage) (state-def (name "VehicleStates") (body brace (inout-declaration))) (state-usage))))
 )
 ~~~

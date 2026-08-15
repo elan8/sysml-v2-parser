@@ -70,6 +70,6 @@ package 'Parts Example-1' {
 (parsed-document
   (references
   )
-  (root (package (name "Parts Example-1") (body (part-def (name "Vehicle") (body (part-usage))) (part-def (name "Engine") (body (part-usage))) (part-def (name "Cylinder") (body semicolon)) (part-usage) (part-usage))))
+  (root (package (name "Parts Example-1") (body brace (part-def (name "Vehicle") (body brace (part-usage))) (part-def (name "Engine") (body brace (part-usage))) (part-def (name "Cylinder") (body semicolon)) (part-usage) (part-usage))))
 )
 ~~~

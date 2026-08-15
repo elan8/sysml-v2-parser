@@ -66,7 +66,38 @@ fn projected_ref(owner_declaration: &str, ref_name: &str) -> String {
     }
     result.push_str(rest);
     assert!(labels > 0, "expected reference labels in {result}");
-    result
+
+    // Spans are position, and position differs by construction here: the owners have
+    // different keyword lengths, so the same member sits at a different offset under each.
+    // Erase them the same way reference labels are erased, so the comparison is about which
+    // members the body holds.
+    let mut without_spans = String::new();
+    let mut rest = result.as_str();
+    while let Some(index) = rest.find("(span (offset ") {
+        without_spans.push_str(&rest[..index]);
+        without_spans.push_str("(span N)");
+        let after = &rest[index..];
+        let end = after
+            .find(')')
+            .and_then(|_| {
+                after
+                    .char_indices()
+                    .scan(0i32, |depth, (i, c)| {
+                        match c {
+                            '(' => *depth += 1,
+                            ')' => *depth -= 1,
+                            _ => {}
+                        }
+                        Some((i, *depth))
+                    })
+                    .find(|(_, depth)| *depth == 0)
+                    .map(|(i, _)| i + 1)
+            })
+            .expect("a balanced span form");
+        rest = &after[end..];
+    }
+    without_spans.push_str(rest);
+    without_spans
 }
 
 #[test]
@@ -86,7 +117,7 @@ fn every_owner_projects_the_same_ref_body() {
     // the members, or it cannot detect a difference in them.
     assert!(
         first.contains("(doc)")
-            && first.contains("(comment)")
+            && first.contains("(comment (keyword ")
             && first.contains("(textual-rep)")
             && first.contains("(attribute-usage")
             && first.contains("(ref (name \"nested\")"),

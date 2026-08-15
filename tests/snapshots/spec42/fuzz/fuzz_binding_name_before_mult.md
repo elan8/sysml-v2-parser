@@ -28,6 +28,6 @@ package P {
 (parsed-document
   (references
   )
-  (root (package (name "P") (body (binding-connector-usage))))
+  (root (package (name "P") (body brace (binding-connector-usage))))
 )
 ~~~

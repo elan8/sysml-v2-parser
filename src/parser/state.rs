@@ -288,6 +288,8 @@ fn exit_action_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExitAction>> {
 /// Ref in state body: `ref` (`state`)? name (`:` type)? (`:>>` / `:>` redeclarations)? body
 fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
+    // `BasicUsagePrefix = RefPrefix ('ref')?` -- see `connector::ref_decl`.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
@@ -340,7 +342,10 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             start,
             input,
             RefDecl {
-                direction: None,
+                is_derived: prefix.is_derived,
+                usage_prefix: prefix.usage_prefix,
+                is_constant: prefix.is_constant,
+                direction: prefix.direction,
                 kind_keyword: None,
                 name: name_str,
                 typing,

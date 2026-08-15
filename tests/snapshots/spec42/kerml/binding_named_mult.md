@@ -29,6 +29,6 @@ package BindingNamedMult {
 (parsed-document
   (references
   )
-  (root (package (name "BindingNamedMult") (body (binding-connector-usage) (binding-connector-usage) (binding-connector-usage) (binding-connector-usage))))
+  (root (package (name "BindingNamedMult") (body brace (binding-connector-usage) (binding-connector-usage) (binding-connector-usage) (binding-connector-usage))))
 )
 ~~~

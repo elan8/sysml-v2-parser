@@ -34,6 +34,6 @@ package P {
 (parsed-document
   (references
   )
-  (root (package (name "P") (body (calc-def) (attribute-def) (attribute-def))))
+  (root (package (name "P") (body brace (calc-def) (attribute-def) (attribute-def))))
 )
 ~~~

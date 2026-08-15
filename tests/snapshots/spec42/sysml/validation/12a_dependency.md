@@ -56,6 +56,6 @@ package '12a-Dependency' {
     (reference r5 (scope relative) (span (offset 284) (line 14) (column 18) (len 1)) (segments (segment 0 (token "x") (name "x") (separator none) (span (offset 284) (line 14) (column 18) (len 1)))))
     (reference r6 (scope relative) (span (offset 287) (line 14) (column 21) (len 1)) (segments (segment 0 (token "y") (name "y") (separator none) (span (offset 287) (line 14) (column 21) (len 1)))))
   )
-  (root (package (name "12a-Dependency") (body (package (name "Application Layer") (body semicolon)) (package (name "Service Layer") (body semicolon)) (package (name "Data Layer") (body semicolon)) (dependency (clients (ref r0)) (suppliers (ref r1))) (dependency (clients (ref r2)) (suppliers (ref r3))) (attribute-def) (attribute-def) (attribute-def) (dependency (clients (ref r4)) (suppliers (ref r5) (ref r6))))))
+  (root (package (name "12a-Dependency") (body brace (package (name "Application Layer") (body semicolon)) (package (name "Service Layer") (body semicolon)) (package (name "Data Layer") (body semicolon)) (dependency (clients (ref r0)) (suppliers (ref r1)) (body none)) (dependency (clients (ref r2)) (suppliers (ref r3)) (body none)) (attribute-def) (attribute-def) (attribute-def) (dependency (clients (ref r4)) (suppliers (ref r5) (ref r6)) (body none)))))
 )
 ~~~

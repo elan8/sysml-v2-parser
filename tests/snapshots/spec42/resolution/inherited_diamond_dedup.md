@@ -33,6 +33,6 @@ package Diamond {
 (parsed-document
   (references
   )
-  (root (package (name "Diamond") (body (part-def (name "Base") (body (part-def (name "Member") (body semicolon)))) (part-def (name "Left") (body semicolon)) (part-def (name "Right") (body semicolon)) (part-def (name "Diamond") (body (part-usage))))))
+  (root (package (name "Diamond") (body brace (part-def (name "Base") (body brace (part-def (name "Member") (body semicolon)))) (part-def (name "Left") (body semicolon)) (part-def (name "Right") (body semicolon)) (part-def (name "Diamond") (body brace (part-usage))))))
 )
 ~~~

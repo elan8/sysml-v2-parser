@@ -97,6 +97,6 @@ package 'Viewpoint Example' {
 (parsed-document
   (references
   )
-  (root (package (name "Viewpoint Example") (body (part-def (name "Systems Engineer") (body semicolon)) (part-def (name "IV&V") (body semicolon)) (concern-usage) (concern-usage) (viewpoint-usage))))
+  (root (package (name "Viewpoint Example") (body brace (part-def (name "Systems Engineer") (body semicolon)) (part-def (name "IV&V") (body semicolon)) (concern-usage) (concern-usage) (viewpoint-usage))))
 )
 ~~~

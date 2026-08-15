@@ -78,6 +78,6 @@ package '14a-Language Extensions' {
   (references
     (reference r0 (scope relative) (span (offset 52) (line 2) (column 17) (len 25)) (segments (segment 0 (token "'User Defined Extensions'") (name "User Defined Extensions") (separator none) (span (offset 52) (line 2) (column 17) (len 25)))))
   )
-  (root (package (name "14a-Language Extensions") (body (import (target (span (span (offset 52) (line 2) (column 17) (len 28))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 77) (line 2) (column 42) (len 3))) (separator (span (offset 77) (line 2) (column 42) (len 2))) (marker (span (offset 79) (line 2) (column 44) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "User Defined Extensions") (body (enum-def) (metadata-def))) (part-usage) (part-usage))))
+  (root (package (name "14a-Language Extensions") (body brace (import (target (span (span (offset 52) (line 2) (column 17) (len 28))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 77) (line 2) (column 42) (len 3))) (separator (span (offset 77) (line 2) (column 42) (len 2))) (marker (span (offset 79) (line 2) (column 44) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "User Defined Extensions") (body brace (enum-def) (metadata-def))) (part-usage) (part-usage))))
 )
 ~~~

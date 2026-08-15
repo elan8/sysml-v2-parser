@@ -52,6 +52,6 @@ package Annotated {
 (parsed-document
   (references
   )
-  (root (metadata-def) (metadata-def) (package (name "Annotated") (body (metadata-annotation) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Engine") (body semicolon)) (metadata-usage) (metadata-keyword-usage) (part-def (name "AnnotatedPart") (body semicolon)) (metadata-keyword-usage) (metadata-keyword-usage) (part-def (name "MultiAnnotated") (body semicolon)))))
+  (root (metadata-def) (metadata-def) (package (name "Annotated") (body brace (metadata-annotation) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Engine") (body semicolon)) (metadata-usage) (metadata-keyword-usage) (part-def (name "AnnotatedPart") (body semicolon)) (metadata-keyword-usage) (metadata-keyword-usage) (part-def (name "MultiAnnotated") (body semicolon)))))
 )
 ~~~

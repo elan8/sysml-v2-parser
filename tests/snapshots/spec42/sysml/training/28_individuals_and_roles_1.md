@@ -64,6 +64,6 @@ package 'Individuals and Roles' {
   (references
     (reference r0 (scope relative) (span (offset 50) (line 2) (column 17) (len 25)) (segments (segment 0 (token "'Part Definition Example'") (name "Part Definition Example") (separator none) (span (offset 50) (line 2) (column 17) (len 25)))))
   )
-  (root (package (name "Individuals and Roles") (body (import (target (span (span (offset 50) (line 2) (column 17) (len 28))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 75) (line 2) (column 42) (len 3))) (separator (span (offset 75) (line 2) (column 42) (len 2))) (marker (span (offset 77) (line 2) (column 44) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-def (name "Wheel") (body semicolon)) (part-def (name "Vehicle_1") (body (part-usage) (part-usage))) (part-def (name "Wheel_1") (body semicolon)) (part-usage))))
+  (root (package (name "Individuals and Roles") (body brace (import (target (span (span (offset 50) (line 2) (column 17) (len 28))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 75) (line 2) (column 42) (len 3))) (separator (span (offset 75) (line 2) (column 42) (len 2))) (marker (span (offset 77) (line 2) (column 44) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-def (name "Wheel") (body semicolon)) (part-def (name "Vehicle_1") (body brace (part-usage) (part-usage))) (part-def (name "Wheel_1") (body semicolon)) (part-usage))))
 )
 ~~~

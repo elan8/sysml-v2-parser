@@ -94,6 +94,9 @@ pub(crate) fn emit_constraint_body_element(
         ConstraintDefBodyElement::FeatureDecl(declaration) => {
             super::structure::emit_default_reference_usage(w, path, &declaration.value)
         }
+        ConstraintDefBodyElement::RequireConstraint(require) => {
+            super::requirement::emit_require_constraint(w, path, &require.value)
+        }
         ConstraintDefBodyElement::AttributeUsage(a) => {
             // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).
             if a.value.redefines.is_some()
@@ -138,6 +141,9 @@ pub(crate) fn emit_calc_usage(
     if let Some(dir) = usage.direction {
         super::structure::emit_direction(w, dir);
     }
+    if usage.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str("calc ");
     let leading_target = usage.redefines.as_ref().and_then(|targets| {
         (targets.len() == 1
@@ -165,6 +171,9 @@ pub(crate) fn emit_calc_usage(
                 w.push_qualified_reference(&format!("{path}/redefines[{index}]"), target)?;
             }
         }
+    }
+    if let Some(subsets) = &usage.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
     }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
@@ -581,6 +590,9 @@ pub(crate) fn emit_view_def(
     def: &crate::ast::ViewDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    if def.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str("view def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -604,6 +616,15 @@ pub(crate) fn emit_view_def(
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
                     crate::ast::ViewDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::ViewDefBodyElement::RefDecl(r) => {
+                        crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
+                    crate::ast::ViewDefBodyElement::ViewpointUsage(v) => {
+                        emit_viewpoint_usage(w, path, &v.value)?
+                    }
+                    crate::ast::ViewDefBodyElement::Satisfy(s) => {
+                        crate::emit::requirement::emit_satisfy(w, path, &s.value)?
+                    }
                     crate::ast::ViewDefBodyElement::MetadataAnnotation(m) => {
                         super::structure::emit_metadata_annotation(w, path, &m.value)?;
                     }
@@ -685,6 +706,9 @@ pub(crate) fn emit_view_usage(
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &error.span)?
                     }
                     crate::ast::ViewBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::ViewBodyElement::RefDecl(r) => {
+                        crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
                     crate::ast::ViewBodyElement::Filter(f) => {
                         super::root::emit_filter(w, &f.value)?;
                     }
@@ -818,6 +842,9 @@ pub(crate) fn emit_rendering_def(
     def: &crate::ast::RenderingDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    if def.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str("rendering def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -841,6 +868,9 @@ pub(crate) fn emit_rendering_def(
                         w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                     }
                     crate::ast::RenderingDefBodyElement::Doc(d) => emit_doc(w, &d.value)?,
+                    crate::ast::RenderingDefBodyElement::RefDecl(r) => {
+                        crate::emit::structure::emit_ref_decl(w, path, &r.value)?
+                    }
                     crate::ast::RenderingDefBodyElement::Filter(f) => {
                         super::root::emit_filter(w, &f.value)?;
                     }

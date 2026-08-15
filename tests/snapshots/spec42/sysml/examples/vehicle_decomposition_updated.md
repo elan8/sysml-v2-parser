@@ -140,6 +140,6 @@ package 'Vehicle Decomposition - Updated' {
 (parsed-document
   (references
   )
-  (root (package (name "Vehicle Decomposition - Updated") (body (doc) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Chassis Assembly") (body semicolon)) (part-def (name "Wheel") (body semicolon)) (part-def (name "LugBolt") (body semicolon)) (part-def (name "RollBar") (body semicolon)) (part-def (name "HeavyRollBar") (body semicolon)) (part-def (name "LightRollBar") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Cylinder") (body semicolon)) (part-usage) (part-usage) (part-usage))))
+  (root (package (name "Vehicle Decomposition - Updated") (body brace (doc) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Chassis Assembly") (body semicolon)) (part-def (name "Wheel") (body semicolon)) (part-def (name "LugBolt") (body semicolon)) (part-def (name "RollBar") (body semicolon)) (part-def (name "HeavyRollBar") (body semicolon)) (part-def (name "LightRollBar") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Cylinder") (body semicolon)) (part-usage) (part-usage) (part-usage))))
 )
 ~~~

@@ -60,6 +60,6 @@ package ServerSequenceModelOutside {
   (references
     (reference r0 (scope relative) (span (offset 52) (line 2) (column 16) (len 19)) (segments (segment 0 (token "ServerSequenceModel") (name "ServerSequenceModel") (separator none) (span (offset 52) (line 2) (column 16) (len 19)))))
   )
-  (root (package (name "ServerSequenceModelOutside") (body (import (target (span (span (offset 52) (line 2) (column 16) (len 22))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 71) (line 2) (column 35) (len 3))) (separator (span (offset 71) (line 2) (column 35) (len 2))) (marker (span (offset 73) (line 2) (column 37) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-def (name "PubSubSequenceOutside") (body (part-usage) (part-usage) (part-usage))))))
+  (root (package (name "ServerSequenceModelOutside") (body brace (import (target (span (span (offset 52) (line 2) (column 16) (len 22))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 71) (line 2) (column 35) (len 3))) (separator (span (offset 71) (line 2) (column 35) (len 2))) (marker (span (offset 73) (line 2) (column 37) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-def (name "PubSubSequenceOutside") (body brace (part-usage) (part-usage) (part-usage))))))
 )
 ~~~

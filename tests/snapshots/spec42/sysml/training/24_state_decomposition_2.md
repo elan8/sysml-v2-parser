@@ -74,6 +74,6 @@ package 'State Decomposition-1' {
 (parsed-document
   (references
   )
-  (root (package (name "State Decomposition-1") (body (attribute-def) (attribute-def) (attribute-def) (state-def (name "VehicleStates") (body semicolon)) (state-usage))))
+  (root (package (name "State Decomposition-1") (body brace (attribute-def) (attribute-def) (attribute-def) (state-def (name "VehicleStates") (body semicolon)) (state-usage))))
 )
 ~~~

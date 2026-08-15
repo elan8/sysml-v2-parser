@@ -595,6 +595,16 @@ pub enum AnnotationHead {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartUsageBodyElement {
     Error(Node<ParseErrorNode>),
+    /// `end name;` / `end ref name;` inside a usage body, e.g. the two ends of the transfer
+    /// constraint in `ref :>> outgoingTransfersFromSelf :> ... { end ref source; end ref
+    /// target; }` (Systems Library `Ports.sysml:37`). Occurrence bodies already modelled this
+    /// member; part usage bodies did not.
+    EndDecl(Node<EndDecl>),
+    /// Directed parameter declaration with no kind keyword, e.g. `in :>> MessageTransfer::payload,
+    /// MessageAction::payload;` inside a `ref` body (Systems Library `Actions.sysml`). Port and
+    /// action bodies already modelled this member; part usage bodies did not, so the same line
+    /// was an unexpected keyword here.
+    InOutDecl(Node<InOutDecl>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
@@ -897,6 +907,8 @@ impl PartialEq for AttributeUsage {
             && self.is_derived == other.is_derived
             && self.is_constant == other.is_constant
             && self.is_end == other.is_end
+            && self.is_reference == other.is_reference
+            && self.usage_prefix == other.usage_prefix
             && self.membership == other.membership
     }
 }
@@ -1014,6 +1026,11 @@ pub enum PortDefBodyElement {
     /// APIS_HTTP { ... }`) -- previously port definition bodies had no `#`/`@` annotation support
     /// at all, unlike part/item/action/etc. bodies. See `PackageBodyElement::MetadataKeywordUsage`.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `abstract ref port interfacingPorts : Port[0..*]
+    /// nonunique :> ports { ... }` and `ref self: Port :>> Object::self;` (Systems Library
+    /// `Ports.sysml`). This scope accepted no `ref` member at all, so every one of them was
+    /// captured as unsupported grammar.
+    RefDecl(Node<RefDecl>),
 }
 
 /// Port usage: `port` name `:` type multiplicity? `:>` subsets? `redefines`? body.
@@ -1261,6 +1278,15 @@ pub struct RefDecl {
     /// `part def` body (`Simple Tests/ItemTest.sysml:15`). Only parsed by `part_ref_usage`;
     /// `connector::ref_decl`'s call sites have no confirmed real usage for a leading direction.
     pub direction: Option<InOut>,
+    /// `derived` from BNF `RefPrefix`, e.g. `derived ref item receiverArgument : Expression[0..1]
+    /// subsets Metadata::metadataItems;` (`sysml.library/Systems Library/SysML.sysml:14`).
+    pub is_derived: bool,
+    /// `abstract` or `variation` from `RefPrefix` -- alternatives there, so one field, matching
+    /// [`AttributeUsage::usage_prefix`]. E.g. `abstract ref port outgoingTransfersFromSelf : ...`
+    /// (`sysml.library/Systems Library/Ports.sysml`).
+    pub usage_prefix: Option<DefinitionPrefix>,
+    /// `constant` from `RefPrefix`. See [`AttributeUsage::is_constant`].
+    pub is_constant: bool,
     /// Kind keyword after `ref` (`ref item scene : Scene;`, `ref port :>> participant ...`).
     /// Previously parsed by `connector::ref_decl` and discarded, so formatting dropped the
     /// authored keyword.
@@ -1302,6 +1328,10 @@ pub struct RefDecl {
 impl PartialEq for RefDecl {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
+            && self.direction == other.direction
+            && self.is_derived == other.is_derived
+            && self.usage_prefix == other.usage_prefix
+            && self.is_constant == other.is_constant
             && self.kind_keyword == other.kind_keyword
             && self.typing == other.typing
             && self.redefines == other.redefines
@@ -1330,6 +1360,23 @@ pub enum RefDeclKind {
     /// `use case` (`ref use case self : UseCase :>> Case::self;`, Systems Library
     /// `UseCases.sysml`; spec42 Gap 34).
     UseCase,
+    /// `concern` (`ref concern :>> self: ConcernCheck;`, Systems Library `Requirements.sysml`).
+    Concern,
+    /// `viewpoint` (`ref viewpoint :>> self : ViewpointCheck;`, Systems Library `Views.sysml`).
+    Viewpoint,
+    /// `rendering` (`abstract ref rendering subrenderings : Rendering[0..*] :> renderings;`,
+    /// Systems Library `Views.sysml`).
+    Rendering,
+    /// `view` (`abstract ref view subviews : View[0..*] :> views { ... }`, Systems Library
+    /// `Views.sysml`).
+    View,
+    /// `action` (`private ref action thisConnection = self;`, Systems Library `Flows.sysml`).
+    Action,
+    /// `case` (`ref case self : Case :>> Calculation::self;`, Systems Library `Cases.sysml`).
+    Case,
+    /// `verification` (`ref verification self : VerificationCase :>> Case::self;`, Systems
+    /// Library `VerificationCases.sysml`).
+    Verification,
 }
 
 impl RefDeclKind {
@@ -1341,6 +1388,13 @@ impl RefDeclKind {
             Self::Item => "item",
             Self::Requirement => "requirement",
             Self::UseCase => "use case",
+            Self::Concern => "concern",
+            Self::Viewpoint => "viewpoint",
+            Self::Rendering => "rendering",
+            Self::View => "view",
+            Self::Action => "action",
+            Self::Case => "case",
+            Self::Verification => "verification",
         }
     }
 }
@@ -1620,6 +1674,14 @@ pub enum OccurrenceBodyElement {
     /// exhibits states just as a part usage does -- real usage: `exhibit vehicleStates.on { ... }`
     /// in the OMG spec Annex `6-Individual and Snapshots.sysml`.
     StateUsage(Node<StateUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `ref self : SuccessionFlow :>> Flow::self,
+    /// FlowTransfer::self;` and `private ref action thisConnection = self;` (Systems Library
+    /// `Flows.sysml`). Occurrence bodies accepted no `ref` member at all.
+    RefDecl(Node<RefDecl>),
+    /// Connection usage, e.g. `connection :HappensDuring connect sourceEvent to [1] self;`
+    /// (Systems Library `Flows.sysml`). Part and attribute bodies already dispatched this
+    /// member; occurrence bodies did not.
+    ConnectionUsage(Box<Node<ConnectionUsageMember>>),
 }
 
 /// Standalone succession usage directly in a definition/occurrence body (distinct from the

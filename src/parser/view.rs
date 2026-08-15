@@ -32,11 +32,20 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
     let (input, elem) = alt((
         map(doc_comment, ViewDefBodyElement::Doc),
         map(
+            crate::parser::connector::ref_decl,
+            ViewDefBodyElement::RefDecl,
+        ),
+        map(
             crate::parser::metadata_annotation::metadata_annotation,
             ViewDefBodyElement::MetadataAnnotation,
         ),
         map(view_filter_member, ViewDefBodyElement::Filter),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
+        map(viewpoint_usage, ViewDefBodyElement::ViewpointUsage),
+        map(
+            crate::parser::requirement::satisfy,
+            ViewDefBodyElement::Satisfy,
+        ),
         map(
             |i| {
                 crate::parser::recovery::unsupported_member(
@@ -205,6 +214,7 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
             input,
             ViewDef {
                 identification: prefix.identification,
+                is_abstract: prefix.is_abstract,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
@@ -246,6 +256,10 @@ fn rendering_def_body_element(
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
         map(doc_comment, RenderingDefBodyElement::Doc),
+        map(
+            crate::parser::connector::ref_decl,
+            RenderingDefBodyElement::RefDecl,
+        ),
         map(view_filter_member, RenderingDefBodyElement::Filter),
         map(view_rendering_usage, RenderingDefBodyElement::ViewRendering),
         map(
@@ -317,6 +331,7 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
             input,
             RenderingDef {
                 identification: prefix.identification,
+                is_abstract: prefix.is_abstract,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
@@ -330,6 +345,7 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
         map(doc_comment, ViewBodyElement::Doc),
+        map(crate::parser::connector::ref_decl, ViewBodyElement::RefDecl),
         map(view_filter_member, ViewBodyElement::Filter),
         map(view_rendering_usage, ViewBodyElement::ViewRendering),
         map(expose_member, ViewBodyElement::Expose),

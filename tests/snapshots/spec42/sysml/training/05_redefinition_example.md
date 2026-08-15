@@ -67,6 +67,6 @@ package 'Redefinition Example' {
 (parsed-document
   (references
   )
-  (root (package (name "Redefinition Example") (body (part-def (name "Vehicle") (body (part-usage))) (part-def (name "SmallVehicle") (body (part-usage))) (part-def (name "BigVehicle") (body (part-usage))) (part-def (name "Engine") (body (part-usage))) (part-def (name "SmallEngine") (body (part-usage))) (part-def (name "BigEngine") (body (part-usage))) (part-def (name "Cylinder") (body semicolon)))))
+  (root (package (name "Redefinition Example") (body brace (part-def (name "Vehicle") (body brace (part-usage))) (part-def (name "SmallVehicle") (body brace (part-usage))) (part-def (name "BigVehicle") (body brace (part-usage))) (part-def (name "Engine") (body brace (part-usage))) (part-def (name "SmallEngine") (body brace (part-usage))) (part-def (name "BigEngine") (body brace (part-usage))) (part-def (name "Cylinder") (body semicolon)))))
 )
 ~~~

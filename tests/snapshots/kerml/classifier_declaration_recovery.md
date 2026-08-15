@@ -31,6 +31,6 @@ standard library package Broken {
   (references
     (reference r0 (scope relative) (span (offset 62) (line 2) (column 29) (len 7)) (segments (segment 0 (token "Element") (name "Element") (separator none) (span (offset 62) (line 2) (column 29) (len 7)))))
   )
-  (root (library-package (name "Broken") (standard true) (body (kerml-classifier (keyword metaclass) (abstract false) (name "M") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r0))))))))
+  (root (library-package (name "Broken") (standard true) (body brace (kerml-classifier (keyword metaclass) (abstract false) (name "M") (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r0))))))))
 )
 ~~~

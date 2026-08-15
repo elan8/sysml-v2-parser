@@ -62,6 +62,11 @@ pub enum ConstraintDefBodyElement {
     /// Keyword-less feature declaration (`mass : Real;`): a constraint definition body is a
     /// `DefinitionBody`, so it owns usages as well as the constraint expression.
     FeatureDecl(Box<Node<crate::ast::DefaultReferenceUsage>>),
+    /// `require` / `assume` member, e.g. `require viewpointSatisfactions { ... }` inside a
+    /// `satisfy requirement ... by that { ... }` body (Systems Library `Views.sysml:43`). The
+    /// brace-bodied form previously fell through to the terminal expression arm, which consumed
+    /// the name and then could not account for the `{`.
+    RequireConstraint(Box<Node<crate::ast::RequireConstraint>>),
 }
 
 /// constraint body {}
@@ -89,7 +94,15 @@ pub struct CalcDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcUsage {
     pub identification: Identification,
+    /// `abstract` keyword, e.g. `abstract calc subcalculations : Calculation :> calculations,
+    /// subactions { ... }` (Systems Library `Calculations.sysml`). Parsed and discarded until
+    /// this field existed, so emission dropped it.
+    pub is_abstract: bool,
     pub type_name: Option<QualifiedReferenceId>,
+    /// `:>` subsets clause, which may name several comma-separated targets. Also previously
+    /// parsed and discarded, with a comment claiming `CalcUsage` "doesn't model subsetting
+    /// separately from redefines" -- it does now, because they are different relationships.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// Redefinition targets for `calc :>> name { … }` and multi-target trailing clauses.
     pub redefines: Option<Vec<QualifiedReferenceId>>,
     /// `= expr` / `:= expr` binding (`in calc scenario = cityScenario;`, validation `10c`).
@@ -225,6 +238,10 @@ impl ReturnKindKeyword {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewDef {
     pub identification: Identification,
+    /// `abstract` keyword, e.g. `abstract view def View :> Part { ... }` (Systems Library
+    /// `Views.sysml`). The definition prefix parser has always produced it; this struct had
+    /// nowhere to put it, so emission dropped the keyword.
+    pub is_abstract: bool,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ViewDefBody,
     pub membership: Membership,
@@ -232,6 +249,11 @@ pub struct ViewDef {
 
 pub type ViewDefBody = Body<ViewDefBodyElement>;
 
+// A `RefDecl` carries a typing, several relationship nodes and a body, making it inherently
+// larger than the `Doc`/`Error` variants beside it. Boxing just this one variant in just this one
+// enum would be inconsistent with the other body-element enums sharing the same
+// `RefDecl(Node<RefDecl>)` shape crate-wide -- see `RequirementDefBodyElement`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewDefBodyElement {
@@ -243,6 +265,17 @@ pub enum ViewDefBodyElement {
     MetadataAnnotation(Node<MetadataAnnotation>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `ref viewpoint :>> self : ViewpointCheck;` and
+    /// `abstract ref rendering subrenderings : Rendering[0..*] :> renderings;` (Systems Library
+    /// `Views.sysml`). This scope accepted no `ref` member at all.
+    RefDecl(Node<crate::ast::RefDecl>),
+    /// Nested viewpoint usage, e.g. `viewpoint viewpointSatisfactions : ViewpointCheck[0..*] :>
+    /// ...;` (Systems Library `Views.sysml`). Parsed by the same `viewpoint_usage` that package
+    /// and part bodies already dispatch.
+    ViewpointUsage(Node<ViewpointUsage>),
+    /// `satisfy requirement X by Y;`, e.g. `satisfy requirement viewpointConformance by
+    /// this;` (`Views.sysml`). The same `Satisfy` node part bodies already accept.
+    Satisfy(Node<crate::ast::Satisfy>),
 }
 
 /// View rendering usage: `render` name `:` type (`;` or body).
@@ -293,6 +326,10 @@ pub struct ViewpointDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderingDef {
     pub identification: Identification,
+    /// `abstract` keyword, e.g. `abstract view def View :> Part { ... }` (Systems Library
+    /// `Views.sysml`). The definition prefix parser has always produced it; this struct had
+    /// nowhere to put it, so emission dropped the keyword.
+    pub is_abstract: bool,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RenderingDefBody,
     pub membership: Membership,
@@ -300,6 +337,11 @@ pub struct RenderingDef {
 
 pub type RenderingDefBody = Body<RenderingDefBodyElement>;
 
+// A `RefDecl` carries a typing, several relationship nodes and a body, making it inherently
+// larger than the `Doc`/`Error` variants beside it. Boxing just this one variant in just this one
+// enum would be inconsistent with the other body-element enums sharing the same
+// `RefDecl(Node<RefDecl>)` shape crate-wide -- see `RequirementDefBodyElement`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderingDefBodyElement {
@@ -310,6 +352,10 @@ pub enum RenderingDefBodyElement {
     Doc(Node<DocComment>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `ref rendering :>> self : Rendering;` and
+    /// `abstract ref rendering subrenderings : Rendering[0..*] :> renderings { ... }` (Systems
+    /// Library `Views.sysml`).
+    RefDecl(Node<crate::ast::RefDecl>),
 }
 
 /// View usage: `view` name `:` type? ViewBody, or the anonymous redefinition form `view :>>
@@ -343,6 +389,11 @@ pub struct ViewUsage {
 
 pub type ViewBody = Body<ViewBodyElement>;
 
+// A `RefDecl` carries a typing, several relationship nodes and a body, making it inherently
+// larger than the `Doc`/`Error` variants beside it. Boxing just this one variant in just this one
+// enum would be inconsistent with the other body-element enums sharing the same
+// `RefDecl(Node<RefDecl>)` shape crate-wide -- see `RequirementDefBodyElement`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBodyElement {
@@ -352,6 +403,9 @@ pub enum ViewBodyElement {
     ViewRendering(Node<ViewRenderingUsage>),
     Expose(Node<ExposeMember>),
     Satisfy(Node<SatisfyViewMember>),
+    /// `ref`-prefixed feature declaration, e.g. `abstract ref rendering :>> viewRendering[0..1];`
+    /// inside `view columnView[0..*] ordered { ... }` (Systems Library `Views.sysml`).
+    RefDecl(Node<crate::ast::RefDecl>),
 }
 
 /// Expose in view body: `expose` (MembershipImport | NamespaceImport) RelationshipBody.

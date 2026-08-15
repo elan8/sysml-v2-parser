@@ -25,6 +25,6 @@ part def Vehicle {
 (parsed-document
   (references
   )
-  (root (part-def (name "Vehicle") (body )))
+  (root (part-def (name "Vehicle") (body brace)))
 )
 ~~~

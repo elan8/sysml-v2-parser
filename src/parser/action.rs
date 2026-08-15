@@ -25,7 +25,7 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
@@ -75,19 +75,6 @@ fn doc_comment_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Doc
     Ok((input, doc))
 }
 
-fn optional_multiplicity_brackets(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = opt(preceded(
-        ws_and_comments,
-        delimited(
-            tag(&b"["[..]),
-            nom::bytes::complete::take_until(&b"]"[..]),
-            tag(&b"]"[..]),
-        ),
-    ))
-    .parse(input)?;
-    Ok((input, ()))
-}
-
 /// Ref declaration inside an action body.
 ///
 /// The Systems Library uses `ref name :>> redefinesTarget: Type1, Type2 { ... }` in action
@@ -117,16 +104,24 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
         preceded(tag(&b"protected"[..]), ws1),
     )))
     .parse(input)?;
-    // `abstract ref :>> trailerHitch[1];` (OMG spec Annex `3c-Function-based Behavior-structure
-    // mod-2.sysml`) -- the modifier is accepted and discarded, matching `RefDecl`, which has no
-    // `is_abstract` field.
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // `BasicUsagePrefix = RefPrefix ('ref')?`, e.g. `abstract ref :>> trailerHitch[1];` (OMG spec
+    // Annex `3c-Function-based Behavior-structure mod-2.sysml`). The modifiers used to be accepted
+    // and discarded, because `RefDecl` had nowhere to put them.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = opt(preceded(tag(&b"action"[..]), ws1)).parse(input)?;
+    // The kind keyword is retained: `RefDecl::kind_keyword` models it, and dropping it made
+    // `derived ref action deferred : ActionUsage;` format back as `derived ref deferred : ...`.
+    let (input, kind_keyword) = opt(preceded(tag(&b"action"[..]), ws1))
+        .parse(input)
+        .map(|(input, kw)| (input, kw.map(|_| crate::ast::RefDeclKind::Action)))?;
     // `ref :>> name ...` (redefinition) may omit the name before `:>>`.
     let (input, parsed_name) = opt(with_span(name)).parse(input)?;
-    let (input, _) = optional_multiplicity_brackets(input)?;
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
     let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
 
     // Optional `:>>` redefines clause: `ref NAME :>> TARGET`.
@@ -160,6 +155,12 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
         }
     };
 
+    // `:>` subsets, independent of the `:>>` redefinition above: `derived ref action deferred :
+    // ActionUsage :> Metadata::metadataItems;`. Without this the clause reached the
+    // skip-to-terminator below and was swallowed whole.
+    let (input, subsets) = opt(preceded(ws_and_comments, crate::parser::usage::subsetting))
+        .parse(input)
+        .map(|(input, clause)| (input, clause.map(|(relationship, _value)| relationship)))?;
     let (input, _) = ws_and_comments(input)?;
     let (mut input, value) = opt(preceded(
         preceded(ws_and_comments, tag(&b"="[..])),
@@ -185,13 +186,16 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
             start,
             input,
             crate::ast::RefDecl {
-                direction: None,
-                kind_keyword: None,
+                is_derived: prefix.is_derived,
+                usage_prefix: prefix.usage_prefix,
+                is_constant: prefix.is_constant,
+                direction: prefix.direction,
+                kind_keyword,
                 name: name_str,
                 typing,
                 redefines,
-                subsets: None,
-                multiplicity: None,
+                subsets,
+                multiplicity,
                 ordered: false,
                 nonunique: false,
                 value,

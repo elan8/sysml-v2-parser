@@ -29,6 +29,6 @@ package Outer {
 (parsed-document
   (references
   )
-  (root (package (name "Outer") (body (package (name "Inner") (body )))))
+  (root (package (name "Outer") (body brace (package (name "Inner") (body brace)))))
 )
 ~~~

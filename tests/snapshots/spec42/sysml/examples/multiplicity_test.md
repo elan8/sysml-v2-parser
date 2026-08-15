@@ -56,6 +56,6 @@ package MultiplicityTest {
 (parsed-document
   (references
   )
-  (root (package (name "MultiplicityTest") (body (part-def (name "P") (body semicolon)) (attribute-def) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (attribute-def))))
+  (root (package (name "MultiplicityTest") (body brace (part-def (name "P") (body semicolon)) (attribute-def) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (attribute-def))))
 )
 ~~~

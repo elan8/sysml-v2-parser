@@ -227,6 +227,32 @@ pub(crate) fn end_decl(
         ));
     }
 
+    // A bare `end ref source;` (Systems Library `Ports.sysml`) declares the end by name only --
+    // no typing, no reference subsetting, no nested usage. Every branch above and below requires
+    // one of those, so the member had no path at all.
+    {
+        let (after_ws, _) = ws_and_comments(input)?;
+        if after_ws.fragment().starts_with(b";") {
+            let (rest, _) = tag(&b";"[..]).parse(after_ws)?;
+            return Ok((
+                rest,
+                node_from_to(
+                    start,
+                    rest,
+                    EndDecl {
+                        identity,
+                        typing: None,
+                        references: None,
+                        multiplicity: leading_multiplicity,
+                        redefines: None,
+                        crosses: None,
+                        nested_usage: None,
+                        type_ref_span: None,
+                    },
+                ),
+            ));
+        }
+    }
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, (tilde, (type_ref_span, type_reference))) = preceded(
         ws_and_comments,
@@ -292,6 +318,12 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // Visibility prefix (BNF `MemberPrefix`), e.g. `protected ref thisParticipant :>> self;`
     // (Systems Library `Interfaces.sysml`).
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    // `BasicUsagePrefix = RefPrefix ('ref')?` -- the modifiers ahead of `ref` are part of the same
+    // production, e.g. `derived ref item receiverArgument : Expression[0..1] subsets
+    // Metadata::metadataItems;` (`sysml.library/Systems Library/SysML.sysml:14`) and `abstract ref
+    // port outgoingTransfersFromSelf : ...` (`Systems Library/Ports.sysml`). Without them the
+    // whole member fell through to unsupported-grammar capture.
+    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, kind_keyword) = opt(preceded(
@@ -307,6 +339,24 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             // spec42 Gap 34).
             map((tag(&b"use"[..]), ws1, tag(&b"case"[..]), ws1), |_| {
                 crate::ast::RefDeclKind::UseCase
+            }),
+            map((tag(&b"concern"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Concern
+            }),
+            map((tag(&b"viewpoint"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Viewpoint
+            }),
+            map((tag(&b"rendering"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Rendering
+            }),
+            map((tag(&b"view"[..]), ws1), |_| crate::ast::RefDeclKind::View),
+            map((tag(&b"action"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Action
+            }),
+            // After the `use case` arm above, so `use case` is never read as a bare `case`.
+            map((tag(&b"case"[..]), ws1), |_| crate::ast::RefDeclKind::Case),
+            map((tag(&b"verification"[..]), ws1), |_| {
+                crate::ast::RefDeclKind::Verification
             }),
         )),
     ))
@@ -368,8 +418,29 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     // `:>` subsets, independent of and in addition to `:>>` redefines, e.g. `ref requirement
     // originalRequirement[1] :>> originalRequirements :> participant { ... }` (Systems Library
     // `Domain Libraries/Requirement Derivation/DerivationConnections.sysml`).
-    let (input, subsets) = opt(preceded(ws_and_comments, subsetting)).parse(input)?;
-    let subsets = subsets.map(|(target, _value)| target);
+    //
+    // Both kinds may repeat, and they may interleave: `derived ref item subjectParameter :
+    // Usage[1..1] subsets parameter, usage subsets Metadata::metadataItems;`
+    // (`sysml.library/Systems Library/SysML.sysml:78`) writes two `subsets` clauses. Only these
+    // two kinds are read, because they are the only two `RefDecl` can hold -- a `::>`/`=>`
+    // clause stays unconsumed and is reported rather than silently dropped.
+    let (input, subsets, redefines) = {
+        let mut input = input;
+        let mut subsets: Option<Node<crate::ast::SubsettingRelationship>> = None;
+        let mut redefines = redefines;
+        loop {
+            let (after_ws, _) = ws_and_comments(input)?;
+            if let Ok((rest, (relationship, _value))) = subsetting(after_ws) {
+                crate::parser::usage::merge_into(&mut subsets, relationship);
+                input = rest;
+            } else if let Ok((rest, relationship)) = redefinition(after_ws) {
+                crate::parser::usage::merge_into(&mut redefines, relationship);
+                input = rest;
+            } else {
+                break (input, subsets, redefines);
+            }
+        }
+    };
     // `nonunique`/`ordered` feature modifiers may also follow the specialization clauses
     // (real usage: `Interfaces.sysml`'s `ref port :>> participant : Port [2..*] nonunique
     // ordered { ... }`).
@@ -385,7 +456,10 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             start,
             input,
             RefDecl {
-                direction: None,
+                is_derived: prefix.is_derived,
+                usage_prefix: prefix.usage_prefix,
+                is_constant: prefix.is_constant,
+                direction: prefix.direction,
                 kind_keyword,
                 name: name_str,
                 typing,

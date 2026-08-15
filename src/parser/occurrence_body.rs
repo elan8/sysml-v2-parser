@@ -104,7 +104,16 @@ fn occurrence_definition_body_with_labels<'a>(
         recovery_code,
         |input| {
             let start = input;
+            // Structured first, opaque capture only as the fallback -- the order every other
+            // body uses. Reversed, the capture claimed every member whose first token is one of
+            // the opaque starters, so `private attribute seBeforeNum : Natural[1] = ...;`
+            // (`sysml.library/Systems Library/Flows.sysml`) was captured whole even though
+            // `attribute_usage` parses a visibility prefix perfectly well.
             let (input, element) = nom::branch::alt((
+                nom::combinator::map(
+                    occurrence_body_element,
+                    DefinitionBodyElement::OccurrenceMember,
+                ),
                 nom::combinator::map(
                     |i| {
                         crate::parser::recovery::unsupported_member(
@@ -114,10 +123,6 @@ fn occurrence_definition_body_with_labels<'a>(
                         )
                     },
                     DefinitionBodyElement::Unsupported,
-                ),
-                nom::combinator::map(
-                    occurrence_body_element,
-                    DefinitionBodyElement::OccurrenceMember,
                 ),
             ))
             .parse(input)?;
@@ -232,8 +237,15 @@ pub(crate) fn directed_occurrence_usage(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
+    // `event` is accepted alongside `occurrence` because `in event occurrence sourceEvent [1]
+    // default that.sourceEvent;` (Systems Library `Flows.sysml`) writes the event keyword between
+    // the direction and the kind keyword; `occurrence_usage` below decides what the pair means.
+    // A kind keyword is still required, so plain `in name : Type;` parameters stay on
+    // `in_out_decl`.
     let (peek, _) = ws_and_comments(input)?;
-    if !crate::parser::lex::starts_with_keyword(peek.fragment(), b"occurrence") {
+    if !crate::parser::lex::starts_with_keyword(peek.fragment(), b"occurrence")
+        && !crate::parser::lex::starts_with_keyword(peek.fragment(), b"event")
+    {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -627,6 +639,10 @@ pub(crate) fn occurrence_body_element(
         map(then_timeslice_usage, |n| {
             OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
         }),
+        // Before the undirected `occurrence_usage` arm, which would stop at the direction.
+        map(directed_occurrence_usage, |n| {
+            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
+        }),
         map(occurrence_usage, |n| {
             OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
         }),
@@ -636,6 +652,15 @@ pub(crate) fn occurrence_body_element(
         map(
             exhibit_state_as_state_usage,
             OccurrenceBodyElement::StateUsage,
+        ),
+        map(crate::parser::part::connection_usage_member, |n| {
+            OccurrenceBodyElement::ConnectionUsage(Box::new(n))
+        }),
+        // Last of the structured arms: `ref_decl` accepts a bare `ref` with no kind keyword, so
+        // trying it earlier would claim members the kinded parsers above own.
+        map(
+            crate::parser::connector::ref_decl,
+            OccurrenceBodyElement::RefDecl,
         ),
     ))
     .parse(input)?;
