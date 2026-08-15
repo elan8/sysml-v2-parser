@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An action-body `ref` declaration keeps its kind keyword, multiplicity and `:>` clause.**
+  `action_ref_decl_inner` parsed the `action` keyword and the multiplicity only to discard them,
+  never parsed a subsetting clause at all, and ended with a skip-to-terminator that swallowed
+  whatever was left -- so `derived ref action deferred : ActionUsage :> Metadata::metadataItems;`
+  formatted back as `derived ref deferred : ActionUsage;`. **AST version 152 -> 153.**
+
+### Changed
+
+- **Ref and attribute usage projections name the `RefPrefix` chain.** The semantic projection
+  recorded neither `derived`/`abstract`/`variation`/`constant` nor the direction, so a snapshot
+  could not distinguish `derived abstract constant ref attribute x` from a bare `attribute x`,
+  and the fields added for those keywords had no structural coverage at all.
+
 - **Body expressions accept undirected parameters, leading documentation, and parameter bodies.**
   `vertices->exists{p2 : Point; ...}` (`sysml.library/Domain Libraries/Geometry/ShapeItems.sysml`)
   declares an undirected parameter, which the grammar allows and the parser required a direction

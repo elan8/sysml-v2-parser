@@ -69,6 +69,6 @@ package ViewDefBodyMembers {
   (references
     (reference r0 (scope relative) (span (offset 630) (line 16) (column 46) (len 16)) (segments (segment 0 (token "interfacingPorts") (name "interfacingPorts") (separator none) (span (offset 630) (line 16) (column 46) (len 16)))))
   )
-  (root (package (name "ViewDefBodyMembers") (body (view-def) (part-def (name "Ports") (body (ref (name "outgoingTransfersFromSelf") (kind none) (typing none) (redefines none) (subsets (relationship (kind subsets) (implied false) (targets (ref r0)))) (body (end (identity (declaration (name "source") (span (offset 669) (line 17) (column 21) (len 6)))) (typing none) (references none) (redefines none) (crosses none)) (end (identity (declaration (name "target") (span (offset 697) (line 18) (column 21) (len 6)))) (typing none) (references none) (redefines none) (crosses none)))))) (rendering-def))))
+  (root (package (name "ViewDefBodyMembers") (body (view-def) (part-def (name "Ports") (body (ref (name "outgoingTransfersFromSelf") (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind none) (typing none) (redefines none) (subsets (relationship (kind subsets) (implied false) (targets (ref r0)))) (body (end (identity (declaration (name "source") (span (offset 669) (line 17) (column 21) (len 6)))) (typing none) (references none) (redefines none) (crosses none)) (end (identity (declaration (name "target") (span (offset 697) (line 18) (column 21) (len 6)))) (typing none) (references none) (redefines none) (crosses none)))))) (rendering-def))))
 )
 ~~~

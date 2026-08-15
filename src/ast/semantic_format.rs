@@ -1813,7 +1813,25 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
     fn write_ref_declaration(&mut self, declaration: &super::RefDecl) -> io::Result<()> {
         self.writer.write_str("(ref (name ")?;
         write_quoted(self.writer, &declaration.name)?;
-        self.writer.write_str(") (kind ")?;
+        // BNF `RefPrefix`, projected because these keywords are authored syntax the emitter
+        // reproduces: without them a snapshot could not tell `derived ref item x` from `ref
+        // item x`, which is precisely the distinction the fields were added to hold.
+        self.writer.write_str(") (prefix (direction ")?;
+        match declaration.direction {
+            Some(InOut::In) => self.writer.write_str("in")?,
+            Some(InOut::Out) => self.writer.write_str("out")?,
+            Some(InOut::InOut) => self.writer.write_str("inout")?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(self.writer, ") (derived {})", declaration.is_derived)?;
+        self.writer.write_str(" (usage-prefix ")?;
+        match declaration.usage_prefix {
+            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str("abstract")?,
+            Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(self.writer, ") (constant {}))", declaration.is_constant)?;
+        self.writer.write_str(" (kind ")?;
         match declaration.kind_keyword {
             Some(kind) => self.writer.write_str(kind.as_str())?,
             None => self.writer.write_str("none")?,
@@ -2368,6 +2386,21 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
         self.write_usage_declaration_name(&usage.name)?;
         self.writer.write_str(") (direction ")?;
         self.write_direction(usage.direction)?;
+        // BNF `RefPrefix` plus the `ref` of `BasicUsagePrefix`: authored keywords the emitter
+        // reproduces, so the projection has to name them or a snapshot cannot tell `derived
+        // abstract constant ref attribute x` from a bare `attribute x`.
+        write!(self.writer, ") (derived {})", usage.is_derived)?;
+        self.writer.write_str(" (usage-prefix ")?;
+        match usage.usage_prefix {
+            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str("abstract")?,
+            Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(
+            self.writer,
+            ") (constant {}) (reference {}) (end {}",
+            usage.is_constant, usage.is_reference, usage.is_end
+        )?;
         self.writer.write_str(") (typing ")?;
         if let Some(typing) = &usage.typing {
             self.write_typing(&typing.value)?;

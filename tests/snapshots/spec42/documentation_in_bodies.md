@@ -80,6 +80,6 @@ package DocTests {
   (references
     (reference r0 (scope relative) (span (offset 552) (line 26) (column 19) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 552) (line 26) (column 19) (len 7)))))
   )
-  (root (package (name "DocTests") (body (doc) (part-def (name "Vehicle") (body (doc) (attribute-usage (declaration-name "speed") (direction none) (typing none) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-def) (enum-def) (part-usage) (item-def) (alias (name "Car") (target (ref r0)) (body brace (element-count 1))))))
+  (root (package (name "DocTests") (body (doc) (part-def (name "Vehicle") (body (doc) (attribute-usage (declaration-name "speed") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))) (attribute-def) (enum-def) (part-usage) (item-def) (alias (name "Car") (target (ref r0)) (body brace (element-count 1))))))
 )
 ~~~
