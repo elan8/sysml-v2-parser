@@ -2116,6 +2116,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             Some(name) => write_quoted(self.writer, name)?,
             None => self.writer.write_str("none")?,
         }
+        self.writer.write_str(") (about")?;
+        for target in &comment.about_targets {
+            self.writer.write_char(' ')?;
+            self.write_reference(*target)?;
+        }
         self.writer.write_str(") (locale ")?;
         match &comment.locale {
             Some(locale) => write_quoted(self.writer, locale)?,

@@ -105,6 +105,6 @@ package AnnotatingUsageScopes {
 (parsed-document
   (references
   )
-  (root (package (name "AnnotatingUsageScopes") (body brace (part-usage) (view (name "v") (type none) (body brace (doc) (comment (keyword (span (offset 723) (line 24) (column 9) (len 7))) (name none) (locale none)) (textual-rep) (metadata-annotation) (view-rendering))))))
+  (root (package (name "AnnotatingUsageScopes") (body brace (part-usage) (view (name "v") (type none) (body brace (doc) (comment (keyword (span (offset 723) (line 24) (column 9) (len 7))) (name none) (about) (locale none)) (textual-rep) (metadata-annotation) (view-rendering))))))
 )
 ~~~

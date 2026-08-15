@@ -750,6 +750,7 @@ pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<C
             CommentAnnotation {
                 keyword_span: None,
                 identification: None,
+                about_targets: Vec::new(),
                 locale: Some(locale),
                 text,
             },
@@ -757,63 +758,58 @@ pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<C
     ))
 }
 
-/// KerML Comment: ( 'comment' Identification? )? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
+/// KerML Comment: `( 'comment' Identification ( 'about' Annotation ( ',' Annotation )* )? )?
+/// ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT` (8.2.3.3.2).
+///
+/// Wrapped in a reference transaction because the `about` clause allocates qualified references
+/// and this parser is tried speculatively: a comment that fails after its targets are read must
+/// not leave them in the document's arena.
 pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
+    crate::parser::span::reference_transaction(input, comment_annotation_inner)
+}
+
+fn comment_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
     let start = input;
     let (keyword_start, _) = ws_and_comments(input)?;
     let (input, keyword) = tag(&b"comment"[..]).parse(keyword_start)?;
     let keyword_span = node_from_to(keyword_start, input, ()).span;
     let _ = keyword;
     let (input, _) = ws1(input)?;
-    let (input, ident_parsed, locale) = if input.fragment().starts_with(b"/*") {
-        // The body follows the keyword directly. Without this guard `identification` below skips
-        // the body as trivia and takes the *next* member's keyword as this comment's name, so
-        // `comment /* a */ doc /* b */` parses as one comment named `doc` and the doc member
-        // disappears with no diagnostic. `doc_comment` guards the same way.
-        (input, None, None)
-    } else if starts_with_keyword(input.fragment(), b"about") {
-        // The `about` clause takes the place of an identification, so it must not be parsed as
-        // one: `comment about BMS /* ... */` names no comment.
-        (input, None, None)
-    } else if starts_with_keyword(input.fragment(), b"locale") {
-        // GH-91.1: `comment locale "en_US" /* ... */` (no identification) -- without this
-        // guard, `identification` below greedily consumes the bare word `locale` itself as the
-        // comment's own name, leaving nothing for the subsequent `locale` keyword check to
-        // match. This is exactly the shape `emit_comment` produces for a `CommentAnnotation`
-        // with `identification: None, locale: Some(..)` (e.g. from `bare_locale_comment`'s
-        // identification-less form), so without this fix that emitted output would fail to
-        // roundtrip.
-        let (input, locale) = preceded(
-            preceded(ws_and_comments, tag(&b"locale"[..])),
-            preceded(ws1, string_value),
-        )
-        .parse(input)?;
-        (input, None, Some(locale))
+    // Each guard keeps `identification` from claiming something that is not a name. The body
+    // guard is the important one: `identification` skips block comments as trivia, so without it
+    // `comment /* a */ doc /* b */` parses as one comment named `doc` and the doc member
+    // disappears with no diagnostic. `about` and `locale` are keywords of this same production
+    // (GH-91.1), and a bare `locale` would otherwise be taken as the comment's own name.
+    let (input, ident_parsed) = if input.fragment().starts_with(b"/*")
+        || starts_with_keyword(input.fragment(), b"about")
+        || starts_with_keyword(input.fragment(), b"locale")
+    {
+        (input, None)
     } else {
-        let (input, ident_parsed) = opt(identification).parse(input)?;
-        // `ws`, not `ws_and_comments`: this member's own `/* ... */` body must terminate the
-        // search for an optional `locale`. Skipping comments walked straight past the body and
-        // found the *next* member's `locale`, fusing two members into one and discarding this
-        // one's text with no diagnostic -- `comment named /* two */` followed by `locale "en_US"
-        // /* three */` became a single comment named `named`, in locale `en_US`, whose text was
-        // ` three `. The same hazard the `/*` guard above and the body scan below document.
-        let (input, locale) = opt(preceded(
-            preceded(ws, tag(&b"locale"[..])),
-            preceded(ws1, string_value),
-        ))
-        .parse(input)?;
-        (input, ident_parsed, locale)
+        opt(identification).parse(input)?
     };
-    // `comment about x /* ... */` is grammar-legal (KerML 8.2.3.3.2). Its targets are not modelled
-    // yet, so the clause is skipped -- but only when `about` is actually written. Scanning for the
-    // body unconditionally would let a comment run past the end of its own member.
+    // `comment about x, y /* ... */`. The clause used to be skipped with an unbounded
+    // `take_until("/*")`, which is a raw substring search across the rest of the document: it ran
+    // past this member's own end, past the enclosing `}`, and through however many later
+    // declarations it took to find a block comment, discarding all of them with no diagnostic --
+    // and it dropped the annotated elements themselves. The targets are parsed as the qualified
+    // references they are, and the scan is gone.
     let (peek, _) = ws(input)?;
-    let (input, _) = if starts_with_keyword(peek.fragment(), b"about") {
-        nom::bytes::complete::take_until::<_, _, nom::error::Error<Input>>(&b"/*"[..])
-            .parse(input)?
+    let (input, about_targets) = if starts_with_keyword(peek.fragment(), b"about") {
+        crate::parser::metadata_annotation::parse_about_targets(peek)?
     } else {
-        (input, input)
+        (input, Vec::new())
     };
+    // `ws`, not `ws_and_comments`: this member's own `/* ... */` body must terminate the search
+    // for an optional `locale`. Skipping comments walked straight past the body and found the
+    // *next* member's `locale`, fusing two members into one and discarding this one's text with
+    // no diagnostic -- `comment named /* two */` followed by `locale "en_US" /* three */` became
+    // a single comment named `named`, in locale `en_US`, whose text was ` three `.
+    let (input, locale) = opt(preceded(
+        preceded(ws, tag(&b"locale"[..])),
+        preceded(ws1, string_value),
+    ))
+    .parse(input)?;
     // Use ws so we don't consume the comment body as a block comment.
     let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
     let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
@@ -828,6 +824,7 @@ pub(crate) fn comment_annotation(input: Input<'_>) -> IResult<Input<'_>, Node<Co
             CommentAnnotation {
                 keyword_span: Some(keyword_span),
                 identification: ident,
+                about_targets,
                 locale,
                 text,
             },

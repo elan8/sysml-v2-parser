@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A comment's `about` clause is parsed instead of scanned past.**
+  `Comment = ( 'comment' Identification ( 'about' Annotation ( ',' Annotation )* )? )? …`, and the
+  clause was skipped with `take_until("/*")` -- a raw substring search with no bound. It ran past
+  the comment's own end, past the enclosing `}`, and through however many later declarations it
+  took to reach a block comment, discarding every one of them with no diagnostic:
+  `comment about` with no target consumed the `attribute mass;` after it, the closing brace, and
+  the whole next `part def`. The annotated elements were dropped too, and so was a `locale` that
+  followed them. `CommentAnnotation::about_targets` holds them as the qualified references they
+  are, emission reproduces them, and an incomplete clause is a recovery node with an exact span
+  that later siblings survive. Three checked-in spec fixtures get their annotated elements back.
+  **AST version 157 -> 158.**
+
 - **An `enum def` body keeps its annotating members instead of silently dropping them.**
   `EnumerationBody` is the one production that names the membership directly -- `';' | '{'
   ( ownedRelationship += AnnotatingMember | ownedRelationship += EnumerationUsageMember )* '}'` --

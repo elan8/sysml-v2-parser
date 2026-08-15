@@ -1890,12 +1890,15 @@ macro_rules! ast_traversal {
         pub fn walk_comment_annotation<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CommentAnnotation>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CommentAnnotation { keyword_span, identification, locale, text } = &$($mutability)? node.value;
+            let CommentAnnotation { keyword_span, identification, about_targets, locale, text } = &$($mutability)? node.value;
             if let Some(inner) = keyword_span {
                 visitor.visit_span(inner);
             }
             if let Some(inner) = identification {
                 visitor.visit_identification(inner);
+            }
+            for inner in about_targets {
+                visitor.visit_qualified_reference(inner);
             }
             if let Some(inner) = locale {
                 visitor.visit_text(inner);

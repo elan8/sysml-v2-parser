@@ -47,6 +47,6 @@ package AnnotatingEnumerationBody {
 (parsed-document
   (references
   )
-  (root (package (name "AnnotatingEnumerationBody") (body brace (enum-def (name "Level") (body brace (doc) (enum-value (name "low") (span (offset 106) (line 4) (column 9) (len 3))) (comment (keyword (span (offset 119) (line 5) (column 9) (len 7))) (name none) (locale none)) (enum-value (name "medium") (span (offset 160) (line 6) (column 9) (len 6))) (textual-rep) (metadata-annotation) (enum-value (name "high") (span (offset 260) (line 9) (column 9) (len 4))))))))
+  (root (package (name "AnnotatingEnumerationBody") (body brace (enum-def (name "Level") (body brace (doc) (enum-value (name "low") (span (offset 106) (line 4) (column 9) (len 3))) (comment (keyword (span (offset 119) (line 5) (column 9) (len 7))) (name none) (about) (locale none)) (enum-value (name "medium") (span (offset 160) (line 6) (column 9) (len 6))) (textual-rep) (metadata-annotation) (enum-value (name "high") (span (offset 260) (line 9) (column 9) (len 4))))))))
 )
 ~~~

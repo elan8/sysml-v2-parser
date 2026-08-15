@@ -565,6 +565,18 @@ pub(crate) fn emit_comment(
             }
             emit_identification(w, id);
         }
+        // `about` follows the identification in the production, and the elements it names are
+        // part of what the comment says. Omitting them once cost the reader the annotation
+        // itself; omitting them now would also fail the reparse gate.
+        if !comment.about_targets.is_empty() {
+            w.push_str(" about ");
+            for (index, target) in comment.about_targets.iter().enumerate() {
+                if index > 0 {
+                    w.push_str(", ");
+                }
+                w.push_qualified_reference("comment about target", *target)?;
+            }
+        }
         if let Some(locale) = &comment.locale {
             if has_keyword || comment.identification.is_some() {
                 w.push_char(' ');
