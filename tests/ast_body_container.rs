@@ -1,85 +1,19 @@
-//! The shared body container (`ast::Body`) and the distinctions it has to keep.
+//! Properties of the shared body container (`ast::Body`) that no snapshot can state.
 //!
 //! Every declaration body in the grammar is `;` or `{ ... }`, so one container carries that shape
-//! for every scope while the member set stays typed per scope. These tests pin the facts that
-//! sharing the container must not blur: an absent body is not an empty one, members keep their
-//! authored order, and each scope still accepts only its own members.
+//! for every scope while the member set stays typed per scope.
+//!
+//! That the two spellings stay distinct, and that members keep their authored order, is pinned by
+//! `tests/snapshots/sysml/body_container_forms.md`, whose AST section shows `(body semicolon)`
+//! beside the brace forms and lists members in order.
+//!
+//! What remains here is what a fixture cannot express: a type-level property asserted by
+//! construction, the serialized wire shape of the delimiters, and the rejection of a deserialized
+//! document whose delimiters point somewhere else. The delimiter *spans* are checked on every
+//! fixture by `serialized_provenance_corpus.rs`, which validates them during serialization; the
+//! test here states the invariant directly rather than as a side effect of that.
 
-use sysml_v2_parser::ast::{
-    Body, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RootElement, Span,
-};
-use sysml_v2_parser::{emit_sysml, parse};
-
-fn package_body(source: &str) -> PackageBody {
-    let root = parse(source).expect("parse");
-    match &root.elements[0].value {
-        RootElement::Package(package) => package.value.body.clone(),
-        other => panic!("expected a package, got {other:?}"),
-    }
-}
-
-fn first_part_def_body(source: &str) -> PartDefBody {
-    match package_body(source).braced_elements().expect("brace body") {
-        [element] => match &element.value {
-            PackageBodyElement::PartDef(part_def) => part_def.value.body.clone(),
-            other => panic!("expected a part def, got {other:?}"),
-        },
-        elements => panic!("expected exactly one member, got {}", elements.len()),
-    }
-}
-
-/// `;` and `{}` are different authored syntax, and a shared container must keep them different:
-/// one declares that the element owns no members, the other that it owns an empty body.
-#[test]
-fn a_semicolon_body_is_not_an_empty_brace_body() {
-    let semicolon = first_part_def_body("package P { part def A; }");
-    let empty_braces = first_part_def_body("package P { part def A {} }");
-
-    assert!(semicolon.is_semicolon());
-    assert!(!empty_braces.is_semicolon());
-    assert_ne!(semicolon, empty_braces);
-
-    assert_eq!(semicolon.braced_elements(), None);
-    assert_eq!(empty_braces.braced_elements(), Some(&[][..]));
-
-    // `members` deliberately flattens the two for consumers that only want members; that is why
-    // it is not the way to ask whether a body was written.
-    assert_eq!(semicolon.members().count(), 0);
-    assert_eq!(empty_braces.members().count(), 0);
-}
-
-/// The distinction survives a format/reparse cycle rather than collapsing to one spelling.
-#[test]
-fn the_semicolon_and_brace_forms_both_round_trip() {
-    for source in ["package P { part def A; }", "package P { part def A {} }"] {
-        let parsed = parse(source).expect("parse");
-        let emitted = emit_sysml(&parsed).expect("emit");
-        let reparsed =
-            parse(&emitted).unwrap_or_else(|error| panic!("reparse: {error}\n{emitted}"));
-        assert_eq!(
-            parsed.normalize_for_test_comparison(),
-            reparsed.normalize_for_test_comparison(),
-            "body form changed across format/reparse; emitted:\n{emitted}"
-        );
-    }
-}
-
-/// Members stay in authored order, including malformed ones, which is what lets a consumer report
-/// against source position without re-deriving it.
-#[test]
-fn members_keep_their_authored_order() {
-    let body = first_part_def_body(
-        "package P { part def A { attribute one : Real; attribute two : Real; } }",
-    );
-    let names: Vec<_> = body
-        .members()
-        .map(|member| match &member.value {
-            PartDefBodyElement::AttributeUsage(attribute) => attribute.value.name.clone(),
-            other => panic!("expected an attribute usage, got {other:?}"),
-        })
-        .collect();
-    assert_eq!(names, vec!["one".to_owned(), "two".to_owned()]);
-}
+use sysml_v2_parser::ast::{Body, PackageBody, PackageBodyElement, PartDefBody, RootElement, Span};
 
 /// Sharing the container does not share the member set: each scope still names its own element
 /// type, so a member cannot be moved to a scope whose grammar does not accept it. This is a
