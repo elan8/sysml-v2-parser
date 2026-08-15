@@ -151,6 +151,14 @@ not precedent: do not copy or extend them, and do not disguise them with compati
 - Generated sections are derived artifacts. Change `SOURCE` or the owning formatter, run the snapshot
   update tool, and review the complete diff. Check mode rejects stale output; tests must not silently
   rewrite fixtures.
+- For every diagnostic-free fixture with available typed emission, formatting must preserve the
+  span-insensitive semantic snapshot projection, and parsing then re-emitting `FORMAT` must reproduce
+  `FORMAT` byte-for-byte. Existing violations may be pinned only to an exact fixture path and
+  `SOURCE`/`FORMAT` fingerprint; no new or changed fixture inherits an exemption, and pins are removed
+  as their owning formatter paths are repaired. `SOURCE` need not already be canonical: prefer
+  canonical source for new hand-authored semantic fixtures, but do not rewrite imported, provenance,
+  recovery, malformed, or deliberately non-canonical input merely to obtain `(stable-idempotent)`.
+  Migrate existing fixtures gradually when their source or formatter is already in scope.
 - Express language behavior, provenance, diagnostics, recovery, and formatting in snapshots by
   default. Do not traverse concrete Rust fields merely to assert an observable parser result; extend
   the semantic snapshot projection when it cannot yet show the invariant. Reserve focused Rust tests

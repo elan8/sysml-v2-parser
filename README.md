@@ -90,6 +90,16 @@ not-yet-emittable syntax; in that case the snapshot remains valid and uses the d
 snapshot generation. The driver recomputes this choice from `SOURCE`; it never uses either
 sentinel as source text or as cached formatter output.
 
+For diagnostic-free, emittable fixtures whose formatter changes `SOURCE`, the driver strictly
+reparses the generated `FORMAT`, compares the two span-insensitive semantic S-expressions, and
+requires a second formatting pass to reproduce `FORMAT` byte-for-byte. Thus non-canonical authored
+input remains useful coverage while generated output is both meaning-preserving and stable. New
+hand-authored semantic fixtures should normally use canonical source; imported, provenance,
+recovery, malformed, and deliberately non-canonical source is migrated only when independently in
+scope. Four pre-existing violations are pinned in the driver to their exact fixture path and
+`SOURCE`/`FORMAT` fingerprint. Changing either payload re-enables the gate, so the baseline cannot
+hide new regressions and each pin can be removed independently when its formatter path is repaired.
+
 The driver delegates its AST section to the library's `ast::WriteSemanticAst` boundary, which
 streams bytes to any `std::io::Write` destination (for example a file or `Vec<u8>`). Its exhaustive
 enum matches make newly added AST variants a compile-time formatting decision.

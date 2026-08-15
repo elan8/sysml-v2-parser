@@ -7,6 +7,7 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::io::Write as _;
 
 use super::{
     ActionDefBodyElement, Argument, CaseReturnFeatureKind, CollectionOperator, ConnectBody,
@@ -37,21 +38,70 @@ pub trait WriteSemanticAst {
 
 impl WriteSemanticAst for ParsedDocument {
     fn write_semantic_ast<W: io::Write + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
+        self.write_semantic_ast_with_span_policy(writer, true)
+    }
+}
+
+impl ParsedDocument {
+    /// Write the exhaustive semantic projection with source coordinates normalized away.
+    ///
+    /// This is the cross-document comparison boundary for equivalent parses of different source
+    /// text. Reference IDs are resolved through each document's arena, so callers never compare
+    /// document-local IDs.
+    pub fn write_semantic_ast_for_comparison<W: io::Write + ?Sized>(
+        &self,
+        writer: &mut W,
+    ) -> io::Result<()> {
+        self.write_semantic_ast_with_span_policy(writer, false)
+    }
+
+    fn write_semantic_ast_with_span_policy<W: io::Write + ?Sized>(
+        &self,
+        writer: &mut W,
+        include_source_spans: bool,
+    ) -> io::Result<()> {
+        let mut output = SemanticOutput {
+            writer,
+            include_source_spans,
+        };
         // References precede the root in the wire view. Discover their stable semantic order with
         // the same streaming traversal, using a sink rather than allocating an intermediate tree.
         let mut labels = ReferenceLabels::default();
         {
             let mut sink = Sink;
-            SemanticWriter::new(self, &mut sink, &mut labels).write_root()?;
+            let mut sink_output = SemanticOutput {
+                writer: &mut sink,
+                include_source_spans,
+            };
+            SemanticWriter::new(self, &mut sink_output, &mut labels).write_root()?;
         }
 
-        writer.write_str("(parsed-document\n  (references")?;
+        output.write_str("(parsed-document\n  (references")?;
         for (index, id) in labels.in_order.iter().copied().enumerate() {
-            write_reference_definition(self, writer, index, id)?;
+            write_reference_definition(self, &mut output, index, id)?;
         }
-        writer.write_str("\n  )\n  ")?;
-        SemanticWriter::new(self, writer, &mut labels).write_root()?;
-        writer.write_str("\n)")
+        output.write_str("\n  )\n  ")?;
+        SemanticWriter::new(self, &mut output, &mut labels).write_root()?;
+        output.write_str("\n)")
+    }
+}
+
+struct SemanticOutput<'writer, W: io::Write + ?Sized> {
+    writer: &'writer mut W,
+    include_source_spans: bool,
+}
+
+impl<W: io::Write + ?Sized> io::Write for SemanticOutput<'_, W> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.writer.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
+
+    fn write_all(&mut self, bytes: &[u8]) -> io::Result<()> {
+        self.writer.write_all(bytes)
     }
 }
 
@@ -98,18 +148,18 @@ impl ReferenceLabels {
     }
 }
 
-struct SemanticWriter<'document, 'labels, 'writer, W: io::Write + ?Sized> {
+struct SemanticWriter<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized> {
     document: &'document ParsedDocument,
     labels: &'labels mut ReferenceLabels,
-    writer: &'writer mut W,
+    writer: &'output mut SemanticOutput<'writer, W>,
 }
 
-impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
-    SemanticWriter<'document, 'labels, 'writer, W>
+impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
+    SemanticWriter<'document, 'labels, 'output, 'writer, W>
 {
     fn new(
         document: &'document ParsedDocument,
-        writer: &'writer mut W,
+        writer: &'output mut SemanticOutput<'writer, W>,
         labels: &'labels mut ReferenceLabels,
     ) -> Self {
         Self {
@@ -3039,7 +3089,7 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
 
 fn write_reference_definition<W: io::Write + ?Sized>(
     document: &ParsedDocument,
-    writer: &mut W,
+    writer: &mut SemanticOutput<'_, W>,
     index: usize,
     id: QualifiedReferenceId,
 ) -> io::Result<()> {
@@ -3152,7 +3202,15 @@ fn write_quoted<W: io::Write + ?Sized>(writer: &mut W, value: &str) -> io::Resul
     writer.write_char('"')
 }
 
-fn write_span<W: io::Write + ?Sized>(writer: &mut W, span: &Span) -> io::Result<()> {
+fn write_span<W: io::Write + ?Sized>(
+    writer: &mut SemanticOutput<'_, W>,
+    span: &Span,
+) -> io::Result<()> {
+    let span = if writer.include_source_spans {
+        span
+    } else {
+        &Span::dummy()
+    };
     write!(
         writer,
         "(span (offset {}) (line {}) (column {}) (len {}))",
