@@ -1358,6 +1358,29 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             self.writer.write_char(' ')?;
             self.write_reference(*reference)?;
         }
+        // A dependency body owns the whole annotating production, so name its members: without
+        // them the projection could not show that a body holds a doc, a comment and a rep rather
+        // than some other mix, which is the only thing a relationship body can get wrong.
+        self.writer.write_str(") (body")?;
+        match &dependency.body_elements {
+            Some(elements) => {
+                for element in elements {
+                    self.writer.write_char(' ')?;
+                    match &element.value {
+                        super::RelationshipBodyElement::Annotating(member) => {
+                            self.write_annotating_member(member)?
+                        }
+                        super::RelationshipBodyElement::Error(error) => {
+                            self.write_malformed(&error.value, &element.span)?
+                        }
+                        super::RelationshipBodyElement::KermlFeature(_) => {
+                            self.writer.write_str("(kerml-feature)")?
+                        }
+                    }
+                }
+            }
+            None => self.writer.write_str(" none")?,
+        }
         self.writer.write_str("))")
     }
 

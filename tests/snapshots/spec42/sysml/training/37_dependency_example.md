@@ -70,6 +70,6 @@ package 'Dependency Example' {
     (reference r3 (scope relative) (span (offset 422) (line 26) (column 6) (len 32)) (segments (segment 0 (token "'Software Design'") (name "Software Design") (separator none) (span (offset 422) (line 26) (column 6) (len 17))) (segment 1 (token "MessageSchema") (name "MessageSchema") (separator colon-colon) (span (offset 441) (line 26) (column 25) (len 13)))))
     (reference r4 (scope relative) (span (offset 456) (line 26) (column 40) (len 29)) (segments (segment 0 (token "'Software Design'") (name "Software Design") (separator none) (span (offset 456) (line 26) (column 40) (len 17))) (segment 1 (token "DataSchema") (name "DataSchema") (separator colon-colon) (span (offset 475) (line 26) (column 59) (len 10)))))
   )
-  (root (package (name "Dependency Example") (body (part-usage) (package (name "Software Design") (body (item-def) (item-def))) (dependency (clients (ref r0)) (suppliers (ref r1))) (dependency (clients (ref r2)) (suppliers (ref r3) (ref r4))))))
+  (root (package (name "Dependency Example") (body (part-usage) (package (name "Software Design") (body (item-def) (item-def))) (dependency (clients (ref r0)) (suppliers (ref r1)) (body none)) (dependency (clients (ref r2)) (suppliers (ref r3) (ref r4)) (body none)))))
 )
 ~~~
