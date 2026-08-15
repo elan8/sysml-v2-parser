@@ -386,6 +386,11 @@ pub enum Expression {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CollectionOperatorBody {
     pub open_brace_span: Span,
+    /// Documentation written before the parameters, e.g. `alternatives->minimize { doc /* For a
+    /// MinimizeObjective, the best value is the minimum one. */ ... }`
+    /// (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:88`). A body expression is a
+    /// feature body, so it may be documented like any other.
+    pub doc: Option<Box<Node<super::DocComment>>>,
     pub parameters: Vec<Node<CollectionOperatorParameter>>,
     pub result: Option<Box<Node<Expression>>>,
     pub close_brace_span: Span,
@@ -395,15 +400,34 @@ pub struct CollectionOperatorBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CollectionOperatorParameter {
-    /// Direction keyword and its exact authored span.
-    pub direction: Node<super::InOut>,
+    /// Direction keyword and its exact authored span. `None` for the undirected form, e.g. `p2`
+    /// in `vertices->exists{p2 : Point; ...}` (`sysml.library/Domain Libraries/Geometry/
+    /// ShapeItems.sysml:72`) -- a body-expression parameter declares a feature, and a feature
+    /// need not be directed.
+    pub direction: Option<Node<super::InOut>>,
     /// Exact `ref` keyword span when the parameter is a reference feature.
     pub reference_keyword_span: Option<Span>,
     /// Decoded declaration label; `name_span` preserves its authored spelling.
     pub name: String,
     pub name_span: Span,
     pub typing: Option<CollectionOperatorParameterTyping>,
-    pub semicolon_span: Span,
+    /// How the parameter is terminated: `;` or its own brace body. `in ref a { doc /* ... */ }`
+    /// (`TradeStudies.sysml:162`) documents the parameter instead of ending it with `;`.
+    pub terminator: CollectionOperatorParameterTerminator,
+}
+
+/// What closes a [`CollectionOperatorParameter`] declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum CollectionOperatorParameterTerminator {
+    /// `p2 : Point;`
+    Semicolon { span: Span },
+    /// `in ref a { doc /* ... */ }` -- the parameter's own body, holding its documentation.
+    Body {
+        open_brace_span: Span,
+        doc: Option<Box<Node<super::DocComment>>>,
+        close_brace_span: Span,
+    },
 }
 
 /// Exact `:` typing syntax plus its source-backed target identity.

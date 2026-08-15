@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Body expressions accept undirected parameters, leading documentation, and parameter bodies.**
+  `vertices->exists{p2 : Point; ...}` (`sysml.library/Domain Libraries/Geometry/ShapeItems.sysml`)
+  declares an undirected parameter, which the grammar allows and the parser required a direction
+  for; `alternatives->minimize { doc /* ... */ ... }` opens with documentation; and
+  `selectOne {in ref a { doc /* ... */ } ...}` terminates a parameter with its own documented
+  body instead of `;` (both `TradeStudies.sysml`). `CollectionOperatorParameter::direction`
+  became optional and its `semicolon_span` became a typed `terminator`.
+- **`abstract calc` keeps its keyword and its `:>` clause.** `CalcUsage` had neither field, so
+  `abstract calc subcalculations : Calculation :> calculations, subactions { ... }`
+  (Systems Library `Calculations.sysml`) emitted as `calc subcalculations : Calculation`.
+  **AST version 151 -> 152.**
+
 - **Calc usages take the `RefPrefix` and are requirement-body members.** `in calc eval :
   EvaluationFunction { ... }` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml:61`)
   had no arm in requirement bodies, and `calc_usage` parsed neither the direction nor `abstract`

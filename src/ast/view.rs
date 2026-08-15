@@ -94,7 +94,15 @@ pub struct CalcDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcUsage {
     pub identification: Identification,
+    /// `abstract` keyword, e.g. `abstract calc subcalculations : Calculation :> calculations,
+    /// subactions { ... }` (Systems Library `Calculations.sysml`). Parsed and discarded until
+    /// this field existed, so emission dropped it.
+    pub is_abstract: bool,
     pub type_name: Option<QualifiedReferenceId>,
+    /// `:>` subsets clause, which may name several comma-separated targets. Also previously
+    /// parsed and discarded, with a comment claiming `CalcUsage` "doesn't model subsetting
+    /// separately from redefines" -- it does now, because they are different relationships.
+    pub subsets: Option<Node<SubsettingRelationship>>,
     /// Redefinition targets for `calc :>> name { … }` and multi-target trailing clauses.
     pub redefines: Option<Vec<QualifiedReferenceId>>,
     /// `= expr` / `:= expr` binding (`in calc scenario = cityScenario;`, validation `10c`).

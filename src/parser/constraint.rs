@@ -260,11 +260,10 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
         (input, redefines)
     };
     // `:>` subsets, independent of `:>>` redefines, e.g. `abstract calc subcalculations:
-    // Calculation :> calculations, subactions { ... }` (Systems Library `Calculations.sysml`);
-    // accepted and discarded -- `CalcUsage` doesn't model subsetting separately from redefines,
-    // matching `RefDecl`'s "don't model every shorthand" scope for feature modifiers.
-    let (input, _) =
-        opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
+    // Calculation :> calculations, subactions { ... }` (Systems Library `Calculations.sysml`).
+    let (input, subsets) = opt(preceded(ws_and_comments, crate::parser::usage::subsetting))
+        .parse(input)
+        .map(|(input, clause)| (input, clause.map(|(relationship, _value)| relationship)))?;
     let (input, value) = opt(preceded(
         ws_and_comments,
         crate::parser::feature_value::feature_value_part,
@@ -278,7 +277,9 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
             input,
             CalcUsage {
                 identification,
+                is_abstract: prefix.usage_prefix == Some(crate::ast::DefinitionPrefix::Abstract),
                 type_name,
+                subsets,
                 redefines,
                 value,
                 direction: prefix.direction,

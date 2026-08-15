@@ -71,7 +71,7 @@ standard library package Calculations {
 		 */
         'ref';
         calc self : Calculation :>> Action::self, Evaluation::self;
-        calc subcalculations : Calculation {
+        abstract calc subcalculations : Calculation :> calculations, subactions {
             doc
             /*
 			 * The subactions of this Calculation that are Calculations.

@@ -87,6 +87,11 @@ macro_rules! ast_traversal {
                 walk_collection_operator_parameter(self, node)
             }
 
+            /// Visits [`CollectionOperatorParameterTerminator`]; the default implementation walks its children.
+            fn visit_collection_operator_parameter_terminator(&mut self, node: &$($mutability)? CollectionOperatorParameterTerminator) {
+                walk_collection_operator_parameter_terminator(self, node)
+            }
+
             /// Visits [`CollectionOperatorParameterTyping`]; the default implementation walks its children.
             fn visit_collection_operator_parameter_typing(&mut self, node: &$($mutability)? CollectionOperatorParameterTyping) {
                 walk_collection_operator_parameter_typing(self, node)
@@ -1549,8 +1554,11 @@ macro_rules! ast_traversal {
         pub fn walk_collection_operator_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CollectionOperatorBody>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CollectionOperatorBody { open_brace_span, parameters, result, close_brace_span } = &$($mutability)? node.value;
+            let CollectionOperatorBody { open_brace_span, doc, parameters, result, close_brace_span } = &$($mutability)? node.value;
             visitor.visit_span(open_brace_span);
+            if let Some(inner) = doc {
+                visitor.visit_doc_comment(&$($mutability)? **inner);
+            }
             for inner in parameters {
                 visitor.visit_collection_operator_parameter(inner);
             }
@@ -1564,8 +1572,10 @@ macro_rules! ast_traversal {
         pub fn walk_collection_operator_parameter<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CollectionOperatorParameter>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CollectionOperatorParameter { direction, reference_keyword_span, name, name_span, typing, semicolon_span } = &$($mutability)? node.value;
-            visitor.visit_in_out(direction);
+            let CollectionOperatorParameter { direction, reference_keyword_span, name, name_span, typing, terminator } = &$($mutability)? node.value;
+            if let Some(inner) = direction {
+                visitor.visit_in_out(inner);
+            }
             if let Some(inner) = reference_keyword_span {
                 visitor.visit_span(inner);
             }
@@ -1574,8 +1584,23 @@ macro_rules! ast_traversal {
             if let Some(inner) = typing {
                 visitor.visit_collection_operator_parameter_typing(inner);
             }
-            visitor.visit_span(semicolon_span);
+            visitor.visit_collection_operator_parameter_terminator(terminator);
             visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_collection_operator_parameter_terminator<V: $Visitor>(visitor: &mut V, node: &$($mutability)? CollectionOperatorParameterTerminator) {
+            match node {
+                CollectionOperatorParameterTerminator::Semicolon { span } => {
+                    visitor.visit_span(span);
+                }
+                CollectionOperatorParameterTerminator::Body { open_brace_span, doc, close_brace_span } => {
+                    visitor.visit_span(open_brace_span);
+                    if let Some(inner) = doc {
+                        visitor.visit_doc_comment(&$($mutability)? **inner);
+                    }
+                    visitor.visit_span(close_brace_span);
+                }
+            }
         }
 
         pub fn walk_collection_operator_parameter_typing<V: $Visitor>(visitor: &mut V, node: &$($mutability)? CollectionOperatorParameterTyping) {
@@ -6332,8 +6357,12 @@ macro_rules! ast_traversal {
         pub fn walk_calc_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CalcUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CalcUsage { identification, type_name, redefines, value, direction, body, membership } = &$($mutability)? node.value;
+            let CalcUsage { identification, is_abstract, type_name, subsets, redefines, value, direction, body, membership } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
+            let _ = is_abstract;
+            if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }

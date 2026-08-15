@@ -348,14 +348,17 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             self.writer.write_str(" (parameter ")?;
             write_span(self.writer, &parameter.span)?;
             self.writer.write_str(" (direction ")?;
-            self.writer
-                .write_str(match parameter.value.direction.value {
+            if let Some(direction) = &parameter.value.direction {
+                self.writer.write_str(match direction.value {
                     InOut::In => "in",
                     InOut::Out => "out",
                     InOut::InOut => "inout",
                 })?;
-            self.writer.write_char(' ')?;
-            write_span(self.writer, &parameter.value.direction.span)?;
+                self.writer.write_char(' ')?;
+                write_span(self.writer, &direction.span)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
             self.writer.write_str(") (reference-keyword ")?;
             if let Some(span) = &parameter.value.reference_keyword_span {
                 write_span(self.writer, span)?;
@@ -376,8 +379,28 @@ impl<'document, 'labels, 'writer, W: io::Write + ?Sized>
             } else {
                 self.writer.write_str("none")?;
             }
-            self.writer.write_str(") (semicolon ")?;
-            write_span(self.writer, &parameter.value.semicolon_span)?;
+            self.writer.write_str(") (terminator ")?;
+            match &parameter.value.terminator {
+                crate::ast::CollectionOperatorParameterTerminator::Semicolon { span } => {
+                    self.writer.write_str("(semicolon ")?;
+                    write_span(self.writer, span)?;
+                    self.writer.write_str(")")?;
+                }
+                crate::ast::CollectionOperatorParameterTerminator::Body {
+                    open_brace_span,
+                    doc,
+                    close_brace_span,
+                } => {
+                    self.writer.write_str("(body (open-brace ")?;
+                    write_span(self.writer, open_brace_span)?;
+                    self.writer.write_str(") (doc ")?;
+                    self.writer
+                        .write_str(if doc.is_some() { "present" } else { "none" })?;
+                    self.writer.write_str(") (close-brace ")?;
+                    write_span(self.writer, close_brace_span)?;
+                    self.writer.write_str("))")?;
+                }
+            }
             self.writer.write_str("))")?;
         }
         self.writer.write_str(") (result ")?;

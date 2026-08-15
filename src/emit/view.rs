@@ -141,6 +141,9 @@ pub(crate) fn emit_calc_usage(
     if let Some(dir) = usage.direction {
         super::structure::emit_direction(w, dir);
     }
+    if usage.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str("calc ");
     let leading_target = usage.redefines.as_ref().and_then(|targets| {
         (targets.len() == 1
@@ -168,6 +171,9 @@ pub(crate) fn emit_calc_usage(
                 w.push_qualified_reference(&format!("{path}/redefines[{index}]"), target)?;
             }
         }
+    }
+    if let Some(subsets) = &usage.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
     }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;

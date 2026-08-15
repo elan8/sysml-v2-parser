@@ -473,19 +473,54 @@ fn extent_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     ))
 }
 
+/// True when the input starts an undirected body-expression parameter (`p2 : Point;` or
+/// `p2 : Point { ... }`). Requires the typing and the terminator so a bare result expression --
+/// which may itself contain a `:` further along -- is not consumed as a parameter.
+fn undirected_parameter_ahead(input: Input<'_>) -> bool {
+    let Ok((rest, _)) = name(input) else {
+        return false;
+    };
+    let Ok((rest, _)) = ws_and_comments(rest) else {
+        return false;
+    };
+    if !rest.fragment().starts_with(b":") || rest.fragment().starts_with(b":>") {
+        return false;
+    }
+    let Ok((rest, _)) =
+        nom::bytes::complete::tag::<_, _, nom::error::Error<Input<'_>>>(&b":"[..]).parse(rest)
+    else {
+        return false;
+    };
+    let Ok((rest, _)) = ws_and_comments(rest) else {
+        return false;
+    };
+    let Ok((rest, _)) = qualified_reference(rest) else {
+        return false;
+    };
+    let Ok((rest, _)) = ws_and_comments(rest) else {
+        return false;
+    };
+    rest.fragment().starts_with(b";") || rest.fragment().starts_with(b"{")
+}
+
 fn collection_operator_parameter(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<CollectionOperatorParameter>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
-    let (input, (direction_span, direction)) = with_span(|input| {
+    // Optional: `vertices->exists{p2 : Point; ...}` (`sysml.library/Domain Libraries/Geometry/
+    // ShapeItems.sysml:72`) declares an undirected parameter. `collection_operator_body` decides
+    // whether a parameter is present at all, so this parser is only reached when one is.
+    let (input, direction) = nom::combinator::opt(with_span(|input| {
         alt((
             map(|input| keyword_token(input, b"inout"), |_| InOut::InOut),
             map(|input| keyword_token(input, b"in"), |_| InOut::In),
             map(|input| keyword_token(input, b"out"), |_| InOut::Out),
         ))
         .parse(input)
-    })(input)?;
+    }))
+    .parse(input)?;
+    let direction = direction.map(|(span, value)| Node::new(span, value));
     let (input, _) = ws_and_comments(input)?;
     let (input, reference_keyword_span) = if starts_with_keyword(input.fragment(), b"ref") {
         let (input, (span, _)) = with_span(|input| keyword_token(input, b"ref"))(input)?;
@@ -511,19 +546,41 @@ fn collection_operator_parameter(
         (input, None)
     };
     let (input, _) = ws_and_comments(input)?;
-    let (input, (semicolon_span, _)) = with_span(tag(&b";"[..]))(input)?;
+    // `;` or the parameter's own brace body (`in ref a { doc /* ... */ }`,
+    // `TradeStudies.sysml:162`).
+    let (input, terminator) = if input.fragment().starts_with(b"{") {
+        let (input, (open_brace_span, _)) = with_span(tag(&b"{"[..]))(input)?;
+        let (input, doc) =
+            nom::combinator::opt(crate::parser::requirement::doc_comment).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        let (input, (close_brace_span, _)) = with_span(tag(&b"}"[..]))(input)?;
+        (
+            input,
+            crate::ast::CollectionOperatorParameterTerminator::Body {
+                open_brace_span,
+                doc: doc.map(Box::new),
+                close_brace_span,
+            },
+        )
+    } else {
+        let (input, (span, _)) = with_span(tag(&b";"[..]))(input)?;
+        (
+            input,
+            crate::ast::CollectionOperatorParameterTerminator::Semicolon { span },
+        )
+    };
     Ok((
         input,
         node_from_to(
             start,
             input,
             CollectionOperatorParameter {
-                direction: Node::new(direction_span, direction),
+                direction,
                 reference_keyword_span,
                 name: parameter_name,
                 name_span,
                 typing,
-                semicolon_span,
+                terminator,
             },
         ),
     ))
@@ -540,13 +597,21 @@ pub(crate) fn body_expression(
 fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<CollectionOperatorBody>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
-    let (mut input, (open_brace_span, _)) = with_span(tag(&b"{"[..]))(input)?;
+    let (input, (open_brace_span, _)) = with_span(tag(&b"{"[..]))(input)?;
+    // A body expression is a feature body, so it may open with documentation:
+    // `alternatives->minimize { doc /* ... */ ... }` (`sysml.library/Domain
+    // Libraries/Analysis/TradeStudies.sysml:88`).
+    let (mut input, doc) =
+        nom::combinator::opt(crate::parser::requirement::doc_comment).parse(input)?;
     let mut parameters = Vec::new();
     loop {
         let (next, _) = ws_and_comments(input)?;
+        // An undirected parameter is only recognised when a `:` typing and a terminator follow,
+        // so a bare result expression (`{ b }`) is never mistaken for one.
         if starts_with_keyword(next.fragment(), b"in")
             || starts_with_keyword(next.fragment(), b"out")
             || starts_with_keyword(next.fragment(), b"inout")
+            || undirected_parameter_ahead(next)
         {
             let (next, parameter) = collection_operator_parameter(next)?;
             parameters.push(parameter);
@@ -572,6 +637,7 @@ fn collection_operator_body(input: Input<'_>) -> IResult<Input<'_>, Node<Collect
             input,
             CollectionOperatorBody {
                 open_brace_span,
+                doc: doc.map(Box::new),
                 parameters,
                 result,
                 close_brace_span,
@@ -1802,8 +1868,9 @@ mod tests {
         assert_eq!(source.slice(&body.value.close_brace_span), Some("}"));
         assert_eq!(body.value.parameters.len(), 2);
         let item = &body.value.parameters[0].value;
-        assert_eq!(item.direction.value, InOut::In);
-        assert_eq!(source.slice(&item.direction.span), Some("in"));
+        let direction = item.direction.as_ref().expect("direction");
+        assert_eq!(direction.value, InOut::In);
+        assert_eq!(source.slice(&direction.span), Some("in"));
         assert_eq!(
             item.reference_keyword_span
                 .as_ref()
@@ -1816,7 +1883,12 @@ mod tests {
             source.slice(&item.typing.as_ref().expect("typing").separator_span),
             Some(":")
         );
-        assert_eq!(source.slice(&item.semicolon_span), Some(";"));
+        let crate::ast::CollectionOperatorParameterTerminator::Semicolon { span } =
+            &item.terminator
+        else {
+            panic!("expected a semicolon terminator");
+        };
+        assert_eq!(source.slice(span), Some(";"));
         assert!(matches!(
             body.value.result.as_deref().map(|result| &result.value),
             Some(Expression::BinaryOp {

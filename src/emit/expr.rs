@@ -236,23 +236,41 @@ fn emit_body_expression_bare(
     body: &CollectionOperatorBody,
 ) -> Result<(), EmitError> {
     w.push_str("{");
+    if let Some(doc) = &body.doc {
+        w.push_char(' ');
+        super::root::emit_doc(w, &doc.value)?;
+    }
     for parameter in &body.parameters {
         w.push_char(' ');
-        w.push_str(match parameter.value.direction.value {
-            InOut::In => "in",
-            InOut::Out => "out",
-            InOut::InOut => "inout",
-        });
-        if parameter.value.reference_keyword_span.is_some() {
-            w.push_str(" ref");
+        if let Some(direction) = &parameter.value.direction {
+            w.push_str(match direction.value {
+                InOut::In => "in",
+                InOut::Out => "out",
+                InOut::InOut => "inout",
+            });
+            w.push_char(' ');
         }
-        w.push_char(' ');
+        if parameter.value.reference_keyword_span.is_some() {
+            w.push_str("ref ");
+        }
         w.push_str(&parameter.value.name);
         if let Some(typing) = &parameter.value.typing {
             w.push_str(" : ");
             w.push_qualified_reference("collection body parameter type", typing.target)?;
         }
-        w.push_char(';');
+        match &parameter.value.terminator {
+            crate::ast::CollectionOperatorParameterTerminator::Semicolon { .. } => {
+                w.push_char(';');
+            }
+            crate::ast::CollectionOperatorParameterTerminator::Body { doc, .. } => {
+                w.push_str(" {");
+                if let Some(doc) = doc {
+                    w.push_char(' ');
+                    super::root::emit_doc(w, &doc.value)?;
+                }
+                w.push_str(" }");
+            }
+        }
     }
     if let Some(result) = &body.result {
         w.push_char(' ');
