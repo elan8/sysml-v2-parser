@@ -269,9 +269,7 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::Unsupported(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }
-        PackageBodyElement::Doc(d) => emit_doc(w, &d.value),
-        PackageBodyElement::Comment(c) => emit_comment(w, &c.value),
-        PackageBodyElement::TextualRep(t) => emit_textual_rep(w, &t.value),
+        PackageBodyElement::Annotating(member) => emit_annotating_member(w, path, member),
         PackageBodyElement::Filter(f) => emit_filter(w, &f.value),
         PackageBodyElement::Package(p) => emit_package(w, path, &p.value),
         PackageBodyElement::LibraryPackage(p) => emit_library_package(w, path, &p.value),
@@ -349,9 +347,6 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
-        PackageBodyElement::MetadataAnnotation(m) => {
-            structure::emit_metadata_annotation(w, path, &m.value)
-        }
         PackageBodyElement::Ref(r) => structure::emit_ref_decl(w, path, &r.value),
         PackageBodyElement::DefaultReferenceUsage(d) => {
             structure::emit_default_reference_usage(w, path, &d.value)
@@ -394,7 +389,8 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::KermlFeatureMember(feature) => {
             super::view::emit_kerml_feature_member(w, path, &feature.value)
         }
-        other @ (PackageBodyElement::Actor(_) | PackageBodyElement::FlowDef(_)) => w.unsupported(
+        PackageBodyElement::FlowDef(f) => behavior::emit_flow_def(w, path, &f.value),
+        other @ PackageBodyElement::Actor(_) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
@@ -569,6 +565,18 @@ pub(crate) fn emit_comment(
                 w.push_char(' ');
             }
             emit_identification(w, id);
+        }
+        // `about` follows the identification in the production, and the elements it names are
+        // part of what the comment says. Omitting them once cost the reader the annotation
+        // itself; omitting them now would also fail the reparse gate.
+        if !comment.about_targets.is_empty() {
+            w.push_str(" about ");
+            for (index, target) in comment.about_targets.iter().enumerate() {
+                if index > 0 {
+                    w.push_str(", ");
+                }
+                w.push_qualified_reference("comment about target", *target)?;
+            }
         }
         if let Some(locale) = &comment.locale {
             if has_keyword || comment.identification.is_some() {

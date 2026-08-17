@@ -11,7 +11,6 @@ use crate::parser::lex::{
     subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
-use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{
     multiplicity_node, optional_typings, prefix_redefinition_target, specialization_clauses,
     typing_node, typing_relationship_node, typings,
@@ -222,7 +221,10 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, AttributeBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            AttributeBodyElement::Annotating,
+        ),
         map(
             |i| attribute_def(i, true),
             AttributeBodyElement::AttributeDef,
@@ -496,11 +498,12 @@ fn feature_binding_body(
             let (input, _) = tag(&b"}"[..]).parse(input)?;
             return Ok((input, elements));
         }
-        if let Ok((next, doc)) = crate::parser::requirement::doc_comment(input) {
-            let span = doc.span.clone();
-            elements.push(crate::ast::Node::new(
-                span,
-                crate::ast::FeatureBodyElement::Doc(doc),
+        let member_start = input;
+        if let Ok((next, member)) = crate::parser::body::annotating_member(input) {
+            elements.push(crate::parser::node_from_to(
+                member_start,
+                next,
+                crate::ast::FeatureBodyElement::Annotating(member),
             ));
             input = next;
             continue;
@@ -1256,7 +1259,10 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, AttributeBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            AttributeBodyElement::Annotating,
+        ),
         map(
             |i| attribute_def(i, true),
             AttributeBodyElement::AttributeDef,

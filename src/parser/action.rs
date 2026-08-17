@@ -16,7 +16,7 @@ use crate::parser::lex::{
     name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
     ws1, ws_and_comments,
 };
-use crate::parser::metadata_annotation::{annotation, metadata_annotation};
+use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::usage::{multiplicity_node, redefinition, usage_feature_modifier_flags};
@@ -69,10 +69,15 @@ const CONTROL_NODE_KEYWORDS: &[&[u8]] = &[b"accept", b"send", b"terminate", b"wh
 
 const UNTIL_SEMI_OR_BRACE: &[u8] = b";{";
 
-fn doc_comment_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::DocComment>> {
-    let (input, doc) = crate::parser::requirement::doc_comment(input)?;
+/// The `AnnotatingElement` production, plus the redundant `;` an action body is written with.
+///
+/// The terminator is not part of the production -- `Documentation` ends at its
+/// `REGULAR_COMMENT` -- but action bodies in the corpus write one anyway, and consuming it here
+/// keeps it from reaching the member parser as unrecognized content.
+fn annotating_member_stmt(input: Input<'_>) -> IResult<Input<'_>, crate::ast::AnnotatingMember> {
+    let (input, member) = crate::parser::body::annotating_member(input)?;
     let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
-    Ok((input, doc))
+    Ok((input, member))
 }
 
 /// Ref declaration inside an action body.
@@ -265,12 +270,10 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::ActionDef(_)
         | ActionDefBodyElement::Error(_)
         | ActionDefBodyElement::InOutDecl(_)
-        | ActionDefBodyElement::Doc(_)
+        | ActionDefBodyElement::Annotating(_)
         | ActionDefBodyElement::Annotation(_)
-        | ActionDefBodyElement::MetadataAnnotation(_)
         | ActionDefBodyElement::MetadataKeywordUsage(_)
         | ActionDefBodyElement::MetadataUsage(_)
-        | ActionDefBodyElement::TextualRep(_)
         | ActionDefBodyElement::RefDecl(_)
         | ActionDefBodyElement::Perform(_)
         | ActionDefBodyElement::Bind(_)
@@ -516,7 +519,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
 }
 
 /// Action def body: `;` or `{` ActionDefBodyElement* `}`
-fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
+pub(crate) fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((crate::parser::body::semicolon_body, action_def_body_brace)).parse(input)
 }
@@ -712,7 +715,7 @@ fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Action
     )))
 }
 
-fn action_def_body_element(
+pub(crate) fn action_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::ActionDefBodyElement>> {
     use crate::ast::ActionDefBodyElement;
@@ -741,11 +744,7 @@ fn action_def_body_element(
             }),
         )),
         map(in_out_decl, ActionDefBodyElement::InOutDecl),
-        map(doc_comment_stmt, ActionDefBodyElement::Doc),
-        map(
-            metadata_annotation,
-            ActionDefBodyElement::MetadataAnnotation,
-        ),
+        map(annotating_member_stmt, ActionDefBodyElement::Annotating),
         map(
             crate::parser::metadata_annotation::metadata_keyword_usage,
             ActionDefBodyElement::MetadataKeywordUsage,
@@ -778,12 +777,6 @@ fn action_def_body_element(
             map(
                 crate::parser::metadata::metadata_usage,
                 ActionDefBodyElement::MetadataUsage,
-            ),
-            // KerML `TextualRepresentation` (GH-86), e.g. `language "alf" /* c.x = newX; */`.
-            // Previously not reachable from any action body.
-            map(
-                crate::parser::requirement::textual_representation,
-                ActionDefBodyElement::TextualRep,
             ),
             // Nested `action def` must win over `action_usage` (which would otherwise treat
             // `def` as a usage name).
@@ -1284,11 +1277,7 @@ pub(crate) fn action_usage_body_element(
             }),
         )),
         map(in_out_decl, ActionUsageBodyElement::InOutDecl),
-        map(doc_comment_stmt, ActionUsageBodyElement::Doc),
-        map(
-            metadata_annotation,
-            ActionUsageBodyElement::MetadataAnnotation,
-        ),
+        map(annotating_member_stmt, ActionUsageBodyElement::Annotating),
         map(
             crate::parser::metadata_annotation::metadata_keyword_usage,
             ActionUsageBodyElement::MetadataKeywordUsage,
@@ -1320,12 +1309,6 @@ pub(crate) fn action_usage_body_element(
             map(
                 crate::parser::metadata::metadata_usage,
                 ActionUsageBodyElement::MetadataUsage,
-            ),
-            // KerML `TextualRepresentation` (GH-86), e.g. `language "alf" /* c.x = newX; */`.
-            // Previously not reachable from any action body.
-            map(
-                crate::parser::requirement::textual_representation,
-                ActionUsageBodyElement::TextualRep,
             ),
             map(action_def, |d| {
                 ActionUsageBodyElement::ActionDef(Box::new(d))
@@ -1661,7 +1644,10 @@ mod in_out_decl_tests {
         assert!(value.value.is_default);
         let body = node.value.body.as_ref().expect("retained body");
         assert_eq!(body.len(), 1);
-        assert!(matches!(body[0].value, ActionDefBodyElement::Doc(_)));
+        assert!(matches!(
+            body[0].value,
+            ActionDefBodyElement::Annotating(crate::ast::AnnotatingMember::Doc(_))
+        ));
     }
 
     /// A malformed declaration must fail the parser (so the enclosing body produces an explicit

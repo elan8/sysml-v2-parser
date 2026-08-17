@@ -6,7 +6,6 @@ use crate::ast::{
     RenderingUsageBodyElement, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody,
     ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
-use crate::parser::connector::connect_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::import::import_shape;
@@ -14,7 +13,7 @@ use crate::parser::lex::{
     name, qualified_reference, reference_path, visibility_prefix, ws1, ws_and_comments,
     VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
-use crate::parser::requirement::{doc_comment, requirement_def_body};
+use crate::parser::requirement::requirement_def_body;
 use crate::parser::usage::{multiplicity_node, prefix_redefinition_target};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to, span_from_to};
@@ -30,14 +29,13 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, ViewDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            ViewDefBodyElement::Annotating,
+        ),
         map(
             crate::parser::connector::ref_decl,
             ViewDefBodyElement::RefDecl,
-        ),
-        map(
-            crate::parser::metadata_annotation::metadata_annotation,
-            ViewDefBodyElement::MetadataAnnotation,
         ),
         map(view_filter_member, ViewDefBodyElement::Filter),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
@@ -79,7 +77,10 @@ fn rendering_usage_body_element(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, RenderingUsageBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            RenderingUsageBodyElement::Annotating,
+        ),
         map(view_usage, |n| {
             RenderingUsageBodyElement::ViewUsage(Box::new(n))
         }),
@@ -255,7 +256,10 @@ fn rendering_def_body_element(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, RenderingDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            RenderingDefBodyElement::Annotating,
+        ),
         map(
             crate::parser::connector::ref_decl,
             RenderingDefBodyElement::RefDecl,
@@ -344,7 +348,10 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, ViewBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            ViewBodyElement::Annotating,
+        ),
         map(crate::parser::connector::ref_decl, ViewBodyElement::RefDecl),
         map(view_filter_member, ViewBodyElement::Filter),
         map(view_rendering_usage, ViewBodyElement::ViewRendering),
@@ -367,10 +374,17 @@ fn expose_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember
     let (input, _) = preceded(ws_and_comments, tag(&b"expose"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let target_start = input;
-    let (input, reference) = reference_path(input)?;
-    let (input, shape) = import_shape(input)?;
-    let target_span = span_from_to(target_start, input);
-    let (input, body) = connect_body(input)?;
+    let (after_reference, reference) = reference_path(input)?;
+    let (input, shape) = import_shape(after_reference)?;
+    // The target ends at its last authored token, not wherever shape parsing stopped -- looking
+    // for an absent `::*` consumes the trivia before a braced body. `import_` documents the same
+    // hazard; `expose` shared the bug and only stopped hiding it once the body became a real
+    // `Body` whose deserialization checks the target span it sits beside.
+    let mut target_span = span_from_to(target_start, input);
+    target_span.len =
+        crate::parser::import::import_target_end(&shape, after_reference.location_offset())
+            .saturating_sub(target_span.offset);
+    let (input, body) = crate::parser::body::relationship_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -399,7 +413,7 @@ fn satisfy_view_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisf
     let (input, _) = preceded(ws_and_comments, tag(&b"satisfy"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, viewpoint_ref) = qualified_reference.parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = crate::parser::body::relationship_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -765,7 +779,7 @@ mod expose_diagnostic_tests {
             }
             other => panic!("expected filter shape, got {other:?}"),
         }
-        assert_eq!(expose.body, crate::ast::ConnectBody::Brace);
+        assert!(expose.body.braced_elements().is_some());
     }
 
     #[test]

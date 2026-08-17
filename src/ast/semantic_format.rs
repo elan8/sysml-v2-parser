@@ -10,16 +10,15 @@ use std::io;
 use std::io::Write as _;
 
 use super::{
-    ActionDefBodyElement, Argument, CaseReturnFeatureKind, CollectionOperator, ConnectBody,
-    ConnectionDefBody, ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole,
-    EndIdentity, Expression, FeatureValue, FeatureValueKind, FirstMergeBody, FirstMergeBodyElement,
-    ImportShape, ImportSuffixSpans, ImportTarget, InOut, InterfaceDefBody, InterfaceDefBodyElement,
-    Node, PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement,
-    PerformBody, PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId,
-    ReferenceSeparator, RequirementDefBody, RequirementDefBodyElement, RootElement, Span,
-    StateDefBody, StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind,
-    TypingKind, TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
-    ViewBodyElement,
+    ActionDefBodyElement, Argument, CaseReturnFeatureKind, CollectionOperator, ConnectionDefBody,
+    ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole, EndIdentity, Expression,
+    FeatureValue, FeatureValueKind, FirstMergeBody, FirstMergeBodyElement, ImportShape,
+    ImportSuffixSpans, ImportTarget, InOut, InterfaceDefBody, InterfaceDefBodyElement, Node,
+    PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement, PerformBody,
+    PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId, ReferenceSeparator,
+    RequirementDefBody, RequirementDefBodyElement, RootElement, Span, StateDefBody,
+    StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind, TypingKind,
+    TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
 };
 
 /// Stream a semantic AST projection to an [`io::Write`] sink.
@@ -627,8 +626,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
                         }
-                        RequirementDefBodyElement::MetadataAnnotation(_annotation) => {
-                            self.write_marker(&mut first, "metadata-annotation")?;
+                        RequirementDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         RequirementDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
@@ -738,12 +738,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Frame(_frame) => {
                             self.write_marker(&mut first, "frame")?;
                         }
-                        RequirementDefBodyElement::TextualRep(_text) => {
-                            self.write_marker(&mut first, "textual-representation")?;
-                        }
-                        RequirementDefBodyElement::Doc(_doc) => {
-                            self.write_marker(&mut first, "doc")?;
-                        }
                         RequirementDefBodyElement::ConcernUsage(_usage) => {
                             self.write_marker(&mut first, "concern-usage")?;
                         }
@@ -772,7 +766,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
-                        ViewBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
+                        ViewBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
                         ViewBodyElement::RefDecl(declaration) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
@@ -787,13 +784,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(expose ")?;
                             self.write_import_target(&expose.value.target)?;
+                            self.writer.write_char(' ')?;
+                            self.write_relationship_body(&expose.value.body)?;
                             self.writer.write_char(')')?;
                         }
                         ViewBodyElement::Satisfy(satisfy) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(satisfy (viewpoint ")?;
                             self.write_reference(satisfy.value.viewpoint_ref)?;
-                            self.writer.write_str("))")?;
+                            self.writer.write_str(") ")?;
+                            self.write_relationship_body(&satisfy.value.body)?;
+                            self.writer.write_char(')')?;
                         }
                     }
                 }
@@ -816,8 +817,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
                         }
-                        UseCaseDefBodyElement::MetadataAnnotation(_annotation) => {
-                            self.write_marker(&mut first, "metadata-annotation")?;
+                        UseCaseDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         UseCaseDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
@@ -825,7 +827,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::AttributeDef(_definition) => {
                             self.write_marker(&mut first, "attribute-def")?;
                         }
-                        UseCaseDefBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
                         UseCaseDefBodyElement::SubjectDecl(_subject) => {
                             self.write_marker(&mut first, "subject")?;
                         }
@@ -944,8 +945,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                     for element in elements {
                                         self.writer.write_char(' ')?;
                                         match &element.value {
-                                            super::ReturnRefBodyElement::Doc(_) => {
-                                                self.writer.write_str("(doc)")?;
+                                            super::ReturnRefBodyElement::Annotating(member) => {
+                                                self.write_annotating_member(member)?;
                                             }
                                             super::ReturnRefBodyElement::Result(expression) => {
                                                 self.writer.write_str("(result ")?;
@@ -1019,12 +1020,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
-                        StateDefBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
+                        StateDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
                         StateDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
-                        }
-                        StateDefBodyElement::MetadataAnnotation(_annotation) => {
-                            self.write_marker(&mut first, "metadata-annotation")?;
                         }
                         StateDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
@@ -1173,15 +1174,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             )?;
                             self.writer.write_str("))")?;
                         }
-                        PartDefBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
-                        PartDefBodyElement::Comment(_comment) => {
-                            self.write_marker(&mut first, "comment")?;
+                        PartDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         PartDefBodyElement::Annotation(_annotation) => {
                             self.write_marker(&mut first, "annotation")?;
-                        }
-                        PartDefBodyElement::MetadataAnnotation(_annotation) => {
-                            self.write_marker(&mut first, "metadata-annotation")?;
                         }
                         PartDefBodyElement::MetadataKeywordUsage(_usage) => {
                             self.write_marker(&mut first, "metadata-keyword-usage")?;
@@ -1417,18 +1415,26 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.writer.write_char(' ')?;
             self.write_reference(*reference)?;
         }
-        // A dependency body owns the whole annotating production, so name its members: without
-        // them the projection could not show that a body holds a doc, a comment and a rep rather
-        // than some other mix, which is the only thing a relationship body can get wrong.
-        self.writer.write_str(") (body")?;
-        match &dependency.body_elements {
-            Some(elements) => {
-                // A dependency body is a `Vec`, not an `ast::Body<E>`, so it has no `;`/`{}`
-                // marker of its own -- but a present one was written with braces, and saying so
-                // keeps it readable the same way every other body is.
-                self.writer.write_str(" brace")?;
+        self.writer.write_str(") ")?;
+        self.write_relationship_body(&dependency.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// A `RelationshipBody`'s members.
+    ///
+    /// The body owns the whole annotating production, so its members are named rather than
+    /// counted: that is the only thing a relationship body can get wrong, and `expose` and the
+    /// view-body `satisfy` used to discard theirs entirely.
+    fn write_relationship_body(
+        &mut self,
+        body: &super::Body<super::RelationshipBodyElement>,
+    ) -> io::Result<()> {
+        match body {
+            super::Body::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::Body::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
                 for element in elements {
-                    self.writer.write_char(' ')?;
+                    self.write_item_prefix(&mut first)?;
                     match &element.value {
                         super::RelationshipBodyElement::Annotating(member) => {
                             self.write_annotating_member(member)?
@@ -1441,10 +1447,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                     }
                 }
+                self.writer.write_char(')')
             }
-            None => self.writer.write_str(" none")?,
         }
-        self.writer.write_str("))")
     }
 
     fn write_first_statement(&mut self, statement: &super::FirstStmt) -> io::Result<()> {
@@ -1567,6 +1572,104 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
     }
 
+    fn write_calc_definition(&mut self, definition: &super::CalcDef) -> io::Result<()> {
+        self.writer.write_str("(calc-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") ")?;
+        self.write_calc_def_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// A calculation body's members.
+    ///
+    /// `CalculationBodyItem = ActionBodyItem | ReturnParameterMember`, and the action half used to
+    /// be shredded into invented keyword-named features, so a marker for the definition as a whole
+    /// could not show whether a member survived at all. Action members reuse the exhaustive
+    /// `ActionDefBodyElement` writer rather than restating it.
+    fn write_calc_def_body(&mut self, body: &super::CalcDefBody) -> io::Result<()> {
+        match body {
+            super::CalcDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::CalcDefBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::CalcDefBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::CalcDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::CalcDefBodyElement::ActionMember(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_first_merge_member(&member.value, &member.span)?;
+                        }
+                        super::CalcDefBodyElement::InOutDecl(_declaration) => {
+                            self.write_marker(&mut first, "in-out-declaration")?;
+                        }
+                        super::CalcDefBodyElement::TypedParameter(_member) => {
+                            self.write_marker(&mut first, "typed-parameter")?;
+                        }
+                        super::CalcDefBodyElement::KermlFeature(_member) => {
+                            self.write_marker(&mut first, "kerml-feature")?;
+                        }
+                        super::CalcDefBodyElement::Invariant(_member) => {
+                            self.write_marker(&mut first, "invariant")?;
+                        }
+                        super::CalcDefBodyElement::Connector(_member) => {
+                            self.write_marker(&mut first, "connector")?;
+                        }
+                        super::CalcDefBodyElement::Binding(_member) => {
+                            self.write_marker(&mut first, "binding")?;
+                        }
+                        super::CalcDefBodyElement::Succession(_member) => {
+                            self.write_marker(&mut first, "succession")?;
+                        }
+                        super::CalcDefBodyElement::EndMember(_member) => {
+                            self.write_marker(&mut first, "end-member")?;
+                        }
+                        super::CalcDefBodyElement::Import(_member) => {
+                            self.write_marker(&mut first, "import")?;
+                        }
+                        super::CalcDefBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        super::CalcDefBodyElement::AssertConstraint(_member) => {
+                            self.write_marker(&mut first, "assert-constraint")?;
+                        }
+                        super::CalcDefBodyElement::KermlClassifier(_member) => {
+                            self.write_marker(&mut first, "kerml-classifier")?;
+                        }
+                        super::CalcDefBodyElement::DefaultReferenceUsage(_member) => {
+                            self.write_marker(&mut first, "default-reference-usage")?;
+                        }
+                        super::CalcDefBodyElement::ReturnDecl(_member) => {
+                            self.write_marker(&mut first, "return-declaration")?;
+                        }
+                        super::CalcDefBodyElement::Expression(expression) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(expression ")?;
+                            self.write_expression(expression)?;
+                            self.writer.write_char(')')?;
+                        }
+                        super::CalcDefBodyElement::CalcUsage(_member) => {
+                            self.write_marker(&mut first, "calc-usage")?;
+                        }
+                        super::CalcDefBodyElement::CalcDef(_member) => {
+                            self.write_marker(&mut first, "calc-def")?;
+                        }
+                        super::CalcDefBodyElement::PartUsage(_member) => {
+                            self.write_marker(&mut first, "part-usage")?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
     fn write_first_merge_member(
         &mut self,
         member: &ActionDefBodyElement,
@@ -1654,19 +1757,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 write_span(self.writer, span)?;
                 self.writer.write_char(')')
             }
-            ActionDefBodyElement::Doc(_doc) => self.writer.write_str("(doc)"),
+            ActionDefBodyElement::Annotating(member) => self.write_annotating_member(member),
             ActionDefBodyElement::Annotation(_annotation) => self.writer.write_str("(annotation)"),
-            ActionDefBodyElement::MetadataAnnotation(_annotation) => {
-                self.writer.write_str("(metadata-annotation)")
-            }
             ActionDefBodyElement::MetadataKeywordUsage(_usage) => {
                 self.writer.write_str("(metadata-keyword-usage)")
             }
             ActionDefBodyElement::MetadataUsage(_usage) => {
                 self.writer.write_str("(metadata-usage)")
-            }
-            ActionDefBodyElement::TextualRep(_text) => {
-                self.writer.write_str("(textual-representation)")
             }
             ActionDefBodyElement::RefDecl(declaration) => {
                 self.write_ref_declaration(&declaration.value)
@@ -1781,8 +1878,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
-                        InterfaceDefBodyElement::Doc(_doc) => {
-                            self.write_marker(&mut first, "doc")?;
+                        InterfaceDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         InterfaceDefBodyElement::EndDecl(end) => {
                             self.write_item_prefix(&mut first)?;
@@ -1792,8 +1890,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
-                        InterfaceDefBodyElement::ConnectStmt(_connect) => {
-                            self.write_marker(&mut first, "connect")?;
+                        InterfaceDefBodyElement::ConnectStmt(connect) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_connect_statement(&connect.value)?;
                         }
                         InterfaceDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -1845,11 +1944,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
-                        ConnectionDefBodyElement::ConnectStmt(_connect) => {
-                            self.write_marker(&mut first, "connect")?;
+                        ConnectionDefBodyElement::ConnectStmt(connect) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_connect_statement(&connect.value)?;
                         }
-                        ConnectionDefBodyElement::Doc(_doc) => {
-                            self.write_marker(&mut first, "doc")?;
+                        ConnectionDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         ConnectionDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -1935,6 +2036,37 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_optional_subsetting("subsets", declaration.subsets.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_ref_body(&declaration.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// A part usage and its body.
+    ///
+    /// `PartUsageBody` and `RefBody` are both `Body<PartUsageBodyElement>`, so the exhaustive
+    /// element match in [`write_ref_body`](Self::write_ref_body) already covers this scope; a
+    /// package-level part usage projected as a bare marker only because nothing called it.
+    fn write_part_usage(&mut self, usage: &super::PartUsage) -> io::Result<()> {
+        self.writer.write_str("(part-usage (declaration-name ")?;
+        self.write_usage_declaration_name(&usage.name)?;
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_ref_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// A `connect` statement and its body.
+    ///
+    /// `ConnectionUsage`'s body is a `UsageBody`, so its members are the usage member set that
+    /// [`write_ref_body`](Self::write_ref_body) already projects exhaustively. The statement was
+    /// a bare `(connect)` marker, which could not show that the body holds anything at all -- and
+    /// until this change it mostly did not.
+    fn write_connect_statement(&mut self, connect: &super::ConnectStmt) -> io::Result<()> {
+        self.writer.write_str("(connect ")?;
+        self.write_ref_body(&connect.body)?;
         self.writer.write_char(')')
     }
 
@@ -2099,6 +2231,25 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::VerificationCaseUsage(_member) => {
                             self.write_marker(&mut first, "verification-case-usage")?;
                         }
+                        super::PartUsageBodyElement::ViewDef(_definition) => {
+                            self.write_marker(&mut first, "view-def")?;
+                        }
+                        super::PartUsageBodyElement::ViewUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_usage(&usage.value)?;
+                        }
+                        super::PartUsageBodyElement::ViewpointDef(_definition) => {
+                            self.write_marker(&mut first, "viewpoint-def")?;
+                        }
+                        super::PartUsageBodyElement::ViewpointUsage(_usage) => {
+                            self.write_marker(&mut first, "viewpoint-usage")?;
+                        }
+                        super::PartUsageBodyElement::RenderingDef(_definition) => {
+                            self.write_marker(&mut first, "rendering-def")?;
+                        }
+                        super::PartUsageBodyElement::RenderingUsage(_usage) => {
+                            self.write_marker(&mut first, "rendering-usage")?;
+                        }
                         super::PartUsageBodyElement::KermlClassifier(_member) => {
                             self.write_marker(&mut first, "kerml-classifier")?;
                         }
@@ -2124,6 +2275,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         {
             Some(name) => write_quoted(self.writer, name)?,
             None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (about")?;
+        for target in &comment.about_targets {
+            self.writer.write_char(' ')?;
+            self.write_reference(*target)?;
         }
         self.writer.write_str(") (locale ")?;
         match &comment.locale {
@@ -2331,12 +2487,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_expression(&connect.from.value.expression)?;
         self.writer.write_str(") (to ")?;
         self.write_expression(&connect.to.value.expression)?;
-        self.writer.write_str(") (body ")?;
-        match connect.body {
-            ConnectBody::Semicolon => self.writer.write_str("semicolon")?,
-            ConnectBody::Brace => self.writer.write_str("brace")?,
-        }
         self.writer.write_str(") ")?;
+        self.write_ref_body(&connect.body)?;
+        self.writer.write_str(" ")?;
         self.write_optional_subsetting("subsets", connect.subsets.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", connect.redefines.as_ref())?;
@@ -2374,7 +2527,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 let mut first = self.open_brace_body()?;
                 for element in elements {
                     match &element.value {
-                        PerformBodyElement::Doc(_doc) => self.write_marker(&mut first, "doc")?,
+                        PerformBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
                         PerformBodyElement::InOut(binding) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(binding (direction ")?;
@@ -2468,6 +2624,48 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_state_body(&definition.body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_enumeration_definition(&mut self, definition: &super::EnumDef) -> io::Result<()> {
+        self.writer.write_str("(enum-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") ")?;
+        self.write_enumeration_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// `EnumerationBody` is the one production that names `AnnotatingMember` directly, so its
+    /// members are projected rather than counted: this scope discarded annotating members
+    /// entirely, and a count alone could not show that they are retained in authored order
+    /// between the values.
+    fn write_enumeration_body(&mut self, body: &super::EnumerationBody) -> io::Result<()> {
+        match body {
+            super::EnumerationBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::EnumerationBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::EnumerationBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::EnumerationBodyElement::Value(value) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(enum-value (name ")?;
+                            write_quoted(self.writer, &value.value.name)?;
+                            self.writer.write_str(") ")?;
+                            write_span(self.writer, &value.span)?;
+                            self.writer.write_char(')')?;
+                        }
+                        super::EnumerationBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
     }
 
     fn write_part_definition(&mut self, definition: &super::PartDef) -> io::Result<()> {
@@ -2625,8 +2823,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
-                        PortDefBodyElement::Doc(_doc) => {
-                            self.write_marker(&mut first, "doc")?;
+                        PortDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
                         }
                         PortDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -2711,16 +2910,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_unsupported(&unsupported.value, &element.span)
             }
-            PackageBodyElement::Doc(_doc) => self.write_marker(first, "doc"),
-            // The keyword and locale are grammatical facts, not formatting: a comment member
-            // emitted without its authored keyword becomes a bare block comment, which reparses
-            // as trivia and vanishes. A bare marker could not tell the spellings apart.
-            PackageBodyElement::Comment(comment) => {
+            PackageBodyElement::Annotating(member) => {
                 self.write_item_prefix(first)?;
-                self.write_comment_annotation(&comment.value)
-            }
-            PackageBodyElement::TextualRep(_text) => {
-                self.write_marker(first, "textual-representation")
+                self.write_annotating_member(member)
             }
             PackageBodyElement::Filter(_filter) => self.write_marker(first, "filter"),
             PackageBodyElement::Package(package) => {
@@ -2741,7 +2933,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_part_definition(&definition.value)
             }
-            PackageBodyElement::PartUsage(_usage) => self.write_marker(first, "part-usage"),
+            PackageBodyElement::PartUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_part_usage(&usage.value)
+            }
             PackageBodyElement::PortDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_port_definition(&definition.value)
@@ -2790,7 +2985,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ConstraintUsage(_usage) => {
                 self.write_marker(first, "constraint-usage")
             }
-            PackageBodyElement::CalcDef(_definition) => self.write_marker(first, "calc-def"),
+            PackageBodyElement::CalcDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_calc_definition(&definition.value)
+            }
             PackageBodyElement::ViewDef(_definition) => self.write_marker(first, "view-def"),
             PackageBodyElement::ViewpointDef(_definition) => {
                 self.write_marker(first, "viewpoint-def")
@@ -2816,7 +3014,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_marker(first, "metadata-def")
             }
             PackageBodyElement::MetadataUsage(_usage) => self.write_marker(first, "metadata-usage"),
-            PackageBodyElement::EnumDef(_definition) => self.write_marker(first, "enum-def"),
+            PackageBodyElement::EnumDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_enumeration_definition(&definition.value)
+            }
             PackageBodyElement::OccurrenceDef(_definition) => {
                 self.write_marker(first, "occurrence-def")
             }
@@ -2987,9 +3188,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ExtendedDefinition(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_extended_definition(&definition.value)
-            }
-            PackageBodyElement::MetadataAnnotation(_annotation) => {
-                self.write_marker(first, "metadata-annotation")
             }
             PackageBodyElement::Connect(connect) => {
                 self.write_item_prefix(first)?;

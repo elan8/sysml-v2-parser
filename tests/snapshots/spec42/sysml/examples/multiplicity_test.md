@@ -55,7 +55,9 @@ package MultiplicityTest {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 114) (line 7) (column 17) (len 1)) (segments (segment 0 (token "P") (name "P") (separator none) (span (offset 114) (line 7) (column 17) (len 1)))))
+    (reference r1 (scope relative) (span (offset 127) (line 8) (column 11) (len 1)) (segments (segment 0 (token "P") (name "P") (separator none) (span (offset 127) (line 8) (column 11) (len 1)))))
   )
-  (root (package (name "MultiplicityTest") (body brace (part-def (name "P") (body semicolon)) (attribute-def) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (attribute-def))))
+  (root (package (name "MultiplicityTest") (body brace (part-def (name "P") (body semicolon)) (attribute-def) (part-usage (declaration-name "a") (typing none) (body semicolon)) (part-usage (declaration-name "b") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body semicolon)) (part-usage (declaration-name "c") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r1)))) (body semicolon)) (part-usage (declaration-name "d") (typing none) (body semicolon)) (part-usage (declaration-name "e") (typing none) (body semicolon)) (part-usage (declaration-name "f") (typing none) (body semicolon)) (part-usage (declaration-name "g") (typing none) (body semicolon)) (attribute-def))))
 )
 ~~~

@@ -633,6 +633,11 @@ mod tests {
     }
 
     #[test]
+    /// The end-to-end companion to this test is gone, deliberately. It regenerated a fixture
+    /// whose source was `transition t then next { }` -- a body that used to be an opaque
+    /// `ConnectBody` marker. Every such body is a real `ast::Body` now, and no construct in the
+    /// grammar reaches an opaque hit with a diagnostic-free parse any more, so the sentinel is
+    /// exercised at the mechanism it belongs to rather than through a document that cannot exist.
     fn opaque_ast_format_uses_explicit_unavailable_sentinel() {
         let section = FormatSection::from_emit_result(
             "package P;",
@@ -751,16 +756,6 @@ mod tests {
             &source,
             &format!("{format} ")
         ));
-    }
-
-    #[test]
-    fn regeneration_retains_valid_opaque_ast_with_unavailable_format() {
-        let fixture = "# META\n~~~sexpr\n(snapshot (type semantic) (description \"Retains a parsed opaque transition body without claiming canonical emission.\"))\n~~~\n# SOURCE\n~~~sysml\npackage P { state def S { transition t then next { } } }\n~~~\n";
-        let regenerated = regenerate_snapshot(fixture, Path::new("opaque-format.md"))
-            .expect("opaque AST must not abort snapshot regeneration");
-
-        assert!(regenerated.contains("# FORMAT\n~~~sexpr\n(unavailable (reason opaque-ast))\n~~~"));
-        assert!(regenerated.contains("# AST\n~~~sexpr\n"));
     }
 
     #[test]

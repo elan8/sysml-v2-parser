@@ -86,7 +86,9 @@ fn test_objective_body_preserves_structured_requirement_members() {
     };
     assert!(req_body_elements.iter().any(|e| matches!(
         e.value,
-        sysml_v2_parser::ast::RequirementDefBodyElement::Doc(_)
+        sysml_v2_parser::ast::RequirementDefBodyElement::Annotating(
+            sysml_v2_parser::ast::AnnotatingMember::Doc(_)
+        )
     )));
     assert!(req_body_elements.iter().any(|e| matches!(
         e.value,
@@ -274,7 +276,7 @@ fn test_verification_return_ref_parses_return_expression() {
         .iter()
         .find_map(|element| match &element.value {
             ReturnRefBodyElement::Result(expression) => Some(expression),
-            ReturnRefBodyElement::Doc(_) | ReturnRefBodyElement::Error(_) => None,
+            ReturnRefBodyElement::Annotating(_) | ReturnRefBodyElement::Error(_) => None,
         })
         .expect("return expression should be parsed");
     let token = match &expr.value {
@@ -511,7 +513,9 @@ fn test_parse_require_constraint_keeps_inner_members() {
     assert!(
         constraint_elements.iter().any(|e| matches!(
             e.value,
-            sysml_v2_parser::ast::ConstraintDefBodyElement::Doc(_)
+            sysml_v2_parser::ast::ConstraintDefBodyElement::Annotating(
+                sysml_v2_parser::ast::AnnotatingMember::Doc(_)
+            )
         )),
         "doc should be preserved inside require constraint"
     );

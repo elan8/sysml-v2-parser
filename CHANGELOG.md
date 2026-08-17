@@ -9,6 +9,170 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`transition`, `satisfy` and the three interface-usage forms hold a real body; four spec
+  fixtures become formattable.** `TransitionUsage = 'transition' … ActionBody` and
+  `InterfaceUsage = … InterfaceBody`; `satisfy` paired its marker with a second element list.
+  A `transition t then next { … }` body was an opaque `ConnectBody` marker, and an opaque node
+  makes `emit_sysml` refuse the *whole document* -- so `5-State-based Behavior-1`, `-1a`,
+  `2a-Parts Interconnection` and `8-Requirements` recorded
+  `(unavailable (reason opaque-ast))` for their entire FORMAT section. All four now format, and
+  the first two are promoted into `ROUNDTRIP_PASS`. `ConnectBody` now has a single owner left,
+  the legacy `Annotation`. **AST version 164 -> 165.**
+
+- **`connect`, `allocate`, `succession` and `binding` usages hold a real body, and a braced
+  `connect` can be formatted.** All four end in `UsageBody`, and `UsageBody = DefinitionBody`, so
+  each owns the whole usage member set; all four held a `ConnectBody` marker whose brace form was
+  parsed by `advance_to_closing_brace` and kept nothing. A braced `connect` body was worse than
+  lossy: `emit_connect` aborted with `OpacityKind::OpaqueConnectBrace`, so
+  `connect a to b { doc /* … */ }` inside a part definition made the whole document
+  unformattable. Each is now a `Body<PartUsageBodyElement>` with its own delimiter spans.
+  **AST version 163 -> 164.**
+
+- **`dependency`, `expose` and the view-body `satisfy` hold a real body.** All three carried a
+  `ConnectBody` marker -- two variants, no delimiter spans -- whose brace form `expose` and
+  `satisfy` skipped wholesale, so members written inside `expose Subject { doc /* ... */ }` were
+  discarded with no node and no diagnostic and the body re-emitted as `{}`. `Dependency`
+  additionally kept the members in a second field beside the marker, one body fact in two places.
+  All three are now one `Body<RelationshipBodyElement>` with its own `;` or brace spans, sharing
+  one emitter, one traversal and one projection. Making the body real also surfaced that `expose`
+  computed its import-target span the way `import_` explicitly does not -- looking for an absent
+  `::*` consumes the trivia before a braced body, so the span claimed a trailing space.
+  **AST version 162 -> 163.**
+
+- **A `connect` statement body holds the usage member set, in one field.**
+  `ConnectionUsage = OccurrenceUsagePrefix ( … | 'connect' ConnectorPart ) UsageBody` and
+  `UsageBody = DefinitionBody`, so `connect a to b { … }` legally holds every definition-body
+  member. The parser routed it through `relationship_body`, which admits only the annotating
+  subset, so an `attribute`, a nested `part` or a `ref` inside a connect body reached recovery.
+  `ConnectStmt` also carried the body twice -- a `ConnectBody` marker (`Semicolon | Brace`, with
+  no delimiter spans) beside a separate `body_elements` list -- which is the shape
+  `ast::Body` exists to prevent; it is now one `Body<PartUsageBodyElement>` carrying its own `;`
+  or brace spans. One of the ten `ConnectBody` owners is gone. **AST version 161 -> 162.**
+
+- **A calculation body owns its action members, and `ref calc` parses as one declaration.**
+  `CalculationBodyItem = ActionBodyItem | ReturnParameterMember`, so a calculation body holds every
+  action-body member. It held none of them, and the failure was silent rather than a diagnostic:
+  the body's keyword-less `DefaultReferenceUsage` fallback read each action keyword as a feature
+  name, so `first f;` parsed as two invented members -- `'first';` and `f;` -- and formatted back
+  that way. The same fallback swallowed the `ref` of `BasicUsagePrefix = RefPrefix
+  ( isReference ?= 'ref' )?`, so `ref calc self : Calculation :>> Action::self;` in the checked-in
+  `Calculations.sysml` fixture emitted as `'ref';` on its own line followed by a `calc` usage that
+  had lost its prefix. `CalcUsage::is_reference` retains the keyword and the calculation body now
+  routes action members to the action dispatcher. Only a calculation reaches it: `calc_def_body`
+  also serves KerML type bodies, whose `TypeBodyElement` has no action-node alternative.
+  **AST version 160 -> 161.**
+
+- **A part usage body takes the view family, and a part definition body can emit it.**
+  `ViewUsage`, `ViewpointUsage` and `RenderingUsage` are usage-element alternatives and their
+  three definitions are `DefinitionElement` alternatives, so `UsageBody = DefinitionBody` admits
+  all six in a part usage body exactly as in a part definition body. The part usage scope modelled
+  none of them -- `rendering r { ... }` inside `part p { ... }` reached recovery -- and the part
+  definition scope, which parsed all six, had every one of them in its emitter's `unsupported`
+  group, so a document with a nested view definition parsed and then could not be formatted.
+  **AST version 159 -> 160.**
+
+- **A declared `interface` usage with no typing parses.** `InterfaceUsageDeclaration`'s
+  `UsageDeclaration` makes the `: Type` optional and its `( 'connect' InterfacePart )?` optional
+  too, but the parser reached a name only through the typed spelling or the `connect` spelling.
+  `interface i;` and `interface i { ... }` left the name unconsumed, the body parser then failed
+  on it, and the whole member went to recovery -- while `interface i : I { ... }` parsed.
+  **AST version 158 -> 159.**
+
+- **A `flow def` can be formatted.** `FlowDefinition = OccurrenceDefinitionPrefix ( 'flow' |
+  'message' ) 'def' Definition` is a `DefinitionElement`, so it is legal at package level and in a
+  part definition or part usage body. It parsed into a complete typed node in all three, and all
+  three emitters reported it as an unsupported construct -- a document containing one parsed
+  cleanly and then could not be emitted at all. Its body is a `DefinitionBody`, the same shape
+  `emit_allocation_def` already wrote.
+
+### Added
+
+- **Two more `examples/` files round-trip.** `Simple Tests/TextualRepresentationTest.sysml` and
+  `Metadata Examples/VerificationMetadataExample.sysml` are promoted into
+  `EXAMPLES_ROUNDTRIP_PASS`: the first needed a textual representation to be dispatched in action
+  and KerML type bodies at all, the second needed `@` metadata annotations to emit from the scopes
+  that own them and a comment to keep the elements its `about` clause names.
+
+- **A comment's `about` clause is parsed instead of scanned past.**
+  `Comment = ( 'comment' Identification ( 'about' Annotation ( ',' Annotation )* )? )? …`, and the
+  clause was skipped with `take_until("/*")` -- a raw substring search with no bound. It ran past
+  the comment's own end, past the enclosing `}`, and through however many later declarations it
+  took to reach a block comment, discarding every one of them with no diagnostic:
+  `comment about` with no target consumed the `attribute mass;` after it, the closing brace, and
+  the whole next `part def`. The annotated elements were dropped too, and so was a `locale` that
+  followed them. `CommentAnnotation::about_targets` holds them as the qualified references they
+  are, emission reproduces them, and an incomplete clause is a recovery node with an exact span
+  that later siblings survive. Three checked-in spec fixtures get their annotated elements back.
+  **AST version 157 -> 158.**
+
+- **An `enum def` body keeps its annotating members instead of silently dropping them.**
+  `EnumerationBody` is the one production that names the membership directly -- `';' | '{'
+  ( ownedRelationship += AnnotatingMember | ownedRelationship += EnumerationUsageMember )* '}'` --
+  and the body parser recognised `doc` and `comment` only to discard them: no node, no span, no
+  diagnostic. `rep` and `@` were not recognised at all, and on any member it could not parse it
+  ran to the closing brace and dropped everything in between, still with no diagnostic. A body
+  with four annotating members and three values parsed clean and kept two values. It now goes
+  through the shared brace-member routine, so annotating members are retained in authored order
+  beside the values and a malformed member becomes an `Error` node with an exact span that later
+  values survive. Documentation reappears in the checked-in library fixtures that had it --
+  `RiskMetadata`, `15.10-Primitive Data Types`, `documentation_in_bodies`. `EnumerationBody` is
+  now `Body<EnumerationBodyElement>` rather than `Body<EnumeratedValue>`, and the semantic
+  projection names each member instead of the definition as a whole. **AST version 156 -> 157.**
+
+- **Package bodies use the shared annotating family.** No new syntax -- this scope already
+  accepted all four -- but its four variants collapse into `Annotating(AnnotatingMember)`, so the
+  emitter, the projection and the traversal reach the production through one path here too. The
+  per-production FIRST-set guards are kept: each alternative still dispatches under its own
+  `PackageProduction` tag, so scope drift is still detected per alternative.
+
+- **Requirement, case, constraint, calculation, view and rendering bodies accept the whole
+  annotating production, and a KerML type body stops shredding a `rep`.** `RequirementBodyItem`
+  extends `DefinitionBodyItem`, `CaseBodyItem` and `CalculationBodyItem` extend `ActionBodyItem`,
+  and `ViewDefinitionBodyItem`/`ViewBodyItem` extend `DefinitionBodyItem`, so all nine scopes own
+  the production; between them they accepted eight of the thirty-six alternative-scope pairs. The
+  worst case was the KerML type body, which shares `CalcDefBodyElement`: `rep x language "text"
+  /* … */` was not dispatched at all, and the fallback member parser broke it into four invented
+  members -- `'rep'; x; 'language'; "text";` -- with no diagnostic, so the document parsed clean
+  and formatted back as something else. A constraint or calculation body containing an `@`
+  metadata annotation parsed but could not be formatted at all. **AST version 155 -> 156.**
+
+- **Action, action-usage, state and control-node bodies accept the whole annotating production,
+  and can emit it.** `ActionBodyItem` and `StateBodyItem` both start at `NonBehaviorBodyItem`,
+  which reaches `AnnotatingElement` through `DefinitionMember`, so `comment /* ... */` belongs in
+  all of them and was a parse error in all of them. The other three alternatives parsed but could
+  not be formatted: `emit_action_def_body`, `emit_action_usage_body` and `emit_state_def_body`
+  each reported a metadata annotation or a textual representation as an unsupported construct, so
+  a document was parseable and unformattable at the same time. All four now go through the shared
+  annotating emitter. Control-node bodies (`first`, `merge`, `decide`, `join`, `fork`) inherit the
+  change with the action-body member set they already share. **AST version 154 -> 155.**
+
+- **Eleven structural body scopes accept the whole annotating production.** Part, attribute, port,
+  connection, interface and occurrence definitions, port, interface and perform usages, KerML
+  feature bodies, and metadata bodies each admitted documentation and nothing else -- or, for part
+  definitions, everything but a textual representation -- while the grammar reaches
+  `AnnotatingElement` in all of them through `DefinitionBodyItem -> DefinitionMember ->
+  DefinitionElement` (`NonFeatureMember -> MemberElement` on the KerML side). They now carry
+  `Annotating(AnnotatingMember)` and dispatch through the one parser, so `comment`, `rep` and the
+  `@` metadata spelling parse, emit and traverse identically wherever the production is legal. The
+  derived evidence is `planning/annotating-member-matrix.md`. **AST version 153 -> 154.**
+
+- **A comment's keyword span is validated on deserialization.** `comment` is optional in the
+  production and its presence is the only thing separating a member from a bare block comment,
+  which reparses as trivia and disappears -- so emission reads the span, and a wire document could
+  redirect it at another comment's keyword and silently change what the document says. It is now
+  checked like a delimiter: it must slice to `comment`, and it must lie inside the comment that
+  owns it rather than merely inside the enclosing declaration.
+
+### Removed
+
+- **`DefinitionBodyElement::Doc`, which the parser could not build.** Documentation in a flow,
+  allocation or message body has always arrived as
+  `OccurrenceMember(OccurrenceBodyElement::Doc)`; the sibling variant had no construction site
+  anywhere, so it was an unreachable state in a public enum and a second representation of the
+  same syntactic fact.
+
+### Fixed
+
 - **An anonymous connection definition no longer emits a doubled space.** The trailing space was
   written with the `connection def` keyword rather than with the identification, so
   `#derivation connection { ... }` formatted as `#derivation connection def  {`.
@@ -27,6 +191,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatted back as `derived ref deferred : ActionUsage;`. **AST version 152 -> 153.**
 
 ### Changed
+
+- **An empty part-usage brace body formats as `{}`.** `emit_ref_decl` already wrote that form for
+  the same `Body<PartUsageBodyElement>`, so `part p {}` and the `ref x {}` beside it disagreed.
+
+- **A `connect` statement projects its body.** It was a bare `(connect)` marker, so no snapshot
+  could show that the body holds members -- which is how the missing member set stayed invisible.
+
+- **A calculation definition projects its body.** It was a bare `(calc-def)` marker, so no
+  snapshot could show whether a calculation body member survived parsing -- which is how the
+  shredding above stayed invisible. Action members reuse the exhaustive `ActionDefBodyElement`
+  writer rather than restating it.
+
+- **A package-level part usage projects its typing and its body.** It was a bare `(part-usage)`
+  marker, so a snapshot could not show any member of `part p { ... }` written at package level,
+  and the usage's own type reference never appeared in the projection's reference table.
+  `PartUsageBody` and `RefBody` are both `Body<PartUsageBodyElement>`, so the exhaustive element
+  match that ref bodies already used covers this scope unchanged -- nothing called it. 112 fixtures
+  gain body detail; the reference tables renumber because the table is built from what the
+  projection reaches, in the order it reaches it.
 
 - **Ref and attribute usage projections name the `RefPrefix` chain.** The semantic projection
   recorded neither `derived`/`abstract`/`variation`/`constant` nor the direction, so a snapshot

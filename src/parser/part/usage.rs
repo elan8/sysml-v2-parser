@@ -447,7 +447,10 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
-        map(doc_comment, PerformBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            PerformBodyElement::Annotating,
+        ),
         map(perform_in_out_binding, PerformBodyElement::InOut),
         // §6 G6: parameter-direction usage members (`in part :>> name = value;`, `in item 'n' :
         // Type { }`, …) reuse the same directed/usage parsers as port-def bodies rather than
@@ -666,7 +669,7 @@ pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> 
     let (input, source) = path_expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
     let (input, target) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -783,7 +786,7 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     let (input, to_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = ref_body(input)?;
     let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
@@ -854,10 +857,18 @@ fn interface_usage_body_element(
             let span = end.span.clone();
             Node::new(span, InterfaceUsageBodyElement::EndDecl(Box::new(end)))
         }),
-        map(doc_comment, |doc| {
-            let span = doc.span.clone();
-            Node::new(span, InterfaceUsageBodyElement::Doc(doc))
-        }),
+        |input| {
+            let start = input;
+            let (input, member) = crate::parser::body::annotating_member(input)?;
+            Ok((
+                input,
+                crate::parser::node_from_to(
+                    start,
+                    input,
+                    InterfaceUsageBodyElement::Annotating(member),
+                ),
+            ))
+        },
     ))
     .parse(input)
 }
@@ -894,22 +905,36 @@ fn interface_usage_ref_redef(
 }
 
 /// Connect body for interface usage (TypedConnect): `;` or `{` body_elements* `}`
-fn connect_body_with_elements(
+/// `InterfaceUsage = OccurrenceUsagePrefix 'interface' InterfaceUsageDeclaration InterfaceBody`.
+///
+/// Returns one shared [`crate::ast::Body`] carrying its own delimiter spans. The two callers used
+/// to receive a `ConnectBody` marker beside the element list, so the `;`/`{}` fact lived in two
+/// fields and neither `{` nor `}` had a span.
+fn interface_usage_body(
     input: Input<'_>,
-) -> IResult<Input<'_>, (ConnectBody, Vec<Node<InterfaceUsageBodyElement>>)> {
+) -> IResult<Input<'_>, crate::ast::Body<InterfaceUsageBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
-    if let Ok((input, _)) = tag::<_, _, nom::error::Error<Input>>(&b";"[..]).parse(input) {
-        return Ok((input, (ConnectBody::Semicolon, vec![])));
+    if input.fragment().starts_with(b";") {
+        return crate::parser::body::semicolon_body(input);
     }
-
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let (open_start, _) = ws_and_comments(input)?;
+    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
         let (next, _) = ws_and_comments(input)?;
         input = next;
         if input.fragment().starts_with(b"}") {
-            let (input, _) = tag(&b"}"[..]).parse(input)?;
-            return Ok((input, (ConnectBody::Brace, elements)));
+            let close_start = input;
+            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+            return Ok((
+                input,
+                crate::ast::Body::Brace {
+                    open_span,
+                    elements,
+                    close_span: crate::parser::span::span_from_to(close_start, input),
+                },
+            ));
         }
         let (next, element) = interface_usage_body_element(input)?;
         if next.location_offset() == input.location_offset() {
@@ -982,12 +1007,41 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
             if let Some((iface_name, _, _)) = bare_named {
                 (input, Some(iface_name), None)
             } else {
-                let (input, interface_type) = opt(preceded(
-                    tag(&b":"[..]),
-                    preceded(ws_and_comments, qualified_reference),
+                // A declared interface usage with a name but no typing and no `connect` clause:
+                // `interface i;`, `interface i { ... }`, `interface i :> J;`. `UsageDeclaration`
+                // makes the `: Type` optional, so the name above was reachable only through the
+                // typed or the `connect` spelling and this form fell through to the body parser
+                // with the name still unconsumed -- which then failed on it, sending the whole
+                // member to recovery.
+                //
+                // The lookahead is what keeps `interface a to b;` anonymous: `to` is not a
+                // declaration terminator, so `a` there stays the first connector end.
+                let (input, declared_name) = opt((
+                    name,
+                    opt(multiplicity_node),
+                    preceded(
+                        ws_and_comments,
+                        nom::combinator::peek(alt((
+                            tag(&b";"[..]),
+                            tag(&b"{"[..]),
+                            tag(&b":>>"[..]),
+                            tag(&b":>"[..]),
+                            tag(&b"subsets"[..]),
+                            tag(&b"redefines"[..]),
+                        ))),
+                    ),
                 ))
                 .parse(input)?;
-                (input, None, interface_type)
+                if let Some((iface_name, _, _)) = declared_name {
+                    (input, Some(iface_name), None)
+                } else {
+                    let (input, interface_type) = opt(preceded(
+                        tag(&b":"[..]),
+                        preceded(ws_and_comments, qualified_reference),
+                    ))
+                    .parse(input)?;
+                    (input, None, interface_type)
+                }
             }
         };
     let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
@@ -1000,7 +1054,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         let (input, from_expr) = connector_end_expression(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
         let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
-        let (input, (body, body_elements)) = connect_body_with_elements(input)?;
+        let (input, body) = interface_usage_body(input)?;
         return Ok((
             input,
             node_from_to(
@@ -1014,7 +1068,6 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     from: from_expr,
                     to: to_expr,
                     body,
-                    body_elements,
                 },
             ),
         ));
@@ -1029,7 +1082,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 preceded(ws_and_comments, connector_end_expression).parse(input)?;
             Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (from_expr, to_expr)))
         })() {
-            let (input, _) = opt(connect_body).parse(after_to)?;
+            let (input, body) = interface_usage_body(after_to)?;
             return Ok((
                 input,
                 node_from_to(
@@ -1040,7 +1093,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                         redefines: redefines.clone(),
                         from: from_expr,
                         to: to_expr,
-                        body_elements: vec![],
+                        body,
                     },
                 ),
             ));
@@ -1048,7 +1101,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     }
     // GH-16: no `connect` clause (and, if unnamed/untyped, no bare `from to to` form either) --
     // a plain declared interface usage. Ends, if any, are declared inside the body instead.
-    let (input, (body, body_elements)) = connect_body_with_elements(input)?;
+    let (input, body) = interface_usage_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -1060,7 +1113,6 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 subsets,
                 redefines,
                 body,
-                body_elements,
             },
         ),
     ))
@@ -1488,6 +1540,36 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 crate::parser::case::verification_case_usage,
                 PartUsageBodyElement::VerificationCaseUsage,
             ),
+            // The view family. `UsageBody = DefinitionBody`, so a part *usage* body admits the
+            // same six a part *definition* body already dispatched; this scope had none of them,
+            // so `rendering r { ... }` or `view v { ... }` inside `part p { ... }` reached
+            // recovery. `def` before `usage` throughout, for the bare-keyword reason the part
+            // definition dispatcher documents: `view_usage`, `viewpoint_usage` and
+            // `rendering_usage` each read a bare name straight after their keyword.
+            // Nested in a sub-alt to stay under nom's 21-branch limit, as the sibling groups are.
+            alt((
+                map(crate::parser::view::view_def, PartUsageBodyElement::ViewDef),
+                map(
+                    crate::parser::view::view_usage,
+                    PartUsageBodyElement::ViewUsage,
+                ),
+                map(
+                    crate::parser::view::viewpoint_def,
+                    PartUsageBodyElement::ViewpointDef,
+                ),
+                map(
+                    crate::parser::view::viewpoint_usage,
+                    PartUsageBodyElement::ViewpointUsage,
+                ),
+                map(
+                    crate::parser::view::rendering_def,
+                    PartUsageBodyElement::RenderingDef,
+                ),
+                map(
+                    crate::parser::view::rendering_usage,
+                    PartUsageBodyElement::RenderingUsage,
+                ),
+            )),
         )),
     ))
     .parse(input)?;

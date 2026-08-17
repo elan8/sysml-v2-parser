@@ -3,9 +3,7 @@ use super::behavior::{
     StateUsage,
 };
 use super::body::Body;
-use super::common::{
-    AnnotatingMember, CommentAnnotation, ConnectBody, DocComment, Identification, ParseErrorNode,
-};
+use super::common::{AnnotatingMember, ConnectBody, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
@@ -80,10 +78,9 @@ pub type PartDefBody = Body<PartDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PartDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// A dependency owned by this definition (BNF `DefinitionMember`).
     Dependency(Node<Dependency>),
@@ -341,7 +338,8 @@ pub enum AttributeBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     /// `occurrence ...` usage (§6 G27). `AttributeBody` is shared with `item def` / `item` usage
@@ -714,6 +712,16 @@ pub enum PartUsageBodyElement {
     /// }` (Simple Tests/VerificationTest.sysml:35). Already dispatched in `PartDefBodyElement`,
     /// just not here.
     VerificationCaseUsage(Node<crate::ast::requirement::VerificationCaseUsage>),
+    /// The view family. `RenderingUsage`, `ViewUsage` and `ViewpointUsage` are
+    /// `StructureUsageElement`/`BehaviorUsageElement` alternatives and the three definitions are
+    /// `DefinitionElement` alternatives, so `UsageBody = DefinitionBody` admits all six here
+    /// exactly as `PartDefBodyElement` already did. This scope had none of them.
+    ViewDef(Node<crate::ast::view::ViewDef>),
+    ViewUsage(Node<crate::ast::view::ViewUsage>),
+    ViewpointDef(Node<crate::ast::view::ViewpointDef>),
+    ViewpointUsage(Node<crate::ast::view::ViewpointUsage>),
+    RenderingDef(Node<crate::ast::view::RenderingDef>),
+    RenderingUsage(Node<crate::ast::view::RenderingUsage>),
     /// Nested KerML classifier declaration (`struct Car1_ { ... }` inside a `part` usage body,
     /// KerML `time_varying_car_driver`; spec42 Gap 38); see
     /// [`crate::ast::KermlClassifierDecl`].
@@ -795,7 +803,8 @@ pub type PerformBody = Body<PerformBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PerformBodyElement {
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     InOut(Node<PerformInOutBinding>),
     /// `variant perform doX;` inside a `variation perform action ... { ... }` body (§6 G5).
     Variant(Node<VariantUsage>),
@@ -969,13 +978,18 @@ impl PartialEq for DefaultReferenceUsage {
 /// expression sublanguage; see `DefaultReferenceUsage::body`'s doc comment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// `AnnotatingMember` keeps the same direct representation here as in every other scope that owns
+// it. Boxing it only where the sibling variant happens to be small would make the public shape of
+// one production depend on which body contains it -- the same reason `ActionDefBodyElement` keeps
+// `ThenAction` unboxed.
+#[allow(clippy::large_enum_variant)]
 pub enum FeatureBodyElement {
     /// A nested keyword-less binding, e.g. `:>> dimensions = sourceVector.mRef.dimensions;`
     /// inside `:>> mRef = transformation.target { ... }` (Domain Libraries
     /// `VectorCalculations.sysml`).
     Binding(Box<Node<DefaultReferenceUsage>>),
-    /// Documentation inside a feature body.
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
 }
 
 // ---------------------------------------------------------------------------
@@ -1010,7 +1024,8 @@ pub enum PortDefBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     InOutDecl(Node<InOutDecl>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Error(Node<ParseErrorNode>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
@@ -1114,7 +1129,8 @@ pub enum PortBodyElement {
     Error(Node<ParseErrorNode>),
     InOutDecl(Node<InOutDecl>),
     PortUsage(Node<PortUsage>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     /// Attribute usage nested inside a port usage body (PAR-002 widening; this enum previously
     /// had no attribute/item coverage at all).
     AttributeUsage(Node<AttributeUsage>),
@@ -1132,12 +1148,15 @@ pub struct ConnectStmt {
     /// Additional ends beyond `from`/`to` from the parenthesized n-ary form; empty for the
     /// ordinary binary `from ... to ...` form.
     pub extra_ends: Vec<Node<ConnectionEnd>>,
-    pub body: ConnectBody,
-    /// Real annotation content from a braced body (`body: ConnectBody::Brace`), tracked
-    /// separately from `body` since `ConnectBody` itself is shared as a bare semicolon/brace
-    /// marker across several very differently-shaped contexts (bind, TypedConnect, this plain
-    /// connect statement). Empty for `ConnectBody::Semicolon`.
-    pub body_elements: Vec<Node<RelationshipBodyElement>>,
+    /// `ConnectionUsage = OccurrenceUsagePrefix ( … | 'connect' ConnectorPart ) UsageBody`, and
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set -- not only the
+    /// annotating subset a `RelationshipBody` allows.
+    ///
+    /// This was a `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) paired with a
+    /// separate `body_elements` list: one body fact in two fields, which is what
+    /// [`crate::ast::Body`] exists to prevent. The shared container carries the `;` or the two
+    /// brace spans with it.
+    pub body: PartUsageBody,
 }
 
 // ---------------------------------------------------------------------------
@@ -1161,7 +1180,8 @@ pub type InterfaceDefBody = Body<InterfaceDefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InterfaceDefBodyElement {
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
@@ -1465,7 +1485,8 @@ pub enum ConnectionDefBodyElement {
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Error(Node<ParseErrorNode>),
     /// PAR-002 widening: this enum previously had no attribute/item/port coverage at all.
     AttributeDef(Node<AttributeDef>),
@@ -1533,7 +1554,26 @@ pub struct EnumDef {
     pub membership: Membership,
 }
 
-pub type EnumerationBody = Body<EnumeratedValue>;
+pub type EnumerationBody = Body<EnumerationBodyElement>;
+
+/// A member of an `enum def { ... }` body.
+///
+/// `EnumerationBody` is the one production that names the membership directly --
+/// `';' | '{' ( ownedRelationship += AnnotatingMember | ownedRelationship += EnumerationUsageMember )* '}'`
+/// (SysML 8.2.2.8) -- so this scope's member set is the annotating production plus enumerated
+/// values, and nothing else.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum EnumerationBodyElement {
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
+    /// `EnumerationUsageMember`, one enumerated value.
+    Value(Node<EnumeratedValue>),
+    /// Malformed syntax retained by the structured recovery parser. This body had no recovery
+    /// representation at all: an unparseable member sent it to the closing brace, discarding
+    /// everything in between with no node and no diagnostic.
+    Error(Node<ParseErrorNode>),
+}
 
 /// One enumerated value inside an `enum def { ... }` body: optional `enum` keyword + name, with
 /// an optional inline body or `= expr` initializer that the parser discards (BNF
@@ -1649,7 +1689,8 @@ pub struct AssertConstraintMember {
 #[allow(clippy::large_enum_variant)]
 pub enum OccurrenceBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
     AssertConstraint(Node<AssertConstraintMember>),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
@@ -1712,7 +1753,10 @@ pub struct SuccessionUsage {
     pub target: Node<Expression>,
     /// Multiplicity on the `then` end, e.g. `[0..1]`.
     pub target_multiplicity: Option<Node<Multiplicity>>,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: PartUsageBody,
     pub membership: Membership,
 }
 
@@ -1731,7 +1775,11 @@ pub enum DefinitionBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// Every recognized member of this body, including the annotating ones. This scope shares
+    /// the occurrence-body member set rather than restating it, so it has no annotating variant
+    /// of its own: a `Doc` variant here had no construction site in the parser at all --
+    /// documentation in a flow, allocation or message body has always arrived as
+    /// `OccurrenceMember(OccurrenceBodyElement::Annotating(..))`.
     OccurrenceMember(Node<OccurrenceBodyElement>),
 }
 // ---------------------------------------------------------------------------
@@ -1784,8 +1832,9 @@ pub enum InterfaceUsage {
         redefines: Option<Node<SubsettingRelationship>>,
         from: Node<Expression>,
         to: Node<Expression>,
-        body: ConnectBody,
-        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+        /// The `InterfaceBody`, delimiters included. Was a `ConnectBody` marker beside a separate
+        /// element list -- one body fact in two fields, with no span for either brace.
+        body: Body<InterfaceUsageBodyElement>,
     },
     /// `interface` from `to` to body.
     Connection {
@@ -1793,7 +1842,10 @@ pub enum InterfaceUsage {
         redefines: Option<Node<SubsettingRelationship>>,
         from: Node<Expression>,
         to: Node<Expression>,
-        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+        /// See [`InterfaceUsage::TypedConnect`]'s body. This variant kept only an element list
+        /// that was always empty -- the parser discarded the body outright -- so the `;`/`{}`
+        /// distinction and every member were lost.
+        body: Body<InterfaceUsageBodyElement>,
     },
     /// `interface` (name (multiplicity)?)? (`:` Type)? body -- a declared interface usage with
     /// no inline `connect` clause (GH-16). Per BNF `InterfaceUsageDeclaration = UsageDeclaration
@@ -1807,8 +1859,8 @@ pub enum InterfaceUsage {
         interface_type: Option<QualifiedReferenceId>,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
-        body: ConnectBody,
-        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+        /// See [`InterfaceUsage::TypedConnect`]'s body.
+        body: Body<InterfaceUsageBodyElement>,
     },
 }
 
@@ -1822,7 +1874,8 @@ pub enum InterfaceUsageBodyElement {
         value: Node<Expression>,
         body: RefBody,
     },
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     /// GH-85: `end` member inside a typed, non-`connect` interface usage's body, e.g. `interface
     /// i: I { end port p3: P ::> p.p1; end port p4: ~P ::> p.p2; }` (`Simple Tests/
     /// ConjugationTest.sysml`), parallel to the already-supported `connection a: A { end port
@@ -1836,7 +1889,10 @@ pub enum InterfaceUsageBodyElement {
 pub struct Connect {
     pub from: Node<ConnectionEnd>,
     pub to: Node<ConnectionEnd>,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: PartUsageBody,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
 }
@@ -1870,7 +1926,10 @@ pub struct BindingConnectorUsage {
     pub uses_bind_keyword: bool,
     pub left: QualifiedReferenceId,
     pub right: QualifiedReferenceId,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: PartUsageBody,
 }
 
 // ---------------------------------------------------------------------------

@@ -210,7 +210,9 @@ fn requirement_body_rep_language_parsed() {
         RequirementDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
-                RequirementDefBodyElement::TextualRep(t) => Some(&t.value),
+                RequirementDefBodyElement::Annotating(AnnotatingMember::TextualRep(t)) => {
+                    Some(&t.value)
+                }
                 _ => None,
             })
             .expect("textual rep"),
@@ -409,7 +411,9 @@ fn constraint_body_metadata_annotation_parsed() {
         ConstraintDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
-                ConstraintDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
+                ConstraintDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(m)) => {
+                    Some(&m.value)
+                }
                 _ => None,
             })
             .expect("metadata annotation in constraint body"),
@@ -445,7 +449,9 @@ fn metadata_annotation_brace_body_parses_shorthand_bindings() {
         PartDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
-                PartDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
+                PartDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(m)) => {
+                    Some(&m.value)
+                }
                 _ => None,
             })
             .expect("metadata annotation"),
@@ -509,7 +515,9 @@ fn metadata_annotation_about_clause_parses_targets() {
         PartDefBody::Brace { elements, .. } => elements
             .iter()
             .find_map(|e| match &e.value {
-                PartDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
+                PartDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(m)) => {
+                    Some(&m.value)
+                }
                 _ => None,
             })
             .expect("metadata annotation"),
@@ -740,7 +748,7 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         _ => panic!("expected brace body"),
     };
     let ann = match &uc_body[0].value {
-        UseCaseDefBodyElement::MetadataAnnotation(a) => &a.value,
+        UseCaseDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(a)) => &a.value,
         other => panic!("expected MetadataAnnotation in use case body, got {other:?}"),
     };
     assert!(root.qualified_reference(ann.reference).is_some());
@@ -756,7 +764,7 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         _ => panic!("expected brace body"),
     };
     let ann = match &v_body[0].value {
-        ViewDefBodyElement::MetadataAnnotation(a) => &a.value,
+        ViewDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(a)) => &a.value,
         other => panic!("expected MetadataAnnotation in view def body, got {other:?}"),
     };
     assert!(root.qualified_reference(ann.reference).is_some());
@@ -772,7 +780,7 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         _ => panic!("expected brace body"),
     };
     let ann = match &c_body[0].value {
-        CalcDefBodyElement::MetadataAnnotation(a) => &a.value,
+        CalcDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(a)) => &a.value,
         other => panic!("expected MetadataAnnotation in calc def body, got {other:?}"),
     };
     assert!(root.qualified_reference(ann.reference).is_some());

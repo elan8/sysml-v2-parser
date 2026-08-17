@@ -168,6 +168,32 @@ pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"@", b"doc", b"in", b"out", b"inout", b"return", b"calc", b"part",
 ];
 
+/// The action-node keywords a `CalculationBody` owns through `CalculationBodyItem =
+/// ActionBodyItem | ReturnParameterMember`, used to route a member to the action dispatcher
+/// before the keyword-less-binding fallback can read the keyword itself as a feature name.
+pub(crate) const CALCULATION_ACTION_STARTERS: &[&[u8]] = &[
+    b"first",
+    b"merge",
+    b"decide",
+    b"join",
+    b"fork",
+    b"action",
+    b"if",
+    b"while",
+    b"loop",
+    b"for",
+    b"assign",
+    b"terminate",
+    b"then",
+    b"perform",
+    b"send",
+    b"accept",
+    b"exhibit",
+    b"state",
+    b"item",
+    b"flow",
+];
+
 pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"doc",
     b"@",

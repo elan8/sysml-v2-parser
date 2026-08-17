@@ -1,7 +1,7 @@
 //! Structure emission: part / attribute (and shared helpers).
 
 use super::expr::{emit_expression, emit_feature_value};
-use super::root::{emit_comment, emit_doc, emit_identification, emit_import};
+use super::root::{emit_identification, emit_import};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
@@ -285,8 +285,9 @@ fn emit_part_def_body_element(
         PartDefBodyElement::UnsupportedMember(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }
-        PartDefBodyElement::Doc(d) => emit_doc(w, &d.value),
-        PartDefBodyElement::Comment(c) => emit_comment(w, &c.value),
+        PartDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         PartDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PartDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PartDefBodyElement::PartDef(p) => emit_part_def(w, path, &p.value),
@@ -346,7 +347,6 @@ fn emit_part_def_body_element(
         PartDefBodyElement::AllocationUsage(a) => {
             super::behavior::emit_allocation_usage(w, path, &a.value)
         }
-        PartDefBodyElement::MetadataAnnotation(m) => emit_metadata_annotation(w, path, &m.value),
         PartDefBodyElement::MetadataKeywordUsage(m) => {
             emit_metadata_keyword_usage(w, path, &m.value)
         }
@@ -363,15 +363,19 @@ fn emit_part_def_body_element(
         PartDefBodyElement::FirstStmt(first) => {
             super::behavior::emit_first_stmt(w, path, &first.value)
         }
+        PartDefBodyElement::FlowDef(f) => super::behavior::emit_flow_def(w, path, &f.value),
+        PartDefBodyElement::ViewDef(n) => super::view::emit_view_def(w, path, &n.value),
+        PartDefBodyElement::ViewUsage(n) => super::view::emit_view_usage(w, path, &n.value),
+        PartDefBodyElement::ViewpointDef(n) => super::view::emit_viewpoint_def(w, path, &n.value),
+        PartDefBodyElement::ViewpointUsage(n) => {
+            super::view::emit_viewpoint_usage(w, path, &n.value)
+        }
+        PartDefBodyElement::RenderingDef(n) => super::view::emit_rendering_def(w, path, &n.value),
+        PartDefBodyElement::RenderingUsage(n) => {
+            super::view::emit_rendering_usage(w, path, &n.value)
+        }
         other @ (PartDefBodyElement::Annotation(_)
         | PartDefBodyElement::OccurrenceDef(_)
-        | PartDefBodyElement::FlowDef(_)
-        | PartDefBodyElement::ViewDef(_)
-        | PartDefBodyElement::ViewUsage(_)
-        | PartDefBodyElement::ViewpointDef(_)
-        | PartDefBodyElement::ViewpointUsage(_)
-        | PartDefBodyElement::RenderingDef(_)
-        | PartDefBodyElement::RenderingUsage(_)
         | PartDefBodyElement::CaseDef(_)
         | PartDefBodyElement::CaseUsage(_)
         | PartDefBodyElement::UseCaseDef(_)
@@ -384,6 +388,14 @@ fn emit_part_def_body_element(
     }
 }
 
+pub(crate) fn emit_part_usage_body_public(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &PartUsageBody,
+) -> Result<(), EmitError> {
+    emit_part_usage_body(w, path, body)
+}
+
 fn emit_part_usage_body(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -392,6 +404,13 @@ fn emit_part_usage_body(
     match body {
         PartUsageBody::Semicolon { .. } => {
             w.push_char(';');
+            Ok(())
+        }
+        // An empty brace body stays on one line, the form `emit_ref_decl` already writes for the
+        // same `Body<PartUsageBodyElement>`. Without this a `connect a to b {}` and the
+        // `ref x {}` beside it formatted differently.
+        PartUsageBody::Brace { elements, .. } if elements.is_empty() => {
+            w.push_str(" {}");
             Ok(())
         }
         PartUsageBody::Brace { elements, .. } => {
@@ -468,7 +487,7 @@ fn emit_part_usage_body_element(
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         PartUsageBodyElement::SuccessionUsage(s) => {
-            super::behavior::emit_succession_usage(w, &s.value)
+            super::behavior::emit_succession_usage(w, path, &s.value)
         }
         PartUsageBodyElement::StateDef(s) => super::behavior::emit_state_def(w, path, &s.value),
         PartUsageBodyElement::StateUsage(s) => super::behavior::emit_state_usage(w, path, &s.value),
@@ -500,12 +519,22 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::VerificationCaseUsage(v) => {
             super::requirement::emit_verification_case_usage(w, path, &v.value)
         }
-        other @ (PartUsageBodyElement::Annotation(_)
-        | PartUsageBodyElement::FlowDef(_)
-        | PartUsageBodyElement::OccurrenceDef(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        PartUsageBodyElement::FlowDef(f) => super::behavior::emit_flow_def(w, path, &f.value),
+        PartUsageBodyElement::ViewDef(n) => super::view::emit_view_def(w, path, &n.value),
+        PartUsageBodyElement::ViewUsage(n) => super::view::emit_view_usage(w, path, &n.value),
+        PartUsageBodyElement::ViewpointDef(n) => super::view::emit_viewpoint_def(w, path, &n.value),
+        PartUsageBodyElement::ViewpointUsage(n) => {
+            super::view::emit_viewpoint_usage(w, path, &n.value)
+        }
+        PartUsageBodyElement::RenderingDef(n) => super::view::emit_rendering_def(w, path, &n.value),
+        PartUsageBodyElement::RenderingUsage(n) => {
+            super::view::emit_rendering_usage(w, path, &n.value)
+        }
+        other @ (PartUsageBodyElement::Annotation(_) | PartUsageBodyElement::OccurrenceDef(_)) => w
+            .unsupported(
+                path,
+                format!("{other:?}").chars().take(64).collect::<String>(),
+            ),
     }
 }
 
@@ -544,7 +573,9 @@ fn emit_attribute_body_element(
         AttributeBodyElement::Unsupported(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }
-        AttributeBodyElement::Doc(d) => emit_doc(w, &d.value),
+        AttributeBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         AttributeBodyElement::KermlFeature(n) => {
             super::view::emit_kerml_feature_member(w, path, &n.value)
         }
@@ -709,7 +740,9 @@ fn emit_port_def_body_element(
         PortDefBodyElement::Unsupported(unsupported) => {
             w.push_recovery_span(path, &unsupported.span)
         }
-        PortDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PortDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         PortDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PortDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortDefBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
@@ -759,7 +792,7 @@ fn emit_port_body_element(
 ) -> Result<(), EmitError> {
     match el {
         PortBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        PortBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PortBodyElement::Annotating(member) => super::root::emit_annotating_member(w, path, member),
         PortBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
         PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
@@ -776,18 +809,9 @@ pub(crate) fn emit_connect(
     emit_connection_end(w, &connect.from.value)?;
     w.push_str(" to ");
     emit_connection_end(w, &connect.to.value)?;
-    // Brace bodies are opacity-gated for `Connect` (no structured members).
-    match &connect.body {
-        ConnectBody::Semicolon => {
-            w.push_char(';');
-        }
-        ConnectBody::Brace => {
-            return Err(EmitError::Opaque {
-                path: path.to_string(),
-                kind: super::OpacityKind::OpaqueConnectBrace,
-            });
-        }
-    }
+    // The brace form used to abort emission with `OpacityKind::OpaqueConnectBrace`, because the
+    // body kept no members to write. It is a `UsageBody` now, so it writes like any other.
+    emit_part_usage_body(w, path, &connect.body)?;
     if let Some(subsets) = &connect.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
@@ -854,7 +878,9 @@ fn emit_interface_def_body_element(
 ) -> Result<(), EmitError> {
     match el {
         InterfaceDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        InterfaceDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        InterfaceDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         InterfaceDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         InterfaceDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         InterfaceDefBodyElement::ConnectStmt(c) => emit_connect_stmt(w, path, &c.value),
@@ -938,33 +964,7 @@ fn emit_connect_stmt_body(
     path: &str,
     stmt: &ConnectStmt,
 ) -> Result<(), EmitError> {
-    match &stmt.body {
-        ConnectBody::Semicolon => {
-            w.push_char(';');
-            Ok(())
-        }
-        ConnectBody::Brace => {
-            if stmt.body_elements.is_empty() {
-                w.push_str(" {}");
-                Ok(())
-            } else {
-                w.push_str(" {");
-                w.newline();
-                w.indent();
-                for (i, el) in stmt.body_elements.iter().enumerate() {
-                    emit_relationship_body_element_local(
-                        w,
-                        &format!("{path}/connect-body[{i}]"),
-                        &el.value,
-                    )?;
-                    w.newline();
-                }
-                w.dedent();
-                w.push_char('}');
-                Ok(())
-            }
-        }
-    }
+    emit_part_usage_body(w, path, &stmt.body)
 }
 
 pub(crate) fn emit_relationship_body_element_local(
@@ -998,7 +998,6 @@ pub(crate) fn emit_interface_usage(
             from,
             to,
             body,
-            body_elements,
         } => {
             w.push_str("interface");
             if let Some(n) = name {
@@ -1020,14 +1019,14 @@ pub(crate) fn emit_interface_usage(
             emit_expression(w, &from.value)?;
             w.push_str(" to ");
             emit_expression(w, &to.value)?;
-            emit_interface_usage_body(w, path, body, body_elements)
+            emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Connection {
             subsets,
             redefines,
             from,
             to,
-            body_elements,
+            body,
         } => {
             w.push_str("interface");
             if let Some(subsets) = subsets {
@@ -1040,7 +1039,7 @@ pub(crate) fn emit_interface_usage(
             emit_expression(w, &from.value)?;
             w.push_str(" to ");
             emit_expression(w, &to.value)?;
-            emit_interface_usage_body(w, path, &ConnectBody::Brace, body_elements)
+            emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Declaration {
             name,
@@ -1048,7 +1047,6 @@ pub(crate) fn emit_interface_usage(
             subsets,
             redefines,
             body,
-            body_elements,
         } => {
             w.push_str("interface");
             if let Some(n) = name {
@@ -1072,7 +1070,7 @@ pub(crate) fn emit_interface_usage(
             {
                 w.push_char(' ');
             }
-            emit_interface_usage_body(w, path, body, body_elements)
+            emit_interface_usage_body(w, path, body)
         }
     }
 }
@@ -1080,35 +1078,28 @@ pub(crate) fn emit_interface_usage(
 fn emit_interface_usage_body(
     w: &mut EmitWriter<'_>,
     path: &str,
-    body: &ConnectBody,
-    elements: &[Node<InterfaceUsageBodyElement>],
+    body: &crate::ast::Body<InterfaceUsageBodyElement>,
 ) -> Result<(), EmitError> {
     match body {
-        ConnectBody::Semicolon if elements.is_empty() => {
+        crate::ast::Body::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        ConnectBody::Semicolon | ConnectBody::Brace => {
-            if elements.is_empty() {
-                // Preserve brace vs semicolon: empty TypedConnect brace → `{}`.
-                if matches!(body, ConnectBody::Brace) {
-                    w.push_str(" {}");
-                } else {
-                    w.push_char(';');
-                }
-                Ok(())
-            } else {
-                w.push_str(" {");
+        crate::ast::Body::Brace { elements, .. } if elements.is_empty() => {
+            w.push_str(" {}");
+            Ok(())
+        }
+        crate::ast::Body::Brace { elements, .. } => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                emit_interface_usage_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
                 w.newline();
-                w.indent();
-                for (i, el) in elements.iter().enumerate() {
-                    emit_interface_usage_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
-                    w.newline();
-                }
-                w.dedent();
-                w.push_char('}');
-                Ok(())
             }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
         }
     }
 }
@@ -1119,7 +1110,9 @@ fn emit_interface_usage_body_element(
     el: &InterfaceUsageBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        InterfaceUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
+        InterfaceUsageBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         InterfaceUsageBodyElement::RefRedef {
             target,
             value,
@@ -1252,7 +1245,7 @@ pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, _path: &str, bind: &Bind) -> Res
 
 pub(crate) fn emit_binding_connector_usage(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     usage: &crate::ast::BindingConnectorUsage,
 ) -> Result<(), EmitError> {
     w.push_str("binding");
@@ -1278,7 +1271,7 @@ pub(crate) fn emit_binding_connector_usage(
     w.push_qualified_reference("binding left", usage.left)?;
     w.push_str(" = ");
     w.push_qualified_reference("binding right", usage.right)?;
-    emit_optional_connect_body(w, Some(&usage.body))
+    emit_part_usage_body(w, path, &usage.body)
 }
 
 fn emit_optional_connect_body(
@@ -1419,12 +1412,25 @@ pub(crate) fn emit_alias_def(
     emit_identification(w, &alias.identification);
     w.push_str(" for ");
     w.push_qualified_reference("alias target", alias.target)?;
-    match &alias.body {
-        crate::ast::AliasBody::Semicolon { .. } => {
+    emit_relationship_body(w, path, &alias.body)
+}
+
+/// A `RelationshipBody`: `;`, `{}`, or the brace form around its members.
+///
+/// One emitter for every owner of the shape. `expose` and the view-body `satisfy` used to write
+/// `{}` for *any* brace body, so a body with members formatted as an empty one and the members
+/// were gone.
+pub(crate) fn emit_relationship_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &crate::ast::Body<crate::ast::RelationshipBodyElement>,
+) -> Result<(), EmitError> {
+    match body {
+        crate::ast::Body::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::AliasBody::Brace { elements, .. } => {
+        crate::ast::Body::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())
@@ -1547,7 +1553,9 @@ fn emit_feature_body_element(
         crate::ast::FeatureBodyElement::Binding(b) => {
             emit_default_reference_usage(w, path, &b.value)
         }
-        crate::ast::FeatureBodyElement::Doc(d) => super::root::emit_doc(w, &d.value),
+        crate::ast::FeatureBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
     }
 }
 
@@ -1594,7 +1602,7 @@ pub(crate) fn emit_metadata_usage(
 
 pub(crate) fn emit_enum_def(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     def: &crate::ast::EnumDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
@@ -1614,9 +1622,19 @@ pub(crate) fn emit_enum_def(
             w.push_str(" {");
             w.newline();
             w.indent();
-            for v in values {
-                w.push_str(&format_name(&v.value.name));
-                w.push_char(';');
+            for element in values {
+                match &element.value {
+                    crate::ast::EnumerationBodyElement::Annotating(member) => {
+                        super::root::emit_annotating_member(w, path, member)?;
+                    }
+                    crate::ast::EnumerationBodyElement::Value(value) => {
+                        w.push_str(&format_name(&value.value.name));
+                        w.push_char(';');
+                    }
+                    crate::ast::EnumerationBodyElement::Error(error) => {
+                        w.push_recovery_span(path, &error.span)?;
+                    }
+                }
                 w.newline();
             }
             w.dedent();
@@ -1814,7 +1832,9 @@ fn emit_connection_def_body_element(
         crate::ast::ConnectionDefBodyElement::Error(error) => {
             w.push_recovery_span(path, &error.span)
         }
-        crate::ast::ConnectionDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        crate::ast::ConnectionDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         crate::ast::ConnectionDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         crate::ast::ConnectionDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         crate::ast::ConnectionDefBodyElement::ConnectStmt(c) => {

@@ -1,11 +1,10 @@
 use super::behavior::InOutDecl;
 use super::body::Body;
-use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
+use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::common::{FilterMember, ImportTarget};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::RequirementDefBody;
-use super::structure::MetadataAnnotation;
 use crate::ast::core::{
     Expression, Multiplicity, Node, SubsettingRelationship, TypingRelationship,
 };
@@ -48,9 +47,9 @@ pub type ConstraintDefBody = Body<ConstraintDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConstraintDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     InOutDecl(Box<Node<InOutDecl>>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
     /// A `constraint` member nested inside a `constraint def { ... }` body (e.g. the Systems
     /// Library's `RequirementConstraintCheck::assumptions`/`::constraints`, redefined/subset
@@ -109,6 +108,13 @@ pub struct CalcUsage {
     pub value: Option<Node<crate::ast::FeatureValue>>,
     /// Set when parsed as `in`/`out`/`inout calc` (validation `10c`).
     pub direction: Option<crate::ast::InOut>,
+    /// The `ref` of `BasicUsagePrefix = RefPrefix ( isReference ?= 'ref' )?`, e.g. `ref calc
+    /// self : Calculation :>> Action::self;` (Systems Library `Calculations.sysml`). The keyword
+    /// was not accepted at all, so a calculation body fell through to its expression parser and
+    /// kept the bare word `ref` as a standalone expression member -- emission then wrote
+    /// `'ref';` on its own line and the declaration lost its prefix. Parallel to
+    /// `ActionUsage::is_reference` and `PartUsage::is_reference`.
+    pub is_reference: bool,
     pub body: CalcDefBody,
     pub membership: Membership,
 }
@@ -119,7 +125,18 @@ pub type CalcDefBody = Body<CalcDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CalcDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
+    /// `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML 8.2.2.19), so a
+    /// calculation body owns every action-body member as well as its own `return`. They arrive
+    /// through the action dispatcher rather than as fifteen restated variants, the way
+    /// [`crate::ast::DefinitionBodyElement::OccurrenceMember`] delegates its member set.
+    ///
+    /// Only a SysML calculation body produces this. `calc_def_body` also serves KerML type
+    /// bodies, whose `TypeBodyElement` has no action-node alternative, so the calculation
+    /// entry point is the only one that dispatches it. Splitting the two scopes into their own
+    /// element enums is Phase-4 work; this variant does not make that debt worse.
+    ActionMember(Box<Node<crate::ast::ActionDefBodyElement>>),
     InOutDecl(Box<Node<InOutDecl>>),
     /// KerML kinded parameter member: `in expr fn[0..*] { ... }`, `in bool test = expr;`,
     /// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
@@ -143,8 +160,6 @@ pub enum CalcDefBodyElement {
     /// `import` member inside a type body (`private import SequenceFunctions::*;`, Kernel
     /// Function Library `VectorFunctions.kerml`).
     Import(Box<Node<crate::ast::Import>>),
-    /// `comment about a, b ...` annotation member (`Occurrences.kerml`).
-    Comment(Node<crate::ast::CommentAnnotation>),
     /// Nested `attribute` usage member (`private attribute position : Natural[1] = ...;`,
     /// Systems Library `Interfaces.sysml`; previously captured opaquely).
     AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
@@ -159,7 +174,6 @@ pub enum CalcDefBodyElement {
     /// `VectorValues.kerml`).
     DefaultReferenceUsage(Box<Node<crate::ast::DefaultReferenceUsage>>),
     ReturnDecl(Box<Node<ReturnDecl>>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // formula
     /// Nested `calc` usage inside a calc body (validation `10b` rollups).
     CalcUsage(Box<Node<CalcUsage>>),
@@ -261,8 +275,8 @@ pub enum ViewDefBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
     /// `ref`-prefixed feature declaration, e.g. `ref viewpoint :>> self : ViewpointCheck;` and
@@ -302,7 +316,8 @@ pub type RenderingUsageBody = Body<RenderingUsageBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RenderingUsageBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     /// Nested `view` usage member, e.g. a `columnView` redefinition (`view :>> columnView[1] {
     /// render asTextualNotation; }`).
     ViewUsage(Box<Node<ViewUsage>>),
@@ -349,7 +364,8 @@ pub enum RenderingDefBodyElement {
     /// its authored span and a diagnostic.
     Unsupported(Node<crate::ast::UnsupportedGrammarNode>),
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
     /// `ref`-prefixed feature declaration, e.g. `ref rendering :>> self : Rendering;` and
@@ -398,7 +414,8 @@ pub type ViewBody = Body<ViewBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ViewBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
     Expose(Node<ExposeMember>),
@@ -413,7 +430,9 @@ pub enum ViewBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExposeMember {
     pub target: ImportTarget,
-    pub body: ConnectBody,
+    /// `Expose = 'expose' ( MembershipExpose | NamespaceExpose ) RelationshipBody`. The brace
+    /// form used to be skipped wholesale, so its members and both delimiters were discarded.
+    pub body: crate::ast::Body<crate::ast::RelationshipBodyElement>,
 }
 
 /// Satisfy in view body: `satisfy` QualifiedName RelationshipBody.
@@ -421,7 +440,8 @@ pub struct ExposeMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SatisfyViewMember {
     pub viewpoint_ref: QualifiedReferenceId,
-    pub body: ConnectBody,
+    /// The `RelationshipBody` of the view-body `satisfy` member; see [`ExposeMember::body`].
+    pub body: crate::ast::Body<crate::ast::RelationshipBodyElement>,
 }
 
 /// Viewpoint usage: `viewpoint` ConstraintUsageDeclaration RequirementBody.

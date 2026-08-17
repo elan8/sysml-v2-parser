@@ -253,8 +253,114 @@ package '5-State-based Behavior-1a' {
 )
 ~~~
 # FORMAT
-~~~sexpr
-(unavailable (reason opaque-ast))
+~~~sysml
+package '5-State-based Behavior-1a' {
+    private import ScalarValues::*;
+    private import ISQ::*;
+    package Definitions {
+        part def VehicleA {
+            perform action 'provide power' : 'Provide Power';
+            exhibit state 'vehicle states' : 'Vehicle States';
+        }
+        part def VehicleController {
+            exhibit state 'controller states' : 'Controller States';
+        }
+        state def 'Vehicle States';
+        state def 'Controller States';
+        action def 'Provide Power';
+        action def 'Perform Self Test';
+        action def 'Apply Parking Brake';
+        action def 'Sense Temperature' {
+            out temp : TemperatureValue;
+        }
+        attribute def FuelCmd;
+        attribute def 'Vehicle Start Signal';
+        attribute def 'Vehicle On Signal';
+        attribute def 'Vehicle Off Signal';
+        attribute def 'Start Signal';
+        attribute def 'Off Signal';
+        attribute def 'Over Temp';
+        attribute def 'Return to Normal';
+    }
+    package Usages {
+        private import Definitions::*;
+        action 'provide power' : 'Provide Power';
+        action 'perform self test' : 'Perform Self Test';
+        action 'apply parking brake' : 'Apply Parking Brake';
+        action 'sense temperature' : 'Sense Temperature';
+        state 'vehicle states' : 'Vehicle States' {
+            state 'operational states' {
+                doc
+                /*
+			 * The state definition for this usage is implicit.
+			 */
+                entry action initial {
+                    doc
+                    /*
+				 * This empty entry action acts like a start pseudo state.
+				 */
+                }
+                transition initial then off;
+                state off;
+                transition 'off-starting' first off accept 'Vehicle Start Signal' if vehicle1_c1.'brake pedal depressed' do send new 'Start Signal'() to vehicle1_c1.vehicleController then starting {
+                }
+                state starting;
+                transition 'starting-on' first starting accept 'Vehicle On Signal' then on;
+                state on {
+                    entry 'perform self test';
+                    do 'provide power';
+                    exit 'apply parking brake';
+                }
+                transition 'on-off' first on accept 'Vehicle Off Signal' then off;
+            }
+            state 'health states' {
+                entry action initial;
+                do 'sense temperature' {
+                    out temp;
+                }
+                transition initial then normal;
+                state normal;
+                transition 'normal-maintenance' first normal accept at vehicle1_c1.maintenanceTime then maintenance;
+                transition 'normal-degraded' first normal accept when 'sense temperature'.temp > vehicle1_c1.Tmax do send new 'Over Temp'() to vehicle1_c1.vehicleController then degraded;
+                state maintenance;
+                transition 'maintenance-normal' first maintenance accept 'Return to Normal' then normal;
+                state degraded;
+                transition 'degraded-normal' first degraded accept 'Return to Normal' then normal;
+            }
+        }
+        state 'controller states' : 'Controller States' {
+            state 'operational controller states' {
+                entry action initial;
+                transition initial then off;
+                state off;
+                transition 'off-on' first off accept 'Start Signal' then on;
+                state on;
+                transition 'on-off' first on accept 'Off Signal' then off;
+            }
+        }
+        part vehicle1_c1 : VehicleA {
+            port fuelCmdPort {
+                in fuelCmd : FuelCmd;
+            }
+            attribute 'brake pedal depressed' : Boolean;
+            attribute maintenanceTime : Time::DateTime;
+            attribute Tmax : TemperatureValue;
+            perform 'provide power' :>> VehicleA::'provide power' {
+                doc
+                /*
+			 * In the context of the 'vehicle1_c1' part, the 'provide power' action
+			 * that is enabled in 'vehicle states' gets its input from the 'fuelCmdPort'.
+			 */
+                in fuelCmd = fuelCmdPort.fuelCmd;
+            }
+            state 'vehicle states' :>> VehicleA::'vehicle states' {
+            }
+            part vehicleController : VehicleController {
+                state 'controller states' :>> VehicleController::'controller states';
+            }
+        }
+    }
+}
 ~~~
 # AST
 ~~~sexpr
@@ -265,7 +371,11 @@ package '5-State-based Behavior-1a' {
     (reference r2 (scope relative) (span (offset 362) (line 12) (column 36) (len 15)) (segments (segment 0 (token "'Provide Power'") (name "Provide Power") (separator none) (span (offset 362) (line 12) (column 36) (len 15)))))
     (reference r3 (scope relative) (span (offset 905) (line 32) (column 46) (len 16)) (segments (segment 0 (token "TemperatureValue") (name "TemperatureValue") (separator none) (span (offset 905) (line 32) (column 46) (len 16)))))
     (reference r4 (scope relative) (span (offset 1241) (line 47) (column 18) (len 11)) (segments (segment 0 (token "Definitions") (name "Definitions") (separator none) (span (offset 1241) (line 47) (column 18) (len 11)))))
+    (reference r5 (scope relative) (span (offset 4753) (line 190) (column 21) (len 8)) (segments (segment 0 (token "VehicleA") (name "VehicleA") (separator none) (span (offset 4753) (line 190) (column 21) (len 8)))))
+    (reference r6 (scope relative) (span (offset 4962) (line 199) (column 39) (len 7)) (segments (segment 0 (token "Boolean") (name "Boolean") (separator none) (span (offset 4962) (line 199) (column 39) (len 7)))))
+    (reference r7 (scope relative) (span (offset 5003) (line 200) (column 31) (len 14)) (segments (segment 0 (token "Time") (name "Time") (separator none) (span (offset 5003) (line 200) (column 31) (len 4))) (segment 1 (token "DateTime") (name "DateTime") (separator colon-colon) (span (offset 5009) (line 200) (column 37) (len 8)))))
+    (reference r8 (scope relative) (span (offset 5038) (line 201) (column 20) (len 16)) (segments (segment 0 (token "TemperatureValue") (name "TemperatureValue") (separator none) (span (offset 5038) (line 201) (column 20) (len 16)))))
   )
-  (root (package (name "5-State-based Behavior-1a") (body brace (import (target (span (span (offset 54) (line 2) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 66) (line 2) (column 29) (len 3))) (separator (span (offset 66) (line 2) (column 29) (len 2))) (marker (span (offset 68) (line 2) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 87) (line 3) (column 17) (len 6))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 90) (line 3) (column 20) (len 3))) (separator (span (offset 90) (line 3) (column 20) (len 2))) (marker (span (offset 92) (line 3) (column 22) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "Definitions") (body brace (part-def (name "VehicleA") (body brace (perform (declaration "provide power") (action none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (subsets none) (redefines none) (body semicolon)) (exhibit (declaration "vehicle states") (state none)))) (part-def (name "VehicleController") (body brace (exhibit (declaration "controller states") (state none)))) (state-def (name "Vehicle States") (body semicolon)) (state-def (name "Controller States") (body semicolon)) (action-def (name "Provide Power") (specializes none) (body semicolon)) (action-def (name "Perform Self Test") (specializes none) (body semicolon)) (action-def (name "Apply Parking Brake") (specializes none) (body semicolon)) (action-def (name "Sense Temperature") (specializes none) (body brace (in-out (direction out) (reference false) (declaration "temp") (subsets none) (type (ref r3)) (multiplicity none) (ordered false) (nonunique false) (redefines none) (value none) (span (offset 895) (line 32) (column 36) (len 27))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))) (package (name "Usages") (body brace (import (target (span (span (offset 1241) (line 47) (column 18) (len 14))) (all none) (ref r4) (shape (namespace (wildcard-suffix (span (span (offset 1252) (line 47) (column 29) (len 3))) (separator (span (offset 1252) (line 47) (column 29) (len 2))) (marker (span (offset 1254) (line 47) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (action-usage) (action-usage) (action-usage) (action-usage) (state-usage) (state-usage) (part-usage))))))
+  (root (package (name "5-State-based Behavior-1a") (body brace (import (target (span (span (offset 54) (line 2) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 66) (line 2) (column 29) (len 3))) (separator (span (offset 66) (line 2) (column 29) (len 2))) (marker (span (offset 68) (line 2) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 87) (line 3) (column 17) (len 6))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 90) (line 3) (column 20) (len 3))) (separator (span (offset 90) (line 3) (column 20) (len 2))) (marker (span (offset 92) (line 3) (column 22) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "Definitions") (body brace (part-def (name "VehicleA") (body brace (perform (declaration "provide power") (action none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (subsets none) (redefines none) (body semicolon)) (exhibit (declaration "vehicle states") (state none)))) (part-def (name "VehicleController") (body brace (exhibit (declaration "controller states") (state none)))) (state-def (name "Vehicle States") (body semicolon)) (state-def (name "Controller States") (body semicolon)) (action-def (name "Provide Power") (specializes none) (body semicolon)) (action-def (name "Perform Self Test") (specializes none) (body semicolon)) (action-def (name "Apply Parking Brake") (specializes none) (body semicolon)) (action-def (name "Sense Temperature") (specializes none) (body brace (in-out (direction out) (reference false) (declaration "temp") (subsets none) (type (ref r3)) (multiplicity none) (ordered false) (nonunique false) (redefines none) (value none) (span (offset 895) (line 32) (column 36) (len 27))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))) (package (name "Usages") (body brace (import (target (span (span (offset 1241) (line 47) (column 18) (len 14))) (all none) (ref r4) (shape (namespace (wildcard-suffix (span (span (offset 1252) (line 47) (column 29) (len 3))) (separator (span (offset 1252) (line 47) (column 29) (len 2))) (marker (span (offset 1254) (line 47) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (action-usage) (action-usage) (action-usage) (action-usage) (state-usage) (state-usage) (part-usage (declaration-name "vehicle1_c1") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r5)))) (body brace (port-usage) (attribute-usage (declaration-name "brake pedal depressed") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name "maintenanceTime") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r7)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name "Tmax") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r8)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (perform) (state-usage) (part-usage))))))))
 )
 ~~~

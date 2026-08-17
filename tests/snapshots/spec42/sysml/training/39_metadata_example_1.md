@@ -76,6 +76,6 @@ package 'Metadata Example-1' {
 (parsed-document
   (references
   )
-  (root (package (name "Metadata Example-1") (body brace (metadata-def) (metadata-def) (metadata-usage) (metadata-usage) (part-usage))))
+  (root (package (name "Metadata Example-1") (body brace (metadata-def) (metadata-def) (metadata-usage) (metadata-usage) (part-usage (declaration-name "vehicle") (typing none) (body brace (part-usage) (part-usage))))))
 )
 ~~~

@@ -153,16 +153,15 @@ pub(crate) fn constraint_def_body_element(
 ) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc") {
+    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc")
+        || starts_with_keyword(input.fragment(), b"comment")
+        || starts_with_keyword(input.fragment(), b"rep")
+        || starts_with_keyword(input.fragment(), b"language")
+        || input.fragment().starts_with(b"@")
+    {
         map(
-            crate::parser::requirement::doc_comment,
-            ConstraintDefBodyElement::Doc,
-        )
-        .parse(input)?
-    } else if input.fragment().starts_with(b"@") {
-        map(
-            crate::parser::metadata_annotation::metadata_annotation,
-            ConstraintDefBodyElement::MetadataAnnotation,
+            crate::parser::body::annotating_member,
+            ConstraintDefBodyElement::Annotating,
         )
         .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"in")
@@ -221,6 +220,13 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
     // `Calculations.sysml`) are slots of one production. `CalcUsage::direction` existed but was
     // never populated, and `abstract` was consumed and dropped.
     let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
+    // `BasicUsagePrefix = RefPrefix ( isReference ?= 'ref' )?`. Without this the keyword was
+    // never consumed, `tag("calc")` failed on `ref calc ...`, and the enclosing calculation body
+    // fell through to its expression parser, which happily took the bare word `ref` as an
+    // expression statement of its own.
+    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1))
+        .parse(input)
+        .map(|(input, found)| (input, found.is_some()))?;
     let (input, _) = tag(&b"calc"[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (identification, redefines)) = if input.fragment().starts_with(b":>>") {
@@ -269,13 +275,14 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
         crate::parser::feature_value::feature_value_part,
     ))
     .parse(input)?;
-    let (input, body) = calc_def_body(input)?;
+    let (input, body) = calculation_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             CalcUsage {
+                is_reference,
                 identification,
                 is_abstract: prefix.usage_prefix == Some(crate::ast::DefinitionPrefix::Abstract),
                 type_name,
@@ -317,7 +324,7 @@ fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
         options = options.def_required();
     }
     let (input, prefix) = parse_definition_prefix(input, options)?;
-    let (input, body) = calc_def_body(input)?;
+    let (input, body) = calculation_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -350,6 +357,27 @@ fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefB
 }
 
 pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
+    calc_body_with_element_parser(input, calc_def_body_element)
+}
+
+/// `CalculationBody : Type = ';' | '{' CalculationBodyPart '}'`, whose items are
+/// `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML 8.2.2.19).
+///
+/// Distinct from [`calc_def_body`], which serves KerML type bodies as well: `TypeBodyElement` has
+/// no action-node alternative, so only a calculation reaches the action dispatcher. Sharing one
+/// element enum across the two scopes is pre-existing; this keeps the *parser* precise about
+/// which of them can produce an action member.
+pub(crate) fn calculation_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
+    calc_body_with_element_parser(input, calculation_body_element)
+}
+
+fn calc_body_with_element_parser<'a, F>(
+    input: Input<'a>,
+    element: F,
+) -> IResult<Input<'a>, CalcDefBody>
+where
+    F: FnMut(Input<'a>) -> IResult<Input<'a>, Node<CalcDefBodyElement>>,
+{
     let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let semicolon_start = input;
@@ -366,10 +394,37 @@ pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody>
         CALC_DEF_BODY_STARTERS,
         "calc body",
         "recovered_calc_body_element",
-        calc_def_body_element,
+        element,
         calc_body_recovery_element,
     )?;
     Ok((input, members.into_body()))
+}
+
+/// An action-body member first, then everything a calc body already owned.
+///
+/// The order is what matters. `calc_def_body_element` ends in a keyword-less
+/// `DefaultReferenceUsage` binding, which happily reads `first` as a feature name -- so before
+/// this, `first f;` in a calculation body parsed as two invented members, `'first';` and `f;`,
+/// with no diagnostic at all, and formatted back that way.
+fn calculation_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
+    let (peek, _) = ws_and_comments(input)?;
+    if crate::parser::lex::starts_with_any_keyword(
+        peek.fragment(),
+        crate::parser::lex::CALCULATION_ACTION_STARTERS,
+    ) {
+        let start = input;
+        if let Ok((next, member)) = crate::parser::action::action_def_body_element(peek) {
+            return Ok((
+                next,
+                node_from_to(
+                    start,
+                    next,
+                    CalcDefBodyElement::ActionMember(Box::new(member)),
+                ),
+            ));
+        }
+    }
+    calc_def_body_element(input)
 }
 
 /// Skips an optional `(private|protected|public)?` `abstract`? prefix and reports whether either
@@ -378,7 +433,15 @@ pub(crate) fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody>
 fn skip_calc_modifiers(input: Input<'_>) -> IResult<Input<'_>, bool> {
     let (input, (_, visibility)) = visibility_prefix(input)?;
     let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    Ok((input, visibility.is_some() || is_abstract.is_some()))
+    // `BasicUsagePrefix = RefPrefix ( isReference ?= 'ref' )?`. Without `ref` here the gate below
+    // never fired for `ref calc self : Calculation :>> Action::self;` (Systems Library
+    // `Calculations.sysml`), so the member fell through to the body's expression parser and the
+    // bare word `ref` became an expression statement of its own.
+    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1)).parse(input)?;
+    Ok((
+        input,
+        visibility.is_some() || is_abstract.is_some() || is_reference.is_some(),
+    ))
 }
 
 /// True when `input` is a nested `calc def` (e.g. plain `calc def Inner {` or modifier-prefixed
@@ -1214,28 +1277,21 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     let after_visibility = crate::parser::lex::visibility_prefix(input)
         .map(|(rest, _)| *rest.fragment())
         .unwrap_or_else(|_| *input.fragment());
-    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc") {
+    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc")
+        || starts_with_keyword(input.fragment(), b"comment")
+        || starts_with_keyword(input.fragment(), b"rep")
+        || starts_with_keyword(input.fragment(), b"language")
+        || input.fragment().starts_with(b"@")
+    {
         map(
-            crate::parser::requirement::doc_comment,
-            CalcDefBodyElement::Doc,
-        )
-        .parse(input)?
-    } else if input.fragment().starts_with(b"@") {
-        map(
-            crate::parser::metadata_annotation::metadata_annotation,
-            CalcDefBodyElement::MetadataAnnotation,
+            crate::parser::body::annotating_member,
+            CalcDefBodyElement::Annotating,
         )
         .parse(input)?
     } else if starts_with_keyword(after_visibility, b"import") {
         map(crate::parser::import::import_, |n| {
             CalcDefBodyElement::Import(Box::new(n))
         })
-        .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"comment") {
-        map(
-            crate::parser::requirement::comment_annotation,
-            CalcDefBodyElement::Comment,
-        )
         .parse(input)?
     } else if starts_with_keyword(after_visibility, b"connector") {
         map(kerml_connector_member, |n| {

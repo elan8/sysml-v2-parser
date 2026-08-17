@@ -489,7 +489,8 @@ pub struct DocComment {
     pub text: String,
 }
 
-/// KerML Comment: ( 'comment' Identification? )? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
+/// KerML Comment: `( 'comment' Identification ( 'about' Annotation ( ',' Annotation )* )? )?
+/// ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CommentAnnotation {
@@ -501,6 +502,14 @@ pub struct CommentAnnotation {
     /// the span keeps the provenance rather than reducing the fact to a boolean.
     pub keyword_span: Option<Span>,
     pub identification: Option<Identification>,
+    /// Elements this comment annotates: `comment about a, b /* ... */`.
+    ///
+    /// Each entry is one `Annotation = annotatedElement = [QualifiedName]`, in authored order.
+    /// Empty when no `about` clause was written -- the clause is optional, and an empty list is
+    /// what "absent" means for a repeated production, so no separate `Option` is warranted.
+    /// [`MetadataAnnotation::about_targets`](crate::ast::MetadataAnnotation::about_targets)
+    /// records the same clause of the same shape.
+    pub about_targets: Vec<QualifiedReferenceId>,
     pub locale: Option<String>,
     pub text: String,
 }

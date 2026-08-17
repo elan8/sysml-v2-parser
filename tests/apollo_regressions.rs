@@ -1,9 +1,9 @@
 use sysml_v2_parser::ast::{
-    ActionDefBody, ConnectionDefBody, ConnectionDefBodyElement, ConstraintDefBody,
-    ConstraintDefBodyElement, Expression, InOut, OccurrenceBodyElement, OccurrenceUsageBody,
-    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody,
-    PartUsageBodyElement, RequirementDefBody, RequirementDefBodyElement, RootElement, StateDefBody,
-    StateDefBodyElement,
+    ActionDefBody, AnnotatingMember, ConnectionDefBody, ConnectionDefBodyElement,
+    ConstraintDefBody, ConstraintDefBodyElement, Expression, InOut, OccurrenceBodyElement,
+    OccurrenceUsageBody, PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement,
+    PartUsageBody, PartUsageBodyElement, RequirementDefBody, RequirementDefBodyElement,
+    RootElement, StateDefBody, StateDefBodyElement,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
@@ -845,7 +845,9 @@ fn part_definition_comment_members_parse_structurally() {
     let comment = elements
         .iter()
         .find_map(|e| match &e.value {
-            PartDefBodyElement::Comment(comment) => Some(&comment.value),
+            PartDefBodyElement::Annotating(AnnotatingMember::Comment(comment)) => {
+                Some(&comment.value)
+            }
             _ => None,
         })
         .expect("expected structured comment member in part body");

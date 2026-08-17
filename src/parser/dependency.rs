@@ -1,6 +1,6 @@
 //! Dependency parsing (BNF Dependency, DependencyDeclaration).
 
-use crate::ast::{ConnectBody, Dependency, Identification, Node, QualifiedReferenceId};
+use crate::ast::{Dependency, Identification, Node, QualifiedReferenceId};
 use crate::parser::lex::{name, qualified_reference, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
@@ -73,7 +73,7 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
     ))
     .parse(input)?;
 
-    let (input, (body, body_elements)) = relationship_body_connect(input)?;
+    let (input, body) = crate::parser::body::relationship_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -84,24 +84,9 @@ pub(crate) fn dependency(input: Input<'_>) -> IResult<Input<'_>, Node<Dependency
                 clients,
                 suppliers,
                 body,
-                body_elements,
             },
         ),
     ))
-}
-
-type RelationshipConnectBody = (
-    ConnectBody,
-    Option<Vec<Node<crate::ast::RelationshipBodyElement>>>,
-);
-
-/// `RelationshipBody`: `;` or `{` doc/comment/rep/metadata* `}`.
-fn relationship_body_connect(input: Input<'_>) -> IResult<Input<'_>, RelationshipConnectBody> {
-    let (input, elements) = crate::parser::body::relationship_body_annotations(input)?;
-    match &elements {
-        None => Ok((input, (ConnectBody::Semicolon, None))),
-        Some(_) => Ok((input, (ConnectBody::Brace, elements))),
-    }
 }
 
 #[cfg(test)]
@@ -150,7 +135,7 @@ mod tests {
     #[test]
     fn dependency_body_owns_feature_members() {
         let (dependency, _source, _arena) = parsed("dependency z to x, y { feature e; }");
-        let elements = dependency.body_elements.expect("braced body");
+        let elements = dependency.body.braced_elements().expect("braced body");
         assert_eq!(elements.len(), 1);
         let crate::ast::RelationshipBodyElement::KermlFeature(feature) = &elements[0].value else {
             panic!("expected KermlFeature member");

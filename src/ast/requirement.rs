@@ -1,16 +1,14 @@
 use super::behavior::{AssignStmt, ForLoop, InOut, ThenAction};
 use super::body::Body;
-use super::common::TextualRepresentation;
-use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
+use super::common::{AnnotatingMember, Identification, Import, ParseErrorNode, Visibility};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::structure::DefinitionPrefix;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
-    Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
-    MetadataKeywordUsage, VariantUsage,
+    Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataKeywordUsage, VariantUsage,
 };
-use super::view::{CalcUsage, ConstraintDefBody, ConstraintDefBodyElement, ConstraintUsage};
+use super::view::{CalcUsage, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
@@ -48,7 +46,8 @@ pub type RequirementDefBody = Body<RequirementDefBodyElement>;
 pub enum RequirementDefBodyElement {
     Error(Node<ParseErrorNode>),
     Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Import(Node<Import>),
     SubjectDecl(Node<SubjectDecl>),
@@ -74,8 +73,6 @@ pub enum RequirementDefBodyElement {
     /// `assumptions`/`constraints` (`constraint assumptions :>> RequirementConstraintCheck::assumptions;`).
     Constraint(Node<ConstraintUsage>),
     Frame(Node<FrameMember>),
-    TextualRep(Node<TextualRepresentation>),
-    Doc(Node<DocComment>),
     /// `ref`-prefixed feature declaration, e.g. `ref concern :>> self: ConcernCheck;` and `ref
     /// part actors : Part[0..*] { ... }` (Systems Library `Requirements.sysml`). This scope
     /// accepted no `ref` member at all.
@@ -180,10 +177,14 @@ pub struct VerifyRequirementMember {
 pub struct Satisfy {
     pub source: Node<Expression>,
     pub target: Node<Expression>,
-    pub body: ConnectBody,
-    /// Structured elements from a braced satisfy body, e.g. constraint members.
-    /// `None` when the body is a semicolon terminator.
-    pub body_elements: Option<Vec<Node<ConstraintDefBodyElement>>>,
+    /// The body this member was parsed with, in one field: it was a `ConnectBody` marker beside
+    /// a separate element list, so the `;`/`{}` fact lived in two places and neither carried a
+    /// delimiter span.
+    ///
+    /// `SatisfyRequirementUsage = … RequirementBody`, so the *member set* should be
+    /// `RequirementDefBodyElement`; the parser builds a `ConstraintDefBody` and widening it is a
+    /// member-dispatch change rather than the container change made here.
+    pub body: ConstraintDefBody,
     /// `true` for a negated satisfy usage: `(assert)? not satisfy ...`.
     pub is_negated: bool,
     /// Present for the fuller `satisfy requirement <name> : <Type> by <expr>;` form
@@ -309,11 +310,11 @@ pub struct Dependency {
     pub identification: Option<Identification>,
     pub clients: Vec<QualifiedReferenceId>,
     pub suppliers: Vec<QualifiedReferenceId>,
-    pub body: ConnectBody,
-    /// Braced-body members (BNF `RelationshipBody`: the doc/comment/metadata annotation subset
-    /// plus owned feature members, spec42 Gap 37). `None` when the body is a semicolon
-    /// terminator.
-    pub body_elements: Option<Vec<Node<RelationshipBodyElement>>>,
+    /// `Dependency = ( PrefixMetadataAnnotation )* 'dependency' DependencyDeclaration
+    /// RelationshipBody`, whose members are the annotating production plus owned related
+    /// elements. Was a `ConnectBody` marker with no delimiter spans beside a separate
+    /// `body_elements` list -- one body fact in two fields.
+    pub body: crate::ast::Body<RelationshipBodyElement>,
 }
 
 /// Framed concern member in requirement body: `frame` name (`;` or body).
@@ -621,7 +622,8 @@ pub type ReturnRefBody = Body<ReturnRefBodyElement>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ReturnRefBodyElement {
-    Doc(Node<crate::ast::DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Result(Node<Expression>),
     Error(Node<ParseErrorNode>),
 }
@@ -634,10 +636,10 @@ pub enum ReturnRefBodyElement {
 pub enum UseCaseDefBodyElement {
     Error(Node<ParseErrorNode>),
     Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     AttributeDef(Node<AttributeDef>),
-    Doc(Node<DocComment>),
     SubjectDecl(Node<SubjectDecl>),
     /// `subject;` shorthand.
     SubjectRef(Node<SubjectRef>),

@@ -582,6 +582,11 @@ macro_rules! ast_traversal {
                 walk_enumerated_value(self, node)
             }
 
+            /// Visits [`EnumerationBodyElement`]; the default implementation walks its children.
+            fn visit_enumeration_body_element(&mut self, node: &$($mutability)? Node<EnumerationBodyElement>) {
+                walk_enumeration_body_element(self, node)
+            }
+
             /// Visits [`OccurrenceDef`]; the default implementation walks its children.
             fn visit_occurrence_def(&mut self, node: &$($mutability)? Node<OccurrenceDef>) {
                 walk_occurrence_def(self, node)
@@ -1885,12 +1890,15 @@ macro_rules! ast_traversal {
         pub fn walk_comment_annotation<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CommentAnnotation>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CommentAnnotation { keyword_span, identification, locale, text } = &$($mutability)? node.value;
+            let CommentAnnotation { keyword_span, identification, about_targets, locale, text } = &$($mutability)? node.value;
             if let Some(inner) = keyword_span {
                 visitor.visit_span(inner);
             }
             if let Some(inner) = identification {
                 visitor.visit_identification(inner);
+            }
+            for inner in about_targets {
+                visitor.visit_qualified_reference(inner);
             }
             if let Some(inner) = locale {
                 visitor.visit_text(inner);
@@ -2095,14 +2103,8 @@ macro_rules! ast_traversal {
                 PackageBodyElement::Unsupported(field_0) => {
                     visitor.visit_unsupported_grammar_node(field_0);
                 }
-                PackageBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
-                }
-                PackageBodyElement::Comment(field_0) => {
-                    visitor.visit_comment_annotation(field_0);
-                }
-                PackageBodyElement::TextualRep(field_0) => {
-                    visitor.visit_textual_representation(field_0);
+                PackageBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 PackageBodyElement::Filter(field_0) => {
                     visitor.visit_filter_member(field_0);
@@ -2308,9 +2310,6 @@ macro_rules! ast_traversal {
                 PackageBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
-                PackageBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
-                }
                 PackageBodyElement::Connect(field_0) => {
                     visitor.visit_connect(field_0);
                 }
@@ -2412,17 +2411,11 @@ macro_rules! ast_traversal {
                 PartDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                PartDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
-                }
-                PartDefBodyElement::Comment(field_0) => {
-                    visitor.visit_comment_annotation(field_0);
+                PartDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 PartDefBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
-                }
-                PartDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 PartDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
@@ -2737,8 +2730,8 @@ macro_rules! ast_traversal {
                 AttributeBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                AttributeBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                AttributeBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 AttributeBodyElement::AttributeDef(field_0) => {
                     visitor.visit_attribute_def(field_0);
@@ -3133,6 +3126,24 @@ macro_rules! ast_traversal {
                 PartUsageBodyElement::VerificationCaseUsage(field_0) => {
                     visitor.visit_verification_case_usage(field_0);
                 }
+                PartUsageBodyElement::ViewDef(field_0) => {
+                    visitor.visit_view_def(field_0);
+                }
+                PartUsageBodyElement::ViewUsage(field_0) => {
+                    visitor.visit_view_usage(field_0);
+                }
+                PartUsageBodyElement::ViewpointDef(field_0) => {
+                    visitor.visit_viewpoint_def(field_0);
+                }
+                PartUsageBodyElement::ViewpointUsage(field_0) => {
+                    visitor.visit_viewpoint_usage(field_0);
+                }
+                PartUsageBodyElement::RenderingDef(field_0) => {
+                    visitor.visit_rendering_def(field_0);
+                }
+                PartUsageBodyElement::RenderingUsage(field_0) => {
+                    visitor.visit_rendering_usage(field_0);
+                }
                 PartUsageBodyElement::KermlClassifier(field_0) => {
                     visitor.visit_kerml_classifier_decl(&$($mutability)? **field_0);
                 }
@@ -3231,8 +3242,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                PerformBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                PerformBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 PerformBodyElement::InOut(field_0) => {
                     visitor.visit_perform_in_out_binding(field_0);
@@ -3367,8 +3378,8 @@ macro_rules! ast_traversal {
                 FeatureBodyElement::Binding(field_0) => {
                     visitor.visit_default_reference_usage(&$($mutability)? **field_0);
                 }
-                FeatureBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                FeatureBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -3414,8 +3425,8 @@ macro_rules! ast_traversal {
                 PortDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
                 }
-                PortDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                PortDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 PortDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
@@ -3532,8 +3543,8 @@ macro_rules! ast_traversal {
                 PortBodyElement::PortUsage(field_0) => {
                     visitor.visit_port_usage(field_0);
                 }
-                PortBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                PortBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 PortBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(field_0);
@@ -3548,15 +3559,25 @@ macro_rules! ast_traversal {
         pub fn walk_connect_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConnectStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConnectStmt { from, to, extra_ends, body, body_elements } = &$($mutability)? node.value;
+            let ConnectStmt { from, to, extra_ends, body } = &$($mutability)? node.value;
             visitor.visit_connection_end(from);
             visitor.visit_connection_end(to);
             for inner in extra_ends {
                 visitor.visit_connection_end(inner);
             }
-            visitor.visit_connect_body(body);
-            for inner in body_elements {
-                visitor.visit_relationship_body_element(inner);
+            match body {
+                PartUsageBody::Semicolon { semicolon_span } => {
+                    visitor.visit_body_semicolon(semicolon_span);
+                    visitor.visit_span(semicolon_span);
+                }
+                PartUsageBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
+                    visitor.visit_span(open_span);
+                    for inner in elements {
+                        visitor.visit_part_usage_body_element(inner);
+                    }
+                    visitor.visit_span(close_span);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -3595,8 +3616,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                InterfaceDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                InterfaceDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 InterfaceDefBodyElement::EndDecl(field_0) => {
                     visitor.visit_end_decl(field_0);
@@ -3848,8 +3869,8 @@ macro_rules! ast_traversal {
                 ConnectionDefBodyElement::ConnectStmt(field_0) => {
                     visitor.visit_connect_stmt(field_0);
                 }
-                ConnectionDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                ConnectionDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 ConnectionDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
@@ -3937,14 +3958,32 @@ macro_rules! ast_traversal {
                     visitor.visit_body_semicolon(semicolon_span);
                     visitor.visit_span(semicolon_span);
                 }
-                EnumerationBody::Brace { open_span, elements: values, close_span } => {
+                EnumerationBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
                     visitor.visit_span(open_span);
-                    for inner in values {
-                        visitor.visit_enumerated_value(inner);
+                    for inner in elements {
+                        visitor.visit_enumeration_body_element(inner);
                     }
                     visitor.visit_span(close_span);
                 }
             }
+        }
+
+        pub fn walk_enumeration_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumerationBodyElement>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            match &$($mutability)? node.value {
+                EnumerationBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
+                }
+                EnumerationBodyElement::Value(field_0) => {
+                    visitor.visit_enumerated_value(field_0);
+                }
+                EnumerationBodyElement::Error(field_0) => {
+                    visitor.visit_parse_error_node(field_0);
+                }
+            }
+            visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_enumerated_value<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<EnumeratedValue>) {
@@ -4071,8 +4110,8 @@ macro_rules! ast_traversal {
                 OccurrenceBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                OccurrenceBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                OccurrenceBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 OccurrenceBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
@@ -4141,7 +4180,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = target_multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            visitor.visit_connect_body(body);
+            walk_part_usage_body(visitor, body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -4169,9 +4208,6 @@ macro_rules! ast_traversal {
             match &$($mutability)? node.value {
                 DefinitionBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
-                }
-                DefinitionBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
                 }
                 DefinitionBodyElement::OccurrenceMember(field_0) => {
                     visitor.visit_occurrence_body_element(field_0);
@@ -4217,7 +4253,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                InterfaceUsage::TypedConnect { name, interface_type, subsets, redefines, from, to, body, body_elements } => {
+                InterfaceUsage::TypedConnect { name, interface_type, subsets, redefines, from, to, body } => {
                     if let Some(inner) = name {
                         visitor.visit_text(inner);
                     }
@@ -4232,12 +4268,9 @@ macro_rules! ast_traversal {
                     }
                     visitor.visit_expression(from);
                     visitor.visit_expression(to);
-                    visitor.visit_connect_body(body);
-                    for inner in body_elements {
-                        visitor.visit_interface_usage_body_element(inner);
-                    }
+                    walk_interface_usage_body(visitor, body);
                 }
-                InterfaceUsage::Connection { subsets, redefines, from, to, body_elements } => {
+                InterfaceUsage::Connection { subsets, redefines, from, to, body } => {
                     if let Some(inner) = subsets {
                         visitor.visit_subsetting_relationship(inner);
                     }
@@ -4246,11 +4279,9 @@ macro_rules! ast_traversal {
                     }
                     visitor.visit_expression(from);
                     visitor.visit_expression(to);
-                    for inner in body_elements {
-                        visitor.visit_interface_usage_body_element(inner);
-                    }
+                    walk_interface_usage_body(visitor, body);
                 }
-                InterfaceUsage::Declaration { name, interface_type, subsets, redefines, body, body_elements } => {
+                InterfaceUsage::Declaration { name, interface_type, subsets, redefines, body } => {
                     if let Some(inner) = name {
                         visitor.visit_text(inner);
                     }
@@ -4263,10 +4294,7 @@ macro_rules! ast_traversal {
                     if let Some(inner) = redefines {
                         visitor.visit_subsetting_relationship(inner);
                     }
-                    visitor.visit_connect_body(body);
-                    for inner in body_elements {
-                        visitor.visit_interface_usage_body_element(inner);
-                    }
+                    walk_interface_usage_body(visitor, body);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -4281,8 +4309,8 @@ macro_rules! ast_traversal {
                     visitor.visit_expression(value);
                     visitor.visit_ref_body(body);
                 }
-                InterfaceUsageBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                InterfaceUsageBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 InterfaceUsageBodyElement::EndDecl(field_0) => {
                     visitor.visit_end_decl(&$($mutability)? **field_0);
@@ -4297,7 +4325,7 @@ macro_rules! ast_traversal {
             let Connect { from, to, body, subsets, redefines } = &$($mutability)? node.value;
             visitor.visit_connection_end(from);
             visitor.visit_connection_end(to);
-            visitor.visit_connect_body(body);
+            walk_part_usage_body(visitor, body);
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -4322,7 +4350,7 @@ macro_rules! ast_traversal {
             let _ = uses_bind_keyword;
             visitor.visit_qualified_reference(left);
             visitor.visit_qualified_reference(right);
-            visitor.visit_connect_body(body);
+            walk_part_usage_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -4406,23 +4434,17 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
                 }
-                ActionDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                ActionDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 ActionDefBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
-                }
-                ActionDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 ActionDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
                 ActionDefBodyElement::MetadataUsage(field_0) => {
                     visitor.visit_metadata_usage(field_0);
-                }
-                ActionDefBodyElement::TextualRep(field_0) => {
-                    visitor.visit_textual_representation(field_0);
                 }
                 ActionDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
@@ -4820,23 +4842,17 @@ macro_rules! ast_traversal {
                 ActionUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                ActionUsageBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                ActionUsageBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 ActionUsageBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
-                }
-                ActionUsageBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 ActionUsageBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
                 ActionUsageBodyElement::MetadataUsage(field_0) => {
                     visitor.visit_metadata_usage(field_0);
-                }
-                ActionUsageBodyElement::TextualRep(field_0) => {
-                    visitor.visit_textual_representation(field_0);
                 }
                 ActionUsageBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
@@ -5139,7 +5155,7 @@ macro_rules! ast_traversal {
             let Allocate { source, target, body } = &$($mutability)? node.value;
             visitor.visit_expression(source);
             visitor.visit_expression(target);
-            visitor.visit_connect_body(body);
+            walk_part_usage_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -5220,14 +5236,11 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                StateDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                StateDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 StateDefBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
-                }
-                StateDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 StateDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
@@ -5423,7 +5436,7 @@ macro_rules! ast_traversal {
                 visitor.visit_transition_effect(inner);
             }
             visitor.visit_expression(target);
-            visitor.visit_connect_body(body);
+            walk_action_def_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -5467,9 +5480,6 @@ macro_rules! ast_traversal {
                 }
                 RequirementDefBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
-                }
-                RequirementDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 RequirementDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
@@ -5516,11 +5526,8 @@ macro_rules! ast_traversal {
                 RequirementDefBodyElement::Frame(field_0) => {
                     visitor.visit_frame_member(field_0);
                 }
-                RequirementDefBodyElement::TextualRep(field_0) => {
-                    visitor.visit_textual_representation(field_0);
-                }
-                RequirementDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                RequirementDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 RequirementDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
@@ -5623,15 +5630,10 @@ macro_rules! ast_traversal {
         pub fn walk_satisfy<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Satisfy>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let Satisfy { source, target, body, body_elements, is_negated, inline_requirement } = &$($mutability)? node.value;
+            let Satisfy { source, target, body, is_negated, inline_requirement } = &$($mutability)? node.value;
             visitor.visit_expression(source);
             visitor.visit_expression(target);
-            visitor.visit_connect_body(body);
-            if let Some(inner) = body_elements {
-                for inner in inner {
-                    visitor.visit_constraint_def_body_element(inner);
-                }
-            }
+            walk_constraint_def_body(visitor, body);
             let _ = is_negated;
             if let Some(inner) = inline_requirement {
                 visitor.visit_inline_satisfy_requirement(inner);
@@ -5733,10 +5735,44 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_interface_usage_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Body<InterfaceUsageBodyElement>) {
+            match node {
+                Body::Semicolon { semicolon_span } => {
+                    visitor.visit_body_semicolon(semicolon_span);
+                    visitor.visit_span(semicolon_span);
+                }
+                Body::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
+                    visitor.visit_span(open_span);
+                    for inner in elements {
+                        visitor.visit_interface_usage_body_element(inner);
+                    }
+                    visitor.visit_span(close_span);
+                }
+            }
+        }
+
+        pub fn walk_relationship_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Body<RelationshipBodyElement>) {
+            match node {
+                Body::Semicolon { semicolon_span } => {
+                    visitor.visit_body_semicolon(semicolon_span);
+                    visitor.visit_span(semicolon_span);
+                }
+                Body::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
+                    visitor.visit_span(open_span);
+                    for inner in elements {
+                        visitor.visit_relationship_body_element(inner);
+                    }
+                    visitor.visit_span(close_span);
+                }
+            }
+        }
+
         pub fn walk_dependency<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Dependency>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let Dependency { identification, clients, suppliers, body, body_elements } = &$($mutability)? node.value;
+            let Dependency { identification, clients, suppliers, body } = &$($mutability)? node.value;
             if let Some(inner) = identification {
                 visitor.visit_identification(inner);
             }
@@ -5746,12 +5782,7 @@ macro_rules! ast_traversal {
             for inner in suppliers {
                 visitor.visit_qualified_reference(inner);
             }
-            visitor.visit_connect_body(body);
-            if let Some(inner) = body_elements {
-                for inner in inner {
-                    visitor.visit_relationship_body_element(inner);
-                }
-            }
+            walk_relationship_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -6102,8 +6133,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                ReturnRefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                ReturnRefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 ReturnRefBodyElement::Result(field_0) => {
                     visitor.visit_expression(field_0);
@@ -6125,17 +6156,14 @@ macro_rules! ast_traversal {
                 UseCaseDefBodyElement::Annotation(field_0) => {
                     visitor.visit_annotation(field_0);
                 }
-                UseCaseDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
-                }
                 UseCaseDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
                 UseCaseDefBodyElement::AttributeDef(field_0) => {
                     visitor.visit_attribute_def(field_0);
                 }
-                UseCaseDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                UseCaseDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 UseCaseDefBodyElement::SubjectDecl(field_0) => {
                     visitor.visit_subject_decl(field_0);
@@ -6313,14 +6341,11 @@ macro_rules! ast_traversal {
                 ConstraintDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                ConstraintDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                ConstraintDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 ConstraintDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
-                }
-                ConstraintDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 ConstraintDefBodyElement::Expression(field_0) => {
                     visitor.visit_expression(field_0);
@@ -6357,7 +6382,7 @@ macro_rules! ast_traversal {
         pub fn walk_calc_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CalcUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CalcUsage { identification, is_abstract, type_name, subsets, redefines, value, direction, body, membership } = &$($mutability)? node.value;
+            let CalcUsage { identification, is_abstract, type_name, subsets, redefines, value, direction, is_reference: _, body, membership } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
             let _ = is_abstract;
             if let Some(inner) = subsets {
@@ -6406,8 +6431,11 @@ macro_rules! ast_traversal {
                 CalcDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                CalcDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                CalcDefBodyElement::ActionMember(field_0) => {
+                    visitor.visit_action_def_body_element(&$($mutability)? **field_0);
+                }
+                CalcDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 CalcDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
@@ -6436,9 +6464,6 @@ macro_rules! ast_traversal {
                 CalcDefBodyElement::Import(field_0) => {
                     visitor.visit_import(&$($mutability)? **field_0);
                 }
-                CalcDefBodyElement::Comment(field_0) => {
-                    visitor.visit_comment_annotation(field_0);
-                }
                 CalcDefBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(&$($mutability)? **field_0);
                 }
@@ -6453,9 +6478,6 @@ macro_rules! ast_traversal {
                 }
                 CalcDefBodyElement::ReturnDecl(field_0) => {
                     visitor.visit_return_decl(&$($mutability)? **field_0);
-                }
-                CalcDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 CalcDefBodyElement::Expression(field_0) => {
                     visitor.visit_expression(field_0);
@@ -6549,8 +6571,8 @@ macro_rules! ast_traversal {
                 ViewDefBodyElement::Unsupported(field_0) => {
                     visitor.visit_unsupported_grammar_node(field_0);
                 }
-                ViewDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                ViewDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 ViewDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
@@ -6560,9 +6582,6 @@ macro_rules! ast_traversal {
                 }
                 ViewDefBodyElement::Satisfy(field_0) => {
                     visitor.visit_satisfy(field_0);
-                }
-                ViewDefBodyElement::MetadataAnnotation(field_0) => {
-                    visitor.visit_metadata_annotation(field_0);
                 }
                 ViewDefBodyElement::Filter(field_0) => {
                     visitor.visit_filter_member(field_0);
@@ -6611,8 +6630,8 @@ macro_rules! ast_traversal {
                 RenderingUsageBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                RenderingUsageBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                RenderingUsageBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 RenderingUsageBodyElement::ViewUsage(field_0) => {
                     visitor.visit_view_usage(&$($mutability)? **field_0);
@@ -6675,8 +6694,8 @@ macro_rules! ast_traversal {
                 RenderingDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                RenderingDefBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                RenderingDefBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 RenderingDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
@@ -6742,8 +6761,8 @@ macro_rules! ast_traversal {
                 ViewBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                ViewBodyElement::Doc(field_0) => {
-                    visitor.visit_doc_comment(field_0);
+                ViewBodyElement::Annotating(field_0) => {
+                    visitor.visit_annotating_member(field_0);
                 }
                 ViewBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
@@ -6769,7 +6788,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let ExposeMember { target, body } = &$($mutability)? node.value;
             visitor.visit_import_target(target);
-            visitor.visit_connect_body(body);
+            walk_relationship_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -6778,7 +6797,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let SatisfyViewMember { viewpoint_ref, body } = &$($mutability)? node.value;
             visitor.visit_qualified_reference(viewpoint_ref);
-            visitor.visit_connect_body(body);
+            walk_relationship_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

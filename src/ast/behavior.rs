@@ -1,12 +1,9 @@
 use super::body::Body;
-use super::common::{
-    ConnectBody, DocComment, Identification, ParseErrorNode, TextualRepresentation,
-};
+use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::membership::Membership;
 use super::requirement::RequirementUsage;
 use super::structure::{
-    Annotation, Bind, DefinitionBody, MetadataAnnotation, MetadataKeywordUsage, MetadataUsage,
-    Perform, RefDecl,
+    Annotation, Bind, DefinitionBody, MetadataKeywordUsage, MetadataUsage, Perform, RefDecl,
 };
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
@@ -44,18 +41,14 @@ pub type ActionDefBody = Body<ActionDefBodyElement>;
 pub enum ActionDefBodyElement {
     Error(Node<ParseErrorNode>),
     InOutDecl(Node<InOutDecl>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// Literal `metadata` keyword form (BNF `MetadataUsage`'s `('@' | 'metadata')` alternative,
     /// GH-86), e.g. `metadata ToolExecution { toolName = "ModelCenter"; }` (Analysis Examples/
     /// AnalysisAnnotation.sysml). Previously only dispatched at package-body scope.
     MetadataUsage(Node<MetadataUsage>),
-    /// KerML `TextualRepresentation` (GH-86), e.g. `language "alf" /* c.x = newX; */` (Simple
-    /// Tests/TextualRepresentationTest.sysml). Previously not reachable from an action body at
-    /// all (only package/relationship/requirement bodies dispatched it).
-    TextualRep(Node<TextualRepresentation>),
     RefDecl(Node<RefDecl>),
     Perform(Node<Perform>),
     Bind(Node<Bind>),
@@ -451,18 +444,14 @@ pub type ActionUsageBody = Body<ActionUsageBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActionUsageBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// Literal `metadata` keyword form (BNF `MetadataUsage`'s `('@' | 'metadata')` alternative,
     /// GH-86), e.g. `metadata ToolExecution { toolName = "ModelCenter"; }` (Analysis Examples/
     /// AnalysisAnnotation.sysml). Previously only dispatched at package-body scope.
     MetadataUsage(Node<MetadataUsage>),
-    /// KerML `TextualRepresentation` (GH-86), e.g. `language "alf" /* c.x = newX; */` (Simple
-    /// Tests/TextualRepresentationTest.sysml). Previously not reachable from an action body at
-    /// all (only package/relationship/requirement bodies dispatched it).
-    TextualRep(Node<TextualRepresentation>),
     InOutDecl(Node<InOutDecl>),
     RefDecl(Node<RefDecl>),
     Bind(Node<Bind>),
@@ -803,7 +792,10 @@ pub enum ActionBranchBody {
 pub struct Allocate {
     pub source: Node<Expression>,
     pub target: Node<Expression>,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: crate::ast::PartUsageBody,
 }
 
 /// Allocation definition: `allocation def` Identification body.
@@ -861,9 +853,9 @@ pub type StateDefBody = Body<StateDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StateDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Doc(Node<DocComment>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Annotation(Node<Annotation>),
-    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// `in`/`out`/`inout` parameter redecl inside `entry`/`do`/`exit` action bodies
     /// (e.g. `do 'sense temperature' { out temp; }`, validation `05`).
@@ -1038,7 +1030,9 @@ pub struct Transition {
     pub guard: Option<Node<Expression>>,
     pub effect: Option<TransitionEffect>,
     pub target: Node<Expression>,
-    pub body: ConnectBody,
+    /// `TransitionUsage = 'transition' … ActionBody`. Was a `ConnectBody` marker whose brace form
+    /// was parsed by `advance_to_closing_brace` and kept nothing.
+    pub body: ActionDefBody,
 }
 
 // ---------------------------------------------------------------------------

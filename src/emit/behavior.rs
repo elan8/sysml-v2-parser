@@ -1,7 +1,7 @@
 //! Behavior emission (actions, states, perform, allocate).
 
 use super::expr::{emit_expression, emit_feature_value};
-use super::root::{emit_doc, emit_identification};
+use super::root::emit_identification;
 use super::structure::{
     self, emit_definition_prefix, emit_direction, emit_multiplicity, emit_subsetting_clause,
     emit_typing_clause,
@@ -269,7 +269,7 @@ pub(crate) fn emit_action_def_body(
     }
 }
 
-fn emit_action_def_body_element(
+pub(crate) fn emit_action_def_body_element(
     w: &mut EmitWriter<'_>,
     path: &str,
     el: &ActionDefBodyElement,
@@ -281,7 +281,9 @@ fn emit_action_def_body_element(
         }
         ActionDefBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
         ActionDefBodyElement::ActionDef(d) => emit_action_def(w, path, &d.value),
-        ActionDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        ActionDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         ActionDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ActionDefBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
         ActionDefBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
@@ -336,10 +338,8 @@ fn emit_action_def_body_element(
         }
         ActionDefBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         other @ (ActionDefBodyElement::Annotation(_)
-        | ActionDefBodyElement::MetadataAnnotation(_)
         | ActionDefBodyElement::MetadataKeywordUsage(_)
         | ActionDefBodyElement::MetadataUsage(_)
-        | ActionDefBodyElement::TextualRep(_)
         | ActionDefBodyElement::TerminateStmt(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -384,7 +384,9 @@ pub(crate) fn emit_action_usage_body_element(
         }
         ActionUsageBodyElement::CalcUsage(c) => super::view::emit_calc_usage(w, path, &c.value),
         ActionUsageBodyElement::ActionDef(d) => emit_action_def(w, path, &d.value),
-        ActionUsageBodyElement::Doc(d) => emit_doc(w, &d.value),
+        ActionUsageBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         ActionUsageBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ActionUsageBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
         ActionUsageBodyElement::PartUsage(p) => structure::emit_part_usage(w, path, &p.value),
@@ -431,10 +433,8 @@ pub(crate) fn emit_action_usage_body_element(
         ActionUsageBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
         ActionUsageBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
         other @ (ActionUsageBodyElement::Annotation(_)
-        | ActionUsageBodyElement::MetadataAnnotation(_)
         | ActionUsageBodyElement::MetadataKeywordUsage(_)
         | ActionUsageBodyElement::MetadataUsage(_)
-        | ActionUsageBodyElement::TextualRep(_)
         | ActionUsageBodyElement::TerminateStmt(_)
         | ActionUsageBodyElement::ForLoop(_)) => w.unsupported(
             path,
@@ -554,7 +554,9 @@ fn emit_perform_body_element(
     el: &PerformBodyElement,
 ) -> Result<(), EmitError> {
     match el {
-        PerformBodyElement::Doc(d) => emit_doc(w, &d.value),
+        PerformBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         PerformBodyElement::InOut(b) => emit_perform_inout(w, path, &b.value),
         PerformBodyElement::Variant(v) => structure::emit_variant_usage(w, path, &v.value),
         PerformBodyElement::Action(a) => emit_action_usage_body_element(w, path, &a.value),
@@ -715,7 +717,9 @@ fn emit_state_def_body_element(
     match el {
         StateDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         StateDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
-        StateDefBodyElement::Doc(d) => emit_doc(w, &d.value),
+        StateDefBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         StateDefBodyElement::Entry(e) => {
             w.push_str("entry");
             if let Some(effect) = &e.value.effect {
@@ -831,12 +835,11 @@ fn emit_state_def_body_element(
             structure::emit_attribute_usage(w, path, &a.value)
         }
         StateDefBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
-        StateDefBodyElement::SuccessionUsage(s) => emit_succession_usage(w, &s.value),
+        StateDefBodyElement::SuccessionUsage(s) => emit_succession_usage(w, path, &s.value),
         StateDefBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         other @ (StateDefBodyElement::Annotation(_)
-        | StateDefBodyElement::MetadataAnnotation(_)
         | StateDefBodyElement::MetadataKeywordUsage(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -846,18 +849,14 @@ fn emit_state_def_body_element(
 
 pub(crate) fn emit_allocate(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     allocate: &Allocate,
 ) -> Result<(), EmitError> {
     w.push_str("allocate ");
     emit_expression(w, &allocate.source.value)?;
     w.push_str(" to ");
     emit_expression(w, &allocate.target.value)?;
-    match &allocate.body {
-        crate::ast::ConnectBody::Semicolon => w.push_char(';'),
-        crate::ast::ConnectBody::Brace => w.push_str(" {}"),
-    }
-    Ok(())
+    super::structure::emit_part_usage_body_public(w, path, &allocate.body)
 }
 
 pub(crate) fn emit_allocation_def(
@@ -867,6 +866,24 @@ pub(crate) fn emit_allocation_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     w.push_str("allocation def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    emit_definition_body(w, path, &def.body)
+}
+
+/// `FlowDefinition = OccurrenceDefinitionPrefix ( 'flow' | 'message' ) 'def' Definition`, whose
+/// body is a `DefinitionBody` -- the same shape `emit_allocation_def` writes. It parsed into a
+/// complete typed node in three scopes and was reported as an unsupported construct by all three,
+/// so a document containing one could not be formatted at all.
+pub(crate) fn emit_flow_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::FlowDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    w.push_str("flow def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;
@@ -1065,7 +1082,6 @@ fn emit_definition_body(
                         crate::ast::DefinitionBodyElement::Unsupported(unsupported) => {
                             w.push_recovery_span(&format!("{path}/body[{i}]"), &unsupported.span)?
                         }
-                        crate::ast::DefinitionBodyElement::Doc(d) => emit_doc(w, &d.value)?,
                         crate::ast::DefinitionBodyElement::OccurrenceMember(o) => {
                             emit_occurrence_body_element(
                                 w,
@@ -1156,12 +1172,7 @@ fn emit_transition(
     }
     w.push_str("then ");
     emit_expression(w, &t.target.value)?;
-    match &t.body {
-        crate::ast::ConnectBody::Semicolon => w.push_char(';'),
-        crate::ast::ConnectBody::Brace => w.push_str(" {}"),
-    }
-    let _ = path;
-    Ok(())
+    emit_action_def_body(w, path, &t.body)
 }
 
 pub(crate) fn emit_first_stmt(
@@ -1401,7 +1412,9 @@ pub(crate) fn emit_occurrence_body_element(
 ) -> Result<(), EmitError> {
     match el {
         crate::ast::OccurrenceBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-        crate::ast::OccurrenceBodyElement::Doc(d) => emit_doc(w, &d.value),
+        crate::ast::OccurrenceBodyElement::Annotating(member) => {
+            super::root::emit_annotating_member(w, path, member)
+        }
         crate::ast::OccurrenceBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }
@@ -1435,7 +1448,9 @@ pub(crate) fn emit_occurrence_body_element(
             // Occurrence-body `StateUsage` nodes are exhibit usages (§6 G30 / G18).
             emit_occurrence_exhibit(w, path, &s.value)
         }
-        crate::ast::OccurrenceBodyElement::SuccessionUsage(s) => emit_succession_usage(w, &s.value),
+        crate::ast::OccurrenceBodyElement::SuccessionUsage(s) => {
+            emit_succession_usage(w, path, &s.value)
+        }
         other @ crate::ast::OccurrenceBodyElement::Annotation(_) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -1490,6 +1505,7 @@ fn emit_occurrence_exhibit(
 
 pub(crate) fn emit_succession_usage(
     w: &mut EmitWriter<'_>,
+    path: &str,
     succ: &crate::ast::SuccessionUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, succ.membership.visibility);
@@ -1519,9 +1535,5 @@ pub(crate) fn emit_succession_usage(
         w.push_char(' ');
     }
     emit_expression(w, &succ.target.value)?;
-    match &succ.body {
-        crate::ast::ConnectBody::Semicolon => w.push_char(';'),
-        crate::ast::ConnectBody::Brace => w.push_str(" {}"),
-    }
-    Ok(())
+    super::structure::emit_part_usage_body_public(w, path, &succ.body)
 }

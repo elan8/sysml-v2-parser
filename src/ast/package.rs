@@ -4,10 +4,7 @@ use super::behavior::{
 };
 use super::body::Body;
 use super::common::FilterMember;
-use super::common::{
-    CommentAnnotation, DocComment, Import, ParseErrorNode, TextualRepresentation,
-    UnsupportedGrammarNode,
-};
+use super::common::{AnnotatingMember, Import, ParseErrorNode, UnsupportedGrammarNode};
 use super::kerml_fallback::{
     ClassifierDecl, ExtendedLibraryDecl, FeatureDecl, KermlBareDeclaration, KermlFeatureDecl,
     KermlSemanticDecl,
@@ -20,9 +17,8 @@ use super::requirement::{
 use super::structure::{
     AliasDef, AssertConstraintMember, AttributeDef, AttributeUsage, Connect, ConnectionDef,
     ConnectionUsageMember, DefaultReferenceUsage, EnumDef, ExhibitState, IndividualDef,
-    InterfaceDef, InterfaceUsage, ItemDef, MetadataAnnotation, MetadataDef, MetadataKeywordUsage,
-    MetadataUsage, OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage,
-    RefDecl,
+    InterfaceDef, InterfaceUsage, ItemDef, MetadataDef, MetadataKeywordUsage, MetadataUsage,
+    OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
     CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
@@ -113,9 +109,8 @@ pub enum PackageBodyElement {
     Error(Node<ParseErrorNode>),
     /// Spec-valid package member whose grammar production is not implemented in this scope.
     Unsupported(Node<UnsupportedGrammarNode>),
-    Doc(Node<DocComment>),
-    Comment(Node<CommentAnnotation>),
-    TextualRep(Node<TextualRepresentation>),
+    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
+    Annotating(AnnotatingMember),
     Filter(Node<FilterMember>),
     Package(Node<Package>),
     LibraryPackage(Node<LibraryPackage>),
@@ -215,11 +210,6 @@ pub enum PackageBodyElement {
     /// Extensions.sysml`, FMEA library example) -- previously package bodies had no `#`/`@`
     /// annotation support at all, unlike part/item/action/etc. bodies.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
-    /// Standalone `@ Name (: Type)? about target(, target)*;` annotation statement at package
-    /// level (KerML `Annotation`/`@`-syntax, distinct from the `#keyword` form above -- e.g.
-    /// `@ Classified about Annotated;`). Previously package bodies had no `@`-annotation support
-    /// at all, unlike part/item/action/etc. bodies -- see `MetadataAnnotation`.
-    MetadataAnnotation(Node<MetadataAnnotation>),
     /// Standalone `connect a to b;` connector usage at package level (e.g. the FMEA library's
     /// `#violation connect 'Glucose Meter in Use' to req2;` in `14c-Language Extensions.sysml`).
     /// See `AttributeUsage` for the general PAR-002 rationale.

@@ -2,7 +2,9 @@
 //! See plan: fix_surveillancedrone_test — step 1.
 
 use std::path::Path;
-use sysml_v2_parser::ast::{ImportShape, PackageBody, PackageBodyElement, RootElement};
+use sysml_v2_parser::ast::{
+    AnnotatingMember, ImportShape, PackageBody, PackageBodyElement, RootElement,
+};
 use sysml_v2_parser::parse;
 
 /// Parses "package SurveillanceDrone { attribute def Real; }" (no doc/comment before first element).
@@ -62,7 +64,7 @@ fn test_parse_package_with_doc_and_line_comment() {
     );
     // First element is doc comment, second is attribute def Real
     match &body[0].value {
-        PackageBodyElement::Doc(_) => {}
+        PackageBodyElement::Annotating(AnnotatingMember::Doc(_)) => {}
         other => panic!("expected first element Doc, got {:?}", other),
     }
     let attr = body
@@ -166,7 +168,9 @@ fn test_perform_body_doc_comment_parsed_as_element() {
         "perform body must have Doc then InOut (doc comments are not skipped)"
     );
     match &perform_body[0].value {
-        sysml_v2_parser::ast::PerformBodyElement::Doc(d) => assert!(
+        sysml_v2_parser::ast::PerformBodyElement::Annotating(
+            sysml_v2_parser::ast::AnnotatingMember::Doc(d),
+        ) => assert!(
             d.value.text.contains("allocation comment"),
             "doc text should contain the comment content, got {:?}",
             d.value.text

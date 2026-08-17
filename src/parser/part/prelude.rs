@@ -20,7 +20,7 @@ pub(crate) use crate::parser::case::{
 };
 pub(crate) use crate::parser::connection::connection_def_required;
 pub(crate) use crate::parser::connection::connection_member_body;
-pub(crate) use crate::parser::connector::{connect_body, connect_ends};
+pub(crate) use crate::parser::connector::connect_ends;
 pub(crate) use crate::parser::constraint::calc_def_required;
 pub(crate) use crate::parser::constraint::calc_usage;
 pub(crate) use crate::parser::constraint::{constraint_def, constraint_usage};
@@ -42,9 +42,7 @@ pub(crate) use crate::parser::occurrence::{
     timeslice_usage,
 };
 pub(crate) use crate::parser::port::{port_def_required, port_usage};
-pub(crate) use crate::parser::requirement::{
-    comment_annotation, doc_comment, requirement_def, requirement_usage, satisfy,
-};
+pub(crate) use crate::parser::requirement::{requirement_def, requirement_usage, satisfy};
 pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
 pub(crate) use crate::parser::state::{state_def, state_usage};
 pub(crate) use crate::parser::usage::{

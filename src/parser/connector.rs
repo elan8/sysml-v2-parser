@@ -29,7 +29,7 @@ use crate::ast::{
     ConnectBody, ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndIdentity,
     EndNestedUsage, Node, RefDecl,
 };
-use crate::parser::body::{advance_to_closing_brace, relationship_body_annotations};
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::expr::path_expression;
 use crate::parser::feature_value::feature_value_part;
 use crate::parser::item::item_usage;
@@ -500,20 +500,6 @@ pub(crate) fn connect_body(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> 
     .parse(input)
 }
 
-/// Connect statement body: `;` or `{` doc/comment/rep/metadata* `}` (BNF `RelationshipBody`).
-/// Distinct from the shared marker-only [`connect_body`] above: `ConnectStmt` is the one real,
-/// evidenced call site for this (a plain `connect a to b { ... }` statement can carry `doc`/
-/// annotations same as any other relationship).
-fn connect_stmt_body(
-    input: Input<'_>,
-) -> IResult<Input<'_>, (ConnectBody, Vec<Node<crate::ast::RelationshipBodyElement>>)> {
-    let (input, elements) = relationship_body_annotations(input)?;
-    match elements {
-        None => Ok((input, (ConnectBody::Semicolon, Vec::new()))),
-        Some(elements) => Ok((input, (ConnectBody::Brace, elements))),
-    }
-}
-
 /// Wrap a parsed endpoint expression in a `ConnectionEnd` node with no multiplicity, reusing the
 /// expression's own span (see `ast::core::ConnectionEnd`'s doc comment).
 fn connection_end(expr: Node<crate::ast::Expression>) -> Node<ConnectionEnd> {
@@ -597,7 +583,9 @@ pub(crate) fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectS
     let (input, _) = tag(&b"connect"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, (from_expr, to_expr, extra_ends)) = connect_ends(input)?;
-    let (input, (body, body_elements)) = connect_stmt_body(input)?;
+    // `UsageBody = DefinitionBody`; `ref_body` is the parser for that member set (`RefBody`
+    // and `PartUsageBody` are the same `Body<PartUsageBodyElement>`).
+    let (input, body) = crate::parser::part::ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -608,7 +596,6 @@ pub(crate) fn connect_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectS
                 to: to_expr,
                 extra_ends,
                 body,
-                body_elements,
             },
         ),
     ))

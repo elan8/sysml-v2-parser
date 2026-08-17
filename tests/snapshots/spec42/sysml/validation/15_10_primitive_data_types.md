@@ -147,6 +147,12 @@ package '15.10-Primitive Data Types' {
     }
     private import Time::DateTime;
     enum def ConditionColor {
+        doc
+        /*
+		 * Enumerations are defined as an implicit restriction of the extent of the
+		 * enumeration type to the listed enumeration values.
+		 * Note: Enumerations are currently limited to attributes.
+		 */
         red;
         yellow;
         green;
@@ -179,6 +185,6 @@ package '15.10-Primitive Data Types' {
     (reference r4 (scope relative) (span (offset 998) (line 43) (column 17) (len 21)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 998) (line 43) (column 17) (len 12))) (segment 1 (token "Boolean") (name "Boolean") (separator colon-colon) (span (offset 1012) (line 43) (column 31) (len 7)))))
     (reference r5 (scope relative) (span (offset 1117) (line 50) (column 17) (len 14)) (segments (segment 0 (token "Time") (name "Time") (separator none) (span (offset 1117) (line 50) (column 17) (len 4))) (segment 1 (token "DateTime") (name "DateTime") (separator colon-colon) (span (offset 1123) (line 50) (column 23) (len 8)))))
   )
-  (root (package (name "15.10-Primitive Data Types") (body brace (import (target (span (span (offset 244) (line 8) (column 17) (len 21))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 387) (line 15) (column 17) (len 21))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (attribute-def) (import (target (span (span (offset 573) (line 20) (column 17) (len 18))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (attribute-def) (import (target (span (span (offset 885) (line 36) (column 17) (len 20))) (all none) (ref r3) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 998) (line 43) (column 17) (len 21))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1117) (line 50) (column 17) (len 14))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (enum-def) (attribute-def) (enum-def) (attribute-def) (enum-def) (attribute-def))))
+  (root (package (name "15.10-Primitive Data Types") (body brace (import (target (span (span (offset 244) (line 8) (column 17) (len 21))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 387) (line 15) (column 17) (len 21))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (attribute-def) (import (target (span (span (offset 573) (line 20) (column 17) (len 18))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (attribute-def) (import (target (span (span (offset 885) (line 36) (column 17) (len 20))) (all none) (ref r3) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 998) (line 43) (column 17) (len 21))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1117) (line 50) (column 17) (len 14))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (enum-def (name "ConditionColor") (body brace (doc) (enum-value (name "red") (span (offset 1383) (line 60) (column 8) (len 3))) (enum-value (name "yellow") (span (offset 1395) (line 61) (column 8) (len 6))) (enum-value (name "green") (span (offset 1410) (line 62) (column 8) (len 5))))) (attribute-def) (enum-def (name "SeverityEnum") (body brace (enum-value (name "danger") (span (offset 1550) (line 70) (column 3) (len 6))) (enum-value (name "warning") (span (offset 1612) (line 73) (column 3) (len 7))) (enum-value (name "normal") (span (offset 1678) (line 76) (column 3) (len 6))))) (attribute-def) (enum-def (name "DiameterChoice") (body brace (enum-value (name "small") (span (offset 1832) (line 83) (column 3) (len 5))) (enum-value (name "medium") (span (offset 1855) (line 84) (column 3) (len 6))) (enum-value (name "large") (span (offset 1879) (line 85) (column 3) (len 5))))) (attribute-def))))
 )
 ~~~

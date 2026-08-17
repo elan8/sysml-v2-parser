@@ -15,7 +15,6 @@ use crate::parser::case::{
     verification_case_usage,
 };
 use crate::parser::connection::connection_def;
-use crate::parser::connector::connect_body;
 use crate::parser::constraint::{calc_def, constraint_def, constraint_usage};
 use crate::parser::dependency::dependency;
 use crate::parser::enumeration::{enum_def, enum_usage};
@@ -220,9 +219,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         PackageBodyElement::Import(n) => RootElement::Import(Box::new(n.clone())),
         PackageBodyElement::Error(_)
         | PackageBodyElement::Unsupported(_)
-        | PackageBodyElement::Doc(_)
-        | PackageBodyElement::Comment(_)
-        | PackageBodyElement::TextualRep(_)
+        | PackageBodyElement::Annotating(_)
         | PackageBodyElement::Filter(_)
         | PackageBodyElement::PartDef(_)
         | PackageBodyElement::PartUsage(_)
@@ -288,7 +285,6 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::Ref(_)
         | PackageBodyElement::EnumerationUsage(_)
         | PackageBodyElement::MetadataKeywordUsage(_)
-        | PackageBodyElement::MetadataAnnotation(_)
         | PackageBodyElement::Connect(_)
         | PackageBodyElement::DefaultReferenceUsage(_)
         | PackageBodyElement::AssertConstraint(_)
@@ -444,7 +440,7 @@ fn binding_connector_usage_inner(
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
     let (input, right) =
         preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = crate::parser::part::ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -1389,7 +1385,7 @@ fn try_package_body_annotations<'a>(
         starter,
         Documentation,
         doc_comment,
-        PackageBodyElement::Doc
+        |member| PackageBodyElement::Annotating(crate::ast::AnnotatingMember::Doc(member))
     );
     try_package_body_dispatch!(
         input,
@@ -1397,7 +1393,7 @@ fn try_package_body_annotations<'a>(
         starter,
         Comment,
         comment_annotation,
-        PackageBodyElement::Comment
+        |member| PackageBodyElement::Annotating(crate::ast::AnnotatingMember::Comment(member))
     );
     // GH-91.1: bare `locale "en_US" /* ... */` package member (no `comment` keyword).
     try_package_body_dispatch!(
@@ -1406,7 +1402,7 @@ fn try_package_body_annotations<'a>(
         starter,
         Comment,
         bare_locale_comment,
-        PackageBodyElement::Comment
+        |member| PackageBodyElement::Annotating(crate::ast::AnnotatingMember::Comment(member))
     );
     try_package_body_dispatch!(
         input,
@@ -1414,7 +1410,7 @@ fn try_package_body_annotations<'a>(
         starter,
         TextualRepresentation,
         textual_representation,
-        PackageBodyElement::TextualRep
+        |member| PackageBodyElement::Annotating(crate::ast::AnnotatingMember::TextualRep(member))
     );
     try_package_body_dispatch!(
         input,
@@ -2250,7 +2246,11 @@ pub(crate) fn package_body_element(
     if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
         map(
             crate::parser::metadata_annotation::metadata_annotation,
-            PackageBodyElement::MetadataAnnotation,
+            |member| {
+                PackageBodyElement::Annotating(crate::ast::AnnotatingMember::MetadataAnnotation(
+                    member,
+                ))
+            },
         )
         .parse(input)
     }) {

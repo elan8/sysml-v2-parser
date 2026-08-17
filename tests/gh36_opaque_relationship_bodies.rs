@@ -90,9 +90,9 @@ fn dependency_body_retains_doc_comment() {
         })
         .expect("expected dependency");
     let body_elements = dependency
-        .body_elements
-        .as_ref()
-        .expect("expected Some body_elements for a braced dependency body");
+        .body
+        .braced_elements()
+        .expect("expected a braced dependency body");
     assert!(
         body_elements.iter().any(|e| matches!(
             &e.value,
@@ -123,14 +123,17 @@ fn plain_connect_statement_retains_doc_comment() {
             _ => None,
         })
         .expect("expected connect statement");
-    assert!(matches!(connect_stmt.body, ConnectBody::Brace));
+    // `ConnectionUsage`'s body is a `UsageBody`, so the members are the usage member set.
+    let members = connect_stmt
+        .body
+        .braced_elements()
+        .expect("expected a brace connect statement body");
     assert!(
-        connect_stmt.body_elements.iter().any(|e| matches!(
+        members.iter().any(|e| matches!(
             &e.value,
-            RelationshipBodyElement::Annotating(AnnotatingMember::Doc(_))
+            PartUsageBodyElement::Annotating(AnnotatingMember::Doc(_))
         )),
-        "expected doc comment retained in connect statement body, got: {:?}",
-        connect_stmt.body_elements
+        "expected doc comment retained in connect statement body, got: {members:?}"
     );
 }
 
@@ -290,6 +293,6 @@ fn dependency_semicolon_body_has_no_body_elements() {
             _ => None,
         })
         .expect("expected dependency");
-    assert!(matches!(dependency.body, ConnectBody::Semicolon));
-    assert!(dependency.body_elements.is_none());
+    assert!(dependency.body.is_semicolon());
+    assert!(dependency.body.braced_elements().is_none());
 }

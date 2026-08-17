@@ -10,7 +10,6 @@ use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{ws_and_comments, INTERFACE_DEF_BODY_STARTERS};
 use crate::parser::node_from_to;
 use crate::parser::port::{port_def_required, port_usage};
-use crate::parser::requirement::doc_comment;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -24,7 +23,10 @@ fn interface_def_body_element(
     let (input, _) = ws_and_comments(input)?;
     let start = input;
     let (input, elem) = alt((
-        map(doc_comment, InterfaceDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            InterfaceDefBodyElement::Annotating,
+        ),
         // GH-33: interfaces don't allow the `#name` derived-end-name form connections do (no
         // matching real-usage evidence found for interfaces) -- see `connector::end_decl`'s doc
         // comment.

@@ -14,7 +14,6 @@ use crate::parser::occurrence_body::{
 };
 use crate::parser::part::part_usage;
 use crate::parser::port::{port_def_required, port_usage};
-use crate::parser::requirement::doc_comment;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -33,7 +32,10 @@ fn connection_def_body_element(
         map(|i| end_decl(i, true), ConnectionDefBodyElement::EndDecl),
         map(ref_decl, ConnectionDefBodyElement::RefDecl),
         map(connect_stmt, ConnectionDefBodyElement::ConnectStmt),
-        map(doc_comment, ConnectionDefBodyElement::Doc),
+        map(
+            crate::parser::body::annotating_member,
+            ConnectionDefBodyElement::Annotating,
+        ),
         // PAR-002 widening: this body previously had no attribute/item/port coverage at all.
         // Same def-before-usage discipline as `InterfaceDefBodyElement`/other body enums.
         map(

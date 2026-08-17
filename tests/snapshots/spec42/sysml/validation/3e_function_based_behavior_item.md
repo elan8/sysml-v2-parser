@@ -97,8 +97,7 @@ package '3e-Function-based Behavior-item' {
                     in item transmission : Transmission {
                     }
                     out item 'vehicle assy without engine' : VehicleAssembly = 'vehicle assy without transmission or engine' {
-                        part transmission : Transmission = 'assemble transmission into vehicle'.transmission {
-                        }
+                        part transmission : Transmission = 'assemble transmission into vehicle'.transmission {}
                     }
                 }
                 flow from 'assemble transmission into vehicle'.'vehicle assy without engine' to 'assemble engine into vehicle'.'vehicle assy without engine';
@@ -128,6 +127,6 @@ package '3e-Function-based Behavior-item' {
   (references
     (reference r0 (scope relative) (span (offset 59) (line 2) (column 16) (len 11)) (segments (segment 0 (token "Definitions") (name "Definitions") (separator none) (span (offset 59) (line 2) (column 16) (len 11)))))
   )
-  (root (package (name "3e-Function-based Behavior-item") (body brace (import (target (span (span (offset 59) (line 2) (column 16) (len 14))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 70) (line 2) (column 27) (len 3))) (separator (span (offset 70) (line 2) (column 27) (len 2))) (marker (span (offset 72) (line 2) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "Definitions") (body brace (item-def) (item-def) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Transmission") (body semicolon)) (part-def (name "Engine") (body semicolon)))) (package (name "Usages") (body brace (part-usage))))))
+  (root (package (name "3e-Function-based Behavior-item") (body brace (import (target (span (span (offset 59) (line 2) (column 16) (len 14))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 70) (line 2) (column 27) (len 3))) (separator (span (offset 70) (line 2) (column 27) (len 2))) (marker (span (offset 72) (line 2) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "Definitions") (body brace (item-def) (item-def) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Transmission") (body semicolon)) (part-def (name "Engine") (body semicolon)))) (package (name "Usages") (body brace (part-usage (declaration-name "AssemblyLine") (typing none) (body brace (perform) (bind) (part-usage))))))))
 )
 ~~~

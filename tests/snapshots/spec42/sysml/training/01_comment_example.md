@@ -43,7 +43,7 @@ package 'Comment Example' {
 package 'Comment Example' {
     comment Comment1
     /* This is a named comment. */
-    comment
+    comment about Automobile
     /* This is an unnamed comment, annotating an 
 	 * explicitly specified element. 
 	 */
@@ -56,9 +56,10 @@ package 'Comment Example' {
 ~~~sexpr
 (parsed-document
   (references
-    (reference r0 (scope relative) (span (offset 344) (line 14) (column 16) (len 10)) (segments (segment 0 (token "Automobile") (name "Automobile") (separator none) (span (offset 344) (line 14) (column 16) (len 10)))))
-    (reference r1 (scope relative) (span (offset 547) (line 23) (column 19) (len 16)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 547) (line 23) (column 19) (len 3))) (segment 1 (token "TorqueValue") (name "TorqueValue") (separator colon-colon) (span (offset 552) (line 23) (column 24) (len 11)))))
+    (reference r0 (scope relative) (span (offset 204) (line 7) (column 16) (len 10)) (segments (segment 0 (token "Automobile") (name "Automobile") (separator none) (span (offset 204) (line 7) (column 16) (len 10)))))
+    (reference r1 (scope relative) (span (offset 344) (line 14) (column 16) (len 10)) (segments (segment 0 (token "Automobile") (name "Automobile") (separator none) (span (offset 344) (line 14) (column 16) (len 10)))))
+    (reference r2 (scope relative) (span (offset 547) (line 23) (column 19) (len 16)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 547) (line 23) (column 19) (len 3))) (segment 1 (token "TorqueValue") (name "TorqueValue") (separator colon-colon) (span (offset 552) (line 23) (column 24) (len 11)))))
   )
-  (root (package (name "Comment Example") (body brace (comment (keyword (span (offset 139) (line 5) (column 2) (len 7))) (name "Comment1") (locale none)) (comment (keyword (span (offset 190) (line 7) (column 2) (len 7))) (name none) (locale none)) (part-def (name "Automobile") (body semicolon)) (alias (name "Car") (target (ref r0)) (body brace (element-count 0))) (alias (name "Torque") (target (ref r1)) (body semicolon)))))
+  (root (package (name "Comment Example") (body brace (comment (keyword (span (offset 139) (line 5) (column 2) (len 7))) (name "Comment1") (about) (locale none)) (comment (keyword (span (offset 190) (line 7) (column 2) (len 7))) (name none) (about (ref r0)) (locale none)) (part-def (name "Automobile") (body semicolon)) (alias (name "Car") (target (ref r1)) (body brace (element-count 0))) (alias (name "Torque") (target (ref r2)) (body semicolon)))))
 )
 ~~~
