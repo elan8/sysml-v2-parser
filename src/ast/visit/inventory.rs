@@ -308,8 +308,13 @@ macro_rules! ast_traversal {
             }
 
             /// Visits [`DefinitionPrefix`]; the default implementation walks its children.
-            fn visit_definition_prefix(&mut self, node: &$($mutability)? DefinitionPrefix) {
+            fn visit_definition_prefix(&mut self, node: &$($mutability)? Node<DefinitionPrefix>) {
                 walk_definition_prefix(self, node)
+            }
+
+            /// Visits a [`DefinitionPrefix`] that its parent stores without a node wrapper.
+            fn visit_definition_prefix_value(&mut self, value: &$($mutability)? DefinitionPrefix) {
+                walk_definition_prefix_value(self, value)
             }
 
             /// Visits [`PartDefBody`]; the default implementation walks its children.
@@ -588,8 +593,33 @@ macro_rules! ast_traversal {
             }
 
             /// Visits [`OccurrencePortionKind`]; the default implementation walks its children.
-            fn visit_occurrence_portion_kind(&mut self, node: &$($mutability)? OccurrencePortionKind) {
+            fn visit_occurrence_portion_kind(&mut self, node: &$($mutability)? Node<OccurrencePortionKind>) {
                 walk_occurrence_portion_kind(self, node)
+            }
+
+            /// Visits an [`OccurrencePortionKind`] stored without a node wrapper.
+            fn visit_occurrence_portion_kind_value(&mut self, value: &$($mutability)? OccurrencePortionKind) {
+                walk_occurrence_portion_kind_value(self, value)
+            }
+
+            /// Visits [`RefPrefix`]; the default implementation walks its children.
+            fn visit_ref_prefix(&mut self, node: &$($mutability)? RefPrefix) {
+                walk_ref_prefix(self, node)
+            }
+
+            /// Visits [`BasicUsagePrefix`]; the default implementation walks its children.
+            fn visit_basic_usage_prefix(&mut self, node: &$($mutability)? BasicUsagePrefix) {
+                walk_basic_usage_prefix(self, node)
+            }
+
+            /// Visits [`UsageExtensionKeyword`]; the default implementation walks its children.
+            fn visit_usage_extension_keyword(&mut self, node: &$($mutability)? Node<UsageExtensionKeyword>) {
+                walk_usage_extension_keyword(self, node)
+            }
+
+            /// Visits [`OccurrenceUsagePrefix`]; the default implementation walks its children.
+            fn visit_occurrence_usage_prefix(&mut self, node: &$($mutability)? OccurrenceUsagePrefix) {
+                walk_occurrence_usage_prefix(self, node)
             }
 
             /// Visits [`OccurrenceUsageBody`]; the default implementation walks its children.
@@ -2337,7 +2367,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let PartDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
-                visitor.visit_definition_prefix(inner);
+                visitor.visit_definition_prefix_value(inner);
             }
             let _ = is_individual;
             visitor.visit_identification(identification);
@@ -2357,7 +2387,7 @@ macro_rules! ast_traversal {
                 visitor.visit_metadata_keyword_usage(inner);
             }
             if let Some(inner) = definition_prefix {
-                visitor.visit_definition_prefix(inner);
+                visitor.visit_definition_prefix_value(inner);
             }
             let _ = has_def_keyword;
             visitor.visit_identification(identification);
@@ -2368,7 +2398,14 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_definition_prefix<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? DefinitionPrefix) {
+        pub fn walk_definition_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DefinitionPrefix>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            visitor.visit_definition_prefix_value(&$($mutability)? node.value);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_definition_prefix_value<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? DefinitionPrefix) {
             match node {
                 DefinitionPrefix::Abstract => {}
                 DefinitionPrefix::Variation => {}
@@ -2830,7 +2867,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let PartUsage { usage_prefix, is_individual, is_reference, direction, is_derived, is_constant, name, short_name, typing, multiplicity, ordered, nonunique, subsets, redefines, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
             if let Some(inner) = usage_prefix {
-                visitor.visit_definition_prefix(inner);
+                visitor.visit_definition_prefix_value(inner);
             }
             let _ = is_individual;
             let _ = is_reference;
@@ -3157,7 +3194,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let Perform { usage_prefix, action_name, action_reference, typing, multiplicity, redefines, subsets, value, body } = &$($mutability)? node.value;
             if let Some(inner) = usage_prefix {
-                visitor.visit_definition_prefix(inner);
+                visitor.visit_definition_prefix_value(inner);
             }
             visitor.visit_text(action_name);
             if let Some(inner) = action_reference {
@@ -3287,7 +3324,7 @@ macro_rules! ast_traversal {
             let _ = nonunique;
             let _ = is_derived;
             if let Some(inner) = usage_prefix {
-                visitor.visit_definition_prefix(inner);
+                visitor.visit_definition_prefix_value(inner);
             }
             let _ = is_constant;
             let _ = is_reference;
@@ -3692,7 +3729,7 @@ macro_rules! ast_traversal {
             }
             let _ = is_derived;
             if let Some(inner) = usage_prefix {
-                visitor.visit_definition_prefix(inner);
+                visitor.visit_definition_prefix_value(inner);
             }
             let _ = is_constant;
             if let Some(inner) = kind_keyword {
@@ -4003,7 +4040,7 @@ macro_rules! ast_traversal {
             let _ = is_constant;
             let _ = has_occurrence_keyword;
             if let Some(inner) = portion_kind {
-                visitor.visit_occurrence_portion_kind(inner);
+                visitor.visit_occurrence_portion_kind_value(inner);
             }
             visitor.visit_text(name);
             if let Some(inner) = short_name { visitor.visit_text(inner); }
@@ -4040,10 +4077,64 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_occurrence_portion_kind<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? OccurrencePortionKind) {
+        pub fn walk_occurrence_portion_kind<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<OccurrencePortionKind>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            visitor.visit_occurrence_portion_kind_value(&$($mutability)? node.value);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_occurrence_portion_kind_value<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? OccurrencePortionKind) {
             match node {
                 OccurrencePortionKind::Snapshot => {}
                 OccurrencePortionKind::Timeslice => {}
+            }
+        }
+
+        pub fn walk_ref_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? RefPrefix) {
+            let RefPrefix { direction, derived_span, variance, constant_span } = node;
+            if let Some(inner) = direction {
+                visitor.visit_in_out(inner);
+            }
+            if let Some(inner) = derived_span {
+                visitor.visit_span(inner);
+            }
+            if let Some(inner) = variance {
+                visitor.visit_definition_prefix(inner);
+            }
+            if let Some(inner) = constant_span {
+                visitor.visit_span(inner);
+            }
+        }
+
+        pub fn walk_basic_usage_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? BasicUsagePrefix) {
+            let BasicUsagePrefix { ref_prefix, reference_span } = node;
+            visitor.visit_ref_prefix(ref_prefix);
+            if let Some(inner) = reference_span {
+                visitor.visit_span(inner);
+            }
+        }
+
+        pub fn walk_usage_extension_keyword<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<UsageExtensionKeyword>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let UsageExtensionKeyword { hash_span, annotation } = &$($mutability)? node.value;
+            visitor.visit_span(hash_span);
+            visitor.visit_qualified_reference(annotation);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_occurrence_usage_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? OccurrenceUsagePrefix) {
+            let OccurrenceUsagePrefix { basic, individual_span, portion, extension_keywords } = node;
+            visitor.visit_basic_usage_prefix(basic);
+            if let Some(inner) = individual_span {
+                visitor.visit_span(inner);
+            }
+            if let Some(inner) = portion {
+                visitor.visit_occurrence_portion_kind(inner);
+            }
+            for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
             }
         }
 
@@ -5741,7 +5832,7 @@ macro_rules! ast_traversal {
             let ItemUsage { is_derived, usage_prefix, is_constant, name, type_name, redefines, subsets, short_name, multiplicity, ordered, nonunique, value, body, direction, is_individual, membership } = &$($mutability)? node.value;
             let _ = is_derived;
             if let Some(inner) = usage_prefix {
-                visitor.visit_definition_prefix(inner);
+                visitor.visit_definition_prefix_value(inner);
             }
             let _ = is_constant;
             visitor.visit_text(name);

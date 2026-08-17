@@ -6,6 +6,7 @@ use super::body::Body;
 use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
+use super::occurrence_prefix::OccurrencePortionKind;
 use super::requirement::{
     Dependency, EnumerationUsage, ItemUsage, RequirementUsage, SatisfyRequirementUsage,
 };
@@ -65,7 +66,10 @@ pub struct ExtendedDefinition {
 }
 
 /// BNF BasicDefinitionPrefix: `abstract` | `variation`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// The same two-alternative group `RefPrefix` spells for a usage; see
+/// [`crate::ast::RefPrefix::variance`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DefinitionPrefix {
     Abstract,
@@ -1730,13 +1734,6 @@ pub struct OccurrenceUsage {
     pub value: Option<Node<FeatureValue>>,
     pub body: OccurrenceUsageBody,
     pub membership: Membership,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum OccurrencePortionKind {
-    Snapshot,
-    Timeslice,
 }
 
 pub type OccurrenceUsageBody = Body<OccurrenceBodyElement>;
