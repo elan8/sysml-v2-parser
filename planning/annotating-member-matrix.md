@@ -157,7 +157,15 @@ to show:
 These are annotating-member gaps the matrix found that this change does **not** close. Each is
 recorded with the grammar evidence and the reason it is a different seam.
 
-- **`ConnectBody` marker bodies discard everything inside them.** `Allocate`, `Transition`,
+- **`ConnectBody` and `OpacityKind::OpaqueConnectBrace` survive only for the legacy `Annotation`.**
+  Every other owner now holds a real `Body<E>`. `Annotation` is the generic `@`/`#` fallback whose
+  head is an `AnnotationHead::Opaque(String)`; converting its body belongs with the metadata audit
+  that owns that opaque head, not with the container work. Nothing in the 351-document snapshot
+  corpus reaches `OpaqueConnectBrace` any more, and no `@`/`#` spelling tried here constructs an
+  `Annotation` with a brace body at all — the variant should be deleted with `Annotation`'s
+  rewrite rather than on that evidence alone.
+
+- **(historical) `ConnectBody` marker bodies discard everything inside them.** `Allocate`, `Transition`,
   `ExposeMember`, `SatisfyViewMember` and `Annotation` hold `ConnectBody`, a two-variant marker
   (`Semicolon | Brace`) whose brace form is parsed by `advance_to_closing_brace` and retains
   nothing — not the members, not the delimiter spans. The grammar admits annotating members in

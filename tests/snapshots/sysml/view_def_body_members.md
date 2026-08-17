@@ -49,7 +49,13 @@ package ViewDefBodyMembers {
         }
         ref viewpoint : ViewpointCheck :>> self;
         viewpoint viewpointSatisfactions : ViewpointCheck;
-        satisfy requirement viewpointConformance by that {}
+        satisfy requirement viewpointConformance by that {
+            require viewpointSatisfactions {
+                doc
+                /* The required ViewpointChecks. */
+                'ref' :>> ownedPerformances::this, subperformances::this default that.that;
+            }
+        }
     }
     part def Ports {
         ref outgoingTransfersFromSelf :> interfacingPorts {

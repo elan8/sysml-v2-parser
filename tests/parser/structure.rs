@@ -2698,7 +2698,9 @@ doc /* Addresses: front ToF 0x29, left ToF 0x2A. */
         other => panic!("expected part usage brace body, got {:?}", other),
     };
     let body_elements = match &interface_usage.value {
-        sysml_v2_parser::ast::InterfaceUsage::TypedConnect { body_elements, .. } => body_elements,
+        sysml_v2_parser::ast::InterfaceUsage::TypedConnect { body, .. } => body
+            .braced_elements()
+            .expect("expected a brace interface usage body"),
         other => panic!("expected TypedConnect interface usage, got {:?}", other),
     };
     assert_eq!(

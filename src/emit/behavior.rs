@@ -1172,12 +1172,7 @@ fn emit_transition(
     }
     w.push_str("then ");
     emit_expression(w, &t.target.value)?;
-    match &t.body {
-        crate::ast::ConnectBody::Semicolon => w.push_char(';'),
-        crate::ast::ConnectBody::Brace => w.push_str(" {}"),
-    }
-    let _ = path;
-    Ok(())
+    emit_action_def_body(w, path, &t.body)
 }
 
 pub(crate) fn emit_first_stmt(

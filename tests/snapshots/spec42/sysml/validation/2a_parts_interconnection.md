@@ -300,7 +300,7 @@ package '2a-Parts Interconnection' {
                     port rightDiffPort : DiffPort;
                 }
                 interface differential.leftDiffPort to rearAxle.leftHalfAxle.axleToDiffPort {}
-                interface differential.rightDiffPort to rearAxle.rightHalfAxle.axleToDiffPort {}
+                interface differential.rightDiffPort to rearAxle.rightHalfAxle.axleToDiffPort;
                 part rearAxle : RearAxle {
                     part leftHalfAxle : HalfAxle;
                     part rightHalfAxle : HalfAxle;

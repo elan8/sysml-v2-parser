@@ -131,7 +131,7 @@ package ServerSequenceOutsideRealization_2 {
                 action publish send new Publish(someTopic, somePublication) via publicationPort;
             }
         }
-        interface producer_2.publicationPort to server_2.publicationPort {}
+        interface producer_2.publicationPort to server_2.publicationPort;
         part server_2[1] {
             port publicationPort : PublicationPort;
             port subscriptionPort : SubscriptionPort;
@@ -145,7 +145,7 @@ package ServerSequenceOutsideRealization_2 {
                 transition delivering first waitForPublication accept pub : Publish via publicationPort if pub.topic == subscribing.sub.topic do send new Deliver(pub.publication) to subscribing.sub.subscriber then waitForPublication;
             }
         }
-        interface consumer_2.subscriptionPort to server_2.subscriptionPort {}
+        interface consumer_2.subscriptionPort to server_2.subscriptionPort;
         part consumer_2[1] {
             attribute myTopic : String;
             attribute :>> incomingTransferSort = Occurrences::earlierFirstIncomingTransferSort;

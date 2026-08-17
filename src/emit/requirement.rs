@@ -987,9 +987,5 @@ pub(crate) fn emit_satisfy(
         w.push_str(" by ");
         emit_expression(w, &satisfy.target.value)?;
     }
-    match &satisfy.body {
-        ConnectBody::Semicolon => w.push_char(';'),
-        ConnectBody::Brace => w.push_str(" {}"),
-    }
-    Ok(())
+    crate::emit::view::emit_constraint_body(w, path, &satisfy.body)
 }

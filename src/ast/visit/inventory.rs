@@ -4253,7 +4253,7 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             match &$($mutability)? node.value {
-                InterfaceUsage::TypedConnect { name, interface_type, subsets, redefines, from, to, body, body_elements } => {
+                InterfaceUsage::TypedConnect { name, interface_type, subsets, redefines, from, to, body } => {
                     if let Some(inner) = name {
                         visitor.visit_text(inner);
                     }
@@ -4268,12 +4268,9 @@ macro_rules! ast_traversal {
                     }
                     visitor.visit_expression(from);
                     visitor.visit_expression(to);
-                    visitor.visit_connect_body(body);
-                    for inner in body_elements {
-                        visitor.visit_interface_usage_body_element(inner);
-                    }
+                    walk_interface_usage_body(visitor, body);
                 }
-                InterfaceUsage::Connection { subsets, redefines, from, to, body_elements } => {
+                InterfaceUsage::Connection { subsets, redefines, from, to, body } => {
                     if let Some(inner) = subsets {
                         visitor.visit_subsetting_relationship(inner);
                     }
@@ -4282,11 +4279,9 @@ macro_rules! ast_traversal {
                     }
                     visitor.visit_expression(from);
                     visitor.visit_expression(to);
-                    for inner in body_elements {
-                        visitor.visit_interface_usage_body_element(inner);
-                    }
+                    walk_interface_usage_body(visitor, body);
                 }
-                InterfaceUsage::Declaration { name, interface_type, subsets, redefines, body, body_elements } => {
+                InterfaceUsage::Declaration { name, interface_type, subsets, redefines, body } => {
                     if let Some(inner) = name {
                         visitor.visit_text(inner);
                     }
@@ -4299,10 +4294,7 @@ macro_rules! ast_traversal {
                     if let Some(inner) = redefines {
                         visitor.visit_subsetting_relationship(inner);
                     }
-                    visitor.visit_connect_body(body);
-                    for inner in body_elements {
-                        visitor.visit_interface_usage_body_element(inner);
-                    }
+                    walk_interface_usage_body(visitor, body);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -5444,7 +5436,7 @@ macro_rules! ast_traversal {
                 visitor.visit_transition_effect(inner);
             }
             visitor.visit_expression(target);
-            visitor.visit_connect_body(body);
+            walk_action_def_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -5638,15 +5630,10 @@ macro_rules! ast_traversal {
         pub fn walk_satisfy<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Satisfy>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let Satisfy { source, target, body, body_elements, is_negated, inline_requirement } = &$($mutability)? node.value;
+            let Satisfy { source, target, body, is_negated, inline_requirement } = &$($mutability)? node.value;
             visitor.visit_expression(source);
             visitor.visit_expression(target);
-            visitor.visit_connect_body(body);
-            if let Some(inner) = body_elements {
-                for inner in inner {
-                    visitor.visit_constraint_def_body_element(inner);
-                }
-            }
+            walk_constraint_def_body(visitor, body);
             let _ = is_negated;
             if let Some(inner) = inline_requirement {
                 visitor.visit_inline_satisfy_requirement(inner);
@@ -5746,6 +5733,23 @@ macro_rules! ast_traversal {
             let _ = is_end;
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_interface_usage_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Body<InterfaceUsageBodyElement>) {
+            match node {
+                Body::Semicolon { semicolon_span } => {
+                    visitor.visit_body_semicolon(semicolon_span);
+                    visitor.visit_span(semicolon_span);
+                }
+                Body::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
+                    visitor.visit_span(open_span);
+                    for inner in elements {
+                        visitor.visit_interface_usage_body_element(inner);
+                    }
+                    visitor.visit_span(close_span);
+                }
+            }
         }
 
         pub fn walk_relationship_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Body<RelationshipBodyElement>) {

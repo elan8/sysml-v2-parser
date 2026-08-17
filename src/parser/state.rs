@@ -763,7 +763,7 @@ fn transition_tail<'a>(
     let (input, _) = ws1(input)?;
     let (input, target) = expression(input)?;
     let (input, body) =
-        preceded(ws_and_comments, crate::parser::connector::connect_body).parse(input)?;
+        preceded(ws_and_comments, crate::parser::action::action_def_body).parse(input)?;
     Ok((
         input,
         node_from_to(

@@ -20,7 +20,7 @@ pub(crate) use crate::parser::case::{
 };
 pub(crate) use crate::parser::connection::connection_def_required;
 pub(crate) use crate::parser::connection::connection_member_body;
-pub(crate) use crate::parser::connector::{connect_body, connect_ends};
+pub(crate) use crate::parser::connector::connect_ends;
 pub(crate) use crate::parser::constraint::calc_def_required;
 pub(crate) use crate::parser::constraint::calc_usage;
 pub(crate) use crate::parser::constraint::{constraint_def, constraint_usage};

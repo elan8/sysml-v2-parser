@@ -519,7 +519,7 @@ fn in_out_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl>> {
 }
 
 /// Action def body: `;` or `{` ActionDefBodyElement* `}`
-fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
+pub(crate) fn action_def_body(input: Input<'_>) -> IResult<Input<'_>, ActionDefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((crate::parser::body::semicolon_body, action_def_body_brace)).parse(input)
 }

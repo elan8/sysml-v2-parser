@@ -1832,8 +1832,9 @@ pub enum InterfaceUsage {
         redefines: Option<Node<SubsettingRelationship>>,
         from: Node<Expression>,
         to: Node<Expression>,
-        body: ConnectBody,
-        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+        /// The `InterfaceBody`, delimiters included. Was a `ConnectBody` marker beside a separate
+        /// element list -- one body fact in two fields, with no span for either brace.
+        body: Body<InterfaceUsageBodyElement>,
     },
     /// `interface` from `to` to body.
     Connection {
@@ -1841,7 +1842,10 @@ pub enum InterfaceUsage {
         redefines: Option<Node<SubsettingRelationship>>,
         from: Node<Expression>,
         to: Node<Expression>,
-        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+        /// See [`InterfaceUsage::TypedConnect`]'s body. This variant kept only an element list
+        /// that was always empty -- the parser discarded the body outright -- so the `;`/`{}`
+        /// distinction and every member were lost.
+        body: Body<InterfaceUsageBodyElement>,
     },
     /// `interface` (name (multiplicity)?)? (`:` Type)? body -- a declared interface usage with
     /// no inline `connect` clause (GH-16). Per BNF `InterfaceUsageDeclaration = UsageDeclaration
@@ -1855,8 +1859,8 @@ pub enum InterfaceUsage {
         interface_type: Option<QualifiedReferenceId>,
         subsets: Option<Node<SubsettingRelationship>>,
         redefines: Option<Node<SubsettingRelationship>>,
-        body: ConnectBody,
-        body_elements: Vec<Node<InterfaceUsageBodyElement>>,
+        /// See [`InterfaceUsage::TypedConnect`]'s body.
+        body: Body<InterfaceUsageBodyElement>,
     },
 }
 

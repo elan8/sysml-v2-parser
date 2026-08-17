@@ -1138,7 +1138,7 @@ fn walk_state_def_body_elements(
             StateDefBodyElement::RequirementUsage(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
-            StateDefBodyElement::Transition(n) => walk_connect_body(report, &p, &n.value.body),
+            StateDefBodyElement::Transition(n) => walk_action_def_body(report, &p, &n.value.body),
             StateDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             StateDefBodyElement::AttributeUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -1384,10 +1384,10 @@ fn walk_optional_relationship_body(
 }
 
 fn walk_interface_usage(report: &mut OpacityReport, path: &str, usage: &InterfaceUsage) {
-    let elements = match usage {
-        InterfaceUsage::TypedConnect { body_elements, .. }
-        | InterfaceUsage::Connection { body_elements, .. }
-        | InterfaceUsage::Declaration { body_elements, .. } => body_elements,
+    let elements: &[crate::ast::Node<InterfaceUsageBodyElement>] = match usage {
+        InterfaceUsage::TypedConnect { body, .. }
+        | InterfaceUsage::Connection { body, .. }
+        | InterfaceUsage::Declaration { body, .. } => body.braced_elements().unwrap_or(&[]),
     };
     for (i, element) in elements.iter().enumerate() {
         let p = format!("{path}/body[{i}]");
@@ -1412,9 +1412,7 @@ fn walk_end_decl(report: &mut OpacityReport, path: &str, end: &crate::ast::EndDe
 }
 
 fn walk_satisfy(report: &mut OpacityReport, path: &str, satisfy: &crate::ast::Satisfy) {
-    if let Some(elements) = &satisfy.body_elements {
-        walk_constraint_body_elements(report, path, elements);
-    }
+    walk_constraint_def_body(report, path, &satisfy.body);
 }
 
 fn walk_bind(report: &mut OpacityReport, path: &str, bind: &crate::ast::Bind) {

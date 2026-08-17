@@ -905,22 +905,36 @@ fn interface_usage_ref_redef(
 }
 
 /// Connect body for interface usage (TypedConnect): `;` or `{` body_elements* `}`
-fn connect_body_with_elements(
+/// `InterfaceUsage = OccurrenceUsagePrefix 'interface' InterfaceUsageDeclaration InterfaceBody`.
+///
+/// Returns one shared [`crate::ast::Body`] carrying its own delimiter spans. The two callers used
+/// to receive a `ConnectBody` marker beside the element list, so the `;`/`{}` fact lived in two
+/// fields and neither `{` nor `}` had a span.
+fn interface_usage_body(
     input: Input<'_>,
-) -> IResult<Input<'_>, (ConnectBody, Vec<Node<InterfaceUsageBodyElement>>)> {
+) -> IResult<Input<'_>, crate::ast::Body<InterfaceUsageBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
-    if let Ok((input, _)) = tag::<_, _, nom::error::Error<Input>>(&b";"[..]).parse(input) {
-        return Ok((input, (ConnectBody::Semicolon, vec![])));
+    if input.fragment().starts_with(b";") {
+        return crate::parser::body::semicolon_body(input);
     }
-
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
+    let (open_start, _) = ws_and_comments(input)?;
+    let (mut input, _) = tag(&b"{"[..]).parse(open_start)?;
+    let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
         let (next, _) = ws_and_comments(input)?;
         input = next;
         if input.fragment().starts_with(b"}") {
-            let (input, _) = tag(&b"}"[..]).parse(input)?;
-            return Ok((input, (ConnectBody::Brace, elements)));
+            let close_start = input;
+            let (input, _) = tag(&b"}"[..]).parse(close_start)?;
+            return Ok((
+                input,
+                crate::ast::Body::Brace {
+                    open_span,
+                    elements,
+                    close_span: crate::parser::span::span_from_to(close_start, input),
+                },
+            ));
         }
         let (next, element) = interface_usage_body_element(input)?;
         if next.location_offset() == input.location_offset() {
@@ -1040,7 +1054,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
         let (input, from_expr) = connector_end_expression(input)?;
         let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
         let (input, to_expr) = preceded(ws_and_comments, connector_end_expression).parse(input)?;
-        let (input, (body, body_elements)) = connect_body_with_elements(input)?;
+        let (input, body) = interface_usage_body(input)?;
         return Ok((
             input,
             node_from_to(
@@ -1054,7 +1068,6 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                     from: from_expr,
                     to: to_expr,
                     body,
-                    body_elements,
                 },
             ),
         ));
@@ -1069,7 +1082,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 preceded(ws_and_comments, connector_end_expression).parse(input)?;
             Ok::<_, nom::Err<nom::error::Error<Input<'_>>>>((input, (from_expr, to_expr)))
         })() {
-            let (input, _) = opt(connect_body).parse(after_to)?;
+            let (input, body) = interface_usage_body(after_to)?;
             return Ok((
                 input,
                 node_from_to(
@@ -1080,7 +1093,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                         redefines: redefines.clone(),
                         from: from_expr,
                         to: to_expr,
-                        body_elements: vec![],
+                        body,
                     },
                 ),
             ));
@@ -1088,7 +1101,7 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
     }
     // GH-16: no `connect` clause (and, if unnamed/untyped, no bare `from to to` form either) --
     // a plain declared interface usage. Ends, if any, are declared inside the body instead.
-    let (input, (body, body_elements)) = connect_body_with_elements(input)?;
+    let (input, body) = interface_usage_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -1100,7 +1113,6 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
                 subsets,
                 redefines,
                 body,
-                body_elements,
             },
         ),
     ))

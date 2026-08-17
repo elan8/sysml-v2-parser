@@ -206,25 +206,6 @@ mod tests {
         );
     }
 
-    /// `OpacityKind::OpaqueConnectBrace` is still reachable from the `ConnectBody` owners that
-    /// have not been converted yet -- a `transition` body is one -- so the state stays covered
-    /// rather than becoming an untested variant while those conversions land.
-    #[test]
-    fn a_transition_brace_body_is_still_opaque() {
-        let source = "package P {\n    state def S {\n        state a;\n        state b;\n        transition first a then b {\n            doc /* why */\n        }\n    }\n}\n";
-        let document = crate::parse_for_editor(source).document;
-        let report = opacity_report(&document.root);
-        assert!(!report.is_clean());
-        assert!(
-            report
-                .hits
-                .iter()
-                .any(|hit| hit.kind == OpacityKind::OpaqueConnectBrace),
-            "expected an opaque connect-brace hit, got: {:?}",
-            report.hits
-        );
-    }
-
     #[test]
     fn recovered_emit_preserves_braced_error_and_formats_later_sibling() {
         let source = r#"package P {

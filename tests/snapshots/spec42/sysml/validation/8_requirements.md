@@ -343,7 +343,8 @@ package '8-Requirements' {
                 in :>> drivePwrPort = engine.drivePwrPort;
             }
         }
-        satisfy 'vehicle1-c1 Specification' by vehicle1_c1 {}
+        satisfy 'vehicle1-c1 Specification' by vehicle1_c1 {
+        }
         satisfy 'engine-v1 Specification' by vehicle1_c1.engine_v1;
     }
     part 'vehicle1_c2 Specification Context' {

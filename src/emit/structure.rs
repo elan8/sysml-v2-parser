@@ -998,7 +998,6 @@ pub(crate) fn emit_interface_usage(
             from,
             to,
             body,
-            body_elements,
         } => {
             w.push_str("interface");
             if let Some(n) = name {
@@ -1020,14 +1019,14 @@ pub(crate) fn emit_interface_usage(
             emit_expression(w, &from.value)?;
             w.push_str(" to ");
             emit_expression(w, &to.value)?;
-            emit_interface_usage_body(w, path, body, body_elements)
+            emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Connection {
             subsets,
             redefines,
             from,
             to,
-            body_elements,
+            body,
         } => {
             w.push_str("interface");
             if let Some(subsets) = subsets {
@@ -1040,7 +1039,7 @@ pub(crate) fn emit_interface_usage(
             emit_expression(w, &from.value)?;
             w.push_str(" to ");
             emit_expression(w, &to.value)?;
-            emit_interface_usage_body(w, path, &ConnectBody::Brace, body_elements)
+            emit_interface_usage_body(w, path, body)
         }
         InterfaceUsage::Declaration {
             name,
@@ -1048,7 +1047,6 @@ pub(crate) fn emit_interface_usage(
             subsets,
             redefines,
             body,
-            body_elements,
         } => {
             w.push_str("interface");
             if let Some(n) = name {
@@ -1072,7 +1070,7 @@ pub(crate) fn emit_interface_usage(
             {
                 w.push_char(' ');
             }
-            emit_interface_usage_body(w, path, body, body_elements)
+            emit_interface_usage_body(w, path, body)
         }
     }
 }
@@ -1080,35 +1078,28 @@ pub(crate) fn emit_interface_usage(
 fn emit_interface_usage_body(
     w: &mut EmitWriter<'_>,
     path: &str,
-    body: &ConnectBody,
-    elements: &[Node<InterfaceUsageBodyElement>],
+    body: &crate::ast::Body<InterfaceUsageBodyElement>,
 ) -> Result<(), EmitError> {
     match body {
-        ConnectBody::Semicolon if elements.is_empty() => {
+        crate::ast::Body::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        ConnectBody::Semicolon | ConnectBody::Brace => {
-            if elements.is_empty() {
-                // Preserve brace vs semicolon: empty TypedConnect brace → `{}`.
-                if matches!(body, ConnectBody::Brace) {
-                    w.push_str(" {}");
-                } else {
-                    w.push_char(';');
-                }
-                Ok(())
-            } else {
-                w.push_str(" {");
+        crate::ast::Body::Brace { elements, .. } if elements.is_empty() => {
+            w.push_str(" {}");
+            Ok(())
+        }
+        crate::ast::Body::Brace { elements, .. } => {
+            w.push_str(" {");
+            w.newline();
+            w.indent();
+            for (i, el) in elements.iter().enumerate() {
+                emit_interface_usage_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
                 w.newline();
-                w.indent();
-                for (i, el) in elements.iter().enumerate() {
-                    emit_interface_usage_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
-                    w.newline();
-                }
-                w.dedent();
-                w.push_char('}');
-                Ok(())
             }
+            w.dedent();
+            w.push_char('}');
+            Ok(())
         }
     }
 }

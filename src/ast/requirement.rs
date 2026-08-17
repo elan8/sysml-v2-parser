@@ -1,8 +1,6 @@
 use super::behavior::{AssignStmt, ForLoop, InOut, ThenAction};
 use super::body::Body;
-use super::common::{
-    AnnotatingMember, ConnectBody, Identification, Import, ParseErrorNode, Visibility,
-};
+use super::common::{AnnotatingMember, Identification, Import, ParseErrorNode, Visibility};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::structure::DefinitionPrefix;
@@ -10,7 +8,7 @@ use super::structure::RelationshipBodyElement;
 use super::structure::{
     Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataKeywordUsage, VariantUsage,
 };
-use super::view::{CalcUsage, ConstraintDefBody, ConstraintDefBodyElement, ConstraintUsage};
+use super::view::{CalcUsage, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
@@ -179,10 +177,14 @@ pub struct VerifyRequirementMember {
 pub struct Satisfy {
     pub source: Node<Expression>,
     pub target: Node<Expression>,
-    pub body: ConnectBody,
-    /// Structured elements from a braced satisfy body, e.g. constraint members.
-    /// `None` when the body is a semicolon terminator.
-    pub body_elements: Option<Vec<Node<ConstraintDefBodyElement>>>,
+    /// The body this member was parsed with, in one field: it was a `ConnectBody` marker beside
+    /// a separate element list, so the `;`/`{}` fact lived in two places and neither carried a
+    /// delimiter span.
+    ///
+    /// `SatisfyRequirementUsage = … RequirementBody`, so the *member set* should be
+    /// `RequirementDefBodyElement`; the parser builds a `ConstraintDefBody` and widening it is a
+    /// member-dispatch change rather than the container change made here.
+    pub body: ConstraintDefBody,
     /// `true` for a negated satisfy usage: `(assert)? not satisfy ...`.
     pub is_negated: bool,
     /// Present for the fuller `satisfy requirement <name> : <Type> by <expr>;` form

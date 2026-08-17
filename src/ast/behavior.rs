@@ -1,5 +1,5 @@
 use super::body::Body;
-use super::common::{AnnotatingMember, ConnectBody, Identification, ParseErrorNode};
+use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::membership::Membership;
 use super::requirement::RequirementUsage;
 use super::structure::{
@@ -1030,7 +1030,9 @@ pub struct Transition {
     pub guard: Option<Node<Expression>>,
     pub effect: Option<TransitionEffect>,
     pub target: Node<Expression>,
-    pub body: ConnectBody,
+    /// `TransitionUsage = 'transition' … ActionBody`. Was a `ConnectBody` marker whose brace form
+    /// was parsed by `advance_to_closing_brace` and kept nothing.
+    pub body: ActionDefBody,
 }
 
 // ---------------------------------------------------------------------------

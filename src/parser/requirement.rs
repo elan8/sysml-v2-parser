@@ -1,6 +1,6 @@
 use crate::ast::{
-    CommentAnnotation, ConcernUsage, ConstraintDefBody, DocComment, FrameMember, Node,
-    PurposeMember, RequireConstraint, RequirementActorDecl, RequirementDef, RequirementDefBody,
+    CommentAnnotation, ConcernUsage, DocComment, FrameMember, Node, PurposeMember,
+    RequireConstraint, RequirementActorDecl, RequirementDef, RequirementDefBody,
     RequirementDefBodyElement, RequirementUsage, Satisfy, StakeholderMember, SubjectDecl,
     SubjectRef, TextualRepresentation, VerifyRequirementMember,
 };
@@ -957,18 +957,7 @@ fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
         // We preserve AST shape by mirroring source/target.
         (input, source.clone())
     };
-    let (input, (body, body_elements)) = alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            (crate::ast::ConnectBody::Semicolon, None)
-        }),
-        map(constraint_def_body, |body| match body {
-            ConstraintDefBody::Semicolon { .. } => (crate::ast::ConnectBody::Semicolon, None),
-            ConstraintDefBody::Brace { elements, .. } => {
-                (crate::ast::ConnectBody::Brace, Some(elements))
-            }
-        }),
-    ))
-    .parse(input)?;
+    let (input, body) = constraint_def_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -978,7 +967,6 @@ fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
                 source,
                 target,
                 body,
-                body_elements,
                 is_negated,
                 inline_requirement,
             },

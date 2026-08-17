@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`transition`, `satisfy` and the three interface-usage forms hold a real body; four spec
+  fixtures become formattable.** `TransitionUsage = 'transition' … ActionBody` and
+  `InterfaceUsage = … InterfaceBody`; `satisfy` paired its marker with a second element list.
+  A `transition t then next { … }` body was an opaque `ConnectBody` marker, and an opaque node
+  makes `emit_sysml` refuse the *whole document* -- so `5-State-based Behavior-1`, `-1a`,
+  `2a-Parts Interconnection` and `8-Requirements` recorded
+  `(unavailable (reason opaque-ast))` for their entire FORMAT section. All four now format, and
+  the first two are promoted into `ROUNDTRIP_PASS`. `ConnectBody` now has a single owner left,
+  the legacy `Annotation`. **AST version 164 -> 165.**
+
 - **`connect`, `allocate`, `succession` and `binding` usages hold a real body, and a braced
   `connect` can be formatted.** All four end in `UsageBody`, and `UsageBody = DefinitionBody`, so
   each owns the whole usage member set; all four held a `ConnectBody` marker whose brace form was

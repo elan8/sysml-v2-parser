@@ -36,6 +36,11 @@ const ROUNDTRIP_PASS: &[&str] = &[
     // Promoted by #72 Other-opacity work (state do/out/accept; attribute assert constraint).
     // The exhaustive opacity gate now correctly exposes their unmodeled connect brace bodies.
     // Keep these as known gaps until those members have a typed representation.
+    // Promoted with the `ConnectBody` container work: a `transition ... { ... }` body was an
+    // opaque marker that kept no members, so emission refused the whole document. It is an
+    // `ActionBody` now, and both files format and reparse.
+    "05-State-based Behavior/5-State-based Behavior-1.sysml",
+    "05-State-based Behavior/5-State-based Behavior-1a.sysml",
     "05-State-based Behavior/5-State-based Behavior-2.sysml",
     // Promoted by import/type quoting (#71) once spaced names reparse cleanly.
     "04-Functional Allocation/4a-Functional Allocation.sysml",
