@@ -162,7 +162,7 @@ fn a_metadata_annotation_sigil_span_covering_other_text_is_rejected() {
     let document = parse_for_editor(source).document;
     let mut tampered = serde_json::to_value(&document).expect("the parsed document serializes");
     let sigil = "/root/elements/0/value/Package/value/body/Brace/elements/0/value/PartDef\
-                 /value/body/Brace/elements/0/value/Annotating/MetadataAnnotation/value/at_span";
+                 /value/body/Brace/elements/0/value/Annotating/MetadataAnnotation/value/introducer/At/span";
     *tampered
         .pointer_mut(&format!("{sigil}/offset"))
         .expect("the annotation's sigil offset") = serde_json::json!(0);
@@ -170,7 +170,7 @@ fn a_metadata_annotation_sigil_span_covering_other_text_is_rejected() {
     let error = serde_json::from_value::<sysml_v2_parser::ast::ParsedDocument>(tampered)
         .expect_err("a sigil span that does not cover `@` must be rejected");
     assert!(
-        error.to_string().contains("metadata annotation sigil"),
+        error.to_string().contains("metadata feature introducer"),
         "expected the sigil check to name itself, got: {error}"
     );
 }

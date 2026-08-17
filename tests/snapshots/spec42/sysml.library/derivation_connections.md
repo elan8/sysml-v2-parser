@@ -86,15 +86,15 @@ standard library package DerivationConnections {
 	 */
     private import SequenceFunctions::excludes;
     private import ControlFunctions::allTrue;
-    requirement originalRequirements {
+    requirement originalRequirements[*] {
         doc
         /* originalRequirements are the original requirements in Derivation connections. */
     }
-    requirement derivedRequirements {
+    requirement derivedRequirements[*] {
         doc
         /* derivedRequirements are the derived requirments in Derivation connections. */
     }
-    connection def Derivation {
+    abstract connection def Derivation {
         doc
         /*
 		 * A Derivation connection asserts that one or more derivedRequirements are derived from
@@ -110,7 +110,7 @@ standard library package DerivationConnections {
             doc
             /* The single original requirement. */
         }
-        ref requirement[1..*] :>> derivedRequirements :> participant {
+        ref requirement [1..*] :>> derivedRequirements :> participant {
             doc
             /* The one or more requirements that are derived from the original requirement. */
         }
@@ -128,7 +128,7 @@ standard library package DerivationConnections {
             originalRequirement.result implies allTrue(derivedRequirements.result);
         }
     }
-    connection def derivations : Derivation {
+    abstract connection def derivations : Derivation {
         doc
         /* derivations is the base feature for Derivation connection usages. */
     }
@@ -146,6 +146,6 @@ standard library package DerivationConnections {
     (reference r5 (scope relative) (span (offset 1596) (line 39) (column 52) (len 11)) (segments (segment 0 (token "participant") (name "participant") (separator none) (span (offset 1596) (line 39) (column 52) (len 11)))))
     (reference r6 (scope relative) (span (offset 2207) (line 60) (column 36) (len 10)) (segments (segment 0 (token "Derivation") (name "Derivation") (separator none) (span (offset 2207) (line 60) (column 36) (len 10)))))
   )
-  (root (library-package (name "DerivationConnections") (standard true) (body brace (doc) (import (target (span (span (offset 173) (line 7) (column 17) (len 27))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 218) (line 8) (column 17) (len 25))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (requirement-usage) (requirement-usage) (connection-def (name "Derivation") (role ordinary) (specializes none) (body brace (doc) (ref (name "originalRequirement") (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind requirement) (typing none) (redefines (relationship (kind redefines) (implied false) (targets (ref r2)))) (subsets (relationship (kind subsets) (implied false) (targets (ref r3)))) (body brace (doc))) (ref (name "") (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind requirement) (typing none) (redefines (relationship (kind redefines) (implied false) (targets (ref r4)))) (subsets (relationship (kind subsets) (implied false) (targets (ref r5)))) (body brace (doc))) (assert-constraint) (assert-constraint))) (connection-def (name "derivations") (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (body brace (doc))))))
+  (root (library-package (name "DerivationConnections") (standard true) (body brace (doc) (import (target (span (span (offset 173) (line 7) (column 17) (len 27))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 218) (line 8) (column 17) (len 25))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (requirement-usage (name "originalRequirements") (multiplicity (lower unbounded) (upper unbounded))) (requirement-usage (name "derivedRequirements") (multiplicity (lower unbounded) (upper unbounded))) (connection-def (name "Derivation") (modifiers abstract) (role ordinary) (specializes none) (body brace (doc) (ref (name "originalRequirement") (short-name none) (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind requirement) (typing none) (redefines (relationship (kind redefines) (implied false) (targets (ref r2)))) (subsets (relationship (kind subsets) (implied false) (targets (ref r3)))) (body brace (doc))) (ref (name "") (short-name none) (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind requirement) (typing none) (redefines (relationship (kind redefines) (implied false) (targets (ref r4)))) (subsets (relationship (kind subsets) (implied false) (targets (ref r5)))) (body brace (doc))) (assert-constraint) (assert-constraint))) (connection-def (name "derivations") (modifiers abstract) (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (body brace (doc))))))
 )
 ~~~

@@ -238,7 +238,7 @@ impl Visitor for ProvenanceValidator<'_> {
         walk_metadata_keyword_usage(self, node);
     }
 
-    /// The `@` sigil and the two halves of `MetadataFeatureDeclaration`.
+    /// The authored introducer and the two halves of `MetadataFeatureDeclaration`.
     ///
     /// `( ':' | 'typed' 'by' )` is an authored choice emission reproduces, so its span has to
     /// spell the keyword the variant claims; and the `OwnedFeatureTyping` span has to sit inside
@@ -247,12 +247,16 @@ impl Visitor for ProvenanceValidator<'_> {
         if self.error.is_some() {
             return;
         }
-        self.check(self.delimiter(&node.value.at_span, "@", "metadata annotation sigil"));
+        let (introducer_span, token) = match &node.value.introducer {
+            crate::ast::MetadataFeatureIntroducer::At { span } => (span, "@"),
+            crate::ast::MetadataFeatureIntroducer::Metadata { span } => (span, "metadata"),
+        };
+        self.check(self.delimiter(introducer_span, token, "metadata feature introducer"));
         if self.error.is_none() {
             self.check(sigil_within(
-                &node.value.at_span,
+                introducer_span,
                 &node.span,
-                "metadata annotation sigil",
+                "metadata feature introducer",
             ));
         }
         if self.error.is_none() {

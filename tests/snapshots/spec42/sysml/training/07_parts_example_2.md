@@ -72,6 +72,6 @@ package 'Parts Example-2' {
   (references
     (reference r0 (scope relative) (span (offset 138) (line 11) (column 17) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 138) (line 11) (column 17) (len 7)))))
   )
-  (root (package (name "Parts Example-2") (body brace (part-def (name "Vehicle") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Cylinder") (body semicolon)) (part-usage (declaration-name "vehicle") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body brace (part-usage))) (part-usage (declaration-name "smallVehicle") (typing none) (body brace (part-usage))) (part-usage (declaration-name "bigVehicle") (typing none) (body brace (part-usage))))))
+  (root (package (name "Parts Example-2") (body brace (part-def (name "Vehicle") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Cylinder") (body semicolon)) (part-usage (declaration-name "vehicle") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (part-usage))) (part-usage (declaration-name "smallVehicle") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (part-usage))) (part-usage (declaration-name "bigVehicle") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (part-usage))))))
 )
 ~~~

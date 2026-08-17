@@ -187,6 +187,16 @@ fn exhibit_state_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState
 fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    // `metadata` is ambiguous with KerML MetadataFeature. This SysML scope owns MetadataUsage,
+    // so its more specific production gets first refusal before AnnotatingElement.
+    if crate::parser::lex::starts_with_keyword(start.fragment(), b"metadata") {
+        if let Ok((next, usage)) = metadata_usage(start) {
+            return Ok((
+                next,
+                node_from_to(start, next, PartDefBodyElement::MetadataUsage(usage)),
+            ));
+        }
+    }
     let (input, elem) = alt((
         alt((
             map(

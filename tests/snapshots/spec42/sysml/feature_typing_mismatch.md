@@ -29,6 +29,6 @@ part p : Foo;
   (references
     (reference r0 (scope relative) (span (offset 30) (line 2) (column 10) (len 3)) (segments (segment 0 (token "Foo") (name "Foo") (separator none) (span (offset 30) (line 2) (column 10) (len 3)))))
   )
-  (root (attribute-def) (part-usage (declaration-name "p") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body semicolon)))
+  (root (attribute-def (name "Foo") (multiplicity none)) (part-usage (declaration-name "p") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity-modifiers (ordered false) (nonunique false)) (body semicolon)))
 )
 ~~~

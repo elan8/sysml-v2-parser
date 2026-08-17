@@ -496,7 +496,7 @@ standard library package ISQAcoustics {
         attribute :>> num : Real;
         attribute :>> mRef : LogarithmicFrequencyRangeUnit[1];
     }
-    attribute def logarithmicFrequencyRange : LogarithmicFrequencyRangeValue nonunique;
+    attribute def logarithmicFrequencyRange : LogarithmicFrequencyRangeValue[*] nonunique;
     attribute def LogarithmicFrequencyRangeUnit :> DimensionOneUnit {
     }
     attribute def staticPressure : PressureValue {
@@ -609,7 +609,7 @@ standard library package ISQAcoustics {
         attribute :>> num : Real;
         attribute :>> mRef : SoundEnergyDensityUnit[1];
     }
-    attribute def soundEnergyDensity : SoundEnergyDensityValue nonunique;
+    attribute def soundEnergyDensity : SoundEnergyDensityValue[*] nonunique;
     attribute def SoundEnergyDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -671,7 +671,7 @@ standard library package ISQAcoustics {
         attribute :>> num : Real;
         attribute :>> mRef : SoundIntensityUnit[1];
     }
-    attribute def soundIntensity : SoundIntensityValue nonunique;
+    attribute def soundIntensity : SoundIntensityValue[*] nonunique;
     attribute def SoundIntensityUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -723,7 +723,7 @@ standard library package ISQAcoustics {
         attribute :>> num : Real;
         attribute :>> mRef : SoundExposureUnit[1];
     }
-    attribute def soundExposure : SoundExposureValue nonunique;
+    attribute def soundExposure : SoundExposureValue[*] nonunique;
     attribute def SoundExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -757,7 +757,7 @@ standard library package ISQAcoustics {
         attribute :>> num : Real;
         attribute :>> mRef : CharacteristicImpedanceOfAMediumForLongitudinalWavesUnit[1];
     }
-    attribute def characteristicImpedanceOfAMediumForLongitudinalWaves : CharacteristicImpedanceOfAMediumForLongitudinalWavesValue nonunique;
+    attribute def characteristicImpedanceOfAMediumForLongitudinalWaves : CharacteristicImpedanceOfAMediumForLongitudinalWavesValue[*] nonunique;
     attribute def CharacteristicImpedanceOfAMediumForLongitudinalWavesUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -791,7 +791,7 @@ standard library package ISQAcoustics {
         attribute :>> num : Real;
         attribute :>> mRef : AcousticImpedanceUnit[1];
     }
-    attribute def acousticImpedance : AcousticImpedanceValue nonunique;
+    attribute def acousticImpedance : AcousticImpedanceValue[*] nonunique;
     attribute def AcousticImpedanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -825,7 +825,7 @@ standard library package ISQAcoustics {
         attribute :>> num : Real;
         attribute :>> mRef : SoundPressureLevelUnit[1];
     }
-    attribute def soundPressureLevel : SoundPressureLevelValue nonunique;
+    attribute def soundPressureLevel : SoundPressureLevelValue[*] nonunique;
     attribute def SoundPressureLevelUnit :> DimensionOneUnit {
     }
     attribute def SoundPowerLevelValue :> ScalarQuantityValue {
@@ -844,7 +844,7 @@ standard library package ISQAcoustics {
         attribute :>> num : Real;
         attribute :>> mRef : SoundPowerLevelUnit[1];
     }
-    attribute def soundPowerLevel : SoundPowerLevelValue nonunique;
+    attribute def soundPowerLevel : SoundPowerLevelValue[*] nonunique;
     attribute def SoundPowerLevelUnit :> DimensionOneUnit {
     }
     attribute def SoundExposureLevelValue :> ScalarQuantityValue {
@@ -863,7 +863,7 @@ standard library package ISQAcoustics {
         attribute :>> num : Real;
         attribute :>> mRef : SoundExposureLevelUnit[1];
     }
-    attribute def soundExposureLevel : SoundExposureLevelValue nonunique;
+    attribute def soundExposureLevel : SoundExposureLevelValue[*] nonunique;
     attribute def SoundExposureLevelUnit :> DimensionOneUnit {
     }
     attribute def reverberationTime : DurationValue {
@@ -900,6 +900,6 @@ standard library package ISQAcoustics {
     (reference r11 (scope relative) (span (offset 1395) (line 28) (column 20) (len 30)) (segments (segment 0 (token "ISQThermodynamics") (name "ISQThermodynamics") (separator none) (span (offset 1395) (line 28) (column 20) (len 17))) (segment 1 (token "EnergyValue") (name "EnergyValue") (separator colon-colon) (span (offset 1414) (line 28) (column 39) (len 11)))))
     (reference r12 (scope relative) (span (offset 8057) (line 161) (column 30) (len 14)) (segments (segment 0 (token "volumeVelocity") (name "volumeVelocity") (separator none) (span (offset 8057) (line 161) (column 30) (len 14)))))
   )
-  (root (library-package (name "ISQAcoustics") (standard true) (body brace (doc) (import (target (span (span (offset 779) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 818) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 828) (line 16) (column 30) (len 3))) (separator (span (offset 828) (line 16) (column 30) (len 2))) (marker (span (offset 830) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 852) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 873) (line 17) (column 41) (len 3))) (separator (span (offset 873) (line 17) (column 41) (len 2))) (marker (span (offset 875) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 897) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 904) (line 18) (column 27) (len 3))) (separator (span (offset 904) (line 18) (column 27) (len 2))) (marker (span (offset 906) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 995) (line 21) (column 20) (len 24))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1040) (line 22) (column 20) (len 27))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1088) (line 23) (column 20) (len 47))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1156) (line 24) (column 20) (len 24))) (all none) (ref r7) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1201) (line 25) (column 20) (len 48))) (all none) (ref r8) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1270) (line 26) (column 20) (len 31))) (all none) (ref r9) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1322) (line 27) (column 20) (len 52))) (all none) (ref r10) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1395) (line 28) (column 20) (len 30))) (all none) (ref r11) (shape (membership (recursive-suffix none))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "volumeFlowRate") (target (ref r12)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQAcoustics") (standard true) (body brace (doc) (import (target (span (span (offset 779) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 818) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 828) (line 16) (column 30) (len 3))) (separator (span (offset 828) (line 16) (column 30) (len 2))) (marker (span (offset 830) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 852) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 873) (line 17) (column 41) (len 3))) (separator (span (offset 873) (line 17) (column 41) (len 2))) (marker (span (offset 875) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 897) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 904) (line 18) (column 27) (len 3))) (separator (span (offset 904) (line 18) (column 27) (len 2))) (marker (span (offset 906) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 995) (line 21) (column 20) (len 24))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1040) (line 22) (column 20) (len 27))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1088) (line 23) (column 20) (len 47))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1156) (line 24) (column 20) (len 24))) (all none) (ref r7) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1201) (line 25) (column 20) (len 48))) (all none) (ref r8) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1270) (line 26) (column 20) (len 31))) (all none) (ref r9) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1322) (line 27) (column 20) (len 52))) (all none) (ref r10) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1395) (line 28) (column 20) (len 30))) (all none) (ref r11) (shape (membership (recursive-suffix none))))) (attribute-def (name "LogarithmicFrequencyRangeValue") (multiplicity none)) (attribute-def (name "logarithmicFrequencyRange") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LogarithmicFrequencyRangeUnit") (multiplicity none)) (attribute-def (name "staticPressure") (multiplicity none)) (attribute-def (name "soundPressure") (multiplicity none)) (attribute-def (name "CartesianSoundParticleDisplacement3dVector") (multiplicity none)) (attribute-def (name "cartesianSoundParticleDisplacement3dVector") (multiplicity none)) (attribute-def (name "CartesianSoundParticleVelocity3dVector") (multiplicity none)) (attribute-def (name "cartesianSoundParticleVelocity3dVector") (multiplicity none)) (attribute-def (name "CartesianSoundParticleAcceleration3dVector") (multiplicity none)) (attribute-def (name "cartesianSoundParticleAcceleration3dVector") (multiplicity none)) (attribute-def (name "volumeVelocity") (multiplicity none)) (alias (name "volumeFlowRate") (target (ref r12)) (body semicolon)) (attribute-def (name "SoundEnergyDensityValue") (multiplicity none)) (attribute-def (name "soundEnergyDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SoundEnergyDensityUnit") (multiplicity none)) (attribute-def (name "soundEnergy") (multiplicity none)) (attribute-def (name "soundPower") (multiplicity none)) (attribute-def (name "SoundIntensityValue") (multiplicity none)) (attribute-def (name "soundIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SoundIntensityUnit") (multiplicity none)) (attribute-def (name "CartesianSoundIntensity3dVector") (multiplicity none)) (attribute-def (name "cartesianSoundIntensity3dVector") (multiplicity none)) (attribute-def (name "CartesianSoundIntensity3dCoordinateFrame") (multiplicity none)) (attribute-def (name "SoundExposureValue") (multiplicity none)) (attribute-def (name "soundExposure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SoundExposureUnit") (multiplicity none)) (attribute-def (name "CharacteristicImpedanceOfAMediumForLongitudinalWavesValue") (multiplicity none)) (attribute-def (name "characteristicImpedanceOfAMediumForLongitudinalWaves") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CharacteristicImpedanceOfAMediumForLongitudinalWavesUnit") (multiplicity none)) (attribute-def (name "AcousticImpedanceValue") (multiplicity none)) (attribute-def (name "acousticImpedance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AcousticImpedanceUnit") (multiplicity none)) (attribute-def (name "SoundPressureLevelValue") (multiplicity none)) (attribute-def (name "soundPressureLevel") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SoundPressureLevelUnit") (multiplicity none)) (attribute-def (name "SoundPowerLevelValue") (multiplicity none)) (attribute-def (name "soundPowerLevel") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SoundPowerLevelUnit") (multiplicity none)) (attribute-def (name "SoundExposureLevelValue") (multiplicity none)) (attribute-def (name "soundExposureLevel") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SoundExposureLevelUnit") (multiplicity none)) (attribute-def (name "reverberationTime") (multiplicity none)))))
 )
 ~~~

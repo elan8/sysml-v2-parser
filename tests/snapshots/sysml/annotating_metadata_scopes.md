@@ -78,6 +78,6 @@ package AnnotatingMetadataScopes {
     (reference r2 (scope relative) (span (offset 124) (line 5) (column 10) (len 8)) (segments (segment 0 (token "Approved") (name "Approved") (separator none) (span (offset 124) (line 5) (column 10) (len 8)))))
     (reference r3 (scope relative) (span (offset 323) (line 10) (column 10) (len 8)) (segments (segment 0 (token "Approved") (name "Approved") (separator none) (span (offset 323) (line 10) (column 10) (len 8)))))
   )
-  (root (package (name "AnnotatingMetadataScopes") (body brace (metadata-def) (metadata-keyword-usage (type (ref r0)) (body none)) (part-def (name "Prefixed") (body brace (metadata-keyword-usage (type (ref r1)) (body semicolon)) (metadata-keyword-usage (type (ref r2)) (body brace (element-count 3))) (metadata-annotation (declared-name none) (type (ref r3)) (about) (body brace (element-count 3))) (metadata-usage))))))
+  (root (package (name "AnnotatingMetadataScopes") (body brace (metadata-def) (metadata-keyword-usage (type (ref r0)) (body none)) (part-def (name "Prefixed") (body brace (metadata-keyword-usage (type (ref r1)) (body semicolon)) (metadata-keyword-usage (type (ref r2)) (body brace (element-count 3))) (metadata-annotation (prefixes) (introducer at) (declared-name none) (type (ref r3)) (about) (body brace (element-count 3))) (metadata-usage))))))
 )
 ~~~

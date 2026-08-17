@@ -51,8 +51,8 @@ package 'Metadata Example-1' {
 package 'Metadata Example-1' {
     metadata def SafetyFeature;
     metadata def SecurityFeature {
-        attribute annotatedElement : SysML::PartDefinition :> annotatedElement;
-        attribute annotatedElement : SysML::PartUsage :> annotatedElement;
+        attribute :> annotatedElement : SysML::PartDefinition;
+        attribute :> annotatedElement : SysML::PartUsage;
     }
     metadata SafetyFeature about vehicle::interior::seatBelt, vehicle::interior::driverAirBag, vehicle::bodyAssy::bumper;
     metadata SecurityFeature about vehicle::interior::alarm, vehicle::bodyAssy::keylessEntry;
@@ -76,6 +76,6 @@ package 'Metadata Example-1' {
 (parsed-document
   (references
   )
-  (root (package (name "Metadata Example-1") (body brace (metadata-def) (metadata-def) (metadata-usage) (metadata-usage) (part-usage (declaration-name "vehicle") (typing none) (body brace (part-usage) (part-usage))))))
+  (root (package (name "Metadata Example-1") (body brace (metadata-def) (metadata-def) (metadata-usage) (metadata-usage) (part-usage (declaration-name "vehicle") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (part-usage) (part-usage))))))
 )
 ~~~

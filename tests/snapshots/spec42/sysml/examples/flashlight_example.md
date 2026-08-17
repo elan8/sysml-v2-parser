@@ -131,6 +131,6 @@ package 'Flashlight Example' {
 (parsed-document
   (references
   )
-  (root (package (name "Flashlight Example") (body brace (attribute-def) (attribute-def) (port-def (name "OnOffCmdPort") (specializes none) (body brace (in-out-declaration))) (port-def (name "LightPort") (specializes none) (body brace (in-out-declaration))) (part-usage (declaration-name "context") (typing none) (body brace (part-usage) (malformed (code "recovered_part_usage_body_element") (found "interface userToFlashlight connect user.onOffCmdPort to flas") (span (offset 351) (line 22) (column 3) (len 134))) (part-usage) (part-usage))) (action-usage))))
+  (root (package (name "Flashlight Example") (body brace (attribute-def (name "OnOffCmd") (multiplicity none)) (attribute-def (name "Light") (multiplicity none)) (port-def (name "OnOffCmdPort") (specializes none) (body brace (in-out-declaration))) (port-def (name "LightPort") (specializes none) (body brace (in-out-declaration))) (part-usage (declaration-name "context") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (part-usage) (malformed (code "recovered_part_usage_body_element") (found "interface userToFlashlight connect user.onOffCmdPort to flas") (span (offset 351) (line 22) (column 3) (len 134))) (part-usage) (part-usage))) (action-usage (name "illuminateRegion") (short-name none)))))
 )
 ~~~

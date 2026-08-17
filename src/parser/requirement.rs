@@ -15,9 +15,7 @@ use crate::parser::lex::{
     starts_with_keyword, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
-use crate::parser::usage::{
-    feature_usage_header, multiplicity, multiplicity_node, specialization_clauses,
-};
+use crate::parser::usage::{feature_usage_header, multiplicity_node, specialization_clauses};
 use crate::parser::with_span;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
@@ -213,9 +211,18 @@ fn requirement_def_body_element(
             map(purpose_member, RequirementDefBodyElement::Purpose),
             // Nested in a sub-alt to stay under nom's 21-branch limit.
             alt((
+                map(requirement_def, |definition| {
+                    RequirementDefBodyElement::RequirementDef(Box::new(definition))
+                }),
                 map(concern_usage, RequirementDefBodyElement::ConcernUsage),
                 map(crate::parser::constraint::calc_usage, |n| {
                     RequirementDefBodyElement::CalcUsage(Box::new(n))
+                }),
+                map(crate::parser::port::port_usage, |n| {
+                    RequirementDefBodyElement::PortUsage(Box::new(n))
+                }),
+                map(crate::parser::allocation::allocate_usage, |n| {
+                    RequirementDefBodyElement::AllocationUsage(Box::new(n))
                 }),
                 // `RequirementBodyItem → DefinitionBodyItem → … → SatisfyRequirementUsage`, so a
                 // satisfy usage is a member of every requirement body -- including the
@@ -274,7 +281,7 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
             preceded(ws_and_comments, name).parse(input)?
         }
     };
-    let (input, _multiplicity) = opt(multiplicity).parse(input)?;
+    let (input, multiplicity) = opt(crate::parser::usage::multiplicity_node).parse(input)?;
     let (input, header) = feature_usage_header(input)?;
     let (input, value) = opt(preceded(
         ws_and_comments,
@@ -295,6 +302,7 @@ pub(crate) fn parse_requirement_usage_payload_with_abstract<'a>(
             name,
             short_name,
             type_name: header.type_reference,
+            multiplicity: multiplicity.or(header.multiplicity),
             subsets: post_body_specialization
                 .subsets
                 .map(|(target, _)| target)
@@ -478,11 +486,28 @@ fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"frame"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, n) = name(input)?;
+    let (input, concern_keyword) = opt(preceded(tag(&b"concern"[..]), ws1)).parse(input)?;
+    let (input, ident) = identification(input)?;
+    let (input, header) = crate::parser::usage::feature_usage_header(input)?;
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
-        node_from_to(start, input, FrameMember { name: n, body }),
+        node_from_to(
+            start,
+            input,
+            FrameMember {
+                has_concern_keyword: concern_keyword.is_some(),
+                name: ident.name.unwrap_or_default(),
+                short_name: ident.short_name,
+                type_name: header.type_reference,
+                multiplicity: header.multiplicity,
+                subsets: header.subsets,
+                redefines: header.redefines,
+                value,
+                body,
+            },
+        ),
     ))
 }
 
@@ -577,6 +602,7 @@ pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<Requiremen
             RequirementActorDecl {
                 name: decl.value.name,
                 type_name,
+                multiplicity: decl.value.multiplicity,
             },
         ),
     ))
@@ -601,6 +627,11 @@ fn requirement_parameter_decl<'a>(
     };
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, type_name) = preceded(ws_and_comments, qualified_reference).parse(input)?;
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
     let (input, _) = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
         map(constraint_def_body, |_| ()),
@@ -615,7 +646,7 @@ fn requirement_parameter_decl<'a>(
                 name: n,
                 type_name: Some(type_name),
                 redefines: None,
-                multiplicity: None,
+                multiplicity,
                 value: None,
             },
         ),
@@ -1149,7 +1180,13 @@ pub(crate) fn requirement_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Req
     let (input, variation_kw) =
         nom::combinator::opt(preceded(tag(&b"variation"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"requirement"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    let input = if peek.fragment().starts_with(b";") || peek.fragment().starts_with(b"{") {
+        peek
+    } else {
+        let (input, _) = ws1(input)?;
+        input
+    };
     let (input, mut val) =
         parse_requirement_usage_payload_with_abstract(input, None, abstract_kw.is_some())?;
     val.is_variation = variation_kw.is_some();

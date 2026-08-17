@@ -176,6 +176,7 @@ fn control_node_payload_stmt<'a>(
                 is_reference: false,
                 is_individual: false,
                 name: control_name.to_string(),
+                short_name: None,
                 type_name: None,
                 typing: None,
                 multiplicity: None,

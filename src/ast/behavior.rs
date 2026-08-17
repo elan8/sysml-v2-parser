@@ -9,6 +9,7 @@ use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
 };
 use crate::ast::feature_value::FeatureValue;
+use crate::ast::DefinitionPrefix;
 use crate::ast::QualifiedReferenceId;
 
 /// Action definition: `action def` Identification body (in/out params).
@@ -383,6 +384,7 @@ pub struct ActionUsage {
     /// action a : AP1;` (`Simple Tests/IndividualTest.sysml:30`).
     pub is_individual: bool,
     pub name: String,
+    pub short_name: Option<String>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Structured typing clause (multi-target capable), mirroring `PartUsage.typing`.
     pub typing: Option<Node<TypingRelationship>>,
@@ -427,6 +429,7 @@ impl PartialEq for ActionUsage {
             && self.is_reference == other.is_reference
             && self.is_individual == other.is_individual
             && self.name == other.name
+            && self.short_name == other.short_name
             && self.type_name == other.type_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
@@ -510,6 +513,8 @@ pub enum ActionUsageBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FlowDef {
+    pub definition_prefix: Option<DefinitionPrefix>,
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,
@@ -810,6 +815,8 @@ pub struct Allocate {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AllocationDef {
+    pub definition_prefix: Option<DefinitionPrefix>,
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: DefinitionBody,

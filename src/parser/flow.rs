@@ -28,6 +28,7 @@ pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
         input,
         DefinitionPrefixOptions::new(b"flow")
             .def_required()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
@@ -37,6 +38,10 @@ pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
             start,
             input,
             FlowDef {
+                definition_prefix: prefix
+                    .is_abstract
+                    .then_some(crate::ast::DefinitionPrefix::Abstract),
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,

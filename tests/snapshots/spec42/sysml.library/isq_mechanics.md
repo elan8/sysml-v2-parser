@@ -1614,7 +1614,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : MassDensityUnit[1];
     }
-    attribute def massDensity : MassDensityValue nonunique;
+    attribute def massDensity : MassDensityValue[*] nonunique;
     attribute def MassDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1647,7 +1647,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificVolumeUnit[1];
     }
-    attribute def specificVolume : SpecificVolumeValue nonunique;
+    attribute def specificVolume : SpecificVolumeValue[*] nonunique;
     attribute def SpecificVolumeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1693,7 +1693,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : SurfaceMassDensityUnit[1];
     }
-    attribute def surfaceMassDensity : SurfaceMassDensityValue nonunique;
+    attribute def surfaceMassDensity : SurfaceMassDensityValue[*] nonunique;
     attribute def SurfaceMassDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1726,7 +1726,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : LinearMassDensityUnit[1];
     }
-    attribute def linearMassDensity : LinearMassDensityValue nonunique;
+    attribute def linearMassDensity : LinearMassDensityValue[*] nonunique;
     attribute def LinearMassDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1759,7 +1759,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : MomentOfInertiaUnit[1];
     }
-    attribute def momentOfInertia : MomentOfInertiaValue nonunique;
+    attribute def momentOfInertia : MomentOfInertiaValue[*] nonunique;
     attribute def MomentOfInertiaUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1812,7 +1812,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : MomentumUnit[1];
     }
-    attribute def momentum : MomentumValue nonunique;
+    attribute def momentum : MomentumValue[*] nonunique;
     attribute def MomentumUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1868,7 +1868,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : ForceUnit[1];
     }
-    attribute def force : ForceValue nonunique;
+    attribute def force : ForceValue[*] nonunique;
     attribute def ForceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2013,7 +2013,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : ImpulseUnit[1];
     }
-    attribute def impulse : ImpulseValue nonunique;
+    attribute def impulse : ImpulseValue[*] nonunique;
     attribute def ImpulseUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2069,7 +2069,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : AngularMomentumUnit[1];
     }
-    attribute def angularMomentum : AngularMomentumValue nonunique;
+    attribute def angularMomentum : AngularMomentumValue[*] nonunique;
     attribute def AngularMomentumUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2125,7 +2125,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : MomentOfForceUnit[1];
     }
-    attribute def momentOfForce : MomentOfForceValue nonunique;
+    attribute def momentOfForce : MomentOfForceValue[*] nonunique;
     attribute def MomentOfForceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2181,7 +2181,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : TorqueUnit[1];
     }
-    attribute def torque : TorqueValue nonunique;
+    attribute def torque : TorqueValue[*] nonunique;
     attribute def TorqueUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2215,7 +2215,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : AngularImpulseUnit[1];
     }
-    attribute def angularImpulse : AngularImpulseValue nonunique;
+    attribute def angularImpulse : AngularImpulseValue[*] nonunique;
     attribute def AngularImpulseUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2271,7 +2271,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : PressureUnit[1];
     }
-    attribute def pressure : PressureValue nonunique;
+    attribute def pressure : PressureValue[*] nonunique;
     attribute def PressureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2319,7 +2319,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : StressUnit[1];
     }
-    attribute def stress : StressValue nonunique;
+    attribute def stress : StressValue[*] nonunique;
     attribute def StressUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2376,7 +2376,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : NormalStressUnit[1];
     }
-    attribute def normalStress : NormalStressValue nonunique;
+    attribute def normalStress : NormalStressValue[*] nonunique;
     attribute def NormalStressUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2410,7 +2410,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : ShearStressUnit[1];
     }
-    attribute def shearStress : ShearStressValue nonunique;
+    attribute def shearStress : ShearStressValue[*] nonunique;
     attribute def ShearStressUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2444,7 +2444,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : StrainUnit[1];
     }
-    attribute def strain : StrainValue nonunique;
+    attribute def strain : StrainValue[*] nonunique;
     attribute def StrainUnit :> DimensionOneUnit {
     }
     attribute def Cartesian3dStrainTensor :> TensorQuantityValue {
@@ -2546,7 +2546,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : ModulusOfElasticityUnit[1];
     }
-    attribute def modulusOfElasticity : ModulusOfElasticityValue nonunique;
+    attribute def modulusOfElasticity : ModulusOfElasticityValue[*] nonunique;
     attribute def ModulusOfElasticityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2583,7 +2583,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : ModulusOfRigidityUnit[1];
     }
-    attribute def modulusOfRigidity : ModulusOfRigidityValue nonunique;
+    attribute def modulusOfRigidity : ModulusOfRigidityValue[*] nonunique;
     attribute def ModulusOfRigidityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2620,7 +2620,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : ModulusOfCompressionUnit[1];
     }
-    attribute def modulusOfCompression : ModulusOfCompressionValue nonunique;
+    attribute def modulusOfCompression : ModulusOfCompressionValue[*] nonunique;
     attribute def ModulusOfCompressionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2657,7 +2657,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : CompressibilityUnit[1];
     }
-    attribute def compressibility : CompressibilityValue nonunique;
+    attribute def compressibility : CompressibilityValue[*] nonunique;
     attribute def CompressibilityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2691,7 +2691,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : SecondAxialMomentOfAreaUnit[1];
     }
-    attribute def secondAxialMomentOfArea : SecondAxialMomentOfAreaValue nonunique;
+    attribute def secondAxialMomentOfArea : SecondAxialMomentOfAreaValue[*] nonunique;
     attribute def SecondAxialMomentOfAreaUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2717,7 +2717,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : SecondPolarMomentOfAreaUnit[1];
     }
-    attribute def secondPolarMomentOfArea : SecondPolarMomentOfAreaValue nonunique;
+    attribute def secondPolarMomentOfArea : SecondPolarMomentOfAreaValue[*] nonunique;
     attribute def SecondPolarMomentOfAreaUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2743,7 +2743,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : SectionModulusUnit[1];
     }
-    attribute def sectionModulus : SectionModulusValue nonunique;
+    attribute def sectionModulus : SectionModulusValue[*] nonunique;
     attribute def SectionModulusUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2833,7 +2833,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : DynamicViscosityUnit[1];
     }
-    attribute def dynamicViscosity : DynamicViscosityValue nonunique;
+    attribute def dynamicViscosity : DynamicViscosityValue[*] nonunique;
     attribute def DynamicViscosityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2870,7 +2870,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : KinematicViscosityUnit[1];
     }
-    attribute def kinematicViscosity : KinematicViscosityValue nonunique;
+    attribute def kinematicViscosity : KinematicViscosityValue[*] nonunique;
     attribute def KinematicViscosityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2900,7 +2900,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : SurfaceTensionUnit[1];
     }
-    attribute def surfaceTension : SurfaceTensionValue nonunique;
+    attribute def surfaceTension : SurfaceTensionValue[*] nonunique;
     attribute def SurfaceTensionUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -2930,7 +2930,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : PowerUnit[1];
     }
-    attribute def power : PowerValue nonunique;
+    attribute def power : PowerValue[*] nonunique;
     attribute def PowerUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3050,7 +3050,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : MassFlowUnit[1];
     }
-    attribute def massFlow : MassFlowValue nonunique;
+    attribute def massFlow : MassFlowValue[*] nonunique;
     attribute def MassFlowUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3106,7 +3106,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : MassFlowRateUnit[1];
     }
-    attribute def massFlowRate : MassFlowRateValue nonunique;
+    attribute def massFlowRate : MassFlowRateValue[*] nonunique;
     attribute def MassFlowRateUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -3136,7 +3136,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : MassChangeRateUnit[1];
     }
-    attribute def massChangeRate : MassChangeRateValue nonunique;
+    attribute def massChangeRate : MassChangeRateValue[*] nonunique;
     attribute def MassChangeRateUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -3166,7 +3166,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : VolumeFlowRateUnit[1];
     }
-    attribute def volumeFlowRate : VolumeFlowRateValue nonunique;
+    attribute def volumeFlowRate : VolumeFlowRateValue[*] nonunique;
     attribute def VolumeFlowRateUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3196,7 +3196,7 @@ standard library package ISQMechanics {
         attribute :>> num : Real;
         attribute :>> mRef : ActionQuantityUnit[1];
     }
-    attribute def actionQuantity : ActionQuantityValue nonunique;
+    attribute def actionQuantity : ActionQuantityValue[*] nonunique;
     attribute def ActionQuantityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3257,6 +3257,6 @@ standard library package ISQMechanics {
     (reference r34 (scope relative) (span (offset 58233) (line 1227) (column 25) (len 16)) (segments (segment 0 (token "dynamicViscosity") (name "dynamicViscosity") (separator none) (span (offset 58233) (line 1227) (column 25) (len 16)))))
     (reference r35 (scope relative) (span (offset 65568) (line 1388) (column 20) (len 14)) (segments (segment 0 (token "mechanicalWork") (name "mechanicalWork") (separator none) (span (offset 65568) (line 1388) (column 20) (len 14)))))
   )
-  (root (library-package (name "ISQMechanics") (standard true) (body brace (doc) (import (target (span (span (offset 779) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 818) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 828) (line 16) (column 30) (len 3))) (separator (span (offset 828) (line 16) (column 30) (len 2))) (marker (span (offset 830) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 852) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 873) (line 17) (column 41) (len 3))) (separator (span (offset 873) (line 17) (column 41) (len 2))) (marker (span (offset 875) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 897) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 904) (line 18) (column 27) (len 3))) (separator (span (offset 904) (line 18) (column 27) (len 2))) (marker (span (offset 906) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 995) (line 21) (column 20) (len 30))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (attribute-def) (attribute-def) (attribute-def) (alias (name "DensityUnit") (target (ref r5)) (body semicolon)) (alias (name "DensityValue") (target (ref r6)) (body semicolon)) (alias (name "density") (target (ref r7)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "relativeDensity") (target (ref r8)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "SurfaceDensityUnit") (target (ref r9)) (body semicolon)) (alias (name "SurfaceDensityValue") (target (ref r10)) (body semicolon)) (alias (name "surfaceDensity") (target (ref r11)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "LinearDensityUnit") (target (ref r12)) (body semicolon)) (alias (name "LinearDensityValue") (target (ref r13)) (body semicolon)) (alias (name "linearDensity") (target (ref r14)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "cartesianStaticFriction3dVector") (target (ref r15)) (body semicolon)) (attribute-def) (attribute-def) (alias (name "cartesianDynamicFrictionForce3dVector") (target (ref r16)) (body semicolon)) (attribute-def) (attribute-def) (alias (name "cartesianRollingDrag3dVector") (target (ref r17)) (body semicolon)) (alias (name "cartesianRollingFrictionForce3dVector") (target (ref r18)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "YoungModulusUnit") (target (ref r19)) (body semicolon)) (alias (name "YoungModulusValue") (target (ref r20)) (body semicolon)) (alias (name "youngModulus") (target (ref r21)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "ShearModulusUnit") (target (ref r22)) (body semicolon)) (alias (name "ShearModulusValue") (target (ref r23)) (body semicolon)) (alias (name "shearModulus") (target (ref r24)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "BulkModulusUnit") (target (ref r25)) (body semicolon)) (alias (name "BulkModulusValue") (target (ref r26)) (body semicolon)) (alias (name "bulkModulus") (target (ref r27)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "staticFrictionFactor") (target (ref r28)) (body semicolon)) (alias (name "coefficientOfStaticFriction") (target (ref r29)) (body semicolon)) (attribute-def) (attribute-def) (alias (name "dynamicFrictionFactor") (target (ref r30)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "dragFactor") (target (ref r31)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "ViscosityUnit") (target (ref r32)) (body semicolon)) (alias (name "ViscosityValue") (target (ref r33)) (body semicolon)) (alias (name "viscosity") (target (ref r34)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "work") (target (ref r35)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQMechanics") (standard true) (body brace (doc) (import (target (span (span (offset 779) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 818) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 828) (line 16) (column 30) (len 3))) (separator (span (offset 828) (line 16) (column 30) (len 2))) (marker (span (offset 830) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 852) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 873) (line 17) (column 41) (len 3))) (separator (span (offset 873) (line 17) (column 41) (len 2))) (marker (span (offset 875) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 897) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 904) (line 18) (column 27) (len 3))) (separator (span (offset 904) (line 18) (column 27) (len 2))) (marker (span (offset 906) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 995) (line 21) (column 20) (len 30))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (attribute-def (name "MassDensityValue") (multiplicity none)) (attribute-def (name "massDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassDensityUnit") (multiplicity none)) (alias (name "DensityUnit") (target (ref r5)) (body semicolon)) (alias (name "DensityValue") (target (ref r6)) (body semicolon)) (alias (name "density") (target (ref r7)) (body semicolon)) (attribute-def (name "SpecificVolumeValue") (multiplicity none)) (attribute-def (name "specificVolume") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificVolumeUnit") (multiplicity none)) (attribute-def (name "RelativeMassDensityValue") (multiplicity none)) (attribute-def (name "relativeMassDensity") (multiplicity none)) (alias (name "relativeDensity") (target (ref r8)) (body semicolon)) (attribute-def (name "SurfaceMassDensityValue") (multiplicity none)) (attribute-def (name "surfaceMassDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SurfaceMassDensityUnit") (multiplicity none)) (alias (name "SurfaceDensityUnit") (target (ref r9)) (body semicolon)) (alias (name "SurfaceDensityValue") (target (ref r10)) (body semicolon)) (alias (name "surfaceDensity") (target (ref r11)) (body semicolon)) (attribute-def (name "LinearMassDensityValue") (multiplicity none)) (attribute-def (name "linearMassDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinearMassDensityUnit") (multiplicity none)) (alias (name "LinearDensityUnit") (target (ref r12)) (body semicolon)) (alias (name "LinearDensityValue") (target (ref r13)) (body semicolon)) (alias (name "linearDensity") (target (ref r14)) (body semicolon)) (attribute-def (name "MomentOfInertiaValue") (multiplicity none)) (attribute-def (name "momentOfInertia") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MomentOfInertiaUnit") (multiplicity none)) (attribute-def (name "Cartesian3dMomentOfInertiaTensor") (multiplicity none)) (attribute-def (name "momentOfInertiaTensor") (multiplicity none)) (attribute-def (name "Cartesian3dMomentOfInertiaMeasurementReference") (multiplicity none)) (attribute-def (name "MomentumValue") (multiplicity none)) (attribute-def (name "momentum") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MomentumUnit") (multiplicity none)) (attribute-def (name "CartesianMomentum3dVector") (multiplicity none)) (attribute-def (name "cartesianMomentum3dVector") (multiplicity none)) (attribute-def (name "CartesianMomentum3dCoordinateFrame") (multiplicity none)) (attribute-def (name "ForceValue") (multiplicity none)) (attribute-def (name "force") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ForceUnit") (multiplicity none)) (attribute-def (name "CartesianForce3dVector") (multiplicity none)) (attribute-def (name "cartesianForce3dVector") (multiplicity none)) (attribute-def (name "CartesianForce3dCoordinateFrame") (multiplicity none)) (attribute-def (name "CartesianWeight3dVector") (multiplicity none)) (attribute-def (name "cartesianWeight3dVector") (multiplicity none)) (attribute-def (name "CartesianStaticFrictionForce3dVector") (multiplicity none)) (attribute-def (name "cartesianStaticFrictionForce3dVector") (multiplicity none)) (alias (name "cartesianStaticFriction3dVector") (target (ref r15)) (body semicolon)) (attribute-def (name "CartesianKineticFrictionForce3dVector") (multiplicity none)) (attribute-def (name "cartesianKineticFrictionForce3dVector") (multiplicity none)) (alias (name "cartesianDynamicFrictionForce3dVector") (target (ref r16)) (body semicolon)) (attribute-def (name "CartesianRollingResistance3dVector") (multiplicity none)) (attribute-def (name "cartesianRollingResistance3dVector") (multiplicity none)) (alias (name "cartesianRollingDrag3dVector") (target (ref r17)) (body semicolon)) (alias (name "cartesianRollingFrictionForce3dVector") (target (ref r18)) (body semicolon)) (attribute-def (name "CartesianDragForce3dVector") (multiplicity none)) (attribute-def (name "cartesianDragForce3dVector") (multiplicity none)) (attribute-def (name "ImpulseValue") (multiplicity none)) (attribute-def (name "impulse") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ImpulseUnit") (multiplicity none)) (attribute-def (name "CartesianImpulse3dVector") (multiplicity none)) (attribute-def (name "cartesianImpulse3dVector") (multiplicity none)) (attribute-def (name "CartesianImpulse3dCoordinateFrame") (multiplicity none)) (attribute-def (name "AngularMomentumValue") (multiplicity none)) (attribute-def (name "angularMomentum") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AngularMomentumUnit") (multiplicity none)) (attribute-def (name "CartesianAngularMomentum3dVector") (multiplicity none)) (attribute-def (name "cartesianAngularMomentum3dVector") (multiplicity none)) (attribute-def (name "CartesianAngularMomentum3dCoordinateFrame") (multiplicity none)) (attribute-def (name "MomentOfForceValue") (multiplicity none)) (attribute-def (name "momentOfForce") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MomentOfForceUnit") (multiplicity none)) (attribute-def (name "CartesianMomentOfForce3dVector") (multiplicity none)) (attribute-def (name "cartesianMomentOfForce3dVector") (multiplicity none)) (attribute-def (name "CartesianMomentOfForce3dCoordinateFrame") (multiplicity none)) (attribute-def (name "TorqueValue") (multiplicity none)) (attribute-def (name "torque") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TorqueUnit") (multiplicity none)) (attribute-def (name "AngularImpulseValue") (multiplicity none)) (attribute-def (name "angularImpulse") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AngularImpulseUnit") (multiplicity none)) (attribute-def (name "CartesianAngularImpulse3dVector") (multiplicity none)) (attribute-def (name "cartesianAngularImpulse3dVector") (multiplicity none)) (attribute-def (name "CartesianAngularImpulse3dCoordinateFrame") (multiplicity none)) (attribute-def (name "PressureValue") (multiplicity none)) (attribute-def (name "pressure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PressureUnit") (multiplicity none)) (attribute-def (name "gaugePressure") (multiplicity none)) (attribute-def (name "StressValue") (multiplicity none)) (attribute-def (name "stress") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "StressUnit") (multiplicity none)) (attribute-def (name "Cartesian3dStressTensor") (multiplicity none)) (attribute-def (name "stressTensor") (multiplicity none)) (attribute-def (name "Cartesian3dStressMeasurementReference") (multiplicity none)) (attribute-def (name "NormalStressValue") (multiplicity none)) (attribute-def (name "normalStress") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "NormalStressUnit") (multiplicity none)) (attribute-def (name "ShearStressValue") (multiplicity none)) (attribute-def (name "shearStress") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ShearStressUnit") (multiplicity none)) (attribute-def (name "StrainValue") (multiplicity none)) (attribute-def (name "strain") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "StrainUnit") (multiplicity none)) (attribute-def (name "Cartesian3dStrainTensor") (multiplicity none)) (attribute-def (name "strainTensor") (multiplicity none)) (attribute-def (name "Cartesian3dStrainMeasurementReference") (multiplicity none)) (attribute-def (name "RelativeLinearStrainValue") (multiplicity none)) (attribute-def (name "relativeLinearStrain") (multiplicity none)) (attribute-def (name "ShearStrainValue") (multiplicity none)) (attribute-def (name "shearStrain") (multiplicity none)) (attribute-def (name "RelativeVolumeStrainValue") (multiplicity none)) (attribute-def (name "relativeVolumeStrain") (multiplicity none)) (attribute-def (name "PoissonNumberValue") (multiplicity none)) (attribute-def (name "poissonNumber") (multiplicity none)) (attribute-def (name "ModulusOfElasticityValue") (multiplicity none)) (attribute-def (name "modulusOfElasticity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ModulusOfElasticityUnit") (multiplicity none)) (alias (name "YoungModulusUnit") (target (ref r19)) (body semicolon)) (alias (name "YoungModulusValue") (target (ref r20)) (body semicolon)) (alias (name "youngModulus") (target (ref r21)) (body semicolon)) (attribute-def (name "ModulusOfRigidityValue") (multiplicity none)) (attribute-def (name "modulusOfRigidity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ModulusOfRigidityUnit") (multiplicity none)) (alias (name "ShearModulusUnit") (target (ref r22)) (body semicolon)) (alias (name "ShearModulusValue") (target (ref r23)) (body semicolon)) (alias (name "shearModulus") (target (ref r24)) (body semicolon)) (attribute-def (name "ModulusOfCompressionValue") (multiplicity none)) (attribute-def (name "modulusOfCompression") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ModulusOfCompressionUnit") (multiplicity none)) (alias (name "BulkModulusUnit") (target (ref r25)) (body semicolon)) (alias (name "BulkModulusValue") (target (ref r26)) (body semicolon)) (alias (name "bulkModulus") (target (ref r27)) (body semicolon)) (attribute-def (name "CompressibilityValue") (multiplicity none)) (attribute-def (name "compressibility") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CompressibilityUnit") (multiplicity none)) (attribute-def (name "SecondAxialMomentOfAreaValue") (multiplicity none)) (attribute-def (name "secondAxialMomentOfArea") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SecondAxialMomentOfAreaUnit") (multiplicity none)) (attribute-def (name "SecondPolarMomentOfAreaValue") (multiplicity none)) (attribute-def (name "secondPolarMomentOfArea") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SecondPolarMomentOfAreaUnit") (multiplicity none)) (attribute-def (name "SectionModulusValue") (multiplicity none)) (attribute-def (name "sectionModulus") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SectionModulusUnit") (multiplicity none)) (attribute-def (name "StaticFrictionCoefficientValue") (multiplicity none)) (attribute-def (name "staticFrictionCoefficient") (multiplicity none)) (alias (name "staticFrictionFactor") (target (ref r28)) (body semicolon)) (alias (name "coefficientOfStaticFriction") (target (ref r29)) (body semicolon)) (attribute-def (name "KineticFrictionFactorValue") (multiplicity none)) (attribute-def (name "kineticFrictionFactor") (multiplicity none)) (alias (name "dynamicFrictionFactor") (target (ref r30)) (body semicolon)) (attribute-def (name "RollingResistanceFactorValue") (multiplicity none)) (attribute-def (name "rollingResistanceFactor") (multiplicity none)) (attribute-def (name "DragCoefficientValue") (multiplicity none)) (attribute-def (name "dragCoefficient") (multiplicity none)) (alias (name "dragFactor") (target (ref r31)) (body semicolon)) (attribute-def (name "DynamicViscosityValue") (multiplicity none)) (attribute-def (name "dynamicViscosity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DynamicViscosityUnit") (multiplicity none)) (alias (name "ViscosityUnit") (target (ref r32)) (body semicolon)) (alias (name "ViscosityValue") (target (ref r33)) (body semicolon)) (alias (name "viscosity") (target (ref r34)) (body semicolon)) (attribute-def (name "KinematicViscosityValue") (multiplicity none)) (attribute-def (name "kinematicViscosity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "KinematicViscosityUnit") (multiplicity none)) (attribute-def (name "SurfaceTensionValue") (multiplicity none)) (attribute-def (name "surfaceTension") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SurfaceTensionUnit") (multiplicity none)) (attribute-def (name "PowerValue") (multiplicity none)) (attribute-def (name "power") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PowerUnit") (multiplicity none)) (attribute-def (name "mechanicalPower") (multiplicity none)) (attribute-def (name "potentialEnergy") (multiplicity none)) (attribute-def (name "kineticEnergy") (multiplicity none)) (attribute-def (name "mechanicalEnergy") (multiplicity none)) (attribute-def (name "mechanicalWork") (multiplicity none)) (alias (name "work") (target (ref r35)) (body semicolon)) (attribute-def (name "MechanicalEfficiencyValue") (multiplicity none)) (attribute-def (name "mechanicalEfficiency") (multiplicity none)) (attribute-def (name "MassFlowValue") (multiplicity none)) (attribute-def (name "massFlow") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassFlowUnit") (multiplicity none)) (attribute-def (name "CartesianMassFlow3dVector") (multiplicity none)) (attribute-def (name "cartesianMassFlow3dVector") (multiplicity none)) (attribute-def (name "CartesianMassFlow3dCoordinateFrame") (multiplicity none)) (attribute-def (name "MassFlowRateValue") (multiplicity none)) (attribute-def (name "massFlowRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassFlowRateUnit") (multiplicity none)) (attribute-def (name "MassChangeRateValue") (multiplicity none)) (attribute-def (name "massChangeRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassChangeRateUnit") (multiplicity none)) (attribute-def (name "VolumeFlowRateValue") (multiplicity none)) (attribute-def (name "volumeFlowRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "VolumeFlowRateUnit") (multiplicity none)) (attribute-def (name "ActionQuantityValue") (multiplicity none)) (attribute-def (name "actionQuantity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ActionQuantityUnit") (multiplicity none)))))
 )
 ~~~

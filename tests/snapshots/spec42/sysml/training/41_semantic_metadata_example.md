@@ -45,19 +45,19 @@ library package 'Semantic Metadata Example' {
     private import 'Model Library Example'::*;
     private import Metaobjects::SemanticMetadata;
     metadata def situation :> SemanticMetadata {
-        attribute baseType :>> baseType = situations meta SysML::Usage;
+        attribute :>> baseType = situations meta SysML::Usage;
     }
     metadata def cause :> SemanticMetadata {
-        attribute baseType :>> baseType = causes meta SysML::Usage;
+        attribute :>> baseType = causes meta SysML::Usage;
     }
     metadata def failure :> SemanticMetadata {
-        attribute baseType :>> baseType = failures meta SysML::Usage;
+        attribute :>> baseType = failures meta SysML::Usage;
     }
     metadata def causation :> SemanticMetadata {
-        attribute baseType :>> baseType = causations meta SysML::Usage;
+        attribute :>> baseType = causations meta SysML::Usage;
     }
     metadata def scenario :> SemanticMetadata {
-        attribute baseType :>> baseType = scenarios meta SysML::Usage;
+        attribute :>> baseType = scenarios meta SysML::Usage;
     }
 }
 ~~~

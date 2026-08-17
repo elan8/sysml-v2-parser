@@ -212,6 +212,9 @@ fn parse_connection_def(
             start,
             input,
             ConnectionDef {
+                definition_prefix: prefix
+                    .is_abstract
+                    .then_some(crate::ast::DefinitionPrefix::Abstract),
                 is_individual: prefix.is_individual,
                 derivation_role: prefix.derivation_role,
                 identification: prefix.identification,

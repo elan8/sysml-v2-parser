@@ -47,6 +47,6 @@ package FlowDefinitionEmission {
 (parsed-document
   (references
   )
-  (root (package (name "FlowDefinitionEmission") (body brace (flow-def) (part-def (name "Host") (body brace (flow-def))) (part-usage (declaration-name "host") (typing none) (body brace (flow-def))))))
+  (root (package (name "FlowDefinitionEmission") (body brace (flow-def (name "Signal") (modifiers)) (part-def (name "Host") (body brace (flow-def))) (part-usage (declaration-name "host") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (flow-def))))))
 )
 ~~~

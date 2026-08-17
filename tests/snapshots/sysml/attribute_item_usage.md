@@ -29,6 +29,6 @@ package Messaging {
 (parsed-document
   (references
   )
-  (root (package (name "Messaging") (body brace (attribute-def) (item-def))))
+  (root (package (name "Messaging") (body brace (attribute-def (name "Show") (multiplicity none)) (item-def))))
 )
 ~~~

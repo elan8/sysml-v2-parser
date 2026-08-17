@@ -64,11 +64,11 @@ library package 'Model Library Example' {
         attribute severity : Level;
     }
     abstract occurrence failures : Failure[*] :> situations;
-    connection def Causation :> Occurrences::HappensBefore {
+    abstract connection def Causation :> Occurrences::HappensBefore {
         end cause : Situation[*];
         end effect : Situation[*];
     }
-    connection def causations : Causation;
+    abstract connection def causations : Causation;
     item def Scenario {
         occurrence  :>> situations;
         occurrence  :> situations :>> causes;
@@ -88,6 +88,6 @@ library package 'Model Library Example' {
     (reference r4 (scope relative) (span (offset 614) (line 23) (column 24) (len 9)) (segments (segment 0 (token "Situation") (name "Situation") (separator none) (span (offset 614) (line 23) (column 24) (len 9)))))
     (reference r5 (scope relative) (span (offset 664) (line 26) (column 35) (len 9)) (segments (segment 0 (token "Causation") (name "Causation") (separator none) (span (offset 664) (line 26) (column 35) (len 9)))))
   )
-  (root (library-package (name "Model Library Example") (standard false) (body brace (import (target (span (span (offset 58) (line 2) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 94) (line 3) (column 17) (len 19))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (occurrence-def) (occurrence (portion none) (declaration "situations") (target none)) (occurrence-def) (occurrence (portion none) (declaration "causes") (target none)) (occurrence-def) (occurrence (portion none) (declaration "failures") (target none)) (connection-def (name "Causation") (role ordinary) (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r2)))) (body brace (end (identity (declaration (name "cause") (span (offset 572) (line 22) (column 15) (len 5)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r3)))) (references none) (redefines none) (crosses none)) (end (identity (declaration (name "effect") (span (offset 605) (line 23) (column 15) (len 6)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r4)))) (references none) (redefines none) (crosses none)))) (connection-def (name "causations") (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r5)))) (body semicolon)) (item-def) (item-usage))))
+  (root (library-package (name "Model Library Example") (standard false) (body brace (import (target (span (span (offset 58) (line 2) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 94) (line 3) (column 17) (len 19))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (occurrence-def) (occurrence (portion none) (declaration "situations") (short-name none) (target none)) (occurrence-def) (occurrence (portion none) (declaration "causes") (short-name none) (target none)) (occurrence-def) (occurrence (portion none) (declaration "failures") (short-name none) (target none)) (connection-def (name "Causation") (modifiers abstract) (role ordinary) (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r2)))) (body brace (end (short-name none) (identity (declaration (name "cause") (span (offset 572) (line 22) (column 15) (len 5)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r3)))) (references none) (redefines none) (crosses none)) (end (short-name none) (identity (declaration (name "effect") (span (offset 605) (line 23) (column 15) (len 6)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r4)))) (references none) (redefines none) (crosses none)))) (connection-def (name "causations") (modifiers abstract) (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r5)))) (body semicolon)) (item-def) (item-usage))))
 )
 ~~~

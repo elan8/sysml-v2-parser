@@ -88,6 +88,6 @@ package 'State Actions' {
 (parsed-document
   (references
   )
-  (root (package (name "State Actions") (body brace (attribute-def) (attribute-def) (attribute-def) (part-def (name "Vehicle") (body semicolon)) (action-usage) (state-def (name "VehicleStates") (body brace (inout-declaration))) (state-usage))))
+  (root (package (name "State Actions") (body brace (attribute-def (name "VehicleStartSignal") (multiplicity none)) (attribute-def (name "VehicleOnSignal") (multiplicity none)) (attribute-def (name "VehicleOffSignal") (multiplicity none)) (part-def (name "Vehicle") (body semicolon)) (action-usage (name "performSelfTest") (short-name none)) (state-def (name "VehicleStates") (body brace (inout-declaration))) (state-usage))))
 )
 ~~~

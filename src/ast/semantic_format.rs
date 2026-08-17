@@ -709,6 +709,25 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_named_multiplicity(
+        &mut self,
+        kind: &str,
+        name: &str,
+        multiplicity: Option<&Node<super::Multiplicity>>,
+    ) -> io::Result<()> {
+        self.writer.write_char('(')?;
+        self.writer.write_str(kind)?;
+        self.writer.write_str(" (name ")?;
+        if name.is_empty() {
+            self.writer.write_str("none")?;
+        } else {
+            write_quoted(self.writer, name)?;
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(multiplicity)?;
+        self.writer.write_str("))")
+    }
+
     fn write_requirement_body(&mut self, body: &RequirementDefBody) -> io::Result<()> {
         match body {
             RequirementDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
@@ -774,10 +793,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             write_quoted(self.writer, &actor.value.name)?;
                             self.writer.write_str(") (type ")?;
                             self.write_reference(actor.value.type_name)?;
+                            self.writer.write_str(") (multiplicity ")?;
+                            self.write_multiplicity_clause(actor.value.multiplicity.as_ref())?;
                             self.writer.write_str("))")?;
                         }
-                        RequirementDefBodyElement::RequirementUsage(_usage) => {
-                            self.write_marker(&mut first, "requirement-usage")?;
+                        RequirementDefBodyElement::RequirementUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_named_multiplicity(
+                                "requirement-usage",
+                                &usage.value.name,
+                                usage.value.multiplicity.as_ref(),
+                            )?;
                         }
                         RequirementDefBodyElement::Stakeholder(stakeholder) => {
                             self.write_item_prefix(&mut first)?;
@@ -838,14 +864,45 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Constraint(_constraint) => {
                             self.write_marker(&mut first, "constraint")?;
                         }
-                        RequirementDefBodyElement::Frame(_frame) => {
-                            self.write_marker(&mut first, "frame")?;
+                        RequirementDefBodyElement::Frame(frame) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(frame (concern-keyword ")?;
+                            write!(self.writer, "{}", frame.value.has_concern_keyword)?;
+                            self.writer.write_str(") (name ")?;
+                            write_quoted(self.writer, &frame.value.name)?;
+                            self.writer.write_str(") (short-name ")?;
+                            write_optional_quoted(self.writer, frame.value.short_name.as_deref())?;
+                            self.writer.write_str(") (type ")?;
+                            if let Some(type_name) = frame.value.type_name {
+                                self.write_reference(type_name)?;
+                            } else {
+                                self.writer.write_str("none")?;
+                            }
+                            self.writer.write_str(") ")?;
+                            self.write_requirement_body(&frame.value.body)?;
+                            self.writer.write_char(')')?;
+                        }
+                        RequirementDefBodyElement::RequirementDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_requirement_definition(&definition.value)?;
+                        }
+                        RequirementDefBodyElement::PortUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_usage(&usage.value)?;
+                        }
+                        RequirementDefBodyElement::AllocationUsage(_usage) => {
+                            self.write_marker(&mut first, "allocation-usage")?;
                         }
                         RequirementDefBodyElement::ConcernUsage(_usage) => {
                             self.write_marker(&mut first, "concern-usage")?;
                         }
-                        RequirementDefBodyElement::CalcUsage(_usage) => {
-                            self.write_marker(&mut first, "calc-usage")?;
+                        RequirementDefBodyElement::CalcUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_named_multiplicity(
+                                "calc-usage",
+                                usage.value.identification.name.as_deref().unwrap_or(""),
+                                usage.value.multiplicity.as_ref(),
+                            )?;
                         }
                         RequirementDefBodyElement::RefDecl(declaration) => {
                             self.write_item_prefix(&mut first)?;
@@ -1743,8 +1800,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::DefaultReferenceUsage(_member) => {
                             self.write_marker(&mut first, "default-reference-usage")?;
                         }
-                        super::CalcDefBodyElement::ReturnDecl(_member) => {
-                            self.write_marker(&mut first, "return-declaration")?;
+                        super::CalcDefBodyElement::ReturnDecl(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_return_declaration(&member.value)?;
                         }
                         super::CalcDefBodyElement::Expression(expression) => {
                             self.write_item_prefix(&mut first)?;
@@ -1934,6 +1992,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_connection_definition(&mut self, definition: &super::ConnectionDef) -> io::Result<()> {
         self.writer.write_str("(connection-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") (role ")?;
         if let Some(role) = &definition.derivation_role {
             match role.value {
@@ -1960,6 +2022,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_interface_definition(&mut self, definition: &super::InterfaceDef) -> io::Result<()> {
         self.writer.write_str("(interface-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") (specializes ")?;
         if let Some(specializes) = &definition.specializes {
             self.write_typing(&specializes.value)?;
@@ -1969,6 +2035,43 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_interface_body(&definition.body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_occurrence_definition_modifiers(
+        &mut self,
+        prefix: Option<&super::DefinitionPrefix>,
+        is_individual: bool,
+    ) -> io::Result<()> {
+        self.writer.write_str(") (modifiers")?;
+        match prefix {
+            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str(" abstract")?,
+            Some(super::DefinitionPrefix::Variation) => self.writer.write_str(" variation")?,
+            None => {}
+        }
+        if is_individual {
+            self.writer.write_str(" individual")?;
+        }
+        Ok(())
+    }
+
+    fn write_flow_definition(&mut self, definition: &super::FlowDef) -> io::Result<()> {
+        self.writer.write_str("(flow-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str("))")
+    }
+
+    fn write_allocation_definition(&mut self, definition: &super::AllocationDef) -> io::Result<()> {
+        self.writer.write_str("(allocation-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
+        self.writer.write_str("))")
     }
 
     fn write_interface_body(&mut self, body: &InterfaceDefBody) -> io::Result<()> {
@@ -2109,6 +2212,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_ref_declaration(&mut self, declaration: &super::RefDecl) -> io::Result<()> {
         self.writer.write_str("(ref (name ")?;
         write_quoted(self.writer, &declaration.name)?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, declaration.short_name.as_deref())?;
         // BNF `RefPrefix`, projected because these keywords are authored syntax the emitter
         // reproduces: without them a snapshot could not tell `derived ref item x` from `ref
         // item x`, which is precisely the distinction the fields were added to hold.
@@ -2161,9 +2266,21 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         } else {
             self.writer.write_str("none")?;
         }
-        self.writer.write_str(") ")?;
+        write!(
+            self.writer,
+            ") (multiplicity-modifiers (ordered {}) (nonunique {})) ",
+            usage.ordered, usage.nonunique
+        )?;
         self.write_ref_body(&usage.body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_action_usage(&mut self, usage: &super::ActionUsage) -> io::Result<()> {
+        self.writer.write_str("(action-usage (name ")?;
+        write_quoted(self.writer, &usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, usage.short_name.as_deref())?;
+        self.writer.write_str("))")
     }
 
     /// A `connect` statement and its body.
@@ -2396,8 +2513,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("))")
     }
 
-    /// One projection for the `@` spelling of a metadata feature, shared by every scope that owns
-    /// one.
+    /// One projection for a metadata feature, shared by every scope that owns one.
     ///
     /// This was a contentless `(metadata-annotation)` marker: neither the annotated type, the
     /// optional declared name, nor the `about` targets were observable, so a snapshot could not
@@ -2406,8 +2522,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         &mut self,
         annotation: &super::MetadataAnnotation,
     ) -> io::Result<()> {
-        self.writer
-            .write_str("(metadata-annotation (declared-name ")?;
+        self.writer.write_str("(metadata-annotation (prefixes")?;
+        for prefix in &annotation.prefixes {
+            self.writer.write_char(' ')?;
+            self.write_metadata_keyword_usage(&prefix.value)?;
+        }
+        self.writer.write_str(") (introducer ")?;
+        self.writer.write_str(match annotation.introducer {
+            super::MetadataFeatureIntroducer::At { .. } => "at",
+            super::MetadataFeatureIntroducer::Metadata { .. } => "metadata",
+        })?;
+        self.writer.write_str(") (declared-name ")?;
         match &annotation.declared_name {
             Some(declared) => {
                 self.writer.write_str("(name ")?;
@@ -2490,7 +2615,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_end(&mut self, end: &super::EndDecl) -> io::Result<()> {
-        self.writer.write_str("(end (identity ")?;
+        self.writer.write_str("(end (short-name ")?;
+        write_optional_quoted(self.writer, end.short_name.as_deref())?;
+        self.writer.write_str(") (identity ")?;
         match &end.identity {
             EndIdentity::Declaration(name) => {
                 self.writer.write_str("(declaration (name ")?;
@@ -2523,6 +2650,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("crosses", end.crosses.as_ref())?;
         self.writer.write_char(')')
+    }
+
+    fn write_return_declaration(&mut self, declaration: &super::ReturnDecl) -> io::Result<()> {
+        self.writer.write_str("(return-declaration (name ")?;
+        if declaration.name.is_empty() {
+            self.writer.write_str("none")?;
+        } else {
+            write_quoted(self.writer, &declaration.name)?;
+        }
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, declaration.short_name.as_deref())?;
+        self.writer.write_str("))")
     }
 
     fn write_case_return(&mut self, declaration: &super::CaseReturnDecl) -> io::Result<()> {
@@ -2759,6 +2898,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (declaration ")?;
         write_quoted(self.writer, &occurrence.name)?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, occurrence.short_name.as_deref())?;
         self.writer.write_str(") (target ")?;
         if let Some(reference) = occurrence.occurrence_reference {
             self.write_reference(reference)?;
@@ -2782,6 +2923,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_view_usage(&mut self, usage: &super::ViewUsage) -> io::Result<()> {
         self.writer.write_str("(view (name ")?;
         write_quoted(self.writer, &usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, usage.short_name.as_deref())?;
         self.writer.write_str(") (type ")?;
         if let Some(reference) = usage.type_name {
             self.write_reference(reference)?;
@@ -2836,7 +2979,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(enum-value (name ")?;
                             write_quoted(self.writer, &value.value.name)?;
+                            self.writer.write_str(") (short-name ")?;
+                            write_optional_quoted(self.writer, value.value.short_name.as_deref())?;
+                            self.writer.write_str(") (value ")?;
+                            if let Some(initializer) = &value.value.value {
+                                self.write_feature_value(&initializer.value)?;
+                            } else {
+                                self.writer.write_str("none")?;
+                            }
                             self.writer.write_str(") ")?;
+                            self.write_ref_body(&value.value.body)?;
+                            self.writer.write_char(' ')?;
                             write_span(self.writer, &value.span)?;
                             self.writer.write_char(')')?;
                         }
@@ -3133,20 +3286,33 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_alias_definition(&definition.value)
             }
-            PackageBodyElement::AttributeDef(_definition) => {
-                self.write_marker(first, "attribute-def")
+            PackageBodyElement::AttributeDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_named_multiplicity(
+                    "attribute-def",
+                    &definition.value.name,
+                    definition.value.multiplicity.as_ref(),
+                )
             }
             PackageBodyElement::ActionDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_action_definition(&definition.value)
             }
-            PackageBodyElement::ActionUsage(_usage) => self.write_marker(first, "action-usage"),
+            PackageBodyElement::ActionUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_action_usage(&usage.value)
+            }
             PackageBodyElement::RequirementDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_requirement_definition(&definition.value)
             }
-            PackageBodyElement::RequirementUsage(_usage) => {
-                self.write_marker(first, "requirement-usage")
+            PackageBodyElement::RequirementUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_named_multiplicity(
+                    "requirement-usage",
+                    &usage.value.name,
+                    usage.value.multiplicity.as_ref(),
+                )
             }
             PackageBodyElement::Satisfy(usage) => {
                 self.write_item_prefix(first)?;
@@ -3169,8 +3335,15 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ConstraintDef(_definition) => {
                 self.write_marker(first, "constraint-def")
             }
-            PackageBodyElement::ConstraintUsage(_usage) => {
-                self.write_marker(first, "constraint-usage")
+            PackageBodyElement::ConstraintUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.writer.write_str("(constraint-usage (name ")?;
+                write_quoted(self.writer, &usage.value.name)?;
+                self.writer.write_str(") (short-name ")?;
+                write_optional_quoted(self.writer, usage.value.short_name.as_deref())?;
+                self.writer.write_str(") (multiplicity ")?;
+                self.write_multiplicity_clause(usage.value.multiplicity.as_ref())?;
+                self.writer.write_str("))")
             }
             PackageBodyElement::CalcDef(definition) => {
                 self.write_item_prefix(first)?;
@@ -3216,13 +3389,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_dependency(&dependency.value)
             }
-            PackageBodyElement::AllocationDef(_definition) => {
-                self.write_marker(first, "allocation-def")
+            PackageBodyElement::AllocationDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_allocation_definition(&definition.value)
             }
             PackageBodyElement::AllocationUsage(_usage) => {
                 self.write_marker(first, "allocation-usage")
             }
-            PackageBodyElement::FlowDef(_definition) => self.write_marker(first, "flow-def"),
+            PackageBodyElement::FlowDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_flow_definition(&definition.value)
+            }
             PackageBodyElement::FlowUsage(_usage) => self.write_marker(first, "flow-usage"),
             PackageBodyElement::ConcernUsage(_usage) => self.write_marker(first, "concern-usage"),
             PackageBodyElement::CaseDef(_definition) => self.write_marker(first, "case-def"),
@@ -3290,7 +3467,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(kerml-feature (name ")?;
                 self.write_usage_declaration_name(&feature.value.name)?;
-                self.writer.write_str("))")
+                self.writer.write_str(") ")?;
+                self.write_calc_def_body(&feature.value.body)?;
+                self.writer.write_char(')')
             }
             PackageBodyElement::KermlClassifier(declaration) => {
                 self.write_item_prefix(first)?;

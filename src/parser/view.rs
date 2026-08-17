@@ -462,6 +462,8 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
     // Anonymous redefinition form (BNF `ViewUsage`'s `UsageDeclaration?` legally omits the name
     // in favor of a leading `:>>` target, same shape `PartUsage`'s `part_usage_redefines_only`
     // already handles) -- e.g. `view :>> columnView[1] { render asTextualNotation; }`, confirmed
@@ -483,6 +485,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
             start,
             input,
             ViewUsage {
+                short_name,
                 name: name_str,
                 type_name: header.type_reference,
                 subsets: header.subsets,
@@ -515,6 +518,7 @@ fn view_usage_redefines_only<'a>(
             start,
             input,
             ViewUsage {
+                short_name: None,
                 name: String::new(),
                 type_name: None,
                 subsets: None,

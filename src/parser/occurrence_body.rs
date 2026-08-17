@@ -382,6 +382,8 @@ fn occurrence_usage_tail(
     prefix: OccurrencePrefix,
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let start = input;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
     // §6 G22: `occurrence :>> causes;` redefines an inherited occurrence without renaming it, so
     // the declaration name is optional. The keyword-less event form instead references an
     // existing occurrence and may use a dotted/qualified path.
@@ -453,6 +455,7 @@ fn occurrence_usage_tail(
             start,
             input,
             OccurrenceUsage {
+                short_name,
                 direction: prefix.direction,
                 is_individual: prefix.is_individual,
                 is_then: prefix.is_then,

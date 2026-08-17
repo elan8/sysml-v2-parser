@@ -40,6 +40,6 @@ package NestedClassifiers {
 (parsed-document
   (references
   )
-  (root (package (name "NestedClassifiers") (body brace (part-usage (declaration-name "c") (typing none) (body brace (kerml-classifier) (kerml-classifier))) (part-def (name "PD") (body brace (kerml-classifier (keyword struct) (name "S1")) (kerml-classifier (keyword datatype) (name "D1")))) (attribute-def))))
+  (root (package (name "NestedClassifiers") (body brace (part-usage (declaration-name "c") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (kerml-classifier) (kerml-classifier))) (part-def (name "PD") (body brace (kerml-classifier (keyword struct) (name "S1")) (kerml-classifier (keyword datatype) (name "D1")))) (attribute-def (name "AD") (multiplicity none)))))
 )
 ~~~

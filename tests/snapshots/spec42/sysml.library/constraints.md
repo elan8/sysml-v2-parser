@@ -79,7 +79,7 @@ standard library package Constraints {
         'ref';
         constraint self : ConstraintCheck :>> BooleanEvaluation::self;
     }
-    constraint constraintChecks : ConstraintCheck :> booleanEvaluations {
+    constraint constraintChecks : ConstraintCheck[0..*] :> booleanEvaluations {
         doc
         /*
 		 * constraintChecks is the base feature of all ConstraintUsages.
@@ -108,6 +108,6 @@ standard library package Constraints {
     (reference r2 (scope relative) (span (offset 273) (line 10) (column 17) (len 29)) (segments (segment 0 (token "Performances") (name "Performances") (separator none) (span (offset 273) (line 10) (column 17) (len 12))) (segment 1 (token "trueEvaluations") (name "trueEvaluations") (separator colon-colon) (span (offset 287) (line 10) (column 31) (len 15)))))
     (reference r3 (scope relative) (span (offset 320) (line 11) (column 17) (len 30)) (segments (segment 0 (token "Performances") (name "Performances") (separator none) (span (offset 320) (line 11) (column 17) (len 12))) (segment 1 (token "falseEvaluations") (name "falseEvaluations") (separator colon-colon) (span (offset 334) (line 11) (column 31) (len 16)))))
   )
-  (root (library-package (name "Constraints") (standard true) (body brace (doc) (import (target (span (span (offset 174) (line 8) (column 17) (len 31))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 223) (line 9) (column 17) (len 32))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 273) (line 10) (column 17) (len 29))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 320) (line 11) (column 17) (len 30))) (all none) (ref r3) (shape (membership (recursive-suffix none))))) (constraint-def) (constraint-usage) (constraint-usage) (constraint-usage))))
+  (root (library-package (name "Constraints") (standard true) (body brace (doc) (import (target (span (span (offset 174) (line 8) (column 17) (len 31))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 223) (line 9) (column 17) (len 32))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 273) (line 10) (column 17) (len 29))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 320) (line 11) (column 17) (len 30))) (all none) (ref r3) (shape (membership (recursive-suffix none))))) (constraint-def) (constraint-usage (name "constraintChecks") (short-name none) (multiplicity (lower (expression (span (offset 705) (line 23) (column 56) (len 1)) (integer 0))) (upper unbounded))) (constraint-usage (name "assertedConstraintChecks") (short-name none) (multiplicity none)) (constraint-usage (name "negatedConstraintChecks") (short-name none) (multiplicity none)))))
 )
 ~~~

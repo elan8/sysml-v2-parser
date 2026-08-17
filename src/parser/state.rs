@@ -342,6 +342,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             start,
             input,
             RefDecl {
+                short_name: None,
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,
                 is_constant: prefix.is_constant,

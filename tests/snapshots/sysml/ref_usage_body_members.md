@@ -25,7 +25,7 @@ interface def Interface {
 # FORMAT
 ~~~sysml
 interface def Interface {
-    ref port : Port[2..*] ordered nonunique :>> participant {
+    ref port  : Port[2..*] ordered nonunique :>> participant {
         doc
         /* The participants of an Interface must be Ports. */
         protected ref thisParticipant :>> self;
@@ -43,6 +43,6 @@ interface def Interface {
     (reference r3 (scope relative) (span (offset 245) (line 5) (column 43) (len 4)) (segments (segment 0 (token "Port") (name "Port") (separator none) (span (offset 245) (line 5) (column 43) (len 4)))))
     (reference r4 (scope relative) (span (offset 270) (line 5) (column 68) (len 16)) (segments (segment 0 (token "interfacingPorts") (name "interfacingPorts") (separator none) (span (offset 270) (line 5) (column 68) (len 16)))))
   )
-  (root (interface-def (name "Interface") (specializes none) (body brace (ref (name "") (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind port) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (redefines (relationship (kind redefines) (implied false) (targets (ref r1)))) (subsets none) (body brace (doc) (ref (name "thisParticipant") (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind none) (typing none) (redefines (relationship (kind redefines) (implied false) (targets (ref r2)))) (subsets none) (body semicolon)) (ref (name "otherParticipants") (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r3)))) (redefines none) (subsets (relationship (kind subsets) (implied false) (targets (ref r4)))) (body semicolon)))))))
+  (root (interface-def (name "Interface") (modifiers) (specializes none) (body brace (ref (name "") (short-name none) (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind port) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (redefines (relationship (kind redefines) (implied false) (targets (ref r1)))) (subsets none) (body brace (doc) (ref (name "thisParticipant") (short-name none) (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind none) (typing none) (redefines (relationship (kind redefines) (implied false) (targets (ref r2)))) (subsets none) (body semicolon)) (ref (name "otherParticipants") (short-name none) (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r3)))) (redefines none) (subsets (relationship (kind subsets) (implied false) (targets (ref r4)))) (body semicolon)))))))
 )
 ~~~

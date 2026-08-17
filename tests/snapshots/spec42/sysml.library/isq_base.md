@@ -250,7 +250,7 @@ standard library package ISQBase {
         attribute :>> num : Real;
         attribute :>> mRef : LengthUnit[1];
     }
-    attribute def length : LengthValue nonunique;
+    attribute def length : LengthValue[*] nonunique;
     attribute def LengthUnit :> SimpleUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -276,7 +276,7 @@ standard library package ISQBase {
         attribute :>> num : Real;
         attribute :>> mRef : DurationUnit[1];
     }
-    attribute def duration : DurationValue nonunique;
+    attribute def duration : DurationValue[*] nonunique;
     attribute def DurationUnit :> SimpleUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -302,7 +302,7 @@ standard library package ISQBase {
         attribute :>> num : Real;
         attribute :>> mRef : MassUnit[1];
     }
-    attribute def mass : MassValue nonunique;
+    attribute def mass : MassValue[*] nonunique;
     attribute def MassUnit :> SimpleUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -328,7 +328,7 @@ standard library package ISQBase {
         attribute :>> num : Real;
         attribute :>> mRef : ThermodynamicTemperatureUnit[1];
     }
-    attribute def thermodynamicTemperature : ThermodynamicTemperatureValue nonunique;
+    attribute def thermodynamicTemperature : ThermodynamicTemperatureValue[*] nonunique;
     attribute def ThermodynamicTemperatureUnit :> SimpleUnit {
         private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.'Θ';
@@ -354,7 +354,7 @@ standard library package ISQBase {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricCurrentUnit[1];
     }
-    attribute def electricCurrent : ElectricCurrentValue nonunique;
+    attribute def electricCurrent : ElectricCurrentValue[*] nonunique;
     attribute def ElectricCurrentUnit :> SimpleUnit {
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.I;
@@ -380,7 +380,7 @@ standard library package ISQBase {
         attribute :>> num : Real;
         attribute :>> mRef : LuminousIntensityUnit[1];
     }
-    attribute def luminousIntensity : LuminousIntensityValue nonunique;
+    attribute def luminousIntensity : LuminousIntensityValue[*] nonunique;
     attribute def LuminousIntensityUnit :> SimpleUnit {
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.J;
@@ -406,7 +406,7 @@ standard library package ISQBase {
         attribute :>> num : Real;
         attribute :>> mRef : AmountOfSubstanceUnit[1];
     }
-    attribute def amountOfSubstance : AmountOfSubstanceValue nonunique;
+    attribute def amountOfSubstance : AmountOfSubstanceValue[*] nonunique;
     attribute def AmountOfSubstanceUnit :> SimpleUnit {
         private attribute amountOfSubstancePF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.N;
@@ -441,6 +441,6 @@ standard library package ISQBase {
     (reference r1 (scope relative) (span (offset 473) (line 12) (column 20) (len 10)) (segments (segment 0 (token "Quantities") (name "Quantities") (separator none) (span (offset 473) (line 12) (column 20) (len 10)))))
     (reference r2 (scope relative) (span (offset 507) (line 13) (column 20) (len 21)) (segments (segment 0 (token "MeasurementReferences") (name "MeasurementReferences") (separator none) (span (offset 507) (line 13) (column 20) (len 21)))))
   )
-  (root (library-package (name "ISQBase") (standard true) (body brace (doc) (import (target (span (span (offset 434) (line 11) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 473) (line 12) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 483) (line 12) (column 30) (len 3))) (separator (span (offset 483) (line 12) (column 30) (len 2))) (marker (span (offset 485) (line 12) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 507) (line 13) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 528) (line 13) (column 41) (len 3))) (separator (span (offset 528) (line 13) (column 41) (len 2))) (marker (span (offset 530) (line 13) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQBase") (standard true) (body brace (doc) (import (target (span (span (offset 434) (line 11) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 473) (line 12) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 483) (line 12) (column 30) (len 3))) (separator (span (offset 483) (line 12) (column 30) (len 2))) (marker (span (offset 485) (line 12) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 507) (line 13) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 528) (line 13) (column 41) (len 3))) (separator (span (offset 528) (line 13) (column 41) (len 2))) (marker (span (offset 530) (line 13) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (attribute-def (name "LengthValue") (multiplicity none)) (attribute-def (name "length") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LengthUnit") (multiplicity none)) (attribute-def (name "DurationValue") (multiplicity none)) (attribute-def (name "duration") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DurationUnit") (multiplicity none)) (attribute-def (name "MassValue") (multiplicity none)) (attribute-def (name "mass") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassUnit") (multiplicity none)) (attribute-def (name "ThermodynamicTemperatureValue") (multiplicity none)) (attribute-def (name "thermodynamicTemperature") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ThermodynamicTemperatureUnit") (multiplicity none)) (attribute-def (name "ElectricCurrentValue") (multiplicity none)) (attribute-def (name "electricCurrent") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricCurrentUnit") (multiplicity none)) (attribute-def (name "LuminousIntensityValue") (multiplicity none)) (attribute-def (name "luminousIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LuminousIntensityUnit") (multiplicity none)) (attribute-def (name "AmountOfSubstanceValue") (multiplicity none)) (attribute-def (name "amountOfSubstance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AmountOfSubstanceUnit") (multiplicity none)) (attribute-def (name "International System of Quantities") (multiplicity none)))))
 )
 ~~~
