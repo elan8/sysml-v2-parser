@@ -2109,6 +2109,25 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::VerificationCaseUsage(_member) => {
                             self.write_marker(&mut first, "verification-case-usage")?;
                         }
+                        super::PartUsageBodyElement::ViewDef(_definition) => {
+                            self.write_marker(&mut first, "view-def")?;
+                        }
+                        super::PartUsageBodyElement::ViewUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_usage(&usage.value)?;
+                        }
+                        super::PartUsageBodyElement::ViewpointDef(_definition) => {
+                            self.write_marker(&mut first, "viewpoint-def")?;
+                        }
+                        super::PartUsageBodyElement::ViewpointUsage(_usage) => {
+                            self.write_marker(&mut first, "viewpoint-usage")?;
+                        }
+                        super::PartUsageBodyElement::RenderingDef(_definition) => {
+                            self.write_marker(&mut first, "rendering-def")?;
+                        }
+                        super::PartUsageBodyElement::RenderingUsage(_usage) => {
+                            self.write_marker(&mut first, "rendering-usage")?;
+                        }
                         super::PartUsageBodyElement::KermlClassifier(_member) => {
                             self.write_marker(&mut first, "kerml-classifier")?;
                         }

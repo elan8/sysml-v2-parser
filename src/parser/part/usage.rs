@@ -1528,6 +1528,36 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 crate::parser::case::verification_case_usage,
                 PartUsageBodyElement::VerificationCaseUsage,
             ),
+            // The view family. `UsageBody = DefinitionBody`, so a part *usage* body admits the
+            // same six a part *definition* body already dispatched; this scope had none of them,
+            // so `rendering r { ... }` or `view v { ... }` inside `part p { ... }` reached
+            // recovery. `def` before `usage` throughout, for the bare-keyword reason the part
+            // definition dispatcher documents: `view_usage`, `viewpoint_usage` and
+            // `rendering_usage` each read a bare name straight after their keyword.
+            // Nested in a sub-alt to stay under nom's 21-branch limit, as the sibling groups are.
+            alt((
+                map(crate::parser::view::view_def, PartUsageBodyElement::ViewDef),
+                map(
+                    crate::parser::view::view_usage,
+                    PartUsageBodyElement::ViewUsage,
+                ),
+                map(
+                    crate::parser::view::viewpoint_def,
+                    PartUsageBodyElement::ViewpointDef,
+                ),
+                map(
+                    crate::parser::view::viewpoint_usage,
+                    PartUsageBodyElement::ViewpointUsage,
+                ),
+                map(
+                    crate::parser::view::rendering_def,
+                    PartUsageBodyElement::RenderingDef,
+                ),
+                map(
+                    crate::parser::view::rendering_usage,
+                    PartUsageBodyElement::RenderingUsage,
+                ),
+            )),
         )),
     ))
     .parse(input)?;

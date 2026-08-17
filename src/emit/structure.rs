@@ -364,14 +364,18 @@ fn emit_part_def_body_element(
             super::behavior::emit_first_stmt(w, path, &first.value)
         }
         PartDefBodyElement::FlowDef(f) => super::behavior::emit_flow_def(w, path, &f.value),
+        PartDefBodyElement::ViewDef(n) => super::view::emit_view_def(w, path, &n.value),
+        PartDefBodyElement::ViewUsage(n) => super::view::emit_view_usage(w, path, &n.value),
+        PartDefBodyElement::ViewpointDef(n) => super::view::emit_viewpoint_def(w, path, &n.value),
+        PartDefBodyElement::ViewpointUsage(n) => {
+            super::view::emit_viewpoint_usage(w, path, &n.value)
+        }
+        PartDefBodyElement::RenderingDef(n) => super::view::emit_rendering_def(w, path, &n.value),
+        PartDefBodyElement::RenderingUsage(n) => {
+            super::view::emit_rendering_usage(w, path, &n.value)
+        }
         other @ (PartDefBodyElement::Annotation(_)
         | PartDefBodyElement::OccurrenceDef(_)
-        | PartDefBodyElement::ViewDef(_)
-        | PartDefBodyElement::ViewUsage(_)
-        | PartDefBodyElement::ViewpointDef(_)
-        | PartDefBodyElement::ViewpointUsage(_)
-        | PartDefBodyElement::RenderingDef(_)
-        | PartDefBodyElement::RenderingUsage(_)
         | PartDefBodyElement::CaseDef(_)
         | PartDefBodyElement::CaseUsage(_)
         | PartDefBodyElement::UseCaseDef(_)
@@ -501,6 +505,16 @@ fn emit_part_usage_body_element(
             super::requirement::emit_verification_case_usage(w, path, &v.value)
         }
         PartUsageBodyElement::FlowDef(f) => super::behavior::emit_flow_def(w, path, &f.value),
+        PartUsageBodyElement::ViewDef(n) => super::view::emit_view_def(w, path, &n.value),
+        PartUsageBodyElement::ViewUsage(n) => super::view::emit_view_usage(w, path, &n.value),
+        PartUsageBodyElement::ViewpointDef(n) => super::view::emit_viewpoint_def(w, path, &n.value),
+        PartUsageBodyElement::ViewpointUsage(n) => {
+            super::view::emit_viewpoint_usage(w, path, &n.value)
+        }
+        PartUsageBodyElement::RenderingDef(n) => super::view::emit_rendering_def(w, path, &n.value),
+        PartUsageBodyElement::RenderingUsage(n) => {
+            super::view::emit_rendering_usage(w, path, &n.value)
+        }
         other @ (PartUsageBodyElement::Annotation(_) | PartUsageBodyElement::OccurrenceDef(_)) => w
             .unsupported(
                 path,

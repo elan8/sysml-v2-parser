@@ -606,6 +606,20 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::StateDef(n) => walk_state_def_body(report, &p, &n.value.body),
             PartUsageBodyElement::MetadataDef(n) => walk_attribute_body(report, &p, &n.value.body),
             PartUsageBodyElement::FlowDef(n) => walk_definition_body(report, &p, &n.value.body),
+            PartUsageBodyElement::ViewDef(n) => walk_view_def_body(report, &p, &n.value.body),
+            PartUsageBodyElement::ViewUsage(n) => walk_view_body(report, &p, &n.value.body),
+            PartUsageBodyElement::ViewpointDef(n) => {
+                walk_requirement_def_body(report, &p, &n.value.body)
+            }
+            PartUsageBodyElement::ViewpointUsage(n) => {
+                walk_requirement_def_body(report, &p, &n.value.body)
+            }
+            PartUsageBodyElement::RenderingDef(n) => {
+                walk_rendering_def_body(report, &p, &n.value.body)
+            }
+            PartUsageBodyElement::RenderingUsage(n) => {
+                walk_rendering_usage_body(report, &p, &n.value.body)
+            }
             PartUsageBodyElement::RequirementDef(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }

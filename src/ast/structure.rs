@@ -712,6 +712,16 @@ pub enum PartUsageBodyElement {
     /// }` (Simple Tests/VerificationTest.sysml:35). Already dispatched in `PartDefBodyElement`,
     /// just not here.
     VerificationCaseUsage(Node<crate::ast::requirement::VerificationCaseUsage>),
+    /// The view family. `RenderingUsage`, `ViewUsage` and `ViewpointUsage` are
+    /// `StructureUsageElement`/`BehaviorUsageElement` alternatives and the three definitions are
+    /// `DefinitionElement` alternatives, so `UsageBody = DefinitionBody` admits all six here
+    /// exactly as `PartDefBodyElement` already did. This scope had none of them.
+    ViewDef(Node<crate::ast::view::ViewDef>),
+    ViewUsage(Node<crate::ast::view::ViewUsage>),
+    ViewpointDef(Node<crate::ast::view::ViewpointDef>),
+    ViewpointUsage(Node<crate::ast::view::ViewpointUsage>),
+    RenderingDef(Node<crate::ast::view::RenderingDef>),
+    RenderingUsage(Node<crate::ast::view::RenderingUsage>),
     /// Nested KerML classifier declaration (`struct Car1_ { ... }` inside a `part` usage body,
     /// KerML `time_varying_car_driver`; spec42 Gap 38); see
     /// [`crate::ast::KermlClassifierDecl`].

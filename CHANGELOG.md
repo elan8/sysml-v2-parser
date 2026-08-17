@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A part usage body takes the view family, and a part definition body can emit it.**
+  `ViewUsage`, `ViewpointUsage` and `RenderingUsage` are usage-element alternatives and their
+  three definitions are `DefinitionElement` alternatives, so `UsageBody = DefinitionBody` admits
+  all six in a part usage body exactly as in a part definition body. The part usage scope modelled
+  none of them -- `rendering r { ... }` inside `part p { ... }` reached recovery -- and the part
+  definition scope, which parsed all six, had every one of them in its emitter's `unsupported`
+  group, so a document with a nested view definition parsed and then could not be formatted.
+  **AST version 159 -> 160.**
+
 - **A declared `interface` usage with no typing parses.** `InterfaceUsageDeclaration`'s
   `UsageDeclaration` makes the `: Type` optional and its `( 'connect' InterfacePart )?` optional
   too, but the parser reached a name only through the typed spelling or the `connect` spelling.

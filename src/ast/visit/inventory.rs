@@ -3126,6 +3126,24 @@ macro_rules! ast_traversal {
                 PartUsageBodyElement::VerificationCaseUsage(field_0) => {
                     visitor.visit_verification_case_usage(field_0);
                 }
+                PartUsageBodyElement::ViewDef(field_0) => {
+                    visitor.visit_view_def(field_0);
+                }
+                PartUsageBodyElement::ViewUsage(field_0) => {
+                    visitor.visit_view_usage(field_0);
+                }
+                PartUsageBodyElement::ViewpointDef(field_0) => {
+                    visitor.visit_viewpoint_def(field_0);
+                }
+                PartUsageBodyElement::ViewpointUsage(field_0) => {
+                    visitor.visit_viewpoint_usage(field_0);
+                }
+                PartUsageBodyElement::RenderingDef(field_0) => {
+                    visitor.visit_rendering_def(field_0);
+                }
+                PartUsageBodyElement::RenderingUsage(field_0) => {
+                    visitor.visit_rendering_usage(field_0);
+                }
                 PartUsageBodyElement::KermlClassifier(field_0) => {
                     visitor.visit_kerml_classifier_decl(&$($mutability)? **field_0);
                 }
