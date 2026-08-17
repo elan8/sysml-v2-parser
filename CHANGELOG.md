@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A declared `interface` usage with no typing parses.** `InterfaceUsageDeclaration`'s
+  `UsageDeclaration` makes the `: Type` optional and its `( 'connect' InterfacePart )?` optional
+  too, but the parser reached a name only through the typed spelling or the `connect` spelling.
+  `interface i;` and `interface i { ... }` left the name unconsumed, the body parser then failed
+  on it, and the whole member went to recovery -- while `interface i : I { ... }` parsed.
+  **AST version 158 -> 159.**
+
 - **A `flow def` can be formatted.** `FlowDefinition = OccurrenceDefinitionPrefix ( 'flow' |
   'message' ) 'def' Definition` is a `DefinitionElement`, so it is legal at package level and in a
   part definition or part usage body. It parsed into a complete typed node in all three, and all

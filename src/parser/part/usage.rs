@@ -993,12 +993,41 @@ pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Inter
             if let Some((iface_name, _, _)) = bare_named {
                 (input, Some(iface_name), None)
             } else {
-                let (input, interface_type) = opt(preceded(
-                    tag(&b":"[..]),
-                    preceded(ws_and_comments, qualified_reference),
+                // A declared interface usage with a name but no typing and no `connect` clause:
+                // `interface i;`, `interface i { ... }`, `interface i :> J;`. `UsageDeclaration`
+                // makes the `: Type` optional, so the name above was reachable only through the
+                // typed or the `connect` spelling and this form fell through to the body parser
+                // with the name still unconsumed -- which then failed on it, sending the whole
+                // member to recovery.
+                //
+                // The lookahead is what keeps `interface a to b;` anonymous: `to` is not a
+                // declaration terminator, so `a` there stays the first connector end.
+                let (input, declared_name) = opt((
+                    name,
+                    opt(multiplicity_node),
+                    preceded(
+                        ws_and_comments,
+                        nom::combinator::peek(alt((
+                            tag(&b";"[..]),
+                            tag(&b"{"[..]),
+                            tag(&b":>>"[..]),
+                            tag(&b":>"[..]),
+                            tag(&b"subsets"[..]),
+                            tag(&b"redefines"[..]),
+                        ))),
+                    ),
                 ))
                 .parse(input)?;
-                (input, None, interface_type)
+                if let Some((iface_name, _, _)) = declared_name {
+                    (input, Some(iface_name), None)
+                } else {
+                    let (input, interface_type) = opt(preceded(
+                        tag(&b":"[..]),
+                        preceded(ws_and_comments, qualified_reference),
+                    ))
+                    .parse(input)?;
+                    (input, None, interface_type)
+                }
             }
         };
     let (input, spec) = crate::parser::usage::specialization_clauses(input)?;
