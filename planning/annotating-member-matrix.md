@@ -165,23 +165,23 @@ recorded with the grammar evidence and the reason it is a different seam.
   `Annotation` with a brace body at all — the variant should be deleted with `Annotation`'s
   rewrite rather than on that evidence alone.
 
-- **(historical) `ConnectBody` marker bodies discard everything inside them.** `Allocate`, `Transition`,
-  `ExposeMember`, `SatisfyViewMember` and `Annotation` hold `ConnectBody`, a two-variant marker
-  (`Semicolon | Brace`) whose brace form is parsed by `advance_to_closing_brace` and retains
-  nothing — not the members, not the delimiter spans. The grammar admits annotating members in
-  all of them: `Expose = 'expose' ( MembershipExpose | NamespaceExpose ) RelationshipBody`,
-  `AllocationUsage = OccurrenceUsagePrefix AllocationUsageDeclaration UsageBody`, and
-  `TransitionUsage = 'transition' … ActionBody`. Closing it is not a variant swap: `ConnectBody`
-  has no delimiter provenance at all, so each owner needs the Phase-2 `Body<E>` container before
-  it can hold typed members. `Dependency` and `Satisfy` additionally pair `ConnectBody` with a
-  separate `body_elements: Option<Vec<…>>`, which is the same body fact in two representations
-  and must collapse into one `Body<E>` in that work.
-- **A `connect` statement body is `UsageBody`, not `RelationshipBody`.**
-  `ConnectionUsage = OccurrenceUsagePrefix ( … | 'connect' ConnectorPart ) UsageBody`, so
-  `connect a to b { … }` legally holds every definition-body member, while the parser routes it
-  through `relationship_body`. Annotating members are complete there — that is why the scope
-  appears as row 1 rather than as a gap — but the non-annotating members of that body are missing.
-  That is definition/usage body coverage, not this seam.
+- **`Satisfy`'s member set is still a `ConstraintDefBody`.**
+  `SatisfyRequirementUsage = … RequirementBody`, so the members should be
+  `RequirementDefBodyElement`. Its container is one `Body` now; widening the member set is a
+  member-dispatch change of the same kind as the rows in the table above.
+
+### Closed by the container work
+
+- ~~`ConnectBody` marker bodies discard everything inside them~~ — done for every owner but
+  `Annotation`. `Dependency`, `ExposeMember`, `SatisfyViewMember` → `Body<RelationshipBodyElement>`;
+  `Allocate`, `Connect`, `BindingConnectorUsage`, `SuccessionUsage`, `ConnectStmt` →
+  `Body<PartUsageBodyElement>`; `Transition` → `Body<ActionDefBodyElement>`; `Satisfy` →
+  `ConstraintDefBody`; `InterfaceUsage`'s three variants → `Body<InterfaceUsageBodyElement>`.
+  The dual `ConnectBody` + `body_elements` pairs on `Dependency`, `Satisfy`, `ConnectStmt` and all
+  three `InterfaceUsage` forms are gone with them.
+- ~~A `connect` statement body is `UsageBody`, not `RelationshipBody`~~ — done. `ConnectStmt`
+  holds a `Body<PartUsageBodyElement>`, so an `attribute`, a nested `part` or a `ref` inside
+  `connect a to b { … }` parses.
 
 ## Adjacent gaps this audit ran into
 
@@ -189,15 +189,14 @@ Not annotating-member gaps. They are recorded because writing the coverage fixtu
 and each is a member-dispatch or emission gap of the same class as the already-recorded "`ref` in
 a state body only dispatches when it is typed".
 
-- An untyped `interface i { … }` in a part usage body reaches recovery; `interface i : I { … }`
-  parses. `InterfaceUsage` does not require the typing.
-- A `rendering rr { … }` member in a part usage body reaches recovery, though `render r { … }`
-  parses inside a view usage.
-- A `first f { … }` member in a calculation body reaches recovery.
-  `CalculationBodyItem = ActionBodyItem | ReturnParameterMember`, and `ActionBodyItem` includes
-  `InitialNodeMember`, so it is legal there.
 - ~~A `flow def` parses in a part definition body and at package level, but the emitter reports it
   as an unsupported construct in both~~ — fixed.
+- ~~An untyped `interface i { … }` in a part usage body reaches recovery~~ — fixed.
+- ~~A `rendering rr { … }` member in a part usage body reaches recovery~~ — fixed, along with the
+  rest of the view family in that scope and its emission from part definition bodies.
+- ~~A `first f { … }` member in a calculation body reaches recovery~~ — fixed; the whole
+  `ActionBodyItem` half of `CalculationBodyItem` was missing, and the keyword-less binding
+  fallback was shredding each keyword into an invented feature name.
 - `binding a = b;` (`BindingConnectorAsUsage`, a `NonOccurrenceUsageElement`) is dispatched in
   neither a package body nor a definition body: the package scope reports it as an unimplemented
   production and a part definition body reports an unexpected keyword. The AST models it and its

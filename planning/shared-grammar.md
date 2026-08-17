@@ -162,6 +162,12 @@ Two states that provenance forced into the open:
 - `ActionBranchBody` — the brace-less `if x then y;` is not a one-member brace body, and is no
   longer re-emitted as one.
 
+Every body that was a marker is now this container. `ConnectBody` -- two variants, no delimiter
+spans, brace contents skipped -- held ten owners at the end of Phase 2 and holds one now, the
+legacy `Annotation`; the rest carry a `Body<E>` whose members and delimiters travel together.
+`Dependency`, `Satisfy`, `ConnectStmt` and the three `InterfaceUsage` forms had also been storing
+the same body fact twice, as a marker beside a separate element list, and no longer do.
+
 There is deliberately no state for a missing closing brace. An unterminated body does not produce a
 body today: the enclosing declaration's parse fails and the scope above keeps the text as recovery.
 A typed close outcome (`Authored | Recovered | Missing`) belongs with the recovery change that
