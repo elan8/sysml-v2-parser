@@ -877,6 +877,24 @@ pub(crate) fn emit_allocation_def(
     emit_definition_body(w, path, &def.body)
 }
 
+/// `FlowDefinition = OccurrenceDefinitionPrefix ( 'flow' | 'message' ) 'def' Definition`, whose
+/// body is a `DefinitionBody` -- the same shape `emit_allocation_def` writes. It parsed into a
+/// complete typed node in three scopes and was reported as an unsupported construct by all three,
+/// so a document containing one could not be formatted at all.
+pub(crate) fn emit_flow_def(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    def: &crate::ast::FlowDef,
+) -> Result<(), EmitError> {
+    emit_visibility(w, def.membership.visibility);
+    w.push_str("flow def ");
+    emit_identification(w, &def.identification);
+    if let Some(spec) = &def.specializes {
+        emit_typing_clause(w, &spec.value)?;
+    }
+    emit_definition_body(w, path, &def.body)
+}
+
 pub(crate) fn emit_allocation_usage(
     w: &mut EmitWriter<'_>,
     path: &str,

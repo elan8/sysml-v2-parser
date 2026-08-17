@@ -363,9 +363,9 @@ fn emit_part_def_body_element(
         PartDefBodyElement::FirstStmt(first) => {
             super::behavior::emit_first_stmt(w, path, &first.value)
         }
+        PartDefBodyElement::FlowDef(f) => super::behavior::emit_flow_def(w, path, &f.value),
         other @ (PartDefBodyElement::Annotation(_)
         | PartDefBodyElement::OccurrenceDef(_)
-        | PartDefBodyElement::FlowDef(_)
         | PartDefBodyElement::ViewDef(_)
         | PartDefBodyElement::ViewUsage(_)
         | PartDefBodyElement::ViewpointDef(_)
@@ -500,12 +500,12 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::VerificationCaseUsage(v) => {
             super::requirement::emit_verification_case_usage(w, path, &v.value)
         }
-        other @ (PartUsageBodyElement::Annotation(_)
-        | PartUsageBodyElement::FlowDef(_)
-        | PartUsageBodyElement::OccurrenceDef(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        PartUsageBodyElement::FlowDef(f) => super::behavior::emit_flow_def(w, path, &f.value),
+        other @ (PartUsageBodyElement::Annotation(_) | PartUsageBodyElement::OccurrenceDef(_)) => w
+            .unsupported(
+                path,
+                format!("{other:?}").chars().take(64).collect::<String>(),
+            ),
     }
 }
 

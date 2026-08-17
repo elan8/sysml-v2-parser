@@ -389,7 +389,8 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::KermlFeatureMember(feature) => {
             super::view::emit_kerml_feature_member(w, path, &feature.value)
         }
-        other @ (PackageBodyElement::Actor(_) | PackageBodyElement::FlowDef(_)) => w.unsupported(
+        PackageBodyElement::FlowDef(f) => behavior::emit_flow_def(w, path, &f.value),
+        other @ PackageBodyElement::Actor(_) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),

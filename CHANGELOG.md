@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `flow def` can be formatted.** `FlowDefinition = OccurrenceDefinitionPrefix ( 'flow' |
+  'message' ) 'def' Definition` is a `DefinitionElement`, so it is legal at package level and in a
+  part definition or part usage body. It parsed into a complete typed node in all three, and all
+  three emitters reported it as an unsupported construct -- a document containing one parsed
+  cleanly and then could not be emitted at all. Its body is a `DefinitionBody`, the same shape
+  `emit_allocation_def` already wrote.
+
 ### Added
 
 - **Two more `examples/` files round-trip.** `Simple Tests/TextualRepresentationTest.sysml` and
