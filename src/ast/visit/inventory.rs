@@ -957,14 +957,24 @@ macro_rules! ast_traversal {
                 walk_verify_requirement_member(self, node)
             }
 
-            /// Visits [`Satisfy`]; the default implementation walks its children.
-            fn visit_satisfy(&mut self, node: &$($mutability)? Node<Satisfy>) {
-                walk_satisfy(self, node)
+            /// Visits [`SatisfyRequirementUsage`]; the default implementation walks its children.
+            fn visit_satisfy_requirement_usage(&mut self, node: &$($mutability)? Node<SatisfyRequirementUsage>) {
+                walk_satisfy_requirement_usage(self, node)
             }
 
-            /// Visits [`InlineSatisfyRequirement`]; the default implementation walks its children.
-            fn visit_inline_satisfy_requirement(&mut self, node: &$($mutability)? InlineSatisfyRequirement) {
-                walk_inline_satisfy_requirement(self, node)
+            /// Visits [`SatisfiedRequirement`]; the default implementation walks its children.
+            fn visit_satisfied_requirement(&mut self, node: &$($mutability)? SatisfiedRequirement) {
+                walk_satisfied_requirement(self, node)
+            }
+
+            /// Visits [`InlineRequirementDeclaration`]; the default implementation walks its children.
+            fn visit_inline_requirement_declaration(&mut self, node: &$($mutability)? Node<InlineRequirementDeclaration>) {
+                walk_inline_requirement_declaration(self, node)
+            }
+
+            /// Visits [`SatisfactionSubject`]; the default implementation walks its children.
+            fn visit_satisfaction_subject(&mut self, node: &$($mutability)? Node<SatisfactionSubject>) {
+                walk_satisfaction_subject(self, node)
             }
 
             /// Visits [`RequirementUsage`]; the default implementation walks its children.
@@ -1250,11 +1260,6 @@ macro_rules! ast_traversal {
             /// Visits [`ExposeMember`]; the default implementation walks its children.
             fn visit_expose_member(&mut self, node: &$($mutability)? Node<ExposeMember>) {
                 walk_expose_member(self, node)
-            }
-
-            /// Visits [`SatisfyViewMember`]; the default implementation walks its children.
-            fn visit_satisfy_view_member(&mut self, node: &$($mutability)? Node<SatisfyViewMember>) {
-                walk_satisfy_view_member(self, node)
             }
 
             /// Visits [`ViewpointUsage`]; the default implementation walks its children.
@@ -2132,7 +2137,7 @@ macro_rules! ast_traversal {
                     visitor.visit_requirement_usage(field_0);
                 }
                 PackageBodyElement::Satisfy(field_0) => {
-                    visitor.visit_satisfy(field_0);
+                    visitor.visit_satisfy_requirement_usage(&$($mutability)? **field_0);
                 }
                 PackageBodyElement::UseCaseDef(field_0) => {
                     visitor.visit_use_case_def(field_0);
@@ -2491,7 +2496,7 @@ macro_rules! ast_traversal {
                     visitor.visit_assert_constraint_member(field_0);
                 }
                 PartDefBodyElement::Satisfy(field_0) => {
-                    visitor.visit_satisfy(field_0);
+                    visitor.visit_satisfy_requirement_usage(&$($mutability)? **field_0);
                 }
                 PartDefBodyElement::VariantUsage(field_0) => {
                     visitor.visit_variant_usage(field_0);
@@ -2984,7 +2989,7 @@ macro_rules! ast_traversal {
                     visitor.visit_allocate(field_0);
                 }
                 PartUsageBodyElement::Satisfy(field_0) => {
-                    visitor.visit_satisfy(field_0);
+                    visitor.visit_satisfy_requirement_usage(&$($mutability)? **field_0);
                 }
                 PartUsageBodyElement::StateUsage(field_0) => {
                     visitor.visit_state_usage(field_0);
@@ -4091,7 +4096,7 @@ macro_rules! ast_traversal {
                     visitor.visit_succession_usage(field_0);
                 }
                 OccurrenceBodyElement::Satisfy(field_0) => {
-                    visitor.visit_satisfy(field_0);
+                    visitor.visit_satisfy_requirement_usage(&$($mutability)? **field_0);
                 }
                 OccurrenceBodyElement::Allocate(field_0) => {
                     visitor.visit_allocate(field_0);
@@ -5423,6 +5428,9 @@ macro_rules! ast_traversal {
                 RequirementDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
+                RequirementDefBodyElement::Satisfy(field_0) => {
+                    visitor.visit_satisfy_requirement_usage(&$($mutability)? **field_0);
+                }
                 RequirementDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
@@ -5572,26 +5580,91 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_satisfy<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Satisfy>) {
+        pub fn walk_satisfy_requirement_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<SatisfyRequirementUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let Satisfy { source, target, body, is_negated, inline_requirement } = &$($mutability)? node.value;
-            visitor.visit_expression(source);
-            visitor.visit_expression(target);
-            walk_constraint_def_body(visitor, body);
-            let _ = is_negated;
-            if let Some(inner) = inline_requirement {
-                visitor.visit_inline_satisfy_requirement(inner);
+            let SatisfyRequirementUsage {
+                assert_span,
+                not_span,
+                satisfy_span,
+                requirement,
+                typing,
+                multiplicity,
+                ordered,
+                nonunique,
+                subsets,
+                redefines,
+                references,
+                crosses,
+                value,
+                subject,
+                body,
+            } = &$($mutability)? node.value;
+            if let Some(inner) = assert_span {
+                visitor.visit_span(inner);
             }
+            if let Some(inner) = not_span {
+                visitor.visit_span(inner);
+            }
+            visitor.visit_span(satisfy_span);
+            visitor.visit_satisfied_requirement(requirement);
+            if let Some(inner) = typing {
+                visitor.visit_typing_relationship(inner);
+            }
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            let _ = ordered;
+            let _ = nonunique;
+            if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = redefines {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = value {
+                visitor.visit_feature_value(inner);
+            }
+            if let Some(inner) = subject {
+                visitor.visit_satisfaction_subject(inner);
+            }
+            walk_requirement_def_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_inline_satisfy_requirement<V: $Visitor>(visitor: &mut V, node: &$($mutability)? InlineSatisfyRequirement) {
-            let InlineSatisfyRequirement { name, type_name } = node;
-            visitor.visit_text(name);
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
+        pub fn walk_satisfied_requirement<V: $Visitor>(visitor: &mut V, node: &$($mutability)? SatisfiedRequirement) {
+            match node {
+                SatisfiedRequirement::Reference { reference } => {
+                    visitor.visit_qualified_reference(reference);
+                }
+                SatisfiedRequirement::Declaration(field_0) => {
+                    visitor.visit_inline_requirement_declaration(field_0);
+                }
             }
+        }
+
+        pub fn walk_inline_requirement_declaration<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<InlineRequirementDeclaration>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let InlineRequirementDeclaration { keyword_span, identification } = &$($mutability)? node.value;
+            visitor.visit_span(keyword_span);
+            visitor.visit_identification(identification);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_satisfaction_subject<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<SatisfactionSubject>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let SatisfactionSubject { by_span, reference } = &$($mutability)? node.value;
+            visitor.visit_span(by_span);
+            visitor.visit_qualified_reference(reference);
+            visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_requirement_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RequirementUsage>) {
@@ -6532,7 +6605,7 @@ macro_rules! ast_traversal {
                     visitor.visit_viewpoint_usage(field_0);
                 }
                 ViewDefBodyElement::Satisfy(field_0) => {
-                    visitor.visit_satisfy(field_0);
+                    visitor.visit_satisfy_requirement_usage(&$($mutability)? **field_0);
                 }
                 ViewDefBodyElement::Filter(field_0) => {
                     visitor.visit_filter_member(field_0);
@@ -6728,7 +6801,7 @@ macro_rules! ast_traversal {
                     visitor.visit_expose_member(field_0);
                 }
                 ViewBodyElement::Satisfy(field_0) => {
-                    visitor.visit_satisfy_view_member(field_0);
+                    visitor.visit_satisfy_requirement_usage(&$($mutability)? **field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -6743,14 +6816,6 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_satisfy_view_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<SatisfyViewMember>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let SatisfyViewMember { viewpoint_ref, body } = &$($mutability)? node.value;
-            visitor.visit_qualified_reference(viewpoint_ref);
-            walk_relationship_body(visitor, body);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
 
         pub fn walk_viewpoint_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewpointUsage>) {
             visitor.enter_node(&$($mutability)? node.span);

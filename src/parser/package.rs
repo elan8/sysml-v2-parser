@@ -1882,13 +1882,22 @@ fn try_package_body_requirement<'a>(
         requirement_usage,
         PackageBodyElement::RequirementUsage
     );
+    // `satisfy`, `not satisfy`, `assert satisfy`, and `assert not satisfy` are all one
+    // production, so `assert` is a FIRST keyword of two package-body members. The starter table
+    // can only name one production per keyword, so the `assert`-led attempt is spelled out here;
+    // it fails immediately unless `satisfy` actually follows, leaving `AssertConstraintUsage` to
+    // the fallback dispatcher further down. Without it a package-level `assert satisfy r by q;`
+    // (`Simple Tests/RequirementTest.sysml:27`) fell through to recovery.
+    try_package_body_dispatch!(input, start, starter, AssertConstraintUsage, satisfy, |n| {
+        PackageBodyElement::Satisfy(Box::new(n))
+    });
     try_package_body_dispatch!(
         input,
         start,
         starter,
         SatisfyRequirementUsage,
         satisfy,
-        PackageBodyElement::Satisfy
+        |n| PackageBodyElement::Satisfy(Box::new(n))
     );
     try_package_body_dispatch!(
         input,

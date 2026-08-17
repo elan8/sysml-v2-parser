@@ -744,15 +744,10 @@ pub(crate) fn emit_view_usage(
                         )?;
                     }
                     crate::ast::ViewBodyElement::Satisfy(s) => {
-                        w.push_str("satisfy ");
-                        w.push_qualified_reference(
-                            &format!("{path}/body[{i}]/satisfy/viewpoint"),
-                            s.value.viewpoint_ref,
-                        )?;
-                        super::structure::emit_relationship_body(
+                        crate::emit::requirement::emit_satisfy(
                             w,
                             &format!("{path}/body[{i}]"),
-                            &s.value.body,
+                            &s.value,
                         )?;
                     }
                 }

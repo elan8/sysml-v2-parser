@@ -11,8 +11,8 @@ use super::EmitError;
 use crate::ast::{
     ConcernUsage, Dependency, EnumerationUsage, ItemUsage, RequireConstraint, RequirementDef,
     RequirementDefBody, RequirementDefBodyElement, RequirementUsage, ReturnRef, ReturnRefBody,
-    ReturnRefBodyElement, Satisfy, SubjectDecl, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement,
-    UseCaseUsage,
+    ReturnRefBodyElement, SatisfiedRequirement, SatisfyRequirementUsage, SubjectDecl, UseCaseDef,
+    UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage,
 };
 
 pub(crate) fn emit_requirement_def(
@@ -146,6 +146,7 @@ fn emit_requirement_body_element(
             structure::emit_variant_usage(w, path, &v.value)
         }
         RequirementDefBodyElement::RequirementUsage(r) => emit_requirement_usage(w, path, &r.value),
+        RequirementDefBodyElement::Satisfy(s) => emit_satisfy(w, path, &s.value),
         RequirementDefBodyElement::SubjectDecl(s) => emit_subject_decl(w, &s.value),
         RequirementDefBodyElement::SubjectRef(_) => {
             w.push_str("subject;");
@@ -941,28 +942,66 @@ pub(crate) fn emit_enumeration_usage(
     emit_attribute_body(w, path, &usage.body)
 }
 
+/// `SatisfyRequirementUsage` emission.
+///
+/// Every clause comes from a structured field: the two prefixes from their authored keyword
+/// spans, the requirement clause from whichever alternative the AST holds, and the `by` clause
+/// only when a subject was authored. Nothing here inspects source text, `Display` output, or the
+/// spelling of a declaration label to decide what to write.
 pub(crate) fn emit_satisfy(
     w: &mut EmitWriter<'_>,
     path: &str,
-    satisfy: &Satisfy,
+    satisfy: &SatisfyRequirementUsage,
 ) -> Result<(), EmitError> {
-    if satisfy.is_negated {
+    if satisfy.assert_span.is_some() {
+        w.push_str("assert ");
+    }
+    if satisfy.not_span.is_some() {
         w.push_str("not ");
     }
     w.push_str("satisfy ");
-    if let Some(inline) = &satisfy.inline_requirement {
-        w.push_str("requirement ");
-        w.push_str(&format_name(&inline.name));
-        if let Some(ty) = &inline.type_name {
-            w.push_str(" : ");
-            w.push_qualified_reference(&format!("{path}/inline-requirement/type"), *ty)?;
+    match &satisfy.requirement {
+        SatisfiedRequirement::Reference { reference } => {
+            w.push_qualified_reference(&format!("{path}/satisfy/requirement"), *reference)?;
         }
-        w.push_str(" by ");
-        emit_expression(w, &satisfy.target.value)?;
-    } else {
-        emit_expression(w, &satisfy.source.value)?;
-        w.push_str(" by ");
-        emit_expression(w, &satisfy.target.value)?;
+        SatisfiedRequirement::Declaration(declaration) => {
+            w.push_str("requirement");
+            let identification = &declaration.value.identification;
+            if identification.short_name.is_some() || identification.name.is_some() {
+                w.push_char(' ');
+                emit_identification(w, identification);
+            }
+        }
     }
-    crate::emit::view::emit_constraint_body(w, path, &satisfy.body)
+    if let Some(typing) = &satisfy.typing {
+        emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(multiplicity) = &satisfy.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
+    if satisfy.ordered {
+        w.push_str(" ordered");
+    }
+    if satisfy.nonunique {
+        w.push_str(" nonunique");
+    }
+    for clause in [
+        satisfy.subsets.as_ref(),
+        satisfy.references.as_ref(),
+        satisfy.redefines.as_ref(),
+        satisfy.crosses.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        emit_subsetting_clause(w, &clause.value)?;
+    }
+    if let Some(value) = &satisfy.value {
+        emit_feature_value(w, value)?;
+    }
+    if let Some(subject) = &satisfy.subject {
+        w.push_str(" by ");
+        w.push_qualified_reference(&format!("{path}/satisfy/subject"), subject.value.reference)?;
+    }
+    emit_requirement_body(w, path, &satisfy.body)
 }

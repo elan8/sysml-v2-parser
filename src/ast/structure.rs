@@ -6,7 +6,9 @@ use super::body::Body;
 use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
-use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
+use super::requirement::{
+    Dependency, EnumerationUsage, ItemUsage, RequirementUsage, SatisfyRequirementUsage,
+};
 use super::view::{CalcUsage, ConstraintDef, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
     ConnectionEnd, Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
@@ -132,9 +134,9 @@ pub enum PartDefBodyElement {
     /// `assert (not)? constraint { ... }` inside a part definition body (previously only
     /// reachable from occurrence definition bodies).
     AssertConstraint(Node<AssertConstraintMember>),
-    /// `satisfy <ref> (by <expr>)?;` inside a part definition body (previously only reachable
+    /// `SatisfyRequirementUsage` inside a part definition body (previously only reachable
     /// at package level).
-    Satisfy(Node<Satisfy>),
+    Satisfy(Box<Node<SatisfyRequirementUsage>>),
     /// `variant` name `;` — a variant member inside a `variation part def` body.
     VariantUsage(Node<VariantUsage>),
     /// `state def` nested inside a part definition body (PAR-002: previously only reachable
@@ -665,7 +667,8 @@ pub enum PartUsageBodyElement {
     /// for `ConnectionDefBodyElement`/`OccurrenceBodyElement`; just not dispatched here.
     SuccessionUsage(Node<SuccessionUsage>),
     Allocate(Node<Allocate>),
-    Satisfy(Node<Satisfy>),
+    /// `SatisfyRequirementUsage` inside a part usage body.
+    Satisfy(Box<Node<SatisfyRequirementUsage>>),
     StateUsage(Node<StateUsage>),
     /// `action` / `ref action` usage inside a part usage body.
     ActionUsage(Box<Node<ActionUsage>>),
@@ -1756,9 +1759,9 @@ pub enum OccurrenceBodyElement {
     ItemUsage(Node<ItemUsage>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
     SuccessionUsage(Node<SuccessionUsage>),
-    /// `satisfy <ref> (by <expr>)?;` inside an occurrence definition body (previously only
+    /// `SatisfyRequirementUsage` inside an occurrence definition body (previously only
     /// reachable at package level).
-    Satisfy(Node<Satisfy>),
+    Satisfy(Box<Node<SatisfyRequirementUsage>>),
     /// `allocate <source> to <target>;` nested inside an allocation usage body (§6 G17), which
     /// decomposes the outer allocation. Real usage: OMG spec Annex `12b-Allocation.sysml`.
     Allocate(Node<Allocate>),

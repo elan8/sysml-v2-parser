@@ -990,6 +990,7 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
         let p = format!("{path}/body[{i}]");
         match &el.value {
             RequirementDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
+            RequirementDefBodyElement::Satisfy(n) => walk_satisfy(report, &p, &n.value),
             RequirementDefBodyElement::Dependency(n) => {
                 walk_relationship_body(report, &p, &n.value.body)
             }
@@ -1204,7 +1205,7 @@ fn walk_view_body_element(report: &mut OpacityReport, path: &str, el: &ViewBodyE
         ViewBodyElement::Error(_) => hit(report, path, OpacityKind::ParseError),
         ViewBodyElement::ViewRendering(n) => walk_rendering_usage_body(report, path, &n.value.body),
         ViewBodyElement::Expose(n) => walk_relationship_body(report, path, &n.value.body),
-        ViewBodyElement::Satisfy(n) => walk_relationship_body(report, path, &n.value.body),
+        ViewBodyElement::Satisfy(n) => walk_satisfy(report, path, &n.value),
         ViewBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
         ViewBodyElement::Annotating(member) => walk_annotating_member(report, path, member),
         ViewBodyElement::Filter(_) => {}
@@ -1430,8 +1431,12 @@ fn walk_end_decl(report: &mut OpacityReport, path: &str, end: &crate::ast::EndDe
     }
 }
 
-fn walk_satisfy(report: &mut OpacityReport, path: &str, satisfy: &crate::ast::Satisfy) {
-    walk_constraint_def_body(report, path, &satisfy.body);
+fn walk_satisfy(
+    report: &mut OpacityReport,
+    path: &str,
+    satisfy: &crate::ast::SatisfyRequirementUsage,
+) {
+    walk_requirement_def_body(report, path, &satisfy.body);
 }
 
 fn walk_bind(report: &mut OpacityReport, path: &str, bind: &crate::ast::Bind) {

@@ -1,22 +1,22 @@
 use crate::ast::{
     CommentAnnotation, ConcernUsage, DocComment, FrameMember, Node, PurposeMember,
     RequireConstraint, RequirementActorDecl, RequirementDef, RequirementDefBody,
-    RequirementDefBodyElement, RequirementUsage, Satisfy, StakeholderMember, SubjectDecl,
-    SubjectRef, TextualRepresentation, VerifyRequirementMember,
+    RequirementDefBodyElement, RequirementUsage, SatisfactionSubject, SatisfiedRequirement,
+    SatisfyRequirementUsage, StakeholderMember, SubjectDecl, SubjectRef, TextualRepresentation,
+    VerifyRequirementMember,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage, redefinition_feature_binding};
-use crate::parser::body::parse_structured_brace_members;
+use crate::parser::body::{parse_structured_brace_members_with_skip, BraceMemberSkip};
 use crate::parser::constraint::{constraint_def_body, constraint_usage};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
-    identification, name, qualified_reference, short_name_prefix, skip_statement_or_block,
+    identification, name, qualified_reference, recover_body_element, short_name_prefix,
     starts_with_keyword, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::usage::{
-    feature_usage_header, multiplicity, multiplicity_node, optional_typings, specialization_clauses,
+    feature_usage_header, multiplicity, multiplicity_node, specialization_clauses,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -60,7 +60,11 @@ fn other_requirement_body_element(
         )));
     }
 
-    let (input, _) = skip_statement_or_block(input)?;
+    // Stop at the next member's own starter keyword rather than at the next `;`: a malformed
+    // member with no terminator of its own would otherwise take the following member's, which
+    // swallows a valid sibling. This is the same boundary the part/usage body scopes recover on,
+    // and it matters here because a `SatisfyRequirementUsage` owns a `RequirementBody`.
+    let (input, _) = recover_body_element(input, REQUIREMENT_BODY_STARTERS)?;
     if input.location_offset() == start_after_ws.location_offset() {
         return Err(nom::Err::Error(nom::error::Error::new(
             start_after_ws,
@@ -117,13 +121,18 @@ pub(crate) fn requirement_def_body(input: Input<'_>) -> IResult<Input<'_>, Requi
 }
 
 fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
-    let (input, members) = parse_structured_brace_members(
+    let (input, members) = parse_structured_brace_members_with_skip(
         input,
         REQUIREMENT_BODY_STARTERS,
         "requirement body",
         "recovered_requirement_body_element",
         requirement_def_body_element,
         requirement_body_recovery_element,
+        // Synchronize on the next member's starter keyword rather than on the next `;`, which a
+        // malformed member with no terminator of its own would otherwise borrow from the valid
+        // member after it. The part definition and usage bodies already recover this way; it
+        // matters here too because a `SatisfyRequirementUsage` owns a `RequirementBody`.
+        BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }
@@ -208,6 +217,10 @@ fn requirement_def_body_element(
                 map(crate::parser::constraint::calc_usage, |n| {
                     RequirementDefBodyElement::CalcUsage(Box::new(n))
                 }),
+                // `RequirementBodyItem → DefinitionBodyItem → … → SatisfyRequirementUsage`, so a
+                // satisfy usage is a member of every requirement body -- including the
+                // `RequirementBody` that a satisfy usage owns itself.
+                map(satisfy, |n| RequirementDefBodyElement::Satisfy(Box::new(n))),
             )),
             map(
                 crate::parser::connector::ref_decl,
@@ -909,73 +922,190 @@ pub(crate) fn textual_representation(
     ))
 }
 
-pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
+/// `SatisfyRequirementUsage` (SysML 8.2.2.21.2).
+///
+/// ```text
+/// SatisfyRequirementUsage =
+///     OccurrenceUsagePrefix 'assert' ( isNegated ?= 'not' ) 'satisfy'
+///     ( ownedRelationship += OwnedReferenceSubsetting FeatureSpecializationPart?
+///     | 'requirement' UsageDeclaration )
+///     ValuePart?
+///     ( 'by' ownedRelationship += SatisfactionSubjectMember )?
+///     RequirementBody
+/// ```
+///
+/// See [`crate::ast::SatisfyRequirementUsage`] for the two places where the pinned production text
+/// omits an optionality marker its own corpus proves is there.
+pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyRequirementUsage>> {
     crate::parser::span::reference_transaction(input, satisfy_inner)
 }
 
-fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
+/// Consume one keyword plus the trivia around it, returning the keyword's exact token span.
+///
+/// [`starts_with_keyword`] supplies the token boundary -- `assert` cannot match the first six
+/// bytes of a declaration named `assertions`, nor `by` the first two of `byte` -- so the separator
+/// itself is [`ws_and_comments`] rather than `ws1`. That distinction is load-bearing: `ws1`
+/// consumes whitespace but stops at `/`, so a comment between two of this production's keywords
+/// was left sitting in front of the next one and `assert /* why */ satisfy r by p;` failed to
+/// parse even though the same comment is trivia everywhere else.
+///
+/// A comment *abutting* the keyword (`satisfy/* why */ r`) is still rejected, and not by anything
+/// this production owns: [`starts_with_keyword`] requires the byte after an identifier-shaped
+/// keyword to be whitespace or one of `{ : ; [`, so every keyword in this parser behaves the same
+/// way -- `part/* c */ a;` and `import/* c */ A::*;` are rejected identically. Widening that
+/// predicate to a true identifier boundary is a lexical change affecting every starter table,
+/// dispatch guard and recovery sync in the crate, so it belongs to its own seam; it is recorded in
+/// `planning/satisfy-requirement-usage-matrix.md` §7.
+fn keyword_token<'a>(
+    input: Input<'a>,
+    keyword: &'static [u8],
+) -> IResult<Input<'a>, crate::ast::Span> {
+    let (after_ws, _) = ws_and_comments(input)?;
+    if !starts_with_keyword(after_ws.fragment(), keyword) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            after_ws,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (rest, (span, _)) = with_span(tag(keyword)).parse(after_ws)?;
+    let (rest, _) = ws_and_comments(rest)?;
+    Ok((rest, span))
+}
+
+/// [`keyword_token`] for a keyword the production makes optional. Consumes nothing when the
+/// keyword is absent.
+fn optional_keyword_token<'a>(
+    input: Input<'a>,
+    keyword: &'static [u8],
+) -> IResult<Input<'a>, Option<crate::ast::Span>> {
+    match keyword_token(input, keyword) {
+        Ok((rest, span)) => Ok((rest, Some(span))),
+        Err(_) => Ok((input, None)),
+    }
+}
+
+/// `( OwnedReferenceSubsetting | 'requirement' UsageDeclaration )` -- the production's two
+/// mutually exclusive requirement clauses. The `requirement` keyword is what selects between
+/// them, so the choice is made once here rather than inferred later from which field is set.
+fn satisfied_requirement(input: Input<'_>) -> IResult<Input<'_>, SatisfiedRequirement> {
+    let (after_ws, _) = ws_and_comments(input)?;
+    if let Ok((rest, keyword_span)) = keyword_token(after_ws, b"requirement") {
+        let (rest, identification) = usage_declaration_identification(rest)?;
+        return Ok((
+            rest,
+            SatisfiedRequirement::Declaration(node_from_to(
+                after_ws,
+                rest,
+                crate::ast::InlineRequirementDeclaration {
+                    keyword_span,
+                    identification,
+                },
+            )),
+        ));
+    }
+    // `OwnedReferenceSubsetting = [QualifiedName] | OwnedFeatureChain`: a reference with typed
+    // `::` and `.` separators, not an expression.
+    let (rest, reference) = crate::parser::lex::reference_path(input)?;
+    Ok((rest, SatisfiedRequirement::Reference { reference }))
+}
+
+/// `UsageDeclaration`'s `Identification = ( '<' NAME '>' )? ( NAME )?`.
+///
+/// Both halves are optional, so `satisfy requirement by x;` and `satisfy requirement;` declare an
+/// anonymous requirement. `name` accepts any identifier, so an anonymous declaration would
+/// otherwise swallow the `by` that follows it; a reserved keyword therefore ends the
+/// identification. A *quoted* name is never a keyword, so `satisfy requirement 'by' …` still
+/// declares a requirement called `by`.
+fn usage_declaration_identification(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::Identification> {
+    let (input, short_name) = short_name_prefix(input)?;
+    let (after_ws, _) = ws_and_comments(input)?;
+    if next_word_is_reserved(after_ws) {
+        return Ok((
+            input,
+            crate::ast::Identification {
+                short_name,
+                name: None,
+            },
+        ));
+    }
+    let (input, declared_name) = opt(preceded(ws_and_comments, name)).parse(input)?;
+    Ok((
+        input,
+        crate::ast::Identification {
+            short_name,
+            name: declared_name,
+        },
+    ))
+}
+
+/// Whether the next unquoted identifier token spells a reserved SysML keyword.
+fn next_word_is_reserved(input: Input<'_>) -> bool {
+    let fragment = input.fragment();
+    let word_len = fragment
+        .iter()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+        .count();
+    word_len > 0 && crate::parser::lex::is_reserved_keyword(&fragment[..word_len])
+}
+
+/// `'by' ownedRelationship += SatisfactionSubjectMember`.
+///
+/// The membership chain bottoms out at `FeatureChainMember = [QualifiedName] |
+/// OwnedFeatureChainMember`, so the subject is a source-backed reference path.
+fn satisfaction_subject(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfactionSubject>> {
+    let (after_ws, _) = ws_and_comments(input)?;
+    let (rest, by_span) = keyword_token(after_ws, b"by")?;
+    let (rest, reference) = crate::parser::lex::reference_path(rest)?;
+    Ok((
+        rest,
+        node_from_to(after_ws, rest, SatisfactionSubject { by_span, reference }),
+    ))
+}
+
+fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyRequirementUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"assert"[..]), ws1)).parse(input)?;
-    let (input, is_negated) = opt(preceded(tag(&b"not"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    let (input, _) = tag(&b"satisfy"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, (source, inline_requirement)) =
-        if let Ok((after_kw, _)) = preceded(tag(&b"requirement"[..]), ws1).parse(input) {
-            // Fuller `satisfy requirement <name> : <Type>` form (SysML `SatisfyRequirementUsage`),
-            // reusing the shared typing fragment from usage.rs rather than hand-rolling it.
-            let inline_start = after_kw;
-            let (_, req_reference) = crate::parser::lex::qualified_reference(after_kw)?;
-            let (after_name, req_name) = name(after_kw)?;
-            let (after_type, type_suffix) = optional_typings(after_name)?;
-            let type_name = type_suffix.and_then(|(_, _, targets, _)| targets.first().copied());
-            let source = node_from_to(
-                inline_start,
-                after_type,
-                crate::ast::Expression::FeatureRef(req_reference),
-            );
-            (
-                after_type,
-                (
-                    source,
-                    Some(crate::ast::InlineSatisfyRequirement {
-                        name: req_name,
-                        type_name,
-                    }),
-                ),
-            )
-        } else {
-            let (input, source) = expression(input)?;
-            (input, (source, None))
-        };
-    let (input, target) = if let Ok((input, _)) = preceded(
-        ws_and_comments,
-        tag::<_, _, nom::error::Error<Input>>(&b"by"[..]),
-    )
-    .parse(input)
-    {
-        let (input, _) = ws1(input)?;
-        let (input, target) = expression(input)?;
-        (input, target)
-    } else {
-        // Support shorthand `satisfy RequirementRef;` used in part bodies.
-        // We preserve AST shape by mirroring source/target.
-        (input, source.clone())
-    };
-    let (input, body) = constraint_def_body(input)?;
+    let (input, assert_span) = optional_keyword_token(input, b"assert")?;
+    let (input, not_span) = optional_keyword_token(input, b"not")?;
+    let (input, satisfy_span) = keyword_token(input, b"satisfy")?;
+    let (input, requirement) = satisfied_requirement(input)?;
+    // `FeatureSpecializationPart?`, shared by both alternatives of the requirement clause.
+    let (input, header) = feature_usage_header(input)?;
+    if header.intersects.is_some() {
+        // `FeatureSpecialization = Typings | Subsettings | References | Crosses | Redefinitions`.
+        // KerML's `Intersecting` is not reachable from this SysML production, so accepting it
+        // here would silently discard an authored clause the AST has no role for.
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let (input, subject) = opt(satisfaction_subject).parse(input)?;
+    let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
-            Satisfy {
-                source,
-                target,
+            SatisfyRequirementUsage {
+                assert_span,
+                not_span,
+                satisfy_span,
+                requirement,
+                typing: header.typing,
+                multiplicity: header.multiplicity,
+                ordered: header.ordered,
+                nonunique: header.nonunique,
+                subsets: header.subsets,
+                redefines: header.redefines,
+                references: header.references,
+                crosses: header.crosses,
+                value,
+                subject,
                 body,
-                is_negated,
-                inline_requirement,
             },
         ),
     ))

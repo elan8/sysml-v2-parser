@@ -17,7 +17,13 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"@",
     b"abstract",
     b"allocate",
+    // `assert` and `not` both begin a `SatisfyRequirementUsage`
+    // (`( 'assert' )? ( 'not' )? 'satisfy' ...`), and `assert` also begins an
+    // `AssertConstraintUsage`. Recovery must synchronize on the *first* token of the member, not
+    // on `satisfy`, or a malformed member before `not satisfy r by p;` scans past the prefix and
+    // takes that member's terminator with it.
     b"assert",
+    b"not",
     b"action",
     b"attribute",
     b"bind",
@@ -92,6 +98,10 @@ pub(crate) const PORT_BODY_STARTERS: &[&[u8]] =
 pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"#",
     b"@",
+    // See `PART_BODY_STARTERS`: the two optional prefixes of `SatisfyRequirementUsage` are FIRST
+    // tokens of this scope exactly as `satisfy` itself is.
+    b"assert",
+    b"not",
     b"attribute",
     b"constraint",
     b"doc",
@@ -211,11 +221,24 @@ pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
 pub(crate) const RELATIONSHIP_BODY_STARTERS: &[&[u8]] =
     &[b"doc", b"comment", b"rep", b"@", b"feature"];
 
-pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] =
-    &[b"@", b"doc", b"filter", b"render", b"ref", b"abstract"];
+/// `satisfy`, `assert` and `not` are here because `view_def_body_element` dispatches
+/// `SatisfyRequirementUsage`; the list had none of the three, so a malformed member before any
+/// satisfy usage in a view definition body consumed it.
+pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b"@",
+    b"assert",
+    b"doc",
+    b"filter",
+    b"not",
+    b"render",
+    b"ref",
+    b"satisfy",
+    b"abstract",
+];
 
-pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] =
-    &[b"doc", b"expose", b"filter", b"render", b"satisfy"];
+pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] = &[
+    b"assert", b"doc", b"expose", b"filter", b"not", b"render", b"satisfy",
+];
 
 pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[b"connect", b"end", b"ref", b"doc"];
 

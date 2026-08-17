@@ -1,0 +1,127 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "Every alternative of SatisfyRequirementUsage, side by side. The requirement clause is either an OwnedReferenceSubsetting -- a qualified name or a `.`-separated feature chain, absolute or relative, quoted or unquoted -- or an inline `requirement` UsageDeclaration whose Identification declares a name and short name rather than referring to one. The `assert` and `not` prefixes appear in all four legal combinations; the `by` clause appears both written and omitted, and an omitted one stays omitted rather than being filled in from the satisfied requirement. FeatureSpecializationPart, ValuePart and both RequirementBody forms are shown on both alternatives."))
+~~~
+# SOURCE
+~~~sysml
+package SatisfyAlternatives {
+    package Requirements {
+        requirement def Spec;
+        requirement def 'engine spec';
+    }
+    part vehicle {
+        part engine;
+    }
+    part def ReferenceAlternative {
+        satisfy Requirements::Spec by vehicle;
+        satisfy $::SatisfyAlternatives::Requirements::Spec by vehicle;
+        satisfy Requirements::'engine spec' by vehicle.engine;
+        satisfy Requirements::Spec by SatisfyAlternatives::vehicle.engine;
+        satisfy Requirements::Spec;
+    }
+    part def PrefixCombinations {
+        satisfy Requirements::Spec by vehicle;
+        assert satisfy Requirements::Spec by vehicle;
+        not satisfy Requirements::Spec by vehicle;
+        assert not satisfy Requirements::Spec by vehicle;
+    }
+    part def DeclarationAlternative {
+        satisfy requirement declared by vehicle;
+        satisfy requirement declared : Requirements::Spec by vehicle;
+        satisfy requirement <'1.1'> declared : Requirements::Spec by vehicle;
+        satisfy requirement 'quoted declaration' : Requirements::Spec;
+        satisfy requirement by vehicle;
+        satisfy requirement;
+    }
+    part def SpecializationAndValue {
+        satisfy Requirements::Spec[1] by vehicle;
+        satisfy Requirements::Spec :> Requirements::'engine spec' by vehicle;
+        satisfy Requirements::Spec :>> Requirements::'engine spec' by vehicle;
+        satisfy requirement declared : Requirements::Spec :> Requirements::'engine spec' by vehicle;
+    }
+    part def RequirementBodyMembers {
+        satisfy Requirements::Spec by vehicle;
+        satisfy Requirements::Spec by vehicle {
+        }
+        satisfy Requirements::Spec by vehicle {
+            doc
+            /* the body is a RequirementBody, not a constraint body */
+            subject subjectVehicle : Requirements::Spec;
+            require constraint required;
+            assume constraint assumed;
+            frame framedConcern;
+            actor operator : Requirements::Spec;
+            stakeholder Requirements::Spec;
+            requirement nested :> Requirements::Spec;
+            satisfy Requirements::'engine spec' by vehicle.engine;
+        }
+    }
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "satisfy_requirement_usage_alternatives.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sexpr
+(stable-idempotent)
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+    (reference r0 (scope relative) (span (offset 230) (line 10) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 230) (line 10) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 244) (line 10) (column 31) (len 4)))))
+    (reference r1 (scope relative) (span (offset 252) (line 10) (column 39) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 252) (line 10) (column 39) (len 7)))))
+    (reference r2 (scope absolute) (span (offset 277) (line 11) (column 17) (len 42)) (segments (segment 0 (token "SatisfyAlternatives") (name "SatisfyAlternatives") (separator none) (span (offset 280) (line 11) (column 20) (len 19))) (segment 1 (token "Requirements") (name "Requirements") (separator colon-colon) (span (offset 301) (line 11) (column 41) (len 12))) (segment 2 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 315) (line 11) (column 55) (len 4)))))
+    (reference r3 (scope relative) (span (offset 323) (line 11) (column 63) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 323) (line 11) (column 63) (len 7)))))
+    (reference r4 (scope relative) (span (offset 348) (line 12) (column 17) (len 27)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 348) (line 12) (column 17) (len 12))) (segment 1 (token "'engine spec'") (name "engine spec") (separator colon-colon) (span (offset 362) (line 12) (column 31) (len 13)))))
+    (reference r5 (scope relative) (span (offset 379) (line 12) (column 48) (len 14)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 379) (line 12) (column 48) (len 7))) (segment 1 (token "engine") (name "engine") (separator dot) (span (offset 387) (line 12) (column 56) (len 6)))))
+    (reference r6 (scope relative) (span (offset 411) (line 13) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 411) (line 13) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 425) (line 13) (column 31) (len 4)))))
+    (reference r7 (scope relative) (span (offset 433) (line 13) (column 39) (len 35)) (segments (segment 0 (token "SatisfyAlternatives") (name "SatisfyAlternatives") (separator none) (span (offset 433) (line 13) (column 39) (len 19))) (segment 1 (token "vehicle") (name "vehicle") (separator colon-colon) (span (offset 454) (line 13) (column 60) (len 7))) (segment 2 (token "engine") (name "engine") (separator dot) (span (offset 462) (line 13) (column 68) (len 6)))))
+    (reference r8 (scope relative) (span (offset 486) (line 14) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 486) (line 14) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 500) (line 14) (column 31) (len 4)))))
+    (reference r9 (scope relative) (span (offset 562) (line 17) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 562) (line 17) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 576) (line 17) (column 31) (len 4)))))
+    (reference r10 (scope relative) (span (offset 584) (line 17) (column 39) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 584) (line 17) (column 39) (len 7)))))
+    (reference r11 (scope relative) (span (offset 616) (line 18) (column 24) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 616) (line 18) (column 24) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 630) (line 18) (column 38) (len 4)))))
+    (reference r12 (scope relative) (span (offset 638) (line 18) (column 46) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 638) (line 18) (column 46) (len 7)))))
+    (reference r13 (scope relative) (span (offset 667) (line 19) (column 21) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 667) (line 19) (column 21) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 681) (line 19) (column 35) (len 4)))))
+    (reference r14 (scope relative) (span (offset 689) (line 19) (column 43) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 689) (line 19) (column 43) (len 7)))))
+    (reference r15 (scope relative) (span (offset 725) (line 20) (column 28) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 725) (line 20) (column 28) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 739) (line 20) (column 42) (len 4)))))
+    (reference r16 (scope relative) (span (offset 747) (line 20) (column 50) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 747) (line 20) (column 50) (len 7)))))
+    (reference r17 (scope relative) (span (offset 840) (line 23) (column 41) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 840) (line 23) (column 41) (len 7)))))
+    (reference r18 (scope relative) (span (offset 888) (line 24) (column 40) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 888) (line 24) (column 40) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 902) (line 24) (column 54) (len 4)))))
+    (reference r19 (scope relative) (span (offset 910) (line 24) (column 62) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 910) (line 24) (column 62) (len 7)))))
+    (reference r20 (scope relative) (span (offset 966) (line 25) (column 48) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 966) (line 25) (column 48) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 980) (line 25) (column 62) (len 4)))))
+    (reference r21 (scope relative) (span (offset 988) (line 25) (column 70) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 988) (line 25) (column 70) (len 7)))))
+    (reference r22 (scope relative) (span (offset 1048) (line 26) (column 52) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1048) (line 26) (column 52) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1062) (line 26) (column 66) (len 4)))))
+    (reference r23 (scope relative) (span (offset 1099) (line 27) (column 32) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 1099) (line 27) (column 32) (len 7)))))
+    (reference r24 (scope relative) (span (offset 1197) (line 31) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1197) (line 31) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1211) (line 31) (column 31) (len 4)))))
+    (reference r25 (scope relative) (span (offset 1222) (line 31) (column 42) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 1222) (line 31) (column 42) (len 7)))))
+    (reference r26 (scope relative) (span (offset 1247) (line 32) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1247) (line 32) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1261) (line 32) (column 31) (len 4)))))
+    (reference r27 (scope relative) (span (offset 1269) (line 32) (column 39) (len 27)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1269) (line 32) (column 39) (len 12))) (segment 1 (token "'engine spec'") (name "engine spec") (separator colon-colon) (span (offset 1283) (line 32) (column 53) (len 13)))))
+    (reference r28 (scope relative) (span (offset 1300) (line 32) (column 70) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 1300) (line 32) (column 70) (len 7)))))
+    (reference r29 (scope relative) (span (offset 1325) (line 33) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1325) (line 33) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1339) (line 33) (column 31) (len 4)))))
+    (reference r30 (scope relative) (span (offset 1348) (line 33) (column 40) (len 27)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1348) (line 33) (column 40) (len 12))) (segment 1 (token "'engine spec'") (name "engine spec") (separator colon-colon) (span (offset 1362) (line 33) (column 54) (len 13)))))
+    (reference r31 (scope relative) (span (offset 1379) (line 33) (column 71) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 1379) (line 33) (column 71) (len 7)))))
+    (reference r32 (scope relative) (span (offset 1427) (line 34) (column 40) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1427) (line 34) (column 40) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1441) (line 34) (column 54) (len 4)))))
+    (reference r33 (scope relative) (span (offset 1449) (line 34) (column 62) (len 27)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1449) (line 34) (column 62) (len 12))) (segment 1 (token "'engine spec'") (name "engine spec") (separator colon-colon) (span (offset 1463) (line 34) (column 76) (len 13)))))
+    (reference r34 (scope relative) (span (offset 1480) (line 34) (column 93) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 1480) (line 34) (column 93) (len 7)))))
+    (reference r35 (scope relative) (span (offset 1549) (line 37) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1549) (line 37) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1563) (line 37) (column 31) (len 4)))))
+    (reference r36 (scope relative) (span (offset 1571) (line 37) (column 39) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 1571) (line 37) (column 39) (len 7)))))
+    (reference r37 (scope relative) (span (offset 1596) (line 38) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1596) (line 38) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1610) (line 38) (column 31) (len 4)))))
+    (reference r38 (scope relative) (span (offset 1618) (line 38) (column 39) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 1618) (line 38) (column 39) (len 7)))))
+    (reference r39 (scope relative) (span (offset 1654) (line 40) (column 17) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1654) (line 40) (column 17) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1668) (line 40) (column 31) (len 4)))))
+    (reference r40 (scope relative) (span (offset 1676) (line 40) (column 39) (len 7)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 1676) (line 40) (column 39) (len 7)))))
+    (reference r41 (scope relative) (span (offset 1810) (line 43) (column 38) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1810) (line 43) (column 38) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1824) (line 43) (column 52) (len 4)))))
+    (reference r42 (scope relative) (span (offset 1972) (line 47) (column 30) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 1972) (line 47) (column 30) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 1986) (line 47) (column 44) (len 4)))))
+    (reference r43 (scope relative) (span (offset 2016) (line 48) (column 25) (len 18)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 2016) (line 48) (column 25) (len 12))) (segment 1 (token "Spec") (name "Spec") (separator colon-colon) (span (offset 2030) (line 48) (column 39) (len 4)))))
+    (reference r44 (scope relative) (span (offset 2110) (line 50) (column 21) (len 27)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 2110) (line 50) (column 21) (len 12))) (segment 1 (token "'engine spec'") (name "engine spec") (separator colon-colon) (span (offset 2124) (line 50) (column 35) (len 13)))))
+    (reference r45 (scope relative) (span (offset 2141) (line 50) (column 52) (len 14)) (segments (segment 0 (token "vehicle") (name "vehicle") (separator none) (span (offset 2141) (line 50) (column 52) (len 7))) (segment 1 (token "engine") (name "engine") (separator dot) (span (offset 2149) (line 50) (column 60) (len 6)))))
+  )
+  (root (package (name "SatisfyAlternatives") (body brace (package (name "Requirements") (body brace (requirement-def (name "Spec") (body semicolon)) (requirement-def (name "engine spec") (body semicolon)))) (part-usage (declaration-name "vehicle") (typing none) (body brace (part-usage))) (part-def (name "ReferenceAlternative") (body brace (satisfy (assert false) (negated false) (requirement (reference (ref r0))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r1)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (reference (ref r2))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r3)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (reference (ref r4))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r5)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (reference (ref r6))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r7)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (reference (ref r8))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by none) (body semicolon)))) (part-def (name "PrefixCombinations") (body brace (satisfy (assert false) (negated false) (requirement (reference (ref r9))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r10)) (body semicolon)) (satisfy (assert true) (negated false) (requirement (reference (ref r11))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r12)) (body semicolon)) (satisfy (assert false) (negated true) (requirement (reference (ref r13))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r14)) (body semicolon)) (satisfy (assert true) (negated true) (requirement (reference (ref r15))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r16)) (body semicolon)))) (part-def (name "DeclarationAlternative") (body brace (satisfy (assert false) (negated false) (requirement (declaration (name "declared") (short-name none))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r17)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (declaration (name "declared") (short-name none))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r18)))) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r19)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (declaration (name "declared") (short-name "1.1"))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r20)))) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r21)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (declaration (name "quoted declaration") (short-name none))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r22)))) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by none) (body semicolon)) (satisfy (assert false) (negated false) (requirement (declaration (name none) (short-name none))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r23)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (declaration (name none) (short-name none))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by none) (body semicolon)))) (part-def (name "SpecializationAndValue") (body brace (satisfy (assert false) (negated false) (requirement (reference (ref r24))) (typing none) (multiplicity (lower (expression (span (offset 1216) (line 31) (column 36) (len 1)) (integer 1))) (upper (expression (span (offset 1216) (line 31) (column 36) (len 1)) (integer 1)))) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r25)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (reference (ref r26))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets (relationship (kind subsets) (implied false) (targets (ref r27)))) (references none) (redefines none) (crosses none) (value none) (by (ref r28)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (reference (ref r29))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines (relationship (kind redefines) (implied false) (targets (ref r30)))) (crosses none) (value none) (by (ref r31)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (declaration (name "declared") (short-name none))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r32)))) (multiplicity none) (ordered false) (nonunique false) (subsets (relationship (kind subsets) (implied false) (targets (ref r33)))) (references none) (redefines none) (crosses none) (value none) (by (ref r34)) (body semicolon)))) (part-def (name "RequirementBodyMembers") (body brace (satisfy (assert false) (negated false) (requirement (reference (ref r35))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r36)) (body semicolon)) (satisfy (assert false) (negated false) (requirement (reference (ref r37))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r38)) (body brace)) (satisfy (assert false) (negated false) (requirement (reference (ref r39))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r40)) (body brace (doc) (subject (name "subjectVehicle") (type (ref r41)) (redefines none) (value none)) (require-constraint) (require-constraint) (frame) (actor (name "operator") (type (ref r42))) (stakeholder (declaration "") (target (ref r43)) (type none) (redefinition false)) (requirement-usage) (satisfy (assert false) (negated false) (requirement (reference (ref r44))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by (ref r45)) (body semicolon)))))))))
+)
+~~~

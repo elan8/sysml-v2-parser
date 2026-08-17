@@ -269,7 +269,15 @@ grammar_scope!(
         (b"namespace", Namespace, Extension),
         (b"render", ViewRenderingUsage, Extension),
         (b"require", Requirement, Extension),
+        // `SatisfyRequirementUsage` leads with `satisfy`, `not satisfy`, `assert satisfy` or
+        // `assert not satisfy` (`Simple Tests/RequirementTest.sysml:21-27`). `assert` is already
+        // listed above for `AssertConstraintUsage` -- this table maps one production per keyword,
+        // and `package.rs` spells the `assert`-led satisfy attempt out explicitly -- but `not` has
+        // no other package-body production and must be listed, because the recovery starter slice
+        // is generated from this table: without it a malformed member before `not satisfy r by p;`
+        // scans past the prefix and consumes the whole usage.
         (b"satisfy", SatisfyRequirementUsage, Extension),
+        (b"not", SatisfyRequirementUsage, Extension),
         // KerML (not SysML) `PackageBodyElement` keywords, reached via this parser's
         // KerML-fallback productions rather than the SysML BNF's own `PackageBodyElement`
         // production -- excluded from the spec-FIRST equality lint above like the other

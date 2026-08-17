@@ -612,6 +612,103 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// One projection for `SatisfyRequirementUsage`, shared by every scope that owns one.
+    ///
+    /// This was a contentless `(satisfy)` marker in five scopes and a viewpoint-only
+    /// `(satisfy (viewpoint …) (body …))` in view bodies, so a snapshot could show neither the
+    /// `assert`/`not` prefixes, which of the two requirement alternatives was authored, whether a
+    /// `by` clause existed, nor a single member of the requirement body.
+    fn write_satisfy_requirement_usage(
+        &mut self,
+        usage: &super::SatisfyRequirementUsage,
+    ) -> io::Result<()> {
+        write!(
+            self.writer,
+            "(satisfy (assert {}) (negated {}) (requirement ",
+            usage.assert_span.is_some(),
+            usage.not_span.is_some()
+        )?;
+        match &usage.requirement {
+            super::SatisfiedRequirement::Reference { reference } => {
+                self.writer.write_str("(reference ")?;
+                self.write_reference(*reference)?;
+                self.writer.write_char(')')?;
+            }
+            super::SatisfiedRequirement::Declaration(declaration) => {
+                self.writer.write_str("(declaration (name ")?;
+                write_optional_quoted(
+                    self.writer,
+                    declaration.value.identification.name.as_deref(),
+                )?;
+                self.writer.write_str(") (short-name ")?;
+                write_optional_quoted(
+                    self.writer,
+                    declaration.value.identification.short_name.as_deref(),
+                )?;
+                self.writer.write_str("))")?;
+            }
+        }
+        self.writer.write_str(") (typing ")?;
+        match &usage.typing {
+            Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        write!(
+            self.writer,
+            ") (ordered {}) (nonunique {})",
+            usage.ordered, usage.nonunique
+        )?;
+        for (role, clause) in [
+            ("subsets", usage.subsets.as_ref()),
+            ("references", usage.references.as_ref()),
+            ("redefines", usage.redefines.as_ref()),
+            ("crosses", usage.crosses.as_ref()),
+        ] {
+            write!(self.writer, " ({role} ")?;
+            match clause {
+                Some(clause) => self.write_subsetting(&clause.value)?,
+                None => self.writer.write_str("none")?,
+            }
+            self.writer.write_char(')')?;
+        }
+        self.writer.write_str(" (value ")?;
+        match &usage.value {
+            Some(value) => self.write_feature_value(&value.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (by ")?;
+        match &usage.subject {
+            Some(subject) => self.write_reference(subject.value.reference)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_requirement_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// `MultiplicityPart`'s `OwnedMultiplicity`, or `none` when the clause was not authored.
+    fn write_multiplicity_clause(
+        &mut self,
+        multiplicity: Option<&Node<super::Multiplicity>>,
+    ) -> io::Result<()> {
+        let Some(multiplicity) = multiplicity else {
+            return self.writer.write_str("none");
+        };
+        self.writer.write_str("(lower ")?;
+        match &multiplicity.value.lower {
+            Some(lower) => self.write_expression(lower)?,
+            None => self.writer.write_str("unbounded")?,
+        }
+        self.writer.write_str(") (upper ")?;
+        match &multiplicity.value.upper {
+            Some(upper) => self.write_expression(upper)?,
+            None => self.writer.write_str("unbounded")?,
+        }
+        self.writer.write_char(')')
+    }
+
     fn write_requirement_body(&mut self, body: &RequirementDefBody) -> io::Result<()> {
         match body {
             RequirementDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
@@ -622,6 +719,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         RequirementDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
+                        }
+                        RequirementDefBodyElement::Satisfy(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_satisfy_requirement_usage(&usage.value)?;
                         }
                         RequirementDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -790,13 +891,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_relationship_body(&expose.value.body)?;
                             self.writer.write_char(')')?;
                         }
-                        ViewBodyElement::Satisfy(satisfy) => {
+                        ViewBodyElement::Satisfy(usage) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(satisfy (viewpoint ")?;
-                            self.write_reference(satisfy.value.viewpoint_ref)?;
-                            self.writer.write_str(") ")?;
-                            self.write_relationship_body(&satisfy.value.body)?;
-                            self.writer.write_char(')')?;
+                            self.write_satisfy_requirement_usage(&usage.value)?;
                         }
                     }
                 }
@@ -1293,8 +1390,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::AssertConstraint(_constraint) => {
                             self.write_marker(&mut first, "assert-constraint")?;
                         }
-                        PartDefBodyElement::Satisfy(_satisfy) => {
-                            self.write_marker(&mut first, "satisfy")?;
+                        PartDefBodyElement::Satisfy(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_satisfy_requirement_usage(&usage.value)?;
                         }
                         PartDefBodyElement::VariantUsage(_usage) => {
                             self.write_marker(&mut first, "variant-usage")?;
@@ -2148,8 +2246,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::Allocate(_member) => {
                             self.write_marker(&mut first, "allocate")?;
                         }
-                        super::PartUsageBodyElement::Satisfy(_member) => {
-                            self.write_marker(&mut first, "satisfy")?;
+                        super::PartUsageBodyElement::Satisfy(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_satisfy_requirement_usage(&usage.value)?;
                         }
                         super::PartUsageBodyElement::StateUsage(_member) => {
                             self.write_marker(&mut first, "state-usage")?;
@@ -3049,7 +3148,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::RequirementUsage(_usage) => {
                 self.write_marker(first, "requirement-usage")
             }
-            PackageBodyElement::Satisfy(_satisfy) => self.write_marker(first, "satisfy"),
+            PackageBodyElement::Satisfy(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_satisfy_requirement_usage(&usage.value)
+            }
             PackageBodyElement::UseCaseDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_use_case_definition(&definition.value)

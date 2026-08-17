@@ -9,6 +9,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`SatisfyRequirementUsage` is modelled from its pinned production: typed alternatives, a real
+  `RequirementBody`, and no fabricated `by`.** Audit and evidence:
+  `planning/satisfy-requirement-usage-matrix.md`. **AST version 166 -> 167.**
+
+  - `SatisfyRequirementUsage = OccurrenceUsagePrefix 'assert' ( isNegated ?= 'not' ) 'satisfy'
+    ( OwnedReferenceSubsetting FeatureSpecializationPart? | 'requirement' UsageDeclaration )
+    ValuePart? ( 'by' SatisfactionSubjectMember )? RequirementBody`. The two requirement clauses
+    are mutually exclusive syntax, so they are a `SatisfiedRequirement` enum -- `Reference {
+    reference }` or `Declaration(Node<InlineRequirementDeclaration>)` -- rather than an
+    expression beside an `Option`. `Satisfy` and `InlineSatisfyRequirement` are removed.
+  - `InlineSatisfyRequirement.name: String` is gone. The inline declaration holds the
+    `Identification` node the rest of the parser uses for declaration labels, span-backed by its
+    `Node`, and the parser no longer parses the *same* text as both a name and a qualified
+    reference: `satisfy requirement myReq : T` used to allocate an arena reference for the
+    declaration label `myReq` and store it as `Expression::FeatureRef`.
+  - When `by` was absent the parser cloned the satisfied requirement into the target field, and
+    the emitter printed ` by ` unconditionally -- so `satisfy 'system structure perspective';`
+    re-emitted as `satisfy 'system structure perspective' by 'system structure perspective';` and
+    `satisfy requirement sv : SafetyViewpoint;` as `… by sv;`. `subject:
+    Option<Node<SatisfactionSubject>>` is absent when nothing was authored, and emission writes
+    `by` only when it is present. There is no mirror flag.
+  - `assert` was parsed and discarded, so `assert satisfy r by q;` re-emitted without it. It is
+    now `assert_span: Option<Span>` beside `not_span`, each keeping its authored token; `is_negated`
+    is gone. `assert satisfy` and `assert not satisfy` also parse at package scope now, where
+    `assert` had selected `AssertConstraintUsage` and nothing else
+    (`Simple Tests/RequirementTest.sysml:27`).
+  - The body is `RequirementBody` -- `Body<RequirementDefBodyElement>` -- not `ConstraintDefBody`.
+    `subject`, `require`/`assume`, `frame`, `actor`, `stakeholder`, a nested `requirement` usage
+    and a nested satisfy usage are members of it; a constraint body could represent none of them,
+    so `satisfy Requirements::engineSpecification by vehicle_b.engine { requirement … :>> … { … } }`
+    (`Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml:652`) parsed as three
+    unrelated fragments. `RequirementDefBodyElement` gains a `Satisfy` variant, which also makes
+    `requirement def R { satisfy … }` parse.
+  - `OwnedReferenceSubsetting` and `FeatureChainMember` are references, not expressions. Both the
+    satisfied requirement and the `by` subject are now one arena-backed reference with typed
+    `::`/`.` separators. Parsing them as expressions corrupted emission: `satisfy r by p.q::s;`
+    re-emitted as `… by p.q::s::s;` and `satisfy r [1] by p;` -- a `MultiplicityPart` -- as
+    `satisfy r ['1'] by p;`. `FeatureSpecializationPart?` and `ValuePart?` are now parsed on both
+    alternatives, and a KerML `intersects` clause, which is not one of this production's
+    `FeatureSpecialization`s, is refused instead of parsed and discarded.
+  - `SatisfyViewMember` is removed. A view usage body reaches the one satisfy production through
+    `ViewBodyItem -> DefinitionBodyItem -> ... -> BehaviorUsageElement`; the separate node it used
+    to own held a bare viewpoint reference and a `RelationshipBody`, so `satisfy VP by w;` and
+    `assert satisfy VP;` in a view body were recovery text and a braced body could hold only
+    annotations.
+  - The semantic snapshot projection showed a contentless `(satisfy)` marker in five scopes and a
+    viewpoint-only form in view bodies -- neither the prefixes, the alternative, the `by` clause,
+    nor any body member was observable, and the usage's references never appeared in the
+    document's reference list. It now projects every field.
+  - Deserialization validates the new provenance: the `assert`, `not`, `satisfy`, `requirement`
+    and `by` spans must each cover their own token inside their own node, and the prefixes must
+    appear in the order the production fixes.
+  - Requirement bodies now synchronize recovery on the next member's starter keyword rather than
+    on the next `;`, which a malformed member with no terminator of its own used to borrow from
+    the valid member after it. This is the boundary part definition and usage bodies already used,
+    and it matters here because a satisfy usage owns a requirement body.
+  - `UsageHeader` gains `typing: Option<Node<TypingRelationship>>` so a scope whose emitter must
+    reproduce the authored `Typings` spelling and every target no longer has to settle for the
+    first `type_reference`.
+  - Recovery synchronizes on `assert` and `not`, not only on `satisfy`. All three are FIRST tokens
+    of one production, but the starter tables listed only `satisfy` -- and `VIEW_DEF_BODY_STARTERS`
+    did not list even that -- so in every wired scope a malformed member before a prefixed satisfy
+    usage scanned past the prefix and consumed the whole usage, terminator included. The tables now
+    carry every accepted leading keyword. One consequence at package scope: the malformed
+    `not valid` in `recovery_references.md` now reports `missing_semicolon` rather than
+    `unexpected keyword \`not\``, at the same span and with the same recovered content.
+  - A comment between the production's keywords is trivia again. `assert /* why */ satisfy r by p;`
+    failed because the separator after `assert` was `ws1`, which consumes whitespace but stops at
+    `/`, leaving the comment in front of `satisfy`; the shared keyword token now separates with
+    `ws_and_comments`. A keyword *abutting* a comment (`satisfy/* c */ r`) is still rejected by the
+    crate-wide keyword-boundary predicate, exactly as `part/* c */ a;` is.
+
 - **The `@` and `#` metadata sigils are typed and source-backed; the last opaque annotation node
   and `ConnectBody` are gone.** Audit and evidence: `planning/metadata-sigil-matrix.md`.
   **AST version 165 -> 166.**

@@ -158,10 +158,17 @@ to show:
 These are annotating-member gaps the matrix found that this change does **not** close. Each is
 recorded with the grammar evidence and the reason it is a different seam.
 
-- **`Satisfy`'s member set is still a `ConstraintDefBody`.**
-  `SatisfyRequirementUsage = … RequirementBody`, so the members should be
-  `RequirementDefBodyElement`. Its container is one `Body` now; widening the member set is a
-  member-dispatch change of the same kind as the rows in the table above.
+(None outstanding: the one recorded here is closed below.)
+
+### Closed by the satisfy-requirement-usage seam
+
+- ~~**`Satisfy`'s member set is still a `ConstraintDefBody`.**~~ — done; the audit is
+  `planning/satisfy-requirement-usage-matrix.md`. `SatisfyRequirementUsage.body` is
+  `Body<RequirementDefBodyElement>`, and `RequirementDefBodyElement` gained a `Satisfy` variant so
+  the body a satisfy usage owns can hold another one. `SatisfyViewMember` went with it: a view
+  usage body reaches the same `SatisfyRequirementUsage` every other body scope does, so its
+  `Body<RelationshipBodyElement>` was a second representation of one production rather than a
+  member set of its own.
 
 ### Closed by the metadata-sigil seam
 
@@ -182,7 +189,9 @@ recorded with the grammar evidence and the reason it is a different seam.
   `Annotation`. `Dependency`, `ExposeMember`, `SatisfyViewMember` → `Body<RelationshipBodyElement>`;
   `Allocate`, `Connect`, `BindingConnectorUsage`, `SuccessionUsage`, `ConnectStmt` →
   `Body<PartUsageBodyElement>`; `Transition` → `Body<ActionDefBodyElement>`; `Satisfy` →
-  `ConstraintDefBody`; `InterfaceUsage`'s three variants → `Body<InterfaceUsageBodyElement>`.
+  `ConstraintDefBody` (since corrected to `Body<RequirementDefBodyElement>`, and `SatisfyViewMember`
+  folded into it, by `planning/satisfy-requirement-usage-matrix.md`); `InterfaceUsage`'s three
+  variants → `Body<InterfaceUsageBodyElement>`.
   The dual `ConnectBody` + `body_elements` pairs on `Dependency`, `Satisfy`, `ConnectStmt` and all
   three `InterfaceUsage` forms are gone with them.
 - ~~A `connect` statement body is `UsageBody`, not `RelationshipBody`~~ — done. `ConnectStmt`

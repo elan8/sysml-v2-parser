@@ -3,15 +3,15 @@
 use crate::ast::{
     ExposeMember, FilterMember, ImportTarget, Membership, Node, ParseErrorNode, RenderingDef,
     RenderingDefBody, RenderingDefBodyElement, RenderingUsage, RenderingUsageBody,
-    RenderingUsageBodyElement, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody,
-    ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
+    RenderingUsageBodyElement, ViewBody, ViewBodyElement, ViewDef, ViewDefBody, ViewDefBodyElement,
+    ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::import::import_shape;
 use crate::parser::lex::{
-    name, qualified_reference, reference_path, visibility_prefix, ws1, ws_and_comments,
-    VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    name, reference_path, visibility_prefix, ws1, ws_and_comments, VIEW_BODY_STARTERS,
+    VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::requirement_def_body;
 use crate::parser::usage::{multiplicity_node, prefix_redefinition_target};
@@ -53,10 +53,9 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
         map(view_filter_member, ViewDefBodyElement::Filter),
         map(view_rendering_usage, ViewDefBodyElement::ViewRendering),
         map(viewpoint_usage, ViewDefBodyElement::ViewpointUsage),
-        map(
-            crate::parser::requirement::satisfy,
-            ViewDefBodyElement::Satisfy,
-        ),
+        map(crate::parser::requirement::satisfy, |n| {
+            ViewDefBodyElement::Satisfy(Box::new(n))
+        }),
         map(
             |i| {
                 crate::parser::recovery::unsupported_member(
@@ -369,7 +368,11 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
         map(view_filter_member, ViewBodyElement::Filter),
         map(view_rendering_usage, ViewBodyElement::ViewRendering),
         map(expose_member, ViewBodyElement::Expose),
-        map(satisfy_view_member, ViewBodyElement::Satisfy),
+        // `ViewBodyItem -> DefinitionBodyItem -> ... -> SatisfyRequirementUsage`: one satisfy
+        // production, dispatched here through the same parser every other body scope uses.
+        map(crate::parser::requirement::satisfy, |n| {
+            ViewBodyElement::Satisfy(Box::new(n))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))
@@ -410,30 +413,6 @@ fn expose_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember
                     reference,
                     shape,
                 },
-                body,
-            },
-        ),
-    ))
-}
-
-/// satisfy QualifiedName RelationshipBody (simplified form in view body)
-fn satisfy_view_member(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewMember>> {
-    crate::parser::span::reference_transaction(input, satisfy_view_member_inner)
-}
-
-fn satisfy_view_member_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewMember>> {
-    let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"satisfy"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, viewpoint_ref) = qualified_reference.parse(input)?;
-    let (input, body) = crate::parser::body::relationship_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            SatisfyViewMember {
-                viewpoint_ref,
                 body,
             },
         ),
@@ -825,9 +804,13 @@ mod expose_diagnostic_tests {
             },
             other => panic!("expected view body, got {other:?}"),
         };
+        let reference = match &satisfy.requirement {
+            crate::ast::SatisfiedRequirement::Reference { reference } => *reference,
+            other => panic!("expected the reference alternative, got {other:?}"),
+        };
         let target = result
             .document
-            .qualified_reference(satisfy.viewpoint_ref)
+            .qualified_reference(reference)
             .expect("source-backed viewpoint target");
         assert_eq!(target.authored_text(), "Viewpoints::VP");
         assert_eq!(target.segments.len(), 2);

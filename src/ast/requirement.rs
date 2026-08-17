@@ -90,6 +90,13 @@ pub enum RequirementDefBodyElement {
     /// Nested calc usage, e.g. `in calc eval : EvaluationFunction { ... }` and `in calc :>> eval =
     /// evaluationFunction;` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml`).
     CalcUsage(Box<Node<CalcUsage>>),
+    /// `SatisfyRequirementUsage` as a member of this body.
+    ///
+    /// `RequirementBodyItem → DefinitionBodyItem → … → BehaviorUsageElement →
+    /// SatisfyRequirementUsage`, so a satisfy usage is an ordinary member of every requirement
+    /// body -- including the `RequirementBody` a satisfy usage owns itself, which is why this is
+    /// boxed.
+    Satisfy(Box<Node<SatisfyRequirementUsage>>),
 }
 
 /// Viewpoint stakeholder: typed declaration, shorthand concern reference, or `:>>` redefinition.
@@ -178,35 +185,133 @@ pub struct VerifyRequirementMember {
     pub redefines: Option<QualifiedReferenceId>,
 }
 
-/// Requirement usage / Satisfy. Example: `satisfy EnduranceReq by droneInstance;`
+/// `SatisfyRequirementUsage` (SysML v2 textual notation, clause 8.2.2.21.2).
+///
+/// ```text
+/// SatisfyRequirementUsage =
+///     OccurrenceUsagePrefix 'assert' ( isNegated ?= 'not' ) 'satisfy'
+///     ( ownedRelationship += OwnedReferenceSubsetting
+///       FeatureSpecializationPart?
+///     | 'requirement' UsageDeclaration )
+///     ValuePart?
+///     ( 'by' ownedRelationship += SatisfactionSubjectMember )?
+///     RequirementBody
+/// ```
+///
+/// # Two documented departures from the pinned production text
+///
+/// The pinned `SysML-textual-bnf.kebnf` writes `'assert' ( isNegated ?= 'not' )` without the
+/// optionality markers the same file uses everywhere else (compare `AssertConstraintUsage`, which
+/// writes `'assert' ( isNegated ?= 'not' )?`, and `LibraryPackage`, which writes
+/// `( isStandard ?= 'standard' ) 'library'` for a prefix that is certainly optional). The pinned
+/// corpus that ships in the same release settles it: `Simple Tests/RequirementTest.sysml` writes
+/// all four prefix combinations -- `satisfy`, `assert satisfy`, `not satisfy`, and
+/// `assert not satisfy` -- and the Systems Library's `Views.sysml` writes a bare
+/// `satisfy requirement viewpointConformance by that { … }` that the strict library gate requires
+/// to parse without a diagnostic. Both keywords are therefore modelled as independently optional,
+/// each keeping its authored span rather than collapsing to a flag.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Satisfy {
-    pub source: Node<Expression>,
-    pub target: Node<Expression>,
-    /// The body this member was parsed with, in one field: it was a `ConnectBody` marker beside
-    /// a separate element list, so the `;`/`{}` fact lived in two places and neither carried a
-    /// delimiter span.
+pub struct SatisfyRequirementUsage {
+    /// Exact `assert` keyword token, or `None` when the author omitted it.
     ///
-    /// `SatisfyRequirementUsage = … RequirementBody`, so the *member set* should be
-    /// `RequirementDefBodyElement`; the parser builds a `ConstraintDefBody` and widening it is a
-    /// member-dispatch change rather than the container change made here.
-    pub body: ConstraintDefBody,
-    /// `true` for a negated satisfy usage: `(assert)? not satisfy ...`.
-    pub is_negated: bool,
-    /// Present for the fuller `satisfy requirement <name> : <Type> by <expr>;` form
-    /// (`SatisfyRequirementUsage` in the KerML grammar); `None` for the bare
-    /// `satisfy <ref> (by <expr>)?;` shorthand.
-    pub inline_requirement: Option<InlineSatisfyRequirement>,
+    /// Presence is a grammatical fact emission reproduces, so it is a span rather than a flag:
+    /// the source stays authoritative for where the keyword was written.
+    pub assert_span: Option<Span>,
+    /// Exact `not` keyword token (`isNegated`), or `None` when the author omitted it.
+    pub not_span: Option<Span>,
+    /// Exact `satisfy` keyword token. Always authored; kept so no consumer has to rescan the
+    /// source to find where the usage's keyword sits between its optional prefixes and its
+    /// requirement clause.
+    pub satisfy_span: Span,
+    /// Which of the production's two mutually exclusive requirement clauses was authored.
+    pub requirement: SatisfiedRequirement,
+    /// `FeatureSpecializationPart?`'s `Typings` clause (`: Type`, `defined by Type`, ...).
+    ///
+    /// The specialization part is shared by both alternatives of the requirement clause -- the
+    /// reference alternative spells it directly, the declaration alternative reaches it through
+    /// `UsageDeclaration` -- so it lives beside them rather than being duplicated into each.
+    pub typing: Option<Node<TypingRelationship>>,
+    /// `MultiplicityPart`'s `OwnedMultiplicity`, e.g. `[1]`.
+    pub multiplicity: Option<Node<Multiplicity>>,
+    /// `MultiplicityPart`'s `isOrdered ?= 'ordered'`.
+    pub ordered: bool,
+    /// `MultiplicityPart`'s `'nonunique'`.
+    pub nonunique: bool,
+    /// `FeatureSpecialization`'s `Subsettings` clause (`:>` / `subsets`).
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    /// `FeatureSpecialization`'s `Redefinitions` clause (`:>>` / `redefines`).
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    /// `FeatureSpecialization`'s `References` clause (`::>` / `references`).
+    pub references: Option<Node<SubsettingRelationship>>,
+    /// `FeatureSpecialization`'s `Crosses` clause (`crosses`).
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    /// `ValuePart?` -- an `=` / `:=` / `default` binding on the satisfied requirement.
+    pub value: Option<Node<FeatureValue>>,
+    /// `( 'by' ownedRelationship += SatisfactionSubjectMember )?`.
+    ///
+    /// `None` means the author wrote no `by` clause, and emission writes none. There is no
+    /// separate "had a by clause" flag, and the satisfied requirement is never copied here to
+    /// fabricate one.
+    pub subject: Option<Node<SatisfactionSubject>>,
+    /// `RequirementBody` -- the same `';' | '{' RequirementBodyItem* '}'` a `requirement def`
+    /// owns, so requirement-specific members such as `require`, `assume`, `frame`, `subject`, and
+    /// a nested `requirement` usage are members of this body.
+    pub body: RequirementDefBody,
 }
 
-/// Inline named/typed requirement usage after `satisfy requirement`, e.g.
-/// `satisfy requirement myReq : ReqType by someExpr;`.
+/// The two mutually exclusive spellings of `SatisfyRequirementUsage`'s requirement clause.
+///
+/// They are different grammar alternatives, not one shape with optional parts: the first *refers*
+/// to a requirement that exists elsewhere, the second *declares* one inline. A declaration label
+/// is never stored as a reference identity, and a reference is never synthesized from a label.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct InlineSatisfyRequirement {
-    pub name: String,
-    pub type_name: Option<QualifiedReferenceId>,
+pub enum SatisfiedRequirement {
+    /// `ownedRelationship += OwnedReferenceSubsetting`, i.e. `[QualifiedName] | OwnedFeatureChain`
+    /// -- `satisfy vehicleSpecification …`, `satisfy Requirements::engineSpecification …`.
+    Reference {
+        /// The referenced requirement, resolvable through the owning document's arena.
+        reference: QualifiedReferenceId,
+    },
+    /// `'requirement' UsageDeclaration` -- `satisfy requirement req1 : Req1 …`.
+    Declaration(Node<InlineRequirementDeclaration>),
+}
+
+/// `'requirement' UsageDeclaration`'s declaration half.
+///
+/// `UsageDeclaration = Identification FeatureSpecializationPart?`; the specialization half belongs
+/// to the owning [`SatisfyRequirementUsage`] because the reference alternative spells the same
+/// clauses. `Identification` itself is `( '<' NAME '>' )? ( NAME )?`, so both halves are optional
+/// and `satisfy requirement by x;` declares an anonymous requirement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InlineRequirementDeclaration {
+    /// Exact `requirement` keyword token that selects this alternative.
+    pub keyword_span: Span,
+    /// The declared name and short name. A declaration label, never a reference.
+    pub identification: Identification,
+}
+
+/// `SatisfactionSubjectMember`, the `by` clause's payload.
+///
+/// ```text
+/// SatisfactionSubjectMember     : SubjectMembership        = ownedRelatedElement += SatisfactionParameter
+/// SatisfactionParameter         : ReferenceUsage           = ownedRelationship  += SatisfactionFeatureValue
+/// SatisfactionFeatureValue      : FeatureValue             = ownedRelatedElement += SatisfactionReferenceExpression
+/// SatisfactionReferenceExpression : FeatureReferenceExpression = ownedRelationship += FeatureChainMember
+/// FeatureChainMember            : Membership               = memberElement = [QualifiedName] | OwnedFeatureChainMember
+/// ```
+///
+/// The chain bottoms out at a qualified name or an owned feature chain, so the subject is a
+/// source-backed reference with typed `::`/`.` separators -- not a general expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SatisfactionSubject {
+    /// Exact `by` keyword token.
+    pub by_span: Span,
+    /// The subject feature: `[QualifiedName]` or `OwnedFeatureChain`.
+    pub reference: QualifiedReferenceId,
 }
 
 /// Bare requirement Usage.

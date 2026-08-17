@@ -9,7 +9,7 @@
 
 use super::visit::{
     walk_comment_annotation, walk_first_merge_brace_body, walk_import_target,
-    walk_metadata_annotation, walk_metadata_keyword_usage, Visitor,
+    walk_metadata_annotation, walk_metadata_keyword_usage, walk_satisfy_requirement_usage, Visitor,
 };
 use super::*;
 
@@ -276,6 +276,97 @@ impl Visitor for ProvenanceValidator<'_> {
             }
         }
         walk_metadata_annotation(self, node);
+    }
+
+    /// `SatisfyRequirementUsage` records every keyword whose presence is a grammatical choice.
+    ///
+    /// `assert`, `not`, `by`, and the `requirement` keyword that selects the inline-declaration
+    /// alternative are all written back from these spans, so a wire document that points one of
+    /// them at other text -- or at a keyword belonging to a different member -- would change what
+    /// the document says while every reference in it still resolved. `satisfy` itself is checked
+    /// too: it is the token the whole usage is anchored on.
+    ///
+    /// The alternative/field consistency the enum cannot express is checked here as well: the
+    /// declaration alternative may not carry a `by` subject identity in place of its declared
+    /// name, and the ordering of the keywords has to match the production.
+    fn visit_satisfy_requirement_usage(&mut self, node: &Node<SatisfyRequirementUsage>) {
+        if self.error.is_some() {
+            return;
+        }
+        let usage = &node.value;
+        for (span, token, role) in [
+            (
+                usage.assert_span.as_ref(),
+                "assert",
+                "satisfy assert keyword",
+            ),
+            (usage.not_span.as_ref(), "not", "satisfy negation keyword"),
+            (Some(&usage.satisfy_span), "satisfy", "satisfy keyword"),
+        ] {
+            let Some(span) = span else { continue };
+            if self.error.is_none() {
+                self.check(self.delimiter(span, token, role));
+            }
+            if self.error.is_none() {
+                self.check(sigil_within(span, &node.span, role));
+            }
+        }
+        if self.error.is_none() {
+            // `OccurrenceUsagePrefix 'assert' ( isNegated ?= 'not' ) 'satisfy'` fixes the order,
+            // so a document that reorders the prefixes is not a document this parser produced.
+            let mut previous = node.span.offset;
+            for (span, role) in [
+                (usage.assert_span.as_ref(), "satisfy assert keyword"),
+                (usage.not_span.as_ref(), "satisfy negation keyword"),
+                (Some(&usage.satisfy_span), "satisfy keyword"),
+            ] {
+                let Some(span) = span else { continue };
+                if span.offset < previous {
+                    self.error = Some(format!(
+                        "{role} at {} does not follow the prefix before it at {previous}",
+                        span.offset
+                    ));
+                    return;
+                }
+                previous = span_end(span);
+            }
+        }
+        if self.error.is_none() {
+            if let SatisfiedRequirement::Declaration(declaration) = &usage.requirement {
+                self.check(self.delimiter(
+                    &declaration.value.keyword_span,
+                    "requirement",
+                    "satisfy requirement keyword",
+                ));
+                if self.error.is_none() {
+                    self.check(sigil_within(
+                        &declaration.value.keyword_span,
+                        &declaration.span,
+                        "satisfy requirement keyword",
+                    ));
+                }
+            }
+        }
+        if self.error.is_none() {
+            if let Some(subject) = &usage.subject {
+                self.check(self.delimiter(&subject.value.by_span, "by", "satisfy by keyword"));
+                if self.error.is_none() {
+                    self.check(sigil_within(
+                        &subject.value.by_span,
+                        &subject.span,
+                        "satisfy by keyword",
+                    ));
+                }
+                if self.error.is_none() && subject.span.offset < span_end(&usage.satisfy_span) {
+                    self.error = Some(format!(
+                        "satisfy by clause at {} precedes the satisfy keyword at {}",
+                        subject.span.offset, usage.satisfy_span.offset
+                    ));
+                    return;
+                }
+            }
+        }
+        walk_satisfy_requirement_usage(self, node);
     }
 
     /// A `first`/`merge`/`decide`/`join`/`fork` brace body records both delimiters explicitly.
