@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`dependency`, `expose` and the view-body `satisfy` hold a real body.** All three carried a
+  `ConnectBody` marker -- two variants, no delimiter spans -- whose brace form `expose` and
+  `satisfy` skipped wholesale, so members written inside `expose Subject { doc /* ... */ }` were
+  discarded with no node and no diagnostic and the body re-emitted as `{}`. `Dependency`
+  additionally kept the members in a second field beside the marker, one body fact in two places.
+  All three are now one `Body<RelationshipBodyElement>` with its own `;` or brace spans, sharing
+  one emitter, one traversal and one projection. Making the body real also surfaced that `expose`
+  computed its import-target span the way `import_` explicitly does not -- looking for an absent
+  `::*` consumes the trivia before a braced body, so the span claimed a trailing space.
+  **AST version 162 -> 163.**
+
 - **A `connect` statement body holds the usage member set, in one field.**
   `ConnectionUsage = OccurrenceUsagePrefix ( … | 'connect' ConnectorPart ) UsageBody` and
   `UsageBody = DefinitionBody`, so `connect a to b { … }` legally holds every definition-body

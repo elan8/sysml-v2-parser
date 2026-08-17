@@ -785,13 +785,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(expose ")?;
                             self.write_import_target(&expose.value.target)?;
+                            self.writer.write_char(' ')?;
+                            self.write_relationship_body(&expose.value.body)?;
                             self.writer.write_char(')')?;
                         }
                         ViewBodyElement::Satisfy(satisfy) => {
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(satisfy (viewpoint ")?;
                             self.write_reference(satisfy.value.viewpoint_ref)?;
-                            self.writer.write_str("))")?;
+                            self.writer.write_str(") ")?;
+                            self.write_relationship_body(&satisfy.value.body)?;
+                            self.writer.write_char(')')?;
                         }
                     }
                 }
@@ -1412,18 +1416,26 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.writer.write_char(' ')?;
             self.write_reference(*reference)?;
         }
-        // A dependency body owns the whole annotating production, so name its members: without
-        // them the projection could not show that a body holds a doc, a comment and a rep rather
-        // than some other mix, which is the only thing a relationship body can get wrong.
-        self.writer.write_str(") (body")?;
-        match &dependency.body_elements {
-            Some(elements) => {
-                // A dependency body is a `Vec`, not an `ast::Body<E>`, so it has no `;`/`{}`
-                // marker of its own -- but a present one was written with braces, and saying so
-                // keeps it readable the same way every other body is.
-                self.writer.write_str(" brace")?;
+        self.writer.write_str(") ")?;
+        self.write_relationship_body(&dependency.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// A `RelationshipBody`'s members.
+    ///
+    /// The body owns the whole annotating production, so its members are named rather than
+    /// counted: that is the only thing a relationship body can get wrong, and `expose` and the
+    /// view-body `satisfy` used to discard theirs entirely.
+    fn write_relationship_body(
+        &mut self,
+        body: &super::Body<super::RelationshipBodyElement>,
+    ) -> io::Result<()> {
+        match body {
+            super::Body::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::Body::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
                 for element in elements {
-                    self.writer.write_char(' ')?;
+                    self.write_item_prefix(&mut first)?;
                     match &element.value {
                         super::RelationshipBodyElement::Annotating(member) => {
                             self.write_annotating_member(member)?
@@ -1436,10 +1448,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                     }
                 }
+                self.writer.write_char(')')
             }
-            None => self.writer.write_str(" none")?,
         }
-        self.writer.write_str("))")
     }
 
     fn write_first_statement(&mut self, statement: &super::FirstStmt) -> io::Result<()> {

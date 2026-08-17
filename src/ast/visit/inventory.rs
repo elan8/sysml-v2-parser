@@ -5748,10 +5748,27 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
+        pub fn walk_relationship_body<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Body<RelationshipBodyElement>) {
+            match node {
+                Body::Semicolon { semicolon_span } => {
+                    visitor.visit_body_semicolon(semicolon_span);
+                    visitor.visit_span(semicolon_span);
+                }
+                Body::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
+                    visitor.visit_span(open_span);
+                    for inner in elements {
+                        visitor.visit_relationship_body_element(inner);
+                    }
+                    visitor.visit_span(close_span);
+                }
+            }
+        }
+
         pub fn walk_dependency<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Dependency>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let Dependency { identification, clients, suppliers, body, body_elements } = &$($mutability)? node.value;
+            let Dependency { identification, clients, suppliers, body } = &$($mutability)? node.value;
             if let Some(inner) = identification {
                 visitor.visit_identification(inner);
             }
@@ -5761,12 +5778,7 @@ macro_rules! ast_traversal {
             for inner in suppliers {
                 visitor.visit_qualified_reference(inner);
             }
-            visitor.visit_connect_body(body);
-            if let Some(inner) = body_elements {
-                for inner in inner {
-                    visitor.visit_relationship_body_element(inner);
-                }
-            }
+            walk_relationship_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -6772,7 +6784,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let ExposeMember { target, body } = &$($mutability)? node.value;
             visitor.visit_import_target(target);
-            visitor.visit_connect_body(body);
+            walk_relationship_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -6781,7 +6793,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let SatisfyViewMember { viewpoint_ref, body } = &$($mutability)? node.value;
             visitor.visit_qualified_reference(viewpoint_ref);
-            visitor.visit_connect_body(body);
+            walk_relationship_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

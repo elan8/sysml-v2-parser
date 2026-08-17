@@ -1,6 +1,6 @@
 use super::behavior::InOutDecl;
 use super::body::Body;
-use super::common::{AnnotatingMember, ConnectBody, Identification, ParseErrorNode};
+use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::common::{FilterMember, ImportTarget};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
@@ -430,7 +430,9 @@ pub enum ViewBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExposeMember {
     pub target: ImportTarget,
-    pub body: ConnectBody,
+    /// `Expose = 'expose' ( MembershipExpose | NamespaceExpose ) RelationshipBody`. The brace
+    /// form used to be skipped wholesale, so its members and both delimiters were discarded.
+    pub body: crate::ast::Body<crate::ast::RelationshipBodyElement>,
 }
 
 /// Satisfy in view body: `satisfy` QualifiedName RelationshipBody.
@@ -438,7 +440,8 @@ pub struct ExposeMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SatisfyViewMember {
     pub viewpoint_ref: QualifiedReferenceId,
-    pub body: ConnectBody,
+    /// The `RelationshipBody` of the view-body `satisfy` member; see [`ExposeMember::body`].
+    pub body: crate::ast::Body<crate::ast::RelationshipBodyElement>,
 }
 
 /// Viewpoint usage: `viewpoint` ConstraintUsageDeclaration RequirementBody.

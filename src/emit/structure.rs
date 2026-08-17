@@ -1422,12 +1422,25 @@ pub(crate) fn emit_alias_def(
     emit_identification(w, &alias.identification);
     w.push_str(" for ");
     w.push_qualified_reference("alias target", alias.target)?;
-    match &alias.body {
-        crate::ast::AliasBody::Semicolon { .. } => {
+    emit_relationship_body(w, path, &alias.body)
+}
+
+/// A `RelationshipBody`: `;`, `{}`, or the brace form around its members.
+///
+/// One emitter for every owner of the shape. `expose` and the view-body `satisfy` used to write
+/// `{}` for *any* brace body, so a body with members formatted as an empty one and the members
+/// were gone.
+pub(crate) fn emit_relationship_body(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &crate::ast::Body<crate::ast::RelationshipBodyElement>,
+) -> Result<(), EmitError> {
+    match body {
+        crate::ast::Body::Semicolon { .. } => {
             w.push_char(';');
             Ok(())
         }
-        crate::ast::AliasBody::Brace { elements, .. } => {
+        crate::ast::Body::Brace { elements, .. } => {
             if elements.is_empty() {
                 w.push_str(" {}");
                 Ok(())

@@ -90,9 +90,9 @@ fn dependency_body_retains_doc_comment() {
         })
         .expect("expected dependency");
     let body_elements = dependency
-        .body_elements
-        .as_ref()
-        .expect("expected Some body_elements for a braced dependency body");
+        .body
+        .braced_elements()
+        .expect("expected a braced dependency body");
     assert!(
         body_elements.iter().any(|e| matches!(
             &e.value,
@@ -293,6 +293,6 @@ fn dependency_semicolon_body_has_no_body_elements() {
             _ => None,
         })
         .expect("expected dependency");
-    assert!(matches!(dependency.body, ConnectBody::Semicolon));
-    assert!(dependency.body_elements.is_none());
+    assert!(dependency.body.is_semicolon());
+    assert!(dependency.body.braced_elements().is_none());
 }

@@ -308,11 +308,11 @@ pub struct Dependency {
     pub identification: Option<Identification>,
     pub clients: Vec<QualifiedReferenceId>,
     pub suppliers: Vec<QualifiedReferenceId>,
-    pub body: ConnectBody,
-    /// Braced-body members (BNF `RelationshipBody`: the doc/comment/metadata annotation subset
-    /// plus owned feature members, spec42 Gap 37). `None` when the body is a semicolon
-    /// terminator.
-    pub body_elements: Option<Vec<Node<RelationshipBodyElement>>>,
+    /// `Dependency = ( PrefixMetadataAnnotation )* 'dependency' DependencyDeclaration
+    /// RelationshipBody`, whose members are the annotating production plus owned related
+    /// elements. Was a `ConnectBody` marker with no delimiter spans beside a separate
+    /// `body_elements` list -- one body fact in two fields.
+    pub body: crate::ast::Body<RelationshipBodyElement>,
 }
 
 /// Framed concern member in requirement body: `frame` name (`;` or body).

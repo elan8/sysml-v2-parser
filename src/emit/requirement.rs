@@ -9,10 +9,10 @@ use super::structure::{
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
-    ConcernUsage, ConnectBody, Dependency, EnumerationUsage, ItemUsage, RelationshipBodyElement,
-    RequireConstraint, RequirementDef, RequirementDefBody, RequirementDefBodyElement,
-    RequirementUsage, ReturnRef, ReturnRefBody, ReturnRefBodyElement, Satisfy, SubjectDecl,
-    UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement, UseCaseUsage,
+    ConcernUsage, ConnectBody, Dependency, EnumerationUsage, ItemUsage, RequireConstraint,
+    RequirementDef, RequirementDefBody, RequirementDefBodyElement, RequirementUsage, ReturnRef,
+    ReturnRefBody, ReturnRefBodyElement, Satisfy, SubjectDecl, UseCaseDef, UseCaseDefBody,
+    UseCaseDefBodyElement, UseCaseUsage,
 };
 
 pub(crate) fn emit_requirement_def(
@@ -405,48 +405,8 @@ pub(crate) fn emit_dependency(
         }
         w.push_qualified_reference(&format!("{path}/suppliers[{i}]"), supplier)?;
     }
-    match (&dep.body, &dep.body_elements) {
-        (ConnectBody::Semicolon, _) => {
-            w.push_char(';');
-            Ok(())
-        }
-        (ConnectBody::Brace, elements) => {
-            let els = elements.as_deref().unwrap_or(&[]);
-            if els.is_empty() {
-                w.push_str(" {}");
-                Ok(())
-            } else {
-                w.push_str(" {");
-                w.newline();
-                w.indent();
-                for (i, el) in els.iter().enumerate() {
-                    emit_rel_body(w, &format!("{path}/body[{i}]"), &el.value)?;
-                    w.newline();
-                }
-                w.dedent();
-                w.push_char('}');
-                Ok(())
-            }
-        }
-    }
+    super::structure::emit_relationship_body(w, path, &dep.body)
 }
-
-fn emit_rel_body(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    el: &RelationshipBodyElement,
-) -> Result<(), EmitError> {
-    match el {
-        RelationshipBodyElement::Annotating(member) => {
-            super::root::emit_annotating_member(w, path, member)
-        }
-        RelationshipBodyElement::KermlFeature(n) => {
-            super::view::emit_kerml_feature_member(w, path, &n.value)
-        }
-        RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
-    }
-}
-
 pub(crate) fn emit_item_usage(
     w: &mut EmitWriter<'_>,
     path: &str,

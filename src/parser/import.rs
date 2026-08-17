@@ -139,7 +139,7 @@ pub(crate) fn import_(input: Input<'_>) -> IResult<Input<'_>, Node<Import>> {
 
 /// The offset just past an import target's last authored token: its final suffix or filter member
 /// if it has one, otherwise the qualified reference itself.
-fn import_target_end(shape: &crate::ast::ImportShape, reference_end: usize) -> usize {
+pub(crate) fn import_target_end(shape: &crate::ast::ImportShape, reference_end: usize) -> usize {
     use crate::ast::ImportShape;
     let span_end = |span: &crate::ast::Span| span.offset.saturating_add(span.len);
     match shape {

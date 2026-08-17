@@ -226,9 +226,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::Import(i) => {
             walk_optional_relationship_body(report, path, i.value.body_elements.as_deref())
         }
-        PackageBodyElement::Dependency(d) => {
-            walk_optional_relationship_body(report, path, d.value.body_elements.as_deref())
-        }
+        PackageBodyElement::Dependency(d) => walk_relationship_body(report, path, &d.value.body),
         PackageBodyElement::AliasDef(a) => {
             if let crate::ast::AliasBody::Brace { elements, .. } = &a.value.body {
                 walk_relationship_body_elements(report, path, elements);
@@ -445,9 +443,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
-            PartDefBodyElement::Dependency(n) => {
-                walk_optional_relationship_body(report, &p, n.value.body_elements.as_deref())
-            }
+            PartDefBodyElement::Dependency(n) => walk_relationship_body(report, &p, &n.value.body),
             PartDefBodyElement::RequirementUsage(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
@@ -1197,8 +1193,8 @@ fn walk_view_body_element(report: &mut OpacityReport, path: &str, el: &ViewBodyE
     match el {
         ViewBodyElement::Error(_) => hit(report, path, OpacityKind::ParseError),
         ViewBodyElement::ViewRendering(n) => walk_rendering_usage_body(report, path, &n.value.body),
-        ViewBodyElement::Expose(n) => walk_connect_body(report, path, &n.value.body),
-        ViewBodyElement::Satisfy(n) => walk_connect_body(report, path, &n.value.body),
+        ViewBodyElement::Expose(n) => walk_relationship_body(report, path, &n.value.body),
+        ViewBodyElement::Satisfy(n) => walk_relationship_body(report, path, &n.value.body),
         ViewBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
         ViewBodyElement::Annotating(member) => walk_annotating_member(report, path, member),
         ViewBodyElement::Filter(_) => {}
@@ -1368,6 +1364,16 @@ fn walk_relationship_body_elements(
                 walk_annotating_member(report, &p, member)
             }
         }
+    }
+}
+
+fn walk_relationship_body(
+    report: &mut OpacityReport,
+    path: &str,
+    body: &crate::ast::Body<RelationshipBodyElement>,
+) {
+    if let Some(elements) = body.braced_elements() {
+        walk_relationship_body_elements(report, path, elements);
     }
 }
 

@@ -728,10 +728,11 @@ pub(crate) fn emit_view_usage(
                             &format!("{path}/body[{i}]/expose/target"),
                             &e.value.target,
                         )?;
-                        match e.value.body {
-                            crate::ast::ConnectBody::Semicolon => w.push_char(';'),
-                            crate::ast::ConnectBody::Brace => w.push_str(" {}"),
-                        }
+                        super::structure::emit_relationship_body(
+                            w,
+                            &format!("{path}/body[{i}]"),
+                            &e.value.body,
+                        )?;
                     }
                     crate::ast::ViewBodyElement::Satisfy(s) => {
                         w.push_str("satisfy ");
@@ -739,10 +740,11 @@ pub(crate) fn emit_view_usage(
                             &format!("{path}/body[{i}]/satisfy/viewpoint"),
                             s.value.viewpoint_ref,
                         )?;
-                        match &s.value.body {
-                            crate::ast::ConnectBody::Semicolon => w.push_char(';'),
-                            crate::ast::ConnectBody::Brace => w.push_str(" {}"),
-                        }
+                        super::structure::emit_relationship_body(
+                            w,
+                            &format!("{path}/body[{i}]"),
+                            &s.value.body,
+                        )?;
                     }
                 }
                 w.newline();
