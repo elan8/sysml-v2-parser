@@ -14,7 +14,6 @@ use crate::parser::lex::{
     identification, name, qualified_reference, short_name_prefix, skip_statement_or_block,
     starts_with_keyword, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
 };
-use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::usage::{
     feature_usage_header, multiplicity, multiplicity_node, optional_typings, specialization_clauses,
@@ -52,6 +51,7 @@ fn other_requirement_body_element(
             | "unrecognized_declaration_in_scope"
             | "missing_expression_after_operator"
             | "unsupported_annotation_syntax"
+            | "malformed_annotation_head"
     ) && !is_redefinition
     {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -160,7 +160,14 @@ fn requirement_def_body_element(
                 crate::parser::metadata_annotation::metadata_keyword_usage,
                 RequirementDefBodyElement::MetadataKeywordUsage,
             ),
-            map(annotation, RequirementDefBodyElement::Annotation),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                RequirementDefBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::dependency::dependency,
+                RequirementDefBodyElement::Dependency,
+            ),
             map(import_, RequirementDefBodyElement::Import),
             // `subject;` before typed `subject name : Type;` so the shorthand wins.
             map(subject_ref, RequirementDefBodyElement::SubjectRef),

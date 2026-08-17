@@ -169,8 +169,11 @@ fn metadata_keyword_usage_in_part_body() {
             .expect("metadata keyword usage"),
         _ => panic!("expected brace part body"),
     };
-    assert_eq!(keyword.keyword, "Tag");
-    assert!(keyword.keyword_span.len > 0);
+    let reference = root
+        .qualified_reference(keyword.reference)
+        .expect("`#` is followed by an `OwnedFeatureTyping` reference, not copied text");
+    assert_eq!(reference.segment_decoded_text(0).as_deref(), Some("Tag"));
+    assert_eq!(keyword.hash_span.len, 1, "the `#` sigil is one token");
 }
 
 #[test]
@@ -419,9 +422,9 @@ fn constraint_body_metadata_annotation_parsed() {
             .expect("metadata annotation in constraint body"),
         _ => panic!("expected brace constraint body"),
     };
-    assert!(root.qualified_reference(meta.reference).is_some());
-    assert!(meta.type_reference.is_some());
-    assert!(meta.head_span.as_ref().is_some_and(|s| s.len > 0));
+    assert!(root.qualified_reference(meta.type_reference).is_some());
+    assert!(meta.type_span.len > 0);
+    assert_eq!(meta.at_span.len, 1, "the `@` sigil is one token");
 }
 
 #[test]
@@ -555,7 +558,10 @@ fn action_def_body_metadata_keyword_parses() {
             .expect("metadata keyword"),
         _ => panic!("expected brace action body"),
     };
-    assert_eq!(keyword.keyword, "Tag");
+    let reference = root
+        .qualified_reference(keyword.reference)
+        .expect("`#Tag` refers to a metadata type");
+    assert_eq!(reference.segment_decoded_text(0).as_deref(), Some("Tag"));
 }
 
 #[test]
@@ -751,8 +757,8 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         UseCaseDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(a)) => &a.value,
         other => panic!("expected MetadataAnnotation in use case body, got {other:?}"),
     };
-    assert!(root.qualified_reference(ann.reference).is_some());
-    assert!(ann.head_span.is_some(), "head_span should be set");
+    assert!(root.qualified_reference(ann.type_reference).is_some());
+    assert!(ann.type_span.len > 0, "the typing keeps its authored span");
 
     // view def body
     let view = match &elements[1].value {
@@ -767,8 +773,8 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         ViewDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(a)) => &a.value,
         other => panic!("expected MetadataAnnotation in view def body, got {other:?}"),
     };
-    assert!(root.qualified_reference(ann.reference).is_some());
-    assert!(ann.head_span.is_some(), "head_span should be set");
+    assert!(root.qualified_reference(ann.type_reference).is_some());
+    assert!(ann.type_span.len > 0, "the typing keeps its authored span");
 
     // calc def body
     let calc = match &elements[2].value {
@@ -783,8 +789,8 @@ fn metadata_annotation_in_use_case_and_view_bodies() {
         CalcDefBodyElement::Annotating(AnnotatingMember::MetadataAnnotation(a)) => &a.value,
         other => panic!("expected MetadataAnnotation in calc def body, got {other:?}"),
     };
-    assert!(root.qualified_reference(ann.reference).is_some());
-    assert!(ann.head_span.is_some(), "head_span should be set");
+    assert!(root.qualified_reference(ann.type_reference).is_some());
+    assert!(ann.type_span.len > 0, "the typing keeps its authored span");
 }
 
 #[test]

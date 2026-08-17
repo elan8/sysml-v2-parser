@@ -13,6 +13,10 @@ pub const UNRECOGNIZED_DECLARATION_IN_SCOPE: &str = "unrecognized_declaration_in
 pub const BARE_COMMA_IN_FEATURE_VALUE: &str = "bare_comma_in_feature_value";
 pub const INVALID_REQUIREMENT_SHORT_NAME_SYNTAX: &str = "invalid_requirement_short_name_syntax";
 pub const UNSUPPORTED_ANNOTATION_SYNTAX: &str = "unsupported_annotation_syntax";
+/// A `#`/`@` sigil not followed by the `[QualifiedName]` its production requires. Kept apart
+/// from [`UNSUPPORTED_ANNOTATION_SYNTAX`], which reports valid metadata syntax this parser has
+/// not reached yet.
+pub const MALFORMED_ANNOTATION_HEAD: &str = "malformed_annotation_head";
 pub const RECOVERY_CASCADE_SUPPRESSED: &str = "recovery_cascade_suppressed";
 pub const RECOVERED_ROOT_BODY: &str = "recovered_root_body";
 pub const MISSING_CLOSING_BRACE: &str = "missing_closing_brace";
@@ -42,6 +46,7 @@ pub const DOCUMENTED_CODES: &[&str] = &[
     BARE_COMMA_IN_FEATURE_VALUE,
     INVALID_REQUIREMENT_SHORT_NAME_SYNTAX,
     UNSUPPORTED_ANNOTATION_SYNTAX,
+    MALFORMED_ANNOTATION_HEAD,
     RECOVERY_CASCADE_SUPPRESSED,
     RECOVERED_ROOT_BODY,
     MISSING_CLOSING_BRACE,

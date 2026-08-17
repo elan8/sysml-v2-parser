@@ -733,9 +733,18 @@ fn rationale_and_refinement_annotations_stay_localized() {
             let ActionDefBody::Brace { elements, .. } = &action.value.body else {
                 panic!("expected action body");
             };
+            // `#refinement dependency X to Y;` is `PrefixMetadataAnnotation` + `Dependency`,
+            // both members of `ActionBodyItem → NonBehaviorBodyItem → DefinitionMember`. It was
+            // one opaque `Annotation` node holding the copied text `refinement dependency
+            // PerformCrewIngress to ...`; now the tag and the dependency are separate typed
+            // siblings and the dependency's endpoints are real references.
             assert!(elements.iter().any(|e| matches!(
                 e.value,
-                sysml_v2_parser::ActionDefBodyElement::Annotation(_)
+                sysml_v2_parser::ActionDefBodyElement::MetadataKeywordUsage(_)
+            )));
+            assert!(elements.iter().any(|e| matches!(
+                e.value,
+                sysml_v2_parser::ActionDefBodyElement::Dependency(_)
             )));
         }
         _ => panic!("expected action def"),
@@ -747,7 +756,10 @@ fn rationale_and_refinement_annotations_stay_localized() {
             };
             assert!(elements
                 .iter()
-                .any(|e| matches!(e.value, RequirementDefBodyElement::Annotation(_))));
+                .any(|e| matches!(e.value, RequirementDefBodyElement::MetadataKeywordUsage(_))));
+            assert!(elements
+                .iter()
+                .any(|e| matches!(e.value, RequirementDefBodyElement::Dependency(_))));
         }
         _ => panic!("expected requirement def"),
     }

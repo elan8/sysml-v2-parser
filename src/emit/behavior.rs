@@ -337,9 +337,13 @@ pub(crate) fn emit_action_def_body_element(
             emit_action_def_body(w, path, &f.value.body)
         }
         ActionDefBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
-        other @ (ActionDefBodyElement::Annotation(_)
-        | ActionDefBodyElement::MetadataKeywordUsage(_)
-        | ActionDefBodyElement::MetadataUsage(_)
+        ActionDefBodyElement::MetadataKeywordUsage(m) => {
+            structure::emit_metadata_keyword_usage(w, path, &m.value)
+        }
+        ActionDefBodyElement::Dependency(d) => {
+            super::requirement::emit_dependency(w, path, &d.value)
+        }
+        other @ (ActionDefBodyElement::MetadataUsage(_)
         | ActionDefBodyElement::TerminateStmt(_)) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -432,9 +436,13 @@ pub(crate) fn emit_action_usage_body_element(
         }
         ActionUsageBodyElement::VariantUsage(v) => structure::emit_variant_usage(w, path, &v.value),
         ActionUsageBodyElement::OccurrenceUsage(o) => emit_occurrence_usage(w, path, &o.value),
-        other @ (ActionUsageBodyElement::Annotation(_)
-        | ActionUsageBodyElement::MetadataKeywordUsage(_)
-        | ActionUsageBodyElement::MetadataUsage(_)
+        ActionUsageBodyElement::MetadataKeywordUsage(m) => {
+            structure::emit_metadata_keyword_usage(w, path, &m.value)
+        }
+        ActionUsageBodyElement::Dependency(d) => {
+            super::requirement::emit_dependency(w, path, &d.value)
+        }
+        other @ (ActionUsageBodyElement::MetadataUsage(_)
         | ActionUsageBodyElement::TerminateStmt(_)
         | ActionUsageBodyElement::ForLoop(_)) => w.unsupported(
             path,
@@ -839,11 +847,9 @@ fn emit_state_def_body_element(
         StateDefBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }
-        other @ (StateDefBodyElement::Annotation(_)
-        | StateDefBodyElement::MetadataKeywordUsage(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        StateDefBodyElement::MetadataKeywordUsage(m) => {
+            structure::emit_metadata_keyword_usage(w, path, &m.value)
+        }
     }
 }
 
@@ -1451,10 +1457,9 @@ pub(crate) fn emit_occurrence_body_element(
         crate::ast::OccurrenceBodyElement::SuccessionUsage(s) => {
             emit_succession_usage(w, path, &s.value)
         }
-        other @ crate::ast::OccurrenceBodyElement::Annotation(_) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        crate::ast::OccurrenceBodyElement::MetadataKeywordUsage(m) => {
+            structure::emit_metadata_keyword_usage(w, path, &m.value)
+        }
     }
 }
 

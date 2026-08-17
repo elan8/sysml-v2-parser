@@ -7,9 +7,9 @@
 //! body survives into the AST instead of silently vanishing.
 
 use sysml_v2_parser::ast::{
-    AliasBody, AnnotatingMember, ConnectBody, ConnectionDefBody, ConnectionDefBodyElement,
-    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBodyElement,
-    RefBody, RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
+    AliasBody, AnnotatingMember, ConnectionDefBody, ConnectionDefBodyElement, PackageBody,
+    PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBodyElement, RefBody,
+    RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
@@ -224,9 +224,12 @@ fn bind_trailing_body_retains_real_member() {
             _ => None,
         })
         .expect("expected bind statement");
-    assert!(matches!(bind.body, Some(ConnectBody::Brace)));
+    let members = bind
+        .body
+        .braced_elements()
+        .expect("`bind x = y { ... }` wrote a brace body, not `;`");
     assert!(
-        !bind.body_elements.is_empty(),
+        !members.is_empty(),
         "expected real content retained in bind trailing body, got empty"
     );
 }
@@ -279,9 +282,8 @@ fn action_ref_body_still_retains_action_members() {
     // predates this fix and already had dedicated coverage.
 }
 
-/// Sanity-check the constraint-body-adjacent sibling pattern (`ConnectBody` + separate
-/// `body_elements`, established by `Satisfy`/`Dependency`/`ConnectStmt`) is unaffected for a
-/// plain semicolon-terminated dependency: `body_elements` must stay `None`, not `Some(vec![])`.
+/// A semicolon body and an empty brace body stay distinct: `dependency A to B;` reports the
+/// semicolon form and offers no member list, rather than an empty one.
 #[test]
 fn dependency_semicolon_body_has_no_body_elements() {
     let input = "package P {\npart def A;\npart def B;\ndependency A to B;\n}";

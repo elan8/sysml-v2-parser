@@ -197,7 +197,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 crate::parser::metadata_annotation::metadata_keyword_usage,
                 PartDefBodyElement::MetadataKeywordUsage,
             ),
-            map(annotation, PartDefBodyElement::Annotation),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                PartDefBodyElement::MetadataKeywordUsage,
+            ),
             map(exhibit_state, PartDefBodyElement::ExhibitState),
             // Each `_def` parser must be tried before its `_usage` sibling: neither `calc_usage`
             // nor `constraint_usage` guards against a bare `def` keyword (same bug class as

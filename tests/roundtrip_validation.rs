@@ -146,6 +146,10 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Packet Example/PacketUsage.sysml",
     "Packet Example/Packets.sysml",
     "Requirements Examples/HSUVRequirements.sysml",
+    // Promoted by the metadata-sigil seam: `#derivation`/`#original`/`#derive` reach the typed
+    // `PrefixMetadataMember` path instead of the opaque `#` capture that swallowed the rest of
+    // the statement, so the derivation connections and their end roles survive re-emission.
+    "Requirements Examples/RequirementDerivationExample.sysml",
     "Room Model/RoomModel.sysml",
     "Simple Tests/AliasTest.sysml",
     "Simple Tests/AnalysisTest.sysml",

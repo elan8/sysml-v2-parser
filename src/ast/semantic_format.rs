@@ -623,15 +623,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
-                        RequirementDefBodyElement::Annotation(_annotation) => {
-                            self.write_marker(&mut first, "annotation")?;
-                        }
                         RequirementDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
                         }
-                        RequirementDefBodyElement::MetadataKeywordUsage(_usage) => {
-                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        RequirementDefBodyElement::MetadataKeywordUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&usage.value)?;
+                        }
+                        RequirementDefBodyElement::Dependency(dependency) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_dependency(&dependency.value)?;
                         }
                         RequirementDefBodyElement::Import(import) => {
                             self.write_item_prefix(&mut first)?;
@@ -814,15 +816,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
-                        UseCaseDefBodyElement::Annotation(_annotation) => {
-                            self.write_marker(&mut first, "annotation")?;
-                        }
                         UseCaseDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
                         }
-                        UseCaseDefBodyElement::MetadataKeywordUsage(_usage) => {
-                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        UseCaseDefBodyElement::MetadataKeywordUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::AttributeDef(_definition) => {
                             self.write_marker(&mut first, "attribute-def")?;
@@ -1024,11 +1024,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
                         }
-                        StateDefBodyElement::Annotation(_annotation) => {
-                            self.write_marker(&mut first, "annotation")?;
-                        }
-                        StateDefBodyElement::MetadataKeywordUsage(_usage) => {
-                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        StateDefBodyElement::MetadataKeywordUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&usage.value)?;
                         }
                         StateDefBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "inout-declaration")?;
@@ -1178,11 +1176,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
                         }
-                        PartDefBodyElement::Annotation(_annotation) => {
-                            self.write_marker(&mut first, "annotation")?;
-                        }
-                        PartDefBodyElement::MetadataKeywordUsage(_usage) => {
-                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        PartDefBodyElement::MetadataKeywordUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&usage.value)?;
                         }
                         PartDefBodyElement::Dependency(dependency) => {
                             self.write_item_prefix(&mut first)?;
@@ -1487,7 +1483,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(' ')?;
             }
             first_keyword = false;
-            write_quoted(self.writer, &keyword.value.keyword)?;
+            self.write_reference(keyword.value.reference)?;
         }
         self.writer.write_str(")) (definition-prefix ")?;
         match definition.definition_prefix {
@@ -1600,6 +1596,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
+                        }
+                        super::CalcDefBodyElement::MetadataKeywordUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&usage.value)?;
                         }
                         super::CalcDefBodyElement::ActionMember(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -1758,9 +1758,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')
             }
             ActionDefBodyElement::Annotating(member) => self.write_annotating_member(member),
-            ActionDefBodyElement::Annotation(_annotation) => self.writer.write_str("(annotation)"),
-            ActionDefBodyElement::MetadataKeywordUsage(_usage) => {
-                self.writer.write_str("(metadata-keyword-usage)")
+            ActionDefBodyElement::MetadataKeywordUsage(usage) => {
+                self.write_metadata_keyword_usage(&usage.value)
+            }
+            ActionDefBodyElement::Dependency(dependency) => {
+                self.write_dependency(&dependency.value)
             }
             ActionDefBodyElement::MetadataUsage(_usage) => {
                 self.writer.write_str("(metadata-usage)")
@@ -1882,6 +1884,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
                         }
+                        InterfaceDefBodyElement::MetadataKeywordUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&usage.value)?;
+                        }
                         InterfaceDefBodyElement::EndDecl(end) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_end(&end.value)?;
@@ -1951,6 +1957,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
+                        }
+                        ConnectionDefBodyElement::MetadataKeywordUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&usage.value)?;
                         }
                         ConnectionDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -2085,9 +2095,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
                         }
-                        super::PartUsageBodyElement::Annotation(_member) => {
-                            self.write_marker(&mut first, "annotation")?;
-                        }
                         super::PartUsageBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "in-out-declaration")?;
                         }
@@ -2150,8 +2157,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::ActionUsage(_member) => {
                             self.write_marker(&mut first, "action-usage")?;
                         }
-                        super::PartUsageBodyElement::MetadataKeywordUsage(_member) => {
-                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        super::PartUsageBodyElement::MetadataKeywordUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&member.value)?;
                         }
                         super::PartUsageBodyElement::VariantUsage(_member) => {
                             self.write_marker(&mut first, "variant-usage")?;
@@ -2289,6 +2297,82 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str("))")
     }
 
+    /// One projection for the `@` spelling of a metadata feature, shared by every scope that owns
+    /// one.
+    ///
+    /// This was a contentless `(metadata-annotation)` marker: neither the annotated type, the
+    /// optional declared name, nor the `about` targets were observable, so a snapshot could not
+    /// tell `@Safety;` from `@Security about X;`.
+    fn write_metadata_annotation(
+        &mut self,
+        annotation: &super::MetadataAnnotation,
+    ) -> io::Result<()> {
+        self.writer
+            .write_str("(metadata-annotation (declared-name ")?;
+        match &annotation.declared_name {
+            Some(declared) => {
+                self.writer.write_str("(name ")?;
+                write_optional_quoted(self.writer, declared.value.identification.name.as_deref())?;
+                self.writer.write_str(") (short-name ")?;
+                write_optional_quoted(
+                    self.writer,
+                    declared.value.identification.short_name.as_deref(),
+                )?;
+                self.writer.write_str(") (typed-by ")?;
+                self.writer.write_str(match declared.value.typed_by {
+                    super::MetadataTypedBy::Colon => "colon",
+                    super::MetadataTypedBy::TypedBy => "typed-by",
+                })?;
+                self.writer.write_char(')')?;
+            }
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (type ")?;
+        self.write_reference(annotation.type_reference)?;
+        self.writer.write_str(") (about")?;
+        for target in &annotation.about_targets {
+            self.writer.write_char(' ')?;
+            self.write_reference(*target)?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_metadata_body(&annotation.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// `MetadataBody`, projected the way every other `AttributeBody` in this file is: the `;` and
+    /// `{}` forms stay distinct, and a brace body reports how many members it holds.
+    fn write_metadata_body(&mut self, body: &super::AttributeBody) -> io::Result<()> {
+        self.writer.write_str("(body ")?;
+        match body {
+            super::AttributeBody::Semicolon { .. } => self.writer.write_str("semicolon")?,
+            super::AttributeBody::Brace { elements, .. } => {
+                write!(self.writer, "brace (element-count {})", elements.len())?;
+            }
+        }
+        self.writer.write_char(')')
+    }
+
+    /// One projection for the `#` spelling of a metadata reference, shared by every scope that
+    /// owns one.
+    ///
+    /// This was a contentless `(metadata-keyword-usage)` marker whose only typed content -- the
+    /// referenced metadata type -- was an unqualifiable `String` copied out of the source. The
+    /// body distinguishes the two `#` productions: `none` is `PrefixMetadataMember`, a body is
+    /// `ExtendedUsage` with an empty declaration.
+    fn write_metadata_keyword_usage(
+        &mut self,
+        usage: &super::MetadataKeywordUsage,
+    ) -> io::Result<()> {
+        self.writer.write_str("(metadata-keyword-usage (type ")?;
+        self.write_reference(usage.reference)?;
+        self.writer.write_str(") ")?;
+        match &usage.body {
+            Some(body) => self.write_metadata_body(body)?,
+            None => self.writer.write_str("(body none)")?,
+        }
+        self.writer.write_char(')')
+    }
+
     fn write_annotating_member(&mut self, member: &super::AnnotatingMember) -> io::Result<()> {
         match member {
             super::AnnotatingMember::Doc(_) => self.writer.write_str("(doc)"),
@@ -2300,8 +2384,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_comment_annotation(&comment.value)
             }
             super::AnnotatingMember::TextualRep(_) => self.writer.write_str("(textual-rep)"),
-            super::AnnotatingMember::MetadataAnnotation(_) => {
-                self.writer.write_str("(metadata-annotation)")
+            super::AnnotatingMember::MetadataAnnotation(annotation) => {
+                self.write_metadata_annotation(&annotation.value)
             }
         }
     }
@@ -2851,8 +2935,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_port_usage(&usage.value)?;
                         }
-                        PortDefBodyElement::MetadataKeywordUsage(_usage) => {
-                            self.write_marker(&mut first, "metadata-keyword-usage")?;
+                        PortDefBodyElement::MetadataKeywordUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&usage.value)?;
                         }
                         super::PortDefBodyElement::Unsupported(unsupported) => {
                             self.write_item_prefix(&mut first)?;
@@ -3182,8 +3267,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::EnumerationUsage(_usage) => {
                 self.write_marker(first, "enumeration-usage")
             }
-            PackageBodyElement::MetadataKeywordUsage(_usage) => {
-                self.write_marker(first, "metadata-keyword-usage")
+            PackageBodyElement::MetadataKeywordUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_metadata_keyword_usage(&usage.value)
             }
             PackageBodyElement::ExtendedDefinition(definition) => {
                 self.write_item_prefix(first)?;

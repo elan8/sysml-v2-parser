@@ -16,7 +16,6 @@ use crate::parser::lex::{
     name, qualified_reference, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
     ws1, ws_and_comments,
 };
-use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::usage::{multiplicity_node, redefinition, usage_feature_modifier_flags};
@@ -271,8 +270,8 @@ fn first_merge_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<FirstMe
         | ActionDefBodyElement::Error(_)
         | ActionDefBodyElement::InOutDecl(_)
         | ActionDefBodyElement::Annotating(_)
-        | ActionDefBodyElement::Annotation(_)
         | ActionDefBodyElement::MetadataKeywordUsage(_)
+        | ActionDefBodyElement::Dependency(_)
         | ActionDefBodyElement::MetadataUsage(_)
         | ActionDefBodyElement::RefDecl(_)
         | ActionDefBodyElement::Perform(_)
@@ -749,7 +748,14 @@ pub(crate) fn action_def_body_element(
             crate::parser::metadata_annotation::metadata_keyword_usage,
             ActionDefBodyElement::MetadataKeywordUsage,
         ),
-        map(annotation, ActionDefBodyElement::Annotation),
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_prefix,
+            ActionDefBodyElement::MetadataKeywordUsage,
+        ),
+        map(
+            crate::parser::dependency::dependency,
+            ActionDefBodyElement::Dependency,
+        ),
         map(action_ref_decl, ActionDefBodyElement::RefDecl),
         map(perform_action_decl, ActionDefBodyElement::Perform),
         map(bind_, ActionDefBodyElement::Bind),
@@ -1282,7 +1288,14 @@ pub(crate) fn action_usage_body_element(
             crate::parser::metadata_annotation::metadata_keyword_usage,
             ActionUsageBodyElement::MetadataKeywordUsage,
         ),
-        map(annotation, ActionUsageBodyElement::Annotation),
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_prefix,
+            ActionUsageBodyElement::MetadataKeywordUsage,
+        ),
+        map(
+            crate::parser::dependency::dependency,
+            ActionUsageBodyElement::Dependency,
+        ),
         map(action_ref_decl, ActionUsageBodyElement::RefDecl),
         map(bind_, ActionUsageBodyElement::Bind),
         map(

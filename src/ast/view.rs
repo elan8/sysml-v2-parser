@@ -5,6 +5,7 @@ use super::common::{FilterMember, ImportTarget};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::RequirementDefBody;
+use super::structure::MetadataKeywordUsage;
 use crate::ast::core::{
     Expression, Multiplicity, Node, SubsettingRelationship, TypingRelationship,
 };
@@ -49,6 +50,11 @@ pub enum ConstraintDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// `#Tag` metadata reference: `PrefixMetadataMember` prefixing the next member, or the
+    /// `ExtendedUsage` member spelling `#Tag;` / `#Tag { ... }`. This scope reaches both --
+    /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
+    /// but modelled neither, so a `#` member was reported unsupported here.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     InOutDecl(Box<Node<InOutDecl>>),
     Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
     /// A `constraint` member nested inside a `constraint def { ... }` body (e.g. the Systems
@@ -127,6 +133,11 @@ pub enum CalcDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// `#Tag` metadata reference: `PrefixMetadataMember` prefixing the next member, or the
+    /// `ExtendedUsage` member spelling `#Tag;` / `#Tag { ... }`. This scope reaches both --
+    /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
+    /// but modelled neither, so a `#` member was reported unsupported here.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML 8.2.2.19), so a
     /// calculation body owns every action-body member as well as its own `return`. They arrive
     /// through the action dispatcher rather than as fifteen restated variants, the way
@@ -277,6 +288,11 @@ pub enum ViewDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// `#Tag` metadata reference: `PrefixMetadataMember` prefixing the next member, or the
+    /// `ExtendedUsage` member spelling `#Tag;` / `#Tag { ... }`. This scope reaches both --
+    /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
+    /// but modelled neither, so a `#` member was reported unsupported here.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
     /// `ref`-prefixed feature declaration, e.g. `ref viewpoint :>> self : ViewpointCheck;` and

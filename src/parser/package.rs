@@ -1250,6 +1250,7 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
                         | "unexpected_keyword_in_scope"
                         | "unrecognized_declaration_in_scope"
                         | "unsupported_annotation_syntax"
+                        | "malformed_annotation_head"
                 ) {
                     elements.push(node_from_to(
                         input,
@@ -2629,8 +2630,10 @@ mod package_metadata_and_connect_tests {
     fn package_body_accepts_metadata_tag_prefixing_a_requirement() {
         let (rest, node) = package_body_element(input("#fmeaspec requirement req1 { }"))
             .expect("prefix-form metadata tag");
-        // Only the tag is consumed; the prefixed requirement is left for the next element.
-        assert_eq!(rest.fragment(), b"requirement req1 { }");
+        // Only the tag is consumed -- up to the end of its reference, not past the
+        // whitespace after it, so the node span covers `#fmeaspec` and nothing else. The
+        // prefixed requirement is left for the next element.
+        assert_eq!(rest.fragment(), b" requirement req1 { }");
         assert!(matches!(
             node.value,
             PackageBodyElement::MetadataKeywordUsage(_)

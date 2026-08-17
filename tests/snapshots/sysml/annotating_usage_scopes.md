@@ -104,7 +104,8 @@ package AnnotatingUsageScopes {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 826) (line 26) (column 10) (len 8)) (segments (segment 0 (token "Approved") (name "Approved") (separator none) (span (offset 826) (line 26) (column 10) (len 8)))))
   )
-  (root (package (name "AnnotatingUsageScopes") (body brace (part-usage (declaration-name "p") (typing none) (body brace (port-usage) (interface-usage) (perform))) (view (name "v") (type none) (body brace (doc) (comment (keyword (span (offset 723) (line 24) (column 9) (len 7))) (name none) (about) (locale none)) (textual-rep) (metadata-annotation) (view-rendering))))))
+  (root (package (name "AnnotatingUsageScopes") (body brace (part-usage (declaration-name "p") (typing none) (body brace (port-usage) (interface-usage) (perform))) (view (name "v") (type none) (body brace (doc) (comment (keyword (span (offset 723) (line 24) (column 9) (len 7))) (name none) (about) (locale none)) (textual-rep) (metadata-annotation (declared-name none) (type (ref r0)) (about) (body semicolon)) (view-rendering))))))
 )
 ~~~

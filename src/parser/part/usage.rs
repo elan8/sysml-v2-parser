@@ -740,14 +740,12 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, right) = preceded(ws_and_comments, path_expression).parse(input)?;
     let mut body_parser = alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            (Some(ConnectBody::Semicolon), Vec::new())
-        }),
+        crate::parser::body::semicolon_body,
         map(consume_part_usage_structured_brace, |members| {
-            (Some(ConnectBody::Brace), members.elements)
+            members.into_body()
         }),
     ));
-    let (input, (body, body_elements)) = body_parser.parse(input)?;
+    let (input, body) = body_parser.parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -762,7 +760,6 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
                 right,
                 right_multiplicity,
                 body,
-                body_elements,
             },
         ),
     ))
@@ -1390,7 +1387,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                     crate::parser::metadata_annotation::metadata_keyword_usage,
                     PartUsageBodyElement::MetadataKeywordUsage,
                 ),
-                map(annotation, PartUsageBodyElement::Annotation),
+                map(
+                    crate::parser::metadata_annotation::metadata_keyword_prefix,
+                    PartUsageBodyElement::MetadataKeywordUsage,
+                ),
             )),
             map(
                 exhibit_state_as_state_usage,

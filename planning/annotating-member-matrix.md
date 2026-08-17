@@ -51,7 +51,8 @@ These are separately confirmed against the grammar so they are not folded in by 
   8.2.2.27), reached from `DefinitionExtensionKeyword`, `UsageExtensionKeyword`, `FeaturePrefix`,
   `Package`, `LibraryPackage` and `Dependency`. It is a *prefix on the declaration that follows
   it*, never a member of a body, and it is not an alternative of `AnnotatingElement`. It stays
-  `MetadataKeywordUsage` and keeps `body: None` for the prefix spelling.
+  `MetadataKeywordUsage` and keeps `body: None` for the prefix spelling. Its own audit, including
+  what follows the `#`, is `planning/metadata-sigil-matrix.md`.
 - **`#Name;` and `#Name { … }` as a standalone member** are `ExtendedUsage`
   (`UnextendedUsagePrefix UsageExtensionKeyword+ Usage`) with an empty `UsageDeclaration` — a
   *usage* member of the enclosing body, not an annotating one. That is the spelling
@@ -146,29 +147,34 @@ to show:
 - no scope's opaque-starter list (`ATTRIBUTE_OPAQUE_STARTERS`, `METADATA_OPAQUE_STARTERS`,
   `DEFINITION_BODY_OPAQUE_STARTERS`, `VIEW_DEF_OPAQUE_STARTERS`) contains `doc`, `comment`, `rep`,
   `language` or `@`, so `unsupported_member` cannot claim one; and
-- no emitter reports an `AnnotatingMember` as unsupported. The one surviving `w.unsupported` arm
-  that mentions an annotation is `OccurrenceBodyElement::Annotation`, which is the legacy
-  `Annotation` type — a `#`-sigil fallback with an `AnnotationHead::Opaque` head — and not an
-  alternative of `AnnotatingElement`. An occurrence-body `@M about A, B;` parses and formats
-  through the shared annotating path.
+- no emitter reports an `AnnotatingMember` as unsupported. The one `w.unsupported` arm that used
+  to mention an annotation was `OccurrenceBodyElement::Annotation`, the legacy `Annotation` type
+  — a `#`-sigil fallback with an `AnnotationHead::Opaque` head, and not an alternative of
+  `AnnotatingElement`. It is gone; see `planning/metadata-sigil-matrix.md`. An occurrence-body
+  `@M about A, B;` parses and formats through the shared annotating path.
 
 ## Confirmed remaining gaps
 
 These are annotating-member gaps the matrix found that this change does **not** close. Each is
 recorded with the grammar evidence and the reason it is a different seam.
 
-- **`ConnectBody` and `OpacityKind::OpaqueConnectBrace` survive only for the legacy `Annotation`.**
-  Every other owner now holds a real `Body<E>`. `Annotation` is the generic `@`/`#` fallback whose
-  head is an `AnnotationHead::Opaque(String)`; converting its body belongs with the metadata audit
-  that owns that opaque head, not with the container work. Nothing in the 351-document snapshot
-  corpus reaches `OpaqueConnectBrace` any more, and no `@`/`#` spelling tried here constructs an
-  `Annotation` with a brace body at all — the variant should be deleted with `Annotation`'s
-  rewrite rather than on that evidence alone.
-
 - **`Satisfy`'s member set is still a `ConstraintDefBody`.**
   `SatisfyRequirementUsage = … RequirementBody`, so the members should be
   `RequirementDefBodyElement`. Its container is one `Body` now; widening the member set is a
   member-dispatch change of the same kind as the rows in the table above.
+
+### Closed by the metadata-sigil seam
+
+- ~~`ConnectBody` and `OpacityKind::OpaqueConnectBrace` survive only for the legacy
+  `Annotation`~~ — done; the audit is `planning/metadata-sigil-matrix.md`. `Annotation`,
+  `AnnotationHead::Opaque(String)`, `ConnectBody`, `connect_body` and `OpaqueConnectBrace` are all
+  removed. `Bind` — the other surviving owner, which paired the marker with a separate
+  `body_elements` list — holds a `Body<PartUsageBodyElement>`.
+- ~~The one surviving `w.unsupported` arm that mentions an annotation is
+  `OccurrenceBodyElement::Annotation`~~ — done. That scope has a typed `MetadataKeywordUsage`
+  variant, as do `CalcDefBodyElement`, `ConstraintDefBodyElement`, `ViewDefBodyElement`,
+  `InterfaceDefBodyElement` and `ConnectionDefBodyElement`, which modelled neither `#` production
+  at all.
 
 ### Closed by the container work
 

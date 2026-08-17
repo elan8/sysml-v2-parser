@@ -531,14 +531,6 @@ impl PartialEq for TextualRepresentation {
             && self.text == other.text
     }
 }
-/// Body of a connect statement: `;` or `{` ... `}`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ConnectBody {
-    Semicolon,
-    Brace,
-}
-
 /// A member that annotates its owner rather than declaring structure or behavior.
 ///
 /// This is the grammar's own `AnnotatingElement` production, which both layers define

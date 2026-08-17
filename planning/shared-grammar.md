@@ -163,10 +163,12 @@ Two states that provenance forced into the open:
   longer re-emitted as one.
 
 Every body that was a marker is now this container. `ConnectBody` -- two variants, no delimiter
-spans, brace contents skipped -- held ten owners at the end of Phase 2 and holds one now, the
-legacy `Annotation`; the rest carry a `Body<E>` whose members and delimiters travel together.
-`Dependency`, `Satisfy`, `ConnectStmt` and the three `InterfaceUsage` forms had also been storing
-the same body fact twice, as a marker beside a separate element list, and no longer do.
+spans, brace contents skipped -- held ten owners at the end of Phase 2 and is deleted: the last
+two, the legacy `Annotation` and `Bind`, went with the metadata-sigil seam
+(`planning/metadata-sigil-matrix.md`). Every owner carries a `Body<E>` whose members and delimiters
+travel together. `Dependency`, `Satisfy`, `ConnectStmt`, `Bind` and the three `InterfaceUsage`
+forms had also been storing the same body fact twice, as a marker beside a separate element list,
+and no longer do.
 
 There is deliberately no state for a missing closing brace. An unterminated body does not produce a
 body today: the enclosing declaration's parse fails and the scope above keeps the text as recovery.
@@ -296,9 +298,10 @@ Completion criteria, all met:
 - no `Other(String)` or opaque fallback is introduced to make the family fit.
 
 What is deliberately not done here: recovery members remain unextracted, for the reason recorded in
-the audit above, and the `ConnectBody` marker bodies keep their gap because closing it needs the
-Phase-2 body container per owner rather than a variant swap. Both are recorded with grammar
-evidence in `planning/annotating-member-matrix.md`.
+the audit above. The `ConnectBody` marker bodies kept their gap through this phase because closing
+it needed the Phase-2 body container per owner rather than a variant swap; they are closed now, the
+last of them by the metadata-sigil seam. Both are recorded with grammar evidence in
+`planning/annotating-member-matrix.md` and `planning/metadata-sigil-matrix.md`.
 
 ### Phase 4: Audit and factor broader grammar families
 

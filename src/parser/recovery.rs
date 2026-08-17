@@ -115,8 +115,27 @@ enum RecoveryClassification {
         suggestion: String,
     },
     MissingSemicolon,
+    /// A `#` or `@` head this scope does not model, but that the pinned grammar admits.
     UnsupportedAnnotation,
+    /// A `#` or `@` sigil not followed by the `[QualifiedName]` its production requires.
+    ///
+    /// Distinct from [`RecoveryClassification::UnsupportedAnnotation`]: that one is valid syntax
+    /// the parser has not reached yet, this one is not a metadata reference at all, and the two
+    /// must stay separable in both the recovery node and its diagnostic.
+    MalformedAnnotationHead,
     Unexpected,
+}
+
+/// Whether a `#`/`@` sigil is followed by the `[QualifiedName]` its production requires.
+///
+/// `PrefixMetadataFeature` and `MetadataFeatureDeclaration` both end at an `OwnedFeatureTyping`,
+/// so a sigil followed by anything that cannot begin a name -- `#;`, `@ {`, `#::x` -- is
+/// malformed rather than merely unsupported here.
+fn annotation_head_is_well_formed(trimmed: &[u8]) -> bool {
+    let after_sigil = trim_ascii_start(&trimmed[1..]);
+    after_sigil
+        .first()
+        .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_' || *b == b'\'' || *b == b'$')
 }
 
 fn classify_recovery(
@@ -238,8 +257,12 @@ fn classify_recovery(
         return RecoveryClassification::MissingSemicolon;
     }
 
-    if lex::starts_with_keyword(trimmed, b"#") || lex::starts_with_keyword(trimmed, b"@") {
-        return RecoveryClassification::UnsupportedAnnotation;
+    if trimmed.starts_with(b"#") || trimmed.starts_with(b"@") {
+        return if annotation_head_is_well_formed(trimmed) {
+            RecoveryClassification::UnsupportedAnnotation
+        } else {
+            RecoveryClassification::MalformedAnnotationHead
+        };
     }
 
     if let Some((code, message, expected, suggestion)) =
@@ -346,16 +369,27 @@ pub(crate) fn build_recovery_error_node_from_span(
         },
         RecoveryClassification::UnsupportedAnnotation => ParseErrorNode {
             message: format!(
-                "incomplete parser support for annotation syntax in {scope_label}"
+                "incomplete parser support for metadata syntax in {scope_label}"
             ),
             code: "unsupported_annotation_syntax".to_string(),
             expected: Some(format!("supported {scope_label} element or metadata form")),
             found: recovery_found_snippet_from_span(input, recovery_end),
             suggestion: Some(
-                "This `#`/`@` annotation form is legal SysML but not fully parsed yet; rewrite using a supported metadata form or simplify the annotated declaration."
+                "This `#`/`@` metadata form is legal SysML but not fully parsed yet; rewrite using a supported metadata form or simplify the annotated declaration."
                     .to_string(),
             ),
             category: Some(DiagnosticCategory::UnsupportedGrammarForm),
+        },
+        RecoveryClassification::MalformedAnnotationHead => ParseErrorNode {
+            message: format!("malformed metadata reference in {scope_label}"),
+            code: "malformed_annotation_head".to_string(),
+            expected: Some("qualified name after `#` or `@`".to_string()),
+            found: recovery_found_snippet_from_span(input, recovery_end),
+            suggestion: Some(
+                "`#` and `@` are followed by the qualified name of a metadata type, as in `#safety` or `@Safety`."
+                    .to_string(),
+            ),
+            category: Some(DiagnosticCategory::ParseError),
         },
         RecoveryClassification::Unexpected => ParseErrorNode {
             message: format!("unexpected token in {scope_label}"),

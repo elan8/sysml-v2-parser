@@ -907,6 +907,7 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("unexpected_closing_brace")
         | Some("missing_closing_brace")
         | Some("unsupported_annotation_syntax")
+        | Some("malformed_annotation_head")
         | Some("invalid_bare_identifier_in_action_body")
         | Some("invalid_bare_identifier_in_state_body")
         | Some("recovery_cascade_suppressed")

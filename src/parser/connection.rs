@@ -36,6 +36,19 @@ fn connection_def_body_element(
             crate::parser::body::annotating_member,
             ConnectionDefBodyElement::Annotating,
         ),
+        // Both `#` productions: the `ExtendedUsage` member spelling (which owns a `;`/`{}`
+        // body) is tried before the `PrefixMetadataMember` spelling, which owns no body and
+        // leaves the prefixed declaration for the next member iteration.
+        alt((
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                ConnectionDefBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                ConnectionDefBodyElement::MetadataKeywordUsage,
+            ),
+        )),
         // PAR-002 widening: this body previously had no attribute/item/port coverage at all.
         // Same def-before-usage discipline as `InterfaceDefBodyElement`/other body enums.
         map(

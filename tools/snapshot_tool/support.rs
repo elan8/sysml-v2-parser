@@ -635,15 +635,15 @@ mod tests {
     #[test]
     /// The end-to-end companion to this test is gone, deliberately. It regenerated a fixture
     /// whose source was `transition t then next { }` -- a body that used to be an opaque
-    /// `ConnectBody` marker. Every such body is a real `ast::Body` now, and no construct in the
-    /// grammar reaches an opaque hit with a diagnostic-free parse any more, so the sentinel is
-    /// exercised at the mechanism it belongs to rather than through a document that cannot exist.
+    /// `ConnectBody` marker. `ConnectBody` itself is gone with the annotation seam that owned
+    /// its last brace, so the sentinel is exercised at the mechanism it belongs to (any opacity
+    /// kind reaching `FormatSection`) rather than through a document that cannot exist.
     fn opaque_ast_format_uses_explicit_unavailable_sentinel() {
         let section = FormatSection::from_emit_result(
             "package P;",
             Err(EmitError::Opaque {
                 path: "root.elements[0]".to_owned(),
-                kind: sysml_v2_parser::OpacityKind::OpaqueConnectBrace,
+                kind: sysml_v2_parser::OpacityKind::UnsupportedGrammar,
             }),
         )
         .expect("opacity is a representable FORMAT outcome");

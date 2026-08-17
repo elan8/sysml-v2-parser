@@ -33,6 +33,19 @@ fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBod
             crate::parser::body::annotating_member,
             ViewDefBodyElement::Annotating,
         ),
+        // Both `#` productions: the `ExtendedUsage` member spelling (which owns a `;`/`{}`
+        // body) is tried before the `PrefixMetadataMember` spelling, which owns no body and
+        // leaves the prefixed declaration for the next member iteration.
+        alt((
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                ViewDefBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                ViewDefBodyElement::MetadataKeywordUsage,
+            ),
+        )),
         map(
             crate::parser::connector::ref_decl,
             ViewDefBodyElement::RefDecl,
