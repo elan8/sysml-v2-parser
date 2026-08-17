@@ -15,7 +15,6 @@ use crate::parser::case::{
     verification_case_usage,
 };
 use crate::parser::connection::connection_def;
-use crate::parser::connector::connect_body;
 use crate::parser::constraint::{calc_def, constraint_def, constraint_usage};
 use crate::parser::dependency::dependency;
 use crate::parser::enumeration::{enum_def, enum_usage};
@@ -441,7 +440,7 @@ fn binding_connector_usage_inner(
     let (input, _) = preceded(ws_and_comments, tag(&b"="[..])).parse(input)?;
     let (input, right) =
         preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = crate::parser::part::ref_body(input)?;
     Ok((
         input,
         node_from_to(

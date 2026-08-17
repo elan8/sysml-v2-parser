@@ -7,7 +7,6 @@ use crate::ast::{
 use crate::parser::attribute::attribute_usage;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
-use crate::parser::connector::connect_body;
 use crate::parser::constraint::constraint_def_body;
 use crate::parser::expr::path_expression;
 use crate::parser::flow::flow_usage_member;
@@ -735,7 +734,7 @@ fn succession_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Successio
     let (input, target_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_parser)).parse(input)?;
     let (input, target) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = crate::parser::part::ref_body(input)?;
     Ok((
         input,
         node_from_to(

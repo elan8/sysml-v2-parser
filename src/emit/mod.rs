@@ -188,32 +188,41 @@ mod tests {
         assert_eq!(out.trim(), "package P {\n    part def Vehicle;\n}");
     }
 
+    /// The inverse of what this used to assert. A `connect` body inside a part definition was a
+    /// `ConnectBody` marker whose members lived nowhere, so emission had to refuse it; it is a
+    /// `UsageBody` now, so it emits, and the opacity report has nothing to say about it.
     #[test]
-    fn emit_rejects_an_opaque_connect_body() {
-        // A `connect` body inside a part definition is retained only as a marker, with its members
-        // held elsewhere, so emission cannot reproduce it and says so rather than guessing.
+    fn a_connect_body_is_no_longer_opaque() {
         let source = "package P {\n    part def Q {\n        connect a to b {\n            doc /* why */\n        }\n    }\n}\n";
         let document = crate::parse_for_editor(source).document;
-        let error = emit_sysml(&document).expect_err("an opaque body cannot be emitted");
         assert!(
-            matches!(
-                error,
-                EmitError::Opaque {
-                    kind: OpacityKind::OpaqueConnectBrace,
-                    ..
-                }
-            ),
-            "unexpected error: {error:?}"
+            opacity_report(&document.root).is_clean(),
+            "a connect body retains its members, so nothing about it is opaque"
+        );
+        let emitted = emit_sysml(&document).expect("a connect body emits");
+        assert!(
+            emitted.contains("doc"),
+            "the body's member must survive emission, got: {emitted}"
         );
     }
 
+    /// `OpacityKind::OpaqueConnectBrace` is still reachable from the `ConnectBody` owners that
+    /// have not been converted yet -- a `transition` body is one -- so the state stays covered
+    /// rather than becoming an untested variant while those conversions land.
     #[test]
-    fn opacity_report_finds_an_opaque_connect_body() {
-        let source = "package P {\n    part def Q {\n        connect a to b {\n            doc /* why */\n        }\n    }\n}\n";
+    fn a_transition_brace_body_is_still_opaque() {
+        let source = "package P {\n    state def S {\n        state a;\n        state b;\n        transition first a then b {\n            doc /* why */\n        }\n    }\n}\n";
         let document = crate::parse_for_editor(source).document;
         let report = opacity_report(&document.root);
         assert!(!report.is_clean());
-        assert_eq!(report.hits[0].kind, OpacityKind::OpaqueConnectBrace);
+        assert!(
+            report
+                .hits
+                .iter()
+                .any(|hit| hit.kind == OpacityKind::OpaqueConnectBrace),
+            "expected an opaque connect-brace hit, got: {:?}",
+            report.hits
+        );
     }
 
     #[test]

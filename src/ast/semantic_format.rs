@@ -10,16 +10,15 @@ use std::io;
 use std::io::Write as _;
 
 use super::{
-    ActionDefBodyElement, Argument, CaseReturnFeatureKind, CollectionOperator, ConnectBody,
-    ConnectionDefBody, ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole,
-    EndIdentity, Expression, FeatureValue, FeatureValueKind, FirstMergeBody, FirstMergeBodyElement,
-    ImportShape, ImportSuffixSpans, ImportTarget, InOut, InterfaceDefBody, InterfaceDefBodyElement,
-    Node, PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement,
-    PerformBody, PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId,
-    ReferenceSeparator, RequirementDefBody, RequirementDefBodyElement, RootElement, Span,
-    StateDefBody, StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind,
-    TypingKind, TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
-    ViewBodyElement,
+    ActionDefBodyElement, Argument, CaseReturnFeatureKind, CollectionOperator, ConnectionDefBody,
+    ConnectionDefBodyElement, DerivationConnectionRole, DerivationEndRole, EndIdentity, Expression,
+    FeatureValue, FeatureValueKind, FirstMergeBody, FirstMergeBodyElement, ImportShape,
+    ImportSuffixSpans, ImportTarget, InOut, InterfaceDefBody, InterfaceDefBodyElement, Node,
+    PackageBody, PackageBodyElement, ParsedDocument, PartDefBody, PartDefBodyElement, PerformBody,
+    PerformBodyElement, PortDefBody, PortDefBodyElement, QualifiedReferenceId, ReferenceSeparator,
+    RequirementDefBody, RequirementDefBodyElement, RootElement, Span, StateDefBody,
+    StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind, TypingKind,
+    TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
 };
 
 /// Stream a semantic AST projection to an [`io::Write`] sink.
@@ -2488,12 +2487,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_expression(&connect.from.value.expression)?;
         self.writer.write_str(") (to ")?;
         self.write_expression(&connect.to.value.expression)?;
-        self.writer.write_str(") (body ")?;
-        match connect.body {
-            ConnectBody::Semicolon => self.writer.write_str("semicolon")?,
-            ConnectBody::Brace => self.writer.write_str("brace")?,
-        }
         self.writer.write_str(") ")?;
+        self.write_ref_body(&connect.body)?;
+        self.writer.write_str(" ")?;
         self.write_optional_subsetting("subsets", connect.subsets.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", connect.redefines.as_ref())?;

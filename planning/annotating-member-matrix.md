@@ -188,5 +188,9 @@ a state body only dispatches when it is typed".
 - A `first f { … }` member in a calculation body reaches recovery.
   `CalculationBodyItem = ActionBodyItem | ReturnParameterMember`, and `ActionBodyItem` includes
   `InitialNodeMember`, so it is legal there.
-- A `flow def` parses in a part definition body and at package level, but the emitter reports it
-  as an unsupported construct in both, so such a document cannot be formatted.
+- ~~A `flow def` parses in a part definition body and at package level, but the emitter reports it
+  as an unsupported construct in both~~ — fixed.
+- `binding a = b;` (`BindingConnectorAsUsage`, a `NonOccurrenceUsageElement`) is dispatched in
+  neither a package body nor a definition body: the package scope reports it as an unimplemented
+  production and a part definition body reports an unexpected keyword. The AST models it and its
+  body is a real `Body<PartUsageBodyElement>`, but nothing constructs one.

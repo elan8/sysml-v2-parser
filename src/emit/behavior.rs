@@ -835,7 +835,7 @@ fn emit_state_def_body_element(
             structure::emit_attribute_usage(w, path, &a.value)
         }
         StateDefBodyElement::ActionUsage(a) => emit_action_usage(w, path, &a.value),
-        StateDefBodyElement::SuccessionUsage(s) => emit_succession_usage(w, &s.value),
+        StateDefBodyElement::SuccessionUsage(s) => emit_succession_usage(w, path, &s.value),
         StateDefBodyElement::AssertConstraint(a) => {
             super::view::emit_assert_constraint(w, path, &a.value)
         }
@@ -849,18 +849,14 @@ fn emit_state_def_body_element(
 
 pub(crate) fn emit_allocate(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     allocate: &Allocate,
 ) -> Result<(), EmitError> {
     w.push_str("allocate ");
     emit_expression(w, &allocate.source.value)?;
     w.push_str(" to ");
     emit_expression(w, &allocate.target.value)?;
-    match &allocate.body {
-        crate::ast::ConnectBody::Semicolon => w.push_char(';'),
-        crate::ast::ConnectBody::Brace => w.push_str(" {}"),
-    }
-    Ok(())
+    super::structure::emit_part_usage_body_public(w, path, &allocate.body)
 }
 
 pub(crate) fn emit_allocation_def(
@@ -1457,7 +1453,9 @@ pub(crate) fn emit_occurrence_body_element(
             // Occurrence-body `StateUsage` nodes are exhibit usages (§6 G30 / G18).
             emit_occurrence_exhibit(w, path, &s.value)
         }
-        crate::ast::OccurrenceBodyElement::SuccessionUsage(s) => emit_succession_usage(w, &s.value),
+        crate::ast::OccurrenceBodyElement::SuccessionUsage(s) => {
+            emit_succession_usage(w, path, &s.value)
+        }
         other @ crate::ast::OccurrenceBodyElement::Annotation(_) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
@@ -1512,6 +1510,7 @@ fn emit_occurrence_exhibit(
 
 pub(crate) fn emit_succession_usage(
     w: &mut EmitWriter<'_>,
+    path: &str,
     succ: &crate::ast::SuccessionUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, succ.membership.visibility);
@@ -1541,9 +1540,5 @@ pub(crate) fn emit_succession_usage(
         w.push_char(' ');
     }
     emit_expression(w, &succ.target.value)?;
-    match &succ.body {
-        crate::ast::ConnectBody::Semicolon => w.push_char(';'),
-        crate::ast::ConnectBody::Brace => w.push_str(" {}"),
-    }
-    Ok(())
+    super::structure::emit_part_usage_body_public(w, path, &succ.body)
 }

@@ -792,7 +792,10 @@ pub enum ActionBranchBody {
 pub struct Allocate {
     pub source: Node<Expression>,
     pub target: Node<Expression>,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: crate::ast::PartUsageBody,
 }
 
 /// Allocation definition: `allocation def` Identification body.

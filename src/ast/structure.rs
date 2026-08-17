@@ -1753,7 +1753,10 @@ pub struct SuccessionUsage {
     pub target: Node<Expression>,
     /// Multiplicity on the `then` end, e.g. `[0..1]`.
     pub target_multiplicity: Option<Node<Multiplicity>>,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: PartUsageBody,
     pub membership: Membership,
 }
 
@@ -1882,7 +1885,10 @@ pub enum InterfaceUsageBodyElement {
 pub struct Connect {
     pub from: Node<ConnectionEnd>,
     pub to: Node<ConnectionEnd>,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: PartUsageBody,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
 }
@@ -1916,7 +1922,10 @@ pub struct BindingConnectorUsage {
     pub uses_bind_keyword: bool,
     pub left: QualifiedReferenceId,
     pub right: QualifiedReferenceId,
-    pub body: ConnectBody,
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set. It was a
+    /// `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) whose brace form was parsed
+    /// by `advance_to_closing_brace` and kept nothing at all.
+    pub body: PartUsageBody,
 }
 
 // ---------------------------------------------------------------------------

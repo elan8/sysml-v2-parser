@@ -388,6 +388,14 @@ fn emit_part_def_body_element(
     }
 }
 
+pub(crate) fn emit_part_usage_body_public(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    body: &PartUsageBody,
+) -> Result<(), EmitError> {
+    emit_part_usage_body(w, path, body)
+}
+
 fn emit_part_usage_body(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -479,7 +487,7 @@ fn emit_part_usage_body_element(
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         PartUsageBodyElement::SuccessionUsage(s) => {
-            super::behavior::emit_succession_usage(w, &s.value)
+            super::behavior::emit_succession_usage(w, path, &s.value)
         }
         PartUsageBodyElement::StateDef(s) => super::behavior::emit_state_def(w, path, &s.value),
         PartUsageBodyElement::StateUsage(s) => super::behavior::emit_state_usage(w, path, &s.value),
@@ -801,18 +809,9 @@ pub(crate) fn emit_connect(
     emit_connection_end(w, &connect.from.value)?;
     w.push_str(" to ");
     emit_connection_end(w, &connect.to.value)?;
-    // Brace bodies are opacity-gated for `Connect` (no structured members).
-    match &connect.body {
-        ConnectBody::Semicolon => {
-            w.push_char(';');
-        }
-        ConnectBody::Brace => {
-            return Err(EmitError::Opaque {
-                path: path.to_string(),
-                kind: super::OpacityKind::OpaqueConnectBrace,
-            });
-        }
-    }
+    // The brace form used to abort emission with `OpacityKind::OpaqueConnectBrace`, because the
+    // body kept no members to write. It is a `UsageBody` now, so it writes like any other.
+    emit_part_usage_body(w, path, &connect.body)?;
     if let Some(subsets) = &connect.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
@@ -1255,7 +1254,7 @@ pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, _path: &str, bind: &Bind) -> Res
 
 pub(crate) fn emit_binding_connector_usage(
     w: &mut EmitWriter<'_>,
-    _path: &str,
+    path: &str,
     usage: &crate::ast::BindingConnectorUsage,
 ) -> Result<(), EmitError> {
     w.push_str("binding");
@@ -1281,7 +1280,7 @@ pub(crate) fn emit_binding_connector_usage(
     w.push_qualified_reference("binding left", usage.left)?;
     w.push_str(" = ");
     w.push_qualified_reference("binding right", usage.right)?;
-    emit_optional_connect_body(w, Some(&usage.body))
+    emit_part_usage_body(w, path, &usage.body)
 }
 
 fn emit_optional_connect_body(

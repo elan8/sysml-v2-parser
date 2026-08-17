@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`connect`, `allocate`, `succession` and `binding` usages hold a real body, and a braced
+  `connect` can be formatted.** All four end in `UsageBody`, and `UsageBody = DefinitionBody`, so
+  each owns the whole usage member set; all four held a `ConnectBody` marker whose brace form was
+  parsed by `advance_to_closing_brace` and kept nothing. A braced `connect` body was worse than
+  lossy: `emit_connect` aborted with `OpacityKind::OpaqueConnectBrace`, so
+  `connect a to b { doc /* … */ }` inside a part definition made the whole document
+  unformattable. Each is now a `Body<PartUsageBodyElement>` with its own delimiter spans.
+  **AST version 163 -> 164.**
+
 - **`dependency`, `expose` and the view-body `satisfy` hold a real body.** All three carried a
   `ConnectBody` marker -- two variants, no delimiter spans -- whose brace form `expose` and
   `satisfy` skipped wholesale, so members written inside `expose Subject { doc /* ... */ }` were

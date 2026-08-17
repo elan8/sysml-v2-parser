@@ -669,7 +669,7 @@ pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> 
     let (input, source) = path_expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
     let (input, target) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -786,7 +786,7 @@ fn connect_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     let (input, to_multiplicity) =
         opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, body) = connect_body(input)?;
+    let (input, body) = ref_body(input)?;
     let before_subsets = input;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),

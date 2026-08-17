@@ -4180,7 +4180,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = target_multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            visitor.visit_connect_body(body);
+            walk_part_usage_body(visitor, body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -4333,7 +4333,7 @@ macro_rules! ast_traversal {
             let Connect { from, to, body, subsets, redefines } = &$($mutability)? node.value;
             visitor.visit_connection_end(from);
             visitor.visit_connection_end(to);
-            visitor.visit_connect_body(body);
+            walk_part_usage_body(visitor, body);
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -4358,7 +4358,7 @@ macro_rules! ast_traversal {
             let _ = uses_bind_keyword;
             visitor.visit_qualified_reference(left);
             visitor.visit_qualified_reference(right);
-            visitor.visit_connect_body(body);
+            walk_part_usage_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -5163,7 +5163,7 @@ macro_rules! ast_traversal {
             let Allocate { source, target, body } = &$($mutability)? node.value;
             visitor.visit_expression(source);
             visitor.visit_expression(target);
-            visitor.visit_connect_body(body);
+            walk_part_usage_body(visitor, body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

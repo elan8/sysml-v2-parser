@@ -164,7 +164,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::RenderingUsage(r) => {
             walk_rendering_usage_body(report, path, &r.value.body)
         }
-        PackageBodyElement::Connect(c) => walk_connect_body(report, path, &c.value.body),
+        PackageBodyElement::Connect(c) => walk_ref_body(report, path, &c.value.body),
         PackageBodyElement::ItemDef(i) => walk_attribute_body(report, path, &i.value.body),
         PackageBodyElement::ItemUsage(i) => walk_attribute_body(report, path, &i.value.body),
         PackageBodyElement::IndividualDef(i) => walk_attribute_body(report, path, &i.value.body),
@@ -206,9 +206,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
             walk_constraint_def_body(report, path, &a.value.body)
         }
         PackageBodyElement::PerformUsage(p) => walk_perform_body(report, path, &p.value.body),
-        PackageBodyElement::BindingConnectorUsage(b) => {
-            walk_connect_body(report, path, &b.value.body)
-        }
+        PackageBodyElement::BindingConnectorUsage(b) => walk_ref_body(report, path, &b.value.body),
         PackageBodyElement::ClassDef(c) => walk_attribute_body(report, path, &c.value.body),
         PackageBodyElement::Succession(first) => {
             walk_first_merge_body(report, path, &first.value.body)
@@ -409,7 +407,7 @@ fn walk_connection_def_body(report: &mut OpacityReport, path: &str, body: &Conne
                 walk_constraint_def_body(report, &p, &assertion.value.body)
             }
             ConnectionDefBodyElement::SuccessionUsage(succession) => {
-                walk_connect_body(report, &p, &succession.value.body)
+                walk_ref_body(report, &p, &succession.value.body)
             }
             ConnectionDefBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
@@ -430,7 +428,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::UnsupportedMember(_) => {
                 hit(report, &p, OpacityKind::UnsupportedGrammar)
             }
-            PartDefBodyElement::Connect(c) => walk_connect_body(report, &p, &c.value.body),
+            PartDefBodyElement::Connect(c) => walk_ref_body(report, &p, &c.value.body),
             PartDefBodyElement::PartDef(n) => walk_part_def_body(report, &p, &n.value.body),
             PartDefBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             PartDefBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
@@ -464,7 +462,7 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
                 walk_connection_def_body(report, &p, &n.value.body)
             }
             PartDefBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
-            PartDefBodyElement::Allocate(n) => walk_connect_body(report, &p, &n.value.body),
+            PartDefBodyElement::Allocate(n) => walk_ref_body(report, &p, &n.value.body),
             PartDefBodyElement::ExhibitState(n) => walk_state_def_body(report, &p, &n.value.body),
             PartDefBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
             PartDefBodyElement::ConstraintDef(n) => {
@@ -567,7 +565,7 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::KermlClassifier(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
             }
-            PartUsageBodyElement::Connect(c) => walk_connect_body(report, &p, &c.value.body),
+            PartUsageBodyElement::Connect(c) => walk_ref_body(report, &p, &c.value.body),
             PartUsageBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             PartUsageBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             PartUsageBodyElement::EndDecl(_) => {}
@@ -591,10 +589,8 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::InterfaceUsage(n) => walk_interface_usage(report, &p, &n.value),
             PartUsageBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
             PartUsageBodyElement::Perform(n) => walk_perform_body(report, &p, &n.value.body),
-            PartUsageBodyElement::SuccessionUsage(n) => {
-                walk_connect_body(report, &p, &n.value.body)
-            }
-            PartUsageBodyElement::Allocate(n) => walk_connect_body(report, &p, &n.value.body),
+            PartUsageBodyElement::SuccessionUsage(n) => walk_ref_body(report, &p, &n.value.body),
+            PartUsageBodyElement::Allocate(n) => walk_ref_body(report, &p, &n.value.body),
             PartUsageBodyElement::Satisfy(n) => walk_satisfy(report, &p, &n.value),
             PartUsageBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             PartUsageBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
@@ -707,7 +703,7 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             AttributeBodyElement::KermlClassifier(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
             }
-            AttributeBodyElement::Connect(c) => walk_connect_body(report, &p, &c.value.body),
+            AttributeBodyElement::Connect(c) => walk_ref_body(report, &p, &c.value.body),
             AttributeBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::AttributeUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -1150,7 +1146,7 @@ fn walk_state_def_body_elements(
             StateDefBodyElement::ActionUsage(n) => {
                 walk_optional_action_usage_body(report, &p, &n.value.body)
             }
-            StateDefBodyElement::SuccessionUsage(n) => walk_connect_body(report, &p, &n.value.body),
+            StateDefBodyElement::SuccessionUsage(n) => walk_ref_body(report, &p, &n.value.body),
             StateDefBodyElement::AssertConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
@@ -1248,9 +1244,9 @@ fn walk_occurrence_body_element(
         OccurrenceBodyElement::OccurrenceUsage(n) => {
             walk_occurrence_usage_body(report, path, &n.value.body)
         }
-        OccurrenceBodyElement::SuccessionUsage(n) => walk_connect_body(report, path, &n.value.body),
+        OccurrenceBodyElement::SuccessionUsage(n) => walk_ref_body(report, path, &n.value.body),
         OccurrenceBodyElement::Satisfy(n) => walk_satisfy(report, path, &n.value),
-        OccurrenceBodyElement::Allocate(n) => walk_connect_body(report, path, &n.value.body),
+        OccurrenceBodyElement::Allocate(n) => walk_ref_body(report, path, &n.value.body),
         OccurrenceBodyElement::EndDecl(n) => walk_end_decl(report, path, &n.value),
         OccurrenceBodyElement::StateUsage(n) => walk_state_def_body(report, path, &n.value.body),
         OccurrenceBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),
