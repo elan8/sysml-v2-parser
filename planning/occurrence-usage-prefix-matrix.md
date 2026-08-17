@@ -407,6 +407,39 @@ Two remain, both pre-existing and both outside this production:
   its `AST` section. Extending that projection is a `ViewDef` change, not a prefix change;
 - `ConnectionDefBodyElement::SuccessionUsage` still has no emitter.
 
+## 8.2 Allocation and cost
+
+The prefix is a shared hot path -- every member of every body scope reaches the parsers that carry
+it -- so it was measured rather than reasoned about, with `benches/parser_bench.rs`'s
+`snapshot_parser_corpus/all_sources` over the checked-in snapshot corpus. The baseline is `main`'s
+parser run against *this branch's* corpus, so both sides parse identical input.
+
+| Measurement | Result |
+| --- | --- |
+| First implementation | +6.3% wall clock (p < 0.05). Per fixture: +3.8% on a KerML body with no occurrence, item or satisfy member at all, so the cost was in probing, not in the nodes |
+| After trivia-free slot probing | +0.96% and +0.07% over two runs; the second reports "no change in performance detected" (p = 0.71) |
+| Per fixture, after | `8_requirements` −2.7%, `type_body_relationship_members` −1.5%, `6_individual_and_snapshots` unchanged |
+
+The cause was the *failing* probe. Thirteen optional slots, each re-running the trivia scan and
+rebuilding a located span before comparing a keyword, on a prefix that almost no member has.
+`slot_keyword` takes trivia-free input and reduces a failure to one keyword comparison; the trivia
+scan runs once per prefix and each successful slot re-establishes the invariant after its own
+token. `could_start_prefixed_usage` is a second, coarser admission test that keeps the reference
+transaction and the prefix walk off members that could not be one of the migrated families.
+
+Allocation: an authored prefix adds no heap allocation. Its four independent modifiers are
+`Option<Span>`, its three exclusive slots are `Option<Node<_>>`, and `extension_keywords` is a
+`Vec` that allocates only when a `#tag` was actually written -- one allocation for the run, not one
+per keyword. A refused prefix allocates nothing observable either: the whole family parse runs
+inside `reference_transaction`, which is what
+`occurrence_usage_prefix_owning_layer::a_refused_prefix_leaves_no_arena_entry` pins.
+
+The prefix is 304 bytes inline, and `OccurrenceUsage`, `ItemUsage` and `SatisfyRequirementUsage`
+grow by that. Of the eight body-element enums that own them only two changed size
+(`ActionDefBodyElement`/`ActionUsageBodyElement` 848 → 984, `PackageBodyElement` 1240 → 1280);
+the rest were already dominated by a larger variant. The per-fixture numbers above are what say
+that growth is not what costs.
+
 ## 9. Migration status, family by family
 
 Migrated by this change — no legacy prefix field or parser path remains for either:

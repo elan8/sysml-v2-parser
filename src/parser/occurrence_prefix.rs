@@ -73,17 +73,37 @@ pub(crate) fn optional_keyword_token<'a>(
     }
 }
 
+/// [`keyword_token`] for input whose leading trivia the caller has already consumed.
+///
+/// The prefix has thirteen optional slots and almost every member of every body scope has none of
+/// them, so the probe that *fails* is the hot one. Re-running the trivia scan and rebuilding a
+/// located span for each failed probe is what made walking the prefix measurable on the corpus
+/// benchmark; this reduces a failure to one keyword comparison. Every success re-establishes the
+/// invariant by consuming the trivia after its own token, so the slots can be probed in sequence.
+fn slot_keyword<'a>(input: Input<'a>, keyword: &'static [u8]) -> Option<(Input<'a>, Span)> {
+    if !starts_with_keyword(input.fragment(), keyword) {
+        return None;
+    }
+    let (rest, (span, _)) = with_span(tag::<_, _, nom::error::Error<Input<'a>>>(keyword))
+        .parse(input)
+        .ok()?;
+    let (rest, _) = ws_and_comments(rest).ok()?;
+    Some((rest, span))
+}
+
 /// The first of two alternatives in one slot, as a `Node` carrying the authored keyword's span.
+///
+/// Takes trivia-free input; see [`slot_keyword`].
 fn optional_alternative<'a, T: Copy>(
     input: Input<'a>,
     alternatives: [(&'static [u8], T); 2],
-) -> IResult<Input<'a>, Option<Node<T>>> {
+) -> (Input<'a>, Option<Node<T>>) {
     for (keyword, value) in alternatives {
-        if let Ok((rest, span)) = keyword_token(input, keyword) {
-            return Ok((rest, Some(Node::new(span, value))));
+        if let Some((rest, span)) = slot_keyword(input, keyword) {
+            return (rest, Some(Node::new(span, value)));
         }
     }
-    Ok((input, None))
+    (input, None)
 }
 
 /// `RefPrefix : Usage = FeatureDirection? 'derived'? ('abstract'|'variation')? 'constant'?`.
@@ -92,18 +112,25 @@ fn optional_alternative<'a, T: Copy>(
 /// already the kind keyword. `inout` is tried before `in` for readability only --
 /// [`starts_with_keyword`] would reject `in` against `inout x` anyway, because `o` is not a token
 /// boundary.
-pub(crate) fn ref_prefix(input: Input<'_>) -> IResult<Input<'_>, RefPrefix> {
-    let (input, direction) = optional_direction(input)?;
-    let (input, derived_span) = optional_keyword_token(input, b"derived")?;
+/// Takes trivia-free input; see [`slot_keyword`].
+fn ref_prefix(input: Input<'_>) -> (Input<'_>, RefPrefix) {
+    let (input, direction) = optional_direction(input);
+    let (input, derived_span) = match slot_keyword(input, b"derived") {
+        Some((rest, span)) => (rest, Some(span)),
+        None => (input, None),
+    };
     let (input, variance) = optional_alternative(
         input,
         [
             (&b"abstract"[..], DefinitionPrefix::Abstract),
             (&b"variation"[..], DefinitionPrefix::Variation),
         ],
-    )?;
-    let (input, constant_span) = optional_keyword_token(input, b"constant")?;
-    Ok((
+    );
+    let (input, constant_span) = match slot_keyword(input, b"constant") {
+        Some((rest, span)) => (rest, Some(span)),
+        None => (input, None),
+    };
+    (
         input,
         RefPrefix {
             direction,
@@ -111,34 +138,39 @@ pub(crate) fn ref_prefix(input: Input<'_>) -> IResult<Input<'_>, RefPrefix> {
             variance,
             constant_span,
         },
-    ))
+    )
 }
 
 /// `direction = FeatureDirection` where `FeatureDirection = 'in' | 'out' | 'inout'`.
-fn optional_direction(input: Input<'_>) -> IResult<Input<'_>, Option<Node<InOut>>> {
+fn optional_direction(input: Input<'_>) -> (Input<'_>, Option<Node<InOut>>) {
     for (keyword, value) in [
         (&b"inout"[..], InOut::InOut),
         (&b"in"[..], InOut::In),
         (&b"out"[..], InOut::Out),
     ] {
-        if let Ok((rest, span)) = keyword_token(input, keyword) {
-            return Ok((rest, Some(Node::new(span, value))));
+        if let Some((rest, span)) = slot_keyword(input, keyword) {
+            return (rest, Some(Node::new(span, value)));
         }
     }
-    Ok((input, None))
+    (input, None)
 }
 
 /// `BasicUsagePrefix : Usage = RefPrefix ( isReference ?= 'ref' )?`.
-pub(crate) fn basic_usage_prefix(input: Input<'_>) -> IResult<Input<'_>, BasicUsagePrefix> {
-    let (input, ref_prefix) = ref_prefix(input)?;
-    let (input, reference_span) = optional_keyword_token(input, b"ref")?;
-    Ok((
+///
+/// Takes trivia-free input; see [`slot_keyword`].
+fn basic_usage_prefix(input: Input<'_>) -> (Input<'_>, BasicUsagePrefix) {
+    let (input, ref_prefix) = ref_prefix(input);
+    let (input, reference_span) = match slot_keyword(input, b"ref") {
+        Some((rest, span)) => (rest, Some(span)),
+        None => (input, None),
+    };
+    (
         input,
         BasicUsagePrefix {
             ref_prefix,
             reference_span,
         },
-    ))
+    )
 }
 
 /// One `UsageExtensionKeyword = PrefixMetadataMember = '#' PrefixMetadataUsage`.
@@ -248,19 +280,31 @@ pub(crate) fn next_word_is_reserved(input: Input<'_>) -> bool {
 pub(crate) fn occurrence_usage_prefix(
     input: Input<'_>,
 ) -> IResult<Input<'_>, OccurrenceUsagePrefix> {
-    let (input, basic) = basic_usage_prefix(input)?;
-    let (input, individual_span) = optional_keyword_token(input, b"individual")?;
+    // Consume leading trivia once; every slot below then probes trivia-free input and
+    // re-establishes that invariant after its own token. See [`slot_keyword`].
+    let (input, _) = ws_and_comments(input)?;
+    let (input, basic) = basic_usage_prefix(input);
+    let (input, individual_span) = match slot_keyword(input, b"individual") {
+        Some((rest, span)) => (rest, Some(span)),
+        None => (input, None),
+    };
     let (input, portion) = optional_alternative(
         input,
         [
             (&b"snapshot"[..], OccurrencePortionKind::Snapshot),
             (&b"timeslice"[..], OccurrencePortionKind::Timeslice),
         ],
-    )?;
+    );
     let mut input = input;
     let mut extension_keywords = Vec::new();
-    while let Ok((rest, keyword)) = usage_extension_keyword(input) {
+    while input.fragment().starts_with(b"#") {
+        let Ok((rest, keyword)) = usage_extension_keyword(input) else {
+            break;
+        };
         extension_keywords.push(keyword);
+        let Ok((rest, _)) = ws_and_comments(rest) else {
+            break;
+        };
         input = rest;
     }
     Ok((
