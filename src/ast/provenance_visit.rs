@@ -8,12 +8,30 @@
 //! traversal knows about it -- there is no separate list here to keep in step.
 
 use super::visit::{
-    walk_comment_annotation, walk_first_merge_brace_body, walk_import_target, Visitor,
+    walk_comment_annotation, walk_first_merge_brace_body, walk_import_target,
+    walk_metadata_annotation, walk_metadata_keyword_usage, Visitor,
 };
 use super::*;
 
 fn span_end(span: &Span) -> usize {
     span.offset.saturating_add(span.len)
+}
+
+/// A span that belongs to one node rather than merely to the enclosing declaration.
+///
+/// [`ProvenanceValidator::owned`] checks against the innermost node the traversal is *inside*,
+/// which for a node's own fields is its parent. This checks against the node itself, so
+/// "the `@` of *this* annotation" is a stronger claim than "somewhere in this part def".
+fn sigil_within(span: &Span, node: &Span, role: &str) -> Result<(), String> {
+    if span.offset < node.offset || span_end(span) > span_end(node) {
+        return Err(format!(
+            "{role} at {} lies outside the node that owns it, {}..{}",
+            span.offset,
+            node.offset,
+            span_end(node)
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn validate_ast_provenance(document: &ParsedDocument) -> Result<(), String> {
@@ -60,6 +78,23 @@ impl ProvenanceValidator<'_> {
             ));
         }
         Ok(())
+    }
+
+    /// `typed by` is two keywords with authored whitespace between them, so its span cannot be
+    /// compared byte-for-byte against a fixed spelling the way a single-token delimiter can.
+    fn declaration_separator(&self, span: &Span, token: &str, role: &str) -> Result<(), String> {
+        let Some(text) = self.document.source.slice(span) else {
+            return Err(format!(
+                "{role} span at offset {} is not a valid slice of the document source",
+                span.offset
+            ));
+        };
+        let normalized: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        if normalized == token {
+            Ok(())
+        } else {
+            Err(format!("{role} span covers {text:?} rather than {token:?}"))
+        }
     }
 
     /// A delimiter span must lie inside the source, land on character boundaries, and contain
@@ -182,6 +217,65 @@ impl Visitor for ProvenanceValidator<'_> {
             }
         }
         walk_comment_annotation(self, node);
+    }
+
+    /// The `#` sigil is syntax, not part of the reference behind it. Emission writes the sigil
+    /// from this span, so a wire document that points it at other text -- or at a `#` belonging
+    /// to a different member -- would change what the document says while every reference in it
+    /// still resolved.
+    fn visit_metadata_keyword_usage(&mut self, node: &Node<MetadataKeywordUsage>) {
+        if self.error.is_some() {
+            return;
+        }
+        self.check(self.delimiter(&node.value.hash_span, "#", "metadata keyword sigil"));
+        if self.error.is_none() {
+            self.check(sigil_within(
+                &node.value.hash_span,
+                &node.span,
+                "metadata keyword sigil",
+            ));
+        }
+        walk_metadata_keyword_usage(self, node);
+    }
+
+    /// The `@` sigil and the two halves of `MetadataFeatureDeclaration`.
+    ///
+    /// `( ':' | 'typed' 'by' )` is an authored choice emission reproduces, so its span has to
+    /// spell the keyword the variant claims; and the `OwnedFeatureTyping` span has to sit inside
+    /// the annotation that owns it rather than pointing at an unrelated name elsewhere.
+    fn visit_metadata_annotation(&mut self, node: &Node<MetadataAnnotation>) {
+        if self.error.is_some() {
+            return;
+        }
+        self.check(self.delimiter(&node.value.at_span, "@", "metadata annotation sigil"));
+        if self.error.is_none() {
+            self.check(sigil_within(
+                &node.value.at_span,
+                &node.span,
+                "metadata annotation sigil",
+            ));
+        }
+        if self.error.is_none() {
+            self.check(sigil_within(
+                &node.value.type_span,
+                &node.span,
+                "metadata annotation typing",
+            ));
+        }
+        if let Some(declared) = &node.value.declared_name {
+            if self.error.is_none() {
+                let token = match declared.value.typed_by {
+                    MetadataTypedBy::Colon => ":",
+                    MetadataTypedBy::TypedBy => "typed by",
+                };
+                self.check(self.declaration_separator(
+                    &declared.value.typed_by_span,
+                    token,
+                    "metadata declaration separator",
+                ));
+            }
+        }
+        walk_metadata_annotation(self, node);
     }
 
     /// A `first`/`merge`/`decide`/`join`/`fork` brace body records both delimiters explicitly.

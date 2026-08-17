@@ -3,7 +3,7 @@ use super::behavior::{
     StateUsage,
 };
 use super::body::Body;
-use super::common::{AnnotatingMember, ConnectBody, Identification, ParseErrorNode};
+use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::{Dependency, EnumerationUsage, ItemUsage, RequirementUsage, Satisfy};
@@ -80,7 +80,6 @@ pub enum PartDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
-    Annotation(Node<Annotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// A dependency owned by this definition (BNF `DefinitionMember`).
     Dependency(Node<Dependency>),
@@ -514,78 +513,119 @@ impl PartialEq for PartUsage {
 /// Body of a part usage: `;` or `{` PartUsageBodyElement* `}`.
 pub type PartUsageBody = Body<PartUsageBodyElement>;
 
-/// Metadata annotation on usage: `@` Name (`:` Type)? (`about` targets)? MetadataBody.
+/// The `@` spelling of a metadata feature -- the `MetadataFeature` alternative of
+/// `AnnotatingElement` (KerML 8.2.5.12 `MetadataFeature`, SysML 8.2.2.27 `MetadataUsage`).
+///
+/// ```text
+/// MetadataFeature = ( PrefixMetadataMember )* ( '@' | 'metadata' )
+///                   MetadataFeatureDeclaration
+///                   ( 'about' Annotation ( ',' Annotation )* )?
+///                   MetadataBody
+/// MetadataFeatureDeclaration = ( Identification ( ':' | 'typed' 'by' ) )? OwnedFeatureTyping
+/// ```
+///
+/// # Why the *type* is the reference, and the head is not
+///
+/// The declaration ends at a required `OwnedFeatureTyping`, so the last qualified name is always
+/// the annotated metadata type. The `Identification` in front of `:` / `typed by` is a
+/// **declared name**: `@Tag;` names nothing and is typed by `Tag`, while `@t : Tag;` declares
+/// `t` and is typed by `Tag`. The superseded shape stored whatever followed `@` as a
+/// `QualifiedReferenceId` and demoted the type to an `Option`, so `@t : Tag` allocated an arena
+/// reference for the declaration label `t` -- a reference synthesized from a declaration.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataAnnotation {
-    pub reference: QualifiedReferenceId,
-    pub type_reference: Option<QualifiedReferenceId>,
+    /// The `@` sigil. Syntax and provenance: never part of the declared name or the type.
+    pub at_span: Span,
+    /// `MetadataFeatureDeclaration`'s optional `Identification ( ':' | 'typed' 'by' )` prefix,
+    /// present exactly when a separator keyword was authored.
+    pub declared_name: Option<Node<MetadataDeclaredName>>,
+    /// `OwnedFeatureTyping` -- the annotated metadata type. Required by the production.
+    pub type_reference: QualifiedReferenceId,
+    /// Exact span of the `OwnedFeatureTyping` qualified name.
+    pub type_span: Span,
+    /// `'about' Annotation ( ',' Annotation )*`, where `Annotation = [QualifiedName]`.
     pub about_targets: Vec<QualifiedReferenceId>,
+    /// `MetadataBody`.
     pub body: AttributeBody,
-    pub head_span: Option<Span>,
-    pub type_span: Option<Span>,
 }
 
 impl PartialEq for MetadataAnnotation {
     fn eq(&self, other: &Self) -> bool {
-        self.reference == other.reference
+        self.declared_name == other.declared_name
             && self.type_reference == other.type_reference
             && self.about_targets == other.about_targets
             && self.body == other.body
     }
 }
 
-/// User-defined metadata keyword usage: `#keyword` (`:` Type)? (`about` targets)? body.
+/// `MetadataFeatureDeclaration`'s `Identification ( ':' | 'typed' 'by' )` prefix.
+///
+/// The two parts are one field because the grammar makes them inseparable: the separator is only
+/// written when an identification precedes it, and an identification is only reachable through
+/// the separator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct MetadataDeclaredName {
+    /// The declared name. A declaration label, never a reference.
+    pub identification: Identification,
+    /// Which separator keyword the author wrote.
+    pub typed_by: MetadataTypedBy,
+    /// Exact `:` or `typed by` token span.
+    pub typed_by_span: Span,
+}
+
+/// The authored spelling of `MetadataFeatureDeclaration`'s `( ':' | 'typed' 'by' )` separator.
+///
+/// Both spell the same relationship, so emission reproduces what was written rather than
+/// canonicalizing one into the other. Only these two are legal here, which is why this is its
+/// own enum rather than a reuse of the wider [`crate::ast::TypingSpelling`]: `specializes` and
+/// `defined by` are not reachable from this production and must not be representable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataTypedBy {
+    /// `:`
+    Colon,
+    /// `typed by`
+    TypedBy,
+}
+
+/// The `#` spelling of a metadata reference.
+///
+/// ```text
+/// PrefixMetadataMember     : OwningMembership = '#' ownedRelatedElement += PrefixMetadataFeature
+/// PrefixMetadataAnnotation : Annotation       = '#' ownedRelatedElement += PrefixMetadataFeature
+/// PrefixMetadataFeature    : MetadataFeature  = ownedRelationship += OwnedFeatureTyping
+/// ```
+///
+/// `OwnedFeatureTyping` is `[QualifiedName]`, so what follows `#` is a **reference to a metadata
+/// type** -- possibly qualified (`#ISQ::mass`), possibly quoted -- and never a fabricated name.
+/// The `#` is syntax and is kept as a span rather than folded into the name.
+///
+/// Unlike the `@` spelling, `PrefixMetadataFeature` admits no `Identification`, no
+/// `:` / `typed by` clause and no `about` clause: those belong to `MetadataFeature`, which `#`
+/// does not reach. Fields for them were removed rather than left permanently empty --
+/// `#Tag about X;` is not a production in either layer.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataKeywordUsage {
-    pub keyword: String,
-    pub type_reference: Option<QualifiedReferenceId>,
-    pub about_targets: Vec<QualifiedReferenceId>,
-    /// `None` for the prefix spelling (`#safety part def X`), which annotates the declaration
-    /// that follows it and has no body of its own to write. The member spelling (`#safety;`,
-    /// `#safety { ... }`) always has one.
+    /// The `#` sigil. Syntax and provenance, never part of the reference.
+    pub hash_span: Span,
+    /// `OwnedFeatureTyping` -- the metadata type this tag refers to.
+    pub reference: QualifiedReferenceId,
+    /// Which of the two `#` productions this is.
+    ///
+    /// `None` is `PrefixMetadataMember` / `PrefixMetadataAnnotation`: the tag prefixes the
+    /// declaration that follows it (`#safety part def X;`) and owns no body. `Some` is
+    /// `ExtendedUsage` with an empty `UsageDeclaration` (`#safety;`, `#safety { ... }`), a
+    /// member of the enclosing body that writes its own `UsageBody`.
     pub body: Option<AttributeBody>,
-    pub keyword_span: Span,
-    pub type_span: Option<Span>,
 }
 
 impl PartialEq for MetadataKeywordUsage {
     fn eq(&self, other: &Self) -> bool {
-        self.keyword == other.keyword
-            && self.type_reference == other.type_reference
-            && self.about_targets == other.about_targets
-            && self.body == other.body
+        self.reference == other.reference && self.body == other.body
     }
-}
-
-/// Generic annotation or metadata usage captured in body scopes.
-#[derive(Debug, Clone, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Annotation {
-    pub sigil: String,
-    pub head: AnnotationHead,
-    pub type_reference: Option<QualifiedReferenceId>,
-    pub body: ConnectBody,
-    pub head_span: Option<Span>,
-    pub type_span: Option<Span>,
-}
-
-impl PartialEq for Annotation {
-    fn eq(&self, other: &Self) -> bool {
-        self.sigil == other.sigil
-            && self.head == other.head
-            && self.type_reference == other.type_reference
-            && self.body == other.body
-    }
-}
-
-/// The semantic target of an `@` annotation, or opaque text for an extension-style `#` form.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum AnnotationHead {
-    Reference(QualifiedReferenceId),
-    Opaque(String),
 }
 
 /// Element inside a part usage body.
@@ -605,7 +645,6 @@ pub enum PartUsageBodyElement {
     InOutDecl(Node<InOutDecl>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
-    Annotation(Node<Annotation>),
     AttributeUsage(Node<AttributeUsage>),
     /// Bare `name : Type;` without a kind keyword (SysML DefaultReferenceUsage).
     DefaultReferenceUsage(Node<DefaultReferenceUsage>),
@@ -1182,6 +1221,11 @@ pub type InterfaceDefBody = Body<InterfaceDefBodyElement>;
 pub enum InterfaceDefBodyElement {
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// `#Tag` metadata reference: `PrefixMetadataMember` prefixing the next member, or the
+    /// `ExtendedUsage` member spelling `#Tag;` / `#Tag { ... }`. This scope reaches both --
+    /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
+    /// but modelled neither, so a `#` member was reported unsupported here.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     EndDecl(Node<EndDecl>),
     RefDecl(Node<RefDecl>),
     ConnectStmt(Node<ConnectStmt>),
@@ -1487,6 +1531,11 @@ pub enum ConnectionDefBodyElement {
     ConnectStmt(Node<ConnectStmt>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// `#Tag` metadata reference: `PrefixMetadataMember` prefixing the next member, or the
+    /// `ExtendedUsage` member spelling `#Tag;` / `#Tag { ... }`. This scope reaches both --
+    /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
+    /// but modelled neither, so a `#` member was reported unsupported here.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Error(Node<ParseErrorNode>),
     /// PAR-002 widening: this enum previously had no attribute/item/port coverage at all.
     AttributeDef(Node<AttributeDef>),
@@ -1691,7 +1740,12 @@ pub enum OccurrenceBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
-    Annotation(Node<Annotation>),
+    /// `#Tag` metadata reference: `PrefixMetadataMember` prefixing the next member, or the
+    /// `ExtendedUsage` member spelling `#Tag;` / `#Tag { ... }`. `OccurrenceDefinition`/
+    /// `OccurrenceUsage` reach both through `DefinitionExtensionKeyword`/`UsageExtensionKeyword`
+    /// and `DefinitionBodyItem → NonOccurrenceUsageMember → ExtendedUsage`; this scope was the
+    /// one body that modelled neither and captured `#` as opaque text instead.
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     AssertConstraint(Node<AssertConstraintMember>),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
     AttributeUsage(Node<AttributeUsage>),
@@ -1808,12 +1862,17 @@ pub struct Bind {
     pub right: Node<Expression>,
     /// Multiplicity on the right (`=`) end, e.g. `... = [0..*] be;`.
     pub right_multiplicity: Option<Node<Multiplicity>>,
-    /// Optional body after the bind (semicolon or brace); 3a fixture uses `bind x = y { }`.
-    pub body: Option<ConnectBody>,
-    /// Real content from a braced body (`body: Some(ConnectBody::Brace)`), the same part-usage
-    /// member set `PartUsageBody` uses (BNF `BindingConnectorAsUsage`'s body is `UsageBody`, the
-    /// same general usage-member production). Empty otherwise.
-    pub body_elements: Vec<Node<PartUsageBodyElement>>,
+    /// The body after the bind, delimiters included (`bind x = y;`, `bind x = y { ... }`).
+    ///
+    /// `BindingConnectorAsUsage`'s body is `UsageBody`, the same general usage-member production
+    /// `PartUsageBody` uses. This was the last `ConnectBody` marker in the AST: a
+    /// `Semicolon | Brace` flag with no delimiter spans, paired with a separate `body_elements`
+    /// list, so one body fact lived in two fields and an empty `{ }` was indistinguishable from
+    /// a `{ ... }` whose members had been discarded.
+    ///
+    /// Not an `Option`: `BindingConnectorAsUsage` ends at `UsageCompletion`, so a bind always
+    /// writes `;` or `{ ... }`. The parser only ever produced `Some`.
+    pub body: PartUsageBody,
 }
 
 /// Interface usage: typed+connect or connection form.

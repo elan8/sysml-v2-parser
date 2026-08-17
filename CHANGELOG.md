@@ -9,6 +9,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `@` and `#` metadata sigils are typed and source-backed; the last opaque annotation node
+  and `ConnectBody` are gone.** Audit and evidence: `planning/metadata-sigil-matrix.md`.
+  **AST version 165 -> 166.**
+
+  - `MetadataFeatureDeclaration = ( Identification ( ':' | 'typed' 'by' ) )? OwnedFeatureTyping`
+    ends at a *required* typing, so the last qualified name after `@` is the type and anything in
+    front of the separator is a declared name. `MetadataAnnotation` had this inverted -- the head
+    was a `QualifiedReferenceId` and the type an `Option` -- so `@t : Tag` allocated an arena
+    reference for the declaration label `t`. It now holds `declared_name:
+    Option<Node<MetadataDeclaredName>>` beside a required `type_reference`, and the `typed by`
+    spelling parses and round-trips instead of only `:`.
+  - `PrefixMetadataFeature = OwnedFeatureTyping`, which is `[QualifiedName]`, so what follows `#`
+    is a reference. `MetadataKeywordUsage` stored it as `keyword: String` -- a copied `NAME`, so
+    `#ISQ::mass` truncated to `ISQ` -- alongside `type_reference` and `about_targets` fields no
+    `#` production can produce. It is now `hash_span` + `reference: QualifiedReferenceId` +
+    `body: Option<AttributeBody>`, and those three fields are removed. `#Tag about X;` is no
+    longer accepted: no production spells it.
+  - The legacy `Annotation` type and `AnnotationHead`, including `AnnotationHead::Opaque(String)`,
+    are removed with their parsers (`annotation`, `hash_annotation`) and their variant on eight
+    body-element enums. Its `@` branch was unreachable -- `annotating_member` won first at every
+    dispatch site -- and its `#` branch captured everything to the next `;`/`{` as opaque text.
+    `#refinement dependency PerformCrewIngress to …;` in an action or requirement body was one
+    such node, with neither endpoint reaching the reference arena; `ActionBodyItem →
+    NonBehaviorBodyItem → DefinitionMember → DefinitionElement → Dependency` admits it, so both
+    scopes now dispatch `Dependency` and the tag is a separate typed sibling.
+  - `ConnectBody`, `connect_body` and `OpacityKind::OpaqueConnectBrace` are deleted.
+    `Bind` was its last owner besides `Annotation`, pairing the `Semicolon | Brace` marker with a
+    separate `body_elements` list -- one body fact in two fields, with an authored `{}`
+    indistinguishable from a `{ … }` whose members were discarded. `Bind.body` is a
+    `PartUsageBody`, matching `BindingConnectorAsUsage`'s `UsageBody`.
+  - Six scopes modelled no `#` member at all and reported one as unsupported:
+    `OccurrenceBodyElement`, `CalcDefBodyElement`, `ConstraintDefBodyElement`,
+    `ViewDefBodyElement`, `InterfaceDefBodyElement` and `ConnectionDefBodyElement`. Each admits
+    `ExtendedUsage` through `DefinitionBodyItem → NonOccurrenceUsageMember` and
+    `PrefixMetadataMember` on any member, and each now has a typed `MetadataKeywordUsage` variant.
+  - Recovery splits `#`/`@` into two states that were one. A sigil followed by something that can
+    begin a qualified name keeps `unsupported_annotation_syntax` (warning,
+    `UnsupportedGrammarForm`); a sigil with no reference behind it -- `#;`, `@ ;`, `#::x` -- is
+    the new `malformed_annotation_head` (error, `ParseError`). Valid-but-unsupported and malformed
+    were previously indistinguishable in both the recovery node and the diagnostic.
+  - The semantic snapshot projection showed `(metadata-annotation)` and
+    `(metadata-keyword-usage)` as contentless markers, and an extended definition's prefixes as
+    copied strings. All three now project typed fields: the annotated type as a reference, the
+    declared name and its separator spelling, the `about` targets, and the body form.
+  - Deserialization validates the new provenance: the `@` and `#` sigil spans must cover their own
+    token inside their own node, the `OwnedFeatureTyping` span must sit inside the annotation, and
+    a `MetadataTypedBy` variant must agree with the text its span covers.
+  - `emit_identification` wrote `"> "` unconditionally, leaving a trailing space on an
+    `Identification` written with only its short-name half, which the caller then doubled against
+    whatever it wrote next (`@<short>  : Tag`). The separator is now written only between the two
+    halves.
+  - `Requirements Examples/RequirementDerivationExample.sysml` is promoted into
+    `EXAMPLES_ROUNDTRIP_PASS`: `#derivation`/`#original`/`#derive` reach the typed prefix path
+    instead of the opaque capture that swallowed the rest of the statement.
+
 - **`transition`, `satisfy` and the three interface-usage forms hold a real body; four spec
   fixtures become formattable.** `TransitionUsage = 'transition' … ActionBody` and
   `InterfaceUsage = … InterfaceBody`; `satisfy` paired its marker with a second element list.

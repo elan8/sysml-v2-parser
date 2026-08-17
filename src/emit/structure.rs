@@ -5,12 +5,12 @@ use super::root::{emit_identification, emit_import};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
-    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectBody,
-    ConnectStmt, ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole,
-    EndDecl, EndIdentity, InOut, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
-    InterfaceUsage, InterfaceUsageBodyElement, Multiplicity, Node, PartDef, PartDefBody,
-    PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement,
-    PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind,
+    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Bind, Connect, ConnectStmt,
+    ConnectionEnd, DefinitionPrefix, DerivationConnectionRole, DerivationEndRole, EndDecl,
+    EndIdentity, InOut, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
+    InterfaceUsageBodyElement, Multiplicity, Node, PartDef, PartDefBody, PartDefBodyElement,
+    PartUsage, PartUsageBody, PartUsageBodyElement, PortBody, PortBodyElement, PortDef,
+    PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, SubsettingKind,
     SubsettingRelationship, TypingKind, TypingRelationship,
 };
 
@@ -374,8 +374,7 @@ fn emit_part_def_body_element(
         PartDefBodyElement::RenderingUsage(n) => {
             super::view::emit_rendering_usage(w, path, &n.value)
         }
-        other @ (PartDefBodyElement::Annotation(_)
-        | PartDefBodyElement::OccurrenceDef(_)
+        other @ (PartDefBodyElement::OccurrenceDef(_)
         | PartDefBodyElement::CaseDef(_)
         | PartDefBodyElement::CaseUsage(_)
         | PartDefBodyElement::UseCaseDef(_)
@@ -530,11 +529,10 @@ fn emit_part_usage_body_element(
         PartUsageBodyElement::RenderingUsage(n) => {
             super::view::emit_rendering_usage(w, path, &n.value)
         }
-        other @ (PartUsageBodyElement::Annotation(_) | PartUsageBodyElement::OccurrenceDef(_)) => w
-            .unsupported(
-                path,
-                format!("{other:?}").chars().take(64).collect::<String>(),
-            ),
+        other @ PartUsageBodyElement::OccurrenceDef(_) => w.unsupported(
+            path,
+            format!("{other:?}").chars().take(64).collect::<String>(),
+        ),
     }
 }
 
@@ -881,6 +879,9 @@ fn emit_interface_def_body_element(
         InterfaceDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
+        InterfaceDefBodyElement::MetadataKeywordUsage(usage) => {
+            emit_metadata_keyword_usage(w, path, &usage.value)
+        }
         InterfaceDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         InterfaceDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
         InterfaceDefBodyElement::ConnectStmt(c) => emit_connect_stmt(w, path, &c.value),
@@ -1208,7 +1209,7 @@ fn emit_ref_body(w: &mut EmitWriter<'_>, path: &str, body: &RefBody) -> Result<(
     }
 }
 
-pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, _path: &str, bind: &Bind) -> Result<(), EmitError> {
+pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, path: &str, bind: &Bind) -> Result<(), EmitError> {
     if bind.binding_name.is_some()
         || bind.binding_type.is_some()
         || bind.binding_multiplicity.is_some()
@@ -1240,7 +1241,7 @@ pub(crate) fn emit_bind(w: &mut EmitWriter<'_>, _path: &str, bind: &Bind) -> Res
         w.push_char(' ');
     }
     emit_expression(w, &bind.right.value)?;
-    emit_optional_connect_body(w, bind.body.as_ref())
+    emit_part_usage_body(w, path, &bind.body)
 }
 
 pub(crate) fn emit_binding_connector_usage(
@@ -1272,23 +1273,6 @@ pub(crate) fn emit_binding_connector_usage(
     w.push_str(" = ");
     w.push_qualified_reference("binding right", usage.right)?;
     emit_part_usage_body(w, path, &usage.body)
-}
-
-fn emit_optional_connect_body(
-    w: &mut EmitWriter<'_>,
-    body: Option<&ConnectBody>,
-) -> Result<(), EmitError> {
-    match body {
-        None | Some(ConnectBody::Semicolon) => {
-            w.push_char(';');
-            Ok(())
-        }
-        Some(ConnectBody::Brace) => {
-            // Opaque brace (no structured members); preserve empty `{}` for AST-eq.
-            w.push_str(" {}");
-            Ok(())
-        }
-    }
 }
 
 /// BNF `RefPrefix = 'derived'? ('abstract' | 'variation')? 'constant'?` (§8.2.2.6.2), in the one
@@ -1689,11 +1673,14 @@ pub(crate) fn emit_metadata_annotation(
     ann: &crate::ast::MetadataAnnotation,
 ) -> Result<(), EmitError> {
     w.push_char('@');
-    w.push_qualified_reference("metadata annotation", ann.reference)?;
-    if let Some(ty) = ann.type_reference {
-        w.push_str(" : ");
-        w.push_qualified_reference("metadata annotation type", ty)?;
+    if let Some(declared) = &ann.declared_name {
+        emit_identification(w, &declared.value.identification);
+        match declared.value.typed_by {
+            crate::ast::MetadataTypedBy::Colon => w.push_str(" : "),
+            crate::ast::MetadataTypedBy::TypedBy => w.push_str(" typed by "),
+        }
     }
+    w.push_qualified_reference("metadata annotation type", ann.type_reference)?;
     if !ann.about_targets.is_empty() {
         w.push_str(" about ");
         for (i, target) in ann.about_targets.iter().enumerate() {
@@ -1712,20 +1699,7 @@ pub(crate) fn emit_metadata_keyword_usage(
     usage: &crate::ast::MetadataKeywordUsage,
 ) -> Result<(), EmitError> {
     w.push_char('#');
-    w.push_str(&usage.keyword);
-    if let Some(ty) = usage.type_reference {
-        w.push_str(" : ");
-        w.push_qualified_reference("metadata keyword type", ty)?;
-    }
-    if !usage.about_targets.is_empty() {
-        w.push_str(" about ");
-        for (i, target) in usage.about_targets.iter().enumerate() {
-            if i > 0 {
-                w.push_str(", ");
-            }
-            w.push_qualified_reference("metadata keyword about target", *target)?;
-        }
-    }
+    w.push_qualified_reference("metadata keyword type", usage.reference)?;
     match &usage.body {
         Some(body) => emit_attribute_body(w, path, body),
         None => Ok(()),
@@ -1834,6 +1808,9 @@ fn emit_connection_def_body_element(
         }
         crate::ast::ConnectionDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
+        }
+        crate::ast::ConnectionDefBodyElement::MetadataKeywordUsage(usage) => {
+            emit_metadata_keyword_usage(w, path, &usage.value)
         }
         crate::ast::ConnectionDefBodyElement::EndDecl(e) => emit_end_decl(w, path, &e.value),
         crate::ast::ConnectionDefBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),

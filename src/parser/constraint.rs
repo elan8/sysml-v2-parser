@@ -164,6 +164,21 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::Annotating,
         )
         .parse(input)?
+    } else if input.fragment().starts_with(b"#") {
+        // Both `#` productions: the `ExtendedUsage` member spelling (which owns a `;`/`{}`
+        // body) is tried before the `PrefixMetadataMember` spelling, which owns no body and
+        // leaves the prefixed declaration for the next member iteration.
+        alt((
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                ConstraintDefBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                ConstraintDefBodyElement::MetadataKeywordUsage,
+            ),
+        ))
+        .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"in")
         || starts_with_keyword(input.fragment(), b"out")
         || starts_with_keyword(input.fragment(), b"inout")
@@ -1287,6 +1302,21 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             crate::parser::body::annotating_member,
             CalcDefBodyElement::Annotating,
         )
+        .parse(input)?
+    } else if input.fragment().starts_with(b"#") {
+        // Both `#` productions: the `ExtendedUsage` member spelling (which owns a `;`/`{}`
+        // body) is tried before the `PrefixMetadataMember` spelling, which owns no body and
+        // leaves the prefixed declaration for the next member iteration.
+        alt((
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                CalcDefBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                CalcDefBodyElement::MetadataKeywordUsage,
+            ),
+        ))
         .parse(input)?
     } else if starts_with_keyword(after_visibility, b"import") {
         map(crate::parser::import::import_, |n| {

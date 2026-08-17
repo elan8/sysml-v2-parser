@@ -2,7 +2,7 @@
 
 use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, AttributeBody,
-    AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConnectBody, ConnectionDefBody,
+    AttributeBodyElement, CalcDefBody, CalcDefBodyElement, ConnectionDefBody,
     ConnectionDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, DefinitionBody,
     DefinitionBodyElement, EndNestedUsage, FirstMergeBody, InterfaceDefBody,
     InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement, LibraryPackage,
@@ -25,7 +25,6 @@ pub enum OpacityKind {
     FeatureDecl,
     ClassifierDecl,
     RawRhsString,
-    OpaqueConnectBrace,
     ParseError,
     UnsupportedGrammar,
 }
@@ -272,6 +271,9 @@ fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &Interf
             InterfaceDefBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
             }
+            InterfaceDefBodyElement::MetadataKeywordUsage(n) => {
+                walk_optional_attribute_body(report, &p, &n.value.body)
+            }
         }
     }
 }
@@ -296,6 +298,9 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             ConstraintDefBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
             }
+            ConstraintDefBodyElement::MetadataKeywordUsage(n) => {
+                walk_optional_attribute_body(report, &p, &n.value.body)
+            }
             ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             ConstraintDefBodyElement::RequireConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
@@ -317,6 +322,9 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             CalcDefBodyElement::CalcDef(c) => walk_calc_def_body(report, &p, &c.value.body),
             CalcDefBodyElement::PartUsage(pu) => walk_part_usage_body(report, &p, &pu.value.body),
             CalcDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
+            CalcDefBodyElement::MetadataKeywordUsage(n) => {
+                walk_optional_attribute_body(report, &p, &n.value.body)
+            }
             CalcDefBodyElement::ActionMember(n) => {
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
@@ -411,6 +419,9 @@ fn walk_connection_def_body(report: &mut OpacityReport, path: &str, body: &Conne
             }
             ConnectionDefBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
+            }
+            ConnectionDefBodyElement::MetadataKeywordUsage(n) => {
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
         }
     }
@@ -529,7 +540,6 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
                 walk_use_case_def_body(report, &p, &n.value.body)
             }
             PartDefBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
-            PartDefBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             PartDefBodyElement::Import(import) => {
                 walk_optional_relationship_body(report, &p, import.value.body_elements.as_deref())
             }
@@ -575,7 +585,6 @@ fn walk_part_usage_body_elements(
             PartUsageBodyElement::ActionUsage(n) => {
                 walk_optional_action_usage_body(report, &p, &n.value.body)
             }
-            PartUsageBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             PartUsageBodyElement::EnumerationUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
             }
@@ -811,10 +820,12 @@ fn walk_action_def_body_elements(
             }
             ActionDefBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
             ActionDefBodyElement::ActionDef(n) => walk_action_def_body(report, &p, &n.value.body),
-            ActionDefBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             ActionDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             ActionDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
+            }
+            ActionDefBodyElement::Dependency(n) => {
+                walk_relationship_body(report, &p, &n.value.body)
             }
             ActionDefBodyElement::MetadataUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -910,12 +921,14 @@ fn walk_action_usage_body_elements(
             }
             ActionUsageBodyElement::CalcUsage(n) => walk_calc_def_body(report, &p, &n.value.body),
             ActionUsageBodyElement::ActionDef(n) => walk_action_def_body(report, &p, &n.value.body),
-            ActionUsageBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             ActionUsageBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
             }
             ActionUsageBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
+            }
+            ActionUsageBodyElement::Dependency(n) => {
+                walk_relationship_body(report, &p, &n.value.body)
             }
             ActionUsageBodyElement::MetadataUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
@@ -977,8 +990,8 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
         let p = format!("{path}/body[{i}]");
         match &el.value {
             RequirementDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            RequirementDefBodyElement::Annotation(n) => {
-                walk_connect_body(report, &p, &n.value.body)
+            RequirementDefBodyElement::Dependency(n) => {
+                walk_relationship_body(report, &p, &n.value.body)
             }
             RequirementDefBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
@@ -1039,7 +1052,6 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
         let p = format!("{path}/body[{i}]");
         match &el.value {
             UseCaseDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
-            UseCaseDefBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             UseCaseDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             UseCaseDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
@@ -1130,7 +1142,6 @@ fn walk_state_def_body_elements(
             StateDefBodyElement::Exit(n) => walk_state_def_body(report, &p, &n.value.body),
             StateDefBodyElement::StateUsage(n) => walk_state_def_body(report, &p, &n.value.body),
             StateDefBodyElement::Ref(n) => walk_ref_body(report, &p, &n.value.body),
-            StateDefBodyElement::Annotation(n) => walk_connect_body(report, &p, &n.value.body),
             StateDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
             StateDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
@@ -1165,6 +1176,9 @@ fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody
             ViewDefBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             ViewDefBodyElement::Unsupported(_) => hit(report, &p, OpacityKind::UnsupportedGrammar),
             ViewDefBodyElement::Annotating(member) => walk_annotating_member(report, &p, member),
+            ViewDefBodyElement::MetadataKeywordUsage(n) => {
+                walk_optional_attribute_body(report, &p, &n.value.body)
+            }
             ViewDefBodyElement::ViewRendering(n) => {
                 walk_rendering_usage_body(report, &p, &n.value.body)
             }
@@ -1231,7 +1245,9 @@ fn walk_occurrence_body_element(
 ) {
     match el {
         OccurrenceBodyElement::Error(_) => hit(report, path, OpacityKind::ParseError),
-        OccurrenceBodyElement::Annotation(n) => walk_connect_body(report, path, &n.value.body),
+        OccurrenceBodyElement::MetadataKeywordUsage(n) => {
+            walk_optional_attribute_body(report, path, &n.value.body)
+        }
         OccurrenceBodyElement::AssertConstraint(n) => {
             walk_constraint_def_body(report, path, &n.value.body)
         }
@@ -1310,6 +1326,9 @@ fn walk_constraint_body_elements(
             }
             ConstraintDefBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
+            }
+            ConstraintDefBodyElement::MetadataKeywordUsage(n) => {
+                walk_optional_attribute_body(report, &p, &n.value.body)
             }
             ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             ConstraintDefBodyElement::RequireConstraint(n) => {
@@ -1416,7 +1435,7 @@ fn walk_satisfy(report: &mut OpacityReport, path: &str, satisfy: &crate::ast::Sa
 }
 
 fn walk_bind(report: &mut OpacityReport, path: &str, bind: &crate::ast::Bind) {
-    walk_part_usage_body_elements(report, path, &bind.body_elements);
+    walk_part_usage_body(report, path, &bind.body);
 }
 
 fn walk_variant_usage(report: &mut OpacityReport, path: &str, variant: &VariantUsage) {
@@ -1505,12 +1524,6 @@ fn walk_first_merge_body(report: &mut OpacityReport, path: &str, body: &FirstMer
                 }
             }
         }
-    }
-}
-
-fn walk_connect_body(report: &mut OpacityReport, path: &str, body: &ConnectBody) {
-    if matches!(body, ConnectBody::Brace) {
-        hit(report, path, OpacityKind::OpaqueConnectBrace);
     }
 }
 

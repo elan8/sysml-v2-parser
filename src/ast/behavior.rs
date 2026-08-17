@@ -3,7 +3,7 @@ use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::membership::Membership;
 use super::requirement::RequirementUsage;
 use super::structure::{
-    Annotation, Bind, DefinitionBody, MetadataKeywordUsage, MetadataUsage, Perform, RefDecl,
+    Bind, DefinitionBody, MetadataKeywordUsage, MetadataUsage, Perform, RefDecl,
 };
 use crate::ast::core::{
     Expression, Multiplicity, Node, Span, SubsettingRelationship, TypingRelationship,
@@ -43,8 +43,15 @@ pub enum ActionDefBodyElement {
     InOutDecl(Node<InOutDecl>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
-    Annotation(Node<Annotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// A dependency owned by this action definition.
+    ///
+    /// `ActionBody → ActionBodyItem → NonBehaviorBodyItem → DefinitionMember →
+    /// DefinitionElement → Dependency`, so `dependency X to Y;` -- and the
+    /// `PrefixMetadataAnnotation`-tagged `#refinement dependency X to Y;` the Apollo model
+    /// writes here -- are ordinary members of this scope. Neither was dispatched, so the whole
+    /// statement was swallowed by the opaque `#` fallback that owned `AnnotationHead::Opaque`.
+    Dependency(Node<crate::ast::Dependency>),
     /// Literal `metadata` keyword form (BNF `MetadataUsage`'s `('@' | 'metadata')` alternative,
     /// GH-86), e.g. `metadata ToolExecution { toolName = "ModelCenter"; }` (Analysis Examples/
     /// AnalysisAnnotation.sysml). Previously only dispatched at package-body scope.
@@ -446,8 +453,9 @@ pub enum ActionUsageBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
-    Annotation(Node<Annotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// A dependency owned by this action usage; see [`ActionDefBodyElement::Dependency`].
+    Dependency(Node<crate::ast::Dependency>),
     /// Literal `metadata` keyword form (BNF `MetadataUsage`'s `('@' | 'metadata')` alternative,
     /// GH-86), e.g. `metadata ToolExecution { toolName = "ModelCenter"; }` (Analysis Examples/
     /// AnalysisAnnotation.sysml). Previously only dispatched at package-body scope.
@@ -855,7 +863,6 @@ pub enum StateDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
-    Annotation(Node<Annotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// `in`/`out`/`inout` parameter redecl inside `entry`/`do`/`exit` action bodies
     /// (e.g. `do 'sense temperature' { out temp; }`, validation `05`).

@@ -14,7 +14,6 @@ use crate::parser::lex::{
     name, qualified_reference, recover_body_element, reference_path, starts_with_keyword,
     visibility_prefix, ws1, ws_and_comments,
 };
-use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::part::exhibit_state_as_state_usage;
 use crate::parser::part::part_usage;
@@ -595,7 +594,20 @@ pub(crate) fn occurrence_body_element(
             crate::parser::body::annotating_member,
             OccurrenceBodyElement::Annotating,
         ),
-        map(annotation, OccurrenceBodyElement::Annotation),
+        // Both `#` productions, in the order the grammar disambiguates them: the `ExtendedUsage`
+        // member spelling requires its own `;`/`{`, so a head without one falls through to the
+        // `PrefixMetadataMember` spelling, which leaves the prefixed declaration for the next
+        // member iteration. Grouped into a sub-`alt` to stay under nom's 21-branch limit.
+        alt((
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                OccurrenceBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
+                OccurrenceBodyElement::MetadataKeywordUsage,
+            ),
+        )),
         map(
             assert_constraint_member,
             OccurrenceBodyElement::AssertConstraint,

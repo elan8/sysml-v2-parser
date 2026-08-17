@@ -1784,8 +1784,10 @@ mod attribute_body_tests {
     fn attribute_body_accepts_metadata_tag_prefixing_a_connect() {
         let (rest, node) = attribute_body_element(input("#prevention connect a to b;"))
             .expect("prefix-form metadata tag");
-        // Only the tag is consumed; the prefixed connect is left for the next element.
-        assert_eq!(rest.fragment(), b"connect a to b;");
+        // Only the tag is consumed -- up to the end of its reference, not past the
+        // whitespace after it, so the node span covers `#prevention` and nothing else. The
+        // prefixed connect is left for the next element.
+        assert_eq!(rest.fragment(), b" connect a to b;");
         assert!(matches!(
             node.value,
             AttributeBodyElement::MetadataKeywordUsage(_)

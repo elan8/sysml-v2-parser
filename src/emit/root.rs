@@ -70,8 +70,7 @@ fn emit_extended_definition(
         structure::emit_definition_prefix(w, Some(prefix));
     }
     for keyword in &def.prefix_keywords {
-        w.push_char('#');
-        w.push_str(&keyword.value.keyword);
+        structure::emit_metadata_keyword_usage(w, path, &keyword.value)?;
         w.push_char(' ');
     }
     if def.has_def_keyword {
@@ -500,7 +499,14 @@ pub(crate) fn emit_identification(w: &mut EmitWriter<'_>, id: &Identification) {
     if let Some(short) = &id.short_name {
         w.push_char('<');
         w.push_str(&format_name(short));
-        w.push_str("> ");
+        w.push_char('>');
+        // The separator belongs between the two halves, not to the short name. Writing it
+        // unconditionally left a trailing space on `Identification = ( '<' NAME '>' )? ( NAME )?`
+        // written with only its first half, which the caller then doubled up against whatever it
+        // wrote next.
+        if id.name.is_some() {
+            w.push_char(' ');
+        }
     }
     if let Some(name) = &id.name {
         w.push_str(&format_name(name));

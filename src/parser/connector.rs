@@ -4,7 +4,7 @@
 //! `interface.rs` (`InterfaceDefinition`).
 //!
 //! GH-33: `connection.rs` and `interface.rs` independently implemented the same seven functions
-//! (`end_decl`, `ref_body`, `ref_decl`, `connect_body`, a connection-end wrapper, `connect_ends`,
+//! (`end_decl`, `ref_body`, `ref_decl`, a connection-end wrapper, `connect_ends`,
 //! `connect_stmt`) with only cosmetic naming differences. That duplication had already cost real
 //! work once (#19 required the same reference-subsetting fix twice, once per file) and, worse,
 //! had silently drifted into three genuine behavior gaps neither file's own tests caught:
@@ -26,10 +26,9 @@
 //! explicit, visible choice at each call site instead of an accidental omission.
 
 use crate::ast::{
-    ConnectBody, ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndIdentity,
-    EndNestedUsage, Node, RefDecl,
+    ConnectStmt, ConnectionEnd, DerivationEndRole, EndDecl, EndIdentity, EndNestedUsage, Node,
+    RefDecl,
 };
-use crate::parser::body::advance_to_closing_brace;
 use crate::parser::expr::path_expression;
 use crate::parser::feature_value::feature_value_part;
 use crate::parser::item::item_usage;
@@ -476,28 +475,6 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             },
         ),
     ))
-}
-
-/// Connect body: `;` or `{` ... `}`. Marker-only (no content preserved): shared by many callers
-/// beyond `connect_stmt` (`Message`, `Allocate`, view/metadata constructs, ...) with no evidence
-/// of real content ever appearing in their braces. See [`connect_stmt_body`] for `connect_stmt`'s
-/// own body, which does preserve doc/comment/metadata annotations.
-pub(crate) fn connect_body(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            ConnectBody::Semicolon
-        }),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| ConnectBody::Brace,
-        ),
-    ))
-    .parse(input)
 }
 
 /// Wrap a parsed endpoint expression in a `ConnectionEnd` node with no multiplicity, reusing the

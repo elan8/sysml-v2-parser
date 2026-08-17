@@ -457,6 +457,7 @@ fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDe
             | "unrecognized_declaration_in_scope"
             | "missing_expression_after_operator"
             | "unsupported_annotation_syntax"
+            | "malformed_annotation_head"
     ) && !is_redefinition
     {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -581,11 +582,11 @@ pub(crate) fn use_case_def_body_element(
                 UseCaseDefBodyElement::Annotating,
             ),
             map(
-                crate::parser::metadata_annotation::annotation,
-                UseCaseDefBodyElement::Annotation,
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                UseCaseDefBodyElement::MetadataKeywordUsage,
             ),
             map(
-                crate::parser::metadata_annotation::metadata_keyword_usage,
+                crate::parser::metadata_annotation::metadata_keyword_prefix,
                 UseCaseDefBodyElement::MetadataKeywordUsage,
             ),
             map(

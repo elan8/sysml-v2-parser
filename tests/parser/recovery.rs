@@ -174,9 +174,10 @@ fn test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling() {
     // though the annotation itself is legal SysML the parser doesn't fully support yet.
     //
     // `#tag : Type trailing-garbage;` (not `#fmeaspec requirement req1 { }`, which package
-    // bodies now fully support as a PrefixMetadataMember-style tag on the following
-    // `requirement` member -- PARSER_BACKLOG_ROADMAP.md §6) -- the typed short-name form still
-    // has no support for anything after the type besides `;`/`{`/`about`.
+    // bodies fully support as a `PrefixMetadataMember` tag on the following `requirement`
+    // member). `#tag : Type` is `ExtendedUsage` -- `#tag` prefixing an anonymous usage typed by
+    // `Type` -- and the trailing identifier makes even that malformed. The head itself is a
+    // well-formed qualified name, so it classifies as unsupported rather than malformed.
     let input = "package P {\n#tag : Foo::Bar::Baz weirdstuff;\npart def Good;\n}";
     let strict_err = parse(input).expect_err("strict should reject the unsupported annotation");
     assert_eq!(
@@ -568,8 +569,8 @@ fn test_parse_with_diagnostics_reports_local_package_recovery() {
         "diagnostic should preserve recovered snippet"
     );
     assert!(
-        err.message.contains("annotation"),
-        "annotation recovery should say why the declaration could not be parsed: {}",
+        err.message.contains("metadata"),
+        "metadata recovery should say why the declaration could not be parsed: {}",
         err.message
     );
     assert_eq!(

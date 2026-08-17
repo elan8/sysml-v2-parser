@@ -86,6 +86,9 @@ pub(crate) fn emit_constraint_body_element(
         ConstraintDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
+        ConstraintDefBodyElement::MetadataKeywordUsage(usage) => {
+            super::structure::emit_metadata_keyword_usage(w, path, &usage.value)
+        }
         ConstraintDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         ConstraintDefBodyElement::Expression(e) => {
             emit_expression(w, &e.value)?;
@@ -217,6 +220,9 @@ fn emit_calc_body_element(
         CalcDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         CalcDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
+        }
+        CalcDefBodyElement::MetadataKeywordUsage(usage) => {
+            super::structure::emit_metadata_keyword_usage(w, path, &usage.value)
         }
         CalcDefBodyElement::ActionMember(n) => {
             super::behavior::emit_action_def_body_element(w, path, &n.value)
@@ -622,6 +628,9 @@ pub(crate) fn emit_view_def(
                     }
                     crate::ast::ViewDefBodyElement::Annotating(member) => {
                         super::root::emit_annotating_member(w, path, member)?;
+                    }
+                    crate::ast::ViewDefBodyElement::MetadataKeywordUsage(usage) => {
+                        crate::emit::structure::emit_metadata_keyword_usage(w, path, &usage.value)?;
                     }
                     crate::ast::ViewDefBodyElement::RefDecl(r) => {
                         crate::emit::structure::emit_ref_decl(w, path, &r.value)?

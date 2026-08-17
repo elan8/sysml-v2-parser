@@ -9,10 +9,10 @@ use super::structure::{
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
-    ConcernUsage, ConnectBody, Dependency, EnumerationUsage, ItemUsage, RequireConstraint,
-    RequirementDef, RequirementDefBody, RequirementDefBodyElement, RequirementUsage, ReturnRef,
-    ReturnRefBody, ReturnRefBodyElement, Satisfy, SubjectDecl, UseCaseDef, UseCaseDefBody,
-    UseCaseDefBodyElement, UseCaseUsage,
+    ConcernUsage, Dependency, EnumerationUsage, ItemUsage, RequireConstraint, RequirementDef,
+    RequirementDefBody, RequirementDefBodyElement, RequirementUsage, ReturnRef, ReturnRefBody,
+    ReturnRefBodyElement, Satisfy, SubjectDecl, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement,
+    UseCaseUsage,
 };
 
 pub(crate) fn emit_requirement_def(
@@ -198,33 +198,11 @@ fn emit_requirement_body_element(
         RequirementDefBodyElement::VerifyRequirement(v) => {
             emit_verify_requirement(w, path, &v.value)
         }
-        RequirementDefBodyElement::Annotation(a) => emit_requirement_annotation(w, &a.value),
+        RequirementDefBodyElement::Dependency(d) => emit_dependency(w, path, &d.value),
         RequirementDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
     }
-}
-
-fn emit_requirement_annotation(
-    w: &mut EmitWriter<'_>,
-    ann: &crate::ast::Annotation,
-) -> Result<(), EmitError> {
-    w.push_str(&ann.sigil);
-    match &ann.head {
-        crate::ast::AnnotationHead::Reference(reference) => {
-            w.push_qualified_reference("annotation", *reference)?;
-        }
-        crate::ast::AnnotationHead::Opaque(text) => w.push_str(&format_name(text)),
-    }
-    if let Some(ty) = ann.type_reference {
-        w.push_str(" : ");
-        w.push_qualified_reference("annotation type", ty)?;
-    }
-    match &ann.body {
-        ConnectBody::Semicolon => w.push_char(';'),
-        ConnectBody::Brace => w.push_str(" {}"),
-    }
-    Ok(())
 }
 
 pub(crate) fn emit_redefinition_attribute_binding(
@@ -849,7 +827,6 @@ fn emit_use_case_body_element(
             super::behavior::emit_action_def_body(w, path, &f.value.body)
         }
         UseCaseDefBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
-        UseCaseDefBodyElement::Annotation(a) => emit_requirement_annotation(w, &a.value),
         UseCaseDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }

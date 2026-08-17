@@ -6,7 +6,7 @@ use super::membership::Membership;
 use super::structure::DefinitionPrefix;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
-    Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataKeywordUsage, VariantUsage,
+    AttributeBody, AttributeDef, AttributeUsage, MetadataKeywordUsage, VariantUsage,
 };
 use super::view::{CalcUsage, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
@@ -45,9 +45,16 @@ pub type RequirementDefBody = Body<RequirementDefBodyElement>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RequirementDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Annotation(Node<Annotation>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// A dependency owned by this requirement definition.
+    ///
+    /// `RequirementBody → DefinitionBodyItem → DefinitionMember → DefinitionElement →
+    /// Dependency`, so `dependency X to Y;` -- and the `PrefixMetadataAnnotation`-tagged
+    /// `#refinement dependency X to Y;` the Apollo model writes here -- are ordinary members of
+    /// this scope. Neither was dispatched, so the whole statement was swallowed by the opaque
+    /// `#` fallback that owned `AnnotationHead::Opaque`.
+    Dependency(Node<Dependency>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Import(Node<Import>),
     SubjectDecl(Node<SubjectDecl>),
@@ -635,7 +642,6 @@ pub enum ReturnRefBodyElement {
 #[allow(clippy::large_enum_variant)]
 pub enum UseCaseDefBodyElement {
     Error(Node<ParseErrorNode>),
-    Annotation(Node<Annotation>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),

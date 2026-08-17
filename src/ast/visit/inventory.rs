@@ -222,11 +222,6 @@ macro_rules! ast_traversal {
                 walk_annotating_member(self, node)
             }
 
-            /// Visits [`ConnectBody`]; the default implementation walks its children.
-            fn visit_connect_body(&mut self, node: &$($mutability)? ConnectBody) {
-                walk_connect_body(self, node)
-            }
-
             /// Visits [`FeatureValueKind`]; the default implementation walks its children.
             fn visit_feature_value_kind(&mut self, node: &$($mutability)? FeatureValueKind) {
                 walk_feature_value_kind(self, node)
@@ -387,14 +382,9 @@ macro_rules! ast_traversal {
                 walk_metadata_keyword_usage(self, node)
             }
 
-            /// Visits [`Annotation`]; the default implementation walks its children.
-            fn visit_annotation(&mut self, node: &$($mutability)? Node<Annotation>) {
-                walk_annotation(self, node)
-            }
-
-            /// Visits [`AnnotationHead`]; the default implementation walks its children.
-            fn visit_annotation_head(&mut self, node: &$($mutability)? AnnotationHead) {
-                walk_annotation_head(self, node)
+            /// Visits [`MetadataDeclaredName`]; the default implementation walks its children.
+            fn visit_metadata_declared_name(&mut self, node: &$($mutability)? Node<MetadataDeclaredName>) {
+                walk_metadata_declared_name(self, node)
             }
 
             /// Visits [`PartUsageBodyElement`]; the default implementation walks its children.
@@ -1939,13 +1929,6 @@ macro_rules! ast_traversal {
             }
         }
 
-        pub fn walk_connect_body<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? ConnectBody) {
-            match node {
-                ConnectBody::Semicolon => {}
-                ConnectBody::Brace => {}
-            }
-        }
-
         pub fn walk_feature_value_kind<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? FeatureValueKind) {
             match node {
                 FeatureValueKind::Bind => {}
@@ -2413,9 +2396,6 @@ macro_rules! ast_traversal {
                 }
                 PartDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
-                }
-                PartDefBodyElement::Annotation(field_0) => {
-                    visitor.visit_annotation(field_0);
                 }
                 PartDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
@@ -2906,73 +2886,43 @@ macro_rules! ast_traversal {
         pub fn walk_metadata_annotation<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MetadataAnnotation>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let MetadataAnnotation { reference, type_reference, about_targets, body, head_span, type_span } = &$($mutability)? node.value;
-            visitor.visit_qualified_reference(reference);
-            if let Some(inner) = type_reference {
-                visitor.visit_qualified_reference(inner);
+            let MetadataAnnotation { at_span, declared_name, type_reference, type_span, about_targets, body } = &$($mutability)? node.value;
+            visitor.visit_span(at_span);
+            if let Some(inner) = declared_name {
+                visitor.visit_metadata_declared_name(inner);
             }
+            visitor.visit_qualified_reference(type_reference);
+            visitor.visit_span(type_span);
             for inner in about_targets {
                 visitor.visit_qualified_reference(inner);
             }
             visitor.visit_attribute_body(body);
-            if let Some(inner) = head_span {
-                visitor.visit_span(inner);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_metadata_declared_name<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MetadataDeclaredName>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let MetadataDeclaredName { identification, typed_by, typed_by_span } = &$($mutability)? node.value;
+            visitor.visit_identification(identification);
+            match typed_by {
+                MetadataTypedBy::Colon => {}
+                MetadataTypedBy::TypedBy => {}
             }
-            if let Some(inner) = type_span {
-                visitor.visit_span(inner);
-            }
+            visitor.visit_span(typed_by_span);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
         pub fn walk_metadata_keyword_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MetadataKeywordUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let MetadataKeywordUsage { keyword, type_reference, about_targets, body, keyword_span, type_span } = &$($mutability)? node.value;
-            visitor.visit_text(keyword);
-            if let Some(inner) = type_reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            for inner in about_targets {
-                visitor.visit_qualified_reference(inner);
-            }
+            let MetadataKeywordUsage { hash_span, reference, body } = &$($mutability)? node.value;
+            visitor.visit_span(hash_span);
+            visitor.visit_qualified_reference(reference);
             if let Some(inner) = body {
                 visitor.visit_attribute_body(inner);
             }
-            visitor.visit_span(keyword_span);
-            if let Some(inner) = type_span {
-                visitor.visit_span(inner);
-            }
             visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_annotation<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Annotation>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let Annotation { sigil, head, type_reference, body, head_span, type_span } = &$($mutability)? node.value;
-            visitor.visit_text(sigil);
-            visitor.visit_annotation_head(head);
-            if let Some(inner) = type_reference {
-                visitor.visit_qualified_reference(inner);
-            }
-            visitor.visit_connect_body(body);
-            if let Some(inner) = head_span {
-                visitor.visit_span(inner);
-            }
-            if let Some(inner) = type_span {
-                visitor.visit_span(inner);
-            }
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_annotation_head<V: $Visitor>(visitor: &mut V, node: &$($mutability)? AnnotationHead) {
-            match node {
-                AnnotationHead::Reference(field_0) => {
-                    visitor.visit_qualified_reference(field_0);
-                }
-                AnnotationHead::Opaque(field_0) => {
-                    visitor.visit_text(field_0);
-                }
-            }
         }
 
         pub fn walk_part_usage_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<PartUsageBodyElement>) {
@@ -2984,9 +2934,6 @@ macro_rules! ast_traversal {
                 }
                 PartUsageBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
-                }
-                PartUsageBodyElement::Annotation(field_0) => {
-                    visitor.visit_annotation(field_0);
                 }
                 PartUsageBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(field_0);
@@ -3619,6 +3566,9 @@ macro_rules! ast_traversal {
                 InterfaceDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                InterfaceDefBodyElement::MetadataKeywordUsage(field_0) => {
+                    visitor.visit_metadata_keyword_usage(field_0);
+                }
                 InterfaceDefBodyElement::EndDecl(field_0) => {
                     visitor.visit_end_decl(field_0);
                 }
@@ -3872,6 +3822,9 @@ macro_rules! ast_traversal {
                 ConnectionDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                ConnectionDefBodyElement::MetadataKeywordUsage(field_0) => {
+                    visitor.visit_metadata_keyword_usage(field_0);
+                }
                 ConnectionDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
@@ -4113,8 +4066,8 @@ macro_rules! ast_traversal {
                 OccurrenceBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
-                OccurrenceBodyElement::Annotation(field_0) => {
-                    visitor.visit_annotation(field_0);
+                OccurrenceBodyElement::MetadataKeywordUsage(field_0) => {
+                    visitor.visit_metadata_keyword_usage(field_0);
                 }
                 OccurrenceBodyElement::AssertConstraint(field_0) => {
                     visitor.visit_assert_constraint_member(field_0);
@@ -4222,7 +4175,7 @@ macro_rules! ast_traversal {
         pub fn walk_bind<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<Bind>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let Bind { binding_name, binding_type, binding_multiplicity, left, left_multiplicity, right, right_multiplicity, body, body_elements } = &$($mutability)? node.value;
+            let Bind { binding_name, binding_type, binding_multiplicity, left, left_multiplicity, right, right_multiplicity, body } = &$($mutability)? node.value;
             if let Some(inner) = binding_name {
                 visitor.visit_text(inner);
             }
@@ -4240,12 +4193,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = right_multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            if let Some(inner) = body {
-                visitor.visit_connect_body(inner);
-            }
-            for inner in body_elements {
-                visitor.visit_part_usage_body_element(inner);
-            }
+            visitor.visit_part_usage_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 
@@ -4437,11 +4385,11 @@ macro_rules! ast_traversal {
                 ActionDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
-                ActionDefBodyElement::Annotation(field_0) => {
-                    visitor.visit_annotation(field_0);
-                }
                 ActionDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
+                }
+                ActionDefBodyElement::Dependency(field_0) => {
+                    visitor.visit_dependency(field_0);
                 }
                 ActionDefBodyElement::MetadataUsage(field_0) => {
                     visitor.visit_metadata_usage(field_0);
@@ -4845,11 +4793,11 @@ macro_rules! ast_traversal {
                 ActionUsageBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
-                ActionUsageBodyElement::Annotation(field_0) => {
-                    visitor.visit_annotation(field_0);
-                }
                 ActionUsageBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
+                }
+                ActionUsageBodyElement::Dependency(field_0) => {
+                    visitor.visit_dependency(field_0);
                 }
                 ActionUsageBodyElement::MetadataUsage(field_0) => {
                     visitor.visit_metadata_usage(field_0);
@@ -5239,9 +5187,6 @@ macro_rules! ast_traversal {
                 StateDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
-                StateDefBodyElement::Annotation(field_0) => {
-                    visitor.visit_annotation(field_0);
-                }
                 StateDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
@@ -5478,11 +5423,11 @@ macro_rules! ast_traversal {
                 RequirementDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                RequirementDefBodyElement::Annotation(field_0) => {
-                    visitor.visit_annotation(field_0);
-                }
                 RequirementDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
+                }
+                RequirementDefBodyElement::Dependency(field_0) => {
+                    visitor.visit_dependency(field_0);
                 }
                 RequirementDefBodyElement::Import(field_0) => {
                     visitor.visit_import(field_0);
@@ -6153,9 +6098,6 @@ macro_rules! ast_traversal {
                 UseCaseDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
                 }
-                UseCaseDefBodyElement::Annotation(field_0) => {
-                    visitor.visit_annotation(field_0);
-                }
                 UseCaseDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
@@ -6344,6 +6286,9 @@ macro_rules! ast_traversal {
                 ConstraintDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                ConstraintDefBodyElement::MetadataKeywordUsage(field_0) => {
+                    visitor.visit_metadata_keyword_usage(field_0);
+                }
                 ConstraintDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
                 }
@@ -6436,6 +6381,9 @@ macro_rules! ast_traversal {
                 }
                 CalcDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
+                }
+                CalcDefBodyElement::MetadataKeywordUsage(field_0) => {
+                    visitor.visit_metadata_keyword_usage(field_0);
                 }
                 CalcDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
@@ -6573,6 +6521,9 @@ macro_rules! ast_traversal {
                 }
                 ViewDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
+                }
+                ViewDefBodyElement::MetadataKeywordUsage(field_0) => {
+                    visitor.visit_metadata_keyword_usage(field_0);
                 }
                 ViewDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
