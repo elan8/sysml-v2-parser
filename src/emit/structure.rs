@@ -1930,9 +1930,12 @@ fn emit_connection_def_body_element(
         crate::ast::ConnectionDefBodyElement::OccurrenceUsage(o) => {
             super::behavior::emit_occurrence_usage(w, path, &o.value)
         }
-        other @ crate::ast::ConnectionDefBodyElement::SuccessionUsage(_) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        // Same story as the occurrence usage above: `succession causalOrdering first [nCauses]
+        // causes.startShot then [nEffects] effects { … }` (Systems Library
+        // `CausationConnections.sysml`) is what a connection definition body owns them for, and
+        // the emitter every other owning scope already uses is the one that writes it.
+        crate::ast::ConnectionDefBodyElement::SuccessionUsage(s) => {
+            super::behavior::emit_succession_usage(w, path, &s.value)
+        }
     }
 }
