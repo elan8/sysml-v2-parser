@@ -167,8 +167,7 @@ package '9-Verification-simplified' {
             :>> massActual = vehicle.mass;
             :>> massReqd = 2500 ['SI::kg'];
         }
-        part vehicle1_c2 : Vehicle {
-        }
+        part vehicle1_c2 : Vehicle {}
         verification vehicleMassTest : MassTest {
             subject testVehicle : Vehicle;
             objective vehicleMassVerificationObjective  {

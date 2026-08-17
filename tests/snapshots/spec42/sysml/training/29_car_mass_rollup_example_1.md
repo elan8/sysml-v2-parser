@@ -63,10 +63,8 @@ package 'Car Mass Rollup Example 1' {
     part car : CarPart :> compositeThing {
         attribute vin :>> serialNumber;
         part carParts : CarPart[*] :>> subcomponents;
-        part engine :> simpleThing, carParts {
-        }
-        part transmission :> simpleThing, carParts {
-        }
+        part engine :> simpleThing, carParts {}
+        part transmission :> simpleThing, carParts {}
     }
     private import SI::kg;
     part c :> car {

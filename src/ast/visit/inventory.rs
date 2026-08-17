@@ -3559,15 +3559,25 @@ macro_rules! ast_traversal {
         pub fn walk_connect_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConnectStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConnectStmt { from, to, extra_ends, body, body_elements } = &$($mutability)? node.value;
+            let ConnectStmt { from, to, extra_ends, body } = &$($mutability)? node.value;
             visitor.visit_connection_end(from);
             visitor.visit_connection_end(to);
             for inner in extra_ends {
                 visitor.visit_connection_end(inner);
             }
-            visitor.visit_connect_body(body);
-            for inner in body_elements {
-                visitor.visit_relationship_body_element(inner);
+            match body {
+                PartUsageBody::Semicolon { semicolon_span } => {
+                    visitor.visit_body_semicolon(semicolon_span);
+                    visitor.visit_span(semicolon_span);
+                }
+                PartUsageBody::Brace { open_span, elements, close_span } => {
+                    visitor.visit_body_braces(open_span, elements, close_span);
+                    visitor.visit_span(open_span);
+                    for inner in elements {
+                        visitor.visit_part_usage_body_element(inner);
+                    }
+                    visitor.visit_span(close_span);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }

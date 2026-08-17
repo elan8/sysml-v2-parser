@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `connect` statement body holds the usage member set, in one field.**
+  `ConnectionUsage = OccurrenceUsagePrefix ( … | 'connect' ConnectorPart ) UsageBody` and
+  `UsageBody = DefinitionBody`, so `connect a to b { … }` legally holds every definition-body
+  member. The parser routed it through `relationship_body`, which admits only the annotating
+  subset, so an `attribute`, a nested `part` or a `ref` inside a connect body reached recovery.
+  `ConnectStmt` also carried the body twice -- a `ConnectBody` marker (`Semicolon | Brace`, with
+  no delimiter spans) beside a separate `body_elements` list -- which is the shape
+  `ast::Body` exists to prevent; it is now one `Body<PartUsageBodyElement>` carrying its own `;`
+  or brace spans. One of the ten `ConnectBody` owners is gone. **AST version 161 -> 162.**
+
 - **A calculation body owns its action members, and `ref calc` parses as one declaration.**
   `CalculationBodyItem = ActionBodyItem | ReturnParameterMember`, so a calculation body holds every
   action-body member. It held none of them, and the failure was silent rather than a diagnostic:
@@ -151,6 +161,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatted back as `derived ref deferred : ActionUsage;`. **AST version 152 -> 153.**
 
 ### Changed
+
+- **An empty part-usage brace body formats as `{}`.** `emit_ref_decl` already wrote that form for
+  the same `Body<PartUsageBodyElement>`, so `part p {}` and the `ref x {}` beside it disagreed.
+
+- **A `connect` statement projects its body.** It was a bare `(connect)` marker, so no snapshot
+  could show that the body holds members -- which is how the missing member set stayed invisible.
 
 - **A calculation definition projects its body.** It was a bare `(calc-def)` marker, so no
   snapshot could show whether a calculation body member survived parsing -- which is how the

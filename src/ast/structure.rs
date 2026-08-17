@@ -1148,12 +1148,15 @@ pub struct ConnectStmt {
     /// Additional ends beyond `from`/`to` from the parenthesized n-ary form; empty for the
     /// ordinary binary `from ... to ...` form.
     pub extra_ends: Vec<Node<ConnectionEnd>>,
-    pub body: ConnectBody,
-    /// Real annotation content from a braced body (`body: ConnectBody::Brace`), tracked
-    /// separately from `body` since `ConnectBody` itself is shared as a bare semicolon/brace
-    /// marker across several very differently-shaped contexts (bind, TypedConnect, this plain
-    /// connect statement). Empty for `ConnectBody::Semicolon`.
-    pub body_elements: Vec<Node<RelationshipBodyElement>>,
+    /// `ConnectionUsage = OccurrenceUsagePrefix ( … | 'connect' ConnectorPart ) UsageBody`, and
+    /// `UsageBody = DefinitionBody`, so this body owns the whole usage member set -- not only the
+    /// annotating subset a `RelationshipBody` allows.
+    ///
+    /// This was a `ConnectBody` marker (`Semicolon | Brace`, no delimiter spans) paired with a
+    /// separate `body_elements` list: one body fact in two fields, which is what
+    /// [`crate::ast::Body`] exists to prevent. The shared container carries the `;` or the two
+    /// brace spans with it.
+    pub body: PartUsageBody,
 }
 
 // ---------------------------------------------------------------------------

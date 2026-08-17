@@ -267,7 +267,7 @@ fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &Interf
                 walk_ref_body(report, &p, &reference.value.body)
             }
             InterfaceDefBodyElement::ConnectStmt(connect) => {
-                walk_relationship_body_elements(report, &p, &connect.value.body_elements)
+                walk_ref_body(report, &p, &connect.value.body)
             }
             InterfaceDefBodyElement::EndDecl(end) => walk_end_decl(report, &p, &end.value),
             InterfaceDefBodyElement::FlowUsage(flow) => {
@@ -404,7 +404,7 @@ fn walk_connection_def_body(report: &mut OpacityReport, path: &str, body: &Conne
                 walk_ref_body(report, &p, &reference.value.body)
             }
             ConnectionDefBodyElement::ConnectStmt(connect) => {
-                walk_relationship_body_elements(report, &p, &connect.value.body_elements)
+                walk_ref_body(report, &p, &connect.value.body)
             }
             ConnectionDefBodyElement::EndDecl(end) => walk_end_decl(report, &p, &end.value),
             ConnectionDefBodyElement::AssertConstraint(assertion) => {

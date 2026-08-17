@@ -139,14 +139,12 @@ package '1c-Parts Tree Redefinition' {
             attribute mass :>> vehicle1::mass = 2000 [kg] {
             }
             part frontAxleAssembly_c1 :>> frontAxleAssembly {
-                part frontAxle_c1 : FrontAxle :>> frontAxle {
-                }
+                part frontAxle_c1 : FrontAxle :>> frontAxle {}
                 part frontWheel_1 :> frontWheel = frontWheel#(1);
                 part frontWheel_2 :> frontWheel = frontWheel#(2);
             }
             part rearAxleAssembly_c1 :>> rearAxleAssembly {
-                part rearAxle_c1 :>> rearAxle {
-                }
+                part rearAxle_c1 :>> rearAxle {}
                 part rearWheel_1 :> rearWheel = rearWheel#(1);
                 part rearWheel_2 :> rearWheel = rearWheel#(2);
             }

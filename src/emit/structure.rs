@@ -398,6 +398,13 @@ fn emit_part_usage_body(
             w.push_char(';');
             Ok(())
         }
+        // An empty brace body stays on one line, the form `emit_ref_decl` already writes for the
+        // same `Body<PartUsageBodyElement>`. Without this a `connect a to b {}` and the
+        // `ref x {}` beside it formatted differently.
+        PartUsageBody::Brace { elements, .. } if elements.is_empty() => {
+            w.push_str(" {}");
+            Ok(())
+        }
         PartUsageBody::Brace { elements, .. } => {
             w.push_str(" {");
             w.newline();
@@ -958,33 +965,7 @@ fn emit_connect_stmt_body(
     path: &str,
     stmt: &ConnectStmt,
 ) -> Result<(), EmitError> {
-    match &stmt.body {
-        ConnectBody::Semicolon => {
-            w.push_char(';');
-            Ok(())
-        }
-        ConnectBody::Brace => {
-            if stmt.body_elements.is_empty() {
-                w.push_str(" {}");
-                Ok(())
-            } else {
-                w.push_str(" {");
-                w.newline();
-                w.indent();
-                for (i, el) in stmt.body_elements.iter().enumerate() {
-                    emit_relationship_body_element_local(
-                        w,
-                        &format!("{path}/connect-body[{i}]"),
-                        &el.value,
-                    )?;
-                    w.newline();
-                }
-                w.dedent();
-                w.push_char('}');
-                Ok(())
-            }
-        }
-    }
+    emit_part_usage_body(w, path, &stmt.body)
 }
 
 pub(crate) fn emit_relationship_body_element_local(

@@ -45,10 +45,8 @@ package 'Dependency Example' {
 ~~~sysml
 package 'Dependency Example' {
     part 'System Assembly' {
-        part 'Computer Subsystem' {
-        }
-        part 'Storage Subsystem' {
-        }
+        part 'Computer Subsystem' {}
+        part 'Storage Subsystem' {}
     }
     package 'Software Design' {
         item def MessageSchema {

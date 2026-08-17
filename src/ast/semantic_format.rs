@@ -1880,8 +1880,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
-                        InterfaceDefBodyElement::ConnectStmt(_connect) => {
-                            self.write_marker(&mut first, "connect")?;
+                        InterfaceDefBodyElement::ConnectStmt(connect) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_connect_statement(&connect.value)?;
                         }
                         InterfaceDefBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
@@ -1933,8 +1934,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
-                        ConnectionDefBodyElement::ConnectStmt(_connect) => {
-                            self.write_marker(&mut first, "connect")?;
+                        ConnectionDefBodyElement::ConnectStmt(connect) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_connect_statement(&connect.value)?;
                         }
                         ConnectionDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -2043,6 +2045,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") ")?;
         self.write_ref_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// A `connect` statement and its body.
+    ///
+    /// `ConnectionUsage`'s body is a `UsageBody`, so its members are the usage member set that
+    /// [`write_ref_body`](Self::write_ref_body) already projects exhaustively. The statement was
+    /// a bare `(connect)` marker, which could not show that the body holds anything at all -- and
+    /// until this change it mostly did not.
+    fn write_connect_statement(&mut self, connect: &super::ConnectStmt) -> io::Result<()> {
+        self.writer.write_str("(connect ")?;
+        self.write_ref_body(&connect.body)?;
         self.writer.write_char(')')
     }
 

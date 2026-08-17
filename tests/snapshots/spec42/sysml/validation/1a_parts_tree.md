@@ -171,8 +171,7 @@ package '1a-Parts Tree' {
             }
             part frontAxleAssembly : AxleAssembly {
                 part frontAxle : Axle;
-                part frontWheel : Wheel[2] ordered {
-                }
+                part frontWheel : Wheel[2] ordered {}
             }
             part rearAxleAssembly : AxleAssembly {
                 part rearAxle : Axle;
@@ -183,10 +182,8 @@ package '1a-Parts Tree' {
             attribute mass :>> Vehicle::mass = 2000 [kg] {
             }
             part frontAxleAssembly : AxleAssembly {
-                part frontAxle : FrontAxle {
-                }
-                part frontWheel : Wheel[2] ordered {
-                }
+                part frontAxle : FrontAxle {}
+                part frontWheel : Wheel[2] ordered {}
                 part frontWheel_1 :> frontWheel = frontWheel#(1);
                 part frontWheel_2 :> frontWheel = frontWheel#(2);
             }
