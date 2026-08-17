@@ -54,6 +54,6 @@ package ParameterTest {
 (parsed-document
   (references
   )
-  (root (package (name "ParameterTest") (body brace (attribute-def) (attribute-def) (calc-def (name "F") (body brace (in-out-declaration) (in-out-declaration) (return-declaration))) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (package (name "ParameterTest") (body brace (attribute-def (name "A") (multiplicity none)) (attribute-def (name "a") (multiplicity none)) (calc-def (name "F") (body brace (in-out-declaration) (in-out-declaration) (return-declaration (name none) (short-name none)))) (attribute-def (name "f") (multiplicity none)) (attribute-def (name "g") (multiplicity none)) (attribute-def (name "b") (multiplicity none)) (attribute-def (name "c") (multiplicity none)))))
 )
 ~~~

@@ -164,6 +164,11 @@ pub(crate) fn emit_action_usage(
     // Anonymous usages (`action :>> subactions;`, `action { ... }`) get no trailing space
     // after the keyword -- the clause emitters below supply their own leading space.
     w.push_str("action");
+    if let Some(short_name) = &usage.short_name {
+        w.push_str(" <");
+        w.push_str(&format_name(short_name));
+        w.push_char('>');
+    }
     if !usage.name.is_empty() {
         w.push_char(' ');
         w.push_str(&format_name(&usage.name));
@@ -871,6 +876,10 @@ pub(crate) fn emit_allocation_def(
     def: &crate::ast::AllocationDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("allocation def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -889,6 +898,10 @@ pub(crate) fn emit_flow_def(
     def: &crate::ast::FlowDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("flow def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -1357,6 +1370,11 @@ pub(crate) fn emit_occurrence_usage(
         // authored the literal keyword; bare `individual <name>` did not (see `individual_usage`
         // → `occurrence_usage_tail`).
         w.push_str("occurrence ");
+    }
+    if let Some(short_name) = &usage.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short_name));
+        w.push_str("> ");
     }
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));

@@ -82,6 +82,9 @@ pub(crate) fn emit_part_usage(
         if usage.ordered {
             w.push_str(" ordered");
         }
+        if usage.nonunique {
+            w.push_str(" nonunique");
+        }
     }
     if let Some((subsets, subset_value)) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -101,6 +104,9 @@ pub(crate) fn emit_part_usage(
         }
         if usage.ordered {
             w.push_str(" ordered");
+        }
+        if usage.nonunique {
+            w.push_str(" nonunique");
         }
     }
     if let Some(value) = &usage.value {
@@ -132,6 +138,9 @@ pub(crate) fn emit_attribute_def(
     w.push_str(&format_name(&def.name));
     if let Some(typing) = &def.typing {
         emit_typing_clause(w, &typing.value)?;
+    }
+    if let Some(multiplicity) = &def.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
     }
     if def.ordered {
         w.push_str(" ordered");
@@ -836,6 +845,10 @@ pub(crate) fn emit_interface_def(
     def: &InterfaceDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
+    if def.is_individual {
+        w.push_str("individual ");
+    }
     w.push_str("interface def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -906,6 +919,11 @@ pub(crate) fn emit_end_decl(
     end: &EndDecl,
 ) -> Result<(), EmitError> {
     w.push_str("end ");
+    if let Some(short_name) = &end.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short_name));
+        w.push_str("> ");
+    }
     match &end.identity {
         EndIdentity::Declaration(name) => w.push_str(&format_name(&name.value)),
         EndIdentity::Derivation(role) => match role.value {
@@ -1149,11 +1167,21 @@ pub(crate) fn emit_ref_decl(
         w.push_char(' ');
         w.push_str(kind.as_str());
     }
+    if let Some(short_name) = &decl.short_name {
+        w.push_str(" <");
+        w.push_str(&format_name(short_name));
+        w.push_char('>');
+    }
     // Anonymous `ref :>> target;` / `ref redefines a, b;` declarations have no name; emitting
     // `''` fabricated a quoted empty name the author never wrote (spec42 Gap 49d fallout).
     if !decl.name.is_empty() {
         w.push_char(' ');
         w.push_str(&format_name(&decl.name));
+    } else if decl.kind_keyword.is_some() && decl.multiplicity.is_some() {
+        // Keep the anonymous kind keyword lexically separate from its leading multiplicity.
+        // `ref requirement[1..*]` parses `requirement` as a declaration name; the authored
+        // anonymous form is `ref requirement [1..*]`.
+        w.push_char(' ');
     }
     // Typing first, then multiplicity, then the subsetting-family clauses: the one emission
     // order every `RefDecl` parser (`connector::ref_decl`, `part_ref_usage`) accepts, including
@@ -1612,8 +1640,16 @@ pub(crate) fn emit_enum_def(
                         super::root::emit_annotating_member(w, path, member)?;
                     }
                     crate::ast::EnumerationBodyElement::Value(value) => {
+                        if let Some(short_name) = &value.value.short_name {
+                            w.push_char('<');
+                            w.push_str(&format_name(short_name));
+                            w.push_str("> ");
+                        }
                         w.push_str(&format_name(&value.value.name));
-                        w.push_char(';');
+                        if let Some(initializer) = &value.value.value {
+                            emit_feature_value(w, initializer)?;
+                        }
+                        emit_part_usage_body(w, path, &value.value.body)?;
                     }
                     crate::ast::EnumerationBodyElement::Error(error) => {
                         w.push_recovery_span(path, &error.span)?;
@@ -1672,7 +1708,14 @@ pub(crate) fn emit_metadata_annotation(
     path: &str,
     ann: &crate::ast::MetadataAnnotation,
 ) -> Result<(), EmitError> {
-    w.push_char('@');
+    for prefix in &ann.prefixes {
+        emit_metadata_keyword_usage(w, path, &prefix.value)?;
+        w.push_char(' ');
+    }
+    match ann.introducer {
+        crate::ast::MetadataFeatureIntroducer::At { .. } => w.push_char('@'),
+        crate::ast::MetadataFeatureIntroducer::Metadata { .. } => w.push_str("metadata "),
+    }
     if let Some(declared) = &ann.declared_name {
         emit_identification(w, &declared.value.identification);
         match declared.value.typed_by {
@@ -1717,6 +1760,7 @@ pub(crate) fn emit_connection_def(
         }
     }
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }

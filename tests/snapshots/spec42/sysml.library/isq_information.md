@@ -1010,7 +1010,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : TrafficIntensityUnit[1];
     }
-    attribute def trafficIntensity : TrafficIntensityValue nonunique;
+    attribute def trafficIntensity : TrafficIntensityValue[*] nonunique;
     attribute def TrafficIntensityUnit :> DimensionOneUnit {
     }
     attribute def TrafficOfferedIntensityValue :> ScalarQuantityValue {
@@ -1029,7 +1029,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : TrafficOfferedIntensityUnit[1];
     }
-    attribute def trafficOfferedIntensity : TrafficOfferedIntensityValue nonunique;
+    attribute def trafficOfferedIntensity : TrafficOfferedIntensityValue[*] nonunique;
     attribute def TrafficOfferedIntensityUnit :> DimensionOneUnit {
     }
     attribute def TrafficCarriedIntensityValue :> ScalarQuantityValue {
@@ -1048,7 +1048,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : TrafficCarriedIntensityUnit[1];
     }
-    attribute def trafficCarriedIntensity : TrafficCarriedIntensityValue nonunique;
+    attribute def trafficCarriedIntensity : TrafficCarriedIntensityValue[*] nonunique;
     attribute def TrafficCarriedIntensityUnit :> DimensionOneUnit {
     }
     alias TrafficLoadUnit for TrafficCarriedIntensityUnit;
@@ -1115,7 +1115,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : CallIntensityUnit[1];
     }
-    attribute def callIntensity : CallIntensityValue nonunique;
+    attribute def callIntensity : CallIntensityValue[*] nonunique;
     attribute def CallIntensityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1144,7 +1144,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : CompletedCallIntensityUnit[1];
     }
-    attribute def completedCallIntensity : CompletedCallIntensityValue nonunique;
+    attribute def completedCallIntensity : CompletedCallIntensityValue[*] nonunique;
     attribute def CompletedCallIntensityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1170,7 +1170,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : StorageCapacityUnit[1];
     }
-    attribute def storageCapacity : StorageCapacityValue nonunique;
+    attribute def storageCapacity : StorageCapacityValue[*] nonunique;
     attribute def StorageCapacityUnit :> DimensionOneUnit {
     }
     alias StorageSizeUnit for StorageCapacityUnit;
@@ -1192,7 +1192,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : EquivalentBinaryStorageCapacityUnit[1];
     }
-    attribute def equivalentBinaryStorageCapacity : EquivalentBinaryStorageCapacityValue nonunique;
+    attribute def equivalentBinaryStorageCapacity : EquivalentBinaryStorageCapacityValue[*] nonunique;
     attribute def EquivalentBinaryStorageCapacityUnit :> DimensionOneUnit {
     }
     attribute def TransferRateValue :> ScalarQuantityValue {
@@ -1211,7 +1211,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : TransferRateUnit[1];
     }
-    attribute def transferRate : TransferRateValue nonunique;
+    attribute def transferRate : TransferRateValue[*] nonunique;
     attribute def TransferRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1251,7 +1251,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : BinaryDigitRateUnit[1];
     }
-    attribute def binaryDigitRate : BinaryDigitRateValue nonunique;
+    attribute def binaryDigitRate : BinaryDigitRateValue[*] nonunique;
     attribute def BinaryDigitRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1295,7 +1295,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : EquivalentBinaryDigitRateUnit[1];
     }
-    attribute def equivalentBinaryDigitRate : EquivalentBinaryDigitRateValue nonunique;
+    attribute def equivalentBinaryDigitRate : EquivalentBinaryDigitRateValue[*] nonunique;
     attribute def EquivalentBinaryDigitRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1324,7 +1324,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : ModulationRateUnit[1];
     }
-    attribute def modulationRate : ModulationRateValue nonunique;
+    attribute def modulationRate : ModulationRateValue[*] nonunique;
     attribute def ModulationRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1454,7 +1454,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : InformationContentUnit[1];
     }
-    attribute def informationContent : InformationContentValue nonunique;
+    attribute def informationContent : InformationContentValue[*] nonunique;
     attribute def InformationContentUnit :> DimensionOneUnit {
     }
     attribute def EntropyForInformationScienceValue :> ScalarQuantityValue {
@@ -1473,7 +1473,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : EntropyForInformationScienceUnit[1];
     }
-    attribute def entropyForInformationScience : EntropyForInformationScienceValue nonunique;
+    attribute def entropyForInformationScience : EntropyForInformationScienceValue[*] nonunique;
     attribute def EntropyForInformationScienceUnit :> DimensionOneUnit {
     }
     attribute def MaximumEntropyValue :> ScalarQuantityValue {
@@ -1492,7 +1492,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : MaximumEntropyUnit[1];
     }
-    attribute def maximumEntropy : MaximumEntropyValue nonunique;
+    attribute def maximumEntropy : MaximumEntropyValue[*] nonunique;
     attribute def MaximumEntropyUnit :> DimensionOneUnit {
     }
     attribute def RelativeEntropyValue :> DimensionOneValue {
@@ -1526,7 +1526,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : RedundancyUnit[1];
     }
-    attribute def redundancy : RedundancyValue nonunique;
+    attribute def redundancy : RedundancyValue[*] nonunique;
     attribute def RedundancyUnit :> DimensionOneUnit {
     }
     attribute def RelativeRedundancyValue :> DimensionOneValue {
@@ -1560,7 +1560,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : JointInformationContentUnit[1];
     }
-    attribute def jointInformationContent : JointInformationContentValue nonunique;
+    attribute def jointInformationContent : JointInformationContentValue[*] nonunique;
     attribute def JointInformationContentUnit :> DimensionOneUnit {
     }
     attribute def ConditionalInformationContentValue :> ScalarQuantityValue {
@@ -1579,7 +1579,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : ConditionalInformationContentUnit[1];
     }
-    attribute def conditionalInformationContent : ConditionalInformationContentValue nonunique;
+    attribute def conditionalInformationContent : ConditionalInformationContentValue[*] nonunique;
     attribute def ConditionalInformationContentUnit :> DimensionOneUnit {
     }
     attribute def ConditionalEntropyValue :> ScalarQuantityValue {
@@ -1598,7 +1598,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : ConditionalEntropyUnit[1];
     }
-    attribute def conditionalEntropy : ConditionalEntropyValue nonunique;
+    attribute def conditionalEntropy : ConditionalEntropyValue[*] nonunique;
     attribute def ConditionalEntropyUnit :> DimensionOneUnit {
     }
     alias MeanConditionalInformationContentUnit for ConditionalEntropyUnit;
@@ -1623,7 +1623,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : EquivocationUnit[1];
     }
-    attribute def equivocation : EquivocationValue nonunique;
+    attribute def equivocation : EquivocationValue[*] nonunique;
     attribute def EquivocationUnit :> DimensionOneUnit {
     }
     attribute def IrrelevanceValue :> ScalarQuantityValue {
@@ -1642,7 +1642,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : IrrelevanceUnit[1];
     }
-    attribute def irrelevance : IrrelevanceValue nonunique;
+    attribute def irrelevance : IrrelevanceValue[*] nonunique;
     attribute def IrrelevanceUnit :> DimensionOneUnit {
     }
     attribute def TransinformationContentValue :> ScalarQuantityValue {
@@ -1661,7 +1661,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : TransinformationContentUnit[1];
     }
-    attribute def transinformationContent : TransinformationContentValue nonunique;
+    attribute def transinformationContent : TransinformationContentValue[*] nonunique;
     attribute def TransinformationContentUnit :> DimensionOneUnit {
     }
     attribute def MeanTransinformationContentValue :> ScalarQuantityValue {
@@ -1680,7 +1680,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : MeanTransinformationContentUnit[1];
     }
-    attribute def meanTransinformationContent : MeanTransinformationContentValue nonunique;
+    attribute def meanTransinformationContent : MeanTransinformationContentValue[*] nonunique;
     attribute def MeanTransinformationContentUnit :> DimensionOneUnit {
     }
     attribute def CharacterMeanEntropyValue :> ScalarQuantityValue {
@@ -1699,7 +1699,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : CharacterMeanEntropyUnit[1];
     }
-    attribute def characterMeanEntropy : CharacterMeanEntropyValue nonunique;
+    attribute def characterMeanEntropy : CharacterMeanEntropyValue[*] nonunique;
     attribute def CharacterMeanEntropyUnit :> DimensionOneUnit {
     }
     attribute def AverageInformationRateValue :> ScalarQuantityValue {
@@ -1718,7 +1718,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : AverageInformationRateUnit[1];
     }
-    attribute def averageInformationRate : AverageInformationRateValue nonunique;
+    attribute def averageInformationRate : AverageInformationRateValue[*] nonunique;
     attribute def AverageInformationRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1744,7 +1744,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : CharacterMeanTransinformationContentUnit[1];
     }
-    attribute def characterMeanTransinformationContent : CharacterMeanTransinformationContentValue nonunique;
+    attribute def characterMeanTransinformationContent : CharacterMeanTransinformationContentValue[*] nonunique;
     attribute def CharacterMeanTransinformationContentUnit :> DimensionOneUnit {
     }
     attribute def AverageTransinformationRateValue :> ScalarQuantityValue {
@@ -1763,7 +1763,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : AverageTransinformationRateUnit[1];
     }
-    attribute def averageTransinformationRate : AverageTransinformationRateValue nonunique;
+    attribute def averageTransinformationRate : AverageTransinformationRateValue[*] nonunique;
     attribute def AverageTransinformationRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1789,7 +1789,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : ChannelCapacityPerCharacterUnit[1];
     }
-    attribute def channelCapacityPerCharacter : ChannelCapacityPerCharacterValue nonunique;
+    attribute def channelCapacityPerCharacter : ChannelCapacityPerCharacterValue[*] nonunique;
     attribute def ChannelCapacityPerCharacterUnit :> DimensionOneUnit {
     }
     alias ChannelCapacityUnit for ChannelCapacityPerCharacterUnit;
@@ -1811,7 +1811,7 @@ standard library package ISQInformation {
         attribute :>> num : Real;
         attribute :>> mRef : ChannelTimeCapacityUnit[1];
     }
-    attribute def channelTimeCapacity : ChannelTimeCapacityValue nonunique;
+    attribute def channelTimeCapacity : ChannelTimeCapacityValue[*] nonunique;
     attribute def ChannelTimeCapacityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1864,6 +1864,6 @@ standard library package ISQInformation {
     (reference r34 (scope relative) (span (offset 40668) (line 930) (column 36) (len 32)) (segments (segment 0 (token "ChannelCapacityPerCharacterValue") (name "ChannelCapacityPerCharacterValue") (separator none) (span (offset 40668) (line 930) (column 36) (len 32)))))
     (reference r35 (scope relative) (span (offset 40732) (line 931) (column 31) (len 27)) (segments (segment 0 (token "channelCapacityPerCharacter") (name "channelCapacityPerCharacter") (separator none) (span (offset 40732) (line 931) (column 31) (len 27)))))
   )
-  (root (library-package (name "ISQInformation") (standard true) (body brace (doc) (import (target (span (span (offset 828) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 867) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 877) (line 16) (column 30) (len 3))) (separator (span (offset 877) (line 16) (column 30) (len 2))) (marker (span (offset 879) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 901) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 922) (line 17) (column 41) (len 3))) (separator (span (offset 922) (line 17) (column 41) (len 2))) (marker (span (offset 924) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 946) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 953) (line 18) (column 27) (len 3))) (separator (span (offset 953) (line 18) (column 27) (len 2))) (marker (span (offset 955) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1044) (line 21) (column 20) (len 24))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1089) (line 22) (column 20) (len 28))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1138) (line 23) (column 20) (len 30))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "TrafficLoadUnit") (target (ref r7)) (body semicolon)) (alias (name "TrafficLoadValue") (target (ref r8)) (body semicolon)) (alias (name "trafficLoad") (target (ref r9)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "CallingRateUnit") (target (ref r10)) (body semicolon)) (alias (name "CallingRateValue") (target (ref r11)) (body semicolon)) (alias (name "callingRate") (target (ref r12)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "StorageSizeUnit") (target (ref r13)) (body semicolon)) (alias (name "StorageSizeValue") (target (ref r14)) (body semicolon)) (alias (name "storageSize") (target (ref r15)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "BitRateUnit") (target (ref r16)) (body semicolon)) (alias (name "BitRateValue") (target (ref r17)) (body semicolon)) (alias (name "bitRate") (target (ref r18)) (body semicolon)) (attribute-def) (alias (name "bitPeriod") (target (ref r19)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "EquivalentBitRateUnit") (target (ref r20)) (body semicolon)) (alias (name "EquivalentBitRateValue") (target (ref r21)) (body semicolon)) (alias (name "equivalentBitRate") (target (ref r22)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "LineDigitRateUnit") (target (ref r23)) (body semicolon)) (alias (name "LineDigitRateValue") (target (ref r24)) (body semicolon)) (alias (name "lineDigitRate") (target (ref r25)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "clockRate") (target (ref r26)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "MeanConditionalInformationContentUnit") (target (ref r27)) (body semicolon)) (alias (name "MeanConditionalInformationContentValue") (target (ref r28)) (body semicolon)) (alias (name "meanConditionalInformationContent") (target (ref r29)) (body semicolon)) (alias (name "AverageConditionalInformationContentUnit") (target (ref r30)) (body semicolon)) (alias (name "AverageConditionalInformationContentValue") (target (ref r31)) (body semicolon)) (alias (name "averageConditionalInformationContent") (target (ref r32)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "ChannelCapacityUnit") (target (ref r33)) (body semicolon)) (alias (name "ChannelCapacityValue") (target (ref r34)) (body semicolon)) (alias (name "channelCapacity") (target (ref r35)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQInformation") (standard true) (body brace (doc) (import (target (span (span (offset 828) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 867) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 877) (line 16) (column 30) (len 3))) (separator (span (offset 877) (line 16) (column 30) (len 2))) (marker (span (offset 879) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 901) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 922) (line 17) (column 41) (len 3))) (separator (span (offset 922) (line 17) (column 41) (len 2))) (marker (span (offset 924) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 946) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 953) (line 18) (column 27) (len 3))) (separator (span (offset 953) (line 18) (column 27) (len 2))) (marker (span (offset 955) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1044) (line 21) (column 20) (len 24))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1089) (line 22) (column 20) (len 28))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1138) (line 23) (column 20) (len 30))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (attribute-def (name "TrafficIntensityValue") (multiplicity none)) (attribute-def (name "trafficIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TrafficIntensityUnit") (multiplicity none)) (attribute-def (name "TrafficOfferedIntensityValue") (multiplicity none)) (attribute-def (name "trafficOfferedIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TrafficOfferedIntensityUnit") (multiplicity none)) (attribute-def (name "TrafficCarriedIntensityValue") (multiplicity none)) (attribute-def (name "trafficCarriedIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TrafficCarriedIntensityUnit") (multiplicity none)) (alias (name "TrafficLoadUnit") (target (ref r7)) (body semicolon)) (alias (name "TrafficLoadValue") (target (ref r8)) (body semicolon)) (alias (name "trafficLoad") (target (ref r9)) (body semicolon)) (attribute-def (name "MeanQueueLengthValue") (multiplicity none)) (attribute-def (name "meanQueueLength") (multiplicity none)) (attribute-def (name "LossProbabilityValue") (multiplicity none)) (attribute-def (name "lossProbability") (multiplicity none)) (attribute-def (name "WaitingProbabilityValue") (multiplicity none)) (attribute-def (name "waitingProbability") (multiplicity none)) (attribute-def (name "CallIntensityValue") (multiplicity none)) (attribute-def (name "callIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CallIntensityUnit") (multiplicity none)) (alias (name "CallingRateUnit") (target (ref r10)) (body semicolon)) (alias (name "CallingRateValue") (target (ref r11)) (body semicolon)) (alias (name "callingRate") (target (ref r12)) (body semicolon)) (attribute-def (name "CompletedCallIntensityValue") (multiplicity none)) (attribute-def (name "completedCallIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CompletedCallIntensityUnit") (multiplicity none)) (attribute-def (name "StorageCapacityValue") (multiplicity none)) (attribute-def (name "storageCapacity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "StorageCapacityUnit") (multiplicity none)) (alias (name "StorageSizeUnit") (target (ref r13)) (body semicolon)) (alias (name "StorageSizeValue") (target (ref r14)) (body semicolon)) (alias (name "storageSize") (target (ref r15)) (body semicolon)) (attribute-def (name "EquivalentBinaryStorageCapacityValue") (multiplicity none)) (attribute-def (name "equivalentBinaryStorageCapacity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EquivalentBinaryStorageCapacityUnit") (multiplicity none)) (attribute-def (name "TransferRateValue") (multiplicity none)) (attribute-def (name "transferRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TransferRateUnit") (multiplicity none)) (attribute-def (name "periodOfDataElements") (multiplicity none)) (attribute-def (name "BinaryDigitRateValue") (multiplicity none)) (attribute-def (name "binaryDigitRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "BinaryDigitRateUnit") (multiplicity none)) (alias (name "BitRateUnit") (target (ref r16)) (body semicolon)) (alias (name "BitRateValue") (target (ref r17)) (body semicolon)) (alias (name "bitRate") (target (ref r18)) (body semicolon)) (attribute-def (name "periodOfBinaryDigits") (multiplicity none)) (alias (name "bitPeriod") (target (ref r19)) (body semicolon)) (attribute-def (name "EquivalentBinaryDigitRateValue") (multiplicity none)) (attribute-def (name "equivalentBinaryDigitRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EquivalentBinaryDigitRateUnit") (multiplicity none)) (alias (name "EquivalentBitRateUnit") (target (ref r20)) (body semicolon)) (alias (name "EquivalentBitRateValue") (target (ref r21)) (body semicolon)) (alias (name "equivalentBitRate") (target (ref r22)) (body semicolon)) (attribute-def (name "ModulationRateValue") (multiplicity none)) (attribute-def (name "modulationRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ModulationRateUnit") (multiplicity none)) (alias (name "LineDigitRateUnit") (target (ref r23)) (body semicolon)) (alias (name "LineDigitRateValue") (target (ref r24)) (body semicolon)) (alias (name "lineDigitRate") (target (ref r25)) (body semicolon)) (attribute-def (name "quantizingDistortionRate") (multiplicity none)) (attribute-def (name "carrierPower") (multiplicity none)) (attribute-def (name "signalEnergyPerBinaryDigit") (multiplicity none)) (attribute-def (name "ErrorProbabilityValue") (multiplicity none)) (attribute-def (name "errorProbability") (multiplicity none)) (attribute-def (name "hammingDistance") (multiplicity none)) (attribute-def (name "clockFrequency") (multiplicity none)) (alias (name "clockRate") (target (ref r26)) (body semicolon)) (attribute-def (name "DecisionContentValue") (multiplicity none)) (attribute-def (name "decisionContent") (multiplicity none)) (attribute-def (name "InformationContentValue") (multiplicity none)) (attribute-def (name "informationContent") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "InformationContentUnit") (multiplicity none)) (attribute-def (name "EntropyForInformationScienceValue") (multiplicity none)) (attribute-def (name "entropyForInformationScience") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EntropyForInformationScienceUnit") (multiplicity none)) (attribute-def (name "MaximumEntropyValue") (multiplicity none)) (attribute-def (name "maximumEntropy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MaximumEntropyUnit") (multiplicity none)) (attribute-def (name "RelativeEntropyValue") (multiplicity none)) (attribute-def (name "relativeEntropy") (multiplicity none)) (attribute-def (name "RedundancyValue") (multiplicity none)) (attribute-def (name "redundancy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RedundancyUnit") (multiplicity none)) (attribute-def (name "RelativeRedundancyValue") (multiplicity none)) (attribute-def (name "relativeRedundancy") (multiplicity none)) (attribute-def (name "JointInformationContentValue") (multiplicity none)) (attribute-def (name "jointInformationContent") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "JointInformationContentUnit") (multiplicity none)) (attribute-def (name "ConditionalInformationContentValue") (multiplicity none)) (attribute-def (name "conditionalInformationContent") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ConditionalInformationContentUnit") (multiplicity none)) (attribute-def (name "ConditionalEntropyValue") (multiplicity none)) (attribute-def (name "conditionalEntropy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ConditionalEntropyUnit") (multiplicity none)) (alias (name "MeanConditionalInformationContentUnit") (target (ref r27)) (body semicolon)) (alias (name "MeanConditionalInformationContentValue") (target (ref r28)) (body semicolon)) (alias (name "meanConditionalInformationContent") (target (ref r29)) (body semicolon)) (alias (name "AverageConditionalInformationContentUnit") (target (ref r30)) (body semicolon)) (alias (name "AverageConditionalInformationContentValue") (target (ref r31)) (body semicolon)) (alias (name "averageConditionalInformationContent") (target (ref r32)) (body semicolon)) (attribute-def (name "EquivocationValue") (multiplicity none)) (attribute-def (name "equivocation") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EquivocationUnit") (multiplicity none)) (attribute-def (name "IrrelevanceValue") (multiplicity none)) (attribute-def (name "irrelevance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "IrrelevanceUnit") (multiplicity none)) (attribute-def (name "TransinformationContentValue") (multiplicity none)) (attribute-def (name "transinformationContent") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TransinformationContentUnit") (multiplicity none)) (attribute-def (name "MeanTransinformationContentValue") (multiplicity none)) (attribute-def (name "meanTransinformationContent") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MeanTransinformationContentUnit") (multiplicity none)) (attribute-def (name "CharacterMeanEntropyValue") (multiplicity none)) (attribute-def (name "characterMeanEntropy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CharacterMeanEntropyUnit") (multiplicity none)) (attribute-def (name "AverageInformationRateValue") (multiplicity none)) (attribute-def (name "averageInformationRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AverageInformationRateUnit") (multiplicity none)) (attribute-def (name "CharacterMeanTransinformationContentValue") (multiplicity none)) (attribute-def (name "characterMeanTransinformationContent") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CharacterMeanTransinformationContentUnit") (multiplicity none)) (attribute-def (name "AverageTransinformationRateValue") (multiplicity none)) (attribute-def (name "averageTransinformationRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AverageTransinformationRateUnit") (multiplicity none)) (attribute-def (name "ChannelCapacityPerCharacterValue") (multiplicity none)) (attribute-def (name "channelCapacityPerCharacter") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ChannelCapacityPerCharacterUnit") (multiplicity none)) (alias (name "ChannelCapacityUnit") (target (ref r33)) (body semicolon)) (alias (name "ChannelCapacityValue") (target (ref r34)) (body semicolon)) (alias (name "channelCapacity") (target (ref r35)) (body semicolon)) (attribute-def (name "ChannelTimeCapacityValue") (multiplicity none)) (attribute-def (name "channelTimeCapacity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ChannelTimeCapacityUnit") (multiplicity none)))))
 )
 ~~~

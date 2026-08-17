@@ -2385,7 +2385,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricChargeUnit[1];
     }
-    attribute def electricCharge : ElectricChargeValue nonunique;
+    attribute def electricCharge : ElectricChargeValue[*] nonunique;
     attribute def ElectricChargeUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -2415,7 +2415,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricChargeDensityUnit[1];
     }
-    attribute def electricChargeDensity : ElectricChargeDensityValue nonunique;
+    attribute def electricChargeDensity : ElectricChargeDensityValue[*] nonunique;
     attribute def ElectricChargeDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2452,7 +2452,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : SurfaceDensityOfElectricChargeUnit[1];
     }
-    attribute def surfaceDensityOfElectricCharge : SurfaceDensityOfElectricChargeValue nonunique;
+    attribute def surfaceDensityOfElectricCharge : SurfaceDensityOfElectricChargeValue[*] nonunique;
     attribute def SurfaceDensityOfElectricChargeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2489,7 +2489,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : LinearDensityOfElectricChargeUnit[1];
     }
-    attribute def linearDensityOfElectricCharge : LinearDensityOfElectricChargeValue nonunique;
+    attribute def linearDensityOfElectricCharge : LinearDensityOfElectricChargeValue[*] nonunique;
     attribute def LinearDensityOfElectricChargeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2526,7 +2526,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricDipoleMomentUnit[1];
     }
-    attribute def electricDipoleMoment : ElectricDipoleMomentValue nonunique;
+    attribute def electricDipoleMoment : ElectricDipoleMomentValue[*] nonunique;
     attribute def ElectricDipoleMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2582,7 +2582,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricPolarizationUnit[1];
     }
-    attribute def electricPolarization : ElectricPolarizationValue nonunique;
+    attribute def electricPolarization : ElectricPolarizationValue[*] nonunique;
     attribute def ElectricPolarizationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2638,7 +2638,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricCurrentDensityUnit[1];
     }
-    attribute def electricCurrentDensity : ElectricCurrentDensityValue nonunique;
+    attribute def electricCurrentDensity : ElectricCurrentDensityValue[*] nonunique;
     attribute def ElectricCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2692,7 +2692,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : LinearElectricCurrentDensityUnit[1];
     }
-    attribute def linearElectricCurrentDensity : LinearElectricCurrentDensityValue nonunique;
+    attribute def linearElectricCurrentDensity : LinearElectricCurrentDensityValue[*] nonunique;
     attribute def LinearElectricCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2746,7 +2746,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricFieldStrengthUnit[1];
     }
-    attribute def electricFieldStrength : ElectricFieldStrengthValue nonunique;
+    attribute def electricFieldStrength : ElectricFieldStrengthValue[*] nonunique;
     attribute def ElectricFieldStrengthUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2806,7 +2806,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricPotentialUnit[1];
     }
-    attribute def electricPotential : ElectricPotentialValue nonunique;
+    attribute def electricPotential : ElectricPotentialValue[*] nonunique;
     attribute def ElectricPotentialUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2844,7 +2844,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricPotentialDifferenceUnit[1];
     }
-    attribute def electricPotentialDifference : ElectricPotentialDifferenceValue nonunique;
+    attribute def electricPotentialDifference : ElectricPotentialDifferenceValue[*] nonunique;
     attribute def ElectricPotentialDifferenceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2897,7 +2897,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricFluxDensityUnit[1];
     }
-    attribute def electricFluxDensity : ElectricFluxDensityValue nonunique;
+    attribute def electricFluxDensity : ElectricFluxDensityValue[*] nonunique;
     attribute def ElectricFluxDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2955,7 +2955,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : CapacitanceUnit[1];
     }
-    attribute def capacitance : CapacitanceValue nonunique;
+    attribute def capacitance : CapacitanceValue[*] nonunique;
     attribute def CapacitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2993,7 +2993,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricConstantUnit[1];
     }
-    attribute def electricConstant : ElectricConstantValue nonunique;
+    attribute def electricConstant : ElectricConstantValue[*] nonunique;
     attribute def ElectricConstantUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3034,7 +3034,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : PermittivityUnit[1];
     }
-    attribute def permittivity : PermittivityValue nonunique;
+    attribute def permittivity : PermittivityValue[*] nonunique;
     attribute def PermittivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3102,7 +3102,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectricFluxUnit[1];
     }
-    attribute def electricFlux : ElectricFluxValue nonunique;
+    attribute def electricFlux : ElectricFluxValue[*] nonunique;
     attribute def ElectricFluxUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -3132,7 +3132,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : DisplacementCurrentDensityUnit[1];
     }
-    attribute def displacementCurrentDensity : DisplacementCurrentDensityValue nonunique;
+    attribute def displacementCurrentDensity : DisplacementCurrentDensityValue[*] nonunique;
     attribute def DisplacementCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3212,7 +3212,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : TotalCurrentDensityUnit[1];
     }
-    attribute def totalCurrentDensity : TotalCurrentDensityValue nonunique;
+    attribute def totalCurrentDensity : TotalCurrentDensityValue[*] nonunique;
     attribute def TotalCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3264,7 +3264,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagneticFluxDensityUnit[1];
     }
-    attribute def magneticFluxDensity : MagneticFluxDensityValue nonunique;
+    attribute def magneticFluxDensity : MagneticFluxDensityValue[*] nonunique;
     attribute def MagneticFluxDensityUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -3320,7 +3320,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagneticFluxUnit[1];
     }
-    attribute def magneticFlux : MagneticFluxValue nonunique;
+    attribute def magneticFlux : MagneticFluxValue[*] nonunique;
     attribute def MagneticFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3358,7 +3358,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : LinkedFluxUnit[1];
     }
-    attribute def linkedFlux : LinkedFluxValue nonunique;
+    attribute def linkedFlux : LinkedFluxValue[*] nonunique;
     attribute def LinkedFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3396,7 +3396,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagneticMomentUnit[1];
     }
-    attribute def magneticMoment : MagneticMomentValue nonunique;
+    attribute def magneticMoment : MagneticMomentValue[*] nonunique;
     attribute def MagneticMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3450,7 +3450,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagnetizationUnit[1];
     }
-    attribute def magnetization : MagnetizationValue nonunique;
+    attribute def magnetization : MagnetizationValue[*] nonunique;
     attribute def MagnetizationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3502,7 +3502,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagneticFieldStrengthUnit[1];
     }
-    attribute def magneticFieldStrength : MagneticFieldStrengthValue nonunique;
+    attribute def magneticFieldStrength : MagneticFieldStrengthValue[*] nonunique;
     attribute def MagneticFieldStrengthUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3556,7 +3556,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagneticConstantUnit[1];
     }
-    attribute def magneticConstant : MagneticConstantValue nonunique;
+    attribute def magneticConstant : MagneticConstantValue[*] nonunique;
     attribute def MagneticConstantUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3597,7 +3597,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : PermeabilityUnit[1];
     }
-    attribute def permeability : PermeabilityValue nonunique;
+    attribute def permeability : PermeabilityValue[*] nonunique;
     attribute def PermeabilityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3665,7 +3665,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagneticPolarizationUnit[1];
     }
-    attribute def magneticPolarization : MagneticPolarizationValue nonunique;
+    attribute def magneticPolarization : MagneticPolarizationValue[*] nonunique;
     attribute def MagneticPolarizationUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -3721,7 +3721,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagneticDipoleMomentUnit[1];
     }
-    attribute def magneticDipoleMoment : MagneticDipoleMomentValue nonunique;
+    attribute def magneticDipoleMoment : MagneticDipoleMomentValue[*] nonunique;
     attribute def MagneticDipoleMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3781,7 +3781,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : CoercivityUnit[1];
     }
-    attribute def coercivity : CoercivityValue nonunique;
+    attribute def coercivity : CoercivityValue[*] nonunique;
     attribute def CoercivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3811,7 +3811,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagneticVectorPotentialUnit[1];
     }
-    attribute def magneticVectorPotential : MagneticVectorPotentialValue nonunique;
+    attribute def magneticVectorPotential : MagneticVectorPotentialValue[*] nonunique;
     attribute def MagneticVectorPotentialUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3871,7 +3871,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ElectromagneticEnergyDensityUnit[1];
     }
-    attribute def electromagneticEnergyDensity : ElectromagneticEnergyDensityValue nonunique;
+    attribute def electromagneticEnergyDensity : ElectromagneticEnergyDensityValue[*] nonunique;
     attribute def ElectromagneticEnergyDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3908,7 +3908,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : PoyntingVectorMagnitudeUnit[1];
     }
-    attribute def poyntingVectorMagnitude : PoyntingVectorMagnitudeValue nonunique;
+    attribute def poyntingVectorMagnitude : PoyntingVectorMagnitudeValue[*] nonunique;
     attribute def PoyntingVectorMagnitudeUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -3960,7 +3960,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : PhaseSpeedOfElectromagneticWavesUnit[1];
     }
-    attribute def phaseSpeedOfElectromagneticWaves : PhaseSpeedOfElectromagneticWavesValue nonunique;
+    attribute def phaseSpeedOfElectromagneticWaves : PhaseSpeedOfElectromagneticWavesValue[*] nonunique;
     attribute def PhaseSpeedOfElectromagneticWavesUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3990,7 +3990,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : SpeedOfLightUnit[1];
     }
-    attribute def speedOfLight : SpeedOfLightValue nonunique;
+    attribute def speedOfLight : SpeedOfLightValue[*] nonunique;
     attribute def SpeedOfLightUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4023,7 +4023,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : SourceVoltageUnit[1];
     }
-    attribute def sourceVoltage : SourceVoltageValue nonunique;
+    attribute def sourceVoltage : SourceVoltageValue[*] nonunique;
     attribute def SourceVoltageUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4092,7 +4092,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : MagnetomotiveForceUnit[1];
     }
-    attribute def magnetomotiveForce : MagnetomotiveForceValue nonunique;
+    attribute def magnetomotiveForce : MagnetomotiveForceValue[*] nonunique;
     attribute def MagnetomotiveForceUnit :> DerivedUnit {
         private attribute electricCurrentPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.I;
@@ -4146,7 +4146,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ReluctanceUnit[1];
     }
-    attribute def reluctance : ReluctanceValue nonunique;
+    attribute def reluctance : ReluctanceValue[*] nonunique;
     attribute def ReluctanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4184,7 +4184,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : PermeanceUnit[1];
     }
-    attribute def permeance : PermeanceValue nonunique;
+    attribute def permeance : PermeanceValue[*] nonunique;
     attribute def PermeanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4222,7 +4222,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : InductanceUnit[1];
     }
-    attribute def inductance : InductanceValue nonunique;
+    attribute def inductance : InductanceValue[*] nonunique;
     attribute def InductanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4307,7 +4307,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ConductivityUnit[1];
     }
-    attribute def conductivity : ConductivityValue nonunique;
+    attribute def conductivity : ConductivityValue[*] nonunique;
     attribute def ConductivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4345,7 +4345,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ResistivityUnit[1];
     }
-    attribute def resistivity : ResistivityValue nonunique;
+    attribute def resistivity : ResistivityValue[*] nonunique;
     attribute def ResistivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4398,7 +4398,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ResistanceUnit[1];
     }
-    attribute def resistance : ResistanceValue nonunique;
+    attribute def resistance : ResistanceValue[*] nonunique;
     attribute def ResistanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4436,7 +4436,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ConductanceUnit[1];
     }
-    attribute def conductance : ConductanceValue nonunique;
+    attribute def conductance : ConductanceValue[*] nonunique;
     attribute def ConductanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4474,7 +4474,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : PhaseDifferenceUnit[1];
     }
-    attribute def phaseDifference : PhaseDifferenceValue nonunique;
+    attribute def phaseDifference : PhaseDifferenceValue[*] nonunique;
     attribute def PhaseDifferenceUnit :> DimensionOneUnit {
     }
     attribute def electricCurrentPhasor : ElectricCurrentValue {
@@ -4521,7 +4521,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ImpedanceUnit[1];
     }
-    attribute def impedance : ImpedanceValue nonunique;
+    attribute def impedance : ImpedanceValue[*] nonunique;
     attribute def ImpedanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4562,7 +4562,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ResistanceToAlternatingCurrentUnit[1];
     }
-    attribute def resistanceToAlternatingCurrent : ResistanceToAlternatingCurrentValue nonunique;
+    attribute def resistanceToAlternatingCurrent : ResistanceToAlternatingCurrentValue[*] nonunique;
     attribute def ResistanceToAlternatingCurrentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4600,7 +4600,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ReactanceUnit[1];
     }
-    attribute def reactance : ReactanceValue nonunique;
+    attribute def reactance : ReactanceValue[*] nonunique;
     attribute def ReactanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4638,7 +4638,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ModulusOfImpedanceUnit[1];
     }
-    attribute def modulusOfImpedance : ModulusOfImpedanceValue nonunique;
+    attribute def modulusOfImpedance : ModulusOfImpedanceValue[*] nonunique;
     attribute def ModulusOfImpedanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4676,7 +4676,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : AdmittanceUnit[1];
     }
-    attribute def admittance : AdmittanceValue nonunique;
+    attribute def admittance : AdmittanceValue[*] nonunique;
     attribute def AdmittanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4731,7 +4731,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : SusceptanceUnit[1];
     }
-    attribute def susceptance : SusceptanceValue nonunique;
+    attribute def susceptance : SusceptanceValue[*] nonunique;
     attribute def SusceptanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4769,7 +4769,7 @@ standard library package ISQElectromagnetism {
         attribute :>> num : Real;
         attribute :>> mRef : ModulusOfAdmittanceUnit[1];
     }
-    attribute def modulusOfAdmittance : ModulusOfAdmittanceValue nonunique;
+    attribute def modulusOfAdmittance : ModulusOfAdmittanceValue[*] nonunique;
     attribute def ModulusOfAdmittanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4993,6 +4993,6 @@ standard library package ISQElectromagnetism {
     (reference r50 (scope relative) (span (offset 105457) (line 2095) (column 38) (len 15)) (segments (segment 0 (token "AdmittanceValue") (name "AdmittanceValue") (separator none) (span (offset 105457) (line 2095) (column 38) (len 15)))))
     (reference r51 (scope relative) (span (offset 105506) (line 2096) (column 33) (len 10)) (segments (segment 0 (token "admittance") (name "admittance") (separator none) (span (offset 105506) (line 2096) (column 33) (len 10)))))
   )
-  (root (library-package (name "ISQElectromagnetism") (standard true) (body brace (doc) (import (target (span (span (offset 816) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 855) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 865) (line 16) (column 30) (len 3))) (separator (span (offset 865) (line 16) (column 30) (len 2))) (marker (span (offset 867) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 889) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 910) (line 17) (column 41) (len 3))) (separator (span (offset 910) (line 17) (column 41) (len 2))) (marker (span (offset 912) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 934) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 941) (line 18) (column 27) (len 3))) (separator (span (offset 941) (line 18) (column 27) (len 2))) (marker (span (offset 943) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1032) (line 21) (column 20) (len 24))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1077) (line 22) (column 20) (len 33))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1131) (line 23) (column 20) (len 30))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "VolumicElectricChargeUnit") (target (ref r7)) (body semicolon)) (alias (name "VolumicElectricChargeValue") (target (ref r8)) (body semicolon)) (alias (name "volumicElectricCharge") (target (ref r9)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "AreicElectricChargeUnit") (target (ref r10)) (body semicolon)) (alias (name "AreicElectricChargeValue") (target (ref r11)) (body semicolon)) (alias (name "areicElectricCharge") (target (ref r12)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "LineicElectricChargeUnit") (target (ref r13)) (body semicolon)) (alias (name "LineicElectricChargeValue") (target (ref r14)) (body semicolon)) (alias (name "lineicElectricCharge") (target (ref r15)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "CartesianAreicElectricCurrent3dCoordinateFrame") (target (ref r16)) (body semicolon)) (alias (name "cartesianAreicElectricCurrent3dVector") (target (ref r17)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "CartesianLineicElectricCurrent3dCoordinateFrame") (target (ref r18)) (body semicolon)) (alias (name "cartesianLineicElectricCurrent3dVector") (target (ref r19)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "electricTension") (target (ref r20)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "CartesianElectricDisplacement3dCoordinateFrame") (target (ref r21)) (body semicolon)) (alias (name "cartesianElectricDisplacement3dVector") (target (ref r22)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "PermittivityOfVacuumUnit") (target (ref r23)) (body semicolon)) (alias (name "PermittivityOfVacuumValue") (target (ref r24)) (body semicolon)) (alias (name "permittivityOfVacuum") (target (ref r25)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "CartesianMagneticAreaMoment3dCoordinateFrame") (target (ref r26)) (body semicolon)) (alias (name "cartesianMagneticAreaMoment3dVector") (target (ref r27)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "CartesianMagnetizingField3dCoordinateFrame") (target (ref r28)) (body semicolon)) (alias (name "cartesianMagnetizingField3dVector") (target (ref r29)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "PermeabilityOfVacuumUnit") (target (ref r30)) (body semicolon)) (alias (name "PermeabilityOfVacuumValue") (target (ref r31)) (body semicolon)) (alias (name "permeabilityOfVacuum") (target (ref r32)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "VolumicElectromagneticEnergyUnit") (target (ref r33)) (body semicolon)) (alias (name "VolumicElectromagneticEnergyValue") (target (ref r34)) (body semicolon)) (alias (name "volumicElectromagneticEnergy") (target (ref r35)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "LightSpeedUnit") (target (ref r36)) (body semicolon)) (alias (name "LightSpeedValue") (target (ref r37)) (body semicolon)) (alias (name "lightSpeed") (target (ref r38)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "SourceTensionUnit") (target (ref r39)) (body semicolon)) (alias (name "SourceTensionValue") (target (ref r40)) (body semicolon)) (alias (name "sourceTension") (target (ref r41)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "SelfInductanceUnit") (target (ref r42)) (body semicolon)) (alias (name "SelfInductanceValue") (target (ref r43)) (body semicolon)) (alias (name "selfInductance") (target (ref r44)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "instantaneousPower") (target (ref r45)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "ComplexImpedanceUnit") (target (ref r46)) (body semicolon)) (alias (name "ComplexImpedanceValue") (target (ref r47)) (body semicolon)) (alias (name "complexImpedance") (target (ref r48)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "ComplexAdmittanceUnit") (target (ref r49)) (body semicolon)) (alias (name "ComplexAdmittanceValue") (target (ref r50)) (body semicolon)) (alias (name "complexAdmittance") (target (ref r51)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQElectromagnetism") (standard true) (body brace (doc) (import (target (span (span (offset 816) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 855) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 865) (line 16) (column 30) (len 3))) (separator (span (offset 865) (line 16) (column 30) (len 2))) (marker (span (offset 867) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 889) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 910) (line 17) (column 41) (len 3))) (separator (span (offset 910) (line 17) (column 41) (len 2))) (marker (span (offset 912) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 934) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 941) (line 18) (column 27) (len 3))) (separator (span (offset 941) (line 18) (column 27) (len 2))) (marker (span (offset 943) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1032) (line 21) (column 20) (len 24))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1077) (line 22) (column 20) (len 33))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1131) (line 23) (column 20) (len 30))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (attribute-def (name "ElectricChargeValue") (multiplicity none)) (attribute-def (name "electricCharge") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricChargeUnit") (multiplicity none)) (attribute-def (name "ElectricChargeDensityValue") (multiplicity none)) (attribute-def (name "electricChargeDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricChargeDensityUnit") (multiplicity none)) (alias (name "VolumicElectricChargeUnit") (target (ref r7)) (body semicolon)) (alias (name "VolumicElectricChargeValue") (target (ref r8)) (body semicolon)) (alias (name "volumicElectricCharge") (target (ref r9)) (body semicolon)) (attribute-def (name "SurfaceDensityOfElectricChargeValue") (multiplicity none)) (attribute-def (name "surfaceDensityOfElectricCharge") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SurfaceDensityOfElectricChargeUnit") (multiplicity none)) (alias (name "AreicElectricChargeUnit") (target (ref r10)) (body semicolon)) (alias (name "AreicElectricChargeValue") (target (ref r11)) (body semicolon)) (alias (name "areicElectricCharge") (target (ref r12)) (body semicolon)) (attribute-def (name "LinearDensityOfElectricChargeValue") (multiplicity none)) (attribute-def (name "linearDensityOfElectricCharge") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinearDensityOfElectricChargeUnit") (multiplicity none)) (alias (name "LineicElectricChargeUnit") (target (ref r13)) (body semicolon)) (alias (name "LineicElectricChargeValue") (target (ref r14)) (body semicolon)) (alias (name "lineicElectricCharge") (target (ref r15)) (body semicolon)) (attribute-def (name "ElectricDipoleMomentValue") (multiplicity none)) (attribute-def (name "electricDipoleMoment") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricDipoleMomentUnit") (multiplicity none)) (attribute-def (name "CartesianElectricDipoleMoment3dVector") (multiplicity none)) (attribute-def (name "cartesianElectricDipoleMoment3dVector") (multiplicity none)) (attribute-def (name "CartesianElectricDipoleMoment3dCoordinateFrame") (multiplicity none)) (attribute-def (name "ElectricPolarizationValue") (multiplicity none)) (attribute-def (name "electricPolarization") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricPolarizationUnit") (multiplicity none)) (attribute-def (name "CartesianElectricPolarization3dVector") (multiplicity none)) (attribute-def (name "cartesianElectricPolarization3dVector") (multiplicity none)) (attribute-def (name "CartesianElectricPolarization3dCoordinateFrame") (multiplicity none)) (attribute-def (name "ElectricCurrentDensityValue") (multiplicity none)) (attribute-def (name "electricCurrentDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricCurrentDensityUnit") (multiplicity none)) (attribute-def (name "CartesianElectricCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "cartesianElectricCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "CartesianElectricCurrentDensity3dCoordinateFrame") (multiplicity none)) (alias (name "CartesianAreicElectricCurrent3dCoordinateFrame") (target (ref r16)) (body semicolon)) (alias (name "cartesianAreicElectricCurrent3dVector") (target (ref r17)) (body semicolon)) (attribute-def (name "LinearElectricCurrentDensityValue") (multiplicity none)) (attribute-def (name "linearElectricCurrentDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinearElectricCurrentDensityUnit") (multiplicity none)) (attribute-def (name "CartesianLinearElectricCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "cartesianLinearElectricCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "CartesianLinearElectricCurrentDensity3dCoordinateFrame") (multiplicity none)) (alias (name "CartesianLineicElectricCurrent3dCoordinateFrame") (target (ref r18)) (body semicolon)) (alias (name "cartesianLineicElectricCurrent3dVector") (target (ref r19)) (body semicolon)) (attribute-def (name "ElectricFieldStrengthValue") (multiplicity none)) (attribute-def (name "electricFieldStrength") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricFieldStrengthUnit") (multiplicity none)) (attribute-def (name "CartesianElectricFieldStrength3dVector") (multiplicity none)) (attribute-def (name "cartesianElectricFieldStrength3dVector") (multiplicity none)) (attribute-def (name "CartesianElectricFieldStrength3dCoordinateFrame") (multiplicity none)) (attribute-def (name "ElectricPotentialValue") (multiplicity none)) (attribute-def (name "electricPotential") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricPotentialUnit") (multiplicity none)) (attribute-def (name "ElectricPotentialDifferenceValue") (multiplicity none)) (attribute-def (name "electricPotentialDifference") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricPotentialDifferenceUnit") (multiplicity none)) (attribute-def (name "voltage") (multiplicity none)) (alias (name "electricTension") (target (ref r20)) (body semicolon)) (attribute-def (name "ElectricFluxDensityValue") (multiplicity none)) (attribute-def (name "electricFluxDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricFluxDensityUnit") (multiplicity none)) (attribute-def (name "CartesianElectricFluxDensity3dVector") (multiplicity none)) (attribute-def (name "cartesianElectricFluxDensity3dVector") (multiplicity none)) (attribute-def (name "CartesianElectricFluxDensity3dCoordinateFrame") (multiplicity none)) (alias (name "CartesianElectricDisplacement3dCoordinateFrame") (target (ref r21)) (body semicolon)) (alias (name "cartesianElectricDisplacement3dVector") (target (ref r22)) (body semicolon)) (attribute-def (name "CapacitanceValue") (multiplicity none)) (attribute-def (name "capacitance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CapacitanceUnit") (multiplicity none)) (attribute-def (name "ElectricConstantValue") (multiplicity none)) (attribute-def (name "electricConstant") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricConstantUnit") (multiplicity none)) (alias (name "PermittivityOfVacuumUnit") (target (ref r23)) (body semicolon)) (alias (name "PermittivityOfVacuumValue") (target (ref r24)) (body semicolon)) (alias (name "permittivityOfVacuum") (target (ref r25)) (body semicolon)) (attribute-def (name "PermittivityValue") (multiplicity none)) (attribute-def (name "permittivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PermittivityUnit") (multiplicity none)) (attribute-def (name "RelativePermittivityValue") (multiplicity none)) (attribute-def (name "relativePermittivity") (multiplicity none)) (attribute-def (name "ElectricSusceptibilityValue") (multiplicity none)) (attribute-def (name "electricSusceptibility") (multiplicity none)) (attribute-def (name "ElectricFluxValue") (multiplicity none)) (attribute-def (name "electricFlux") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectricFluxUnit") (multiplicity none)) (attribute-def (name "DisplacementCurrentDensityValue") (multiplicity none)) (attribute-def (name "displacementCurrentDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DisplacementCurrentDensityUnit") (multiplicity none)) (attribute-def (name "CartesianDisplacementCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "cartesianDisplacementCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "CartesianDisplacementCurrentDensity3dCoordinateFrame") (multiplicity none)) (attribute-def (name "displacementCurrent") (multiplicity none)) (attribute-def (name "totalCurrent") (multiplicity none)) (attribute-def (name "TotalCurrentDensityValue") (multiplicity none)) (attribute-def (name "totalCurrentDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TotalCurrentDensityUnit") (multiplicity none)) (attribute-def (name "CartesianTotalCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "cartesianTotalCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "CartesianTotalCurrentDensity3dCoordinateFrame") (multiplicity none)) (attribute-def (name "MagneticFluxDensityValue") (multiplicity none)) (attribute-def (name "magneticFluxDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagneticFluxDensityUnit") (multiplicity none)) (attribute-def (name "CartesianMagneticFluxDensity3dVector") (multiplicity none)) (attribute-def (name "cartesianMagneticFluxDensity3dVector") (multiplicity none)) (attribute-def (name "CartesianMagneticFluxDensity3dCoordinateFrame") (multiplicity none)) (attribute-def (name "MagneticFluxValue") (multiplicity none)) (attribute-def (name "magneticFlux") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagneticFluxUnit") (multiplicity none)) (attribute-def (name "LinkedFluxValue") (multiplicity none)) (attribute-def (name "linkedFlux") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinkedFluxUnit") (multiplicity none)) (attribute-def (name "MagneticMomentValue") (multiplicity none)) (attribute-def (name "magneticMoment") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagneticMomentUnit") (multiplicity none)) (attribute-def (name "CartesianMagneticMoment3dVector") (multiplicity none)) (attribute-def (name "cartesianMagneticMoment3dVector") (multiplicity none)) (attribute-def (name "CartesianMagneticMoment3dCoordinateFrame") (multiplicity none)) (alias (name "CartesianMagneticAreaMoment3dCoordinateFrame") (target (ref r26)) (body semicolon)) (alias (name "cartesianMagneticAreaMoment3dVector") (target (ref r27)) (body semicolon)) (attribute-def (name "MagnetizationValue") (multiplicity none)) (attribute-def (name "magnetization") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagnetizationUnit") (multiplicity none)) (attribute-def (name "CartesianMagnetization3dVector") (multiplicity none)) (attribute-def (name "cartesianMagnetization3dVector") (multiplicity none)) (attribute-def (name "CartesianMagnetization3dCoordinateFrame") (multiplicity none)) (attribute-def (name "MagneticFieldStrengthValue") (multiplicity none)) (attribute-def (name "magneticFieldStrength") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagneticFieldStrengthUnit") (multiplicity none)) (attribute-def (name "CartesianMagneticFieldStrength3dVector") (multiplicity none)) (attribute-def (name "cartesianMagneticFieldStrength3dVector") (multiplicity none)) (attribute-def (name "CartesianMagneticFieldStrength3dCoordinateFrame") (multiplicity none)) (alias (name "CartesianMagnetizingField3dCoordinateFrame") (target (ref r28)) (body semicolon)) (alias (name "cartesianMagnetizingField3dVector") (target (ref r29)) (body semicolon)) (attribute-def (name "MagneticConstantValue") (multiplicity none)) (attribute-def (name "magneticConstant") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagneticConstantUnit") (multiplicity none)) (alias (name "PermeabilityOfVacuumUnit") (target (ref r30)) (body semicolon)) (alias (name "PermeabilityOfVacuumValue") (target (ref r31)) (body semicolon)) (alias (name "permeabilityOfVacuum") (target (ref r32)) (body semicolon)) (attribute-def (name "PermeabilityValue") (multiplicity none)) (attribute-def (name "permeability") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PermeabilityUnit") (multiplicity none)) (attribute-def (name "RelativePermeabilityValue") (multiplicity none)) (attribute-def (name "relativePermeability") (multiplicity none)) (attribute-def (name "MagneticSusceptibilityValue") (multiplicity none)) (attribute-def (name "magneticSusceptibility") (multiplicity none)) (attribute-def (name "MagneticPolarizationValue") (multiplicity none)) (attribute-def (name "magneticPolarization") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagneticPolarizationUnit") (multiplicity none)) (attribute-def (name "CartesianMagneticPolarization3dVector") (multiplicity none)) (attribute-def (name "cartesianMagneticPolarization3dVector") (multiplicity none)) (attribute-def (name "CartesianMagneticPolarization3dCoordinateFrame") (multiplicity none)) (attribute-def (name "MagneticDipoleMomentValue") (multiplicity none)) (attribute-def (name "magneticDipoleMoment") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagneticDipoleMomentUnit") (multiplicity none)) (attribute-def (name "CartesianMagneticDipoleMoment3dVector") (multiplicity none)) (attribute-def (name "cartesianMagneticDipoleMoment3dVector") (multiplicity none)) (attribute-def (name "CartesianMagneticDipoleMoment3dCoordinateFrame") (multiplicity none)) (attribute-def (name "CoercivityValue") (multiplicity none)) (attribute-def (name "coercivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CoercivityUnit") (multiplicity none)) (attribute-def (name "MagneticVectorPotentialValue") (multiplicity none)) (attribute-def (name "magneticVectorPotential") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagneticVectorPotentialUnit") (multiplicity none)) (attribute-def (name "CartesianMagneticVectorPotential3dVector") (multiplicity none)) (attribute-def (name "cartesianMagneticVectorPotential3dVector") (multiplicity none)) (attribute-def (name "CartesianMagneticVectorPotential3dCoordinateFrame") (multiplicity none)) (attribute-def (name "ElectromagneticEnergyDensityValue") (multiplicity none)) (attribute-def (name "electromagneticEnergyDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectromagneticEnergyDensityUnit") (multiplicity none)) (alias (name "VolumicElectromagneticEnergyUnit") (target (ref r33)) (body semicolon)) (alias (name "VolumicElectromagneticEnergyValue") (target (ref r34)) (body semicolon)) (alias (name "volumicElectromagneticEnergy") (target (ref r35)) (body semicolon)) (attribute-def (name "PoyntingVectorMagnitudeValue") (multiplicity none)) (attribute-def (name "poyntingVectorMagnitude") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PoyntingVectorMagnitudeUnit") (multiplicity none)) (attribute-def (name "CartesianPoynting3dVector") (multiplicity none)) (attribute-def (name "cartesianPoynting3dVector") (multiplicity none)) (attribute-def (name "CartesianPoynting3dCoordinateFrame") (multiplicity none)) (attribute-def (name "PhaseSpeedOfElectromagneticWavesValue") (multiplicity none)) (attribute-def (name "phaseSpeedOfElectromagneticWaves") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhaseSpeedOfElectromagneticWavesUnit") (multiplicity none)) (attribute-def (name "SpeedOfLightValue") (multiplicity none)) (attribute-def (name "speedOfLight") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpeedOfLightUnit") (multiplicity none)) (alias (name "LightSpeedUnit") (target (ref r36)) (body semicolon)) (alias (name "LightSpeedValue") (target (ref r37)) (body semicolon)) (alias (name "lightSpeed") (target (ref r38)) (body semicolon)) (attribute-def (name "SourceVoltageValue") (multiplicity none)) (attribute-def (name "sourceVoltage") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SourceVoltageUnit") (multiplicity none)) (alias (name "SourceTensionUnit") (target (ref r39)) (body semicolon)) (alias (name "SourceTensionValue") (target (ref r40)) (body semicolon)) (alias (name "sourceTension") (target (ref r41)) (body semicolon)) (attribute-def (name "scalarMagneticPotential") (multiplicity none)) (attribute-def (name "magneticTension") (multiplicity none)) (attribute-def (name "MagnetomotiveForceValue") (multiplicity none)) (attribute-def (name "magnetomotiveForce") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagnetomotiveForceUnit") (multiplicity none)) (attribute-def (name "currentLinkage") (multiplicity none)) (attribute-def (name "numberOfTurnsInAWinding") (multiplicity none)) (attribute-def (name "ReluctanceValue") (multiplicity none)) (attribute-def (name "reluctance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ReluctanceUnit") (multiplicity none)) (attribute-def (name "PermeanceValue") (multiplicity none)) (attribute-def (name "permeance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PermeanceUnit") (multiplicity none)) (attribute-def (name "InductanceValue") (multiplicity none)) (attribute-def (name "inductance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "InductanceUnit") (multiplicity none)) (alias (name "SelfInductanceUnit") (target (ref r42)) (body semicolon)) (alias (name "SelfInductanceValue") (target (ref r43)) (body semicolon)) (alias (name "selfInductance") (target (ref r44)) (body semicolon)) (attribute-def (name "mutualInductance") (multiplicity none)) (attribute-def (name "CouplingFactorValue") (multiplicity none)) (attribute-def (name "couplingFactor") (multiplicity none)) (attribute-def (name "LeakageFactorValue") (multiplicity none)) (attribute-def (name "leakageFactor") (multiplicity none)) (attribute-def (name "ConductivityValue") (multiplicity none)) (attribute-def (name "conductivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ConductivityUnit") (multiplicity none)) (attribute-def (name "ResistivityValue") (multiplicity none)) (attribute-def (name "resistivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ResistivityUnit") (multiplicity none)) (attribute-def (name "electricPower") (multiplicity none)) (alias (name "instantaneousPower") (target (ref r45)) (body semicolon)) (attribute-def (name "ResistanceValue") (multiplicity none)) (attribute-def (name "resistance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ResistanceUnit") (multiplicity none)) (attribute-def (name "ConductanceValue") (multiplicity none)) (attribute-def (name "conductance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ConductanceUnit") (multiplicity none)) (attribute-def (name "PhaseDifferenceValue") (multiplicity none)) (attribute-def (name "phaseDifference") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhaseDifferenceUnit") (multiplicity none)) (attribute-def (name "electricCurrentPhasor") (multiplicity none)) (attribute-def (name "voltagePhasor") (multiplicity none)) (attribute-def (name "ImpedanceValue") (multiplicity none)) (attribute-def (name "impedance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ImpedanceUnit") (multiplicity none)) (alias (name "ComplexImpedanceUnit") (target (ref r46)) (body semicolon)) (alias (name "ComplexImpedanceValue") (target (ref r47)) (body semicolon)) (alias (name "complexImpedance") (target (ref r48)) (body semicolon)) (attribute-def (name "ResistanceToAlternatingCurrentValue") (multiplicity none)) (attribute-def (name "resistanceToAlternatingCurrent") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ResistanceToAlternatingCurrentUnit") (multiplicity none)) (attribute-def (name "ReactanceValue") (multiplicity none)) (attribute-def (name "reactance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ReactanceUnit") (multiplicity none)) (attribute-def (name "ModulusOfImpedanceValue") (multiplicity none)) (attribute-def (name "modulusOfImpedance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ModulusOfImpedanceUnit") (multiplicity none)) (attribute-def (name "AdmittanceValue") (multiplicity none)) (attribute-def (name "admittance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AdmittanceUnit") (multiplicity none)) (alias (name "ComplexAdmittanceUnit") (target (ref r49)) (body semicolon)) (alias (name "ComplexAdmittanceValue") (target (ref r50)) (body semicolon)) (alias (name "complexAdmittance") (target (ref r51)) (body semicolon)) (attribute-def (name "conductanceForAlternatingCurrent") (multiplicity none)) (attribute-def (name "SusceptanceValue") (multiplicity none)) (attribute-def (name "susceptance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SusceptanceUnit") (multiplicity none)) (attribute-def (name "ModulusOfAdmittanceValue") (multiplicity none)) (attribute-def (name "modulusOfAdmittance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ModulusOfAdmittanceUnit") (multiplicity none)) (attribute-def (name "QualityFactorValue") (multiplicity none)) (attribute-def (name "qualityFactor") (multiplicity none)) (attribute-def (name "LossFactorValue") (multiplicity none)) (attribute-def (name "lossFactor") (multiplicity none)) (attribute-def (name "lossAngle") (multiplicity none)) (attribute-def (name "activePower") (multiplicity none)) (attribute-def (name "apparentPower") (multiplicity none)) (attribute-def (name "PowerFactorValue") (multiplicity none)) (attribute-def (name "powerFactor") (multiplicity none)) (attribute-def (name "complexPower") (multiplicity none)) (attribute-def (name "reactivePower") (multiplicity none)) (attribute-def (name "nonActivePower") (multiplicity none)) (attribute-def (name "activeEnergy") (multiplicity none)))))
 )
 ~~~

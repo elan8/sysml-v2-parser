@@ -1587,7 +1587,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpeedOfLightInAMediumUnit[1];
     }
-    attribute def speedOfLightInAMedium : SpeedOfLightInAMediumValue nonunique;
+    attribute def speedOfLightInAMedium : SpeedOfLightInAMediumValue[*] nonunique;
     attribute def SpeedOfLightInAMediumUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1646,7 +1646,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralRadiantEnergyUnit[1];
     }
-    attribute def spectralRadiantEnergy : SpectralRadiantEnergyValue nonunique;
+    attribute def spectralRadiantEnergy : SpectralRadiantEnergyValue[*] nonunique;
     attribute def SpectralRadiantEnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1680,7 +1680,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : RadiantEnergyDensityUnit[1];
     }
-    attribute def radiantEnergyDensity : RadiantEnergyDensityValue nonunique;
+    attribute def radiantEnergyDensity : RadiantEnergyDensityValue[*] nonunique;
     attribute def RadiantEnergyDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1714,7 +1714,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralRadiantEnergyDensityInTermsOfWavelengthUnit[1];
     }
-    attribute def spectralRadiantEnergyDensityInTermsOfWavelength : SpectralRadiantEnergyDensityInTermsOfWavelengthValue nonunique;
+    attribute def spectralRadiantEnergyDensityInTermsOfWavelength : SpectralRadiantEnergyDensityInTermsOfWavelengthValue[*] nonunique;
     attribute def SpectralRadiantEnergyDensityInTermsOfWavelengthUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1748,7 +1748,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralRadiantEnergyDensityInTermsOfWavenumberUnit[1];
     }
-    attribute def spectralRadiantEnergyDensityInTermsOfWavenumber : SpectralRadiantEnergyDensityInTermsOfWavenumberValue nonunique;
+    attribute def spectralRadiantEnergyDensityInTermsOfWavenumber : SpectralRadiantEnergyDensityInTermsOfWavenumberValue[*] nonunique;
     attribute def SpectralRadiantEnergyDensityInTermsOfWavenumberUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -1778,7 +1778,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : RadiantFluxUnit[1];
     }
-    attribute def radiantFlux : RadiantFluxValue nonunique;
+    attribute def radiantFlux : RadiantFluxValue[*] nonunique;
     attribute def RadiantFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1815,7 +1815,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralRadiantFluxUnit[1];
     }
-    attribute def spectralRadiantFlux : SpectralRadiantFluxValue nonunique;
+    attribute def spectralRadiantFlux : SpectralRadiantFluxValue[*] nonunique;
     attribute def SpectralRadiantFluxUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1852,7 +1852,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : RadiantIntensityUnit[1];
     }
-    attribute def radiantIntensity : RadiantIntensityValue nonunique;
+    attribute def radiantIntensity : RadiantIntensityValue[*] nonunique;
     attribute def RadiantIntensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1886,7 +1886,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralRadiantIntensityUnit[1];
     }
-    attribute def spectralRadiantIntensity : SpectralRadiantIntensityValue nonunique;
+    attribute def spectralRadiantIntensity : SpectralRadiantIntensityValue[*] nonunique;
     attribute def SpectralRadiantIntensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1920,7 +1920,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : RadianceUnit[1];
     }
-    attribute def radiance : RadianceValue nonunique;
+    attribute def radiance : RadianceValue[*] nonunique;
     attribute def RadianceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -1950,7 +1950,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralRadianceUnit[1];
     }
-    attribute def spectralRadiance : SpectralRadianceValue nonunique;
+    attribute def spectralRadiance : SpectralRadianceValue[*] nonunique;
     attribute def SpectralRadianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1984,7 +1984,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : IrradianceUnit[1];
     }
-    attribute def irradiance : IrradianceValue nonunique;
+    attribute def irradiance : IrradianceValue[*] nonunique;
     attribute def IrradianceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -2014,7 +2014,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralIrradianceUnit[1];
     }
-    attribute def spectralIrradiance : SpectralIrradianceValue nonunique;
+    attribute def spectralIrradiance : SpectralIrradianceValue[*] nonunique;
     attribute def SpectralIrradianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2048,7 +2048,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : RadiantExitanceUnit[1];
     }
-    attribute def radiantExitance : RadiantExitanceValue nonunique;
+    attribute def radiantExitance : RadiantExitanceValue[*] nonunique;
     attribute def RadiantExitanceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -2081,7 +2081,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralRadiantExitanceUnit[1];
     }
-    attribute def spectralRadiantExitance : SpectralRadiantExitanceValue nonunique;
+    attribute def spectralRadiantExitance : SpectralRadiantExitanceValue[*] nonunique;
     attribute def SpectralRadiantExitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2115,7 +2115,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : RadiantExposureUnit[1];
     }
-    attribute def radiantExposure : RadiantExposureValue nonunique;
+    attribute def radiantExposure : RadiantExposureValue[*] nonunique;
     attribute def RadiantExposureUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -2145,7 +2145,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralRadiantExposureUnit[1];
     }
-    attribute def spectralRadiantExposure : SpectralRadiantExposureValue nonunique;
+    attribute def spectralRadiantExposure : SpectralRadiantExposureValue[*] nonunique;
     attribute def SpectralRadiantExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2209,7 +2209,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : LuminousEfficacyOfRadiationUnit[1];
     }
-    attribute def luminousEfficacyOfRadiation : LuminousEfficacyOfRadiationValue nonunique;
+    attribute def luminousEfficacyOfRadiation : LuminousEfficacyOfRadiationValue[*] nonunique;
     attribute def LuminousEfficacyOfRadiationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2247,7 +2247,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : SpectralLuminousEfficacyUnit[1];
     }
-    attribute def spectralLuminousEfficacy : SpectralLuminousEfficacyValue nonunique;
+    attribute def spectralLuminousEfficacy : SpectralLuminousEfficacyValue[*] nonunique;
     attribute def SpectralLuminousEfficacyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2285,7 +2285,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : MaximumLuminousEfficacyUnit[1];
     }
-    attribute def maximumLuminousEfficacy : MaximumLuminousEfficacyValue nonunique;
+    attribute def maximumLuminousEfficacy : MaximumLuminousEfficacyValue[*] nonunique;
     attribute def MaximumLuminousEfficacyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2323,7 +2323,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : LuminousEfficacyOfASourceUnit[1];
     }
-    attribute def luminousEfficacyOfASource : LuminousEfficacyOfASourceValue nonunique;
+    attribute def luminousEfficacyOfASource : LuminousEfficacyOfASourceValue[*] nonunique;
     attribute def LuminousEfficacyOfASourceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2361,7 +2361,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : LuminousEnergyUnit[1];
     }
-    attribute def luminousEnergy : LuminousEnergyValue nonunique;
+    attribute def luminousEnergy : LuminousEnergyValue[*] nonunique;
     attribute def LuminousEnergyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -2394,7 +2394,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : LuminousFluxUnit[1];
     }
-    attribute def luminousFlux : LuminousFluxValue nonunique;
+    attribute def luminousFlux : LuminousFluxValue[*] nonunique;
     attribute def LuminousFluxUnit :> DerivedUnit {
         private attribute luminousIntensityPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.J;
@@ -2420,7 +2420,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : LuminanceUnit[1];
     }
-    attribute def luminance : LuminanceValue nonunique;
+    attribute def luminance : LuminanceValue[*] nonunique;
     attribute def LuminanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2450,7 +2450,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : IlluminanceUnit[1];
     }
-    attribute def illuminance : IlluminanceValue nonunique;
+    attribute def illuminance : IlluminanceValue[*] nonunique;
     attribute def IlluminanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2480,7 +2480,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : LuminousExitanceUnit[1];
     }
-    attribute def luminousExitance : LuminousExitanceValue nonunique;
+    attribute def luminousExitance : LuminousExitanceValue[*] nonunique;
     attribute def LuminousExitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2510,7 +2510,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : LuminousExposureUnit[1];
     }
-    attribute def luminousExposure : LuminousExposureValue nonunique;
+    attribute def luminousExposure : LuminousExposureValue[*] nonunique;
     attribute def LuminousExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2580,7 +2580,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : PhotonFluxUnit[1];
     }
-    attribute def photonFlux : PhotonFluxValue nonunique;
+    attribute def photonFlux : PhotonFluxValue[*] nonunique;
     attribute def PhotonFluxUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -2606,7 +2606,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : PhotonIntensityUnit[1];
     }
-    attribute def photonIntensity : PhotonIntensityValue nonunique;
+    attribute def photonIntensity : PhotonIntensityValue[*] nonunique;
     attribute def PhotonIntensityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -2632,7 +2632,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : PhotonRadianceUnit[1];
     }
-    attribute def photonRadiance : PhotonRadianceValue nonunique;
+    attribute def photonRadiance : PhotonRadianceValue[*] nonunique;
     attribute def PhotonRadianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2662,7 +2662,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : PhotonIrradianceUnit[1];
     }
-    attribute def photonIrradiance : PhotonIrradianceValue nonunique;
+    attribute def photonIrradiance : PhotonIrradianceValue[*] nonunique;
     attribute def PhotonIrradianceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2692,7 +2692,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : PhotonExitanceUnit[1];
     }
-    attribute def photonExitance : PhotonExitanceValue nonunique;
+    attribute def photonExitance : PhotonExitanceValue[*] nonunique;
     attribute def PhotonExitanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2722,7 +2722,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : PhotonExposureUnit[1];
     }
-    attribute def photonExposure : PhotonExposureValue nonunique;
+    attribute def photonExposure : PhotonExposureValue[*] nonunique;
     attribute def PhotonExposureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2748,7 +2748,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : TristimulusValuesForTheCie1931StandardColorimetricObserverUnit[1];
     }
-    attribute def tristimulusValuesForTheCie1931StandardColorimetricObserver : TristimulusValuesForTheCie1931StandardColorimetricObserverValue nonunique;
+    attribute def tristimulusValuesForTheCie1931StandardColorimetricObserver : TristimulusValuesForTheCie1931StandardColorimetricObserverValue[*] nonunique;
     attribute def TristimulusValuesForTheCie1931StandardColorimetricObserverUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2778,7 +2778,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : TristimulusValuesForTheCie1964StandardColorimetricObserverUnit[1];
     }
-    attribute def tristimulusValuesForTheCie1964StandardColorimetricObserver : TristimulusValuesForTheCie1964StandardColorimetricObserverValue nonunique;
+    attribute def tristimulusValuesForTheCie1964StandardColorimetricObserver : TristimulusValuesForTheCie1964StandardColorimetricObserverValue[*] nonunique;
     attribute def TristimulusValuesForTheCie1964StandardColorimetricObserverUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3094,7 +3094,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : LinearAttenuationCoefficientUnit[1];
     }
-    attribute def linearAttenuationCoefficient : LinearAttenuationCoefficientValue nonunique;
+    attribute def linearAttenuationCoefficient : LinearAttenuationCoefficientValue[*] nonunique;
     attribute def LinearAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3123,7 +3123,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : LinearAbsorptionCoefficientUnit[1];
     }
-    attribute def linearAbsorptionCoefficient : LinearAbsorptionCoefficientValue nonunique;
+    attribute def linearAbsorptionCoefficient : LinearAbsorptionCoefficientValue[*] nonunique;
     attribute def LinearAbsorptionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3149,7 +3149,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : MassAttenuationCoefficientUnit[1];
     }
-    attribute def massAttenuationCoefficient : MassAttenuationCoefficientValue nonunique;
+    attribute def massAttenuationCoefficient : MassAttenuationCoefficientValue[*] nonunique;
     attribute def MassAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3179,7 +3179,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : MassAbsorptionCoefficientUnit[1];
     }
-    attribute def massAbsorptionCoefficient : MassAbsorptionCoefficientValue nonunique;
+    attribute def massAbsorptionCoefficient : MassAbsorptionCoefficientValue[*] nonunique;
     attribute def MassAbsorptionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3209,7 +3209,7 @@ standard library package ISQLight {
         attribute :>> num : Real;
         attribute :>> mRef : MolarAbsorptionCoefficientUnit[1];
     }
-    attribute def molarAbsorptionCoefficient : MolarAbsorptionCoefficientValue nonunique;
+    attribute def molarAbsorptionCoefficient : MolarAbsorptionCoefficientValue[*] nonunique;
     attribute def MolarAbsorptionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3260,6 +3260,6 @@ standard library package ISQLight {
     (reference r28 (scope relative) (span (offset 93928) (line 1431) (column 48) (len 33)) (segments (segment 0 (token "LinearAttenuationCoefficientValue") (name "LinearAttenuationCoefficientValue") (separator none) (span (offset 93928) (line 1431) (column 48) (len 33)))))
     (reference r29 (scope relative) (span (offset 94005) (line 1432) (column 43) (len 28)) (segments (segment 0 (token "linearAttenuationCoefficient") (name "linearAttenuationCoefficient") (separator none) (span (offset 94005) (line 1432) (column 43) (len 28)))))
   )
-  (root (library-package (name "ISQLight") (standard true) (body brace (doc) (import (target (span (span (offset 785) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 824) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 834) (line 16) (column 30) (len 3))) (separator (span (offset 834) (line 16) (column 30) (len 2))) (marker (span (offset 836) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 858) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 879) (line 17) (column 41) (len 3))) (separator (span (offset 879) (line 17) (column 41) (len 2))) (marker (span (offset 881) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 903) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 910) (line 18) (column 27) (len 3))) (separator (span (offset 910) (line 18) (column 27) (len 2))) (marker (span (offset 912) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1001) (line 21) (column 20) (len 30))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "RadiantPowerUnit") (target (ref r5)) (body semicolon)) (alias (name "RadiantPowerValue") (target (ref r6)) (body semicolon)) (alias (name "radiantPower") (target (ref r7)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "SpectralRadiantPowerUnit") (target (ref r8)) (body semicolon)) (alias (name "SpectralRadiantPowerValue") (target (ref r9)) (body semicolon)) (alias (name "spectralRadiantPower") (target (ref r10)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "RadiantEmittanceUnit") (target (ref r11)) (body semicolon)) (alias (name "RadiantEmittanceValue") (target (ref r12)) (body semicolon)) (alias (name "radiantEmittance") (target (ref r13)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "QuantityOfLightUnit") (target (ref r14)) (body semicolon)) (alias (name "QuantityOfLightValue") (target (ref r15)) (body semicolon)) (alias (name "quantityOfLight") (target (ref r16)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "QuantityOfIlluminationUnit") (target (ref r17)) (body semicolon)) (alias (name "QuantityOfIlluminationValue") (target (ref r18)) (body semicolon)) (alias (name "quantityOfIllumination") (target (ref r19)) (body semicolon)) (alias (name "LightExposureUnit") (target (ref r20)) (body semicolon)) (alias (name "LightExposureValue") (target (ref r21)) (body semicolon)) (alias (name "lightExposure") (target (ref r22)) (body semicolon)) (attribute-def) (attribute-def) (alias (name "numberOfPhotons") (target (ref r23)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "opticalDensity") (target (ref r24)) (body semicolon)) (alias (name "transmittanceDensity") (target (ref r25)) (body semicolon)) (alias (name "decadicAbsorbance") (target (ref r26)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "LinearExtinctionCoefficientUnit") (target (ref r27)) (body semicolon)) (alias (name "LinearExtinctionCoefficientValue") (target (ref r28)) (body semicolon)) (alias (name "linearExtinctionCoefficient") (target (ref r29)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQLight") (standard true) (body brace (doc) (import (target (span (span (offset 785) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 824) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 834) (line 16) (column 30) (len 3))) (separator (span (offset 834) (line 16) (column 30) (len 2))) (marker (span (offset 836) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 858) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 879) (line 17) (column 41) (len 3))) (separator (span (offset 879) (line 17) (column 41) (len 2))) (marker (span (offset 881) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 903) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 910) (line 18) (column 27) (len 3))) (separator (span (offset 910) (line 18) (column 27) (len 2))) (marker (span (offset 912) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1001) (line 21) (column 20) (len 30))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (attribute-def (name "SpeedOfLightInAMediumValue") (multiplicity none)) (attribute-def (name "speedOfLightInAMedium") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpeedOfLightInAMediumUnit") (multiplicity none)) (attribute-def (name "RefractiveIndexValue") (multiplicity none)) (attribute-def (name "refractiveIndex") (multiplicity none)) (attribute-def (name "radiantEnergy") (multiplicity none)) (attribute-def (name "SpectralRadiantEnergyValue") (multiplicity none)) (attribute-def (name "spectralRadiantEnergy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralRadiantEnergyUnit") (multiplicity none)) (attribute-def (name "RadiantEnergyDensityValue") (multiplicity none)) (attribute-def (name "radiantEnergyDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RadiantEnergyDensityUnit") (multiplicity none)) (attribute-def (name "SpectralRadiantEnergyDensityInTermsOfWavelengthValue") (multiplicity none)) (attribute-def (name "spectralRadiantEnergyDensityInTermsOfWavelength") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralRadiantEnergyDensityInTermsOfWavelengthUnit") (multiplicity none)) (attribute-def (name "SpectralRadiantEnergyDensityInTermsOfWavenumberValue") (multiplicity none)) (attribute-def (name "spectralRadiantEnergyDensityInTermsOfWavenumber") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralRadiantEnergyDensityInTermsOfWavenumberUnit") (multiplicity none)) (attribute-def (name "RadiantFluxValue") (multiplicity none)) (attribute-def (name "radiantFlux") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RadiantFluxUnit") (multiplicity none)) (alias (name "RadiantPowerUnit") (target (ref r5)) (body semicolon)) (alias (name "RadiantPowerValue") (target (ref r6)) (body semicolon)) (alias (name "radiantPower") (target (ref r7)) (body semicolon)) (attribute-def (name "SpectralRadiantFluxValue") (multiplicity none)) (attribute-def (name "spectralRadiantFlux") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralRadiantFluxUnit") (multiplicity none)) (alias (name "SpectralRadiantPowerUnit") (target (ref r8)) (body semicolon)) (alias (name "SpectralRadiantPowerValue") (target (ref r9)) (body semicolon)) (alias (name "spectralRadiantPower") (target (ref r10)) (body semicolon)) (attribute-def (name "RadiantIntensityValue") (multiplicity none)) (attribute-def (name "radiantIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RadiantIntensityUnit") (multiplicity none)) (attribute-def (name "SpectralRadiantIntensityValue") (multiplicity none)) (attribute-def (name "spectralRadiantIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralRadiantIntensityUnit") (multiplicity none)) (attribute-def (name "RadianceValue") (multiplicity none)) (attribute-def (name "radiance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RadianceUnit") (multiplicity none)) (attribute-def (name "SpectralRadianceValue") (multiplicity none)) (attribute-def (name "spectralRadiance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralRadianceUnit") (multiplicity none)) (attribute-def (name "IrradianceValue") (multiplicity none)) (attribute-def (name "irradiance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "IrradianceUnit") (multiplicity none)) (attribute-def (name "SpectralIrradianceValue") (multiplicity none)) (attribute-def (name "spectralIrradiance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralIrradianceUnit") (multiplicity none)) (attribute-def (name "RadiantExitanceValue") (multiplicity none)) (attribute-def (name "radiantExitance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RadiantExitanceUnit") (multiplicity none)) (alias (name "RadiantEmittanceUnit") (target (ref r11)) (body semicolon)) (alias (name "RadiantEmittanceValue") (target (ref r12)) (body semicolon)) (alias (name "radiantEmittance") (target (ref r13)) (body semicolon)) (attribute-def (name "SpectralRadiantExitanceValue") (multiplicity none)) (attribute-def (name "spectralRadiantExitance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralRadiantExitanceUnit") (multiplicity none)) (attribute-def (name "RadiantExposureValue") (multiplicity none)) (attribute-def (name "radiantExposure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RadiantExposureUnit") (multiplicity none)) (attribute-def (name "SpectralRadiantExposureValue") (multiplicity none)) (attribute-def (name "spectralRadiantExposure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralRadiantExposureUnit") (multiplicity none)) (attribute-def (name "LuminousEfficiencyValue") (multiplicity none)) (attribute-def (name "luminousEfficiency") (multiplicity none)) (attribute-def (name "SpectralLuminousEfficiencyValue") (multiplicity none)) (attribute-def (name "spectralLuminousEfficiency") (multiplicity none)) (attribute-def (name "LuminousEfficacyOfRadiationValue") (multiplicity none)) (attribute-def (name "luminousEfficacyOfRadiation") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LuminousEfficacyOfRadiationUnit") (multiplicity none)) (attribute-def (name "SpectralLuminousEfficacyValue") (multiplicity none)) (attribute-def (name "spectralLuminousEfficacy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpectralLuminousEfficacyUnit") (multiplicity none)) (attribute-def (name "MaximumLuminousEfficacyValue") (multiplicity none)) (attribute-def (name "maximumLuminousEfficacy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MaximumLuminousEfficacyUnit") (multiplicity none)) (attribute-def (name "LuminousEfficacyOfASourceValue") (multiplicity none)) (attribute-def (name "luminousEfficacyOfASource") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LuminousEfficacyOfASourceUnit") (multiplicity none)) (attribute-def (name "LuminousEnergyValue") (multiplicity none)) (attribute-def (name "luminousEnergy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LuminousEnergyUnit") (multiplicity none)) (alias (name "QuantityOfLightUnit") (target (ref r14)) (body semicolon)) (alias (name "QuantityOfLightValue") (target (ref r15)) (body semicolon)) (alias (name "quantityOfLight") (target (ref r16)) (body semicolon)) (attribute-def (name "LuminousFluxValue") (multiplicity none)) (attribute-def (name "luminousFlux") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LuminousFluxUnit") (multiplicity none)) (attribute-def (name "LuminanceValue") (multiplicity none)) (attribute-def (name "luminance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LuminanceUnit") (multiplicity none)) (attribute-def (name "IlluminanceValue") (multiplicity none)) (attribute-def (name "illuminance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "IlluminanceUnit") (multiplicity none)) (attribute-def (name "LuminousExitanceValue") (multiplicity none)) (attribute-def (name "luminousExitance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LuminousExitanceUnit") (multiplicity none)) (attribute-def (name "LuminousExposureValue") (multiplicity none)) (attribute-def (name "luminousExposure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LuminousExposureUnit") (multiplicity none)) (alias (name "QuantityOfIlluminationUnit") (target (ref r17)) (body semicolon)) (alias (name "QuantityOfIlluminationValue") (target (ref r18)) (body semicolon)) (alias (name "quantityOfIllumination") (target (ref r19)) (body semicolon)) (alias (name "LightExposureUnit") (target (ref r20)) (body semicolon)) (alias (name "LightExposureValue") (target (ref r21)) (body semicolon)) (alias (name "lightExposure") (target (ref r22)) (body semicolon)) (attribute-def (name "PhotonNumberValue") (multiplicity none)) (attribute-def (name "photonNumber") (multiplicity none)) (alias (name "numberOfPhotons") (target (ref r23)) (body semicolon)) (attribute-def (name "photonEnergy") (multiplicity none)) (attribute-def (name "PhotonFluxValue") (multiplicity none)) (attribute-def (name "photonFlux") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhotonFluxUnit") (multiplicity none)) (attribute-def (name "PhotonIntensityValue") (multiplicity none)) (attribute-def (name "photonIntensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhotonIntensityUnit") (multiplicity none)) (attribute-def (name "PhotonRadianceValue") (multiplicity none)) (attribute-def (name "photonRadiance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhotonRadianceUnit") (multiplicity none)) (attribute-def (name "PhotonIrradianceValue") (multiplicity none)) (attribute-def (name "photonIrradiance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhotonIrradianceUnit") (multiplicity none)) (attribute-def (name "PhotonExitanceValue") (multiplicity none)) (attribute-def (name "photonExitance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhotonExitanceUnit") (multiplicity none)) (attribute-def (name "PhotonExposureValue") (multiplicity none)) (attribute-def (name "photonExposure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhotonExposureUnit") (multiplicity none)) (attribute-def (name "TristimulusValuesForTheCie1931StandardColorimetricObserverValue") (multiplicity none)) (attribute-def (name "tristimulusValuesForTheCie1931StandardColorimetricObserver") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TristimulusValuesForTheCie1931StandardColorimetricObserverUnit") (multiplicity none)) (attribute-def (name "TristimulusValuesForTheCie1964StandardColorimetricObserverValue") (multiplicity none)) (attribute-def (name "tristimulusValuesForTheCie1964StandardColorimetricObserver") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TristimulusValuesForTheCie1964StandardColorimetricObserverUnit") (multiplicity none)) (attribute-def (name "CieColourMatchingFunctionsForTheCie1931StandardColorimetricObserverValue") (multiplicity none)) (attribute-def (name "cieColourMatchingFunctionsForTheCie1931StandardColorimetricObserver") (multiplicity none)) (attribute-def (name "CieColourMatchingFunctionsForTheCie1964StandardColorimetricObserverValue") (multiplicity none)) (attribute-def (name "cieColourMatchingFunctionsForTheCie1964StandardColorimetricObserver") (multiplicity none)) (attribute-def (name "ChromaticityCoordinatesInTheCie1931StandardColorimetricSystemValue") (multiplicity none)) (attribute-def (name "chromaticityCoordinatesInTheCie1931StandardColorimetricSystem") (multiplicity none)) (attribute-def (name "ChromaticityCoordinatesInTheCie1964StandardColorimetricSystemValue") (multiplicity none)) (attribute-def (name "chromaticityCoordinatesInTheCie1964StandardColorimetricSystem") (multiplicity none)) (attribute-def (name "colourTemperature") (multiplicity none)) (attribute-def (name "correlatedColourTemperature") (multiplicity none)) (attribute-def (name "EmissivityValue") (multiplicity none)) (attribute-def (name "emissivity") (multiplicity none)) (attribute-def (name "EmissivityAtASpecifiedWavelengthValue") (multiplicity none)) (attribute-def (name "emissivityAtASpecifiedWavelength") (multiplicity none)) (attribute-def (name "AbsorptanceValue") (multiplicity none)) (attribute-def (name "absorptance") (multiplicity none)) (attribute-def (name "LuminousAbsorptanceValue") (multiplicity none)) (attribute-def (name "luminousAbsorptance") (multiplicity none)) (attribute-def (name "ReflectanceValue") (multiplicity none)) (attribute-def (name "reflectance") (multiplicity none)) (attribute-def (name "LuminousReflectanceValue") (multiplicity none)) (attribute-def (name "luminousReflectance") (multiplicity none)) (attribute-def (name "TransmittanceValue") (multiplicity none)) (attribute-def (name "transmittance") (multiplicity none)) (attribute-def (name "LuminousTransmittanceValue") (multiplicity none)) (attribute-def (name "luminousTransmittance") (multiplicity none)) (attribute-def (name "TransmittanceOpticalDensityValue") (multiplicity none)) (attribute-def (name "transmittanceOpticalDensity") (multiplicity none)) (alias (name "opticalDensity") (target (ref r24)) (body semicolon)) (alias (name "transmittanceDensity") (target (ref r25)) (body semicolon)) (alias (name "decadicAbsorbance") (target (ref r26)) (body semicolon)) (attribute-def (name "NapierianAbsorbanceValue") (multiplicity none)) (attribute-def (name "napierianAbsorbance") (multiplicity none)) (attribute-def (name "RadianceFactorValue") (multiplicity none)) (attribute-def (name "radianceFactor") (multiplicity none)) (attribute-def (name "LuminanceFactorValue") (multiplicity none)) (attribute-def (name "luminanceFactor") (multiplicity none)) (attribute-def (name "ReflectanceFactorValue") (multiplicity none)) (attribute-def (name "reflectanceFactor") (multiplicity none)) (attribute-def (name "LinearAttenuationCoefficientValue") (multiplicity none)) (attribute-def (name "linearAttenuationCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinearAttenuationCoefficientUnit") (multiplicity none)) (alias (name "LinearExtinctionCoefficientUnit") (target (ref r27)) (body semicolon)) (alias (name "LinearExtinctionCoefficientValue") (target (ref r28)) (body semicolon)) (alias (name "linearExtinctionCoefficient") (target (ref r29)) (body semicolon)) (attribute-def (name "LinearAbsorptionCoefficientValue") (multiplicity none)) (attribute-def (name "linearAbsorptionCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinearAbsorptionCoefficientUnit") (multiplicity none)) (attribute-def (name "MassAttenuationCoefficientValue") (multiplicity none)) (attribute-def (name "massAttenuationCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassAttenuationCoefficientUnit") (multiplicity none)) (attribute-def (name "MassAbsorptionCoefficientValue") (multiplicity none)) (attribute-def (name "massAbsorptionCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassAbsorptionCoefficientUnit") (multiplicity none)) (attribute-def (name "MolarAbsorptionCoefficientValue") (multiplicity none)) (attribute-def (name "molarAbsorptionCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarAbsorptionCoefficientUnit") (multiplicity none)))))
 )
 ~~~

@@ -1436,7 +1436,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarMassUnit[1];
     }
-    attribute def molarMass : MolarMassValue nonunique;
+    attribute def molarMass : MolarMassValue[*] nonunique;
     attribute def MolarMassUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -1466,7 +1466,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarVolumeUnit[1];
     }
-    attribute def molarVolume : MolarVolumeValue nonunique;
+    attribute def molarVolume : MolarVolumeValue[*] nonunique;
     attribute def MolarVolumeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1496,7 +1496,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarInternalEnergyUnit[1];
     }
-    attribute def molarInternalEnergy : MolarInternalEnergyValue nonunique;
+    attribute def molarInternalEnergy : MolarInternalEnergyValue[*] nonunique;
     attribute def MolarInternalEnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1534,7 +1534,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarEnthalpyUnit[1];
     }
-    attribute def molarEnthalpy : MolarEnthalpyValue nonunique;
+    attribute def molarEnthalpy : MolarEnthalpyValue[*] nonunique;
     attribute def MolarEnthalpyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1572,7 +1572,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarHelmholtzEnergyUnit[1];
     }
-    attribute def molarHelmholtzEnergy : MolarHelmholtzEnergyValue nonunique;
+    attribute def molarHelmholtzEnergy : MolarHelmholtzEnergyValue[*] nonunique;
     attribute def MolarHelmholtzEnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1610,7 +1610,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarGibbsEnergyUnit[1];
     }
-    attribute def molarGibbsEnergy : MolarGibbsEnergyValue nonunique;
+    attribute def molarGibbsEnergy : MolarGibbsEnergyValue[*] nonunique;
     attribute def MolarGibbsEnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1648,7 +1648,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarHeatCapacityUnit[1];
     }
-    attribute def molarHeatCapacity : MolarHeatCapacityValue nonunique;
+    attribute def molarHeatCapacity : MolarHeatCapacityValue[*] nonunique;
     attribute def MolarHeatCapacityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1690,7 +1690,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarEntropyUnit[1];
     }
-    attribute def molarEntropy : MolarEntropyValue nonunique;
+    attribute def molarEntropy : MolarEntropyValue[*] nonunique;
     attribute def MolarEntropyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1732,7 +1732,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : ParticleConcentrationUnit[1];
     }
-    attribute def particleConcentration : ParticleConcentrationValue nonunique;
+    attribute def particleConcentration : ParticleConcentrationValue[*] nonunique;
     attribute def ParticleConcentrationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1772,7 +1772,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MassConcentrationUnit[1];
     }
-    attribute def massConcentration : MassConcentrationValue nonunique;
+    attribute def massConcentration : MassConcentrationValue[*] nonunique;
     attribute def MassConcentrationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1817,7 +1817,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : AmountOfSubstanceConcentrationUnit[1];
     }
-    attribute def amountOfSubstanceConcentration : AmountOfSubstanceConcentrationValue nonunique;
+    attribute def amountOfSubstanceConcentration : AmountOfSubstanceConcentrationValue[*] nonunique;
     attribute def AmountOfSubstanceConcentrationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1876,7 +1876,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : VolumeFractionUnit[1];
     }
-    attribute def volumeFraction : VolumeFractionValue nonunique;
+    attribute def volumeFraction : VolumeFractionValue[*] nonunique;
     attribute def VolumeFractionUnit :> DimensionOneUnit {
     }
     attribute def MolalityValue :> ScalarQuantityValue {
@@ -1895,7 +1895,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolalityUnit[1];
     }
-    attribute def molality : MolalityValue nonunique;
+    attribute def molality : MolalityValue[*] nonunique;
     attribute def MolalityUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -1940,7 +1940,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : ChemicalPotentialUnit[1];
     }
-    attribute def chemicalPotential : ChemicalPotentialValue nonunique;
+    attribute def chemicalPotential : ChemicalPotentialValue[*] nonunique;
     attribute def ChemicalPotentialUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1993,7 +1993,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : PartialPressureUnit[1];
     }
-    attribute def partialPressure : PartialPressureValue nonunique;
+    attribute def partialPressure : PartialPressureValue[*] nonunique;
     attribute def PartialPressureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2027,7 +2027,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : FugacityUnit[1];
     }
-    attribute def fugacity : FugacityValue nonunique;
+    attribute def fugacity : FugacityValue[*] nonunique;
     attribute def FugacityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2061,7 +2061,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : StandardChemicalPotentialUnit[1];
     }
-    attribute def standardChemicalPotential : StandardChemicalPotentialValue nonunique;
+    attribute def standardChemicalPotential : StandardChemicalPotentialValue[*] nonunique;
     attribute def StandardChemicalPotentialUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2222,7 +2222,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : OsmoticPressureUnit[1];
     }
-    attribute def osmoticPressure : OsmoticPressureValue nonunique;
+    attribute def osmoticPressure : OsmoticPressureValue[*] nonunique;
     attribute def OsmoticPressureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2271,7 +2271,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : AffinityOfAChemicalReactionUnit[1];
     }
-    attribute def affinityOfAChemicalReaction : AffinityOfAChemicalReactionValue nonunique;
+    attribute def affinityOfAChemicalReaction : AffinityOfAChemicalReactionValue[*] nonunique;
     attribute def AffinityOfAChemicalReactionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2339,7 +2339,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : EquilibriumConstantOnPressureBasisUnit[1];
     }
-    attribute def equilibriumConstantOnPressureBasis : EquilibriumConstantOnPressureBasisValue nonunique;
+    attribute def equilibriumConstantOnPressureBasis : EquilibriumConstantOnPressureBasisValue[*] nonunique;
     attribute def EquilibriumConstantOnPressureBasisUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2373,7 +2373,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : EquilibriumConstantOnConcentrationBasisUnit[1];
     }
-    attribute def equilibriumConstantOnConcentrationBasis : EquilibriumConstantOnConcentrationBasisValue nonunique;
+    attribute def equilibriumConstantOnConcentrationBasis : EquilibriumConstantOnConcentrationBasisValue[*] nonunique;
     attribute def EquilibriumConstantOnConcentrationBasisUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2494,7 +2494,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarGasConstantUnit[1];
     }
-    attribute def molarGasConstant : MolarGasConstantValue nonunique;
+    attribute def molarGasConstant : MolarGasConstantValue[*] nonunique;
     attribute def MolarGasConstantUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2550,7 +2550,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : DiffusionCoefficientUnit[1];
     }
-    attribute def diffusionCoefficient : DiffusionCoefficientValue nonunique;
+    attribute def diffusionCoefficient : DiffusionCoefficientValue[*] nonunique;
     attribute def DiffusionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2610,7 +2610,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : ThermalDiffusionCoefficientUnit[1];
     }
-    attribute def thermalDiffusionCoefficient : ThermalDiffusionCoefficientValue nonunique;
+    attribute def thermalDiffusionCoefficient : ThermalDiffusionCoefficientValue[*] nonunique;
     attribute def ThermalDiffusionCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2640,7 +2640,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : IonicStrengthUnit[1];
     }
-    attribute def ionicStrength : IonicStrengthValue nonunique;
+    attribute def ionicStrength : IonicStrengthValue[*] nonunique;
     attribute def IonicStrengthUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -2686,7 +2686,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : ElectrolyticConductivityUnit[1];
     }
-    attribute def electrolyticConductivity : ElectrolyticConductivityValue nonunique;
+    attribute def electrolyticConductivity : ElectrolyticConductivityValue[*] nonunique;
     attribute def ElectrolyticConductivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2724,7 +2724,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarConductivityUnit[1];
     }
-    attribute def molarConductivity : MolarConductivityValue nonunique;
+    attribute def molarConductivity : MolarConductivityValue[*] nonunique;
     attribute def MolarConductivityUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -2792,7 +2792,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : MolarOpticalRotatoryPowerUnit[1];
     }
-    attribute def molarOpticalRotatoryPower : MolarOpticalRotatoryPowerValue nonunique;
+    attribute def molarOpticalRotatoryPower : MolarOpticalRotatoryPowerValue[*] nonunique;
     attribute def MolarOpticalRotatoryPowerUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2822,7 +2822,7 @@ standard library package ISQChemistryMolecular {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificOpticalRotatoryPowerUnit[1];
     }
-    attribute def specificOpticalRotatoryPower : SpecificOpticalRotatoryPowerValue nonunique;
+    attribute def specificOpticalRotatoryPower : SpecificOpticalRotatoryPowerValue[*] nonunique;
     attribute def SpecificOpticalRotatoryPowerUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2862,6 +2862,6 @@ standard library package ISQChemistryMolecular {
     (reference r17 (scope relative) (span (offset 64066) (line 1208) (column 36) (len 20)) (segments (segment 0 (token "degreeOfDissociation") (name "degreeOfDissociation") (separator none) (span (offset 64066) (line 1208) (column 36) (len 20)))))
     (reference r18 (scope relative) (span (offset 68003) (line 1283) (column 40) (len 24)) (segments (segment 0 (token "transportNumberOfTheIonB") (name "transportNumberOfTheIonB") (separator none) (span (offset 68003) (line 1283) (column 40) (len 24)))))
   )
-  (root (library-package (name "ISQChemistryMolecular") (standard true) (body brace (doc) (import (target (span (span (offset 819) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 858) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 868) (line 16) (column 30) (len 3))) (separator (span (offset 868) (line 16) (column 30) (len 2))) (marker (span (offset 870) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 892) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 913) (line 17) (column 41) (len 3))) (separator (span (offset 913) (line 17) (column 41) (len 2))) (marker (span (offset 915) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 937) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 944) (line 18) (column 27) (len 3))) (separator (span (offset 944) (line 18) (column 27) (len 2))) (marker (span (offset 946) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1035) (line 21) (column 20) (len 33))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1089) (line 22) (column 20) (len 30))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (attribute-def) (alias (name "NumberOfMolesUnit") (target (ref r6)) (body semicolon)) (alias (name "NumberOfMolesValue") (target (ref r7)) (body semicolon)) (alias (name "numberOfMoles") (target (ref r8)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "enthalpyOfPhaseTransition") (target (ref r9)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "relativeActivityOfSolute") (target (ref r10)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "relativeActivityOfSolvent") (target (ref r11)) (body semicolon)) (attribute-def) (attribute-def) (alias (name "osmoticCoefficientOfSolventA") (target (ref r12)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "thermodynamicEquilibriumConstant") (target (ref r13)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "grandPartitionFunction") (target (ref r14)) (body semicolon)) (attribute-def) (attribute-def) (alias (name "partitionFunctionOfAMolecule") (target (ref r15)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "multiplicity") (target (ref r16)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "dissociationFraction") (target (ref r17)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "currentFractionOfTheIonB") (target (ref r18)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQChemistryMolecular") (standard true) (body brace (doc) (import (target (span (span (offset 819) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 858) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 868) (line 16) (column 30) (len 3))) (separator (span (offset 868) (line 16) (column 30) (len 2))) (marker (span (offset 870) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 892) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 913) (line 17) (column 41) (len 3))) (separator (span (offset 913) (line 17) (column 41) (len 2))) (marker (span (offset 915) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 937) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 944) (line 18) (column 27) (len 3))) (separator (span (offset 944) (line 18) (column 27) (len 2))) (marker (span (offset 946) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1035) (line 21) (column 20) (len 33))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1089) (line 22) (column 20) (len 30))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (attribute-def (name "numberOfEntities") (multiplicity none)) (alias (name "NumberOfMolesUnit") (target (ref r6)) (body semicolon)) (alias (name "NumberOfMolesValue") (target (ref r7)) (body semicolon)) (alias (name "numberOfMoles") (target (ref r8)) (body semicolon)) (attribute-def (name "RelativeAtomicMassValue") (multiplicity none)) (attribute-def (name "relativeAtomicMass") (multiplicity none)) (attribute-def (name "MolarMassValue") (multiplicity none)) (attribute-def (name "molarMass") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarMassUnit") (multiplicity none)) (attribute-def (name "MolarVolumeValue") (multiplicity none)) (attribute-def (name "molarVolume") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarVolumeUnit") (multiplicity none)) (attribute-def (name "MolarInternalEnergyValue") (multiplicity none)) (attribute-def (name "molarInternalEnergy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarInternalEnergyUnit") (multiplicity none)) (attribute-def (name "MolarEnthalpyValue") (multiplicity none)) (attribute-def (name "molarEnthalpy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarEnthalpyUnit") (multiplicity none)) (attribute-def (name "MolarHelmholtzEnergyValue") (multiplicity none)) (attribute-def (name "molarHelmholtzEnergy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarHelmholtzEnergyUnit") (multiplicity none)) (attribute-def (name "MolarGibbsEnergyValue") (multiplicity none)) (attribute-def (name "molarGibbsEnergy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarGibbsEnergyUnit") (multiplicity none)) (attribute-def (name "MolarHeatCapacityValue") (multiplicity none)) (attribute-def (name "molarHeatCapacity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarHeatCapacityUnit") (multiplicity none)) (attribute-def (name "MolarEntropyValue") (multiplicity none)) (attribute-def (name "molarEntropy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarEntropyUnit") (multiplicity none)) (attribute-def (name "ParticleConcentrationValue") (multiplicity none)) (attribute-def (name "particleConcentration") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ParticleConcentrationUnit") (multiplicity none)) (attribute-def (name "molecularConcentration") (multiplicity none)) (attribute-def (name "MassConcentrationValue") (multiplicity none)) (attribute-def (name "massConcentration") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassConcentrationUnit") (multiplicity none)) (attribute-def (name "MassFractionValue") (multiplicity none)) (attribute-def (name "massFraction") (multiplicity none)) (attribute-def (name "AmountOfSubstanceConcentrationValue") (multiplicity none)) (attribute-def (name "amountOfSubstanceConcentration") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AmountOfSubstanceConcentrationUnit") (multiplicity none)) (attribute-def (name "standardAmountOfSubstanceConcentration") (multiplicity none)) (attribute-def (name "AmountOfSubstanceFractionMoleFractionValue") (multiplicity none)) (attribute-def (name "amountOfSubstanceFractionMoleFraction") (multiplicity none)) (attribute-def (name "VolumeFractionValue") (multiplicity none)) (attribute-def (name "volumeFraction") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "VolumeFractionUnit") (multiplicity none)) (attribute-def (name "MolalityValue") (multiplicity none)) (attribute-def (name "molality") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolalityUnit") (multiplicity none)) (attribute-def (name "latentHeatOfPhaseTransition") (multiplicity none)) (alias (name "enthalpyOfPhaseTransition") (target (ref r9)) (body semicolon)) (attribute-def (name "ChemicalPotentialValue") (multiplicity none)) (attribute-def (name "chemicalPotential") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ChemicalPotentialUnit") (multiplicity none)) (attribute-def (name "AbsoluteActivityValue") (multiplicity none)) (attribute-def (name "absoluteActivity") (multiplicity none)) (attribute-def (name "PartialPressureValue") (multiplicity none)) (attribute-def (name "partialPressure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PartialPressureUnit") (multiplicity none)) (attribute-def (name "FugacityValue") (multiplicity none)) (attribute-def (name "fugacity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "FugacityUnit") (multiplicity none)) (attribute-def (name "StandardChemicalPotentialValue") (multiplicity none)) (attribute-def (name "standardChemicalPotential") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "StandardChemicalPotentialUnit") (multiplicity none)) (attribute-def (name "ActivityFactorValue") (multiplicity none)) (attribute-def (name "activityFactor") (multiplicity none)) (attribute-def (name "StandardAbsoluteActivityInMixtureValue") (multiplicity none)) (attribute-def (name "standardAbsoluteActivityInMixture") (multiplicity none)) (attribute-def (name "ActivityOfSoluteValue") (multiplicity none)) (attribute-def (name "activityOfSolute") (multiplicity none)) (alias (name "relativeActivityOfSolute") (target (ref r10)) (body semicolon)) (attribute-def (name "ActivityCoefficientValue") (multiplicity none)) (attribute-def (name "activityCoefficient") (multiplicity none)) (attribute-def (name "StandardAbsoluteActivityInSolutionValue") (multiplicity none)) (attribute-def (name "standardAbsoluteActivityInSolution") (multiplicity none)) (attribute-def (name "ActivityOfSolventValue") (multiplicity none)) (attribute-def (name "activityOfSolvent") (multiplicity none)) (alias (name "relativeActivityOfSolvent") (target (ref r11)) (body semicolon)) (attribute-def (name "OsmoticFactorOfSolventValue") (multiplicity none)) (attribute-def (name "osmoticFactorOfSolvent") (multiplicity none)) (alias (name "osmoticCoefficientOfSolventA") (target (ref r12)) (body semicolon)) (attribute-def (name "StandardAbsoluteActivityOfSolventValue") (multiplicity none)) (attribute-def (name "standardAbsoluteActivityOfSolvent") (multiplicity none)) (attribute-def (name "OsmoticPressureValue") (multiplicity none)) (attribute-def (name "osmoticPressure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "OsmoticPressureUnit") (multiplicity none)) (attribute-def (name "StoichiometricNumberOfSubstanceValue") (multiplicity none)) (attribute-def (name "stoichiometricNumberOfSubstance") (multiplicity none)) (attribute-def (name "AffinityOfAChemicalReactionValue") (multiplicity none)) (attribute-def (name "affinityOfAChemicalReaction") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AffinityOfAChemicalReactionUnit") (multiplicity none)) (attribute-def (name "extentOfReaction") (multiplicity none)) (attribute-def (name "StandardEquilibriumConstantValue") (multiplicity none)) (attribute-def (name "standardEquilibriumConstant") (multiplicity none)) (alias (name "thermodynamicEquilibriumConstant") (target (ref r13)) (body semicolon)) (attribute-def (name "EquilibriumConstantOnPressureBasisValue") (multiplicity none)) (attribute-def (name "equilibriumConstantOnPressureBasis") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EquilibriumConstantOnPressureBasisUnit") (multiplicity none)) (attribute-def (name "EquilibriumConstantOnConcentrationBasisValue") (multiplicity none)) (attribute-def (name "equilibriumConstantOnConcentrationBasis") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EquilibriumConstantOnConcentrationBasisUnit") (multiplicity none)) (attribute-def (name "microcanonicalPartitionFunction") (multiplicity none)) (attribute-def (name "CanonicalPartitionFunctionValue") (multiplicity none)) (attribute-def (name "canonicalPartitionFunction") (multiplicity none)) (attribute-def (name "GrandCanonicalPartitionFunctionValue") (multiplicity none)) (attribute-def (name "grandCanonicalPartitionFunction") (multiplicity none)) (alias (name "grandPartitionFunction") (target (ref r14)) (body semicolon)) (attribute-def (name "MolecularPartitionFunctionValue") (multiplicity none)) (attribute-def (name "molecularPartitionFunction") (multiplicity none)) (alias (name "partitionFunctionOfAMolecule") (target (ref r15)) (body semicolon)) (attribute-def (name "statisticalWeightOfSubsystem") (multiplicity none)) (attribute-def (name "DegeneracyValue") (multiplicity none)) (attribute-def (name "degeneracy") (multiplicity none)) (alias (name "multiplicity") (target (ref r16)) (body semicolon)) (attribute-def (name "MolarGasConstantValue") (multiplicity none)) (attribute-def (name "molarGasConstant") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarGasConstantUnit") (multiplicity none)) (attribute-def (name "meanFreePath") (multiplicity none)) (attribute-def (name "DiffusionCoefficientValue") (multiplicity none)) (attribute-def (name "diffusionCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DiffusionCoefficientUnit") (multiplicity none)) (attribute-def (name "ThermalDiffusionRatioValue") (multiplicity none)) (attribute-def (name "thermalDiffusionRatio") (multiplicity none)) (attribute-def (name "ThermalDiffusionFactorValue") (multiplicity none)) (attribute-def (name "thermalDiffusionFactor") (multiplicity none)) (attribute-def (name "ThermalDiffusionCoefficientValue") (multiplicity none)) (attribute-def (name "thermalDiffusionCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ThermalDiffusionCoefficientUnit") (multiplicity none)) (attribute-def (name "IonicStrengthValue") (multiplicity none)) (attribute-def (name "ionicStrength") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "IonicStrengthUnit") (multiplicity none)) (attribute-def (name "DegreeOfDissociationValue") (multiplicity none)) (attribute-def (name "degreeOfDissociation") (multiplicity none)) (alias (name "dissociationFraction") (target (ref r17)) (body semicolon)) (attribute-def (name "ElectrolyticConductivityValue") (multiplicity none)) (attribute-def (name "electrolyticConductivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectrolyticConductivityUnit") (multiplicity none)) (attribute-def (name "MolarConductivityValue") (multiplicity none)) (attribute-def (name "molarConductivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarConductivityUnit") (multiplicity none)) (attribute-def (name "TransportNumberOfTheIonBValue") (multiplicity none)) (attribute-def (name "transportNumberOfTheIonB") (multiplicity none)) (alias (name "currentFractionOfTheIonB") (target (ref r18)) (body semicolon)) (attribute-def (name "angleOfOpticalRotation") (multiplicity none)) (attribute-def (name "MolarOpticalRotatoryPowerValue") (multiplicity none)) (attribute-def (name "molarOpticalRotatoryPower") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarOpticalRotatoryPowerUnit") (multiplicity none)) (attribute-def (name "SpecificOpticalRotatoryPowerValue") (multiplicity none)) (attribute-def (name "specificOpticalRotatoryPower") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificOpticalRotatoryPowerUnit") (multiplicity none)))))
 )
 ~~~

@@ -212,6 +212,7 @@ fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
     }
 }
 
+#[derive(Clone, Copy)]
 enum MetadataBindingPrefix {
     Subsets,
     Redefines,
@@ -382,7 +383,7 @@ pub(crate) fn attribute_feature_binding(
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (_, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (_, (target_span, target_spelling)) = with_span(name).parse(input)?;
     // The prefixed forms take the same comma-separated multi-target list as every other
     // `:>>`/`:>` clause (`:>> A::x, B::y { ... }`, Quantities and Units `SI.kerml`; spec42
     // Gap 49b); the unprefixed binding keeps its single name-reference.
@@ -392,7 +393,7 @@ pub(crate) fn attribute_feature_binding(
         let (input, target) = qualified_reference(input)?;
         (input, vec![target])
     };
-    if is_reserved_shorthand_starter(&name_str) {
+    if is_reserved_shorthand_starter(&target_spelling) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
@@ -441,7 +442,11 @@ pub(crate) fn attribute_feature_binding(
             AttributeUsage {
                 // A prefix form (`:>> target` / `:> target`) names a semantic target, not a new
                 // declaration. Its spelling lives only in the arena-backed relationship.
-                name: if target_only { String::new() } else { name_str },
+                name: if target_only {
+                    String::new()
+                } else {
+                    target_spelling
+                },
                 short_name: None,
                 typing,
                 subsets,
@@ -451,7 +456,7 @@ pub(crate) fn attribute_feature_binding(
                 intersects: None,
                 value,
                 body,
-                name_span: (!target_only).then_some(name_span),
+                name_span: (!target_only).then_some(target_span),
                 typing_span,
                 redefines_span: None,
                 direction: None,
@@ -499,6 +504,23 @@ fn feature_binding_body(
             return Ok((input, elements));
         }
         let member_start = input;
+        // KerML `FeatureBodyElement -> NonFeatureMember -> AnnotatingElement` reaches the full
+        // MetadataFeature production, including its `metadata` introducer and optional `#`
+        // prefixes. SysML bodies that own the distinct MetadataUsage production keep their own
+        // dispatch precedence in their scope parsers.
+        if let Ok((next, annotation)) =
+            crate::parser::metadata_annotation::metadata_annotation(input)
+        {
+            elements.push(crate::parser::node_from_to(
+                member_start,
+                next,
+                crate::ast::FeatureBodyElement::Annotating(
+                    crate::ast::AnnotatingMember::MetadataAnnotation(annotation),
+                ),
+            ));
+            input = next;
+            continue;
+        }
         if let Ok((next, member)) = crate::parser::body::annotating_member(input) {
             elements.push(crate::parser::node_from_to(
                 member_start,
@@ -795,6 +817,7 @@ pub(crate) fn attribute_def(
                 name: name_str,
                 short_name,
                 typing,
+                multiplicity: mods.multiplicity,
                 value,
                 body,
                 name_span,
@@ -1170,7 +1193,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (_, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (_, (target_span, target_spelling)) = with_span(name).parse(input)?;
     // The prefixed forms take the same comma-separated multi-target list as every other
     // `:>>`/`:>` clause (`:>> A::x, B::y { ... }`, Quantities and Units `SI.kerml`; spec42
     // Gap 49b); the unprefixed binding keeps its single name-reference.
@@ -1180,7 +1203,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
         let (input, target) = qualified_reference(input)?;
         (input, vec![target])
     };
-    if is_reserved_shorthand_starter(&name_str) {
+    if is_reserved_shorthand_starter(&target_spelling) {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
             nom::error::ErrorKind::Tag,
@@ -1225,7 +1248,11 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
             start,
             input,
             AttributeUsage {
-                name: name_str,
+                name: if prefix.is_some() {
+                    String::new()
+                } else {
+                    target_spelling
+                },
                 short_name: None,
                 typing,
                 subsets,
@@ -1235,7 +1262,11 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 intersects: None,
                 value,
                 body: AttributeBody::Semicolon { semicolon_span },
-                name_span: Some(name_span),
+                name_span: if prefix.is_some() {
+                    None
+                } else {
+                    Some(target_span)
+                },
                 typing_span,
                 redefines_span: None,
                 direction: None,
@@ -1511,6 +1542,34 @@ mod attribute_body_tests {
             panic!("expected brace body");
         };
         assert_eq!(elements.len(), 2);
+        assert!(
+            node.value.name.is_empty(),
+            "a redefinition target is not a declared name"
+        );
+        assert!(node.value.name_span.is_none());
+        for element in elements {
+            let AttributeBodyElement::AttributeUsage(binding) = &element.value else {
+                panic!("expected metadata binding");
+            };
+            assert!(binding.value.name.is_empty());
+            assert!(binding.value.name_span.is_none());
+        }
+    }
+
+    #[test]
+    fn metadata_subsetting_binding_has_no_declared_name() {
+        let source = input(":> annotatedElement : SysML::Usage;");
+        let (rest, node) = metadata_binding(source).expect("metadata subsetting binding");
+        assert!(rest.fragment().is_empty());
+        assert!(node.value.name.is_empty());
+        assert!(node.value.name_span.is_none());
+        assert_eq!(
+            node.value
+                .subsets
+                .as_ref()
+                .map(|relationship| target_texts(source, &relationship.value.target)),
+            Some(vec!["annotatedElement".to_string()])
+        );
     }
 
     #[test]

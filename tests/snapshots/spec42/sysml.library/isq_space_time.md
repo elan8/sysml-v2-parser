@@ -1343,7 +1343,7 @@ standard library package ISQSpaceTime {
         attribute :>> mRefs : LengthUnit[3];
         attribute :>> isOrthogonal = true;
     }
-    attribute def universalCartesianSpatial3dCoordinateFrame : CartesianSpatial3dCoordinateFrame {
+    attribute def universalCartesianSpatial3dCoordinateFrame : CartesianSpatial3dCoordinateFrame[1] {
         doc
         /*
          * A singleton CartesianSpatial3dCoordinateFrame that can be used as a default universal Cartesian 3D coordinate frame.
@@ -1566,7 +1566,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : CurvatureUnit[1];
     }
-    attribute def curvature : CurvatureValue nonunique;
+    attribute def curvature : CurvatureValue[*] nonunique;
     attribute def CurvatureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1592,7 +1592,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : AreaUnit[1];
     }
-    attribute def area : AreaValue nonunique;
+    attribute def area : AreaValue[*] nonunique;
     attribute def AreaUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1618,7 +1618,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : VolumeUnit[1];
     }
-    attribute def volume : VolumeValue nonunique;
+    attribute def volume : VolumeValue[*] nonunique;
     attribute def VolumeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1644,7 +1644,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : AngularMeasureUnit[1];
     }
-    attribute def angularMeasure : AngularMeasureValue nonunique;
+    attribute def angularMeasure : AngularMeasureValue[*] nonunique;
     attribute def AngularMeasureUnit :> DimensionOneUnit {
     }
     alias PlaneAngleUnit for AngularMeasureUnit;
@@ -1695,7 +1695,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : SolidAngularMeasureUnit[1];
     }
-    attribute def solidAngularMeasure : SolidAngularMeasureValue nonunique;
+    attribute def solidAngularMeasure : SolidAngularMeasureValue[*] nonunique;
     attribute def SolidAngularMeasureUnit :> DimensionOneUnit {
     }
     alias TimeUnit for DurationUnit;
@@ -1739,7 +1739,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : SpeedUnit[1];
     }
-    attribute def speed : SpeedValue nonunique;
+    attribute def speed : SpeedValue[*] nonunique;
     attribute def SpeedUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1769,7 +1769,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : AccelerationUnit[1];
     }
-    attribute def acceleration : AccelerationValue nonunique;
+    attribute def acceleration : AccelerationValue[*] nonunique;
     attribute def AccelerationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1821,7 +1821,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : AngularVelocityUnit[1];
     }
-    attribute def angularVelocity : AngularVelocityValue nonunique;
+    attribute def angularVelocity : AngularVelocityValue[*] nonunique;
     attribute def AngularVelocityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1869,7 +1869,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : AngularAccelerationUnit[1];
     }
-    attribute def angularAcceleration : AngularAccelerationValue nonunique;
+    attribute def angularAcceleration : AngularAccelerationValue[*] nonunique;
     attribute def AngularAccelerationUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -1960,7 +1960,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : FrequencyUnit[1];
     }
-    attribute def frequency : FrequencyValue nonunique;
+    attribute def frequency : FrequencyValue[*] nonunique;
     attribute def FrequencyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -2000,7 +2000,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : AngularFrequencyUnit[1];
     }
-    attribute def angularFrequency : AngularFrequencyValue nonunique;
+    attribute def angularFrequency : AngularFrequencyValue[*] nonunique;
     attribute def AngularFrequencyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -2040,7 +2040,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : RepetencyUnit[1];
     }
-    attribute def repetency : RepetencyValue nonunique;
+    attribute def repetency : RepetencyValue[*] nonunique;
     attribute def RepetencyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2091,7 +2091,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : AngularRepetencyUnit[1];
     }
-    attribute def angularRepetency : AngularRepetencyValue nonunique;
+    attribute def angularRepetency : AngularRepetencyValue[*] nonunique;
     attribute def AngularRepetencyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2120,7 +2120,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : PhaseVelocityUnit[1];
     }
-    attribute def phaseVelocity : PhaseVelocityValue nonunique;
+    attribute def phaseVelocity : PhaseVelocityValue[*] nonunique;
     attribute def PhaseVelocityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2168,7 +2168,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : DampingCoefficientUnit[1];
     }
-    attribute def dampingCoefficient : DampingCoefficientValue nonunique;
+    attribute def dampingCoefficient : DampingCoefficientValue[*] nonunique;
     attribute def DampingCoefficientUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -2209,7 +2209,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : AttenuationUnit[1];
     }
-    attribute def attenuation : AttenuationValue nonunique;
+    attribute def attenuation : AttenuationValue[*] nonunique;
     attribute def AttenuationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2238,7 +2238,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : PhaseCoefficientUnit[1];
     }
-    attribute def phaseCoefficient : PhaseCoefficientValue nonunique;
+    attribute def phaseCoefficient : PhaseCoefficientValue[*] nonunique;
     attribute def PhaseCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2264,7 +2264,7 @@ standard library package ISQSpaceTime {
         attribute :>> num : Real;
         attribute :>> mRef : PropagationCoefficientUnit[1];
     }
-    attribute def propagationCoefficient : PropagationCoefficientValue nonunique;
+    attribute def propagationCoefficient : PropagationCoefficientValue[*] nonunique;
     attribute def PropagationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2310,6 +2310,6 @@ standard library package ISQSpaceTime {
     (reference r27 (scope relative) (span (offset 52297) (line 1116) (column 31) (len 16)) (segments (segment 0 (token "AttenuationValue") (name "AttenuationValue") (separator none) (span (offset 52297) (line 1116) (column 31) (len 16)))))
     (reference r28 (scope relative) (span (offset 52340) (line 1117) (column 26) (len 11)) (segments (segment 0 (token "attenuation") (name "attenuation") (separator none) (span (offset 52340) (line 1117) (column 26) (len 11)))))
   )
-  (root (library-package (name "ISQSpaceTime") (standard true) (body brace (doc) (import (target (span (span (offset 784) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 823) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 833) (line 16) (column 30) (len 3))) (separator (span (offset 833) (line 16) (column 30) (len 2))) (marker (span (offset 835) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 857) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 878) (line 17) (column 41) (len 3))) (separator (span (offset 878) (line 17) (column 41) (len 2))) (marker (span (offset 880) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 902) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 909) (line 18) (column 27) (len 3))) (separator (span (offset 909) (line 18) (column 27) (len 2))) (marker (span (offset 911) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (attribute-def) (alias (name "breadth") (target (ref r4)) (body semicolon)) (attribute-def) (alias (name "depth") (target (ref r5)) (body semicolon)) (alias (name "altitude") (target (ref r6)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "arcLength") (target (ref r7)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "PlaneAngleUnit") (target (ref r8)) (body semicolon)) (alias (name "PlaneAngleValue") (target (ref r9)) (body semicolon)) (alias (name "planeAngle") (target (ref r10)) (body semicolon)) (attribute-def) (alias (name "angularDisplacement") (target (ref r11)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "TimeUnit") (target (ref r12)) (body semicolon)) (alias (name "TimeValue") (target (ref r13)) (body semicolon)) (alias (name "time") (target (ref r14)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "period") (target (ref r15)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "WavenumberUnit") (target (ref r16)) (body semicolon)) (alias (name "WavenumberValue") (target (ref r17)) (body semicolon)) (alias (name "wavenumber") (target (ref r18)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "AngularWavenumberUnit") (target (ref r19)) (body semicolon)) (alias (name "AngularWavenumberValue") (target (ref r20)) (body semicolon)) (alias (name "angularWavenumber") (target (ref r21)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "PhaseSpeedUnit") (target (ref r22)) (body semicolon)) (alias (name "PhaseSpeedValue") (target (ref r23)) (body semicolon)) (alias (name "phaseSpeed") (target (ref r24)) (body semicolon)) (attribute-def) (alias (name "groupSpeed") (target (ref r25)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "ExtinctionUnit") (target (ref r26)) (body semicolon)) (alias (name "ExtinctionValue") (target (ref r27)) (body semicolon)) (alias (name "extinction") (target (ref r28)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQSpaceTime") (standard true) (body brace (doc) (import (target (span (span (offset 784) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 823) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 833) (line 16) (column 30) (len 3))) (separator (span (offset 833) (line 16) (column 30) (len 2))) (marker (span (offset 835) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 857) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 878) (line 17) (column 41) (len 3))) (separator (span (offset 878) (line 17) (column 41) (len 2))) (marker (span (offset 880) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 902) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 909) (line 18) (column 27) (len 3))) (separator (span (offset 909) (line 18) (column 27) (len 2))) (marker (span (offset 911) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (attribute-def (name "width") (multiplicity none)) (alias (name "breadth") (target (ref r4)) (body semicolon)) (attribute-def (name "height") (multiplicity none)) (alias (name "depth") (target (ref r5)) (body semicolon)) (alias (name "altitude") (target (ref r6)) (body semicolon)) (attribute-def (name "thickness") (multiplicity none)) (attribute-def (name "diameter") (multiplicity none)) (attribute-def (name "radius") (multiplicity none)) (attribute-def (name "pathLength") (multiplicity none)) (alias (name "arcLength") (target (ref r7)) (body semicolon)) (attribute-def (name "distance") (multiplicity none)) (attribute-def (name "radialDistance") (multiplicity none)) (attribute-def (name "Spatial3dCoordinateFrame") (multiplicity none)) (attribute-def (name "CartesianSpatial3dCoordinateFrame") (multiplicity none)) (attribute-def (name "universalCartesianSpatial3dCoordinateFrame") (multiplicity (lower (expression (span (offset 7671) (line 188) (column 94) (len 1)) (integer 1))) (upper (expression (span (offset 7671) (line 188) (column 94) (len 1)) (integer 1))))) (attribute-def (name "CylindricalSpatial3dCoordinateFrame") (multiplicity none)) (attribute-def (name "SphericalSpatial3dCoordinateFrame") (multiplicity none)) (attribute-def (name "PlanetarySpatial3dCoordinateFrame") (multiplicity none)) (attribute-def (name "Position3dVector") (multiplicity none)) (attribute-def (name "position3dVector") (multiplicity none)) (attribute-def (name "CartesianPosition3dVector") (multiplicity none)) (attribute-def (name "cartesianPosition3dVector") (multiplicity none)) (attribute-def (name "CylindricalPosition3dVector") (multiplicity none)) (attribute-def (name "cylindricalPosition3dVector") (multiplicity none)) (attribute-def (name "SphericalPosition3dVector") (multiplicity none)) (attribute-def (name "sphericalPosition3dVector") (multiplicity none)) (attribute-def (name "PlanetaryPosition3dVector") (multiplicity none)) (attribute-def (name "planetaryPosition3dVector") (multiplicity none)) (attribute-def (name "Displacement3dVector") (multiplicity none)) (attribute-def (name "displacement3dVector") (multiplicity none)) (attribute-def (name "CartesianDisplacement3dVector") (multiplicity none)) (attribute-def (name "cartesianDisplacement3dVector") (multiplicity none)) (attribute-def (name "CylindricalDisplacement3dVector") (multiplicity none)) (attribute-def (name "cylindricalDisplacement3dVector") (multiplicity none)) (attribute-def (name "SphericalDisplacement3dVector") (multiplicity none)) (attribute-def (name "sphericalDisplacement3dVector") (multiplicity none)) (attribute-def (name "radiusOfCurvature") (multiplicity none)) (attribute-def (name "CurvatureValue") (multiplicity none)) (attribute-def (name "curvature") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CurvatureUnit") (multiplicity none)) (attribute-def (name "AreaValue") (multiplicity none)) (attribute-def (name "area") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AreaUnit") (multiplicity none)) (attribute-def (name "VolumeValue") (multiplicity none)) (attribute-def (name "volume") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "VolumeUnit") (multiplicity none)) (attribute-def (name "AngularMeasureValue") (multiplicity none)) (attribute-def (name "angularMeasure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AngularMeasureUnit") (multiplicity none)) (alias (name "PlaneAngleUnit") (target (ref r8)) (body semicolon)) (alias (name "PlaneAngleValue") (target (ref r9)) (body semicolon)) (alias (name "planeAngle") (target (ref r10)) (body semicolon)) (attribute-def (name "rotationalDisplacement") (multiplicity none)) (alias (name "angularDisplacement") (target (ref r11)) (body semicolon)) (attribute-def (name "phaseAngle") (multiplicity none)) (attribute-def (name "SolidAngularMeasureValue") (multiplicity none)) (attribute-def (name "solidAngularMeasure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SolidAngularMeasureUnit") (multiplicity none)) (alias (name "TimeUnit") (target (ref r12)) (body semicolon)) (alias (name "TimeValue") (target (ref r13)) (body semicolon)) (alias (name "time") (target (ref r14)) (body semicolon)) (attribute-def (name "CartesianVelocity3dVector") (multiplicity none)) (attribute-def (name "cartesianVelocity3dVector") (multiplicity none)) (attribute-def (name "CartesianVelocity3dCoordinateFrame") (multiplicity none)) (attribute-def (name "SpeedValue") (multiplicity none)) (attribute-def (name "speed") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpeedUnit") (multiplicity none)) (attribute-def (name "AccelerationValue") (multiplicity none)) (attribute-def (name "acceleration") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AccelerationUnit") (multiplicity none)) (attribute-def (name "CartesianAcceleration3dVector") (multiplicity none)) (attribute-def (name "cartesianAcceleration3dVector") (multiplicity none)) (attribute-def (name "CartesianAcceleration3dCoordinateFrame") (multiplicity none)) (attribute-def (name "AngularVelocityValue") (multiplicity none)) (attribute-def (name "angularVelocity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AngularVelocityUnit") (multiplicity none)) (attribute-def (name "CartesianAngularVelocity3dVector") (multiplicity none)) (attribute-def (name "cartesianAngularVelocity3dVector") (multiplicity none)) (attribute-def (name "CartesianAngularVelocity3dCoordinateFrame") (multiplicity none)) (attribute-def (name "AngularAccelerationValue") (multiplicity none)) (attribute-def (name "angularAcceleration") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AngularAccelerationUnit") (multiplicity none)) (attribute-def (name "CartesianAngularAcceleration3dVector") (multiplicity none)) (attribute-def (name "cartesianAngularAcceleration3dVector") (multiplicity none)) (attribute-def (name "CartesianAngularAcceleration3dCoordinateFrame") (multiplicity none)) (attribute-def (name "periodDuration") (multiplicity none)) (alias (name "period") (target (ref r15)) (body semicolon)) (attribute-def (name "timeConstant") (multiplicity none)) (attribute-def (name "rotation") (multiplicity none)) (attribute-def (name "FrequencyValue") (multiplicity none)) (attribute-def (name "frequency") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "FrequencyUnit") (multiplicity none)) (attribute-def (name "rotationalFrequency") (multiplicity none)) (attribute-def (name "AngularFrequencyValue") (multiplicity none)) (attribute-def (name "angularFrequency") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AngularFrequencyUnit") (multiplicity none)) (attribute-def (name "wavelength") (multiplicity none)) (attribute-def (name "RepetencyValue") (multiplicity none)) (attribute-def (name "repetency") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RepetencyUnit") (multiplicity none)) (alias (name "WavenumberUnit") (target (ref r16)) (body semicolon)) (alias (name "WavenumberValue") (target (ref r17)) (body semicolon)) (alias (name "wavenumber") (target (ref r18)) (body semicolon)) (attribute-def (name "CartesianWave3dVector") (multiplicity none)) (attribute-def (name "cartesianWave3dVector") (multiplicity none)) (attribute-def (name "CartesianWaveVector3dCoordinateFrame") (multiplicity none)) (attribute-def (name "AngularRepetencyValue") (multiplicity none)) (attribute-def (name "angularRepetency") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AngularRepetencyUnit") (multiplicity none)) (alias (name "AngularWavenumberUnit") (target (ref r19)) (body semicolon)) (alias (name "AngularWavenumberValue") (target (ref r20)) (body semicolon)) (alias (name "angularWavenumber") (target (ref r21)) (body semicolon)) (attribute-def (name "PhaseVelocityValue") (multiplicity none)) (attribute-def (name "phaseVelocity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhaseVelocityUnit") (multiplicity none)) (alias (name "PhaseSpeedUnit") (target (ref r22)) (body semicolon)) (alias (name "PhaseSpeedValue") (target (ref r23)) (body semicolon)) (alias (name "phaseSpeed") (target (ref r24)) (body semicolon)) (attribute-def (name "groupVelocity") (multiplicity none)) (alias (name "groupSpeed") (target (ref r25)) (body semicolon)) (attribute-def (name "DampingCoefficientValue") (multiplicity none)) (attribute-def (name "dampingCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DampingCoefficientUnit") (multiplicity none)) (attribute-def (name "LogarithmicDecrementValue") (multiplicity none)) (attribute-def (name "logarithmicDecrement") (multiplicity none)) (attribute-def (name "AttenuationValue") (multiplicity none)) (attribute-def (name "attenuation") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AttenuationUnit") (multiplicity none)) (alias (name "ExtinctionUnit") (target (ref r26)) (body semicolon)) (alias (name "ExtinctionValue") (target (ref r27)) (body semicolon)) (alias (name "extinction") (target (ref r28)) (body semicolon)) (attribute-def (name "PhaseCoefficientValue") (multiplicity none)) (attribute-def (name "phaseCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PhaseCoefficientUnit") (multiplicity none)) (attribute-def (name "PropagationCoefficientValue") (multiplicity none)) (attribute-def (name "propagationCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PropagationCoefficientUnit") (multiplicity none)))))
 )
 ~~~

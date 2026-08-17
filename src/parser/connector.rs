@@ -129,6 +129,7 @@ pub(crate) fn end_decl(
         )),
     ))
     .parse(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, identity) = if allow_derivation_role && input.fragment().starts_with(b"#") {
         let (input, role) = derivation_end_role(input)?;
@@ -165,6 +166,7 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
+                    short_name,
                     identity,
                     typing: None,
                     references: Some(references),
@@ -193,6 +195,7 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
+                    short_name,
                     identity,
                     typing: None,
                     references: None,
@@ -213,6 +216,7 @@ pub(crate) fn end_decl(
                 start,
                 input,
                 EndDecl {
+                    short_name,
                     identity,
                     typing: None,
                     references: None,
@@ -239,6 +243,7 @@ pub(crate) fn end_decl(
                     start,
                     rest,
                     EndDecl {
+                        short_name,
                         identity,
                         typing: None,
                         references: None,
@@ -289,6 +294,7 @@ pub(crate) fn end_decl(
             start,
             input,
             EndDecl {
+                short_name,
                 identity,
                 typing,
                 references: trailing_references,
@@ -360,6 +366,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         )),
     ))
     .parse(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     // `ref :>> name ...` (redefinition) may omit the name before `:>>`. A relationship keyword
     // is never the declared name: `ref redefines Item::x, subobjects::x;` (Kernel Systems
     // Library `Items.kerml`; spec42 Gap 49d) authors the keyword spelling of `:>>` with no name,
@@ -455,6 +462,7 @@ pub(crate) fn ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             start,
             input,
             RefDecl {
+                short_name,
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,
                 is_constant: prefix.is_constant,

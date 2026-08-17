@@ -424,7 +424,12 @@ fn constraint_body_metadata_annotation_parsed() {
     };
     assert!(root.qualified_reference(meta.type_reference).is_some());
     assert!(meta.type_span.len > 0);
-    assert_eq!(meta.at_span.len, 1, "the `@` sigil is one token");
+    match &meta.introducer {
+        MetadataFeatureIntroducer::At { span } => {
+            assert_eq!(span.len, 1, "the `@` sigil is one token");
+        }
+        MetadataFeatureIntroducer::Metadata { .. } => panic!("expected the `@` alternative"),
+    }
 }
 
 #[test]
@@ -637,12 +642,15 @@ fn metadata_def_shorthand_annotated_element() {
     let attr = elements
         .iter()
         .find_map(|e| match &e.value {
-            AttributeBodyElement::AttributeUsage(a) if a.value.name == "annotatedElement" => {
-                Some(&a.value)
-            }
+            AttributeBodyElement::AttributeUsage(a) if a.value.subsets.is_some() => Some(&a.value),
             _ => None,
         })
         .expect("annotatedElement shorthand binding");
+    assert!(
+        attr.name.is_empty(),
+        "the target is not an authored declaration name"
+    );
+    assert!(attr.name_span.is_none());
     assert_eq!(attr.subsets.as_ref().map(|n| n.value.target.len()), Some(1));
     assert_eq!(attr.typing.as_ref().map(|n| n.value.target.len()), Some(1));
 }

@@ -287,6 +287,7 @@ pub struct AttributeDef {
     /// enclosing [`crate::ast::ParsedDocument`] (PAR-004 item 1). `typing_span` duplicates the
     /// node's own `span` for existing consumers that read the span without the node.
     pub typing: Option<Node<TypingRelationship>>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Default or binding after `=` / `:=` / `default =` before the body terminator.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
@@ -317,6 +318,7 @@ impl PartialEq for AttributeDef {
         self.name == other.name
             && self.short_name == other.short_name
             && self.typing == other.typing
+            && self.multiplicity == other.multiplicity
             && self.value == other.value
             && self.body == other.body
             && self.ordered == other.ordered
@@ -473,6 +475,7 @@ pub struct PartUsage {
     /// Multiplicity, e.g. `[2]` parsed into structured lower/upper bounds.
     pub multiplicity: Option<Node<Multiplicity>>,
     pub ordered: bool,
+    pub nonunique: bool,
     /// Optional `subsets` feature and value expression.
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
     /// Redefines target, e.g. `frontAxleAssembly` or `vehicle1::mass`.
@@ -504,6 +507,7 @@ impl PartialEq for PartUsage {
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
             && self.ordered == other.ordered
+            && self.nonunique == other.nonunique
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.value == other.value
@@ -537,8 +541,10 @@ pub type PartUsageBody = Body<PartUsageBodyElement>;
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataAnnotation {
-    /// The `@` sigil. Syntax and provenance: never part of the declared name or the type.
-    pub at_span: Span,
+    /// Prefix metadata applied to this metadata feature, in authored order.
+    pub prefixes: Vec<Node<MetadataKeywordUsage>>,
+    /// Authored `MetadataFeature` introducer. KerML and SysML both allow `@` or `metadata`.
+    pub introducer: MetadataFeatureIntroducer,
     /// `MetadataFeatureDeclaration`'s optional `Identification ( ':' | 'typed' 'by' )` prefix,
     /// present exactly when a separator keyword was authored.
     pub declared_name: Option<Node<MetadataDeclaredName>>,
@@ -554,11 +560,21 @@ pub struct MetadataAnnotation {
 
 impl PartialEq for MetadataAnnotation {
     fn eq(&self, other: &Self) -> bool {
-        self.declared_name == other.declared_name
+        self.prefixes == other.prefixes
+            && self.introducer == other.introducer
+            && self.declared_name == other.declared_name
             && self.type_reference == other.type_reference
             && self.about_targets == other.about_targets
             && self.body == other.body
     }
+}
+
+/// The mutually exclusive introducers of `MetadataFeature`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum MetadataFeatureIntroducer {
+    At { span: Span },
+    Metadata { span: Span },
 }
 
 /// `MetadataFeatureDeclaration`'s `Identification ( ':' | 'typed' 'by' )` prefix.
@@ -1209,6 +1225,8 @@ pub struct ConnectStmt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InterfaceDef {
+    pub definition_prefix: Option<DefinitionPrefix>,
+    pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: InterfaceDefBody,
@@ -1267,6 +1285,7 @@ pub enum EndNestedUsage {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EndDecl {
+    pub short_name: Option<String>,
     /// A normal declared name or a fixed derivation-end role. `#original`/`#derive` are grammar
     /// roles, not declaration labels.
     pub identity: EndIdentity,
@@ -1327,7 +1346,8 @@ pub enum DerivationEndRole {
 
 impl PartialEq for EndDecl {
     fn eq(&self, other: &Self) -> bool {
-        self.identity == other.identity
+        self.short_name == other.short_name
+            && self.identity == other.identity
             && self.typing == other.typing
             && self.references == other.references
             && self.multiplicity == other.multiplicity
@@ -1359,6 +1379,7 @@ pub struct RefDecl {
     /// authored keyword.
     pub kind_keyword: Option<RefDeclKind>,
     pub name: String,
+    pub short_name: Option<String>,
     /// Structured typing clause mirroring `PartUsage.typing`/`AttributeUsage.typing`: every
     /// comma-separated target from a `:` clause, not just the first (S42-004).
     pub typing: Option<Node<TypingRelationship>>,
@@ -1395,6 +1416,7 @@ pub struct RefDecl {
 impl PartialEq for RefDecl {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
+            && self.short_name == other.short_name
             && self.direction == other.direction
             && self.is_derived == other.is_derived
             && self.usage_prefix == other.usage_prefix
@@ -1483,6 +1505,7 @@ pub type RefBody = Body<PartUsageBodyElement>;
 /// silently discarded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::large_enum_variant)]
 pub enum RelationshipBodyElement {
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
@@ -1507,6 +1530,7 @@ pub enum DerivationConnectionRole {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionDef {
+    pub definition_prefix: Option<DefinitionPrefix>,
     /// `individual connection def ...` (BNF `OccurrenceUsagePrefix`/definition-prefix
     /// `isIndividual`, GH-90.1), mirroring `ActionDef::is_individual`.
     pub is_individual: bool,
@@ -1627,13 +1651,16 @@ pub enum EnumerationBodyElement {
     Error(Node<ParseErrorNode>),
 }
 
-/// One enumerated value inside an `enum def { ... }` body: optional `enum` keyword + name, with
-/// an optional inline body or `= expr` initializer that the parser discards (BNF
-/// EnumeratedValue). Only the name and its span are retained.
+/// One enumerated value inside an `enum def { ... }` body. `EnumeratedValue` is a full SysML
+/// `Usage`, so its identification, optional value part and usage body are all retained.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnumeratedValue {
     pub name: String,
+    pub short_name: Option<String>,
+    pub value: Option<Node<FeatureValue>>,
+    pub body: PartUsageBody,
+    pub name_span: Option<Span>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1683,6 +1710,7 @@ pub struct OccurrenceUsage {
     pub portion_kind: Option<OccurrencePortionKind>,
     /// Declaration label for ordinary occurrence usages.
     pub name: String,
+    pub short_name: Option<String>,
     /// Existing occurrence referenced by the shorthand `event path` form.
     pub occurrence_reference: Option<QualifiedReferenceId>,
     pub type_name: Option<QualifiedReferenceId>,

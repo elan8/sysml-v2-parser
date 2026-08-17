@@ -190,6 +190,7 @@ fn action_ref_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast
             start,
             input,
             crate::ast::RefDecl {
+                short_name: None,
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,
                 is_constant: prefix.is_constant,
@@ -1442,6 +1443,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let (input, is_individual) =
         nom::combinator::opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"action"[..]).parse(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     // SysML allows anonymous action usages: `action: Runner;` (Identification may be empty).
     let (after_gap, _) = ws_and_comments(input)?;
     // `action def …` is a definition, not a usage named `def`.
@@ -1573,6 +1575,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 is_reference: is_reference.is_some(),
                 is_individual: is_individual.is_some(),
                 name: name_str,
+                short_name,
                 type_name,
                 typing,
                 multiplicity,

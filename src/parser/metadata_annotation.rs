@@ -2,7 +2,7 @@
 
 use crate::ast::{
     DefinitionPrefix, ExtendedDefinition, MetadataAnnotation, MetadataDeclaredName,
-    MetadataKeywordUsage, MetadataTypedBy, Node,
+    MetadataFeatureIntroducer, MetadataKeywordUsage, MetadataTypedBy, Node,
 };
 use crate::parser::attribute::metadata_body;
 use crate::parser::lex::{
@@ -37,10 +37,11 @@ pub(crate) fn parse_about_targets(
     .parse(input)
 }
 
-/// `MetadataFeature`'s `@` spelling (KerML 8.2.5.12, SysML 8.2.2.27):
+/// `MetadataFeature` (KerML 8.2.5.12, SysML 8.2.2.27):
 ///
 /// ```text
-/// '@' MetadataFeatureDeclaration ( 'about' Annotation ( ',' Annotation )* )? MetadataBody
+/// PrefixMetadataMember* ( '@' | 'metadata' ) MetadataFeatureDeclaration
+///     ( 'about' Annotation ( ',' Annotation )* )? MetadataBody
 /// MetadataFeatureDeclaration = ( Identification ( ':' | 'typed' 'by' ) )? OwnedFeatureTyping
 /// ```
 pub(crate) fn metadata_annotation(
@@ -93,9 +94,32 @@ fn metadata_declared_name(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataD
 
 fn metadata_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MetadataAnnotation>> {
     let start = input;
-    let (at_start, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"@"[..]).parse(at_start)?;
-    let at_span = crate::parser::span::span_from_to(at_start, input);
+    let (input, prefixes) =
+        nom::multi::many0(preceded(ws_and_comments, extended_definition_prefix_tag))
+            .parse(input)?;
+    let (introducer_start, _) = ws_and_comments(input)?;
+    let (input, introducer) = if introducer_start.fragment().starts_with(b"@") {
+        let (input, _) = tag(&b"@"[..]).parse(introducer_start)?;
+        (
+            input,
+            MetadataFeatureIntroducer::At {
+                span: crate::parser::span::span_from_to(introducer_start, input),
+            },
+        )
+    } else if starts_with_keyword(introducer_start.fragment(), b"metadata") {
+        let (input, _) = tag(&b"metadata"[..]).parse(introducer_start)?;
+        (
+            input,
+            MetadataFeatureIntroducer::Metadata {
+                span: crate::parser::span::span_from_to(introducer_start, input),
+            },
+        )
+    } else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            introducer_start,
+            nom::error::ErrorKind::Tag,
+        )));
+    };
     let (input, declared_name) = opt(metadata_declared_name).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (type_span, type_reference)) = with_span(qualified_reference).parse(input)?;
@@ -107,7 +131,8 @@ fn metadata_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
             start,
             input,
             MetadataAnnotation {
-                at_span,
+                prefixes,
+                introducer,
                 declared_name,
                 type_reference,
                 type_span,
@@ -387,6 +412,30 @@ mod tests {
             .about_targets
             .iter()
             .all(|target| arena.get(&source, *target).is_some()));
+    }
+
+    #[test]
+    fn metadata_keyword_and_prefixes_are_one_metadata_feature() {
+        let source_text = "#Security #Classified metadata Profile::Classified { }";
+        let context = ParseContext::new();
+        let input = context.input(source_text.as_bytes());
+        let (rest, annotation) = metadata_annotation(input).expect("keyword metadata feature");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert_eq!(annotation.value.prefixes.len(), 2);
+        assert!(matches!(
+            annotation.value.introducer,
+            MetadataFeatureIntroducer::Metadata { .. }
+        ));
+        let arena = context.finish();
+        let source = SourceStorage::new(source_text.to_owned());
+        assert_eq!(
+            arena
+                .get(&source, annotation.value.type_reference)
+                .expect("metadata type")
+                .segment_decoded_text(1)
+                .as_deref(),
+            Some("Classified")
+        );
     }
 
     /// With a separator the head is a declaration label, not a reference: it must not reach the

@@ -80,6 +80,8 @@ pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Cons
     let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (input, _) = ws_and_comments(input)?;
     // Anonymous body-only form: `constraint { stateSpace.order == order }` (Domain Libraries
     // `StateSpaceRepresentation.sysml`; spec42 Gap 49a).
     let (input, name_str) = {
@@ -98,8 +100,10 @@ pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Cons
             start,
             input,
             ConstraintUsage {
+                short_name,
                 name: name_str,
                 type_name: header.type_reference,
+                multiplicity: header.multiplicity,
                 subsets: header.subsets,
                 redefines: header.redefines,
                 body,
@@ -269,6 +273,11 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
         preceded(ws_and_comments, qualified_reference),
     ))
     .parse(input)?;
+    let (input, multiplicity) = opt(preceded(
+        ws_and_comments,
+        crate::parser::usage::multiplicity_node,
+    ))
+    .parse(input)?;
     // `:>>` redefines may also follow the type instead of preceding the identification, e.g.
     // `calc self: Calculation :>> Action::self, Evaluation::self;` (Systems Library
     // `Calculations.sysml`) -- only retry if the earlier attempt (right after `calc`) didn't
@@ -301,6 +310,7 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
                 identification,
                 is_abstract: prefix.usage_prefix == Some(crate::ast::DefinitionPrefix::Abstract),
                 type_name,
+                multiplicity,
                 subsets,
                 redefines,
                 value,
@@ -1292,7 +1302,18 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     let after_visibility = crate::parser::lex::visibility_prefix(input)
         .map(|(rest, _)| *rest.fragment())
         .unwrap_or_else(|_| *input.fragment());
-    let (input, elem) = if starts_with_keyword(input.fragment(), b"doc")
+    let prefixed_metadata_feature = (input.fragment().starts_with(b"#")
+        || starts_with_keyword(input.fragment(), b"metadata"))
+    .then(|| crate::parser::metadata_annotation::metadata_annotation(input))
+    .and_then(Result::ok);
+    let (input, elem) = if let Some((next, annotation)) = prefixed_metadata_feature {
+        (
+            next,
+            CalcDefBodyElement::Annotating(crate::ast::AnnotatingMember::MetadataAnnotation(
+                annotation,
+            )),
+        )
+    } else if starts_with_keyword(input.fragment(), b"doc")
         || starts_with_keyword(input.fragment(), b"comment")
         || starts_with_keyword(input.fragment(), b"rep")
         || starts_with_keyword(input.fragment(), b"language")
@@ -1638,6 +1659,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
         }),
     )))
     .parse(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
     // Anonymous typed form: `return : Type [= expr];`
     let (input, n) = if input.fragment().starts_with(b":") && !input.fragment().starts_with(b":>") {
@@ -1700,6 +1722,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
             start,
             input,
             ReturnDecl {
+                short_name,
                 kind_keyword,
                 name: n,
                 type_name,

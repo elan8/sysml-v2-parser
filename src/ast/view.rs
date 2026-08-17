@@ -31,7 +31,9 @@ pub struct ConstraintDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConstraintUsage {
     pub name: String,
+    pub short_name: Option<String>,
     pub type_name: Option<QualifiedReferenceId>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// Usage-level `:>` subsetting, e.g. `constraint c :> Base;`. Mirrors
     /// `ConnectionUsageMember::subsets`.
     pub subsets: Option<Node<SubsettingRelationship>>,
@@ -104,6 +106,7 @@ pub struct CalcUsage {
     /// this field existed, so emission dropped it.
     pub is_abstract: bool,
     pub type_name: Option<QualifiedReferenceId>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     /// `:>` subsets clause, which may name several comma-separated targets. Also previously
     /// parsed and discarded, with a comment claiming `CalcUsage` "doesn't model subsetting
     /// separately from redefines" -- it does now, because they are different relationships.
@@ -129,6 +132,7 @@ pub type CalcDefBody = Body<CalcDefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::large_enum_variant)]
 pub enum CalcDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
@@ -205,6 +209,7 @@ pub struct ReturnDecl {
     pub kind_keyword: Option<ReturnKindKeyword>,
     /// Empty for anonymous `return : Type [= expr];` (validation `10c`, `10d`).
     pub name: String,
+    pub short_name: Option<String>,
     /// `None` for the untyped named forms `return result [1..1];` / `return sampling = ...;`
     /// (Domain Libraries `SampledFunctions.sysml`).
     pub type_name: Option<QualifiedReferenceId>,
@@ -330,6 +335,7 @@ pub type RenderingUsageBody = Body<RenderingUsageBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::large_enum_variant)]
 pub enum RenderingUsageBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
@@ -400,6 +406,7 @@ pub enum RenderingDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewUsage {
     pub name: String,
+    pub short_name: Option<String>,
     pub type_name: Option<QualifiedReferenceId>,
     /// Subsets target, e.g. `baseView` in `view v :> baseView { ... }`.
     pub subsets: Option<Node<SubsettingRelationship>>,

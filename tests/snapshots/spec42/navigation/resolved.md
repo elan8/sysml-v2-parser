@@ -28,6 +28,6 @@ package P {
   (references
     (reference r0 (scope relative) (span (offset 51) (line 3) (column 19) (len 6)) (segments (segment 0 (token "Engine") (name "Engine") (separator none) (span (offset 51) (line 3) (column 19) (len 6)))))
   )
-  (root (package (name "P") (body brace (part-def (name "Engine") (body semicolon)) (part-usage (declaration-name "engine") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body semicolon)))))
+  (root (package (name "P") (body brace (part-def (name "Engine") (body semicolon)) (part-usage (declaration-name "engine") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity-modifiers (ordered false) (nonunique false)) (body semicolon)))))
 )
 ~~~

@@ -109,8 +109,8 @@ standard library package CauseAndEffect {
 		 * CauseMetadata identifies a usage as being a cause occurrence.
 		 * It is intended to be used to tag the cause ends of a Multicausation.
 		 */
-        attribute annotatedElement : SysML::Usage :>> annotatedElement;
-        attribute baseType :>> baseType = causes as SysML::Usage;
+        attribute :>> annotatedElement : SysML::Usage;
+        attribute :>> baseType = causes as SysML::Usage;
     }
     metadata def <effect> EffectMetadata :> SemanticMetadata {
         doc
@@ -118,8 +118,8 @@ standard library package CauseAndEffect {
 		 * EffectMetadata identifies a usage as being an effect occurrence.
 		 * It is intended to be used to tag the effect ends of a Multicausation.
 		 */
-        attribute annotatedElement : SysML::Usage :>> annotatedElement;
-        attribute baseType :>> baseType = effects as SysML::Usage;
+        attribute :>> annotatedElement : SysML::Usage;
+        attribute :>> baseType = effects as SysML::Usage;
     }
     metadata def CausationMetadata {
         doc
@@ -127,8 +127,8 @@ standard library package CauseAndEffect {
 		 * CausationMetadata allows for the specification of additional metadata about
 		 * a cause-effect connection definition or usage.
 		 */
-        attribute annotatedElement : SysML::ConnectionDefinition :> annotatedElement;
-        attribute annotatedElement : SysML::ConnectionUsage :> annotatedElement;
+        attribute :> annotatedElement : SysML::ConnectionDefinition;
+        attribute :> annotatedElement : SysML::ConnectionUsage;
         attribute isNecessary : Boolean default false {
             doc
             /* 
@@ -156,14 +156,14 @@ standard library package CauseAndEffect {
         /*
 		 * MulticausationMetadata is SemanticMetadata for a Multicausation connection.
 		 */
-        attribute baseType :>> baseType = multicausations meta SysML::Usage;
+        attribute :>> baseType = multicausations meta SysML::Usage;
     }
     metadata def <causation> CausationSemanticMetadadata :> CausationMetadata, SemanticMetadata {
         doc
         /*
 		 * CausationMetadata is SemanticMetadata for a Causation connection.
 		 */
-        attribute baseType :>> baseType = causations meta SysML::Usage;
+        attribute :>> baseType = causations meta SysML::Usage;
     }
 }
 ~~~

@@ -24,7 +24,7 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
         input,
         DefinitionPrefixOptions::new(b"allocation")
             .def_required()
-            .no_abstract()
+            .individual_allowed()
             .with_captured_visibility(),
     )?;
     let (input, body) = semicolon_or_structured_definition_body(input)?;
@@ -34,6 +34,10 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
             start,
             input,
             AllocationDef {
+                definition_prefix: prefix
+                    .is_abstract
+                    .then_some(crate::ast::DefinitionPrefix::Abstract),
+                is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,

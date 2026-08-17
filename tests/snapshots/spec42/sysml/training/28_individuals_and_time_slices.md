@@ -68,6 +68,6 @@ package 'Individuals and Time Slices' {
   (references
     (reference r0 (scope relative) (span (offset 56) (line 2) (column 17) (len 35)) (segments (segment 0 (token "'Individuals and Snapshots Example'") (name "Individuals and Snapshots Example") (separator none) (span (offset 56) (line 2) (column 17) (len 35)))))
   )
-  (root (package (name "Individuals and Time Slices") (body brace (import (target (span (span (offset 56) (line 2) (column 17) (len 38))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 91) (line 2) (column 52) (len 3))) (separator (span (offset 91) (line 2) (column 52) (len 2))) (marker (span (offset 93) (line 2) (column 54) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (item-def) (item-def) (occurrence (portion none) (declaration "") (target none)))))
+  (root (package (name "Individuals and Time Slices") (body brace (import (target (span (span (offset 56) (line 2) (column 17) (len 38))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 91) (line 2) (column 52) (len 3))) (separator (span (offset 91) (line 2) (column 52) (len 2))) (marker (span (offset 93) (line 2) (column 54) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (item-def) (item-def) (occurrence (portion none) (declaration "") (short-name none) (target none)))))
 )
 ~~~

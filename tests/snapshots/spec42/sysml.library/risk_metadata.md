@@ -136,9 +136,9 @@ standard library package RiskMetadata {
         /*
 		 * LevelEnum provides standard probability Levels for low, medium and high risks.
 		 */
-        low;
-        medium;
-        high;
+        low = 0.25;
+        medium = 0.50;
+        high = 0.75;
     }
     attribute def RiskLevel {
         doc
@@ -166,9 +166,9 @@ standard library package RiskMetadata {
 		 * RiskLevelEnum enumerates standard RiskLevels for low, medium and high risks
 		 * (without including impact).
 		 */
-        low;
-        medium;
-        high;
+        low = new RiskLevel(probability = LevelEnum::low);
+        medium = new RiskLevel(probability = LevelEnum::medium);
+        high = new RiskLevel(probability = LevelEnum::high);
     }
     metadata def Risk {
         doc
@@ -208,7 +208,16 @@ standard library package RiskMetadata {
 (parsed-document
   (references
     (reference r0 (scope relative) (span (offset 161) (line 7) (column 17) (len 18)) (segments (segment 0 (token "ScalarValues") (name "ScalarValues") (separator none) (span (offset 161) (line 7) (column 17) (len 12))) (segment 1 (token "Real") (name "Real") (separator colon-colon) (span (offset 175) (line 7) (column 31) (len 4)))))
+    (reference r1 (scope relative) (span (offset 1168) (line 59) (column 13) (len 9)) (segments (segment 0 (token "RiskLevel") (name "RiskLevel") (separator none) (span (offset 1168) (line 59) (column 13) (len 9)))))
+    (reference r2 (scope relative) (span (offset 1178) (line 59) (column 23) (len 11)) (segments (segment 0 (token "probability") (name "probability") (separator none) (span (offset 1178) (line 59) (column 23) (len 11)))))
+    (reference r3 (scope relative) (span (offset 1192) (line 59) (column 37) (len 14)) (segments (segment 0 (token "LevelEnum") (name "LevelEnum") (separator none) (span (offset 1192) (line 59) (column 37) (len 9))) (segment 1 (token "low") (name "low") (separator colon-colon) (span (offset 1203) (line 59) (column 48) (len 3)))))
+    (reference r4 (scope relative) (span (offset 1224) (line 60) (column 16) (len 9)) (segments (segment 0 (token "RiskLevel") (name "RiskLevel") (separator none) (span (offset 1224) (line 60) (column 16) (len 9)))))
+    (reference r5 (scope relative) (span (offset 1234) (line 60) (column 26) (len 11)) (segments (segment 0 (token "probability") (name "probability") (separator none) (span (offset 1234) (line 60) (column 26) (len 11)))))
+    (reference r6 (scope relative) (span (offset 1248) (line 60) (column 40) (len 17)) (segments (segment 0 (token "LevelEnum") (name "LevelEnum") (separator none) (span (offset 1248) (line 60) (column 40) (len 9))) (segment 1 (token "medium") (name "medium") (separator colon-colon) (span (offset 1259) (line 60) (column 51) (len 6)))))
+    (reference r7 (scope relative) (span (offset 1281) (line 61) (column 14) (len 9)) (segments (segment 0 (token "RiskLevel") (name "RiskLevel") (separator none) (span (offset 1281) (line 61) (column 14) (len 9)))))
+    (reference r8 (scope relative) (span (offset 1291) (line 61) (column 24) (len 11)) (segments (segment 0 (token "probability") (name "probability") (separator none) (span (offset 1291) (line 61) (column 24) (len 11)))))
+    (reference r9 (scope relative) (span (offset 1305) (line 61) (column 38) (len 15)) (segments (segment 0 (token "LevelEnum") (name "LevelEnum") (separator none) (span (offset 1305) (line 61) (column 38) (len 9))) (segment 1 (token "high") (name "high") (separator colon-colon) (span (offset 1316) (line 61) (column 49) (len 4)))))
   )
-  (root (library-package (name "RiskMetadata") (standard true) (body brace (doc) (import (target (span (span (offset 161) (line 7) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (attribute-def) (enum-def (name "LevelEnum") (body brace (doc) (enum-value (name "low") (span (offset 495) (line 24) (column 3) (len 3))) (enum-value (name "medium") (span (offset 509) (line 25) (column 3) (len 6))) (enum-value (name "high") (span (offset 526) (line 26) (column 3) (len 4))))) (attribute-def) (enum-def (name "RiskLevelEnum") (body brace (doc) (enum-value (name "low") (span (offset 1158) (line 59) (column 3) (len 3))) (enum-value (name "medium") (span (offset 1211) (line 60) (column 3) (len 6))) (enum-value (name "high") (span (offset 1270) (line 61) (column 3) (len 4))))) (metadata-def))))
+  (root (library-package (name "RiskMetadata") (standard true) (body brace (doc) (import (target (span (span (offset 161) (line 7) (column 17) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (attribute-def (name "Level") (multiplicity none)) (enum-def (name "LevelEnum") (body brace (doc) (enum-value (name "low") (short-name none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 501) (line 24) (column 9) (len 4)) (real "0.25"))))) (body semicolon) (span (offset 495) (line 24) (column 3) (len 11))) (enum-value (name "medium") (short-name none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 518) (line 25) (column 12) (len 4)) (real "0.50"))))) (body semicolon) (span (offset 509) (line 25) (column 3) (len 14))) (enum-value (name "high") (short-name none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 533) (line 26) (column 10) (len 4)) (real "0.75"))))) (body semicolon) (span (offset 526) (line 26) (column 3) (len 12))))) (attribute-def (name "RiskLevel") (multiplicity none)) (enum-def (name "RiskLevelEnum") (body brace (doc) (enum-value (name "low") (short-name none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 1164) (line 59) (column 9) (len 43)) (constructor (type (ref r1)) (arguments (argument (parameter (ref r2)) (value (expression (span (offset 1192) (line 59) (column 37) (len 14)) (ref r3)))))))))) (body semicolon) (span (offset 1158) (line 59) (column 3) (len 50))) (enum-value (name "medium") (short-name none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 1220) (line 60) (column 12) (len 46)) (constructor (type (ref r4)) (arguments (argument (parameter (ref r5)) (value (expression (span (offset 1248) (line 60) (column 40) (len 17)) (ref r6)))))))))) (body semicolon) (span (offset 1211) (line 60) (column 3) (len 56))) (enum-value (name "high") (short-name none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 1277) (line 61) (column 10) (len 44)) (constructor (type (ref r7)) (arguments (argument (parameter (ref r8)) (value (expression (span (offset 1305) (line 61) (column 38) (len 15)) (ref r9)))))))))) (body semicolon) (span (offset 1270) (line 61) (column 3) (len 52))))) (metadata-def))))
 )
 ~~~

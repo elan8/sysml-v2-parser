@@ -66,6 +66,8 @@ pub enum RequirementDefBodyElement {
     /// Boxed because a `RequirementUsage` owns a `RequirementDefBody`, which may contain
     /// further requirement usages.
     RequirementUsage(Box<Node<RequirementUsage>>),
+    /// Nested requirement definition (`requirement def ...`) from DefinitionBodyItem.
+    RequirementDef(Box<Node<RequirementDef>>),
     Stakeholder(Node<StakeholderMember>),
     Purpose(Node<PurposeMember>),
     AttributeDef(Node<AttributeDef>),
@@ -90,6 +92,10 @@ pub enum RequirementDefBodyElement {
     /// Nested calc usage, e.g. `in calc eval : EvaluationFunction { ... }` and `in calc :>> eval =
     /// evaluationFunction;` (`sysml.library/Domain Libraries/Analysis/TradeStudies.sysml`).
     CalcUsage(Box<Node<CalcUsage>>),
+    /// Port usage admitted through DefinitionBodyItem.
+    PortUsage(Box<Node<crate::ast::PortUsage>>),
+    /// Allocation usage admitted through DefinitionBodyItem.
+    AllocationUsage(Box<Node<crate::ast::AllocationUsage>>),
     /// `SatisfyRequirementUsage` as a member of this body.
     ///
     /// `RequirementBodyItem → DefinitionBodyItem → … → BehaviorUsageElement →
@@ -148,6 +154,7 @@ pub struct SubjectDecl {
 pub struct RequirementActorDecl {
     pub name: String,
     pub type_name: QualifiedReferenceId,
+    pub multiplicity: Option<Node<Multiplicity>>,
 }
 
 /// Require/assume constraint: `(require|assume) constraint` name? body.
@@ -322,6 +329,7 @@ pub struct RequirementUsage {
     /// Short name from `< ... >` when present (e.g. `requirement <'1.1'> vehicleMass1 : …`).
     pub short_name: Option<String>,
     pub type_name: Option<QualifiedReferenceId>,
+    pub multiplicity: Option<Node<Multiplicity>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Reference subsetting after `::>` / `references` (validation `08`:
     /// `requirement references vehicleMass1 { … }`).
@@ -433,7 +441,14 @@ pub struct Dependency {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrameMember {
+    pub has_concern_keyword: bool,
     pub name: String,
+    pub short_name: Option<String>,
+    pub type_name: Option<QualifiedReferenceId>,
+    pub multiplicity: Option<Node<Multiplicity>>,
+    pub subsets: Option<Node<SubsettingRelationship>>,
+    pub redefines: Option<Node<SubsettingRelationship>>,
+    pub value: Option<Node<FeatureValue>>,
     pub body: RequirementDefBody,
 }
 
@@ -733,6 +748,7 @@ pub type ReturnRefBody = Body<ReturnRefBodyElement>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::large_enum_variant)]
 pub enum ReturnRefBodyElement {
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),

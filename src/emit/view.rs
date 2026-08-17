@@ -34,6 +34,11 @@ pub(crate) fn emit_constraint_usage(
     // No trailing space for the anonymous body-only form (`constraint { ... }`, spec42
     // Gap 49a): the body emits its own leading space.
     w.push_str("constraint");
+    if let Some(short_name) = &usage.short_name {
+        w.push_str(" <");
+        w.push_str(&format_name(short_name));
+        w.push_char('>');
+    }
     if !usage.name.is_empty() {
         w.push_char(' ');
         w.push_str(&format_name(&usage.name));
@@ -41,6 +46,9 @@ pub(crate) fn emit_constraint_usage(
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(multiplicity) = &usage.multiplicity {
+        super::structure::emit_multiplicity(w, &multiplicity.value)?;
     }
     if let Some(subsets) = &usage.subsets {
         super::structure::emit_subsetting_clause(w, &subsets.value)?;
@@ -165,6 +173,9 @@ pub(crate) fn emit_calc_usage(
     if let Some(ty) = &usage.type_name {
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
+    }
+    if let Some(multiplicity) = &usage.multiplicity {
+        super::structure::emit_multiplicity(w, &multiplicity.value)?;
     }
     if leading_target.is_none() {
         if let Some(redefines) = &usage.redefines {
@@ -537,6 +548,11 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
         w.push_str(kind.as_str());
         w.push_char(' ');
     }
+    if let Some(short_name) = &ret.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short_name));
+        w.push_str("> ");
+    }
     if !ret.name.is_empty() {
         w.push_str(&format_name(&ret.name));
     }
@@ -664,6 +680,11 @@ pub(crate) fn emit_view_usage(
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
     w.push_str("view ");
+    if let Some(short_name) = &usage.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short_name));
+        w.push_str("> ");
+    }
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }

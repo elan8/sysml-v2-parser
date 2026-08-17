@@ -2941,7 +2941,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : RydbergConstantUnit[1];
     }
-    attribute def rydbergConstant : RydbergConstantValue nonunique;
+    attribute def rydbergConstant : RydbergConstantValue[*] nonunique;
     attribute def RydbergConstantUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2967,7 +2967,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : HartreeEnergyUnit[1];
     }
-    attribute def hartreeEnergy : HartreeEnergyValue nonunique;
+    attribute def hartreeEnergy : HartreeEnergyValue[*] nonunique;
     attribute def HartreeEnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3001,7 +3001,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : MagneticDipoleMomentUnit[1];
     }
-    attribute def magneticDipoleMoment : MagneticDipoleMomentValue nonunique;
+    attribute def magneticDipoleMoment : MagneticDipoleMomentValue[*] nonunique;
     attribute def MagneticDipoleMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3081,7 +3081,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : SpinUnit[1];
     }
-    attribute def spin : SpinValue nonunique;
+    attribute def spin : SpinValue[*] nonunique;
     attribute def SpinUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3137,7 +3137,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : TotalAngularMomentumUnit[1];
     }
-    attribute def totalAngularMomentum : TotalAngularMomentumValue nonunique;
+    attribute def totalAngularMomentum : TotalAngularMomentumValue[*] nonunique;
     attribute def TotalAngularMomentumUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3193,7 +3193,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : GyromagneticRatioUnit[1];
     }
-    attribute def gyromagneticRatio : GyromagneticRatioValue nonunique;
+    attribute def gyromagneticRatio : GyromagneticRatioValue[*] nonunique;
     attribute def GyromagneticRatioUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -3233,7 +3233,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : GyromagneticRatioOfTheElectronUnit[1];
     }
-    attribute def gyromagneticRatioOfTheElectron : GyromagneticRatioOfTheElectronValue nonunique;
+    attribute def gyromagneticRatioOfTheElectron : GyromagneticRatioOfTheElectronValue[*] nonunique;
     attribute def GyromagneticRatioOfTheElectronUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -3431,7 +3431,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : LarmorFrequencyUnit[1];
     }
-    attribute def larmorFrequency : LarmorFrequencyValue nonunique;
+    attribute def larmorFrequency : LarmorFrequencyValue[*] nonunique;
     attribute def LarmorFrequencyUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -3500,7 +3500,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : NuclearQuadrupoleMomentUnit[1];
     }
-    attribute def nuclearQuadrupoleMoment : NuclearQuadrupoleMomentValue nonunique;
+    attribute def nuclearQuadrupoleMoment : NuclearQuadrupoleMomentValue[*] nonunique;
     attribute def NuclearQuadrupoleMomentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3656,7 +3656,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : DecayConstantUnit[1];
     }
-    attribute def decayConstant : DecayConstantValue nonunique;
+    attribute def decayConstant : DecayConstantValue[*] nonunique;
     attribute def DecayConstantUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -3714,7 +3714,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : NuclearActivityUnit[1];
     }
-    attribute def nuclearActivity : NuclearActivityValue nonunique;
+    attribute def nuclearActivity : NuclearActivityValue[*] nonunique;
     attribute def NuclearActivityUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -3740,7 +3740,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificActivityUnit[1];
     }
-    attribute def specificActivity : SpecificActivityValue nonunique;
+    attribute def specificActivity : SpecificActivityValue[*] nonunique;
     attribute def SpecificActivityUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -3773,7 +3773,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ActivityDensityUnit[1];
     }
-    attribute def activityDensity : ActivityDensityValue nonunique;
+    attribute def activityDensity : ActivityDensityValue[*] nonunique;
     attribute def ActivityDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3809,7 +3809,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : SurfaceActivityDensityUnit[1];
     }
-    attribute def surfaceActivityDensity : SurfaceActivityDensityValue nonunique;
+    attribute def surfaceActivityDensity : SurfaceActivityDensityValue[*] nonunique;
     attribute def SurfaceActivityDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -3910,7 +3910,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ParticleEmissionRateUnit[1];
     }
-    attribute def particleEmissionRate : ParticleEmissionRateValue nonunique;
+    attribute def particleEmissionRate : ParticleEmissionRateValue[*] nonunique;
     attribute def ParticleEmissionRateUnit :> DerivedUnit {
         private attribute durationPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.T;
@@ -3992,7 +3992,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : DirectionDistributionOfCrossSectionUnit[1];
     }
-    attribute def directionDistributionOfCrossSection : DirectionDistributionOfCrossSectionValue nonunique;
+    attribute def directionDistributionOfCrossSection : DirectionDistributionOfCrossSectionValue[*] nonunique;
     attribute def DirectionDistributionOfCrossSectionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4018,7 +4018,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : EnergyDistributionOfCrossSectionUnit[1];
     }
-    attribute def energyDistributionOfCrossSection : EnergyDistributionOfCrossSectionValue nonunique;
+    attribute def energyDistributionOfCrossSection : EnergyDistributionOfCrossSectionValue[*] nonunique;
     attribute def EnergyDistributionOfCrossSectionUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -4048,7 +4048,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : DirectionAndEnergyDistributionOfCrossSectionUnit[1];
     }
-    attribute def directionAndEnergyDistributionOfCrossSection : DirectionAndEnergyDistributionOfCrossSectionValue nonunique;
+    attribute def directionAndEnergyDistributionOfCrossSection : DirectionAndEnergyDistributionOfCrossSectionValue[*] nonunique;
     attribute def DirectionAndEnergyDistributionOfCrossSectionUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -4078,7 +4078,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : VolumicCrossSectionUnit[1];
     }
-    attribute def volumicCrossSection : VolumicCrossSectionValue nonunique;
+    attribute def volumicCrossSection : VolumicCrossSectionValue[*] nonunique;
     attribute def VolumicCrossSectionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4107,7 +4107,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : VolumicTotalCrossSectionUnit[1];
     }
-    attribute def volumicTotalCrossSection : VolumicTotalCrossSectionValue nonunique;
+    attribute def volumicTotalCrossSection : VolumicTotalCrossSectionValue[*] nonunique;
     attribute def VolumicTotalCrossSectionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4136,7 +4136,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ParticleFluenceUnit[1];
     }
-    attribute def particleFluence : ParticleFluenceValue nonunique;
+    attribute def particleFluence : ParticleFluenceValue[*] nonunique;
     attribute def ParticleFluenceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4162,7 +4162,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ParticleFluenceRateUnit[1];
     }
-    attribute def particleFluenceRate : ParticleFluenceRateValue nonunique;
+    attribute def particleFluenceRate : ParticleFluenceRateValue[*] nonunique;
     attribute def ParticleFluenceRateUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4206,7 +4206,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : EnergyFluenceUnit[1];
     }
-    attribute def energyFluence : EnergyFluenceValue nonunique;
+    attribute def energyFluence : EnergyFluenceValue[*] nonunique;
     attribute def EnergyFluenceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -4236,7 +4236,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : EnergyFluenceRateUnit[1];
     }
-    attribute def energyFluenceRate : EnergyFluenceRateValue nonunique;
+    attribute def energyFluenceRate : EnergyFluenceRateValue[*] nonunique;
     attribute def EnergyFluenceRateUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -4266,7 +4266,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ParticleCurrentDensityUnit[1];
     }
-    attribute def particleCurrentDensity : ParticleCurrentDensityValue nonunique;
+    attribute def particleCurrentDensity : ParticleCurrentDensityValue[*] nonunique;
     attribute def ParticleCurrentDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4318,7 +4318,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : LinearAttenuationCoefficientForIonizingRadiationUnit[1];
     }
-    attribute def linearAttenuationCoefficientForIonizingRadiation : LinearAttenuationCoefficientForIonizingRadiationValue nonunique;
+    attribute def linearAttenuationCoefficientForIonizingRadiation : LinearAttenuationCoefficientForIonizingRadiationValue[*] nonunique;
     attribute def LinearAttenuationCoefficientForIonizingRadiationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4344,7 +4344,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : MassAttenuationCoefficientForIonizingRadiationUnit[1];
     }
-    attribute def massAttenuationCoefficientForIonizingRadiation : MassAttenuationCoefficientForIonizingRadiationValue nonunique;
+    attribute def massAttenuationCoefficientForIonizingRadiation : MassAttenuationCoefficientForIonizingRadiationValue[*] nonunique;
     attribute def MassAttenuationCoefficientForIonizingRadiationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4374,7 +4374,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : MolarAttenuationCoefficientUnit[1];
     }
-    attribute def molarAttenuationCoefficient : MolarAttenuationCoefficientValue nonunique;
+    attribute def molarAttenuationCoefficient : MolarAttenuationCoefficientValue[*] nonunique;
     attribute def MolarAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4404,7 +4404,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : AtomicAttenuationCoefficientUnit[1];
     }
-    attribute def atomicAttenuationCoefficient : AtomicAttenuationCoefficientValue nonunique;
+    attribute def atomicAttenuationCoefficient : AtomicAttenuationCoefficientValue[*] nonunique;
     attribute def AtomicAttenuationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4444,7 +4444,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : TotalLinearStoppingPowerUnit[1];
     }
-    attribute def totalLinearStoppingPower : TotalLinearStoppingPowerValue nonunique;
+    attribute def totalLinearStoppingPower : TotalLinearStoppingPowerValue[*] nonunique;
     attribute def TotalLinearStoppingPowerUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4481,7 +4481,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : TotalMassStoppingPowerUnit[1];
     }
-    attribute def totalMassStoppingPower : TotalMassStoppingPowerValue nonunique;
+    attribute def totalMassStoppingPower : TotalMassStoppingPowerValue[*] nonunique;
     attribute def TotalMassStoppingPowerUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4528,7 +4528,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : MeanMassRangeUnit[1];
     }
-    attribute def meanMassRange : MeanMassRangeValue nonunique;
+    attribute def meanMassRange : MeanMassRangeValue[*] nonunique;
     attribute def MeanMassRangeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4558,7 +4558,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : LinearIonizationUnit[1];
     }
-    attribute def linearIonization : LinearIonizationValue nonunique;
+    attribute def linearIonization : LinearIonizationValue[*] nonunique;
     attribute def LinearIonizationUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4599,7 +4599,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : AverageEnergyLossPerElementaryChargeProducedUnit[1];
     }
-    attribute def averageEnergyLossPerElementaryChargeProduced : AverageEnergyLossPerElementaryChargeProducedValue nonunique;
+    attribute def averageEnergyLossPerElementaryChargeProduced : AverageEnergyLossPerElementaryChargeProducedValue[*] nonunique;
     attribute def AverageEnergyLossPerElementaryChargeProducedUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4633,7 +4633,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : MobilityUnit[1];
     }
-    attribute def mobility : MobilityValue nonunique;
+    attribute def mobility : MobilityValue[*] nonunique;
     attribute def MobilityUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -4667,7 +4667,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ParticleNumberDensityUnit[1];
     }
-    attribute def particleNumberDensity : ParticleNumberDensityValue nonunique;
+    attribute def particleNumberDensity : ParticleNumberDensityValue[*] nonunique;
     attribute def ParticleNumberDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4693,7 +4693,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : IonNumberDensityUnit[1];
     }
-    attribute def ionNumberDensity : IonNumberDensityValue nonunique;
+    attribute def ionNumberDensity : IonNumberDensityValue[*] nonunique;
     attribute def IonNumberDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4722,7 +4722,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : RecombinationCoefficientUnit[1];
     }
-    attribute def recombinationCoefficient : RecombinationCoefficientValue nonunique;
+    attribute def recombinationCoefficient : RecombinationCoefficientValue[*] nonunique;
     attribute def RecombinationCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4769,7 +4769,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ParticleSourceDensityUnit[1];
     }
-    attribute def particleSourceDensity : ParticleSourceDensityValue nonunique;
+    attribute def particleSourceDensity : ParticleSourceDensityValue[*] nonunique;
     attribute def ParticleSourceDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -4799,7 +4799,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : SlowingDownDensityUnit[1];
     }
-    attribute def slowingDownDensity : SlowingDownDensityValue nonunique;
+    attribute def slowingDownDensity : SlowingDownDensityValue[*] nonunique;
     attribute def SlowingDownDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -5000,7 +5000,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : FastFissionFactorUnit[1];
     }
-    attribute def fastFissionFactor : FastFissionFactorValue nonunique;
+    attribute def fastFissionFactor : FastFissionFactorValue[*] nonunique;
     attribute def FastFissionFactorUnit :> DimensionOneUnit {
     }
     attribute def ThermalUtilizationFactorValue :> ScalarQuantityValue {
@@ -5019,7 +5019,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ThermalUtilizationFactorUnit[1];
     }
-    attribute def thermalUtilizationFactor : ThermalUtilizationFactorValue nonunique;
+    attribute def thermalUtilizationFactor : ThermalUtilizationFactorValue[*] nonunique;
     attribute def ThermalUtilizationFactorUnit :> DimensionOneUnit {
     }
     attribute def NonLeakageProbabilityValue :> ScalarQuantityValue {
@@ -5038,7 +5038,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : NonLeakageProbabilityUnit[1];
     }
-    attribute def nonLeakageProbability : NonLeakageProbabilityValue nonunique;
+    attribute def nonLeakageProbability : NonLeakageProbabilityValue[*] nonunique;
     attribute def NonLeakageProbabilityUnit :> DimensionOneUnit {
     }
     attribute def MultiplicationFactorValue :> ScalarQuantityValue {
@@ -5057,7 +5057,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : MultiplicationFactorUnit[1];
     }
-    attribute def multiplicationFactor : MultiplicationFactorValue nonunique;
+    attribute def multiplicationFactor : MultiplicationFactorValue[*] nonunique;
     attribute def MultiplicationFactorUnit :> DimensionOneUnit {
     }
     attribute def InfiniteMultiplicationFactorValue :> ScalarQuantityValue {
@@ -5076,7 +5076,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : InfiniteMultiplicationFactorUnit[1];
     }
-    attribute def infiniteMultiplicationFactor : InfiniteMultiplicationFactorValue nonunique;
+    attribute def infiniteMultiplicationFactor : InfiniteMultiplicationFactorValue[*] nonunique;
     attribute def InfiniteMultiplicationFactorUnit :> DimensionOneUnit {
     }
     attribute def reactorTimeConstant : DurationValue {
@@ -5137,7 +5137,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : AbsorbedDoseUnit[1];
     }
-    attribute def absorbedDose : AbsorbedDoseValue nonunique;
+    attribute def absorbedDose : AbsorbedDoseValue[*] nonunique;
     attribute def AbsorbedDoseUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -5181,7 +5181,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : QualityFactorForIonizingRadiationUnit[1];
     }
-    attribute def qualityFactorForIonizingRadiation : QualityFactorForIonizingRadiationValue nonunique;
+    attribute def qualityFactorForIonizingRadiation : QualityFactorForIonizingRadiationValue[*] nonunique;
     attribute def QualityFactorForIonizingRadiationUnit :> DimensionOneUnit {
     }
     attribute def DoseEquivalentValue :> ScalarQuantityValue {
@@ -5200,7 +5200,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : DoseEquivalentUnit[1];
     }
-    attribute def doseEquivalent : DoseEquivalentValue nonunique;
+    attribute def doseEquivalent : DoseEquivalentValue[*] nonunique;
     attribute def DoseEquivalentUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -5244,7 +5244,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : AbsorbedDoseRateUnit[1];
     }
-    attribute def absorbedDoseRate : AbsorbedDoseRateValue nonunique;
+    attribute def absorbedDoseRate : AbsorbedDoseRateValue[*] nonunique;
     attribute def AbsorbedDoseRateUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -5274,7 +5274,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : LinearEnergyTransferUnit[1];
     }
-    attribute def linearEnergyTransfer : LinearEnergyTransferValue nonunique;
+    attribute def linearEnergyTransfer : LinearEnergyTransferValue[*] nonunique;
     attribute def LinearEnergyTransferUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -5308,7 +5308,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : KermaUnit[1];
     }
-    attribute def kerma : KermaValue nonunique;
+    attribute def kerma : KermaValue[*] nonunique;
     attribute def KermaUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -5338,7 +5338,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : KermaRateUnit[1];
     }
-    attribute def kermaRate : KermaRateValue nonunique;
+    attribute def kermaRate : KermaRateValue[*] nonunique;
     attribute def KermaRateUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -5368,7 +5368,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : MassEnergyTransferCoefficientUnit[1];
     }
-    attribute def massEnergyTransferCoefficient : MassEnergyTransferCoefficientValue nonunique;
+    attribute def massEnergyTransferCoefficient : MassEnergyTransferCoefficientValue[*] nonunique;
     attribute def MassEnergyTransferCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -5398,7 +5398,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ExposureUnit[1];
     }
-    attribute def exposure : ExposureValue nonunique;
+    attribute def exposure : ExposureValue[*] nonunique;
     attribute def ExposureUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -5432,7 +5432,7 @@ standard library package ISQAtomicNuclear {
         attribute :>> num : Real;
         attribute :>> mRef : ExposureRateUnit[1];
     }
-    attribute def exposureRate : ExposureRateValue nonunique;
+    attribute def exposureRate : ExposureRateValue[*] nonunique;
     attribute def ExposureRateUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -5513,6 +5513,6 @@ standard library package ISQAtomicNuclear {
     (reference r58 (scope relative) (span (offset 110956) (line 2006) (column 65) (len 25)) (segments (segment 0 (token "DiffusionCoefficientValue") (name "DiffusionCoefficientValue") (separator none) (span (offset 110956) (line 2006) (column 65) (len 25)))))
     (reference r59 (scope relative) (span (offset 111042) (line 2007) (column 60) (len 20)) (segments (segment 0 (token "diffusionCoefficient") (name "diffusionCoefficient") (separator none) (span (offset 111042) (line 2007) (column 60) (len 20)))))
   )
-  (root (library-package (name "ISQAtomicNuclear") (standard true) (body brace (doc) (import (target (span (span (offset 801) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 840) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 850) (line 16) (column 30) (len 3))) (separator (span (offset 850) (line 16) (column 30) (len 2))) (marker (span (offset 852) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 874) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 895) (line 17) (column 41) (len 3))) (separator (span (offset 895) (line 17) (column 41) (len 2))) (marker (span (offset 897) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 919) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 926) (line 18) (column 27) (len 3))) (separator (span (offset 926) (line 18) (column 27) (len 2))) (marker (span (offset 928) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1017) (line 21) (column 20) (len 47))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1085) (line 22) (column 20) (len 48))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1154) (line 23) (column 20) (len 43))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1222) (line 24) (column 20) (len 40))) (all none) (ref r7) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1283) (line 25) (column 20) (len 35))) (all none) (ref r8) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1339) (line 26) (column 20) (len 23))) (all none) (ref r9) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1383) (line 27) (column 20) (len 30))) (all none) (ref r10) (shape (membership (recursive-suffix none))))) (attribute-def) (alias (name "protonNumber") (target (ref r11)) (body semicolon)) (attribute-def) (attribute-def) (alias (name "massNumber") (target (ref r12)) (body semicolon)) (attribute-def) (alias (name "properMass") (target (ref r13)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "ionizationNumber") (target (ref r14)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "MagnetogyricRatioUnit") (target (ref r15)) (body semicolon)) (alias (name "MagnetogyricRatioValue") (target (ref r16)) (body semicolon)) (alias (name "magnetogyricRatio") (target (ref r17)) (body semicolon)) (alias (name "GyromagneticCoefficientUnit") (target (ref r18)) (body semicolon)) (alias (name "GyromagneticCoefficientValue") (target (ref r19)) (body semicolon)) (alias (name "gyromagneticCoefficient") (target (ref r20)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "MagnetogyricRatioOfTheElectronUnit") (target (ref r21)) (body semicolon)) (alias (name "MagnetogyricRatioOfTheElectronValue") (target (ref r22)) (body semicolon)) (alias (name "magnetogyricRatioOfTheElectron") (target (ref r23)) (body semicolon)) (alias (name "GyromagneticCoefficientOfTheElectronUnit") (target (ref r24)) (body semicolon)) (alias (name "GyromagneticCoefficientOfTheElectronValue") (target (ref r25)) (body semicolon)) (alias (name "gyromagneticCoefficientOfTheElectron") (target (ref r26)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "gFactorOfAtom") (target (ref r27)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "larmorRadius") (target (ref r28)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "DisintegrationConstantUnit") (target (ref r29)) (body semicolon)) (alias (name "DisintegrationConstantValue") (target (ref r30)) (body semicolon)) (alias (name "disintegrationConstant") (target (ref r31)) (body semicolon)) (attribute-def) (alias (name "meanLifeTime") (target (ref r32)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "MassicActivityUnit") (target (ref r33)) (body semicolon)) (alias (name "MassicActivityValue") (target (ref r34)) (body semicolon)) (alias (name "massicActivity") (target (ref r35)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "VolumicActivityUnit") (target (ref r36)) (body semicolon)) (alias (name "VolumicActivityValue") (target (ref r37)) (body semicolon)) (alias (name "volumicActivity") (target (ref r38)) (body semicolon)) (alias (name "ActivityConcentrationUnit") (target (ref r39)) (body semicolon)) (alias (name "ActivityConcentrationValue") (target (ref r40)) (body semicolon)) (alias (name "activityConcentration") (target (ref r41)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "MacroscopicCrossSectionUnit") (target (ref r42)) (body semicolon)) (alias (name "MacroscopicCrossSectionValue") (target (ref r43)) (body semicolon)) (alias (name "macroscopicCrossSection") (target (ref r44)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "MacroscopicTotalCrossSectionUnit") (target (ref r45)) (body semicolon)) (alias (name "MacroscopicTotalCrossSectionValue") (target (ref r46)) (body semicolon)) (alias (name "macroscopicTotalCrossSection") (target (ref r47)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "LinearStoppingPowerUnit") (target (ref r48)) (body semicolon)) (alias (name "LinearStoppingPowerValue") (target (ref r49)) (body semicolon)) (alias (name "linearStoppingPower") (target (ref r50)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "MassStoppingPowerUnit") (target (ref r51)) (body semicolon)) (alias (name "MassStoppingPowerValue") (target (ref r52)) (body semicolon)) (alias (name "massStoppingPower") (target (ref r53)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "IonDensityUnit") (target (ref r54)) (body semicolon)) (alias (name "IonDensityValue") (target (ref r55)) (body semicolon)) (alias (name "ionDensity") (target (ref r56)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (alias (name "DiffusionCoefficientForParticleNumberDensityUnit") (target (ref r57)) (body semicolon)) (alias (name "DiffusionCoefficientForParticleNumberDensityValue") (target (ref r58)) (body semicolon)) (alias (name "diffusionCoefficientForParticleNumberDensity") (target (ref r59)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQAtomicNuclear") (standard true) (body brace (doc) (import (target (span (span (offset 801) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 840) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 850) (line 16) (column 30) (len 3))) (separator (span (offset 850) (line 16) (column 30) (len 2))) (marker (span (offset 852) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 874) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 895) (line 17) (column 41) (len 3))) (separator (span (offset 895) (line 17) (column 41) (len 2))) (marker (span (offset 897) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 919) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 926) (line 18) (column 27) (len 3))) (separator (span (offset 926) (line 18) (column 27) (len 2))) (marker (span (offset 928) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1017) (line 21) (column 20) (len 47))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1085) (line 22) (column 20) (len 48))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1154) (line 23) (column 20) (len 43))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1222) (line 24) (column 20) (len 40))) (all none) (ref r7) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1283) (line 25) (column 20) (len 35))) (all none) (ref r8) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1339) (line 26) (column 20) (len 23))) (all none) (ref r9) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1383) (line 27) (column 20) (len 30))) (all none) (ref r10) (shape (membership (recursive-suffix none))))) (attribute-def (name "atomicNumber") (multiplicity none)) (alias (name "protonNumber") (target (ref r11)) (body semicolon)) (attribute-def (name "neutronNumber") (multiplicity none)) (attribute-def (name "nucleonNumber") (multiplicity none)) (alias (name "massNumber") (target (ref r12)) (body semicolon)) (attribute-def (name "restMass") (multiplicity none)) (alias (name "properMass") (target (ref r13)) (body semicolon)) (attribute-def (name "restEnergy") (multiplicity none)) (attribute-def (name "atomicMass") (multiplicity none)) (attribute-def (name "nuclidicMass") (multiplicity none)) (attribute-def (name "unifiedAtomicMassConstant") (multiplicity none)) (attribute-def (name "elementaryCharge") (multiplicity none)) (attribute-def (name "ChargeNumberValue") (multiplicity none)) (attribute-def (name "chargeNumber") (multiplicity none)) (alias (name "ionizationNumber") (target (ref r14)) (body semicolon)) (attribute-def (name "bohrRadius") (multiplicity none)) (attribute-def (name "RydbergConstantValue") (multiplicity none)) (attribute-def (name "rydbergConstant") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RydbergConstantUnit") (multiplicity none)) (attribute-def (name "HartreeEnergyValue") (multiplicity none)) (attribute-def (name "hartreeEnergy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "HartreeEnergyUnit") (multiplicity none)) (attribute-def (name "MagneticDipoleMomentValue") (multiplicity none)) (attribute-def (name "magneticDipoleMoment") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MagneticDipoleMomentUnit") (multiplicity none)) (attribute-def (name "CartesianMagneticDipoleMoment3dVector") (multiplicity none)) (attribute-def (name "cartesianMagneticDipoleMoment3dVector") (multiplicity none)) (attribute-def (name "CartesianMagneticDipoleMoment3dCoordinateFrame") (multiplicity none)) (attribute-def (name "bohrMagneton") (multiplicity none)) (attribute-def (name "nuclearMagneton") (multiplicity none)) (attribute-def (name "SpinValue") (multiplicity none)) (attribute-def (name "spin") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpinUnit") (multiplicity none)) (attribute-def (name "CartesianSpin3dVector") (multiplicity none)) (attribute-def (name "cartesianSpin3dVector") (multiplicity none)) (attribute-def (name "CartesianSpin3dCoordinateFrame") (multiplicity none)) (attribute-def (name "TotalAngularMomentumValue") (multiplicity none)) (attribute-def (name "totalAngularMomentum") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TotalAngularMomentumUnit") (multiplicity none)) (attribute-def (name "CartesianTotalAngularMomentum3dVector") (multiplicity none)) (attribute-def (name "cartesianTotalAngularMomentum3dVector") (multiplicity none)) (attribute-def (name "CartesianTotalAngularMomentum3dCoordinateFrame") (multiplicity none)) (attribute-def (name "GyromagneticRatioValue") (multiplicity none)) (attribute-def (name "gyromagneticRatio") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "GyromagneticRatioUnit") (multiplicity none)) (alias (name "MagnetogyricRatioUnit") (target (ref r15)) (body semicolon)) (alias (name "MagnetogyricRatioValue") (target (ref r16)) (body semicolon)) (alias (name "magnetogyricRatio") (target (ref r17)) (body semicolon)) (alias (name "GyromagneticCoefficientUnit") (target (ref r18)) (body semicolon)) (alias (name "GyromagneticCoefficientValue") (target (ref r19)) (body semicolon)) (alias (name "gyromagneticCoefficient") (target (ref r20)) (body semicolon)) (attribute-def (name "GyromagneticRatioOfTheElectronValue") (multiplicity none)) (attribute-def (name "gyromagneticRatioOfTheElectron") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "GyromagneticRatioOfTheElectronUnit") (multiplicity none)) (alias (name "MagnetogyricRatioOfTheElectronUnit") (target (ref r21)) (body semicolon)) (alias (name "MagnetogyricRatioOfTheElectronValue") (target (ref r22)) (body semicolon)) (alias (name "magnetogyricRatioOfTheElectron") (target (ref r23)) (body semicolon)) (alias (name "GyromagneticCoefficientOfTheElectronUnit") (target (ref r24)) (body semicolon)) (alias (name "GyromagneticCoefficientOfTheElectronValue") (target (ref r25)) (body semicolon)) (alias (name "gyromagneticCoefficientOfTheElectron") (target (ref r26)) (body semicolon)) (attribute-def (name "QuantumNumberValue") (multiplicity none)) (attribute-def (name "quantumNumber") (multiplicity none)) (attribute-def (name "principalQuantumNumber") (multiplicity none)) (attribute-def (name "orbitalAngularMomentumQuantumNumber") (multiplicity none)) (attribute-def (name "magneticQuantumNumber") (multiplicity none)) (attribute-def (name "spinQuantumNumber") (multiplicity none)) (attribute-def (name "totalAngularMomentumQuantumNumber") (multiplicity none)) (attribute-def (name "nuclearSpinQuantumNumber") (multiplicity none)) (attribute-def (name "hyperfineStructureQuantumNumber") (multiplicity none)) (attribute-def (name "LandeFactorValue") (multiplicity none)) (attribute-def (name "landeFactor") (multiplicity none)) (alias (name "gFactorOfAtom") (target (ref r27)) (body semicolon)) (attribute-def (name "GFactorOfNucleusOrNuclearParticleValue") (multiplicity none)) (attribute-def (name "gFactorOfNucleusOrNuclearParticle") (multiplicity none)) (attribute-def (name "larmorAngularFrequency") (multiplicity none)) (attribute-def (name "LarmorFrequencyValue") (multiplicity none)) (attribute-def (name "larmorFrequency") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LarmorFrequencyUnit") (multiplicity none)) (attribute-def (name "nuclearPrecessionAngularFrequency") (multiplicity none)) (attribute-def (name "cyclotronAngularFrequency") (multiplicity none)) (attribute-def (name "gyroradius") (multiplicity none)) (alias (name "larmorRadius") (target (ref r28)) (body semicolon)) (attribute-def (name "NuclearQuadrupoleMomentValue") (multiplicity none)) (attribute-def (name "nuclearQuadrupoleMoment") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "NuclearQuadrupoleMomentUnit") (multiplicity none)) (attribute-def (name "nuclearRadius") (multiplicity none)) (attribute-def (name "electronRadius") (multiplicity none)) (attribute-def (name "comptonWavelength") (multiplicity none)) (attribute-def (name "massExcess") (multiplicity none)) (attribute-def (name "massDefect") (multiplicity none)) (attribute-def (name "RelativeMassExcessValue") (multiplicity none)) (attribute-def (name "relativeMassExcess") (multiplicity none)) (attribute-def (name "RelativeMassDefectValue") (multiplicity none)) (attribute-def (name "relativeMassDefect") (multiplicity none)) (attribute-def (name "PackingFractionValue") (multiplicity none)) (attribute-def (name "packingFraction") (multiplicity none)) (attribute-def (name "BindingFractionValue") (multiplicity none)) (attribute-def (name "bindingFraction") (multiplicity none)) (attribute-def (name "DecayConstantValue") (multiplicity none)) (attribute-def (name "decayConstant") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DecayConstantUnit") (multiplicity none)) (alias (name "DisintegrationConstantUnit") (target (ref r29)) (body semicolon)) (alias (name "DisintegrationConstantValue") (target (ref r30)) (body semicolon)) (alias (name "disintegrationConstant") (target (ref r31)) (body semicolon)) (attribute-def (name "meanDurationOfLife") (multiplicity none)) (alias (name "meanLifeTime") (target (ref r32)) (body semicolon)) (attribute-def (name "levelWidth") (multiplicity none)) (attribute-def (name "NuclearActivityValue") (multiplicity none)) (attribute-def (name "nuclearActivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "NuclearActivityUnit") (multiplicity none)) (attribute-def (name "SpecificActivityValue") (multiplicity none)) (attribute-def (name "specificActivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificActivityUnit") (multiplicity none)) (alias (name "MassicActivityUnit") (target (ref r33)) (body semicolon)) (alias (name "MassicActivityValue") (target (ref r34)) (body semicolon)) (alias (name "massicActivity") (target (ref r35)) (body semicolon)) (attribute-def (name "ActivityDensityValue") (multiplicity none)) (attribute-def (name "activityDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ActivityDensityUnit") (multiplicity none)) (alias (name "VolumicActivityUnit") (target (ref r36)) (body semicolon)) (alias (name "VolumicActivityValue") (target (ref r37)) (body semicolon)) (alias (name "volumicActivity") (target (ref r38)) (body semicolon)) (alias (name "ActivityConcentrationUnit") (target (ref r39)) (body semicolon)) (alias (name "ActivityConcentrationValue") (target (ref r40)) (body semicolon)) (alias (name "activityConcentration") (target (ref r41)) (body semicolon)) (attribute-def (name "SurfaceActivityDensityValue") (multiplicity none)) (attribute-def (name "surfaceActivityDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SurfaceActivityDensityUnit") (multiplicity none)) (attribute-def (name "halfLife") (multiplicity none)) (attribute-def (name "alphaDisintegrationEnergy") (multiplicity none)) (attribute-def (name "maximumBetaParticleEnergy") (multiplicity none)) (attribute-def (name "betaDisintegrationEnergy") (multiplicity none)) (attribute-def (name "InternalConversionFactorValue") (multiplicity none)) (attribute-def (name "internalConversionFactor") (multiplicity none)) (attribute-def (name "ParticleEmissionRateValue") (multiplicity none)) (attribute-def (name "particleEmissionRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ParticleEmissionRateUnit") (multiplicity none)) (attribute-def (name "reactionEnergy") (multiplicity none)) (attribute-def (name "resonanceEnergy") (multiplicity none)) (attribute-def (name "crossSection") (multiplicity none)) (attribute-def (name "totalCrossSection") (multiplicity none)) (attribute-def (name "DirectionDistributionOfCrossSectionValue") (multiplicity none)) (attribute-def (name "directionDistributionOfCrossSection") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DirectionDistributionOfCrossSectionUnit") (multiplicity none)) (attribute-def (name "EnergyDistributionOfCrossSectionValue") (multiplicity none)) (attribute-def (name "energyDistributionOfCrossSection") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EnergyDistributionOfCrossSectionUnit") (multiplicity none)) (attribute-def (name "DirectionAndEnergyDistributionOfCrossSectionValue") (multiplicity none)) (attribute-def (name "directionAndEnergyDistributionOfCrossSection") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DirectionAndEnergyDistributionOfCrossSectionUnit") (multiplicity none)) (attribute-def (name "VolumicCrossSectionValue") (multiplicity none)) (attribute-def (name "volumicCrossSection") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "VolumicCrossSectionUnit") (multiplicity none)) (alias (name "MacroscopicCrossSectionUnit") (target (ref r42)) (body semicolon)) (alias (name "MacroscopicCrossSectionValue") (target (ref r43)) (body semicolon)) (alias (name "macroscopicCrossSection") (target (ref r44)) (body semicolon)) (attribute-def (name "VolumicTotalCrossSectionValue") (multiplicity none)) (attribute-def (name "volumicTotalCrossSection") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "VolumicTotalCrossSectionUnit") (multiplicity none)) (alias (name "MacroscopicTotalCrossSectionUnit") (target (ref r45)) (body semicolon)) (alias (name "MacroscopicTotalCrossSectionValue") (target (ref r46)) (body semicolon)) (alias (name "macroscopicTotalCrossSection") (target (ref r47)) (body semicolon)) (attribute-def (name "ParticleFluenceValue") (multiplicity none)) (attribute-def (name "particleFluence") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ParticleFluenceUnit") (multiplicity none)) (attribute-def (name "ParticleFluenceRateValue") (multiplicity none)) (attribute-def (name "particleFluenceRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ParticleFluenceRateUnit") (multiplicity none)) (attribute-def (name "radiantEnergyForIonizingRadiation") (multiplicity none)) (attribute-def (name "EnergyFluenceValue") (multiplicity none)) (attribute-def (name "energyFluence") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EnergyFluenceUnit") (multiplicity none)) (attribute-def (name "EnergyFluenceRateValue") (multiplicity none)) (attribute-def (name "energyFluenceRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EnergyFluenceRateUnit") (multiplicity none)) (attribute-def (name "ParticleCurrentDensityValue") (multiplicity none)) (attribute-def (name "particleCurrentDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ParticleCurrentDensityUnit") (multiplicity none)) (attribute-def (name "CartesianParticleCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "cartesianParticleCurrentDensity3dVector") (multiplicity none)) (attribute-def (name "CartesianParticleCurrentDensity3dCoordinateFrame") (multiplicity none)) (attribute-def (name "LinearAttenuationCoefficientForIonizingRadiationValue") (multiplicity none)) (attribute-def (name "linearAttenuationCoefficientForIonizingRadiation") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinearAttenuationCoefficientForIonizingRadiationUnit") (multiplicity none)) (attribute-def (name "MassAttenuationCoefficientForIonizingRadiationValue") (multiplicity none)) (attribute-def (name "massAttenuationCoefficientForIonizingRadiation") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassAttenuationCoefficientForIonizingRadiationUnit") (multiplicity none)) (attribute-def (name "MolarAttenuationCoefficientValue") (multiplicity none)) (attribute-def (name "molarAttenuationCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MolarAttenuationCoefficientUnit") (multiplicity none)) (attribute-def (name "AtomicAttenuationCoefficientValue") (multiplicity none)) (attribute-def (name "atomicAttenuationCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AtomicAttenuationCoefficientUnit") (multiplicity none)) (attribute-def (name "halfValueThickness") (multiplicity none)) (attribute-def (name "TotalLinearStoppingPowerValue") (multiplicity none)) (attribute-def (name "totalLinearStoppingPower") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TotalLinearStoppingPowerUnit") (multiplicity none)) (alias (name "LinearStoppingPowerUnit") (target (ref r48)) (body semicolon)) (alias (name "LinearStoppingPowerValue") (target (ref r49)) (body semicolon)) (alias (name "linearStoppingPower") (target (ref r50)) (body semicolon)) (attribute-def (name "TotalMassStoppingPowerValue") (multiplicity none)) (attribute-def (name "totalMassStoppingPower") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "TotalMassStoppingPowerUnit") (multiplicity none)) (alias (name "MassStoppingPowerUnit") (target (ref r51)) (body semicolon)) (alias (name "MassStoppingPowerValue") (target (ref r52)) (body semicolon)) (alias (name "massStoppingPower") (target (ref r53)) (body semicolon)) (attribute-def (name "meanLinearRange") (multiplicity none)) (attribute-def (name "MeanMassRangeValue") (multiplicity none)) (attribute-def (name "meanMassRange") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MeanMassRangeUnit") (multiplicity none)) (attribute-def (name "LinearIonizationValue") (multiplicity none)) (attribute-def (name "linearIonization") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinearIonizationUnit") (multiplicity none)) (attribute-def (name "TotalIonizationValue") (multiplicity none)) (attribute-def (name "totalIonization") (multiplicity none)) (attribute-def (name "AverageEnergyLossPerElementaryChargeProducedValue") (multiplicity none)) (attribute-def (name "averageEnergyLossPerElementaryChargeProduced") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AverageEnergyLossPerElementaryChargeProducedUnit") (multiplicity none)) (attribute-def (name "MobilityValue") (multiplicity none)) (attribute-def (name "mobility") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MobilityUnit") (multiplicity none)) (attribute-def (name "ParticleNumberDensityValue") (multiplicity none)) (attribute-def (name "particleNumberDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ParticleNumberDensityUnit") (multiplicity none)) (attribute-def (name "IonNumberDensityValue") (multiplicity none)) (attribute-def (name "ionNumberDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "IonNumberDensityUnit") (multiplicity none)) (alias (name "IonDensityUnit") (target (ref r54)) (body semicolon)) (alias (name "IonDensityValue") (target (ref r55)) (body semicolon)) (alias (name "ionDensity") (target (ref r56)) (body semicolon)) (attribute-def (name "RecombinationCoefficientValue") (multiplicity none)) (attribute-def (name "recombinationCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RecombinationCoefficientUnit") (multiplicity none)) (alias (name "DiffusionCoefficientForParticleNumberDensityUnit") (target (ref r57)) (body semicolon)) (alias (name "DiffusionCoefficientForParticleNumberDensityValue") (target (ref r58)) (body semicolon)) (alias (name "diffusionCoefficientForParticleNumberDensity") (target (ref r59)) (body semicolon)) (attribute-def (name "diffusionCoefficientForFluenceRate") (multiplicity none)) (attribute-def (name "ParticleSourceDensityValue") (multiplicity none)) (attribute-def (name "particleSourceDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ParticleSourceDensityUnit") (multiplicity none)) (attribute-def (name "SlowingDownDensityValue") (multiplicity none)) (attribute-def (name "slowingDownDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SlowingDownDensityUnit") (multiplicity none)) (attribute-def (name "ResonanceEscapeProbabilityValue") (multiplicity none)) (attribute-def (name "resonanceEscapeProbability") (multiplicity none)) (attribute-def (name "LethargyValue") (multiplicity none)) (attribute-def (name "lethargy") (multiplicity none)) (attribute-def (name "AverageLogarithmicEnergyDecrementValue") (multiplicity none)) (attribute-def (name "averageLogarithmicEnergyDecrement") (multiplicity none)) (attribute-def (name "meanFreePathForAtomicPhysics") (multiplicity none)) (attribute-def (name "slowingDownArea") (multiplicity none)) (attribute-def (name "diffusionArea") (multiplicity none)) (attribute-def (name "migrationArea") (multiplicity none)) (attribute-def (name "slowingDownLength") (multiplicity none)) (attribute-def (name "diffusionLength") (multiplicity none)) (attribute-def (name "migrationLength") (multiplicity none)) (attribute-def (name "neutronYieldPerFission") (multiplicity none)) (attribute-def (name "neutronYieldPerAbsorption") (multiplicity none)) (attribute-def (name "FastFissionFactorValue") (multiplicity none)) (attribute-def (name "fastFissionFactor") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "FastFissionFactorUnit") (multiplicity none)) (attribute-def (name "ThermalUtilizationFactorValue") (multiplicity none)) (attribute-def (name "thermalUtilizationFactor") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ThermalUtilizationFactorUnit") (multiplicity none)) (attribute-def (name "NonLeakageProbabilityValue") (multiplicity none)) (attribute-def (name "nonLeakageProbability") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "NonLeakageProbabilityUnit") (multiplicity none)) (attribute-def (name "MultiplicationFactorValue") (multiplicity none)) (attribute-def (name "multiplicationFactor") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MultiplicationFactorUnit") (multiplicity none)) (attribute-def (name "InfiniteMultiplicationFactorValue") (multiplicity none)) (attribute-def (name "infiniteMultiplicationFactor") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "InfiniteMultiplicationFactorUnit") (multiplicity none)) (attribute-def (name "reactorTimeConstant") (multiplicity none)) (attribute-def (name "energyImparted") (multiplicity none)) (attribute-def (name "meanEnergyImparted") (multiplicity none)) (attribute-def (name "AbsorbedDoseValue") (multiplicity none)) (attribute-def (name "absorbedDose") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AbsorbedDoseUnit") (multiplicity none)) (attribute-def (name "specificEnergyImparted") (multiplicity none)) (attribute-def (name "QualityFactorForIonizingRadiationValue") (multiplicity none)) (attribute-def (name "qualityFactorForIonizingRadiation") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "QualityFactorForIonizingRadiationUnit") (multiplicity none)) (attribute-def (name "DoseEquivalentValue") (multiplicity none)) (attribute-def (name "doseEquivalent") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DoseEquivalentUnit") (multiplicity none)) (attribute-def (name "doseEquivalentRate") (multiplicity none)) (attribute-def (name "AbsorbedDoseRateValue") (multiplicity none)) (attribute-def (name "absorbedDoseRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AbsorbedDoseRateUnit") (multiplicity none)) (attribute-def (name "LinearEnergyTransferValue") (multiplicity none)) (attribute-def (name "linearEnergyTransfer") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinearEnergyTransferUnit") (multiplicity none)) (attribute-def (name "KermaValue") (multiplicity none)) (attribute-def (name "kerma") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "KermaUnit") (multiplicity none)) (attribute-def (name "KermaRateValue") (multiplicity none)) (attribute-def (name "kermaRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "KermaRateUnit") (multiplicity none)) (attribute-def (name "MassEnergyTransferCoefficientValue") (multiplicity none)) (attribute-def (name "massEnergyTransferCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassEnergyTransferCoefficientUnit") (multiplicity none)) (attribute-def (name "ExposureValue") (multiplicity none)) (attribute-def (name "exposure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ExposureUnit") (multiplicity none)) (attribute-def (name "ExposureRateValue") (multiplicity none)) (attribute-def (name "exposureRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ExposureRateUnit") (multiplicity none)))))
 )
 ~~~

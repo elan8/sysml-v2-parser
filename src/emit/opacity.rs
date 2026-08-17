@@ -1029,12 +1029,19 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::Frame(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
+            RequirementDefBodyElement::RequirementDef(n) => {
+                walk_requirement_def_body(report, &p, &n.value.body)
+            }
             RequirementDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             RequirementDefBodyElement::ConcernUsage(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
             RequirementDefBodyElement::CalcUsage(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
+            }
+            RequirementDefBodyElement::PortUsage(_n) => {}
+            RequirementDefBodyElement::AllocationUsage(n) => {
+                walk_definition_body(report, &p, &n.value.body)
             }
             RequirementDefBodyElement::SubjectDecl(_)
             | RequirementDefBodyElement::SubjectRef(_)

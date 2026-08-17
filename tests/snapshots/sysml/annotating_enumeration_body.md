@@ -7,12 +7,14 @@
 package AnnotatingEnumerationBody {
     enum def Level {
         doc /* enumeration definition */
-        low;
+        <lo> low = 1;
         comment /* between two values */
         medium;
         rep levelRep language "text" /* enumeration rendering */
         @Approved;
-        high;
+        high {
+            doc /* per-value documentation */
+        }
     }
 }
 ~~~
@@ -31,14 +33,17 @@ package AnnotatingEnumerationBody {
     enum def Level {
         doc
         /* enumeration definition */
-        low;
+        <lo> low = 1;
         comment
         /* between two values */
         medium;
         rep levelRep language "text"
         /* enumeration rendering */
         @Approved;
-        high;
+        high {
+            doc
+            /* per-value documentation */
+        }
     }
 }
 ~~~
@@ -46,8 +51,8 @@ package AnnotatingEnumerationBody {
 ~~~sexpr
 (parsed-document
   (references
-    (reference r0 (scope relative) (span (offset 242) (line 8) (column 10) (len 8)) (segments (segment 0 (token "Approved") (name "Approved") (separator none) (span (offset 242) (line 8) (column 10) (len 8)))))
+    (reference r0 (scope relative) (span (offset 251) (line 8) (column 10) (len 8)) (segments (segment 0 (token "Approved") (name "Approved") (separator none) (span (offset 251) (line 8) (column 10) (len 8)))))
   )
-  (root (package (name "AnnotatingEnumerationBody") (body brace (enum-def (name "Level") (body brace (doc) (enum-value (name "low") (span (offset 106) (line 4) (column 9) (len 3))) (comment (keyword (span (offset 119) (line 5) (column 9) (len 7))) (name none) (about) (locale none)) (enum-value (name "medium") (span (offset 160) (line 6) (column 9) (len 6))) (textual-rep) (metadata-annotation (declared-name none) (type (ref r0)) (about) (body semicolon)) (enum-value (name "high") (span (offset 260) (line 9) (column 9) (len 4))))))))
+  (root (package (name "AnnotatingEnumerationBody") (body brace (enum-def (name "Level") (body brace (doc) (enum-value (name "low") (short-name "lo") (value (feature-value (kind bind) (default false) (expression (expression (span (offset 117) (line 4) (column 20) (len 1)) (integer 1))))) (body semicolon) (span (offset 106) (line 4) (column 9) (len 13))) (comment (keyword (span (offset 128) (line 5) (column 9) (len 7))) (name none) (about) (locale none)) (enum-value (name "medium") (short-name none) (value none) (body semicolon) (span (offset 169) (line 6) (column 9) (len 7))) (textual-rep) (metadata-annotation (prefixes) (introducer at) (declared-name none) (type (ref r0)) (about) (body semicolon)) (enum-value (name "high") (short-name none) (value none) (body brace (doc)) (span (offset 269) (line 9) (column 9) (len 62))))))))
 )
 ~~~

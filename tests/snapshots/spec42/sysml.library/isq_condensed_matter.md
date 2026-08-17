@@ -1314,7 +1314,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : AngularReciprocalLatticeVectorMagnitudeUnit[1];
     }
-    attribute def angularReciprocalLatticeVectorMagnitude : AngularReciprocalLatticeVectorMagnitudeValue nonunique;
+    attribute def angularReciprocalLatticeVectorMagnitude : AngularReciprocalLatticeVectorMagnitudeValue[*] nonunique;
     attribute def AngularReciprocalLatticeVectorMagnitudeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1362,7 +1362,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : FundamentalReciprocalLatticeVectorMagnitudeUnit[1];
     }
-    attribute def fundamentalReciprocalLatticeVectorMagnitude : FundamentalReciprocalLatticeVectorMagnitudeValue nonunique;
+    attribute def fundamentalReciprocalLatticeVectorMagnitude : FundamentalReciprocalLatticeVectorMagnitudeValue[*] nonunique;
     attribute def FundamentalReciprocalLatticeVectorMagnitudeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1654,7 +1654,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : DensityOfVibrationalStatesUnit[1];
     }
-    attribute def densityOfVibrationalStates : DensityOfVibrationalStatesValue nonunique;
+    attribute def densityOfVibrationalStates : DensityOfVibrationalStatesValue[*] nonunique;
     attribute def DensityOfVibrationalStatesUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1742,7 +1742,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : EnergyDensityOfStatesUnit[1];
     }
-    attribute def energyDensityOfStates : EnergyDensityOfStatesValue nonunique;
+    attribute def energyDensityOfStates : EnergyDensityOfStatesValue[*] nonunique;
     attribute def EnergyDensityOfStatesUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1790,7 +1790,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : LorenzCoefficientUnit[1];
     }
-    attribute def lorenzCoefficient : LorenzCoefficientValue nonunique;
+    attribute def lorenzCoefficient : LorenzCoefficientValue[*] nonunique;
     attribute def LorenzCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1832,7 +1832,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : HallCoefficientUnit[1];
     }
-    attribute def hallCoefficient : HallCoefficientValue nonunique;
+    attribute def hallCoefficient : HallCoefficientValue[*] nonunique;
     attribute def HallCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1880,7 +1880,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : SeebeckCoefficientForSubstancesAAndBUnit[1];
     }
-    attribute def seebeckCoefficientForSubstancesAAndB : SeebeckCoefficientForSubstancesAAndBValue nonunique;
+    attribute def seebeckCoefficientForSubstancesAAndB : SeebeckCoefficientForSubstancesAAndBValue[*] nonunique;
     attribute def SeebeckCoefficientForSubstancesAAndBUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1936,7 +1936,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : ThomsonCoefficientUnit[1];
     }
-    attribute def thomsonCoefficient : ThomsonCoefficientValue nonunique;
+    attribute def thomsonCoefficient : ThomsonCoefficientValue[*] nonunique;
     attribute def ThomsonCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2020,7 +2020,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : RichardsonConstantUnit[1];
     }
-    attribute def richardsonConstant : RichardsonConstantValue nonunique;
+    attribute def richardsonConstant : RichardsonConstantValue[*] nonunique;
     attribute def RichardsonConstantUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2096,7 +2096,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : ElectronDensityUnit[1];
     }
-    attribute def electronDensity : ElectronDensityValue nonunique;
+    attribute def electronDensity : ElectronDensityValue[*] nonunique;
     attribute def ElectronDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2122,7 +2122,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : HoleDensityUnit[1];
     }
-    attribute def holeDensity : HoleDensityValue nonunique;
+    attribute def holeDensity : HoleDensityValue[*] nonunique;
     attribute def HoleDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2148,7 +2148,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : IntrinsicCarrierDensityUnit[1];
     }
-    attribute def intrinsicCarrierDensity : IntrinsicCarrierDensityValue nonunique;
+    attribute def intrinsicCarrierDensity : IntrinsicCarrierDensityValue[*] nonunique;
     attribute def IntrinsicCarrierDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2174,7 +2174,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : DonorDensityUnit[1];
     }
-    attribute def donorDensity : DonorDensityValue nonunique;
+    attribute def donorDensity : DonorDensityValue[*] nonunique;
     attribute def DonorDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2200,7 +2200,7 @@ standard library package ISQCondensedMatter {
         attribute :>> num : Real;
         attribute :>> mRef : AcceptorDensityUnit[1];
     }
-    attribute def acceptorDensity : AcceptorDensityValue nonunique;
+    attribute def acceptorDensity : AcceptorDensityValue[*] nonunique;
     attribute def AcceptorDensityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2443,6 +2443,6 @@ standard library package ISQCondensedMatter {
     (reference r13 (scope relative) (span (offset 19444) (line 401) (column 37) (len 22)) (segments (segment 0 (token "fermiAngularWavenumber") (name "fermiAngularWavenumber") (separator none) (span (offset 19444) (line 401) (column 37) (len 22)))))
     (reference r14 (scope relative) (span (offset 20278) (line 419) (column 37) (len 22)) (segments (segment 0 (token "debyeAngularWavenumber") (name "debyeAngularWavenumber") (separator none) (span (offset 20278) (line 419) (column 37) (len 22)))))
   )
-  (root (library-package (name "ISQCondensedMatter") (standard true) (body brace (doc) (import (target (span (span (offset 801) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 840) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 850) (line 16) (column 30) (len 3))) (separator (span (offset 850) (line 16) (column 30) (len 2))) (marker (span (offset 852) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 874) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 895) (line 17) (column 41) (len 3))) (separator (span (offset 895) (line 17) (column 41) (len 2))) (marker (span (offset 897) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 919) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 926) (line 18) (column 27) (len 3))) (separator (span (offset 926) (line 18) (column 27) (len 2))) (marker (span (offset 928) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1017) (line 21) (column 20) (len 53))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1091) (line 22) (column 20) (len 45))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1157) (line 23) (column 20) (len 37))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1215) (line 24) (column 20) (len 47))) (all none) (ref r7) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1283) (line 25) (column 20) (len 35))) (all none) (ref r8) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1339) (line 26) (column 20) (len 33))) (all none) (ref r9) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1393) (line 27) (column 20) (len 28))) (all none) (ref r10) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1442) (line 28) (column 20) (len 30))) (all none) (ref r11) (shape (membership (recursive-suffix none))))) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "angularRepetency") (target (ref r12)) (body semicolon)) (attribute-def) (alias (name "fermiAngularRepetency") (target (ref r13)) (body semicolon)) (attribute-def) (alias (name "debyeAngularRepetency") (target (ref r14)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQCondensedMatter") (standard true) (body brace (doc) (import (target (span (span (offset 801) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 840) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 850) (line 16) (column 30) (len 3))) (separator (span (offset 850) (line 16) (column 30) (len 2))) (marker (span (offset 852) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 874) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 895) (line 17) (column 41) (len 3))) (separator (span (offset 895) (line 17) (column 41) (len 2))) (marker (span (offset 897) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 919) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 926) (line 18) (column 27) (len 3))) (separator (span (offset 926) (line 18) (column 27) (len 2))) (marker (span (offset 928) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 1017) (line 21) (column 20) (len 53))) (all none) (ref r4) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1091) (line 22) (column 20) (len 45))) (all none) (ref r5) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1157) (line 23) (column 20) (len 37))) (all none) (ref r6) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1215) (line 24) (column 20) (len 47))) (all none) (ref r7) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1283) (line 25) (column 20) (len 35))) (all none) (ref r8) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1339) (line 26) (column 20) (len 33))) (all none) (ref r9) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1393) (line 27) (column 20) (len 28))) (all none) (ref r10) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1442) (line 28) (column 20) (len 30))) (all none) (ref r11) (shape (membership (recursive-suffix none))))) (attribute-def (name "CartesianLattice3dVector") (multiplicity none)) (attribute-def (name "cartesianLattice3dVector") (multiplicity none)) (attribute-def (name "CartesianFundamentalLattice3dVector") (multiplicity none)) (attribute-def (name "cartesianFundamentalLattice3dVector") (multiplicity none)) (attribute-def (name "AngularReciprocalLatticeVectorMagnitudeValue") (multiplicity none)) (attribute-def (name "angularReciprocalLatticeVectorMagnitude") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AngularReciprocalLatticeVectorMagnitudeUnit") (multiplicity none)) (attribute-def (name "CartesianAngularReciprocalLattice3dVector") (multiplicity none)) (attribute-def (name "cartesianAngularReciprocalLattice3dVector") (multiplicity none)) (attribute-def (name "CartesianAngularReciprocalLattice3dCoordinateFrame") (multiplicity none)) (attribute-def (name "FundamentalReciprocalLatticeVectorMagnitudeValue") (multiplicity none)) (attribute-def (name "fundamentalReciprocalLatticeVectorMagnitude") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "FundamentalReciprocalLatticeVectorMagnitudeUnit") (multiplicity none)) (attribute-def (name "CartesianFundamentalReciprocalLattice3dVector") (multiplicity none)) (attribute-def (name "cartesianFundamentalReciprocalLattice3dVector") (multiplicity none)) (attribute-def (name "CartesianFundamentalReciprocalLattice3dCoordinateFrame") (multiplicity none)) (attribute-def (name "latticePlaneSpacing") (multiplicity none)) (attribute-def (name "braggAngle") (multiplicity none)) (attribute-def (name "ShortRangeOrderParameterValue") (multiplicity none)) (attribute-def (name "shortRangeOrderParameter") (multiplicity none)) (attribute-def (name "LongRangeOrderParameterValue") (multiplicity none)) (attribute-def (name "longRangeOrderParameter") (multiplicity none)) (attribute-def (name "AtomicScatteringFactorValue") (multiplicity none)) (attribute-def (name "atomicScatteringFactor") (multiplicity none)) (attribute-def (name "StructureFactorValue") (multiplicity none)) (attribute-def (name "structureFactor") (multiplicity none)) (attribute-def (name "CartesianBurgers3dVector") (multiplicity none)) (attribute-def (name "cartesianBurgers3dVector") (multiplicity none)) (attribute-def (name "CartesianParticlePosition3dVector") (multiplicity none)) (attribute-def (name "cartesianParticlePosition3dVector") (multiplicity none)) (attribute-def (name "CartesianEquilibriumPosition3dVector") (multiplicity none)) (attribute-def (name "cartesianEquilibriumPosition3dVector") (multiplicity none)) (attribute-def (name "CartesianDisplacement3dVector") (multiplicity none)) (attribute-def (name "cartesianDisplacement3dVector") (multiplicity none)) (attribute-def (name "DebyeWallerFactorValue") (multiplicity none)) (attribute-def (name "debyeWallerFactor") (multiplicity none)) (attribute-def (name "angularWavenumber") (multiplicity none)) (alias (name "angularRepetency") (target (ref r12)) (body semicolon)) (attribute-def (name "fermiAngularWavenumber") (multiplicity none)) (alias (name "fermiAngularRepetency") (target (ref r13)) (body semicolon)) (attribute-def (name "debyeAngularWavenumber") (multiplicity none)) (alias (name "debyeAngularRepetency") (target (ref r14)) (body semicolon)) (attribute-def (name "debyeAngularFrequency") (multiplicity none)) (attribute-def (name "debyeTemperature") (multiplicity none)) (attribute-def (name "DensityOfVibrationalStatesValue") (multiplicity none)) (attribute-def (name "densityOfVibrationalStates") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DensityOfVibrationalStatesUnit") (multiplicity none)) (attribute-def (name "ThermodynamicGrüneisenParameterValue") (multiplicity none)) (attribute-def (name "thermodynamicGrüneisenParameter") (multiplicity none)) (attribute-def (name "GrüneisenParameterValue") (multiplicity none)) (attribute-def (name "grüneisenParameter") (multiplicity none)) (attribute-def (name "meanFreePathOfPhonons") (multiplicity none)) (attribute-def (name "meanFreePathOfElectrons") (multiplicity none)) (attribute-def (name "EnergyDensityOfStatesValue") (multiplicity none)) (attribute-def (name "energyDensityOfStates") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EnergyDensityOfStatesUnit") (multiplicity none)) (attribute-def (name "residualResistivity") (multiplicity none)) (attribute-def (name "LorenzCoefficientValue") (multiplicity none)) (attribute-def (name "lorenzCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LorenzCoefficientUnit") (multiplicity none)) (attribute-def (name "HallCoefficientValue") (multiplicity none)) (attribute-def (name "hallCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "HallCoefficientUnit") (multiplicity none)) (attribute-def (name "thermoelectricVoltageBetweenSubstancesAAndB") (multiplicity none)) (attribute-def (name "SeebeckCoefficientForSubstancesAAndBValue") (multiplicity none)) (attribute-def (name "seebeckCoefficientForSubstancesAAndB") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SeebeckCoefficientForSubstancesAAndBUnit") (multiplicity none)) (attribute-def (name "peltierCoefficientForSubstancesAAndB") (multiplicity none)) (attribute-def (name "ThomsonCoefficientValue") (multiplicity none)) (attribute-def (name "thomsonCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ThomsonCoefficientUnit") (multiplicity none)) (attribute-def (name "workFunction") (multiplicity none)) (attribute-def (name "ionizationEnergy") (multiplicity none)) (attribute-def (name "electronAffinity") (multiplicity none)) (attribute-def (name "RichardsonConstantValue") (multiplicity none)) (attribute-def (name "richardsonConstant") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RichardsonConstantUnit") (multiplicity none)) (attribute-def (name "fermiEnergy") (multiplicity none)) (attribute-def (name "gapEnergy") (multiplicity none)) (attribute-def (name "fermiTemperature") (multiplicity none)) (attribute-def (name "ElectronDensityValue") (multiplicity none)) (attribute-def (name "electronDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ElectronDensityUnit") (multiplicity none)) (attribute-def (name "HoleDensityValue") (multiplicity none)) (attribute-def (name "holeDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "HoleDensityUnit") (multiplicity none)) (attribute-def (name "IntrinsicCarrierDensityValue") (multiplicity none)) (attribute-def (name "intrinsicCarrierDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "IntrinsicCarrierDensityUnit") (multiplicity none)) (attribute-def (name "DonorDensityValue") (multiplicity none)) (attribute-def (name "donorDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DonorDensityUnit") (multiplicity none)) (attribute-def (name "AcceptorDensityValue") (multiplicity none)) (attribute-def (name "acceptorDensity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "AcceptorDensityUnit") (multiplicity none)) (attribute-def (name "effectiveMass") (multiplicity none)) (attribute-def (name "MobilityRatioValue") (multiplicity none)) (attribute-def (name "mobilityRatio") (multiplicity none)) (attribute-def (name "relaxationTime") (multiplicity none)) (attribute-def (name "carrierLifetime") (multiplicity none)) (attribute-def (name "diffusionLengthForCondensedMatterPhysics") (multiplicity none)) (attribute-def (name "exchangeIntegral") (multiplicity none)) (attribute-def (name "curieTemperature") (multiplicity none)) (attribute-def (name "néelTemperature") (multiplicity none)) (attribute-def (name "superconductionTransitionTemperature") (multiplicity none)) (attribute-def (name "thermodynamicCriticalMagneticFluxDensity") (multiplicity none)) (attribute-def (name "lowerCriticalMagneticFluxDensity") (multiplicity none)) (attribute-def (name "upperCriticalMagneticFluxDensity") (multiplicity none)) (attribute-def (name "superconductorEnergyGap") (multiplicity none)) (attribute-def (name "londonPenetrationDepth") (multiplicity none)) (attribute-def (name "coherenceLength") (multiplicity none)))))
 )
 ~~~

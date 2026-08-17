@@ -252,9 +252,9 @@ package '14c-Language-Extensions' {
             end cause : Situation[*];
             end effect : Situation[*];
         }
-        connection def causations : Causation;
+        abstract connection def causations : Causation;
         requirement def FMEARequirement;
-        abstract requirement fmeaRequirements : FMEARequirement;
+        abstract requirement fmeaRequirements : FMEARequirement[*];
         requirement def RequirementWithSIL :> FMEARequirement {
             attribute sil : SIL;
         }
@@ -267,15 +267,15 @@ package '14c-Language-Extensions' {
             end sit : Situation[*];
             end req : FMEARequirement[*];
         }
-        connection def violations : Violation;
-        connection def ControllingMeasure {
+        abstract connection def violations : Violation;
+        abstract connection def ControllingMeasure {
             end sit : Situation[*];
             end req : FMEARequirement[*];
         }
         connection def Prevention :> ControllingMeasure;
-        connection def preventions : Prevention;
+        abstract connection def preventions : Prevention;
         connection def Mitigation :> ControllingMeasure;
-        connection def mitigations : Mitigation;
+        abstract connection def mitigations : Mitigation;
     }
     library package FMEAMetadata {
         private import Metaobjects::SemanticMetadata;
@@ -288,42 +288,42 @@ package '14c-Language-Extensions' {
             attribute status : Status;
         }
         metadata def <situation> SituationMetadata :> SemanticMetadata {
-            attribute baseType :>> baseType default situations meta SysML::Usage;
+            attribute :>> baseType default situations meta SysML::Usage;
         }
         metadata def <cause> CauseMetadata :> SituationMetadata {
-            attribute baseType :>> baseType = causes meta SysML::Usage;
+            attribute :>> baseType = causes meta SysML::Usage;
         }
         metadata def <failure> FailureModeMetadata :> SituationMetadata {
-            attribute baseType :>> baseType = failureModes meta SysML::Usage;
+            attribute :>> baseType = failureModes meta SysML::Usage;
         }
         metadata def <effect> EffectMetadata :> SituationMetadata {
-            attribute baseType :>> baseType = effects meta SysML::Usage;
+            attribute :>> baseType = effects meta SysML::Usage;
         }
         metadata def <fmea> FMEAItemMetadata :> SituationMetadata {
-            attribute annotatedElement : SysML::ItemDefinition :> annotatedElement;
-            attribute annotatedElement : SysML::ItemUsage :> annotatedElement;
-            attribute baseType :>> baseType = fmeaItems meta SysML::Usage;
+            attribute :> annotatedElement : SysML::ItemDefinition;
+            attribute :> annotatedElement : SysML::ItemUsage;
+            attribute :>> baseType = fmeaItems meta SysML::Usage;
         }
         metadata def <causation> CausationMetadata :> SemanticMetadata {
-            attribute annotatedElement : SysML::ConnectionUsage :>> annotatedElement;
-            attribute baseType :>> baseType = causations meta SysML::Usage;
+            attribute :>> annotatedElement : SysML::ConnectionUsage;
+            attribute :>> baseType = causations meta SysML::Usage;
         }
         metadata def <fmeaspec> FMEARequirementMetadata :> SemanticMetadata {
-            attribute annotatedElement : SysML::RequirementUsage :>> annotatedElement;
-            attribute baseType :>> baseType = fmeaRequirements meta SysML::Usage;
+            attribute :>> annotatedElement : SysML::RequirementUsage;
+            attribute :>> baseType = fmeaRequirements meta SysML::Usage;
         }
         metadata def <violation> ViolationMetadata :> SemanticMetadata {
-            attribute annotatedElement : SysML::ConnectionUsage :>> annotatedElement;
-            attribute baseType :>> baseType = violations meta SysML::Usage;
+            attribute :>> annotatedElement : SysML::ConnectionUsage;
+            attribute :>> baseType = violations meta SysML::Usage;
         }
         abstract metadata def ControllingMeasureMetadata :> SemanticMetadata {
-            attribute annotatedElement : SysML::ConnectionUsage :>> annotatedElement;
+            attribute :>> annotatedElement : SysML::ConnectionUsage;
         }
         metadata def <prevention> PreventionMetadata :> ControllingMeasureMetadata {
-            attribute baseType :>> baseType = preventions meta SysML::Usage;
+            attribute :>> baseType = preventions meta SysML::Usage;
         }
         metadata def <mitigation> MitigationMetadata :> ControllingMeasureMetadata {
-            attribute baseType :>> baseType = mitigations meta SysML::Usage;
+            attribute :>> baseType = mitigations meta SysML::Usage;
         }
     }
     package FMEAUserModel {
@@ -429,6 +429,6 @@ package '14c-Language-Extensions' {
     (reference r27 (scope relative) (span (offset 4849) (line 188) (column 49) (len 4)) (segments (segment 0 (token "req3") (name "req3") (separator none) (span (offset 4849) (line 188) (column 49) (len 4)))))
     (reference r28 (scope relative) (span (offset 4862) (line 190) (column 4) (len 4)) (segments (segment 0 (token "fmea") (name "fmea") (separator none) (span (offset 4862) (line 190) (column 4) (len 4)))))
   )
-  (root (package (name "14c-Language-Extensions") (body brace (import (target (span (span (offset 52) (line 2) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 64) (line 2) (column 29) (len 3))) (separator (span (offset 64) (line 2) (column 29) (len 2))) (marker (span (offset 66) (line 2) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (library-package (name "FMEALibrary") (standard false) (body brace (occurrence-def) (occurrence (portion none) (declaration "situations") (target none)) (occurrence-def) (occurrence (portion none) (declaration "causes") (target none)) (occurrence-def) (occurrence (portion none) (declaration "failureModes") (target none)) (occurrence-def) (occurrence (portion none) (declaration "effects") (target none)) (item-def) (item-usage) (connection-def (name "Causation") (role ordinary) (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r1)))) (body brace (end (identity (declaration (name "cause") (span (offset 921) (line 39) (column 16) (len 5)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (references none) (redefines none) (crosses none)) (end (identity (declaration (name "effect") (span (offset 954) (line 40) (column 16) (len 6)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r3)))) (references none) (redefines none) (crosses none)))) (connection-def (name "causations") (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r4)))) (body semicolon)) (requirement-def (name "FMEARequirement") (body semicolon)) (requirement-usage) (requirement-def (name "RequirementWithSIL") (body brace (attribute-usage))) (enum-def (name "SIL") (body brace (enum-value (name "A") (span (offset 1260) (line 53) (column 18) (len 1))) (enum-value (name "B") (span (offset 1263) (line 53) (column 21) (len 1))) (enum-value (name "C") (span (offset 1266) (line 53) (column 24) (len 1))))) (connection-def (name "Violation") (role ordinary) (specializes none) (body brace (end (identity (declaration (name "sit") (span (offset 1318) (line 56) (column 16) (len 3)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r5)))) (references none) (redefines none) (crosses none)) (end (identity (declaration (name "req") (span (offset 1349) (line 57) (column 16) (len 3)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (references none) (redefines none) (crosses none)))) (connection-def (name "violations") (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r7)))) (body semicolon)) (connection-def (name "ControllingMeasure") (role ordinary) (specializes none) (body brace (end (identity (declaration (name "sit") (span (offset 1502) (line 63) (column 16) (len 3)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r8)))) (references none) (redefines none) (crosses none)) (end (identity (declaration (name "req") (span (offset 1533) (line 64) (column 16) (len 3)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r9)))) (references none) (redefines none) (crosses none)))) (connection-def (name "Prevention") (role ordinary) (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r10)))) (body semicolon)) (connection-def (name "preventions") (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r11)))) (body semicolon)) (connection-def (name "Mitigation") (role ordinary) (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r12)))) (body semicolon)) (connection-def (name "mitigations") (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r13)))) (body semicolon)))) (library-package (name "FMEAMetadata") (standard false) (body brace (import (target (span (span (offset 1852) (line 78) (column 18) (len 29))) (all none) (ref r14) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1900) (line 79) (column 18) (len 14))) (all none) (ref r15) (shape (namespace (wildcard-suffix (span (span (offset 1911) (line 79) (column 29) (len 3))) (separator (span (offset 1911) (line 79) (column 29) (len 2))) (marker (span (offset 1913) (line 79) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (enum-def (name "Status") (body brace (enum-value (name "Approved") (span (offset 1940) (line 82) (column 4) (len 8))) (enum-value (name "NotApproved") (span (offset 1953) (line 83) (column 4) (len 11))))) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def))) (package (name "FMEAUserModel") (body brace (import (target (span (span (offset 3689) (line 142) (column 18) (len 14))) (all none) (ref r16) (shape (namespace (wildcard-suffix (span (span (offset 3700) (line 142) (column 29) (len 3))) (separator (span (offset 3700) (line 142) (column 29) (len 2))) (marker (span (offset 3702) (line 142) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 3722) (line 143) (column 18) (len 15))) (all none) (ref r17) (shape (namespace (wildcard-suffix (span (span (offset 3734) (line 143) (column 30) (len 3))) (separator (span (offset 3734) (line 143) (column 30) (len 2))) (marker (span (offset 3736) (line 143) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (metadata-keyword-usage (type (ref r18)) (body none)) (requirement-usage) (metadata-keyword-usage (type (ref r19)) (body none)) (requirement-usage) (metadata-keyword-usage (type (ref r20)) (body none)) (requirement-usage) (metadata-keyword-usage (type (ref r21)) (body none)) (item-def) (metadata-keyword-usage (type (ref r22)) (body none)) (connect (from (expression (span (offset 4769) (line 187) (column 22) (len 22)) (ref r23))) (to (expression (span (offset 4795) (line 187) (column 48) (len 4)) (ref r24))) (body semicolon) (subsets none) (redefines none)) (metadata-keyword-usage (type (ref r25)) (body none)) (connect (from (expression (span (offset 4823) (line 188) (column 23) (len 22)) (ref r26))) (to (expression (span (offset 4849) (line 188) (column 49) (len 4)) (ref r27))) (body semicolon) (subsets none) (redefines none)) (metadata-keyword-usage (type (ref r28)) (body none)) (item-usage))))))
+  (root (package (name "14c-Language-Extensions") (body brace (import (target (span (span (offset 52) (line 2) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 64) (line 2) (column 29) (len 3))) (separator (span (offset 64) (line 2) (column 29) (len 2))) (marker (span (offset 66) (line 2) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (library-package (name "FMEALibrary") (standard false) (body brace (occurrence-def) (occurrence (portion none) (declaration "situations") (short-name none) (target none)) (occurrence-def) (occurrence (portion none) (declaration "causes") (short-name none) (target none)) (occurrence-def) (occurrence (portion none) (declaration "failureModes") (short-name none) (target none)) (occurrence-def) (occurrence (portion none) (declaration "effects") (short-name none) (target none)) (item-def) (item-usage) (connection-def (name "Causation") (modifiers) (role ordinary) (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r1)))) (body brace (end (short-name none) (identity (declaration (name "cause") (span (offset 921) (line 39) (column 16) (len 5)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (references none) (redefines none) (crosses none)) (end (short-name none) (identity (declaration (name "effect") (span (offset 954) (line 40) (column 16) (len 6)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r3)))) (references none) (redefines none) (crosses none)))) (connection-def (name "causations") (modifiers abstract) (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r4)))) (body semicolon)) (requirement-def (name "FMEARequirement") (body semicolon)) (requirement-usage (name "fmeaRequirements") (multiplicity (lower unbounded) (upper unbounded))) (requirement-def (name "RequirementWithSIL") (body brace (attribute-usage))) (enum-def (name "SIL") (body brace (enum-value (name "A") (short-name none) (value none) (body semicolon) (span (offset 1260) (line 53) (column 18) (len 2))) (enum-value (name "B") (short-name none) (value none) (body semicolon) (span (offset 1263) (line 53) (column 21) (len 2))) (enum-value (name "C") (short-name none) (value none) (body semicolon) (span (offset 1266) (line 53) (column 24) (len 2))))) (connection-def (name "Violation") (modifiers) (role ordinary) (specializes none) (body brace (end (short-name none) (identity (declaration (name "sit") (span (offset 1318) (line 56) (column 16) (len 3)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r5)))) (references none) (redefines none) (crosses none)) (end (short-name none) (identity (declaration (name "req") (span (offset 1349) (line 57) (column 16) (len 3)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (references none) (redefines none) (crosses none)))) (connection-def (name "violations") (modifiers abstract) (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r7)))) (body semicolon)) (connection-def (name "ControllingMeasure") (modifiers abstract) (role ordinary) (specializes none) (body brace (end (short-name none) (identity (declaration (name "sit") (span (offset 1502) (line 63) (column 16) (len 3)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r8)))) (references none) (redefines none) (crosses none)) (end (short-name none) (identity (declaration (name "req") (span (offset 1533) (line 64) (column 16) (len 3)))) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r9)))) (references none) (redefines none) (crosses none)))) (connection-def (name "Prevention") (modifiers) (role ordinary) (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r10)))) (body semicolon)) (connection-def (name "preventions") (modifiers abstract) (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r11)))) (body semicolon)) (connection-def (name "Mitigation") (modifiers) (role ordinary) (specializes (typing (kind subclassification) (conjugated false) (implied false) (targets (ref r12)))) (body semicolon)) (connection-def (name "mitigations") (modifiers abstract) (role ordinary) (specializes (typing (kind typing) (conjugated false) (implied false) (targets (ref r13)))) (body semicolon)))) (library-package (name "FMEAMetadata") (standard false) (body brace (import (target (span (span (offset 1852) (line 78) (column 18) (len 29))) (all none) (ref r14) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 1900) (line 79) (column 18) (len 14))) (all none) (ref r15) (shape (namespace (wildcard-suffix (span (span (offset 1911) (line 79) (column 29) (len 3))) (separator (span (offset 1911) (line 79) (column 29) (len 2))) (marker (span (offset 1913) (line 79) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (enum-def (name "Status") (body brace (enum-value (name "Approved") (short-name none) (value none) (body semicolon) (span (offset 1940) (line 82) (column 4) (len 9))) (enum-value (name "NotApproved") (short-name none) (value none) (body semicolon) (span (offset 1953) (line 83) (column 4) (len 12))))) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def) (metadata-def))) (package (name "FMEAUserModel") (body brace (import (target (span (span (offset 3689) (line 142) (column 18) (len 14))) (all none) (ref r16) (shape (namespace (wildcard-suffix (span (span (offset 3700) (line 142) (column 29) (len 3))) (separator (span (offset 3700) (line 142) (column 29) (len 2))) (marker (span (offset 3702) (line 142) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 3722) (line 143) (column 18) (len 15))) (all none) (ref r17) (shape (namespace (wildcard-suffix (span (span (offset 3734) (line 143) (column 30) (len 3))) (separator (span (offset 3734) (line 143) (column 30) (len 2))) (marker (span (offset 3736) (line 143) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (metadata-keyword-usage (type (ref r18)) (body none)) (requirement-usage (name "req1") (multiplicity none)) (metadata-keyword-usage (type (ref r19)) (body none)) (requirement-usage (name "req2") (multiplicity none)) (metadata-keyword-usage (type (ref r20)) (body none)) (requirement-usage (name "req3") (multiplicity none)) (metadata-keyword-usage (type (ref r21)) (body none)) (item-def) (metadata-keyword-usage (type (ref r22)) (body none)) (connect (from (expression (span (offset 4769) (line 187) (column 22) (len 22)) (ref r23))) (to (expression (span (offset 4795) (line 187) (column 48) (len 4)) (ref r24))) (body semicolon) (subsets none) (redefines none)) (metadata-keyword-usage (type (ref r25)) (body none)) (connect (from (expression (span (offset 4823) (line 188) (column 23) (len 22)) (ref r26))) (to (expression (span (offset 4849) (line 188) (column 49) (len 4)) (ref r27))) (body semicolon) (subsets none) (redefines none)) (metadata-keyword-usage (type (ref r28)) (body none)) (item-usage))))))
 )
 ~~~

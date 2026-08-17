@@ -13,7 +13,7 @@ pub(crate) use def::part_def_or_usage;
 // directly, which is why a plain (non-test) `cargo build` sees the re-export itself as unused.
 pub(crate) use usage::{
     allocate_, bind_, connect_, exhibit_state_as_state_usage, interface_usage, part_ref_usage,
-    part_usage, perform_action_decl, perform_usage, ref_body, variant_usage,
+    part_usage, part_usage_body, perform_action_decl, perform_usage, ref_body, variant_usage,
 };
 #[allow(unused_imports)]
 pub(crate) use {body::part_def_body, def::part_def};

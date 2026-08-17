@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Closed the remaining verified parser-owned gaps from the spec42 upstream audit.** KerML
+  feature bodies now dispatch the complete pinned `MetadataFeature` production, retaining ordered
+  `#` prefixes and the authored `@`/`metadata` introducer instead of lowering `metadata` as an
+  expression operand. Anonymous `:>`/`:>>` bindings no longer fabricate declaration names.
+  Connection-, interface-, flow-, and allocation-definition prefixes retain `abstract` and
+  `individual`. Requirement bodies accept nested requirements, bare requirement usages, ports,
+  allocations, and framed concern declarations. Missing multiplicities, `PartUsage.nonunique`,
+  and usage short names are retained and emitted. Enumerated values now retain their full usage
+  identification, initializer, aggregate span, and body. The semantic snapshots cover each
+  owning scope. Claims for `that`, direction-plus-`end`, trivia comments, and
+  `readonly`/`variable`/authored-`unique` were rejected after comparison with the pinned 2026-04
+  grammar and sibling Pilot grammar because those claimed productions do not exist. **AST version
+  167 -> 168.**
+
 - **`SatisfyRequirementUsage` is modelled from its pinned production: typed alternatives, a real
   `RequirementBody`, and no fabricated `by`.** Audit and evidence:
   `planning/satisfy-requirement-usage-matrix.md`. **AST version 166 -> 167.**

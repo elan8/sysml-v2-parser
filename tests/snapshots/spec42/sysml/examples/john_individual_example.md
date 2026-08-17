@@ -135,6 +135,6 @@ package JohnIndividualExample {
 (parsed-document
   (references
   )
-  (root (package (name "JohnIndividualExample") (body brace (item-def) (item-def) (item-def) (item-def) (occurrence (portion none) (declaration "UnitedStatesWithJohnAsPresident") (target none)))))
+  (root (package (name "JohnIndividualExample") (body brace (item-def) (item-def) (item-def) (item-def) (occurrence (portion none) (declaration "UnitedStatesWithJohnAsPresident") (short-name none) (target none)))))
 )
 ~~~

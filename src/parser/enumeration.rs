@@ -5,46 +5,48 @@ use crate::ast::{
     Membership, Node,
 };
 use crate::parser::attribute::attribute_body;
-use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
+use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, take_until_terminator, visibility_prefix, ws1, ws_and_comments};
+use crate::parser::lex::{identification, name, visibility_prefix, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::{feature_usage_header, multiplicity_node};
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// Enumerated value: optional `enum` keyword + name + `;`. The span covers the name only (not
-/// the discarded inline body or `= expr` initializer) so it stays stable regardless of which
-/// trailing form is present.
+/// Enumerated value: `UsageExtensionKeyword* EnumerationUsageKeyword? Usage`. Extension keywords
+/// are not currently modeled elsewhere, but the owned `Usage` is retained without flattening its
+/// value or body.
 fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, Node<EnumeratedValue>> {
+    let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"enum"[..]), ws1)).parse(input)?;
     let name_start = input;
-    let (input, n) = name(input)?;
-    let value_node = node_from_to(name_start, input, EnumeratedValue { name: n });
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b"{") {
-        let (input, _) = delimited(
-            tag(&b"{"[..]),
-            advance_to_closing_brace,
-            preceded(ws_and_comments, tag(&b"}"[..])),
-        )
-        .parse(input)?;
-        Ok((input, value_node))
-    } else {
-        let (input, _) = opt(preceded(
-            preceded(ws_and_comments, tag(&b"="[..])),
-            preceded(ws_and_comments, |i| take_until_terminator(i, b";")),
-        ))
-        .parse(input)?;
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        Ok((input, value_node))
-    }
+    let (input, ident) = identification(input)?;
+    let name_span = ident
+        .name
+        .as_ref()
+        .map(|_| crate::parser::span_from_to(name_start, input));
+    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
+    let (input, body) = crate::parser::part::part_usage_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            EnumeratedValue {
+                name: ident.name.unwrap_or_default(),
+                short_name: ident.short_name,
+                value,
+                body,
+                name_span,
+            },
+        ),
+    ))
 }
 
 /// `EnumerationBody : EnumerationDefinition = ';' | '{' ( ownedRelationship += AnnotatingMember |
@@ -219,10 +221,8 @@ mod enumerated_value_tests {
         crate::parser::span::test_input(text)
     }
 
-    // Regression coverage: `enumerated_value` used to return a bare `String`, so enumerated
-    // values had no source range and couldn't become addressable Spec42/Babel42 elements. It now
-    // returns a `Node<EnumeratedValue>` whose span covers just the name, regardless of whether a
-    // discarded inline body or `= expr` initializer follows.
+    // The aggregate span covers the full owned usage; `name_span` independently preserves the
+    // authored declaration token.
 
     #[test]
     fn enumerated_value_bare_semicolon_form_has_name_span() {
@@ -230,26 +230,32 @@ mod enumerated_value_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "active");
         assert_eq!(node.span.offset, 0);
-        assert_eq!(node.span.len, "active".len());
+        assert_eq!(node.span.len, "active;".len());
+        assert_eq!(
+            node.value.name_span.as_ref().map(|span| span.len),
+            Some("active".len())
+        );
     }
 
     #[test]
-    fn enumerated_value_inline_body_form_has_name_only_span() {
+    fn enumerated_value_inline_body_is_retained() {
         let (rest, node) =
             enumerated_value(input("active { doc /* x */ }")).expect("enumerated value");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "active");
         assert_eq!(node.span.offset, 0);
-        assert_eq!(node.span.len, "active".len());
+        assert_eq!(node.span.len, "active { doc /* x */ }".len());
+        assert!(matches!(node.value.body, crate::ast::Body::Brace { .. }));
     }
 
     #[test]
-    fn enumerated_value_initializer_form_has_name_only_span() {
+    fn enumerated_value_initializer_is_retained() {
         let (rest, node) = enumerated_value(input("active = 1;")).expect("enumerated value");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "active");
         assert_eq!(node.span.offset, 0);
-        assert_eq!(node.span.len, "active".len());
+        assert_eq!(node.span.len, "active = 1;".len());
+        assert!(node.value.value.is_some());
     }
 
     #[test]
@@ -257,8 +263,12 @@ mod enumerated_value_tests {
         let (rest, node) = enumerated_value(input("enum active;")).expect("enumerated value");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(node.value.name, "active");
-        assert_eq!(node.span.offset, "enum ".len());
-        assert_eq!(node.span.len, "active".len());
+        assert_eq!(node.span.offset, 0);
+        assert_eq!(node.span.len, "enum active;".len());
+        assert_eq!(
+            node.value.name_span.as_ref().map(|span| span.offset),
+            Some("enum ".len())
+        );
     }
 
     #[test]

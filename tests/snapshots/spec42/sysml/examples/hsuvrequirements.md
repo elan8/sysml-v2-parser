@@ -89,6 +89,6 @@ package HSUVRequirements {
   (references
     (reference r0 (scope relative) (span (offset 43) (line 2) (column 17) (len 12)) (segments (segment 0 (token "Requirements") (name "Requirements") (separator none) (span (offset 43) (line 2) (column 17) (len 12)))))
   )
-  (root (package (name "HSUVRequirements") (body brace (import (target (span (span (offset 43) (line 2) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 55) (line 2) (column 29) (len 3))) (separator (span (offset 55) (line 2) (column 29) (len 2))) (marker (span (offset 57) (line 2) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (requirement-usage) (requirement-usage) (requirement-usage) (requirement-usage) (requirement-usage))))
+  (root (package (name "HSUVRequirements") (body brace (import (target (span (span (offset 43) (line 2) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 55) (line 2) (column 29) (len 3))) (separator (span (offset 55) (line 2) (column 29) (len 2))) (marker (span (offset 57) (line 2) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (requirement-usage (name "Load") (multiplicity none)) (requirement-usage (name "EcoFriendliness") (multiplicity none)) (requirement-usage (name "Performance") (multiplicity none)) (requirement-usage (name "Ergonomics") (multiplicity none)) (requirement-usage (name "HybridSUVSpec") (multiplicity none)))))
 )
 ~~~

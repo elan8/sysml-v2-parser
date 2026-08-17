@@ -60,6 +60,9 @@ pub(crate) fn emit_requirement_usage(
         w.push_str(" : ");
         w.push_qualified_reference(&format!("{path}/type"), *ty)?;
     }
+    if let Some(multiplicity) = &usage.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+    }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
@@ -146,6 +149,11 @@ fn emit_requirement_body_element(
             structure::emit_variant_usage(w, path, &v.value)
         }
         RequirementDefBodyElement::RequirementUsage(r) => emit_requirement_usage(w, path, &r.value),
+        RequirementDefBodyElement::RequirementDef(r) => emit_requirement_def(w, path, &r.value),
+        RequirementDefBodyElement::PortUsage(p) => structure::emit_port_usage(w, path, &p.value),
+        RequirementDefBodyElement::AllocationUsage(a) => {
+            super::behavior::emit_allocation_usage(w, path, &a.value)
+        }
         RequirementDefBodyElement::Satisfy(s) => emit_satisfy(w, path, &s.value),
         RequirementDefBodyElement::SubjectDecl(s) => emit_subject_decl(w, &s.value),
         RequirementDefBodyElement::SubjectRef(_) => {
@@ -159,6 +167,9 @@ fn emit_requirement_body_element(
             }
             w.push_str(" : ");
             w.push_qualified_reference(&format!("{path}/actor/type"), a.value.type_name)?;
+            if let Some(multiplicity) = &a.value.multiplicity {
+                emit_multiplicity(w, &multiplicity.value)?;
+            }
             w.push_char(';');
             Ok(())
         }
@@ -193,7 +204,31 @@ fn emit_requirement_body_element(
         }
         RequirementDefBodyElement::Frame(f) => {
             w.push_str("frame ");
+            if f.value.has_concern_keyword {
+                w.push_str("concern ");
+            }
+            if let Some(short_name) = &f.value.short_name {
+                w.push_char('<');
+                w.push_str(&format_name(short_name));
+                w.push_str("> ");
+            }
             w.push_str(&format_name(&f.value.name));
+            if let Some(type_name) = f.value.type_name {
+                w.push_str(" : ");
+                w.push_qualified_reference(&format!("{path}/frame/type"), type_name)?;
+            }
+            if let Some(multiplicity) = &f.value.multiplicity {
+                emit_multiplicity(w, &multiplicity.value)?;
+            }
+            if let Some(subsets) = &f.value.subsets {
+                emit_subsetting_clause(w, &subsets.value)?;
+            }
+            if let Some(redefines) = &f.value.redefines {
+                emit_subsetting_clause(w, &redefines.value)?;
+            }
+            if let Some(value) = &f.value.value {
+                emit_feature_value(w, value)?;
+            }
             emit_requirement_body(w, path, &f.value.body)
         }
         RequirementDefBodyElement::VerifyRequirement(v) => {

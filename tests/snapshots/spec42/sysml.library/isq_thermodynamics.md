@@ -1308,7 +1308,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : CelsiusTemperatureUnit[1];
     }
-    attribute def celsiusTemperature : CelsiusTemperatureValue nonunique;
+    attribute def celsiusTemperature : CelsiusTemperatureValue[*] nonunique;
     attribute def CelsiusTemperatureUnit :> DerivedUnit {
         private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.'Θ';
@@ -1334,7 +1334,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : LinearExpansionCoefficientUnit[1];
     }
-    attribute def linearExpansionCoefficient : LinearExpansionCoefficientValue nonunique;
+    attribute def linearExpansionCoefficient : LinearExpansionCoefficientValue[*] nonunique;
     attribute def LinearExpansionCoefficientUnit :> DerivedUnit {
         private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.'Θ';
@@ -1360,7 +1360,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : CubicExpansionCoefficientUnit[1];
     }
-    attribute def cubicExpansionCoefficient : CubicExpansionCoefficientValue nonunique;
+    attribute def cubicExpansionCoefficient : CubicExpansionCoefficientValue[*] nonunique;
     attribute def CubicExpansionCoefficientUnit :> DerivedUnit {
         private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.'Θ';
@@ -1386,7 +1386,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : RelativePressureCoefficientUnit[1];
     }
-    attribute def relativePressureCoefficient : RelativePressureCoefficientValue nonunique;
+    attribute def relativePressureCoefficient : RelativePressureCoefficientValue[*] nonunique;
     attribute def RelativePressureCoefficientUnit :> DerivedUnit {
         private attribute thermodynamicTemperaturePF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.'Θ';
@@ -1412,7 +1412,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : PressureCoefficientUnit[1];
     }
-    attribute def pressureCoefficient : PressureCoefficientValue nonunique;
+    attribute def pressureCoefficient : PressureCoefficientValue[*] nonunique;
     attribute def PressureCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1450,7 +1450,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : IsothermalCompressibilityUnit[1];
     }
-    attribute def isothermalCompressibility : IsothermalCompressibilityValue nonunique;
+    attribute def isothermalCompressibility : IsothermalCompressibilityValue[*] nonunique;
     attribute def IsothermalCompressibilityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1484,7 +1484,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : IsentropicCompressibilityUnit[1];
     }
-    attribute def isentropicCompressibility : IsentropicCompressibilityValue nonunique;
+    attribute def isentropicCompressibility : IsentropicCompressibilityValue[*] nonunique;
     attribute def IsentropicCompressibilityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1547,7 +1547,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : HeatFlowRateUnit[1];
     }
-    attribute def heatFlowRate : HeatFlowRateValue nonunique;
+    attribute def heatFlowRate : HeatFlowRateValue[*] nonunique;
     attribute def HeatFlowRateUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1581,7 +1581,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : DensityOfHeatFlowRateUnit[1];
     }
-    attribute def densityOfHeatFlowRate : DensityOfHeatFlowRateValue nonunique;
+    attribute def densityOfHeatFlowRate : DensityOfHeatFlowRateValue[*] nonunique;
     attribute def DensityOfHeatFlowRateUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -1611,7 +1611,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : ThermalConductivityUnit[1];
     }
-    attribute def thermalConductivity : ThermalConductivityValue nonunique;
+    attribute def thermalConductivity : ThermalConductivityValue[*] nonunique;
     attribute def ThermalConductivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1649,7 +1649,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : CoefficientOfHeatTransferUnit[1];
     }
-    attribute def coefficientOfHeatTransfer : CoefficientOfHeatTransferValue nonunique;
+    attribute def coefficientOfHeatTransfer : CoefficientOfHeatTransferValue[*] nonunique;
     attribute def CoefficientOfHeatTransferUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -1683,7 +1683,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : SurfaceCoefficientOfHeatTransferUnit[1];
     }
-    attribute def surfaceCoefficientOfHeatTransfer : SurfaceCoefficientOfHeatTransferValue nonunique;
+    attribute def surfaceCoefficientOfHeatTransfer : SurfaceCoefficientOfHeatTransferValue[*] nonunique;
     attribute def SurfaceCoefficientOfHeatTransferUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -1717,7 +1717,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : ThermalInsulanceUnit[1];
     }
-    attribute def thermalInsulance : ThermalInsulanceValue nonunique;
+    attribute def thermalInsulance : ThermalInsulanceValue[*] nonunique;
     attribute def ThermalInsulanceUnit :> DerivedUnit {
         private attribute massPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.M;
@@ -1754,7 +1754,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : ThermalResistanceUnit[1];
     }
-    attribute def thermalResistance : ThermalResistanceValue nonunique;
+    attribute def thermalResistance : ThermalResistanceValue[*] nonunique;
     attribute def ThermalResistanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1792,7 +1792,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : ThermalConductanceUnit[1];
     }
-    attribute def thermalConductance : ThermalConductanceValue nonunique;
+    attribute def thermalConductance : ThermalConductanceValue[*] nonunique;
     attribute def ThermalConductanceUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1830,7 +1830,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : ThermalDiffusivityUnit[1];
     }
-    attribute def thermalDiffusivity : ThermalDiffusivityValue nonunique;
+    attribute def thermalDiffusivity : ThermalDiffusivityValue[*] nonunique;
     attribute def ThermalDiffusivityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1860,7 +1860,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : HeatCapacityUnit[1];
     }
-    attribute def heatCapacity : HeatCapacityValue nonunique;
+    attribute def heatCapacity : HeatCapacityValue[*] nonunique;
     attribute def HeatCapacityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1898,7 +1898,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificHeatCapacityUnit[1];
     }
-    attribute def specificHeatCapacity : SpecificHeatCapacityValue nonunique;
+    attribute def specificHeatCapacity : SpecificHeatCapacityValue[*] nonunique;
     attribute def SpecificHeatCapacityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1932,7 +1932,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificHeatCapacityAtConstantPressureUnit[1];
     }
-    attribute def specificHeatCapacityAtConstantPressure : SpecificHeatCapacityAtConstantPressureValue nonunique;
+    attribute def specificHeatCapacityAtConstantPressure : SpecificHeatCapacityAtConstantPressureValue[*] nonunique;
     attribute def SpecificHeatCapacityAtConstantPressureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -1966,7 +1966,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificHeatCapacityAtConstantVolumeUnit[1];
     }
-    attribute def specificHeatCapacityAtConstantVolume : SpecificHeatCapacityAtConstantVolumeValue nonunique;
+    attribute def specificHeatCapacityAtConstantVolume : SpecificHeatCapacityAtConstantVolumeValue[*] nonunique;
     attribute def SpecificHeatCapacityAtConstantVolumeUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2000,7 +2000,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificHeatCapacityAtSaturatedVapourPressureUnit[1];
     }
-    attribute def specificHeatCapacityAtSaturatedVapourPressure : SpecificHeatCapacityAtSaturatedVapourPressureValue nonunique;
+    attribute def specificHeatCapacityAtSaturatedVapourPressure : SpecificHeatCapacityAtSaturatedVapourPressureValue[*] nonunique;
     attribute def SpecificHeatCapacityAtSaturatedVapourPressureUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2065,7 +2065,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : EntropyUnit[1];
     }
-    attribute def entropy : EntropyValue nonunique;
+    attribute def entropy : EntropyValue[*] nonunique;
     attribute def EntropyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2103,7 +2103,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificEntropyUnit[1];
     }
-    attribute def specificEntropy : SpecificEntropyValue nonunique;
+    attribute def specificEntropy : SpecificEntropyValue[*] nonunique;
     attribute def SpecificEntropyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2137,7 +2137,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : EnergyUnit[1];
     }
-    attribute def energy : EnergyValue nonunique;
+    attribute def energy : EnergyValue[*] nonunique;
     attribute def EnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2230,7 +2230,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificEnergyUnit[1];
     }
-    attribute def specificEnergy : SpecificEnergyValue nonunique;
+    attribute def specificEnergy : SpecificEnergyValue[*] nonunique;
     attribute def SpecificEnergyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2275,7 +2275,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificEnthalpyUnit[1];
     }
-    attribute def specificEnthalpy : SpecificEnthalpyValue nonunique;
+    attribute def specificEnthalpy : SpecificEnthalpyValue[*] nonunique;
     attribute def SpecificEnthalpyUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2335,7 +2335,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : MassieuFunctionUnit[1];
     }
-    attribute def massieuFunction : MassieuFunctionValue nonunique;
+    attribute def massieuFunction : MassieuFunctionValue[*] nonunique;
     attribute def MassieuFunctionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2373,7 +2373,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : PlanckFunctionUnit[1];
     }
-    attribute def planckFunction : PlanckFunctionValue nonunique;
+    attribute def planckFunction : PlanckFunctionValue[*] nonunique;
     attribute def PlanckFunctionUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2411,7 +2411,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : JouleThomsonCoefficientUnit[1];
     }
-    attribute def jouleThomsonCoefficient : JouleThomsonCoefficientValue nonunique;
+    attribute def jouleThomsonCoefficient : JouleThomsonCoefficientValue[*] nonunique;
     attribute def JouleThomsonCoefficientUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2479,7 +2479,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : SpecificGasConstantUnit[1];
     }
-    attribute def specificGasConstant : SpecificGasConstantValue nonunique;
+    attribute def specificGasConstant : SpecificGasConstantValue[*] nonunique;
     attribute def SpecificGasConstantUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2513,7 +2513,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : MassConcentrationOfWaterUnit[1];
     }
-    attribute def massConcentrationOfWater : MassConcentrationOfWaterValue nonunique;
+    attribute def massConcentrationOfWater : MassConcentrationOfWaterValue[*] nonunique;
     attribute def MassConcentrationOfWaterUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2543,7 +2543,7 @@ standard library package ISQThermodynamics {
         attribute :>> num : Real;
         attribute :>> mRef : MassConcentrationOfWaterVapourAbsoluteHumidityUnit[1];
     }
-    attribute def massConcentrationOfWaterVapourAbsoluteHumidity : MassConcentrationOfWaterVapourAbsoluteHumidityValue nonunique;
+    attribute def massConcentrationOfWaterVapourAbsoluteHumidity : MassConcentrationOfWaterVapourAbsoluteHumidityValue[*] nonunique;
     attribute def MassConcentrationOfWaterVapourAbsoluteHumidityUnit :> DerivedUnit {
         private attribute lengthPF : QuantityPowerFactor[1] {
             attribute :>> quantity = isq.L;
@@ -2701,6 +2701,6 @@ standard library package ISQThermodynamics {
     (reference r16 (scope relative) (span (offset 46651) (line 904) (column 41) (len 23)) (segments (segment 0 (token "specificHelmholtzEnergy") (name "specificHelmholtzEnergy") (separator none) (span (offset 46651) (line 904) (column 41) (len 23)))))
     (reference r17 (scope relative) (span (offset 47483) (line 922) (column 37) (len 19)) (segments (segment 0 (token "specificGibbsEnergy") (name "specificGibbsEnergy") (separator none) (span (offset 47483) (line 922) (column 37) (len 19)))))
   )
-  (root (library-package (name "ISQThermodynamics") (standard true) (body brace (doc) (import (target (span (span (offset 789) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 828) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 838) (line 16) (column 30) (len 3))) (separator (span (offset 838) (line 16) (column 30) (len 2))) (marker (span (offset 840) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 862) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 883) (line 17) (column 41) (len 3))) (separator (span (offset 883) (line 17) (column 41) (len 2))) (marker (span (offset 885) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 907) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 914) (line 18) (column 27) (len 3))) (separator (span (offset 914) (line 18) (column 27) (len 2))) (marker (span (offset 916) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (alias (name "TemperatureUnit") (target (ref r4)) (body semicolon)) (alias (name "TemperatureValue") (target (ref r5)) (body semicolon)) (alias (name "temperature") (target (ref r6)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "amountOfHeat") (target (ref r7)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "CoefficientOfThermalInsulanceUnit") (target (ref r8)) (body semicolon)) (alias (name "CoefficientOfThermalInsulanceValue") (target (ref r9)) (body semicolon)) (alias (name "coefficientOfThermalInsulance") (target (ref r10)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "isentropicExpansionFactor") (target (ref r11)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "thermodynamicEnergy") (target (ref r12)) (body semicolon)) (attribute-def) (attribute-def) (alias (name "helmholtzFunction") (target (ref r13)) (body semicolon)) (attribute-def) (alias (name "gibbsFunction") (target (ref r14)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "specificThermodynamicEnergy") (target (ref r15)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (alias (name "specificHelmholtzFunction") (target (ref r16)) (body semicolon)) (attribute-def) (alias (name "specificGibbsFunction") (target (ref r17)) (body semicolon)) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def) (attribute-def))))
+  (root (library-package (name "ISQThermodynamics") (standard true) (body brace (doc) (import (target (span (span (offset 789) (line 15) (column 20) (len 18))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 828) (line 16) (column 20) (len 13))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 838) (line 16) (column 30) (len 3))) (separator (span (offset 838) (line 16) (column 30) (len 2))) (marker (span (offset 840) (line 16) (column 32) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 862) (line 17) (column 20) (len 24))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 883) (line 17) (column 41) (len 3))) (separator (span (offset 883) (line 17) (column 41) (len 2))) (marker (span (offset 885) (line 17) (column 43) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 907) (line 18) (column 20) (len 10))) (all none) (ref r3) (shape (namespace (wildcard-suffix (span (span (offset 914) (line 18) (column 27) (len 3))) (separator (span (offset 914) (line 18) (column 27) (len 2))) (marker (span (offset 916) (line 18) (column 29) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (alias (name "TemperatureUnit") (target (ref r4)) (body semicolon)) (alias (name "TemperatureValue") (target (ref r5)) (body semicolon)) (alias (name "temperature") (target (ref r6)) (body semicolon)) (attribute-def (name "CelsiusTemperatureValue") (multiplicity none)) (attribute-def (name "celsiusTemperature") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CelsiusTemperatureUnit") (multiplicity none)) (attribute-def (name "LinearExpansionCoefficientValue") (multiplicity none)) (attribute-def (name "linearExpansionCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "LinearExpansionCoefficientUnit") (multiplicity none)) (attribute-def (name "CubicExpansionCoefficientValue") (multiplicity none)) (attribute-def (name "cubicExpansionCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CubicExpansionCoefficientUnit") (multiplicity none)) (attribute-def (name "RelativePressureCoefficientValue") (multiplicity none)) (attribute-def (name "relativePressureCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "RelativePressureCoefficientUnit") (multiplicity none)) (attribute-def (name "PressureCoefficientValue") (multiplicity none)) (attribute-def (name "pressureCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PressureCoefficientUnit") (multiplicity none)) (attribute-def (name "IsothermalCompressibilityValue") (multiplicity none)) (attribute-def (name "isothermalCompressibility") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "IsothermalCompressibilityUnit") (multiplicity none)) (attribute-def (name "IsentropicCompressibilityValue") (multiplicity none)) (attribute-def (name "isentropicCompressibility") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "IsentropicCompressibilityUnit") (multiplicity none)) (attribute-def (name "heat") (multiplicity none)) (alias (name "amountOfHeat") (target (ref r7)) (body semicolon)) (attribute-def (name "latentHeat") (multiplicity none)) (attribute-def (name "HeatFlowRateValue") (multiplicity none)) (attribute-def (name "heatFlowRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "HeatFlowRateUnit") (multiplicity none)) (attribute-def (name "DensityOfHeatFlowRateValue") (multiplicity none)) (attribute-def (name "densityOfHeatFlowRate") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "DensityOfHeatFlowRateUnit") (multiplicity none)) (attribute-def (name "ThermalConductivityValue") (multiplicity none)) (attribute-def (name "thermalConductivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ThermalConductivityUnit") (multiplicity none)) (attribute-def (name "CoefficientOfHeatTransferValue") (multiplicity none)) (attribute-def (name "coefficientOfHeatTransfer") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "CoefficientOfHeatTransferUnit") (multiplicity none)) (attribute-def (name "SurfaceCoefficientOfHeatTransferValue") (multiplicity none)) (attribute-def (name "surfaceCoefficientOfHeatTransfer") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SurfaceCoefficientOfHeatTransferUnit") (multiplicity none)) (attribute-def (name "ThermalInsulanceValue") (multiplicity none)) (attribute-def (name "thermalInsulance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ThermalInsulanceUnit") (multiplicity none)) (alias (name "CoefficientOfThermalInsulanceUnit") (target (ref r8)) (body semicolon)) (alias (name "CoefficientOfThermalInsulanceValue") (target (ref r9)) (body semicolon)) (alias (name "coefficientOfThermalInsulance") (target (ref r10)) (body semicolon)) (attribute-def (name "ThermalResistanceValue") (multiplicity none)) (attribute-def (name "thermalResistance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ThermalResistanceUnit") (multiplicity none)) (attribute-def (name "ThermalConductanceValue") (multiplicity none)) (attribute-def (name "thermalConductance") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ThermalConductanceUnit") (multiplicity none)) (attribute-def (name "ThermalDiffusivityValue") (multiplicity none)) (attribute-def (name "thermalDiffusivity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "ThermalDiffusivityUnit") (multiplicity none)) (attribute-def (name "HeatCapacityValue") (multiplicity none)) (attribute-def (name "heatCapacity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "HeatCapacityUnit") (multiplicity none)) (attribute-def (name "SpecificHeatCapacityValue") (multiplicity none)) (attribute-def (name "specificHeatCapacity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificHeatCapacityUnit") (multiplicity none)) (attribute-def (name "SpecificHeatCapacityAtConstantPressureValue") (multiplicity none)) (attribute-def (name "specificHeatCapacityAtConstantPressure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificHeatCapacityAtConstantPressureUnit") (multiplicity none)) (attribute-def (name "SpecificHeatCapacityAtConstantVolumeValue") (multiplicity none)) (attribute-def (name "specificHeatCapacityAtConstantVolume") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificHeatCapacityAtConstantVolumeUnit") (multiplicity none)) (attribute-def (name "SpecificHeatCapacityAtSaturatedVapourPressureValue") (multiplicity none)) (attribute-def (name "specificHeatCapacityAtSaturatedVapourPressure") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificHeatCapacityAtSaturatedVapourPressureUnit") (multiplicity none)) (attribute-def (name "RatioOfSpecificHeatCapacitiesValue") (multiplicity none)) (attribute-def (name "ratioOfSpecificHeatCapacities") (multiplicity none)) (attribute-def (name "IsentropicExponentValue") (multiplicity none)) (attribute-def (name "isentropicExponent") (multiplicity none)) (alias (name "isentropicExpansionFactor") (target (ref r11)) (body semicolon)) (attribute-def (name "EntropyValue") (multiplicity none)) (attribute-def (name "entropy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EntropyUnit") (multiplicity none)) (attribute-def (name "SpecificEntropyValue") (multiplicity none)) (attribute-def (name "specificEntropy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificEntropyUnit") (multiplicity none)) (attribute-def (name "EnergyValue") (multiplicity none)) (attribute-def (name "energy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "EnergyUnit") (multiplicity none)) (attribute-def (name "internalEnergy") (multiplicity none)) (alias (name "thermodynamicEnergy") (target (ref r12)) (body semicolon)) (attribute-def (name "enthalpy") (multiplicity none)) (attribute-def (name "helmholtzEnergy") (multiplicity none)) (alias (name "helmholtzFunction") (target (ref r13)) (body semicolon)) (attribute-def (name "gibbsEnergy") (multiplicity none)) (alias (name "gibbsFunction") (target (ref r14)) (body semicolon)) (attribute-def (name "SpecificEnergyValue") (multiplicity none)) (attribute-def (name "specificEnergy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificEnergyUnit") (multiplicity none)) (attribute-def (name "specificInternalEnergy") (multiplicity none)) (alias (name "specificThermodynamicEnergy") (target (ref r15)) (body semicolon)) (attribute-def (name "SpecificEnthalpyValue") (multiplicity none)) (attribute-def (name "specificEnthalpy") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificEnthalpyUnit") (multiplicity none)) (attribute-def (name "specificHelmholtzEnergy") (multiplicity none)) (alias (name "specificHelmholtzFunction") (target (ref r16)) (body semicolon)) (attribute-def (name "specificGibbsEnergy") (multiplicity none)) (alias (name "specificGibbsFunction") (target (ref r17)) (body semicolon)) (attribute-def (name "MassieuFunctionValue") (multiplicity none)) (attribute-def (name "massieuFunction") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassieuFunctionUnit") (multiplicity none)) (attribute-def (name "PlanckFunctionValue") (multiplicity none)) (attribute-def (name "planckFunction") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "PlanckFunctionUnit") (multiplicity none)) (attribute-def (name "JouleThomsonCoefficientValue") (multiplicity none)) (attribute-def (name "jouleThomsonCoefficient") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "JouleThomsonCoefficientUnit") (multiplicity none)) (attribute-def (name "ThermalEfficiencyValue") (multiplicity none)) (attribute-def (name "thermalEfficiency") (multiplicity none)) (attribute-def (name "MaximumThermalEfficiencyValue") (multiplicity none)) (attribute-def (name "maximumThermalEfficiency") (multiplicity none)) (attribute-def (name "SpecificGasConstantValue") (multiplicity none)) (attribute-def (name "specificGasConstant") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "SpecificGasConstantUnit") (multiplicity none)) (attribute-def (name "MassConcentrationOfWaterValue") (multiplicity none)) (attribute-def (name "massConcentrationOfWater") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassConcentrationOfWaterUnit") (multiplicity none)) (attribute-def (name "MassConcentrationOfWaterVapourAbsoluteHumidityValue") (multiplicity none)) (attribute-def (name "massConcentrationOfWaterVapourAbsoluteHumidity") (multiplicity (lower unbounded) (upper unbounded))) (attribute-def (name "MassConcentrationOfWaterVapourAbsoluteHumidityUnit") (multiplicity none)) (attribute-def (name "MassRatioOfWaterToDryMatterValue") (multiplicity none)) (attribute-def (name "massRatioOfWaterToDryMatter") (multiplicity none)) (attribute-def (name "MassRatioOfWaterVapourToDryGasValue") (multiplicity none)) (attribute-def (name "massRatioOfWaterVapourToDryGas") (multiplicity none)) (attribute-def (name "MassFractionOfWaterValue") (multiplicity none)) (attribute-def (name "massFractionOfWater") (multiplicity none)) (attribute-def (name "MassFractionOfDryMatterValue") (multiplicity none)) (attribute-def (name "massFractionOfDryMatter") (multiplicity none)) (attribute-def (name "RelativeHumidityValue") (multiplicity none)) (attribute-def (name "relativeHumidity") (multiplicity none)) (attribute-def (name "RelativeMassConcentrationOfVapourValue") (multiplicity none)) (attribute-def (name "relativeMassConcentrationOfVapour") (multiplicity none)) (attribute-def (name "RelativeMassRatioOfVapourValue") (multiplicity none)) (attribute-def (name "relativeMassRatioOfVapour") (multiplicity none)) (attribute-def (name "dewPointTemperature") (multiplicity none)))))
 )
 ~~~
