@@ -446,6 +446,8 @@ Parser-side delivery for [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DI
 | P2 structured body loops | Complete | [PARSER_DEBT_P2_PLAN.md](./PARSER_DEBT_P2_PLAN.md) |
 | P3 AST split, action/requirement bodies | Complete | [PARSER_DEBT_P3_PLAN.md](./PARSER_DEBT_P3_PLAN.md) |
 | P4 view/part bodies, implies, part split | Complete | [PARSER_DEBT_P4_PLAN.md](./PARSER_DEBT_P4_PLAN.md) |
+| Shared grammar Phase 1-3 (traversal, body container, annotating members) | Complete | [shared-grammar.md](../planning/shared-grammar.md) |
+| Shared grammar Phase 4, first family: `OccurrenceUsagePrefix` | Complete for `OccurrenceUsage`, `ItemUsage`, `SatisfyRequirementUsage`; every other family listed with what it still needs | [occurrence-usage-prefix-matrix.md](../planning/occurrence-usage-prefix-matrix.md) |
 
 ---
 

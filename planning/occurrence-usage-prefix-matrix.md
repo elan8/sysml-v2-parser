@@ -152,7 +152,7 @@ precedes even that, and is likewise not part of the prefix.
 | `abstract` / `variation` | ordinary keywords | `Option<Node<DefinitionPrefix>>` |
 | `snapshot` / `timeslice` | ordinary keywords | `Option<Node<OccurrencePortionKind>>` |
 | `#` of a `UsageExtensionKeyword` | syntax | `UsageExtensionKeyword::hash_span` |
-| the name after `#` | **reference** (`OwnedFeatureTyping = [QualifiedName]`) | `QualifiedReferenceId` into the document arena — absolute/relative scope, ordered segments and typed separators live there |
+| the name after `#` | **reference** (`OwnedFeatureTyping = [QualifiedName]`) | `QualifiedReferenceId` into the document arena — absolute/relative scope, ordered segments and typed separators live there. `QualifiedName` is `::`-separated only, so `#a.b` is not grammatical here and no fixture asserts it; `#Lib::Tag`, `#$::P::Tag` and `#'safety critical'` all are |
 | `public`/`private`/`protected` | ordinary keyword on the **membership** | `Membership::visibility` + `Membership::span` |
 
 The extension keyword's name is a reference, never a declaration label and never copied text: the
@@ -336,7 +336,7 @@ anywhere in the pinned corpus. No malformed occurrence-usage prefix occurs in it
 | `individual`, `individual occurrence`, `ref individual` | `tests/gh90_individual_timeslice.rs`, `tests/validation/surveillance_drone.rs` | valid and represented |
 | `abstract constant ref occurrence causes[1..*]` | `tests/snapshots/sysml/…`, GH-51 regression | valid and represented |
 | `in occurrence terminatedOccurrence[1]` | Systems Library `Actions.sysml`, exercised by the library gates | valid and represented (via `directed_occurrence_usage`) |
-| `derived`, `variation`, `#Tag` on an occurrence usage | **absent** | the gap this seam closes; fixtures added by it |
+| `derived`, `variation`, `#Tag` on an occurrence usage | **absent** before this seam | the gap it closes; covered by the four fixtures in §10 |
 
 ### 7.3 Classification of every spelling found
 
@@ -347,7 +347,7 @@ anywhere in the pinned corpus. No malformed occurrence-usage prefix occurs in it
 | valid but parsed and discarded | none in this production — the discarded facts were not parsed at all |
 | valid but unsupported | `derived …`, `variation …`, `in individual …`, `individual snapshot …`, `individual timeslice …`, `in abstract occurrence …`, `constant snapshot …`, `#Tag <occurrence usage>` (parsed as a sibling, not a prefix), and every prefix at all on a `SatisfyRequirementUsage` |
 | malformed | none in the pinned corpus. Constructed for coverage: `abstract abstract`, `snapshot timeslice`, `in out`, `ref in`, `individual ref`, `constant derived`, `#`, `#::`, `derived;` |
-| permissive legacy syntax not supported by the pinned grammar | `ref individual item :>> driver : Alice;` was **accepted with the wrong shape** — `item` is `ItemUsage`'s kind keyword, and the occurrence parser took it as the declaration name, re-emitting `ref individual 'item' : Alice :>> driver;`. That is corpus input (`training/28. Individuals/Individuals and Time Slices.sysml:10`) silently changed by a round trip |
+| permissive legacy syntax not supported by the pinned grammar | `ref individual item :>> driver : Alice;` was **accepted with the wrong shape** — `item` is `ItemUsage`'s kind keyword, and the occurrence parser took it as the declaration name, re-emitting `ref individual 'item' : Alice :>> driver;`. That is corpus input (`training/28. Individuals/Individuals and Time Slices.sysml:10`) silently changed by a round trip. Now an `ItemUsage` with a `ref individual` prefix, which is why `ItemUsage` is migrated here and not deferred: refusing the wrong reading is only an improvement if the family that owns `item` can then claim it |
 
 ## 8. Recovery contract
 
@@ -372,6 +372,41 @@ Recovery never fabricates a prefix component, and a refused prefix never becomes
 usage: the refusal is at the whole production, so the member becomes one recovery node spanning
 the authored text.
 
+## 8.1 Dispatch precedence, and what the implementation found
+
+Two of the prefix's FIRST tokens also head a *different* production that several scopes dispatch
+before the migrated families, and neither of those parsers knows about the kind keyword that
+follows:
+
+| Token | Competing production | What happened before | Now |
+| --- | --- | --- | --- |
+| `#` | `PrefixMetadataMember` as a standalone sibling member (`metadata_keyword_prefix`) | `#Tag occurrence o;` became two sibling members, leaving the usage unprefixed | one member, with the tag in its prefix |
+| `ref` | `ReferenceUsage = ( EndUsagePrefix \| RefPrefix ) 'ref' Usage` (`ref_decl` / `part_ref_usage` / `action_ref_decl`) | `derived ref item x;` became an anonymous `ReferenceUsage` named `item`, and `ref individual snapshot satisfy R;` one named `individual` — silently, with no diagnostic | the migrated family claims it |
+
+`parser::occurrence_prefix::starts_contended_prefix` scans the prefix slots that head no competing
+production (`in`, `out`, `inout`, `derived`, `abstract`, `variation`, `constant`, `individual`,
+`snapshot`, `timeslice`) and reports whether the run reaches a `ref` or a `#`. Only then do the
+migrated families get first refusal, so every scope's `*_def`-before-`*_usage` ordering is
+untouched — `abstract item items : Item[0..*] nonunique :> objects { … }` still reaches
+`item_def`, which is the PAR-001 bug class a blanket reordering would have reopened.
+
+Three further findings from the migration, each fixed here:
+
+- a `connection def` body could not *emit* an occurrence usage at all, so one legal owning scope of
+  a migrated family had no round trip;
+- `ConnectionDefBodyElement::OccurrenceUsage` and `PartUsageBodyElement::OccurrenceUsage`
+  projected as contentless markers, as did `ItemUsage` in every scope, so a snapshot could not tell
+  a prefixed usage from a bare one;
+- an anonymous declaration (`ref individual :>> driver : Alice;`) left the keyword's trailing space
+  stranded in front of a clause that supplies its own, emitting `ref individual  :>> driver`.
+
+Two remain, both pre-existing and both outside this production:
+
+- `ViewDef` projects as a contentless `(view-def)` marker in every scope, so a satisfy usage inside
+  a `view def` body is covered by that fixture's `FORMAT` and `DIAGNOSTICS` sections rather than by
+  its `AST` section. Extending that projection is a `ViewDef` change, not a prefix change;
+- `ConnectionDefBodyElement::SuccessionUsage` still has no emitter.
+
 ## 9. Migration status, family by family
 
 Migrated by this change — no legacy prefix field or parser path remains for either:
@@ -394,6 +429,17 @@ component this one defines:
 | `StateUsage`, `CalcUsage`, `ConstraintUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage` | varying subsets of `abstract`/`variation`/`ref`/`individual`/direction | spans, and the slots each does not carry |
 | `ViewUsage`, `RenderingUsage`, `ConnectionUsage`, `InterfaceUsage`, `AllocationUsage`, `FlowUsage`, `Message`, `SuccessionFlowUsage`, `PerformActionUsage`, `ExhibitStateUsage`, `IncludeUseCaseUsage`, `AssertConstraintUsage`, `AcceptNode`, `SendNode` | little or none | the whole prefix |
 | `MergeNode`, `DecisionNode`, `JoinNode`, `ForkNode` | none | **`ControlNodePrefix`, not this production** — needs its own `RefPrefix`-rooted component, which §5.2's nesting already provides |
+
+## 10. Coverage
+
+| Evidence | What it pins |
+| --- | --- |
+| `tests/snapshots/sysml/occurrence_usage_prefix_alternatives.md` | every slot alone, the full legal order, materially different combinations, all three families, both keyword-less spellings, both body forms, extension keywords qualified/absolute/quoted, `MemberPrefix` visibility beside the prefix |
+| `tests/snapshots/sysml/occurrence_usage_prefix_owning_scopes.md` | a materially different prefix in every scope a migrated family is dispatched from |
+| `tests/snapshots/sysml/occurrence_usage_prefix_recovery.md` | malformed content before every FIRST token and between two prefix components; invalid orderings, both exclusive pairs, a repeated portion kind, a prefix with no usage, a malformed extension keyword; prefix words inside a quoted name, a string literal and both comment forms; a valid sibling after every case |
+| `tests/snapshots/sysml/occurrence_usage_prefix_unterminated.md` | the unmatched-brace state, which subsumes every other member and therefore needs its own fixture |
+| `tests/occurrence_usage_prefix_owning_layer.rs` | arena rollback after refused speculation, strict/editor equivalence, parse→format→reparse and format idempotence per slot, and envelope rejection of a wrong-token span, a wrong alternative, out-of-order slots, a non-`#` sigil, a dangling extension identity, and a keyword belonging to another member |
+| `tests/snapshots/spec42/**` | the pinned corpus files this seam changed: `28_individuals_and_time_slices.md`, `john_individual_example.md`, `6_individual_and_snapshots.md`, `9_verification_simplified.md`, `14c_language_extensions.md`, `fuzz_individual_direction_prefix.md` and the action-body fixtures, each losing a diagnostic or a corrupted round trip |
 
 The safe continuation path for an unmigrated family is: confirm from the pin which of
 `OccurrenceUsagePrefix` / `UsagePrefix` / `ControlNodePrefix` its production names; give the AST
