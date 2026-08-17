@@ -116,7 +116,8 @@ package '7a-Variant Configuration - General Concept' {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 192) (line 12) (column 35) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 192) (line 12) (column 35) (len 7)))))
   )
-  (root (package (name "7a-Variant Configuration - General Concept") (body brace (part-def (name "Vehicle") (body semicolon)) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage) (part-usage))))
+  (root (package (name "7a-Variant Configuration - General Concept") (body brace (part-def (name "Vehicle") (body semicolon)) (part-usage (declaration-name "part1") (typing none) (body semicolon)) (part-usage (declaration-name "part2") (typing none) (body semicolon)) (part-usage (declaration-name "part3") (typing none) (body semicolon)) (part-usage (declaration-name "part4") (typing none) (body semicolon)) (part-usage (declaration-name "part5") (typing none) (body semicolon)) (part-usage (declaration-name "part6") (typing none) (body semicolon)) (part-usage (declaration-name "anyVehicleConfig") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body brace (part-usage) (part-usage) (assert-constraint))) (part-usage (declaration-name "vehicleConfigA") (typing none) (body brace (part-usage) (part-usage))) (part-usage (declaration-name "VehicleConfigB") (typing none) (body brace (part-usage) (part-usage))))))
 )
 ~~~

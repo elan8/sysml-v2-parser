@@ -91,7 +91,8 @@ package AnalysisTest {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 59) (line 7) (column 12) (len 1)) (segments (segment 0 (token "V") (name "V") (separator none) (span (offset 59) (line 7) (column 12) (len 1)))))
   )
-  (root (package (name "AnalysisTest") (body brace (part-def (name "V") (body brace (default-reference-usage))) (part-usage) (requirement-def (name "AnalysisObjective") (body brace (doc))) (analysis-case-def) (analysis-case-def) (part-usage))))
+  (root (package (name "AnalysisTest") (body brace (part-def (name "V") (body brace (default-reference-usage))) (part-usage (declaration-name "vv") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body semicolon)) (requirement-def (name "AnalysisObjective") (body brace (doc))) (analysis-case-def) (analysis-case-def) (part-usage (declaration-name "analysisContext") (typing none) (body brace (analysis-case-usage))))))
 )
 ~~~

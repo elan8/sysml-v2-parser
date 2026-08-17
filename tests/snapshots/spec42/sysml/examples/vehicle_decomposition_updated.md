@@ -139,7 +139,8 @@ package 'Vehicle Decomposition - Updated' {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 448) (line 28) (column 17) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 448) (line 28) (column 17) (len 7)))))
   )
-  (root (package (name "Vehicle Decomposition - Updated") (body brace (doc) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Chassis Assembly") (body semicolon)) (part-def (name "Wheel") (body semicolon)) (part-def (name "LugBolt") (body semicolon)) (part-def (name "RollBar") (body semicolon)) (part-def (name "HeavyRollBar") (body semicolon)) (part-def (name "LightRollBar") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Cylinder") (body semicolon)) (part-usage) (part-usage) (part-usage))))
+  (root (package (name "Vehicle Decomposition - Updated") (body brace (doc) (part-def (name "Vehicle") (body semicolon)) (part-def (name "Chassis Assembly") (body semicolon)) (part-def (name "Wheel") (body semicolon)) (part-def (name "LugBolt") (body semicolon)) (part-def (name "RollBar") (body semicolon)) (part-def (name "HeavyRollBar") (body semicolon)) (part-def (name "LightRollBar") (body semicolon)) (part-def (name "Engine") (body semicolon)) (part-def (name "Cylinder") (body semicolon)) (part-usage (declaration-name "vehicle") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body brace (part-usage) (part-usage))) (part-usage (declaration-name "vehicle model 1") (typing none) (body brace (part-usage) (part-usage) (ref (name "lugBolts") (prefix (direction none) (derived false) (usage-prefix none) (constant false)) (kind none) (typing none) (redefines none) (subsets none) (body semicolon)))) (part-usage (declaration-name "vehicle model 2") (typing none) (body brace (part-usage) (part-usage))))))
 )
 ~~~

@@ -40,7 +40,8 @@ package C {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 97) (line 8) (column 14) (len 4)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 97) (line 8) (column 14) (len 1))) (segment 1 (token "T") (name "T") (separator colon-colon) (span (offset 100) (line 8) (column 17) (len 1)))))
   )
-  (root (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (package (name "C") (body brace (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (part-usage))))
+  (root (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (package (name "C") (body brace (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (part-usage (declaration-name "p") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body semicolon)))))
 )
 ~~~

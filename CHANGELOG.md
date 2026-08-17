@@ -130,6 +130,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A package-level part usage projects its typing and its body.** It was a bare `(part-usage)`
+  marker, so a snapshot could not show any member of `part p { ... }` written at package level,
+  and the usage's own type reference never appeared in the projection's reference table.
+  `PartUsageBody` and `RefBody` are both `Body<PartUsageBodyElement>`, so the exhaustive element
+  match that ref bodies already used covers this scope unchanged -- nothing called it. 112 fixtures
+  gain body detail; the reference tables renumber because the table is built from what the
+  projection reaches, in the order it reaches it.
+
 - **Ref and attribute usage projections name the `RefPrefix` chain.** The semantic projection
   recorded neither `derived`/`abstract`/`variation`/`constant` nor the direction, so a snapshot
   could not distinguish `derived abstract constant ref attribute x` from a bare `attribute x`,

@@ -69,7 +69,9 @@ package 'Parts Example-1' {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 203) (line 17) (column 22) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 203) (line 17) (column 22) (len 7)))))
+    (reference r1 (scope relative) (span (offset 290) (line 23) (column 20) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 290) (line 23) (column 20) (len 7)))))
   )
-  (root (package (name "Parts Example-1") (body brace (part-def (name "Vehicle") (body brace (part-usage))) (part-def (name "Engine") (body brace (part-usage))) (part-def (name "Cylinder") (body semicolon)) (part-usage) (part-usage))))
+  (root (package (name "Parts Example-1") (body brace (part-def (name "Vehicle") (body brace (part-usage))) (part-def (name "Engine") (body brace (part-usage))) (part-def (name "Cylinder") (body semicolon)) (part-usage (declaration-name "smallVehicle") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body brace (part-usage))) (part-usage (declaration-name "bigVehicle") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r1)))) (body brace (part-usage))))))
 )
 ~~~

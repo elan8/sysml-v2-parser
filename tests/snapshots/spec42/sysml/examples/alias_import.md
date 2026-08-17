@@ -46,7 +46,8 @@ package AliasImport {
   (references
     (reference r0 (scope relative) (span (offset 93) (line 5) (column 20) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 93) (line 5) (column 20) (len 7)))))
     (reference r1 (scope relative) (span (offset 145) (line 9) (column 21) (len 16)) (segments (segment 0 (token "Definitions") (name "Definitions") (separator none) (span (offset 145) (line 9) (column 21) (len 11))) (segment 1 (token "Car") (name "Car") (separator colon-colon) (span (offset 158) (line 9) (column 34) (len 3)))))
+    (reference r2 (scope relative) (span (offset 185) (line 11) (column 21) (len 3)) (segments (segment 0 (token "Car") (name "Car") (separator none) (span (offset 185) (line 11) (column 21) (len 3)))))
   )
-  (root (package (name "AliasImport") (body brace (package (name "Definitions") (body brace (part-def (name "Vehicle") (body semicolon)) (alias (name "Car") (target (ref r0)) (body semicolon)))) (package (name "Usages") (body brace (import (target (span (span (offset 145) (line 9) (column 21) (len 16))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (part-usage))))))
+  (root (package (name "AliasImport") (body brace (package (name "Definitions") (body brace (part-def (name "Vehicle") (body semicolon)) (alias (name "Car") (target (ref r0)) (body semicolon)))) (package (name "Usages") (body brace (import (target (span (span (offset 145) (line 9) (column 21) (len 16))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (part-usage (declaration-name "vehicle") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (body semicolon)))))))
 )
 ~~~

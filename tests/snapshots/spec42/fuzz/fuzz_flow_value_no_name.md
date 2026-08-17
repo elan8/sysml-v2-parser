@@ -39,7 +39,8 @@ package P {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 31) (line 2) (column 20) (len 7)) (segments (segment 0 (token "Vehicle") (name "Vehicle") (separator none) (span (offset 31) (line 2) (column 20) (len 7)))))
   )
-  (root (package (name "P") (body brace (part-usage))))
+  (root (package (name "P") (body brace (part-usage (declaration-name "vehicle") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (body brace (part-usage) (malformed (code "missing_semicolon") (found "flow = FuelFlow of Fuel") (span (offset 77) (line 5) (column 9) (len 100))))))))
 )
 ~~~

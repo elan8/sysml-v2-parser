@@ -1929,6 +1929,25 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// A part usage and its body.
+    ///
+    /// `PartUsageBody` and `RefBody` are both `Body<PartUsageBodyElement>`, so the exhaustive
+    /// element match in [`write_ref_body`](Self::write_ref_body) already covers this scope; a
+    /// package-level part usage projected as a bare marker only because nothing called it.
+    fn write_part_usage(&mut self, usage: &super::PartUsage) -> io::Result<()> {
+        self.writer.write_str("(part-usage (declaration-name ")?;
+        self.write_usage_declaration_name(&usage.name)?;
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_ref_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_ref_body(&mut self, body: &super::RefBody) -> io::Result<()> {
         match body {
             super::RefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
@@ -2776,7 +2795,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_part_definition(&definition.value)
             }
-            PackageBodyElement::PartUsage(_usage) => self.write_marker(first, "part-usage"),
+            PackageBodyElement::PartUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_part_usage(&usage.value)
+            }
             PackageBodyElement::PortDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_port_definition(&definition.value)
