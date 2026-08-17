@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A calculation body owns its action members, and `ref calc` parses as one declaration.**
+  `CalculationBodyItem = ActionBodyItem | ReturnParameterMember`, so a calculation body holds every
+  action-body member. It held none of them, and the failure was silent rather than a diagnostic:
+  the body's keyword-less `DefaultReferenceUsage` fallback read each action keyword as a feature
+  name, so `first f;` parsed as two invented members -- `'first';` and `f;` -- and formatted back
+  that way. The same fallback swallowed the `ref` of `BasicUsagePrefix = RefPrefix
+  ( isReference ?= 'ref' )?`, so `ref calc self : Calculation :>> Action::self;` in the checked-in
+  `Calculations.sysml` fixture emitted as `'ref';` on its own line followed by a `calc` usage that
+  had lost its prefix. `CalcUsage::is_reference` retains the keyword and the calculation body now
+  routes action members to the action dispatcher. Only a calculation reaches it: `calc_def_body`
+  also serves KerML type bodies, whose `TypeBodyElement` has no action-node alternative.
+  **AST version 160 -> 161.**
+
 - **A part usage body takes the view family, and a part definition body can emit it.**
   `ViewUsage`, `ViewpointUsage` and `RenderingUsage` are usage-element alternatives and their
   three definitions are `DefinitionElement` alternatives, so `UsageBody = DefinitionBody` admits
@@ -138,6 +151,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatted back as `derived ref deferred : ActionUsage;`. **AST version 152 -> 153.**
 
 ### Changed
+
+- **A calculation definition projects its body.** It was a bare `(calc-def)` marker, so no
+  snapshot could show whether a calculation body member survived parsing -- which is how the
+  shredding above stayed invisible. Action members reuse the exhaustive `ActionDefBodyElement`
+  writer rather than restating it.
 
 - **A package-level part usage projects its typing and its body.** It was a bare `(part-usage)`
   marker, so a snapshot could not show any member of `part p { ... }` written at package level,

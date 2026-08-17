@@ -69,8 +69,7 @@ standard library package Calculations {
 		 * Calculation is the most general class of evaluations of CalculationDefinitions in a
 		 * system or part of a system. Calculation is the base class of all CalculationDefinitions.
 		 */
-        'ref';
-        calc self : Calculation :>> Action::self, Evaluation::self;
+        ref calc self : Calculation :>> Action::self, Evaluation::self;
         abstract calc subcalculations : Calculation :> calculations, subactions {
             doc
             /*
@@ -95,6 +94,6 @@ standard library package Calculations {
     (reference r2 (scope relative) (span (offset 272) (line 10) (column 17) (len 15)) (segments (segment 0 (token "Actions") (name "Actions") (separator none) (span (offset 272) (line 10) (column 17) (len 7))) (segment 1 (token "Action") (name "Action") (separator colon-colon) (span (offset 281) (line 10) (column 26) (len 6)))))
     (reference r3 (scope relative) (span (offset 305) (line 11) (column 17) (len 16)) (segments (segment 0 (token "Actions") (name "Actions") (separator none) (span (offset 305) (line 11) (column 17) (len 7))) (segment 1 (token "actions") (name "actions") (separator colon-colon) (span (offset 314) (line 11) (column 26) (len 7)))))
   )
-  (root (library-package (name "Calculations") (standard true) (body brace (doc) (import (target (span (span (offset 187) (line 8) (column 17) (len 24))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 229) (line 9) (column 17) (len 25))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 272) (line 10) (column 17) (len 15))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 305) (line 11) (column 17) (len 16))) (all none) (ref r3) (shape (membership (recursive-suffix none))))) (calc-def) (calc-def))))
+  (root (library-package (name "Calculations") (standard true) (body brace (doc) (import (target (span (span (offset 187) (line 8) (column 17) (len 24))) (all none) (ref r0) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 229) (line 9) (column 17) (len 25))) (all none) (ref r1) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 272) (line 10) (column 17) (len 15))) (all none) (ref r2) (shape (membership (recursive-suffix none))))) (import (target (span (span (offset 305) (line 11) (column 17) (len 16))) (all none) (ref r3) (shape (membership (recursive-suffix none))))) (calc-def (name "Calculation") (body brace (doc) (calc-usage) (calc-usage))) (calc-def (name "calculations") (body brace (doc))))))
 )
 ~~~

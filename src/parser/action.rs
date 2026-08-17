@@ -715,7 +715,7 @@ fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Action
     )))
 }
 
-fn action_def_body_element(
+pub(crate) fn action_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::ActionDefBodyElement>> {
     use crate::ast::ActionDefBodyElement;

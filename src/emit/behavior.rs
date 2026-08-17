@@ -269,7 +269,7 @@ pub(crate) fn emit_action_def_body(
     }
 }
 
-fn emit_action_def_body_element(
+pub(crate) fn emit_action_def_body_element(
     w: &mut EmitWriter<'_>,
     path: &str,
     el: &ActionDefBodyElement,

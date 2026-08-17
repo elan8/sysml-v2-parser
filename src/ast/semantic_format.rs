@@ -1562,6 +1562,104 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
     }
 
+    fn write_calc_definition(&mut self, definition: &super::CalcDef) -> io::Result<()> {
+        self.writer.write_str("(calc-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") ")?;
+        self.write_calc_def_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// A calculation body's members.
+    ///
+    /// `CalculationBodyItem = ActionBodyItem | ReturnParameterMember`, and the action half used to
+    /// be shredded into invented keyword-named features, so a marker for the definition as a whole
+    /// could not show whether a member survived at all. Action members reuse the exhaustive
+    /// `ActionDefBodyElement` writer rather than restating it.
+    fn write_calc_def_body(&mut self, body: &super::CalcDefBody) -> io::Result<()> {
+        match body {
+            super::CalcDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::CalcDefBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::CalcDefBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::CalcDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::CalcDefBodyElement::ActionMember(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_first_merge_member(&member.value, &member.span)?;
+                        }
+                        super::CalcDefBodyElement::InOutDecl(_declaration) => {
+                            self.write_marker(&mut first, "in-out-declaration")?;
+                        }
+                        super::CalcDefBodyElement::TypedParameter(_member) => {
+                            self.write_marker(&mut first, "typed-parameter")?;
+                        }
+                        super::CalcDefBodyElement::KermlFeature(_member) => {
+                            self.write_marker(&mut first, "kerml-feature")?;
+                        }
+                        super::CalcDefBodyElement::Invariant(_member) => {
+                            self.write_marker(&mut first, "invariant")?;
+                        }
+                        super::CalcDefBodyElement::Connector(_member) => {
+                            self.write_marker(&mut first, "connector")?;
+                        }
+                        super::CalcDefBodyElement::Binding(_member) => {
+                            self.write_marker(&mut first, "binding")?;
+                        }
+                        super::CalcDefBodyElement::Succession(_member) => {
+                            self.write_marker(&mut first, "succession")?;
+                        }
+                        super::CalcDefBodyElement::EndMember(_member) => {
+                            self.write_marker(&mut first, "end-member")?;
+                        }
+                        super::CalcDefBodyElement::Import(_member) => {
+                            self.write_marker(&mut first, "import")?;
+                        }
+                        super::CalcDefBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        super::CalcDefBodyElement::AssertConstraint(_member) => {
+                            self.write_marker(&mut first, "assert-constraint")?;
+                        }
+                        super::CalcDefBodyElement::KermlClassifier(_member) => {
+                            self.write_marker(&mut first, "kerml-classifier")?;
+                        }
+                        super::CalcDefBodyElement::DefaultReferenceUsage(_member) => {
+                            self.write_marker(&mut first, "default-reference-usage")?;
+                        }
+                        super::CalcDefBodyElement::ReturnDecl(_member) => {
+                            self.write_marker(&mut first, "return-declaration")?;
+                        }
+                        super::CalcDefBodyElement::Expression(expression) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(expression ")?;
+                            self.write_expression(expression)?;
+                            self.writer.write_char(')')?;
+                        }
+                        super::CalcDefBodyElement::CalcUsage(_member) => {
+                            self.write_marker(&mut first, "calc-usage")?;
+                        }
+                        super::CalcDefBodyElement::CalcDef(_member) => {
+                            self.write_marker(&mut first, "calc-def")?;
+                        }
+                        super::CalcDefBodyElement::PartUsage(_member) => {
+                            self.write_marker(&mut first, "part-usage")?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
     fn write_first_merge_member(
         &mut self,
         member: &ActionDefBodyElement,
@@ -2866,7 +2964,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ConstraintUsage(_usage) => {
                 self.write_marker(first, "constraint-usage")
             }
-            PackageBodyElement::CalcDef(_definition) => self.write_marker(first, "calc-def"),
+            PackageBodyElement::CalcDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_calc_definition(&definition.value)
+            }
             PackageBodyElement::ViewDef(_definition) => self.write_marker(first, "view-def"),
             PackageBodyElement::ViewpointDef(_definition) => {
                 self.write_marker(first, "viewpoint-def")

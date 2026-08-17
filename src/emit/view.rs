@@ -143,6 +143,9 @@ pub(crate) fn emit_calc_usage(
     if usage.is_abstract {
         w.push_str("abstract ");
     }
+    if usage.is_reference {
+        w.push_str("ref ");
+    }
     w.push_str("calc ");
     let leading_target = usage.redefines.as_ref().and_then(|targets| {
         (targets.len() == 1
@@ -214,6 +217,9 @@ fn emit_calc_body_element(
         CalcDefBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         CalcDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
+        }
+        CalcDefBodyElement::ActionMember(n) => {
+            super::behavior::emit_action_def_body_element(w, path, &n.value)
         }
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),

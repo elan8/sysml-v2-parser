@@ -6356,7 +6356,7 @@ macro_rules! ast_traversal {
         pub fn walk_calc_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<CalcUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let CalcUsage { identification, is_abstract, type_name, subsets, redefines, value, direction, body, membership } = &$($mutability)? node.value;
+            let CalcUsage { identification, is_abstract, type_name, subsets, redefines, value, direction, is_reference: _, body, membership } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
             let _ = is_abstract;
             if let Some(inner) = subsets {
@@ -6404,6 +6404,9 @@ macro_rules! ast_traversal {
             match &$($mutability)? node.value {
                 CalcDefBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
+                }
+                CalcDefBodyElement::ActionMember(field_0) => {
+                    visitor.visit_action_def_body_element(&$($mutability)? **field_0);
                 }
                 CalcDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);

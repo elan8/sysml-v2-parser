@@ -108,6 +108,13 @@ pub struct CalcUsage {
     pub value: Option<Node<crate::ast::FeatureValue>>,
     /// Set when parsed as `in`/`out`/`inout calc` (validation `10c`).
     pub direction: Option<crate::ast::InOut>,
+    /// The `ref` of `BasicUsagePrefix = RefPrefix ( isReference ?= 'ref' )?`, e.g. `ref calc
+    /// self : Calculation :>> Action::self;` (Systems Library `Calculations.sysml`). The keyword
+    /// was not accepted at all, so a calculation body fell through to its expression parser and
+    /// kept the bare word `ref` as a standalone expression member -- emission then wrote
+    /// `'ref';` on its own line and the declaration lost its prefix. Parallel to
+    /// `ActionUsage::is_reference` and `PartUsage::is_reference`.
+    pub is_reference: bool,
     pub body: CalcDefBody,
     pub membership: Membership,
 }
@@ -120,6 +127,16 @@ pub enum CalcDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML 8.2.2.19), so a
+    /// calculation body owns every action-body member as well as its own `return`. They arrive
+    /// through the action dispatcher rather than as fifteen restated variants, the way
+    /// [`crate::ast::DefinitionBodyElement::OccurrenceMember`] delegates its member set.
+    ///
+    /// Only a SysML calculation body produces this. `calc_def_body` also serves KerML type
+    /// bodies, whose `TypeBodyElement` has no action-node alternative, so the calculation
+    /// entry point is the only one that dispatches it. Splitting the two scopes into their own
+    /// element enums is Phase-4 work; this variant does not make that debt worse.
+    ActionMember(Box<Node<crate::ast::ActionDefBodyElement>>),
     InOutDecl(Box<Node<InOutDecl>>),
     /// KerML kinded parameter member: `in expr fn[0..*] { ... }`, `in bool test = expr;`,
     /// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
