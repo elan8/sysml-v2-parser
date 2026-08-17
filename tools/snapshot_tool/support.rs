@@ -389,27 +389,26 @@ fn comparison_projection(
 /// Existing formatter debt is pinned to an exact fixture path and SOURCE/FORMAT byte pair. A new
 /// fixture can never inherit an exemption, and any parser, emitter, or fixture change makes the
 /// gate run again. Remove entries as their owning formatter paths are repaired.
+///
+/// A pin that is no longer *needed* is as much a defect as a missing one: it claims debt the
+/// formatter has already paid off, and — because a stale fingerprint is indistinguishable from a
+/// repaired path — it hides whether the exemption is still doing anything.
+/// [`every_pinned_debt_entry_is_live_and_invalidated_by_change`] checks every entry both ways.
 const CANONICAL_OUTPUT_DEBT: &[(&str, u64)] = &[
-    // Derivation ends change semantic shape after emission.
-    (
-        "tests/snapshots/spec42/sysml.library/derivation_connections.md",
-        0x1d27_4982_f49b_e1d8,
-    ),
     // Containment references change semantic shape after emission.
     (
         "tests/snapshots/spec42/sysml/validation/13a_model_containment.md",
         0x5b3f_9624_f3ce_3342,
-    ),
-    // Ref declarations change semantic shape after emission.
-    (
-        "tests/snapshots/sysml/ref_declaration_scopes.md",
-        0xdf43_bbdf_f9e6_d5be,
     ),
     // The emitted KerML type body does not strictly reparse.
     (
         "tests/snapshots/kerml/type_body_relationship_members.md",
         0xa337_2e6d_d744_3f8d,
     ),
+    // Removed as their owning formatter paths were repaired: `sysml/ref_declaration_scopes.md`
+    // and `spec42/sysml.library/derivation_connections.md`. Both now satisfy the canonical-output
+    // gate outright, and `ref_declaration_scopes.md` had additionally drifted out of sync with its
+    // pinned fingerprint, which is what the liveness half of the test above now catches.
 ];
 
 fn canonical_output_fingerprint(source: &str, emitted: &str) -> u64 {
@@ -729,33 +728,56 @@ mod tests {
         assert!(error.contains("formatted output is not stable"));
     }
 
+    /// Every entry of [`CANONICAL_OUTPUT_DEBT`] still matches its fixture, and none of them would
+    /// survive a change to it.
+    ///
+    /// Both halves matter, and this used to check only the second, against one hard-coded path.
+    /// A pin whose fingerprint has drifted still *reads* like live debt — the gate simply stops
+    /// recognizing it — so a repaired formatter path and a stale pin look identical from the
+    /// entry alone. Driving the test from the list rather than from a path means neither can
+    /// happen to any entry unnoticed, and a pin left behind after its path is repaired is caught
+    /// by the accompanying `check` run rather than sitting in the table claiming debt that no
+    /// longer exists.
     #[test]
-    fn debt_exemption_is_invalidated_by_any_source_or_format_change() {
-        let path = Path::new("tests/snapshots/sysml/ref_declaration_scopes.md");
-        let fixture = fs::read_to_string(path).expect("read pinned fixture");
-        let source = leading_fenced_section(
-            leading_fenced_section(&fixture, "META", "sexpr")
-                .expect("META")
-                .1,
-            "SOURCE",
-            "sysml",
-        )
-        .expect("SOURCE")
-        .0;
-        let format = fixture
-            .split_once("# FORMAT\n~~~sysml\n")
-            .expect("SysML FORMAT")
-            .1
-            .split_once("\n~~~\n")
-            .expect("FORMAT fence")
+    fn every_pinned_debt_entry_is_live_and_invalidated_by_change() {
+        assert!(
+            !CANONICAL_OUTPUT_DEBT.is_empty(),
+            "the table is empty, so this test proves nothing; delete it with the last entry"
+        );
+        for (suffix, _) in CANONICAL_OUTPUT_DEBT {
+            let path = Path::new(suffix);
+            let fixture = fs::read_to_string(path)
+                .unwrap_or_else(|error| panic!("read pinned fixture {suffix}: {error}"));
+            let source = leading_fenced_section(
+                leading_fenced_section(&fixture, "META", "sexpr")
+                    .unwrap_or_else(|error| panic!("META in {suffix}: {error}"))
+                    .1,
+                "SOURCE",
+                "sysml",
+            )
+            .unwrap_or_else(|error| panic!("SOURCE in {suffix}: {error}"))
             .0;
+            let format = fixture
+                .split_once("# FORMAT\n~~~sysml\n")
+                .unwrap_or_else(|| {
+                    panic!("{suffix} has no SysML FORMAT section, so it cannot carry a pin")
+                })
+                .1
+                .split_once("\n~~~\n")
+                .unwrap_or_else(|| panic!("FORMAT fence in {suffix}"))
+                .0;
 
-        assert!(is_pinned_canonical_output_debt(path, &source, format));
-        assert!(!is_pinned_canonical_output_debt(
-            path,
-            &source,
-            &format!("{format} ")
-        ));
+            assert!(
+                is_pinned_canonical_output_debt(path, &source, format),
+                "{suffix}'s pinned fingerprint no longer matches its SOURCE/FORMAT pair, so the \
+                 exemption is dead: either the formatter path was repaired and the entry should \
+                 be removed, or the fixture changed and the entry needs re-pinning"
+            );
+            assert!(
+                !is_pinned_canonical_output_debt(path, &source, &format!("{format} ")),
+                "{suffix}'s exemption survived a change to its FORMAT"
+            );
+        }
     }
 
     #[test]

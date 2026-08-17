@@ -400,12 +400,11 @@ Three further findings from the migration, each fixed here:
 - an anonymous declaration (`ref individual :>> driver : Alice;`) left the keyword's trailing space
   stranded in front of a clause that supplies its own, emitting `ref individual  :>> driver`.
 
-Two remain, both pre-existing and both outside this production:
-
-- `ViewDef` projects as a contentless `(view-def)` marker in every scope, so a satisfy usage inside
-  a `view def` body is covered by that fixture's `FORMAT` and `DIAGNOSTICS` sections rather than by
-  its `AST` section. Extending that projection is a `ViewDef` change, not a prefix change;
-- `ConnectionDefBodyElement::SuccessionUsage` still has no emitter.
+Two more were outside this production and are fixed in the follow-up that also repaired the
+canonical-output debt pins: `ViewDef` projected as a contentless `(view-def)` marker in every
+scope, so a satisfy usage inside a `view def` body could only be pinned through `FORMAT`; and
+`ConnectionDefBodyElement::SuccessionUsage` had no emitter. Both now behave like every other
+member of their scope.
 
 ## 8.2 Allocation and cost
 

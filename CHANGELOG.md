@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Three pre-existing gaps the occurrence-prefix seam surfaced but did not own.**
+
+  - A `connection def` body is an ordinary `DefinitionBody`, so it owns occurrence usages and
+    succession usages like any other; neither could be *emitted*, which made it the one legal
+    owning scope of those families with no round trip. Systems Library
+    `Domain Libraries/Cause and Effect/CausationConnections.sysml` writes both.
+    `tests/snapshots/sysml/connection_def_body_occurrence_and_succession.md` pins them.
+  - `ViewDef` projected as a contentless `(view-def)` marker in all three scopes that own one, so
+    a snapshot could show neither the declaration, nor `abstract`, nor the subclassification
+    clause, nor a single body member -- a `view def` was the one definition family whose entire
+    contents were invisible to the end-to-end contract. `view_def_body_members.md` now shows them.
+  - Two `CANONICAL_OUTPUT_DEBT` pins claimed formatter debt that no longer exists
+    (`sysml/ref_declaration_scopes.md`, `spec42/sysml.library/derivation_connections.md`), and the
+    first had additionally drifted out of sync with its own fingerprint, which is what made the
+    snapshot driver's exemption test fail. Both are removed. The test that guarded one hard-coded
+    path is now driven by the table itself and checks each entry both ways -- that it still
+    matches its fixture, and that it would not survive a change to it -- so neither a dead pin nor
+    a drifted one can go unnoticed again.
+
 - **One shared, typed `OccurrenceUsagePrefix`, and three families migrated onto it.** Audit and
   evidence: `planning/occurrence-usage-prefix-matrix.md`. **AST version 168 -> 169.**
 
