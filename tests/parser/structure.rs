@@ -3466,19 +3466,27 @@ part def Foo {
             _ => None,
         })
         .expect("expected a Satisfy member");
-    let inline = satisfy
-        .inline_requirement
-        .as_ref()
-        .expect("expected inline_requirement to be populated for the `requirement` form");
-    assert_eq!(inline.name, "myReq");
-    assert!(inline.type_name.is_some());
-    assert!(matches!(&satisfy.target.value, Expression::FeatureRef(_)));
+    let declaration = match &satisfy.requirement {
+        sysml_v2_parser::ast::SatisfiedRequirement::Declaration(declaration) => &declaration.value,
+        other => panic!("expected the inline-declaration alternative, got {other:?}"),
+    };
+    assert_eq!(declaration.identification.name.as_deref(), Some("myReq"));
+    assert!(declaration.identification.short_name.is_none());
+    assert!(satisfy.typing.is_some());
+    let subject = satisfy.subject.as_ref().expect("authored `by` clause");
+    assert_eq!(
+        result
+            .qualified_reference(subject.value.reference)
+            .expect("source-backed subject")
+            .authored_text(),
+        "someExpr"
+    );
 }
 
 #[test]
 fn test_satisfy_bare_shorthand_still_has_no_inline_requirement() {
-    // "Didn't break the neighbor" check: the existing bare shorthand must keep
-    // `inline_requirement: None`.
+    // "Didn't break the neighbor" check: the reference alternative must stay a reference, and an
+    // omitted `by` clause must stay absent rather than being filled in from the reference.
     let input = r#"package P {
 requirement def MyReq;
 part def Foo {
@@ -3512,7 +3520,11 @@ part def Foo {
             _ => None,
         })
         .expect("expected a Satisfy member");
-    assert!(satisfy.inline_requirement.is_none());
+    assert!(matches!(
+        satisfy.requirement,
+        sysml_v2_parser::ast::SatisfiedRequirement::Reference { .. }
+    ));
+    assert!(satisfy.subject.is_none());
 }
 
 // --- gaps-doc item 3: `derived`/`constant`/direction swept onto PartUsage/PortUsage, `end` onto

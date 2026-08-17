@@ -304,8 +304,8 @@ pub enum ViewDefBodyElement {
     /// and part bodies already dispatch.
     ViewpointUsage(Node<ViewpointUsage>),
     /// `satisfy requirement X by Y;`, e.g. `satisfy requirement viewpointConformance by
-    /// this;` (`Views.sysml`). The same `Satisfy` node part bodies already accept.
-    Satisfy(Node<crate::ast::Satisfy>),
+    /// this;` (`Views.sysml`). The same `SatisfyRequirementUsage` node part bodies already accept.
+    Satisfy(Box<Node<crate::ast::SatisfyRequirementUsage>>),
 }
 
 /// View rendering usage: `render` name `:` type (`;` or body).
@@ -435,7 +435,15 @@ pub enum ViewBodyElement {
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
     Expose(Node<ExposeMember>),
-    Satisfy(Node<SatisfyViewMember>),
+    /// `SatisfyRequirementUsage` in a view usage body.
+    ///
+    /// `ViewBodyItem → DefinitionBodyItem → … → BehaviorUsageElement →
+    /// SatisfyRequirementUsage`: there is one satisfy production, and a view body reaches it the
+    /// same way every other definition or usage body does. This scope used to own a separate
+    /// `SatisfyViewMember` node carrying a bare viewpoint reference and a `RelationshipBody`,
+    /// which could represent neither the `assert`/`not` prefixes, the `by` clause, the inline
+    /// `requirement` declaration, nor a `RequirementBody` member.
+    Satisfy(Box<Node<crate::ast::SatisfyRequirementUsage>>),
     /// `ref`-prefixed feature declaration, e.g. `abstract ref rendering :>> viewRendering[0..1];`
     /// inside `view columnView[0..*] ordered { ... }` (Systems Library `Views.sysml`).
     RefDecl(Node<crate::ast::RefDecl>),
@@ -448,15 +456,6 @@ pub struct ExposeMember {
     pub target: ImportTarget,
     /// `Expose = 'expose' ( MembershipExpose | NamespaceExpose ) RelationshipBody`. The brace
     /// form used to be skipped wholesale, so its members and both delimiters were discarded.
-    pub body: crate::ast::Body<crate::ast::RelationshipBodyElement>,
-}
-
-/// Satisfy in view body: `satisfy` QualifiedName RelationshipBody.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SatisfyViewMember {
-    pub viewpoint_ref: QualifiedReferenceId,
-    /// The `RelationshipBody` of the view-body `satisfy` member; see [`ExposeMember::body`].
     pub body: crate::ast::Body<crate::ast::RelationshipBodyElement>,
 }
 

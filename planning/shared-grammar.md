@@ -168,7 +168,10 @@ two, the legacy `Annotation` and `Bind`, went with the metadata-sigil seam
 (`planning/metadata-sigil-matrix.md`). Every owner carries a `Body<E>` whose members and delimiters
 travel together. `Dependency`, `Satisfy`, `ConnectStmt`, `Bind` and the three `InterfaceUsage`
 forms had also been storing the same body fact twice, as a marker beside a separate element list,
-and no longer do.
+and no longer do. Choosing a container left the *member set* of each owner still to be checked
+against its production: `Satisfy`'s was `ConstraintDefBody` where `SatisfyRequirementUsage = …
+RequirementBody`, corrected -- along with the rest of that production -- by
+`planning/satisfy-requirement-usage-matrix.md`.
 
 There is deliberately no state for a missing closing brace. An unterminated body does not produce a
 body today: the enclosing declaration's parse fails and the scope above keeps the text as recovery.

@@ -33,7 +33,10 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"allocate",
     b"doc",
     b"event",
+    // `assert`, `not` and `satisfy` are the three FIRST tokens of a `SatisfyRequirementUsage`;
+    // see `PART_BODY_STARTERS` for why all three have to be recovery boundaries.
     b"assert",
+    b"not",
     b"satisfy",
     b"attribute",
     b"flow",
@@ -620,7 +623,7 @@ pub(crate) fn occurrence_body_element(
         ),
         map(flow_usage_member, OccurrenceBodyElement::FlowUsage),
         map(succession_usage, OccurrenceBodyElement::SuccessionUsage),
-        map(satisfy, OccurrenceBodyElement::Satisfy),
+        map(satisfy, |n| OccurrenceBodyElement::Satisfy(Box::new(n))),
         // Allocation / connection ends in structured definition bodies (`allocation def { end …; }`).
         map(
             |i| crate::parser::connector::end_decl(i, true),

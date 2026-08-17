@@ -324,7 +324,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 crate::parser::occurrence_body::assert_constraint_member,
                 PartDefBodyElement::AssertConstraint,
             ),
-            map(satisfy, PartDefBodyElement::Satisfy),
+            map(satisfy, |n| PartDefBodyElement::Satisfy(Box::new(n))),
             map(
                 unsupported_part_member,
                 PartDefBodyElement::UnsupportedMember,

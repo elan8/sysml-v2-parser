@@ -73,6 +73,11 @@ pub(crate) struct SpecializationClauses {
 pub(crate) struct UsageHeader {
     pub type_reference: Option<QualifiedReferenceId>,
     pub type_is_conjugated: bool,
+    /// The complete `Typings` clause as one relationship node: its authored spelling (`:`,
+    /// `typed by`, `defined by`), conjugation, span, and every target -- not just the first.
+    /// Callers that keep only a single `type_reference` lose the spelling and the extra targets,
+    /// so scopes whose emitter must reproduce what was written read this instead.
+    pub typing: Option<Node<TypingRelationship>>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
     pub references: Option<Node<SubsettingRelationship>>,
@@ -656,13 +661,11 @@ fn merge_usage_header(
     let references = merge_groups(leading.references, trailing.references);
     let crosses = merge_groups(leading.crosses, trailing.crosses);
     let intersects = merge_groups(leading.intersects, trailing.intersects);
+    let (_, type_reference, typing) = typing_reference_fields_from_result(type_result);
     UsageHeader {
-        type_is_conjugated: type_result
-            .as_ref()
-            .is_some_and(|(_, is_conjugated, _, _)| *is_conjugated),
-        type_reference: type_result
-            .as_ref()
-            .and_then(|(_, _, targets, _)| targets.first().copied()),
+        type_is_conjugated: typing.as_ref().is_some_and(|node| node.value.is_conjugated),
+        type_reference,
+        typing,
         subsets,
         redefines,
         references,

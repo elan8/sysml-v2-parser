@@ -32,6 +32,6 @@ package ViewCoverage {
     (reference r0 (scope relative) (span (offset 119) (line 4) (column 25) (len 16)) (segments (segment 0 (token "ArchitectureView") (name "ArchitectureView") (separator none) (span (offset 119) (line 4) (column 25) (len 16)))))
     (reference r1 (scope relative) (span (offset 154) (line 5) (column 17) (len 21)) (segments (segment 0 (token "ArchitectureViewpoint") (name "ArchitectureViewpoint") (separator none) (span (offset 154) (line 5) (column 17) (len 21)))))
   )
-  (root (package (name "ViewCoverage") (body brace (viewpoint-def) (view-def) (view (name "architecture") (type (ref r0)) (body brace (satisfy (viewpoint (ref r1)) (body semicolon)))))))
+  (root (package (name "ViewCoverage") (body brace (viewpoint-def) (view-def) (view (name "architecture") (type (ref r0)) (body brace (satisfy (assert false) (negated false) (requirement (reference (ref r1))) (typing none) (multiplicity none) (ordered false) (nonunique false) (subsets none) (references none) (redefines none) (crosses none) (value none) (by none) (body semicolon)))))))
 )
 ~~~

@@ -1491,7 +1491,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 PartUsageBodyElement::Ref,
             ),
             map(bind_, PartUsageBodyElement::Bind),
-            map(satisfy, PartUsageBodyElement::Satisfy),
+            map(satisfy, |n| PartUsageBodyElement::Satisfy(Box::new(n))),
             map(
                 crate::parser::occurrence_body::assert_constraint_member,
                 PartUsageBodyElement::AssertConstraint,

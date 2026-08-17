@@ -11,8 +11,8 @@ use super::kerml_fallback::{
 };
 use super::requirement::{
     ActorDecl, AnalysisCaseDef, AnalysisCaseUsage, CaseDef, CaseUsage, ConcernUsage, Dependency,
-    EnumerationUsage, IncludeUseCase, ItemUsage, RequirementDef, RequirementUsage, Satisfy,
-    UseCaseDef, UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
+    EnumerationUsage, IncludeUseCase, ItemUsage, RequirementDef, RequirementUsage,
+    SatisfyRequirementUsage, UseCaseDef, UseCaseUsage, VerificationCaseDef, VerificationCaseUsage,
 };
 use super::structure::{
     AliasDef, AssertConstraintMember, AttributeDef, AttributeUsage, Connect, ConnectionDef,
@@ -125,7 +125,7 @@ pub enum PackageBodyElement {
     ActionUsage(Node<ActionUsage>),
     RequirementDef(Node<RequirementDef>),
     RequirementUsage(Node<RequirementUsage>),
-    Satisfy(Node<Satisfy>),
+    Satisfy(Box<Node<SatisfyRequirementUsage>>),
     UseCaseDef(Node<UseCaseDef>),
     Actor(Node<ActorDecl>),
     StateDef(Node<StateDef>),
