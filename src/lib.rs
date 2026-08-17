@@ -36,28 +36,29 @@ pub mod parser;
 pub use ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
     ActionUsageBodyElement, AliasBody, AliasDef, AllocationDef, AllocationUsage, AnalysisCaseDef,
-    AnalysisCaseUsage, Argument, AstNode, AttributeBody, AttributeDef, AttributeUsage, Bind,
-    CaseDef, CaseUsage, CollectionOperator, CollectionOperatorBody, CollectionOperatorParameter,
-    CollectionOperatorParameterTyping, CommentAnnotation, Connect, ConnectStmt, ConnectionDef,
-    ConnectionDefBody, ConnectionDefBodyElement, DeclarationName, Dependency,
-    DerivationConnectionRole, DerivationEndRole, DocComment, EndDecl, EndIdentity, Expression,
-    FilterMember, FilterPackageMember, FirstMergeBody, FirstMergeBodyElement, FirstMergeBraceBody,
-    FirstStmt, FlowDef, FlowUsage, FlowUsageKind, Identification, Import, ImportShape,
-    ImportSuffixSpans, ImportTarget, InOut, InOutDecl, InlineRequirementDeclaration, InterfaceDef,
-    InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage, InterfaceUsageBodyElement,
-    ItemUsage, LoopStmt, MergeStmt, NamespaceDecl, Node, OccurrenceBodyElement,
-    OccurrencePortionKind, OccurrenceUsage, OccurrenceUsageBody, Package, PackageBody,
-    PackageBodyElement, ParseErrorNode, ParsedDocument, PartDef, PartDefBody, PartDefBodyElement,
-    PartUsage, PartUsageBody, PartUsageBodyElement, PayloadFeature, Perform, PerformBody,
-    PerformBodyElement, PerformInOutBinding, PortBody, PortBodyElement, PortDef, PortDefBody,
-    PortDefBodyElement, PortUsage, QualifiedDeclarationName, QualifiedIdentification,
-    QualifiedReferenceArena, QualifiedReferenceId, QualifiedReferenceMetadata,
-    QualifiedReferenceValidationError, QualifiedReferenceView, RefBody, RefDecl, ReferenceSegment,
-    ReferenceSeparator, RelationshipBodyElement, RequireConstraint, RequirementDef,
-    RequirementDefBody, RequirementDefBodyElement, RequirementUsage, ReturnRef, ReturnRefBody,
-    ReturnRefBodyElement, RootElement, RootNamespace, SatisfactionSubject, SatisfiedRequirement,
-    SatisfyRequirementUsage, SegmentRange, SourceStorage, Span, TextualRepresentation, ThenAction,
-    ThenTarget, TypeCheckKind, VerificationCaseDef, VerificationCaseUsage, Visibility,
+    AnalysisCaseUsage, Argument, AstNode, AttributeBody, AttributeDef, AttributeUsage,
+    BasicUsagePrefix, Bind, CaseDef, CaseUsage, CollectionOperator, CollectionOperatorBody,
+    CollectionOperatorParameter, CollectionOperatorParameterTyping, CommentAnnotation, Connect,
+    ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, DeclarationName,
+    Dependency, DerivationConnectionRole, DerivationEndRole, DocComment, EndDecl, EndIdentity,
+    Expression, FilterMember, FilterPackageMember, FirstMergeBody, FirstMergeBodyElement,
+    FirstMergeBraceBody, FirstStmt, FlowDef, FlowUsage, FlowUsageKind, Identification, Import,
+    ImportShape, ImportSuffixSpans, ImportTarget, InOut, InOutDecl, InlineRequirementDeclaration,
+    InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
+    InterfaceUsageBodyElement, ItemUsage, LoopStmt, MergeStmt, NamespaceDecl, Node,
+    OccurrenceBodyElement, OccurrencePortionKind, OccurrenceUsage, OccurrenceUsageBody,
+    OccurrenceUsagePrefix, Package, PackageBody, PackageBodyElement, ParseErrorNode,
+    ParsedDocument, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
+    PartUsageBodyElement, PayloadFeature, Perform, PerformBody, PerformBodyElement,
+    PerformInOutBinding, PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement,
+    PortUsage, QualifiedDeclarationName, QualifiedIdentification, QualifiedReferenceArena,
+    QualifiedReferenceId, QualifiedReferenceMetadata, QualifiedReferenceValidationError,
+    QualifiedReferenceView, RefBody, RefDecl, RefPrefix, ReferenceSegment, ReferenceSeparator,
+    RelationshipBodyElement, RequireConstraint, RequirementDef, RequirementDefBody,
+    RequirementDefBodyElement, RequirementUsage, ReturnRef, ReturnRefBody, ReturnRefBodyElement,
+    RootElement, RootNamespace, SatisfactionSubject, SatisfiedRequirement, SatisfyRequirementUsage,
+    SegmentRange, SourceStorage, Span, TextualRepresentation, ThenAction, ThenTarget,
+    TypeCheckKind, UsageExtensionKeyword, VerificationCaseDef, VerificationCaseUsage, Visibility,
 };
 pub use emit::{
     emit_recovered_sysml, emit_sysml, emit_sysml_with_options, opacity_report, EmitError,
@@ -67,7 +68,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 168;
+pub const PARSE_AST_VERSION: u32 = 169;
 
 /// The pinned grammar release understood by this build of the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

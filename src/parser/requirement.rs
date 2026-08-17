@@ -15,6 +15,9 @@ use crate::parser::lex::{
     starts_with_keyword, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
+use crate::parser::occurrence_prefix::{
+    keyword_token, next_word_is_reserved, occurrence_usage_prefix, optional_keyword_token,
+};
 use crate::parser::usage::{feature_usage_header, multiplicity_node, specialization_clauses};
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -157,6 +160,21 @@ fn requirement_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RequirementDefBodyElement>> {
     let start = input;
+    // `UsageExtensionKeyword*` is the last slot of `OccurrenceUsagePrefix`, so a `#tag` run
+    // followed by a head one of the migrated families owns belongs to that usage's prefix, not to
+    // a sibling `PrefixMetadataMember`. The `metadata_keyword_prefix` arm below would otherwise
+    // claim the tag first and leave the usage unprefixed, so the migrated families get first
+    // refusal on a leading `#`. Each attempt is transactional, so a `#tag` that turns out to
+    // prefix some other member rolls back and falls through unchanged.
+    {
+        let (after_ws, _) = ws_and_comments(input)?;
+        if after_ws.fragment().starts_with(b"#") {
+            if let Ok((next, usage)) = satisfy(after_ws) {
+                let elem = RequirementDefBodyElement::Satisfy(Box::new(usage));
+                return Ok((next, node_from_to(start, next, elem)));
+            }
+        }
+    }
     let (rest, elem) = alt((
         alt((
             map(
@@ -971,50 +989,6 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyRequir
     crate::parser::span::reference_transaction(input, satisfy_inner)
 }
 
-/// Consume one keyword plus the trivia around it, returning the keyword's exact token span.
-///
-/// [`starts_with_keyword`] supplies the token boundary -- `assert` cannot match the first six
-/// bytes of a declaration named `assertions`, nor `by` the first two of `byte` -- so the separator
-/// itself is [`ws_and_comments`] rather than `ws1`. That distinction is load-bearing: `ws1`
-/// consumes whitespace but stops at `/`, so a comment between two of this production's keywords
-/// was left sitting in front of the next one and `assert /* why */ satisfy r by p;` failed to
-/// parse even though the same comment is trivia everywhere else.
-///
-/// A comment *abutting* the keyword (`satisfy/* why */ r`) is still rejected, and not by anything
-/// this production owns: [`starts_with_keyword`] requires the byte after an identifier-shaped
-/// keyword to be whitespace or one of `{ : ; [`, so every keyword in this parser behaves the same
-/// way -- `part/* c */ a;` and `import/* c */ A::*;` are rejected identically. Widening that
-/// predicate to a true identifier boundary is a lexical change affecting every starter table,
-/// dispatch guard and recovery sync in the crate, so it belongs to its own seam; it is recorded in
-/// `planning/satisfy-requirement-usage-matrix.md` §7.
-fn keyword_token<'a>(
-    input: Input<'a>,
-    keyword: &'static [u8],
-) -> IResult<Input<'a>, crate::ast::Span> {
-    let (after_ws, _) = ws_and_comments(input)?;
-    if !starts_with_keyword(after_ws.fragment(), keyword) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            after_ws,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let (rest, (span, _)) = with_span(tag(keyword)).parse(after_ws)?;
-    let (rest, _) = ws_and_comments(rest)?;
-    Ok((rest, span))
-}
-
-/// [`keyword_token`] for a keyword the production makes optional. Consumes nothing when the
-/// keyword is absent.
-fn optional_keyword_token<'a>(
-    input: Input<'a>,
-    keyword: &'static [u8],
-) -> IResult<Input<'a>, Option<crate::ast::Span>> {
-    match keyword_token(input, keyword) {
-        Ok((rest, span)) => Ok((rest, Some(span))),
-        Err(_) => Ok((input, None)),
-    }
-}
-
 /// `( OwnedReferenceSubsetting | 'requirement' UsageDeclaration )` -- the production's two
 /// mutually exclusive requirement clauses. The `requirement` keyword is what selects between
 /// them, so the choice is made once here rather than inferred later from which field is set.
@@ -1071,16 +1045,6 @@ fn usage_declaration_identification(
     ))
 }
 
-/// Whether the next unquoted identifier token spells a reserved SysML keyword.
-fn next_word_is_reserved(input: Input<'_>) -> bool {
-    let fragment = input.fragment();
-    let word_len = fragment
-        .iter()
-        .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
-        .count();
-    word_len > 0 && crate::parser::lex::is_reserved_keyword(&fragment[..word_len])
-}
-
 /// `'by' ownedRelationship += SatisfactionSubjectMember`.
 ///
 /// The membership chain bottoms out at `FeatureChainMember = [QualifiedName] |
@@ -1098,6 +1062,11 @@ fn satisfaction_subject(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfactio
 fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyRequirementUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `BehaviorUsageMember : FeatureMembership = MemberPrefix ownedRelatedElement +=
+    // BehaviorUsageElement`: the visibility keyword belongs to the membership and precedes the
+    // usage's own `OccurrenceUsagePrefix`.
+    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
+    let (input, prefix) = occurrence_usage_prefix(input)?;
     let (input, assert_span) = optional_keyword_token(input, b"assert")?;
     let (input, not_span) = optional_keyword_token(input, b"not")?;
     let (input, satisfy_span) = keyword_token(input, b"satisfy")?;
@@ -1122,6 +1091,8 @@ fn satisfy_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyRequirement
             start,
             input,
             SatisfyRequirementUsage {
+                prefix,
+                membership: crate::ast::Membership::feature(visibility, visibility_span),
                 assert_span,
                 not_span,
                 satisfy_span,

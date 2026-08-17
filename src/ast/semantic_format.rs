@@ -19,6 +19,7 @@ use super::{
     RequirementDefBody, RequirementDefBodyElement, RootElement, Span, StateDefBody,
     StateDefBodyElement, SubsettingKind, SubsettingRelationship, TypeCheckKind, TypingKind,
     TypingRelationship, UseCaseDefBody, UseCaseDefBodyElement, ViewBody, ViewBodyElement,
+    Visibility,
 };
 
 /// Stream a semantic AST projection to an [`io::Write`] sink.
@@ -194,6 +195,27 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         } else {
             self.writer.write_char(' ')
         }
+    }
+
+    /// `ItemUsage`, projected with the shared `OccurrenceUsagePrefix` it now carries.
+    ///
+    /// Was a contentless `(item-usage)` marker in every scope, so a snapshot could not tell
+    /// `ref individual item i;` from a bare `item i;`.
+    fn write_item_usage(&mut self, usage: &super::ItemUsage) -> io::Result<()> {
+        self.writer.write_str("(item-usage ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
+        self.writer.write_str(" (declaration ")?;
+        write_quoted(self.writer, &usage.name)?;
+        self.writer.write_str("))")
+    }
+
+    fn write_item_usage_member(
+        &mut self,
+        first: &mut bool,
+        usage: &super::ItemUsage,
+    ) -> io::Result<()> {
+        self.write_item_prefix(first)?;
+        self.write_item_usage(usage)
     }
 
     fn write_marker(&mut self, first: &mut bool, kind: &str) -> io::Result<()> {
@@ -622,9 +644,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         &mut self,
         usage: &super::SatisfyRequirementUsage,
     ) -> io::Result<()> {
+        self.writer.write_str("(satisfy ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
         write!(
             self.writer,
-            "(satisfy (assert {}) (negated {}) (requirement ",
+            " (visibility {}) (assert {}) (negated {}) (requirement ",
+            visibility_name(usage.membership.visibility),
             usage.assert_span.is_some(),
             usage.not_span.is_some()
         )?;
@@ -1354,8 +1379,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::ItemDef(_definition) => {
                             self.write_marker(&mut first, "item-def")?;
                         }
-                        PartDefBodyElement::ItemUsage(_usage) => {
-                            self.write_marker(&mut first, "item-usage")?;
+                        PartDefBodyElement::ItemUsage(usage) => {
+                            self.write_item_usage_member(&mut first, &usage.value)?;
                         }
                         PartDefBodyElement::Ref(declaration) => {
                             self.write_item_prefix(&mut first)?;
@@ -1951,14 +1976,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_str("))")
             }
             ActionDefBodyElement::PartUsage(_part) => self.writer.write_str("(part-usage)"),
-            ActionDefBodyElement::ItemUsage(_item) => self.writer.write_str("(item-usage)"),
+            ActionDefBodyElement::ItemUsage(item) => self.write_item_usage(&item.value),
             ActionDefBodyElement::AssertConstraint(_constraint) => {
                 self.writer.write_str("(assert-constraint)")
             }
             ActionDefBodyElement::OccurrenceUsage(occurrence) => {
-                self.writer.write_str("(occurrence-usage (direction ")?;
-                self.write_direction(occurrence.value.direction)?;
-                self.writer.write_str("))")
+                self.writer.write_str("(occurrence-usage ")?;
+                self.write_occurrence_usage_prefix(&occurrence.value.prefix)?;
+                self.writer.write_char(')')
             }
             ActionDefBodyElement::Assign(_assign) => self.writer.write_str("(assign)"),
             ActionDefBodyElement::ForLoop(for_loop) => self.write_for_loop(&for_loop.value),
@@ -2115,8 +2140,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         InterfaceDefBodyElement::ItemDef(_definition) => {
                             self.write_marker(&mut first, "item-def")?;
                         }
-                        InterfaceDefBodyElement::ItemUsage(_usage) => {
-                            self.write_marker(&mut first, "item-usage")?;
+                        InterfaceDefBodyElement::ItemUsage(usage) => {
+                            self.write_item_usage_member(&mut first, &usage.value)?;
                         }
                         InterfaceDefBodyElement::PortDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -2176,8 +2201,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::ItemDef(_definition) => {
                             self.write_marker(&mut first, "item-def")?;
                         }
-                        ConnectionDefBodyElement::ItemUsage(_usage) => {
-                            self.write_marker(&mut first, "item-usage")?;
+                        ConnectionDefBodyElement::ItemUsage(usage) => {
+                            self.write_item_usage_member(&mut first, &usage.value)?;
                         }
                         ConnectionDefBodyElement::PortDef(_definition) => {
                             self.write_marker(&mut first, "port-def")?;
@@ -2431,8 +2456,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::ItemDef(_member) => {
                             self.write_marker(&mut first, "item-def")?;
                         }
-                        super::PartUsageBodyElement::ItemUsage(_member) => {
-                            self.write_marker(&mut first, "item-usage")?;
+                        super::PartUsageBodyElement::ItemUsage(usage) => {
+                            self.write_item_usage_member(&mut first, &usage.value)?;
                         }
                         super::PartUsageBodyElement::MetadataUsage(_member) => {
                             self.write_marker(&mut first, "metadata-usage")?;
@@ -2876,8 +2901,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PerformBodyElement::PartUsage(_usage) => {
                             self.write_marker(&mut first, "part-usage")?;
                         }
-                        PerformBodyElement::ItemUsage(_usage) => {
-                            self.write_marker(&mut first, "item-usage")?;
+                        PerformBodyElement::ItemUsage(usage) => {
+                            self.write_item_usage_member(&mut first, &usage.value)?;
                         }
                         PerformBodyElement::AttributeUsage(_usage) => {
                             self.write_marker(&mut first, "attribute-usage")?;
@@ -2890,13 +2915,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     }
 
     fn write_occurrence(&mut self, occurrence: &super::OccurrenceUsage) -> io::Result<()> {
-        self.writer.write_str("(occurrence (portion ")?;
-        match occurrence.portion_kind {
-            Some(super::OccurrencePortionKind::Snapshot) => self.writer.write_str("snapshot")?,
-            Some(super::OccurrencePortionKind::Timeslice) => self.writer.write_str("timeslice")?,
-            None => self.writer.write_str("none")?,
-        }
-        self.writer.write_str(") (declaration ")?;
+        self.writer.write_str("(occurrence ")?;
+        self.write_occurrence_usage_prefix(&occurrence.prefix)?;
+        self.writer.write_str(" (declaration ")?;
         write_quoted(self.writer, &occurrence.name)?;
         self.writer.write_str(") (short-name ")?;
         write_optional_quoted(self.writer, occurrence.short_name.as_deref())?;
@@ -3027,6 +3048,50 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             Some(InOut::InOut) => self.writer.write_str("inout"),
             None => self.writer.write_str("none"),
         }
+    }
+
+    /// The shared `OccurrenceUsagePrefix`, projected in the production's own slot order.
+    ///
+    /// One projection for every family that owns the prefix, so a snapshot shows the same
+    /// language-level facts wherever it appears. Each slot names the alternative that was
+    /// authored -- presence is the grammatical fact, exactly as `(assert true)` is for
+    /// `SatisfyRequirementUsage` -- and the extension keywords appear as the references they are,
+    /// in authored order, so a snapshot can tell `#a #b` from `#b #a`.
+    fn write_occurrence_usage_prefix(
+        &mut self,
+        prefix: &super::OccurrenceUsagePrefix,
+    ) -> io::Result<()> {
+        let ref_prefix = &prefix.basic.ref_prefix;
+        self.writer.write_str("(prefix (direction ")?;
+        self.write_direction(ref_prefix.direction.as_ref().map(|node| node.value))?;
+        write!(
+            self.writer,
+            ") (derived {}) (variance ",
+            ref_prefix.derived_span.is_some()
+        )?;
+        match ref_prefix.variance.as_ref().map(|node| node.value) {
+            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str("abstract")?,
+            Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(
+            self.writer,
+            ") (constant {}) (reference {}) (individual {}) (portion ",
+            ref_prefix.constant_span.is_some(),
+            prefix.basic.reference_span.is_some(),
+            prefix.individual_span.is_some()
+        )?;
+        match prefix.portion.as_ref().map(|node| node.value) {
+            Some(super::OccurrencePortionKind::Snapshot) => self.writer.write_str("snapshot")?,
+            Some(super::OccurrencePortionKind::Timeslice) => self.writer.write_str("timeslice")?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (extensions")?;
+        for keyword in &prefix.extension_keywords {
+            self.writer.write_char(' ')?;
+            self.write_reference(keyword.value.annotation)?;
+        }
+        self.writer.write_str("))")
     }
 
     fn write_attribute_usage(&mut self, usage: &super::AttributeUsage) -> io::Result<()> {
@@ -3177,8 +3242,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PortDefBodyElement::ItemDef(_definition) => {
                             self.write_marker(&mut first, "item-def")?;
                         }
-                        PortDefBodyElement::ItemUsage(_usage) => {
-                            self.write_marker(&mut first, "item-usage")?;
+                        PortDefBodyElement::ItemUsage(usage) => {
+                            self.write_item_usage_member(&mut first, &usage.value)?;
                         }
                         PortDefBodyElement::EnumerationUsage(_usage) => {
                             self.write_marker(&mut first, "enumeration-usage")?;
@@ -3533,7 +3598,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::AttributeUsage(_usage) => {
                 self.write_marker(first, "attribute-usage")
             }
-            PackageBodyElement::ItemUsage(_usage) => self.write_marker(first, "item-usage"),
+            PackageBodyElement::ItemUsage(usage) => {
+                self.write_item_usage_member(first, &usage.value)
+            }
             PackageBodyElement::PortUsage(_usage) => self.write_marker(first, "port-usage"),
             PackageBodyElement::ConnectionUsage(_usage) => {
                 self.write_marker(first, "connection-usage")
@@ -3765,6 +3832,17 @@ fn write_quoted<W: io::Write + ?Sized>(writer: &mut W, value: &str) -> io::Resul
         }
     }
     writer.write_char('"')
+}
+
+/// `MemberPrefix`'s `visibility = VisibilityIndicator`, or `none` when the author wrote no
+/// visibility keyword. The membership's own syntax, distinct from the usage's prefix.
+fn visibility_name(visibility: Option<Visibility>) -> &'static str {
+    match visibility {
+        Some(Visibility::Public) => "public",
+        Some(Visibility::Private) => "private",
+        Some(Visibility::Protected) => "protected",
+        None => "none",
+    }
 }
 
 fn write_span<W: io::Write + ?Sized>(

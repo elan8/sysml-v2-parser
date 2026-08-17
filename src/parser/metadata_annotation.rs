@@ -149,7 +149,7 @@ fn metadata_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
 /// `OwnedFeatureTyping` is `[QualifiedName]`, so this is a reference -- qualified (`#ISQ::mass`)
 /// or quoted (`#'safety critical'`) where the author wrote one -- and never a fabricated name.
 /// Each caller decides which production it is by what it requires *after* this head.
-fn metadata_keyword_head(
+pub(crate) fn metadata_keyword_head(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (crate::ast::Span, crate::ast::QualifiedReferenceId)> {
     let (hash_start, _) = ws_and_comments(input)?;

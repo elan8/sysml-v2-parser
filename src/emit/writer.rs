@@ -43,6 +43,18 @@ impl<'a> EmitWriter<'a> {
         }
     }
 
+    /// Drop one trailing space when the declaration that would have consumed it was not authored.
+    ///
+    /// Prefix and kind keywords are written space-suffixed, and an anonymous usage
+    /// (`ref individual :>> driver : Alice;`) writes no declaration label after them, so without
+    /// this the next clause -- which supplies its own leading space -- doubles it. Reparsing is
+    /// unaffected either way; what this fixes is emitted text an author would not have written.
+    pub(crate) fn trim_trailing_space(&mut self) {
+        if self.buf.ends_with(' ') {
+            self.buf.pop();
+        }
+    }
+
     pub(crate) fn push_char(&mut self, c: char) {
         let mut tmp = [0u8; 4];
         self.push_str(c.encode_utf8(&mut tmp));

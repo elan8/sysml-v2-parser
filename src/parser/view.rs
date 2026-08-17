@@ -28,6 +28,18 @@ const VIEW_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `UsageExtensionKeyword*` is the last slot of `OccurrenceUsagePrefix`, so a `#tag` run
+    // followed by a head one of the migrated families owns belongs to that usage's prefix, not to
+    // a sibling `PrefixMetadataMember`. The `metadata_keyword_prefix` arm below would otherwise
+    // claim the tag first and leave the usage unprefixed, so the migrated families get first
+    // refusal on a leading `#`. Each attempt is transactional, so a `#tag` that turns out to
+    // prefix some other member rolls back and falls through unchanged.
+    if input.fragment().starts_with(b"#") {
+        if let Ok((next, usage)) = crate::parser::requirement::satisfy(input) {
+            let elem = ViewDefBodyElement::Satisfy(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,

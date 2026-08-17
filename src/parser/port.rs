@@ -11,7 +11,7 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::enumeration::enum_usage;
-use crate::parser::item::{directed_item_usage, item_def_required, item_usage};
+use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{
     name, short_name_prefix, starts_with_keyword, ws1, ws_and_comments, PORT_BODY_STARTERS,
     PORT_DEF_BODY_STARTERS,
@@ -244,7 +244,7 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
         return Ok((input, node_from_to(start, input, elem)));
     }
     let (input, elem) = alt((
-        map(directed_item_usage, PortDefBodyElement::ItemUsage),
+        map(item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),
         map(in_out_decl, PortDefBodyElement::InOutDecl),
         map(
@@ -257,8 +257,7 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
             attribute_feature_binding,
             PortDefBodyElement::AttributeUsage,
         ),
-        // `item_def_required` must be tried before the existing bare `directed_item_usage`/
-        // `item_usage` arms above -- same def-before-usage discipline as the other body enums
+        // `item_def_required` must be tried before the existing bare `item_usage` arms above -- same def-before-usage discipline as the other body enums
         // wired in prior increments.
         map(item_def_required, PortDefBodyElement::ItemDef),
         map(enum_usage, PortDefBodyElement::EnumerationUsage),

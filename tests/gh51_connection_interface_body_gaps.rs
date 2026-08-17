@@ -126,9 +126,13 @@ fn connection_def_body_accepts_abstract_constant_ref_occurrence_with_multiplicit
             _ => None,
         })
         .expect("expected occurrence usage");
-    assert!(occurrence.is_abstract);
-    assert!(occurrence.is_constant);
-    assert!(occurrence.is_reference);
+    let ref_prefix = &occurrence.prefix.basic.ref_prefix;
+    assert_eq!(
+        ref_prefix.variance.as_ref().map(|node| node.value),
+        Some(sysml_v2_parser::ast::DefinitionPrefix::Abstract)
+    );
+    assert!(ref_prefix.constant_span.is_some());
+    assert!(occurrence.prefix.basic.reference_span.is_some());
     assert!(occurrence.multiplicity.is_some());
 }
 

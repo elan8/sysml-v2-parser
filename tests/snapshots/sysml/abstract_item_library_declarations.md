@@ -40,6 +40,6 @@ library package Items {
 (parsed-document
   (references
   )
-  (root (library-package (name "Items") (standard false) (body brace (item-usage) (item-usage))))
+  (root (library-package (name "Items") (standard false) (body brace (item-usage (prefix (direction none) (derived false) (variance abstract) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "items")) (item-usage (prefix (direction none) (derived false) (variance abstract) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "metadataItems")))))
 )
 ~~~

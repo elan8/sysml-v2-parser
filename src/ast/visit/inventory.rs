@@ -4028,20 +4028,11 @@ macro_rules! ast_traversal {
         pub fn walk_occurrence_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<OccurrenceUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let OccurrenceUsage { direction, is_individual, is_then, is_event, is_reference, is_abstract, is_constant, has_occurrence_keyword, portion_kind, name, short_name, occurrence_reference, type_name, type_is_conjugated, multiplicity, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
-            if let Some(inner) = direction {
-                visitor.visit_in_out_value(inner);
-            }
-            let _ = is_individual;
+            let OccurrenceUsage { prefix, is_then, is_event, has_occurrence_keyword, name, short_name, occurrence_reference, type_name, type_is_conjugated, multiplicity, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
             let _ = is_then;
             let _ = is_event;
-            let _ = is_reference;
-            let _ = is_abstract;
-            let _ = is_constant;
             let _ = has_occurrence_keyword;
-            if let Some(inner) = portion_kind {
-                visitor.visit_occurrence_portion_kind_value(inner);
-            }
             visitor.visit_text(name);
             if let Some(inner) = short_name { visitor.visit_text(inner); }
             if let Some(inner) = occurrence_reference {
@@ -5710,6 +5701,8 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             let SatisfyRequirementUsage {
+                prefix,
+                membership,
                 assert_span,
                 not_span,
                 satisfy_span,
@@ -5726,6 +5719,8 @@ macro_rules! ast_traversal {
                 subject,
                 body,
             } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
+            visitor.visit_membership(membership);
             if let Some(inner) = assert_span {
                 visitor.visit_span(inner);
             }
@@ -5829,12 +5824,8 @@ macro_rules! ast_traversal {
         pub fn walk_item_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ItemUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ItemUsage { is_derived, usage_prefix, is_constant, name, type_name, redefines, subsets, short_name, multiplicity, ordered, nonunique, value, body, direction, is_individual, membership } = &$($mutability)? node.value;
-            let _ = is_derived;
-            if let Some(inner) = usage_prefix {
-                visitor.visit_definition_prefix_value(inner);
-            }
-            let _ = is_constant;
+            let ItemUsage { prefix, name, type_name, redefines, subsets, short_name, multiplicity, ordered, nonunique, value, body, membership } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
             visitor.visit_text(name);
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
@@ -5857,10 +5848,6 @@ macro_rules! ast_traversal {
                 visitor.visit_feature_value(inner);
             }
             visitor.visit_attribute_body(body);
-            if let Some(inner) = direction {
-                visitor.visit_in_out_value(inner);
-            }
-            let _ = is_individual;
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }

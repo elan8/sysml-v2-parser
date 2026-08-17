@@ -2,7 +2,8 @@
 
 use crate::ast::{
     AssertConstraintMember, DefinitionBody, DefinitionBodyElement, Membership, Node,
-    OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode, SuccessionUsage,
+    OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, OccurrenceUsagePrefix,
+    ParseErrorNode, SuccessionUsage,
 };
 use crate::parser::attribute::attribute_usage;
 use crate::parser::body::parse_structured_brace_members;
@@ -15,6 +16,9 @@ use crate::parser::lex::{
     visibility_prefix, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
+use crate::parser::occurrence_prefix::{
+    next_word_is_reserved, occurrence_usage_prefix, optional_keyword_token,
+};
 use crate::parser::part::exhibit_state_as_state_usage;
 use crate::parser::part::part_usage;
 use crate::parser::requirement::satisfy;
@@ -55,6 +59,14 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"private",
     b"in",
     b"connection",
+    // The rest of FIRST(`OccurrenceUsagePrefix`) -- `#`, `abstract`, `in`, `individual`, `ref`,
+    // `snapshot` and `timeslice` are already listed above. See
+    // `planning/occurrence-usage-prefix-matrix.md` §4.
+    b"constant",
+    b"derived",
+    b"inout",
+    b"out",
+    b"variation",
 ];
 
 // Note: "succession" is intentionally NOT in this list — `succession_usage()` in
@@ -147,239 +159,104 @@ fn occurrence_definition_body_with_labels<'a>(
     Ok((input, members.into_body()))
 }
 
-/// Everything an occurrence usage's leading keywords contribute to the node it builds. Grouped
-/// into one struct so [`occurrence_usage_tail`] keeps a readable signature as the BNF
-/// `OccurrenceUsagePrefix` slots accumulate.
-struct OccurrencePrefix {
-    /// Leading `in`/`out`/`inout` direction (BNF `RefPrefix`) -- see
-    /// `OccurrenceUsage::direction`.
-    direction: Option<crate::ast::InOut>,
-    is_individual: bool,
+/// Everything an occurrence usage's head contributes beyond the shared `OccurrenceUsagePrefix`.
+///
+/// `then` is a `SourceSuccessionMember` and the visibility keyword is a `MemberPrefix`, so both
+/// sit outside the prefix and outside the usage; `event` and `occurrence` are kind keywords that
+/// follow it. None of the four is a prefix slot.
+struct OccurrenceHead {
+    prefix: OccurrenceUsagePrefix,
     is_then: bool,
     is_event: bool,
+    /// `EventOccurrenceUsage`'s first alternative -- `event <path>` names an existing occurrence
+    /// rather than declaring one, so there is no declaration label to read.
     is_event_reference: bool,
-    is_reference: bool,
-    is_abstract: bool,
-    is_constant: bool,
-    /// True when the literal `occurrence` kind keyword was authored -- see
-    /// `OccurrenceUsage::has_occurrence_keyword`.
+    /// See `OccurrenceUsage::has_occurrence_keyword`.
     has_occurrence_keyword: bool,
-    portion_kind: Option<crate::ast::OccurrencePortionKind>,
     membership: Membership,
 }
 
-impl Default for OccurrencePrefix {
-    fn default() -> Self {
-        Self {
-            direction: None,
-            is_individual: false,
-            is_then: false,
-            is_event: false,
-            is_event_reference: false,
-            is_reference: false,
-            is_abstract: false,
-            is_constant: false,
-            has_occurrence_keyword: false,
-            portion_kind: None,
-            membership: Membership::feature(None, crate::ast::Span::dummy()),
-        }
-    }
-}
-
-/// Optional `ref` keyword (BNF `RefPrefix`, §6 G29) before an occurrence usage's kind keyword.
-fn occurrence_ref_prefix(input: Input<'_>) -> IResult<Input<'_>, bool> {
-    let (input, kw) =
-        opt(preceded(preceded(ws_and_comments, tag(&b"ref"[..])), ws1)).parse(input)?;
-    Ok((input, kw.is_some()))
-}
-
-/// GH-51: `abstract`/`constant` prefix keywords (BNF `RefPrefix`, §8.2.2.9.2), ahead of `ref` per
-/// that production's order. Real usage: Systems Library `Domain Libraries/Cause and Effect/
-/// CausationConnections.sysml`'s `abstract constant ref occurrence causes[1..*] :>> causes :>
-/// participant { ... }`.
-fn occurrence_abstract_constant_prefix(input: Input<'_>) -> IResult<Input<'_>, (bool, bool)> {
-    let (input, is_abstract) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"abstract"[..])),
-        ws1,
-    ))
-    .parse(input)?;
-    let (input, is_constant) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"constant"[..])),
-        ws1,
-    ))
-    .parse(input)?;
-    Ok((input, (is_abstract.is_some(), is_constant.is_some())))
-}
-
+/// The four spellings that share one `OccurrenceUsagePrefix`, parsed as one production.
+///
+/// ```text
+/// OccurrenceUsage      = OccurrenceUsagePrefix 'occurrence' Usage                    -- BNF 573
+/// IndividualUsage      = BasicUsagePrefix 'individual' UsageExtensionKeyword* Usage  -- 576
+/// PortionUsage         = BasicUsagePrefix 'individual'? PortionKind
+///                        UsageExtensionKeyword* Usage                                -- 580
+/// EventOccurrenceUsage = OccurrenceUsagePrefix 'event'
+///                        ( OwnedReferenceSubsetting FeatureSpecializationPart?
+///                        | 'occurrence' UsageDeclaration? ) UsageCompletion           -- 589
+/// ```
+///
+/// The prefix is identical in all four -- `IndividualUsage` and `PortionUsage` inline the same
+/// slots instead of naming the production -- so what distinguishes them is which slots were
+/// authored and which kind keyword follows, not which prefix grammar applies. Parsing them as one
+/// production is what makes `individual snapshot s : Ind;` and `in individual :>> testVehicle :
+/// TestVehicle1 { … }` parse: both are in the pinned corpus, and both were recovery nodes while
+/// four separate parsers each accepted a different subset of the prefix.
+///
+/// Wrapped in a reference transaction because a `UsageExtensionKeyword` allocates an arena entry
+/// for its qualified name before the production is known to apply.
 pub(crate) fn occurrence_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, (is_abstract, is_constant)) = occurrence_abstract_constant_prefix(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    occurrence_usage_with_modifiers(
-        input,
-        OccurrencePrefix {
-            is_reference,
-            is_abstract,
-            is_constant,
-            membership: Membership::feature(visibility, visibility_span),
-            ..Default::default()
-        },
-    )
+    crate::parser::span::reference_transaction(input, occurrence_usage_inner)
 }
 
-/// `in`/`out`/`inout occurrence` usage member (BNF `RefPrefix` direction on an occurrence
-/// usage), e.g. `in occurrence terminatedOccurrence[1] { ... }` in an action definition body
-/// (Systems Library `Actions.sysml`). Mirrors `item::directed_item_usage`. Requires the
-/// `occurrence` kind keyword so plain `in name : Type;` parameters stay on `in_out_decl`.
-pub(crate) fn directed_occurrence_usage(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let start = input;
+fn occurrence_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let (input, _) = ws_and_comments(input)?;
-    let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
-    // `event` is accepted alongside `occurrence` because `in event occurrence sourceEvent [1]
-    // default that.sourceEvent;` (Systems Library `Flows.sysml`) writes the event keyword between
-    // the direction and the kind keyword; `occurrence_usage` below decides what the pair means.
-    // A kind keyword is still required, so plain `in name : Type;` parameters stay on
-    // `in_out_decl`.
-    let (peek, _) = ws_and_comments(input)?;
-    if !crate::parser::lex::starts_with_keyword(peek.fragment(), b"occurrence")
-        && !crate::parser::lex::starts_with_keyword(peek.fragment(), b"event")
-    {
+    // The node's own span has to start at the first authored token, not at the kind keyword:
+    // every prefix span it now records sits ahead of the declaration, and deserialization checks
+    // that each one lies inside the node that owns it.
+    let start = input;
+    // `DefinitionBodyItem = ( SourceSuccessionMember )? OccurrenceUsageMember`, and
+    // `OccurrenceUsageMember = MemberPrefix …`, so `then` precedes the visibility keyword, which
+    // precedes the usage's own prefix.
+    let (input, then_span) = optional_keyword_token(input, b"then")?;
+    let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
+    let (input, prefix) = occurrence_usage_prefix(input)?;
+    let (input, event_span) = optional_keyword_token(input, b"event")?;
+    // `occurrence` is optional only after `event`: `EventOccurrenceUsage`'s first alternative
+    // names an existing occurrence (`event someOccurrence;`, OMG spec Annex
+    // `17b-Sequence-Modeling.sysml`).
+    let (input, occurrence_span) = optional_keyword_token(input, b"occurrence")?;
+    let has_kind_keyword = event_span.is_some() || occurrence_span.is_some();
+    // `IndividualUsage` and `PortionUsage` are the two spellings with no kind keyword of their
+    // own; each requires the prefix slot that names it. Without one of those slots there is no
+    // production here, and consuming the prefix anyway would turn a sibling family's declaration
+    // into an occurrence usage.
+    if !has_kind_keyword && prefix.individual_span.is_none() && prefix.portion.is_none() {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, mut usage) = occurrence_usage(input)?;
-    usage.value.direction = Some(direction);
-    Ok((input, node_from_to(start, input, usage.value)))
-}
-
-pub(crate) fn individual_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"individual"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    // BNF `OccurrenceUsagePrefix` allows an explicit `occurrence` kind keyword between
-    // `individual` and the declaration name (gap #7, e.g. `individual occurrence o1;`, `Simple
-    // Tests/IndividualTest.sysml`-style short usage form). Without this, the literal `occurrence`
-    // token was misread as the usage's name and the real name (`o1`) was left dangling. Other
-    // kind keywords (`item`/`port`/etc) are handled by their own dedicated `individual`-aware
-    // parsers (`item_usage`/`port_usage`), tried separately in package-body dispatch, so only the
-    // generic `occurrence` keyword is consumed here.
-    let (input, occurrence_kw) = opt(preceded(tag(&b"occurrence"[..]), ws1)).parse(input)?;
-    occurrence_usage_tail(
-        input,
-        OccurrencePrefix {
-            is_individual: true,
-            is_reference,
-            has_occurrence_keyword: occurrence_kw.is_some(),
-            membership: Membership::feature(visibility, visibility_span),
-            ..Default::default()
-        },
-    )
-}
-
-pub(crate) fn snapshot_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"snapshot"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    occurrence_usage_tail(
-        input,
-        OccurrencePrefix {
-            is_reference,
-            portion_kind: Some(crate::ast::OccurrencePortionKind::Snapshot),
-            membership: Membership::feature(visibility, visibility_span),
-            ..Default::default()
-        },
-    )
-}
-
-pub(crate) fn timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, (visibility_span, visibility)) =
-        preceded(ws_and_comments, visibility_prefix).parse(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"timeslice"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    occurrence_usage_tail(
-        input,
-        OccurrencePrefix {
-            is_reference,
-            portion_kind: Some(crate::ast::OccurrencePortionKind::Timeslice),
-            membership: Membership::feature(visibility, visibility_span),
-            ..Default::default()
-        },
-    )
-}
-
-/// `then timeslice ...`: a succession-continuation form, not a distinct BNF production with its
-/// own `BasicUsagePrefix`/visibility grammar (unlike `occurrence`/`individual`/`snapshot`/
-/// `timeslice`, each `OccurrenceUsagePrefix`-backed per the BNF and captured above) -- ad hoc
-/// site, `visibility: None`, matching this rollout's established convention for constructs with
-/// no visibility grammar of their own (see `AttributeUsage`'s ad hoc sites).
-pub(crate) fn then_timeslice_usage(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    let (input, _) = preceded(ws_and_comments, tag(&b"then"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, is_reference) = occurrence_ref_prefix(input)?;
-    let (input, _) = tag(&b"timeslice"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    occurrence_usage_tail(
-        input,
-        OccurrencePrefix {
-            is_then: true,
-            is_reference,
-            portion_kind: Some(crate::ast::OccurrencePortionKind::Timeslice),
-            membership: Membership::feature(None, crate::ast::Span::dummy()),
-            ..Default::default()
-        },
-    )
-}
-
-fn occurrence_usage_with_modifiers(
-    input: Input<'_>,
-    prefix: OccurrencePrefix,
-) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
-    // §6 G7: `event occurrence <name>;` (BNF `EventOccurrenceUsage`) and its succession form
-    // `then event occurrence <name>;`. Real usage: OMG spec Annex `17a-Sequence-Modeling.sysml`.
-    // Handled here rather than as a separate parser so every dispatcher that already reaches
-    // `occurrence_usage` picks both forms up.
-    let (input, then_kw) =
-        opt(preceded(preceded(ws_and_comments, tag(&b"then"[..])), ws1)).parse(input)?;
-    let (input, event_kw) =
-        opt(preceded(preceded(ws_and_comments, tag(&b"event"[..])), ws1)).parse(input)?;
-    // `occurrence` is only optional after `event`: the reference form `event <path>;` names an
-    // existing occurrence rather than declaring one (OMG spec Annex `17b-Sequence-Modeling.sysml`).
-    let (input, occurrence_kw) = opt(preceded(
-        preceded(ws_and_comments, tag(&b"occurrence"[..])),
-        ws1,
-    ))
-    .parse(input)?;
-    if occurrence_kw.is_none() && event_kw.is_none() {
+    // `ref individual item :>> driver : Alice;` (`training/28. Individuals/Individuals and Time
+    // Slices.sysml:10`) is an `ItemUsage` whose prefix happens to end where this one would: the
+    // next token is `item`, that family's kind keyword, not a declaration label. A reserved
+    // keyword can never be an unquoted declaration name, so the keyword-less spellings refuse it
+    // and leave the member to the family that owns it.
+    if !has_kind_keyword && next_word_is_reserved(input) {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    occurrence_usage_tail(
+    let (rest, usage) = occurrence_usage_tail(
         input,
-        OccurrencePrefix {
-            is_then: prefix.is_then || then_kw.is_some(),
-            is_event: event_kw.is_some(),
-            is_event_reference: event_kw.is_some() && occurrence_kw.is_none(),
-            has_occurrence_keyword: occurrence_kw.is_some(),
-            ..prefix
+        OccurrenceHead {
+            prefix,
+            is_then: then_span.is_some(),
+            is_event: event_span.is_some(),
+            is_event_reference: event_span.is_some() && occurrence_span.is_none(),
+            has_occurrence_keyword: occurrence_span.is_some(),
+            membership: Membership::feature(visibility, visibility_span),
         },
-    )
+    )?;
+    Ok((rest, node_from_to(start, rest, usage.value)))
 }
 
 fn occurrence_usage_tail(
     input: Input<'_>,
-    prefix: OccurrencePrefix,
+    head: OccurrenceHead,
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let start = input;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
@@ -387,7 +264,7 @@ fn occurrence_usage_tail(
     // §6 G22: `occurrence :>> causes;` redefines an inherited occurrence without renaming it, so
     // the declaration name is optional. The keyword-less event form instead references an
     // existing occurrence and may use a dotted/qualified path.
-    let (input, name, occurrence_reference) = if prefix.is_event_reference {
+    let (input, name, occurrence_reference) = if head.is_event_reference {
         let (input, reference) = reference_path(input)?;
         (input, String::new(), Some(reference))
     } else if starts_specialization_or_body(input) {
@@ -456,15 +333,10 @@ fn occurrence_usage_tail(
             input,
             OccurrenceUsage {
                 short_name,
-                direction: prefix.direction,
-                is_individual: prefix.is_individual,
-                is_then: prefix.is_then,
-                is_event: prefix.is_event,
-                is_reference: prefix.is_reference,
-                is_abstract: prefix.is_abstract,
-                is_constant: prefix.is_constant,
-                has_occurrence_keyword: prefix.has_occurrence_keyword,
-                portion_kind: prefix.portion_kind,
+                prefix: head.prefix,
+                is_then: head.is_then,
+                is_event: head.is_event,
+                has_occurrence_keyword: head.has_occurrence_keyword,
                 name,
                 occurrence_reference,
                 type_name,
@@ -477,7 +349,7 @@ fn occurrence_usage_tail(
                 intersects,
                 value,
                 body,
-                membership: prefix.membership,
+                membership: head.membership,
             },
         ),
     ))
@@ -595,6 +467,26 @@ pub(crate) fn occurrence_body_element(
 ) -> IResult<Input<'_>, Node<OccurrenceBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    // `UsageExtensionKeyword*` is the last slot of `OccurrenceUsagePrefix`, so a `#tag` run
+    // followed by a head one of the migrated families owns belongs to that usage's prefix, not to
+    // a sibling `PrefixMetadataMember`. The `metadata_keyword_prefix` arm below would otherwise
+    // claim the tag first and leave the usage unprefixed, so the migrated families get first
+    // refusal on a leading `#`. Each attempt is transactional, so a `#tag` that turns out to
+    // prefix some other member rolls back and falls through unchanged.
+    if start.fragment().starts_with(b"#") {
+        if let Ok((next, usage)) = occurrence_usage(start) {
+            let elem = OccurrenceBodyElement::OccurrenceUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = satisfy(start) {
+            let elem = OccurrenceBodyElement::Satisfy(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
+            let elem = OccurrenceBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -647,22 +539,6 @@ pub(crate) fn occurrence_body_element(
             crate::parser::item::item_usage,
             OccurrenceBodyElement::ItemUsage,
         ),
-        map(individual_usage, |n| {
-            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(snapshot_usage, |n| {
-            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(timeslice_usage, |n| {
-            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(then_timeslice_usage, |n| {
-            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        // Before the undirected `occurrence_usage` arm, which would stop at the direction.
-        map(directed_occurrence_usage, |n| {
-            OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
-        }),
         map(occurrence_usage, |n| {
             OccurrenceBodyElement::OccurrenceUsage(Box::new(n))
         }),
@@ -993,26 +869,41 @@ mod membership_tests {
         ))
         .expect("abstract nonunique occurrence");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_abstract);
+        assert_eq!(
+            node.value
+                .prefix
+                .basic
+                .ref_prefix
+                .variance
+                .as_ref()
+                .map(|node| node.value),
+            Some(crate::ast::DefinitionPrefix::Abstract)
+        );
         assert_eq!(node.value.name, "situations");
     }
 
     #[test]
     fn individual_usage_visibility_prefix_is_captured_on_membership() {
         let (_, node) =
-            individual_usage(input("private individual o1 : O1;")).expect("individual usage");
+            occurrence_usage(input("private individual o1 : O1;")).expect("individual usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Private)
         );
+        assert!(node.value.prefix.individual_span.is_some());
     }
 
     #[test]
     fn snapshot_usage_visibility_prefix_is_captured_on_membership() {
-        let (_, node) = snapshot_usage(input("public snapshot o1 : O1;")).expect("snapshot usage");
+        let (_, node) =
+            occurrence_usage(input("public snapshot o1 : O1;")).expect("snapshot usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Public)
+        );
+        assert_eq!(
+            node.value.prefix.portion.as_ref().map(|node| node.value),
+            Some(crate::ast::OccurrencePortionKind::Snapshot)
         );
     }
 
@@ -1033,20 +924,25 @@ mod membership_tests {
     #[test]
     fn timeslice_usage_visibility_prefix_is_captured_on_membership() {
         let (_, node) =
-            timeslice_usage(input("protected timeslice o1 : O1;")).expect("timeslice usage");
+            occurrence_usage(input("protected timeslice o1 : O1;")).expect("timeslice usage");
         assert_eq!(
             node.value.membership.visibility,
             Some(crate::ast::Visibility::Protected)
         );
+        assert_eq!(
+            node.value.prefix.portion.as_ref().map(|node| node.value),
+            Some(crate::ast::OccurrencePortionKind::Timeslice)
+        );
     }
 
+    /// `SourceSuccessionMember = 'then' …` precedes `OccurrenceUsageMember`'s `MemberPrefix`, so
+    /// a `then` form has no visibility of its own unless one is written after it.
     #[test]
     fn then_timeslice_usage_always_has_no_membership_visibility() {
-        // Ad hoc site with no visibility grammar of its own -- see the doc comment on
-        // `then_timeslice_usage`.
         let (_, node) =
-            then_timeslice_usage(input("then timeslice o1 : O1;")).expect("then timeslice usage");
+            occurrence_usage(input("then timeslice o1 : O1;")).expect("then timeslice usage");
         assert_eq!(node.value.membership.visibility, None);
+        assert!(node.value.is_then);
     }
 
     #[test]

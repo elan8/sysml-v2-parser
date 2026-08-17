@@ -1336,36 +1336,16 @@ pub(crate) fn emit_occurrence_usage(
     path: &str,
     usage: &crate::ast::OccurrenceUsage,
 ) -> Result<(), EmitError> {
-    emit_visibility(w, usage.membership.visibility);
+    // `SourceSuccessionMember` precedes the membership, which precedes the usage's own prefix.
     if usage.is_then {
         w.push_str("then ");
     }
-    if let Some(direction) = usage.direction {
-        emit_direction(w, direction);
-    }
-    if usage.is_abstract {
-        w.push_str("abstract ");
-    }
-    if usage.is_constant {
-        w.push_str("constant ");
-    }
-    if usage.is_reference {
-        w.push_str("ref ");
-    }
-    if usage.is_individual {
-        w.push_str("individual ");
-    }
+    emit_visibility(w, usage.membership.visibility);
+    super::structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     if usage.is_event {
         w.push_str("event ");
     }
-    if let Some(portion) = &usage.portion_kind {
-        // `snapshot` / `timeslice` usages parse without an `occurrence` keyword.
-        w.push_str(match portion {
-            crate::ast::OccurrencePortionKind::Snapshot => "snapshot",
-            crate::ast::OccurrencePortionKind::Timeslice => "timeslice",
-        });
-        w.push_char(' ');
-    } else if usage.has_occurrence_keyword {
+    if usage.has_occurrence_keyword {
         // Plain `occurrence …`, `event occurrence …`, and `individual occurrence …` (gap #7) all
         // authored the literal keyword; bare `individual <name>` did not (see `individual_usage`
         // → `occurrence_usage_tail`).
@@ -1381,6 +1361,9 @@ pub(crate) fn emit_occurrence_usage(
     } else if let Some(reference) = usage.occurrence_reference {
         w.push_qualified_reference(&format!("{path}/occurrence"), reference)?;
     }
+    // `ref individual :>> vehicleUnderTest : TestVehicle1` declares no label, so the prefix's
+    // trailing space has nothing to separate and the clause below brings its own.
+    w.trim_trailing_space();
     if let Some(ty) = usage.type_name {
         w.push_str(" : ");
         if usage.type_is_conjugated {

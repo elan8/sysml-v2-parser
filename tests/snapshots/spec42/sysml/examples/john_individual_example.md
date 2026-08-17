@@ -69,7 +69,6 @@ package JohnIndividualExample {
 (fixture-diagnostics
   (document "john_individual_example.md"
     (diagnostics
-      (diagnostic (code "recovered_occurrence_body_element") (severity error) (category parseerror) (span (offset 1170) (line 50) (column 6) (len 258)) (message "unexpected token in occurrence body"))
     )
   )
 )
@@ -119,14 +118,14 @@ package JohnIndividualExample {
         }
     }
     individual UnitedStatesWithJohnAsPresident : UnitedStates {
-        timeslice item UnitedStatesWhenJohnIsPresident[*] : UnitedStates {
-    		doc
-    		/*
+        timeslice item UnitedStatesWhenJohnIsPresident : UnitedStates[*] {
+            doc
+            /*
     		 * These are the time slices of the United States during
     		 * which John is president of the United States.
     		 */
-    		ref :>> presidentOfUS : John;
-    	}
+            ref : John :>> presidentOfUS;
+        }
     }
 }
 ~~~
@@ -135,6 +134,6 @@ package JohnIndividualExample {
 (parsed-document
   (references
   )
-  (root (package (name "JohnIndividualExample") (body brace (item-def) (item-def) (item-def) (item-def) (occurrence (portion none) (declaration "UnitedStatesWithJohnAsPresident") (short-name none) (target none)))))
+  (root (package (name "JohnIndividualExample") (body brace (item-def) (item-def) (item-def) (item-def) (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual true) (portion none) (extensions)) (declaration "UnitedStatesWithJohnAsPresident") (short-name none) (target none)))))
 )
 ~~~

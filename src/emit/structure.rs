@@ -1340,6 +1340,53 @@ pub(crate) fn emit_direction(w: &mut EmitWriter<'_>, dir: InOut) {
     }
 }
 
+/// `OccurrenceUsagePrefix`, streamed in the production's own slot order.
+///
+/// One emitter for every family that owns the prefix. Each keyword is written because its slot
+/// holds an authored span, never because a flag was inferred from something else, and the order is
+/// the grammar's, not the order the fields happen to be declared in. A slot that was not authored
+/// writes nothing; nothing here can invent a prefix, and no branch can omit one that is present.
+pub(crate) fn emit_occurrence_usage_prefix(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    prefix: &crate::ast::OccurrenceUsagePrefix,
+) -> Result<(), EmitError> {
+    let ref_prefix = &prefix.basic.ref_prefix;
+    if let Some(direction) = &ref_prefix.direction {
+        emit_direction(w, direction.value);
+    }
+    if ref_prefix.derived_span.is_some() {
+        w.push_str("derived ");
+    }
+    match ref_prefix.variance.as_ref().map(|node| node.value) {
+        Some(crate::ast::DefinitionPrefix::Abstract) => w.push_str("abstract "),
+        Some(crate::ast::DefinitionPrefix::Variation) => w.push_str("variation "),
+        None => {}
+    }
+    if ref_prefix.constant_span.is_some() {
+        w.push_str("constant ");
+    }
+    if prefix.basic.reference_span.is_some() {
+        w.push_str("ref ");
+    }
+    if prefix.individual_span.is_some() {
+        w.push_str("individual ");
+    }
+    if let Some(portion) = &prefix.portion {
+        w.push_str(portion.value.keyword());
+        w.push_char(' ');
+    }
+    for (index, keyword) in prefix.extension_keywords.iter().enumerate() {
+        w.push_char('#');
+        w.push_qualified_reference(
+            &format!("{path}/prefix/extension[{index}]"),
+            keyword.value.annotation,
+        )?;
+        w.push_char(' ');
+    }
+    Ok(())
+}
+
 pub(crate) fn emit_typing_clause(
     w: &mut EmitWriter<'_>,
     typing: &TypingRelationship,

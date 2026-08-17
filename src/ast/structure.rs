@@ -6,7 +6,6 @@ use super::body::Body;
 use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
-use super::occurrence_prefix::OccurrencePortionKind;
 use super::requirement::{
     Dependency, EnumerationUsage, ItemUsage, RequirementUsage, SatisfyRequirementUsage,
 };
@@ -1688,30 +1687,25 @@ pub struct OccurrenceDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceUsage {
-    /// Leading `in`/`out`/`inout` direction (BNF `RefPrefix`), e.g. `in occurrence
-    /// terminatedOccurrence[1] { ... }` inside an action definition body (Systems Library
-    /// `Actions.sysml`'s `TerminateAction`). Mirrors [`ItemUsage`]'s `direction`.
-    pub direction: Option<InOut>,
-    pub is_individual: bool,
+    /// The complete `OccurrenceUsagePrefix` this usage was written with.
+    ///
+    /// One shared component rather than six independent fields: the production is
+    /// `BasicUsagePrefix ('individual')? PortionKind? UsageExtensionKeyword*`, every slot keeps
+    /// its authored span, and the three mutually exclusive slots cannot hold two alternatives at
+    /// once. `IndividualUsage`, `PortionUsage` and `EventOccurrenceUsage` inline or name the same
+    /// production, so all four spellings of this family share one value; which of them was
+    /// written is the combination of slots plus the kind keyword recorded below.
+    pub prefix: super::occurrence_prefix::OccurrenceUsagePrefix,
     pub is_then: bool,
     /// True for `event occurrence <name>;` (BNF `EventOccurrenceUsage`, §6 G7) — an occurrence
-    /// that marks a point in time rather than owning a lifetime.
+    /// that marks a point in time rather than owning a lifetime. A kind keyword after the prefix,
+    /// not a prefix slot.
     pub is_event: bool,
-    /// Leading `ref` keyword (BNF `RefPrefix`, §6 G29), as in `ref individual :>> vehicleUnderTest
-    /// : TestVehicle1 { ... }` from the OMG spec Annex `9-Verification-simplified.sysml`.
-    pub is_reference: bool,
-    /// Leading `abstract` keyword (BNF `RefPrefix`, §8.2.2.9.2). GH-51: real usage in Systems
-    /// Library `Domain Libraries/Cause and Effect/CausationConnections.sysml`.
-    pub is_abstract: bool,
-    /// Leading `constant` keyword (BNF `RefPrefix`). See `is_abstract`.
-    pub is_constant: bool,
-    /// True when the literal `occurrence` kind keyword was authored (BNF
-    /// `OccurrenceUsagePrefix`/`OccurrenceUsageKeyword`), distinct from `is_individual` --
-    /// `individual occurrence o1;` and bare `individual o1;` both set `is_individual`, but only
-    /// the former also sets this (gap #7). Needed so emission doesn't fabricate or drop the
-    /// keyword relative to what was authored.
+    /// True when the literal `occurrence` kind keyword was authored (BNF `OccurrenceUsage`),
+    /// distinct from the prefix's `individual` slot -- `individual occurrence o1;` and bare
+    /// `individual o1;` both author `individual`, but only the former also authors this (gap #7).
+    /// Needed so emission doesn't fabricate or drop the keyword relative to what was authored.
     pub has_occurrence_keyword: bool,
-    pub portion_kind: Option<OccurrencePortionKind>,
     /// Declaration label for ordinary occurrence usages.
     pub name: String,
     pub short_name: Option<String>,

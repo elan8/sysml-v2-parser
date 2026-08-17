@@ -427,20 +427,7 @@ pub(crate) fn emit_item_usage(
     usage: &ItemUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if let Some(dir) = usage.direction {
-        emit_direction(w, dir);
-    }
-    // `OccurrenceUsagePrefix = BasicUsagePrefix ('individual')?` -- the `RefPrefix` keywords come
-    // before `individual`.
-    crate::emit::structure::emit_ref_prefix(
-        w,
-        usage.is_derived,
-        usage.usage_prefix.as_ref(),
-        usage.is_constant,
-    );
-    if usage.is_individual {
-        w.push_str("individual ");
-    }
+    crate::emit::structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("item ");
     if let Some(short) = &usage.short_name {
         w.push_char('<');
@@ -450,6 +437,9 @@ pub(crate) fn emit_item_usage(
     if !usage.name.is_empty() {
         w.push_str(&format_name(&usage.name));
     }
+    // `item :>> shape : Cylinder` declares no label, so the `item ` keyword's trailing space has
+    // no declaration to separate it from and the clause below brings its own.
+    w.trim_trailing_space();
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
@@ -988,6 +978,8 @@ pub(crate) fn emit_satisfy(
     path: &str,
     satisfy: &SatisfyRequirementUsage,
 ) -> Result<(), EmitError> {
+    crate::emit::writer::emit_visibility(w, satisfy.membership.visibility);
+    super::structure::emit_occurrence_usage_prefix(w, path, &satisfy.prefix)?;
     if satisfy.assert_span.is_some() {
         w.push_str("assert ");
     }

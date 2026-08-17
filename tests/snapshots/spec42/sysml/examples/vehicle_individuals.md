@@ -174,7 +174,7 @@ package VehicleIndividuals {
     			 * This is a time slice of Vehicle1 starting at snapshot vehicle1_t0 
     			 * (time t0) and ending at time t1.
     			 */
-                snapshot  :>> done {
+                snapshot :>> done {
                     attribute :>> localClock.currentTime = t1;
                 }
             }

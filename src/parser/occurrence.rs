@@ -7,9 +7,7 @@ use crate::parser::occurrence_body::occurrence_def_definition_body;
 use crate::parser::Input;
 use nom::IResult;
 
-pub(crate) use crate::parser::occurrence_body::{
-    individual_usage, occurrence_usage, snapshot_usage, then_timeslice_usage, timeslice_usage,
-};
+pub(crate) use crate::parser::occurrence_body::occurrence_usage;
 
 pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceDef>> {
     let start = input;

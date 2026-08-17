@@ -139,7 +139,7 @@ fn gh90_1_individual_prefix_on_occurrence_and_action_usages() {
         _ => None,
     });
     let occ_usage = occ_usage.expect("expected an OccurrenceUsage element");
-    assert!(occ_usage.is_individual);
+    assert!(occ_usage.prefix.individual_span.is_some());
 
     let PackageBodyElement::ActionDef(action_def) = &elements[3] else {
         panic!("expected ActionDef, got {:?}", elements[3]);
