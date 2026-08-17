@@ -73,6 +73,6 @@ package ViewFamilyBodyScopes {
 (parsed-document
   (references
   )
-  (root (package (name "ViewFamilyBodyScopes") (body brace (part-def (name "Host") (body brace (view-def) (view (name "summary") (short-name none) (type none) (body brace (doc))) (viewpoint-def) (viewpoint-usage) (rendering-def) (rendering-usage))) (part-usage (declaration-name "host") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (view-def) (view (name "nestedSummary") (short-name none) (type none) (body brace (doc))) (viewpoint-def) (viewpoint-usage) (rendering-def) (rendering-usage))))))
+  (root (package (name "ViewFamilyBodyScopes") (body brace (part-def (name "Host") (body brace (view-def (name "Overview") (short-name none) (modifiers) (specializes none) (body semicolon)) (view (name "summary") (short-name none) (type none) (body brace (doc))) (viewpoint-def) (viewpoint-usage) (rendering-def) (rendering-usage))) (part-usage (declaration-name "host") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (view-def (name "NestedOverview") (short-name none) (modifiers) (specializes none) (body semicolon)) (view (name "nestedSummary") (short-name none) (type none) (body brace (doc))) (viewpoint-def) (viewpoint-usage) (rendering-def) (rendering-usage))))))
 )
 ~~~
