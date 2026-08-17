@@ -164,6 +164,59 @@ fn usage_extension_keyword(input: Input<'_>) -> IResult<Input<'_>, Node<UsageExt
     ))
 }
 
+/// Whether a member at this position opens with a prefix token a sibling production would
+/// otherwise claim first.
+///
+/// Two of `OccurrenceUsagePrefix`'s FIRST tokens also head a different production in the same
+/// scopes: `#` heads `PrefixMetadataMember` as a standalone member, and `ref` heads
+/// `ReferenceUsage`. Both of those parsers run before the migrated families in several scopes and
+/// neither knows about the kind keyword that follows, so left alone they claim a prefixed
+/// occurrence, item or satisfy usage and silently drop the production it really was --
+/// `ref individual snapshot satisfy R;` became a `ReferenceUsage` named `individual`, with no
+/// diagnostic. The scopes concerned give the migrated families first refusal when this returns
+/// true; every attempt is transactional, so a member that really is one of the other two falls
+/// through unchanged.
+pub(crate) fn starts_contended_prefix(input: Input<'_>) -> bool {
+    // The prefix slots that head no competing production, skipped so that `derived ref item x;`
+    // is recognized as contended even though its first token is not. `ref` and `#` are the only
+    // two heads a sibling production shares, so a run that reaches neither is not contended and
+    // the scope's ordinary dispatch order -- which puts each `*_def` parser ahead of its `*_usage`
+    // sibling -- is left exactly as it was.
+    const UNCONTENDED_SLOTS: &[&[u8]] = &[
+        b"inout",
+        b"in",
+        b"out",
+        b"derived",
+        b"abstract",
+        b"variation",
+        b"constant",
+        b"individual",
+        b"snapshot",
+        b"timeslice",
+    ];
+    let mut cursor = input;
+    loop {
+        let Ok((after_ws, _)) = ws_and_comments(cursor) else {
+            return false;
+        };
+        let fragment = after_ws.fragment();
+        if fragment.starts_with(b"#") || starts_with_keyword(fragment, b"ref") {
+            return true;
+        }
+        let Some(keyword) = UNCONTENDED_SLOTS
+            .iter()
+            .find(|keyword| starts_with_keyword(fragment, keyword))
+        else {
+            return false;
+        };
+        let Ok((rest, _)) = tag::<_, _, nom::error::Error<Input<'_>>>(*keyword).parse(after_ws)
+        else {
+            return false;
+        };
+        cursor = rest;
+    }
+}
+
 /// Whether the next unquoted identifier token spells a reserved SysML keyword.
 ///
 /// A reserved keyword can never be an unquoted declaration name, so a production whose next slot

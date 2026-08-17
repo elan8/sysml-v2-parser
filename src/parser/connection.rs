@@ -26,13 +26,10 @@ fn connection_def_body_element(
 ) -> IResult<Input<'_>, Node<ConnectionDefBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
-    // `UsageExtensionKeyword*` is the last slot of `OccurrenceUsagePrefix`, so a `#tag` run
-    // followed by a head one of the migrated families owns belongs to that usage's prefix, not to
-    // a sibling `PrefixMetadataMember`. The `metadata_keyword_prefix` arm below would otherwise
-    // claim the tag first and leave the usage unprefixed, so the migrated families get first
-    // refusal on a leading `#`. Each attempt is transactional, so a `#tag` that turns out to
-    // prefix some other member rolls back and falls through unchanged.
-    if start.fragment().starts_with(b"#") {
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
         if let Ok((next, usage)) = occurrence_usage(start) {
             let elem = ConnectionDefBodyElement::OccurrenceUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));

@@ -1924,8 +1924,13 @@ fn emit_connection_def_body_element(
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         crate::ast::ConnectionDefBodyElement::PartUsage(p) => emit_part_usage(w, path, &p.value),
-        other @ (crate::ast::ConnectionDefBodyElement::OccurrenceUsage(_)
-        | crate::ast::ConnectionDefBodyElement::SuccessionUsage(_)) => w.unsupported(
+        // A connection definition body is an ordinary definition body, so it owns occurrence
+        // usages like any other; emission was simply never wired here, which made a `connection
+        // def` the one legal owning scope of a migrated family that could not be re-emitted.
+        crate::ast::ConnectionDefBodyElement::OccurrenceUsage(o) => {
+            super::behavior::emit_occurrence_usage(w, path, &o.value)
+        }
+        other @ crate::ast::ConnectionDefBodyElement::SuccessionUsage(_) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),

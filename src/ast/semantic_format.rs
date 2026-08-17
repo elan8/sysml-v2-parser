@@ -2213,8 +2213,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::AssertConstraint(_constraint) => {
                             self.write_marker(&mut first, "assert-constraint")?;
                         }
-                        ConnectionDefBodyElement::OccurrenceUsage(_usage) => {
-                            self.write_marker(&mut first, "occurrence-usage")?;
+                        ConnectionDefBodyElement::OccurrenceUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_occurrence(&usage.value)?;
                         }
                         ConnectionDefBodyElement::SuccessionUsage(_usage) => {
                             self.write_marker(&mut first, "succession-usage")?;
@@ -2355,8 +2356,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::PartUsage(_member) => {
                             self.write_marker(&mut first, "part-usage")?;
                         }
-                        super::PartUsageBodyElement::OccurrenceUsage(_member) => {
-                            self.write_marker(&mut first, "occurrence-usage")?;
+                        super::PartUsageBodyElement::OccurrenceUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_occurrence(&member.value)?;
                         }
                         super::PartUsageBodyElement::PortUsage(_member) => {
                             self.write_marker(&mut first, "port-usage")?;

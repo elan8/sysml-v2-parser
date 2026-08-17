@@ -724,6 +724,15 @@ pub(crate) fn action_def_body_element(
 
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
+    // `metadata_keyword_prefix` below would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
+            let elem = ActionDefBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = nom::branch::alt((
         map(assign_stmt, ActionDefBodyElement::Assign),
         map(for_loop, ActionDefBodyElement::ForLoop),
@@ -1253,6 +1262,15 @@ pub(crate) fn action_usage_body_element(
 
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
+    // `metadata_keyword_prefix` below would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
+            let elem = ActionUsageBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         map(assign_stmt, ActionUsageBodyElement::Assign),
         map(for_loop, ActionUsageBodyElement::ForLoop),
