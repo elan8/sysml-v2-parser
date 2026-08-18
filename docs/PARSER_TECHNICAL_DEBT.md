@@ -86,7 +86,10 @@ Two neighbouring productions are deliberately **not** this one and must not reus
 
 From [`SYSML_V2_COMPLIANCE_GAP.md`](./SYSML_V2_COMPLIANCE_GAP.md):
 
-1. **Generic definition/usage/specialization** — still distributed across construct-specific parsers instead of one unified layer (largest architectural gap).
+1. **Grammar-production-owned definition/usage/specialization components** — still distributed
+   across construct-specific parsers instead of precise shared components composed by distinct
+   family ASTs (largest architectural gap). This is a destination reached by audited vertical
+   slices, not a request for a universal usage node or repository-wide rewrite.
 2. **Permissive bodies** — `skip_until_brace_end` still appears in alias, import, connect-body fallbacks, and deep behavioral body parsers.
 3. **Expression subset** — `expr.rs` is precedence-aware but not full `OwnedExpression`.
 4. **Recovery / LSP** — solid baseline; more specific diagnostics and coverage still wanted (see the [`tech-debt`](https://github.com/elan8/sysml-v2-parser/issues?q=is%3Aissue+label%3Atech-debt) and general issue trackers for concrete open items).
@@ -96,15 +99,23 @@ Duplication in code and "partial grammar" in the spec sense overlap: the same mi
 ## What to avoid
 
 - **Monolithic "parser framework" rewrite** while validation and library gates are green — high risk of re-breaking `ExtendedLibraryDecl` and strict diagnostics tests.
+- **Universal definition/usage structs** with discriminator tags or mostly irrelevant optional
+  fields — they make illegal cross-family combinations representable and move grammar enforcement
+  from exhaustive types into runtime validation.
 - **Dedup-only refactors** without grammar tests — merging code paths without fixture coverage tends to hide regressions until the full library suite runs.
 - **Removing fallback nodes prematurely** — keep `ExtendedLibraryDecl` at zero via dedicated parsers, not by deleting the fallback.
 
 ## Recommended workflow for refactors
 
-1. Introduce a small shared primitive (like `parse_optional_definition_header_after_identification`).
-2. Add or extend unit tests on the primitive and one representative family parser.
-3. Migrate similar families in a single PR; run `cargo test -- --include-ignored`.
-4. File or update a [`tech-debt`](https://github.com/elan8/sysml-v2-parser/issues?q=is%3Aissue+label%3Atech-debt)-labeled issue for any family that still uses opaque bodies or duplicated logic afterward — not a note in this file.
+1. Check in a matrix for the exact pinned production, neighbouring alternatives, FIRST sets, legal
+   scopes, corpus evidence, recovery, and provenance requirements.
+2. Introduce the smallest shared typed component that the matrix justifies.
+3. Migrate a representative family and all its construction and consumer paths atomically; remove
+   its superseded representation in the same change.
+4. Expand only to families proven to name the same component, in reviewable family-sized slices;
+   run the full gates documented by `planning/shared-grammar.md`.
+5. Keep the owning matrix current for intentionally deferred families. Do not use this summary as a
+   second migration-status ledger.
 
 ## Summary
 
@@ -113,4 +124,4 @@ Duplication in code and "partial grammar" in the spec sense overlap: the same mi
 | Is there a lot of duplication? | **Yes** — especially definition prefixes, body terminators, recovery loops, and (concretely) `connection.rs`/`interface.rs`. |
 | Is the codebase unmaintainable? | **No** — modules and tests are coherent; debt is known and issue-tracked. |
 | Where's the current backlog? | Grammar-coverage work: [`PARSER_BACKLOG_ROADMAP.md`](./PARSER_BACKLOG_ROADMAP.md). Architecture/duplication work: issues labeled [`tech-debt`](https://github.com/elan8/sysml-v2-parser/issues?q=is%3Aissue+label%3Atech-debt). |
-| Largest long-term gap? | **Unified definition/usage/specialization grammar** plus deeper body parsing, not more top-level `*_def` files. |
+| Largest long-term gap? | **Grammar-production-owned definition/usage/specialization components** plus deeper body parsing, not a universal AST and not more top-level `*_def` files. |

@@ -280,7 +280,8 @@ dispatches it:
 | --- | --- | --- | --- |
 | `OccurrenceUsage`, `IndividualUsage`, `PortionUsage`, `EventOccurrenceUsage` | lines 573–589 | package/namespace/root, `part def`, `part` usage, occurrence body, `action def`, `action` usage, attribute body, `connection def`, connector-nested | **migrated** |
 | `SatisfyRequirementUsage` | line 1467 | package/namespace/root, `part def`, `part` usage, occurrence body, `view def`, `view` usage, requirement/concern/viewpoint body | **migrated** |
-| `ItemUsage`, `PartUsage`, `PortUsage`, `ViewUsage`, `RenderingUsage`, `ConnectionUsage`, `InterfaceUsage`, `AllocationUsage`, `Message`, `FlowUsage`, `SuccessionFlowUsage` | 616, 624, 646, 1607, 1647, 668, 758, 792, 806, 826, 830 | various | deferred — §9 |
+| `ItemUsage` | 616 | package/namespace/root and structural/attribute/item/part bodies | **migrated** |
+| `PartUsage`, `PortUsage`, `ViewUsage`, `RenderingUsage`, `ConnectionUsage`, `InterfaceUsage`, `AllocationUsage`, `Message`, `FlowUsage`, `SuccessionFlowUsage` | 624, 646, 1607, 1647, 668, 758, 792, 806, 826, 830 | various | deferred — §9 |
 | `ActionUsage`, `CalculationUsage`, `StateUsage`, `ConstraintUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage`, `PerformActionUsage`, `ExhibitStateUsage`, `IncludeUseCaseUsage`, `AssertConstraintUsage`, `AcceptNode`, `SendNode`, `ActionNodePrefix` | 938–1569 | various | deferred — §9 |
 | `MergeNode`, `DecisionNode`, `JoinNode`, `ForkNode` | 973–1010 | action bodies | **not this production** — `ControlNodePrefix` (§1.1) |
 
@@ -441,12 +442,13 @@ that growth is not what costs.
 
 ## 9. Migration status, family by family
 
-Migrated by this change — no legacy prefix field or parser path remains for either:
+Migrated by this change — no legacy prefix field or parser path remains for these families:
 
 | Family | AST type | What moved |
 | --- | --- | --- |
 | `OccurrenceUsage` / `IndividualUsage` / `PortionUsage` / `EventOccurrenceUsage` | `ast::OccurrenceUsage` | `direction`, `is_abstract`, `is_constant`, `is_reference`, `is_individual`, `portion_kind` deleted; `prefix: OccurrenceUsagePrefix` added, with `derived`, `variation` and `UsageExtensionKeyword*` newly represented |
 | `SatisfyRequirementUsage` | `ast::SatisfyRequirementUsage` | `prefix: OccurrenceUsagePrefix` and `membership: Membership` added; nothing deleted, because nothing was there |
+| `ItemUsage` | `ast::ItemUsage` | `is_derived`, `usage_prefix`, `is_constant`, `direction`, and `is_individual` deleted; `prefix: OccurrenceUsagePrefix` added. This was required to stop `ref individual item …` being claimed and reshaped as a keyword-less occurrence usage |
 
 Deliberately **not** migrated by this change. None of these has moved; each keeps whatever partial
 prefix fields it already had, and closing each is a separate, family-sized change that reuses the
@@ -454,7 +456,6 @@ component this one defines:
 
 | Family | Prefix facts it already models | Still missing |
 | --- | --- | --- |
-| `ItemUsage` | `is_derived`, `usage_prefix`, `is_individual`, direction | spans, `constant`, `ref`, `PortionKind`, extension keywords |
 | `PartUsage` | `is_abstract`, `is_variation`, `is_reference`, `is_individual` | spans, direction, `derived`, `constant`, `PortionKind`, extension keywords |
 | `PortUsage` | direction, `is_abstract`, `is_reference`, `is_individual` | spans, `derived`, `variation`, `constant`, `PortionKind`, extension keywords |
 | `ActionUsage` | `is_abstract`, `is_variation`, `is_reference`, `is_individual` | spans, direction, `derived`, `constant`, `PortionKind`, extension keywords |
@@ -479,3 +480,10 @@ type that component in place of its current fields; route its parser through
 `parser::occurrence_prefix` (or the sibling entry point for the other two productions); delete the
 superseded fields, parser branches and emitter logic; and add the scope's missing FIRST tokens
 from §4.
+
+`PartUsage` is the recommended next audit candidate, not a pre-approved mechanical replacement. It
+is central in the corpus and the pinned production names `OccurrenceUsagePrefix` directly, but its
+matrix extension must still enumerate every construction path, owning scope, competing `ref`/`#`
+dispatch, body form, consumer, and recovery boundary before production edits. `PortUsage` is the
+natural following structural candidate. Behavioral families such as `ActionUsage` must be separate
+slices because several specialized textual productions currently construct their AST types.

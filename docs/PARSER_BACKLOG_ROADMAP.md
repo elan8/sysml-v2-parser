@@ -62,7 +62,9 @@ Items that must close before Spec42 can release v1.0. Everything else is 1.x.
 - Diagnostic catalog string literals → named constants migration (§2.6)
 - `rep` in package-adjacent frame/concern bodies beyond what a Spec42 diagnostic requires (§2.2)
 - `head_span` gaps on non-critical annotation paths (§2.1)
-- Unified definition/usage/specialization grammar layer (§4, P5+)
+- Repository-wide completion of the grammar-production-owned definition/usage/specialization
+  layer (§4, P5+). Audited family-sized Phase 4 slices are active now; what is deferred is a broad
+  completion program or flag-day rewrite, not incremental correction of an in-scope production.
 - Full `OwnedExpression` / complete KerML expression family (§2.4)
 - User-defined declaration keywords (`metadata def` as header starter, deferred 1.5b)
 
@@ -119,7 +121,7 @@ See [`tests/validation/README.md`](../tests/validation/README.md) for layout and
 | Deep body fidelity | **Open** — many `advance_to_closing_brace` call sites remain |
 | Full `OwnedExpression` | **Open** — operator enums added; full KerML expression family not modeled |
 | Systems Library `ref <kind>` in part bodies | **Done** (0.46.0) — `ActionUsage`/`StateUsage` (+ Spec42 graph wire); not full P5+ |
-| Unified definition/usage grammar layer | **Open** — P5+ architectural work (still deferred; do not big-bang rewrite) |
+| Grammar-production-owned definition/usage components | **Active incrementally; repository-wide completion is P5+** — Phase 4 matrices and vertical slices only; no universal usage AST or big-bang rewrite |
 
 ```mermaid
 flowchart TB
@@ -252,14 +254,14 @@ Consolidated from [SYSML_V2_COMPLIANCE_GAP.md](./SYSML_V2_COMPLIANCE_GAP.md) and
 
 | Theme | Priority | Notes |
 | ----- | -------- | ----- |
-| Unified definition / usage / specialization grammar layer | **P5+** | Largest architectural gap; do not big-bang rewrite. The 0.46.0 `ref action`/`ref state` part-body slice is **not** this rewrite — only the Systems Library forms that were opaque catch-alls. |
+| Grammar-production-owned definition / usage / specialization components | **P5+ horizon; incremental slices active** | Largest architectural gap. “Unified” means precise components corresponding to pinned productions, composed by distinct family ASTs. It does not mean a universal usage node, generic optional-field bag, parser framework, or flag-day rewrite. Phase 4 slices are active through [`planning/shared-grammar.md`](../planning/shared-grammar.md); the 0.46.0 `ref action`/`ref state` work was coverage, while the `OccurrenceUsagePrefix` seam is the first grammar-component slice. |
 | `DefaultReferenceUsage` AST (bare `name : Type;`) | **Done** (diagnostics-spec-audit) | Part def/usage bodies; was mis-modeled as `AttributeUsage` via shorthand |
 | Metadata `#` / `@` / user-defined keyword surface | Low | Closed syntactically by the metadata-sigil seam (`planning/metadata-sigil-matrix.md`): both sigils are reference-backed and dispatched in every owning scope, and `unsupported_annotation_syntax` now reaches only `ExtendedUsage` with an anonymous-but-specialized declaration (`#Tag : T;`, `#Tag :>> y;`), which belongs to the `ExtendedUsage` seam. A sigil with no reference behind it is the separate `malformed_annotation_head`. Still doesn't resolve whether `<tag>` is an actually-declared `metadata def <tag>` short name (that semantic check + a package-local short-name index is the remaining 1.5b item, §2.1) |
 | Part-body `ref action` / `ref state` (Systems Library) | **Done** (0.46.0) | Real `ActionUsage`/`StateUsage` with `is_reference`, `:>`/` :>>`, visibility on plain `ref` |
 | `take_until_terminator` header scraping → structured headers | Medium | Per-family as library fixtures expose gaps |
 | `part_def` prelude unify with `definition_prefix` | Low | Intentionally local for disambiguation |
 | `package_body_element` sub-dispatchers | **Done** (P2) | Maintain when adding keywords |
-| AST shape dedup (`DefinitionDecl` internal) | P5+ | Drive from grammar work |
+| AST shape dedup (`DefinitionDecl` internal) | P5+ | Drive only from a pinned production matrix and observable correctness need; similar fields or line-count reduction alone do not justify extraction |
 | Semantic conformance (types, resolution) | Out of scope | Spec42 / other tools |
 
 ---
@@ -456,7 +458,8 @@ Parser-side delivery for [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DI
 1. **Spec42 graph builders** for completed P0 AST (§ 1) — unlocks user-visible diagnostics.
 2. **Parser partials** that block Spec42 (§ 2.1 declaration keywords, § 2.2 rep diagnostics, § 2.3 action/requirement bodies).
 3. **LSP P0** (§ 3) in parallel with body fidelity.
-4. **Expression depth** (§ 2.4) and **P5 grammar layer** (§ 4) as longer horizons.
+4. **Expression depth** (§ 2.4) and repository-wide completion of the **P5 grammar-component
+   layer** (§ 4) as longer horizons; continue independently justified Phase 4 slices meanwhile.
 
 ---
 

@@ -70,9 +70,16 @@ This does not mean every production in those families is fully grammar-faithful,
 
 ## What is still partial or permissive
 
-### Generic definition and usage grammar remains the largest architectural gap
+### Grammar-production-owned definition and usage components remain the largest architectural gap
 
-The spec's shared definition/usage/specialization layer is still only partially modeled. Much of that logic remains distributed across construct-specific parsers such as parts, ports, attributes, actions, and states instead of being represented by a unified grammar layer.
+The spec's shared definition/usage/specialization productions are still only partially modeled as
+shared typed components. Much of that logic remains distributed across construct-specific parsers
+such as parts, ports, attributes, actions, and states.
+
+The intended “unified grammar layer” is compositional: one precise component per justified pinned
+production, retained inside distinct family ASTs. It is not a universal definition/usage node,
+generic optional-field bag, or monolithic parser rewrite. Migrations proceed through the matrix and
+vertical-slice gates in [`planning/shared-grammar.md`](../planning/shared-grammar.md).
 
 Impact:
 
@@ -150,7 +157,8 @@ This means package-level fallback elimination is no longer the main quality prob
 
 The parser is not blocked on missing top-level support for major SysML families anymore. "Not finished" now means:
 
-1. generic definition/usage/specialization grammar is not yet unified
+1. shared definition/usage/specialization productions are not yet consistently represented by
+   grammar-owned components across all families
 2. body-level modeling is still permissive in several modules
 3. action/state/expression coverage is still subset-oriented compared with the full grammar
 4. language-server recovery quality still needs hardening beyond the current solid baseline
