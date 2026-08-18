@@ -2447,7 +2447,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// `PartUsageBody` and `RefBody` are both `Body<PartUsageBodyElement>`, so the exhaustive
     /// element match in [`write_ref_body`](Self::write_ref_body) covers the body members.
     fn write_part_usage(&mut self, usage: &super::PartUsage) -> io::Result<()> {
-        self.writer.write_str("(part-usage ")?;
+        write!(
+            self.writer,
+            "(part-usage (then {}) ",
+            usage.then_span.is_some()
+        )?;
         self.write_occurrence_usage_prefix(&usage.prefix)?;
         self.writer.write_str(" (declaration-name ")?;
         self.write_usage_declaration_name(&usage.name)?;

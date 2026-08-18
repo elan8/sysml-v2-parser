@@ -166,7 +166,7 @@ fn occurrence_definition_body_with_labels<'a>(
 /// follow it. None of the four is a prefix slot.
 struct OccurrenceHead {
     prefix: OccurrenceUsagePrefix,
-    is_then: bool,
+    then_span: Option<crate::ast::Span>,
     is_event: bool,
     /// `EventOccurrenceUsage`'s first alternative -- `event <path>` names an existing occurrence
     /// rather than declaring one, so there is no declaration label to read.
@@ -244,7 +244,7 @@ fn occurrence_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Occurrenc
         input,
         OccurrenceHead {
             prefix,
-            is_then: then_span.is_some(),
+            then_span,
             is_event: event_span.is_some(),
             is_event_reference: event_span.is_some() && occurrence_span.is_none(),
             has_occurrence_keyword: occurrence_span.is_some(),
@@ -334,7 +334,7 @@ fn occurrence_usage_tail(
             OccurrenceUsage {
                 short_name,
                 prefix: head.prefix,
-                is_then: head.is_then,
+                then_span: head.then_span,
                 is_event: head.is_event,
                 has_occurrence_keyword: head.has_occurrence_keyword,
                 name,
@@ -943,7 +943,7 @@ mod membership_tests {
         let (_, node) =
             occurrence_usage(input("then timeslice o1 : O1;")).expect("then timeslice usage");
         assert_eq!(node.value.membership.visibility, None);
-        assert!(node.value.is_then);
+        assert!(node.value.then_span.is_some());
     }
 
     #[test]

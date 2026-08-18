@@ -23,6 +23,8 @@ fn usage_ordered_modifier(input: Input<'_>) -> IResult<Input<'_>, (bool, bool)> 
 /// `part_def_or_usage` came to accept a different set of slots than `part_usage`.
 pub(crate) struct PartUsageHead {
     prefix: crate::ast::OccurrenceUsagePrefix,
+    /// `SourceSuccessionMember`'s `then`, which precedes the membership and therefore the prefix.
+    then_span: Option<crate::ast::Span>,
     short_name: Option<String>,
     membership: Membership,
 }
@@ -53,6 +55,7 @@ fn part_usage_redefines_only<'a>(
             input,
             PartUsage {
                 prefix: head.prefix.clone(),
+                then_span: head.then_span.clone(),
                 name: String::new(),
                 short_name: head.short_name.clone(),
                 typing,
@@ -128,6 +131,7 @@ fn part_usage_named<'a>(
             input,
             PartUsage {
                 prefix: head.prefix.clone(),
+                then_span: head.then_span.clone(),
                 name: name_str,
                 short_name: head.short_name.clone(),
                 typing,
@@ -168,7 +172,11 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
 fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    // `MemberPrefix` precedes the usage's own prefix and belongs to the membership.
+    // `DefinitionBodyItem`/`NonBehaviorBodyItem` = `( SourceSuccessionMember )? …UsageMember`, so
+    // `then` precedes the membership, and `OccurrenceUsageMember = MemberPrefix …`, so the
+    // visibility keyword precedes the usage's own prefix. All three in that order.
+    let (input, then_span) =
+        crate::parser::occurrence_prefix::optional_keyword_token(input, b"then")?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"part"[..]).parse(input)?;
@@ -204,6 +212,7 @@ fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let (input, _) = ws_and_comments(input)?;
     let head = PartUsageHead {
         prefix,
+        then_span,
         short_name,
         membership: Membership::feature(visibility, visibility_span),
     };
@@ -255,6 +264,7 @@ fn anonymous_part_usage<'a>(
             input,
             PartUsage {
                 prefix: head.prefix.clone(),
+                then_span: head.then_span.clone(),
                 name: String::new(),
                 short_name: head.short_name.clone(),
                 typing,

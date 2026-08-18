@@ -2865,8 +2865,11 @@ macro_rules! ast_traversal {
         pub fn walk_part_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<PartUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let PartUsage { prefix, name, short_name, typing, multiplicity, ordered, nonunique, subsets, redefines, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            let PartUsage { prefix, then_span, name, short_name, typing, multiplicity, ordered, nonunique, subsets, redefines, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
+            if let Some(inner) = then_span {
+                visitor.visit_span(inner);
+            }
             visitor.visit_text(name);
             if let Some(inner) = short_name {
                 visitor.visit_text(inner);
@@ -4019,9 +4022,11 @@ macro_rules! ast_traversal {
         pub fn walk_occurrence_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<OccurrenceUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let OccurrenceUsage { prefix, is_then, is_event, has_occurrence_keyword, name, short_name, occurrence_reference, type_name, type_is_conjugated, multiplicity, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
+            let OccurrenceUsage { prefix, then_span, is_event, has_occurrence_keyword, name, short_name, occurrence_reference, type_name, type_is_conjugated, multiplicity, subsets, redefines, references, crosses, intersects, value, body, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
-            let _ = is_then;
+            if let Some(inner) = then_span {
+                visitor.visit_span(inner);
+            }
             let _ = is_event;
             let _ = has_occurrence_keyword;
             visitor.visit_text(name);

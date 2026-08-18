@@ -52,6 +52,6 @@ package InterfaceUsageDeclarationForms {
 (parsed-document
   (references
   )
-  (root (package (name "InterfaceUsageDeclarationForms") (body brace (part-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "host") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines none) (value none) (body brace (interface-usage) (interface-usage) (interface-usage) (interface-usage) (interface-usage) (interface-usage))))))
+  (root (package (name "InterfaceUsageDeclarationForms") (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "host") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines none) (value none) (body brace (interface-usage) (interface-usage) (interface-usage) (interface-usage) (interface-usage) (interface-usage))))))
 )
 ~~~

@@ -465,6 +465,16 @@ pub struct PartUsage {
     /// `#logical part vehicleLogical : Vehicle { ... }` (`Vehicle Example/SysML v2 Spec Annex A
     /// SimpleVehicleModel.sysml:487`) became two sibling members.
     pub prefix: crate::ast::OccurrenceUsagePrefix,
+    /// `SourceSuccessionMember : FeatureMembership = 'then' ownedRelatedElement += SourceSuccession`
+    /// (SysML BNF 597), as the authored keyword's span.
+    ///
+    /// `DefinitionBodyItem` and `NonBehaviorBodyItem` both spell
+    /// `( SourceSuccessionMember )? …UsageMember`, so a `then` precedes the *membership* -- and
+    /// therefore the visibility keyword and the whole prefix -- rather than being a prefix slot.
+    /// It is a separate field for that reason, not a member of [`OccurrenceUsagePrefix`].
+    /// `SourceSuccession` and `SourceEndMember` below it contribute no further tokens, so the
+    /// keyword's span is the whole authored fact.
+    pub then_span: Option<Span>,
     pub name: String,
     /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
     pub short_name: Option<String>,
@@ -496,6 +506,7 @@ pub struct PartUsage {
 impl PartialEq for PartUsage {
     fn eq(&self, other: &Self) -> bool {
         self.prefix == other.prefix
+            && self.then_span == other.then_span
             && self.name == other.name
             && self.short_name == other.short_name
             && self.typing == other.typing
@@ -1687,7 +1698,10 @@ pub struct OccurrenceUsage {
     /// production, so all four spellings of this family share one value; which of them was
     /// written is the combination of slots plus the kind keyword recorded below.
     pub prefix: super::occurrence_prefix::OccurrenceUsagePrefix,
-    pub is_then: bool,
+    /// `SourceSuccessionMember`'s `then`, as the authored keyword's span; see
+    /// [`PartUsage::then_span`]. Was a `bool`, which kept no provenance -- one representation per
+    /// syntactic fact, and `Some` *is* the flag.
+    pub then_span: Option<Span>,
     /// True for `event occurrence <name>;` (BNF `EventOccurrenceUsage`, §6 G7) — an occurrence
     /// that marks a point in time rather than owning a lifetime. A kind keyword after the prefix,
     /// not a prefix slot.

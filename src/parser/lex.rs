@@ -72,6 +72,9 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"timeslice",
     b"variant",
     b"variation",
+    // `DefinitionBodyItem = ( SourceSuccessionMember )? OccurrenceUsageMember`, so `then` is the
+    // first token of a member here, not part of the one before it.
+    b"then",
     b"analysis",
     b"metadata",
     // KerML classifier-keyword family dispatched via `kerml_classifier_structured`

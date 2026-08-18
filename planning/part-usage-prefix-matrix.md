@@ -409,13 +409,17 @@ changed here.
   production. `planning/occurrence-usage-prefix-matrix.md` §9 remains the authoritative ledger.
 - **No universal usage/header node, optional-field bag, compatibility adapter, parallel legacy
   representation, or parser-framework abstraction.**
-- **`then` is not added to `PartUsage`.** `SourceSuccessionMember` precedes
-  `OccurrenceUsageMember`, so it is neither a prefix slot nor part of `PartUsage`. The one pinned
-  corpus occurrence (`then snapshot part vehicle_1_t1 { … }`,
-  `training/28. Individuals/Individuals and Roles-1.sysml:18`) therefore stays a recovery node
-  after this slice, with its `snapshot part …` sibling on the same file now parsing. Modelling
-  `then` on the structure families is its own slice, in the same shape `OccurrenceUsage::is_then`
-  already has.
+- **`then` is on `PartUsage`, but is not a prefix slot.** `SourceSuccessionMember : FeatureMembership
+  = 'then' ownedRelatedElement += SourceSuccession` (BNF 597) precedes `OccurrenceUsageMember`, so
+  it precedes the visibility keyword and the whole prefix. It is therefore a separate
+  `then_span: Option<Span>` field, not a member of `OccurrenceUsagePrefix`. `SourceSuccession` and
+  `SourceEndMember` below it contribute no further tokens, so the keyword's span is the whole
+  authored fact. `OccurrenceUsage`'s pre-existing spanless `is_then: bool` moved to the same shape
+  at the same time. The one pinned corpus occurrence
+  (`then snapshot part vehicle_1_t1 { … }`, `training/28. Individuals/Individuals and
+  Roles-1.sysml:18`) now parses, leaving that file diagnostic-free.
+  `then` on the families this slice did not migrate -- `ItemUsage`, `SatisfyRequirementUsage` and
+  the rest -- is still unrecognized; each closes it with its own slice.
 - **`end part` is not accepted.** Pilot-only; see §8.
 - **`calc def` body dispatch is not widened.** `CalcDefBodyElement::PartUsage` stays reachable
   only through the `in`/`out`/`inout` gate; opening it to bare `part p;` is a change to that

@@ -37,6 +37,11 @@ pub(crate) fn emit_part_usage(
     path: &str,
     usage: &PartUsage,
 ) -> Result<(), EmitError> {
+    // `( SourceSuccessionMember )? OccurrenceUsageMember`, and `OccurrenceUsageMember =
+    // MemberPrefix …`: `then` precedes the visibility keyword, which precedes the prefix.
+    if usage.then_span.is_some() {
+        w.push_str("then ");
+    }
     emit_visibility(w, usage.membership.visibility);
     // `PartUsage = OccurrenceUsagePrefix 'part' Usage`: the same typed prefix boundary the
     // already migrated families stream through, in the production's slot order, with each
