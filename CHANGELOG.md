@@ -62,11 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Emission.** `port :>> pe = c1.pb;` came back out as `port  :>> pe = c1.pb;`: the kind
     keyword's trailing space was stranded in front of a clause that supplies its own. Same fix
     `emit_part_usage` and `emit_attribute_usage` already carry.
-  - **Recovery.** `PORT_BODY_STARTERS`, `PORT_DEF_BODY_STARTERS`, `INTERFACE_DEF_BODY_STARTERS`
-    and `CONNECTION_DEF_BODY_STARTERS` gain the FIRST tokens each lacked, so a malformed member
-    before a prefixed port usage synchronizes at the first prefix token rather than scanning to
-    `port` and consuming the usage. `INTERFACE_DEF_BODY_STARTERS` had listed four of the dozen
-    members that scope dispatches.
+  - **Recovery in the four brace scopes that own a port usage no longer eats the member after
+    malformed content.** `PORT_BODY_STARTERS`, `PORT_DEF_BODY_STARTERS`,
+    `INTERFACE_DEF_BODY_STARTERS` and `CONNECTION_DEF_BODY_STARTERS` gain the FIRST tokens each
+    lacked -- `INTERFACE_DEF_BODY_STARTERS` had listed four of the dozen members its scope
+    dispatches -- *and* all four scopes now actually resynchronize on their table.
+    `parse_structured_brace_members` defaults to a skip mode that scans to the next `;` and never
+    reads the `starters` argument, so completing a table was decorative in those scopes: an
+    unterminated `%%%` followed by `private port p;` produced one malformed node covering both.
+    `MemberPrefix` is why the visibility keywords matter as much as the prefix ones -- `port_usage`
+    accepts `public`/`private`/`protected` ahead of the occurrence prefix, so the member is lost
+    without them even when all thirteen prefix tokens are listed. Both halves are necessary and
+    neither is sufficient. Pre-existing rather than introduced here, but in exactly the scopes this
+    slice completes; `tests/snapshots/sysml/port_usage_prefix_scope_recovery.md` pins all four.
   - **Breaking AST shape.** `PortUsage::{direction, is_abstract, is_derived, is_constant,
     is_individual}` are replaced by `PortUsage::prefix`; `PortUsage::{ordered, nonunique}` are new;
     the `PortUsage` variant of `PackageBodyElement`, `PartDefBodyElement`, `PartUsageBodyElement`,

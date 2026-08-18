@@ -115,6 +115,17 @@ pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"snapshot",
     b"timeslice",
     b"variation",
+    // The remaining members `port_def_body_element` dispatches. A starter table is only worth
+    // having if it names where a member *starts*; recovery synchronizes on it, so a missing entry
+    // is a valid sibling consumed by the malformed node before it.
+    b"item",
+    b"enum",
+    b"comment",
+    b"rep",
+    b"@",
+    b"private",
+    b"protected",
+    b"public",
 ];
 
 /// `PortBody = DefinitionBody`, and this scope dispatches a `PortUsage`, so every token of
@@ -143,6 +154,11 @@ pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[
     // The member itself is not modelled -- see `planning/port-usage-prefix-matrix.md` §10.1 -- but
     // it is still where a member starts, so recovery must synchronize on it.
     b"variant",
+    b"attribute",
+    b"item",
+    b"comment",
+    b"rep",
+    b"@",
     b"private",
     b"protected",
     b"public",
@@ -390,6 +406,17 @@ pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"snapshot",
     b"timeslice",
     b"variation",
+    // The remaining members `connection_def_body_element` dispatches; see
+    // `PORT_DEF_BODY_STARTERS` for why an incomplete table costs a valid sibling.
+    b"attribute",
+    b"assert",
+    b"succession",
+    b"comment",
+    b"rep",
+    b"@",
+    b"private",
+    b"protected",
+    b"public",
 ];
 
 /// GH-51: mirrors [`CONNECTION_DEF_BODY_STARTERS`] -- `interface_def_body` previously had no
@@ -420,6 +447,12 @@ pub(crate) const INTERFACE_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"snapshot",
     b"timeslice",
     b"variation",
+    b"comment",
+    b"rep",
+    b"@",
+    b"private",
+    b"protected",
+    b"public",
 ];
 
 /// Skip optional whitespace (space, tab, newline).

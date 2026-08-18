@@ -7,7 +7,6 @@ use crate::parser::action::in_out_decl;
 use crate::parser::attribute::{
     attribute_def, attribute_feature_binding, attribute_usage, directed_attribute_usage,
 };
-use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::enumeration::enum_usage;
@@ -80,13 +79,14 @@ fn port_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<PortBodyElement>
 }
 
 fn port_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
-    let (input, members) = parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members_with_skip(
         input,
         PORT_BODY_STARTERS,
         "port body",
         "recovered_port_body_element",
         port_body_element,
         port_body_recovery,
+        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }
@@ -338,13 +338,14 @@ fn port_def_body(input: Input<'_>) -> IResult<Input<'_>, PortDefBody> {
 }
 
 fn port_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortDefBody> {
-    let (input, members) = parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members_with_skip(
         input,
         PORT_DEF_BODY_STARTERS,
         "port definition body",
         "recovered_port_def_body_element",
         port_def_body_element,
         port_def_body_recovery,
+        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

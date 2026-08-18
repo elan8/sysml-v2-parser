@@ -2,7 +2,6 @@
 
 use crate::ast::{InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, Membership, Node};
 use crate::parser::attribute::{attribute_def, attribute_usage};
-use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -115,13 +114,14 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
             },
         ));
     }
-    let (input, members) = parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members_with_skip(
         input,
         INTERFACE_DEF_BODY_STARTERS,
         "interface definition body",
         "recovered_interface_def_body_element",
         interface_def_body_element,
         interface_def_body_recovery,
+        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

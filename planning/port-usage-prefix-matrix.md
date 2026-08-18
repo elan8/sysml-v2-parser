@@ -246,6 +246,47 @@ the valid usage that follows it, exactly as recorded for `assert`/`not` in
 `planning/satisfy-requirement-usage-matrix.md` §6 and for the occurrence prefix in
 `planning/occurrence-usage-prefix-matrix.md` §4.
 
+### 6.1 Four of these tables were not consulted at all
+
+Completing a table only helps if the scope resynchronizes on it. `parse_structured_brace_members`
+defaults to `BraceMemberSkip::StatementOrBlock`, which scans to the next `;` or balanced block and
+**never reads the `starters` argument**; only `BraceMemberSkip::BodyElementRecover` calls
+`recover_body_element(input, starters)`. Before this slice exactly four scopes opted in --
+requirement, view, part definition and part usage bodies -- and all four of *this* family's brace
+scopes took the default:
+
+```
+interface def I {
+    %%%                          -- unterminated malformed run
+    private port p;              -- consumed into the malformed node
+}
+```
+
+The malformed span covered both lines. The scan stopped at the `;` of the valid member, so the
+port usage disappeared -- the "recovery must not consume valid later siblings" clause of the
+parsing contract, failing silently because no fixture in any of those four scopes had a member
+after malformed content.
+
+`MemberPrefix` makes it worse than it looks: `port_usage` accepts `public`/`private`/`protected`
+before the occurrence prefix, so even with all thirteen prefix tokens listed, `private port p;`
+still needed `private` to be a starter. Both halves are necessary and neither is sufficient --
+measured by making each change alone and re-parsing the case above.
+
+All four scopes now pass `BraceMemberSkip::BodyElementRecover`, and their tables are completed to
+the member set each `*_body_element` actually dispatches, not just to FIRST(`PortUsage`):
+
+| Table | Also added | Why |
+| --- | --- | --- |
+| `INTERFACE_DEF_BODY_STARTERS` | `private`, `protected`, `public`, `comment`, `rep`, `@` | `MemberPrefix`; the annotating members the scope dispatches |
+| `PORT_DEF_BODY_STARTERS` | `item`, `enum`, `comment`, `rep`, `@`, `private`, `protected`, `public` | the item, enumeration and annotating members it dispatches |
+| `PORT_BODY_STARTERS` | `attribute`, `item`, `comment`, `rep`, `@`, `private`, `protected`, `public` | the attribute, item and annotating members it dispatches |
+| `CONNECTION_DEF_BODY_STARTERS` | `attribute`, `assert`, `succession`, `comment`, `rep`, `@`, `private`, `protected`, `public` | the attribute, assert-constraint, succession and annotating members it dispatches |
+
+This is a pre-existing defect rather than one the slice introduced -- `%%%` followed by a bare
+`port p;` was swallowed before it too -- but it is a defect in exactly the scopes whose starter
+tables this slice completes, and leaving them unconsulted would make that completion decorative.
+`tests/snapshots/sysml/port_usage_prefix_scope_recovery.md` pins all four.
+
 ## 7. Competing productions and parser-precedence hazards
 
 Six productions share a FIRST token with a prefixed `PortUsage`.
@@ -448,10 +489,8 @@ port-usage change. Recorded in §11.
 ### 10.2 The `interface def` body had no real starter table
 
 `INTERFACE_DEF_BODY_STARTERS` was `[connect, end, ref, doc]` -- four of the members that scope
-dispatches, out of a dozen. A malformed member in an interface definition body therefore scanned
-past every port, item and attribute declaration after it. That is not specific to this slice, but
-the scope is one of `PortUsage`'s nine, and the table cannot be left claiming that `port` is not a
-member starter while this slice adds the twelve tokens that may precede it.
+dispatches, out of a dozen -- and the scope did not read it at all. §6.1 has the mechanism and the
+fix; the table is now the member set the scope dispatches, and the scope resynchronizes on it.
 
 ## 11. Explicit non-goals
 
@@ -585,6 +624,7 @@ none of them is independently mergeable.
 | `tests/snapshots/sysml/port_usage_prefix_alternatives.md` | no prefix; every slot alone; all three directions; `abstract` and `variation`; `snapshot` and `timeslice`; one and several extension keywords; the full legal order; materially distinct combinations; absolute/relative/quoted extension references; named, short-name, anonymous and `:>>` shapes; typing, multiplicity with `ordered`/`nonunique`, subsets, redefines, references, crosses, intersects, values, both body forms; `MemberPrefix` visibility beside the prefix |
 | `tests/snapshots/sysml/port_usage_prefix_owning_scopes.md` | a materially different prefix in every scope of §3, and identical projection for identical syntax across scopes |
 | `tests/snapshots/sysml/port_usage_prefix_recovery.md` | every case in §10 except the unmatched brace, plus a valid sibling after each |
+| `tests/snapshots/sysml/port_usage_prefix_scope_recovery.md` | §6.1: an unterminated malformed run in each of the four brace scopes that own a port usage and resynchronize on their own table, each followed by a visibility-prefixed port usage and two further siblings |
 | `tests/snapshots/sysml/port_usage_prefix_unterminated.md` | the unmatched-brace state, which subsumes every other member and so needs its own fixture |
 | `tests/port_usage_prefix_owning_layer.rs` | arena rollback after refused speculation; strict/editor equivalence; parse→format→reparse and format idempotence per slot; envelope rejection of a wrong-token span, a wrong alternative, out-of-order slots, a non-`#` sigil, a dangling extension identity and a keyword belonging to another member |
 | `tests/snapshots/spec42/**` | the pinned corpus files this slice changes |
