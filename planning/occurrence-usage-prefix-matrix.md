@@ -481,9 +481,11 @@ type that component in place of its current fields; route its parser through
 superseded fields, parser branches and emitter logic; and add the scope's missing FIRST tokens
 from §4.
 
-`PartUsage` is the recommended next audit candidate, not a pre-approved mechanical replacement. It
-is central in the corpus and the pinned production names `OccurrenceUsagePrefix` directly, but its
-matrix extension must still enumerate every construction path, owning scope, competing `ref`/`#`
-dispatch, body form, consumer, and recovery boundary before production edits. `PortUsage` is the
-natural following structural candidate. Behavioral families such as `ActionUsage` must be separate
-slices because several specialized textual productions currently construct their AST types.
+`PartUsage` was the recommended next audit candidate, and that audit is
+`planning/part-usage-prefix-matrix.md`: a narrowly focused linked matrix rather than a section
+here, because it enumerates thirteen owning scopes, five construction paths, six competing
+productions and a recovery contract of its own, and none of that is shared with the families
+already migrated. It is the authoritative record for that family; this document stays the
+cross-family ledger (§9). `PortUsage` is the natural following structural candidate. Behavioral
+families such as `ActionUsage` must be separate slices because several specialized textual
+productions currently construct their AST types.
