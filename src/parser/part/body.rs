@@ -217,6 +217,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             let elem = PartDefBodyElement::PartUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = crate::parser::port::port_usage(start) {
+            let elem = PartDefBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let (input, elem) = alt((
         alt((

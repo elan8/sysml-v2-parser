@@ -243,6 +243,17 @@ const PORT_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first -- the two `#` arms immediately below
+    // and `connector::ref_decl` further down; see `occurrence_prefix::starts_contended_prefix`.
+    // `#idd port APIS_HTTP { … }` (`Arrowhead Framework Example/AHFNorwayTopics.sysml:22`) became
+    // two sibling members, and `ref port c2 : C;` (`Simple Tests/PartTest.sysml:46`) a `RefDecl`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+        if let Ok((next, usage)) = port_usage(input) {
+            let elem = PortDefBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     // `#keyword` metadata tag -- tried first so a stacked/prefixing `#idd port APIS_HTTP { ... }`
     // (bare form, then `PrefixMetadataMember`-style form prefixing the next port-body member)
     // dispatches here instead of falling through to the opaque-capture fallback below. Mirrors

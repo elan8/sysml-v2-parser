@@ -170,6 +170,10 @@ fn requirement_def_body_element(
                 let elem = RequirementDefBodyElement::Satisfy(Box::new(usage));
                 return Ok((next, node_from_to(start, next, elem)));
             }
+            if let Ok((next, usage)) = crate::parser::port::port_usage(after_ws) {
+                let elem = RequirementDefBodyElement::PortUsage(Box::new(usage));
+                return Ok((next, node_from_to(start, next, elem)));
+            }
         }
     }
     let (rest, elem) = alt((

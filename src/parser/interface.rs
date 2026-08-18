@@ -22,6 +22,15 @@ fn interface_def_body_element(
 ) -> IResult<Input<'_>, Node<InterfaceDefBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first -- the two `#` arms and
+    // `connector::ref_decl` below; see `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+        if let Ok((next, usage)) = port_usage(input) {
+            let elem = InterfaceDefBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,

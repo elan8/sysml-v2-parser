@@ -105,10 +105,48 @@ pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"inout",
     b"ref",
     b"abstract",
+    // The rest of FIRST(`OccurrenceUsagePrefix`) on the port usage this scope dispatches;
+    // `abstract`, `in`, `inout`, `out`, `port` and `ref` were already listed. See
+    // `planning/port-usage-prefix-matrix.md` §6.
+    b"#",
+    b"constant",
+    b"derived",
+    b"individual",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
-pub(crate) const PORT_BODY_STARTERS: &[&[u8]] =
-    &[b":>>", b":>", b"doc", b"port", b"in", b"out", b"inout"];
+/// `PortBody = DefinitionBody`, and this scope dispatches a `PortUsage`, so every token of
+/// FIRST(`PortUsage`) is a member starter here. Only four of the thirteen were listed, so a
+/// malformed member before `ref port q;` scanned past the prefix and consumed the usage. See
+/// `planning/port-usage-prefix-matrix.md` §6.
+pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[
+    b":>>",
+    b":>",
+    b"doc",
+    b"port",
+    b"in",
+    b"out",
+    b"inout",
+    b"#",
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"individual",
+    b"ref",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
+    // `DefinitionBodyItem` admits a `VariantUsageMember` here, which `variation port :>> autoPort
+    // { variant port autoPort1; }` writes (`Variability Examples/VehicleVariabilityModel.sysml:79`).
+    // The member itself is not modelled -- see `planning/port-usage-prefix-matrix.md` §10.1 -- but
+    // it is still where a member starts, so recovery must synchronize on it.
+    b"variant",
+    b"private",
+    b"protected",
+    b"public",
+];
 
 pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"#",
@@ -337,6 +375,7 @@ pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"end",
     b"ref",
     b"doc",
+    b"port",
     b"#",
     b"abstract",
     b"constant",
@@ -356,7 +395,32 @@ pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[
 /// GH-51: mirrors [`CONNECTION_DEF_BODY_STARTERS`] -- `interface_def_body` previously had no
 /// starter list at all (its own hand-rolled brace loop swallowed unparseable content silently,
 /// with no diagnostic).
-pub(crate) const INTERFACE_DEF_BODY_STARTERS: &[&[u8]] = &[b"connect", b"end", b"ref", b"doc"];
+///
+/// The list named four of the dozen members `interface_def_body_element` dispatches, so a
+/// malformed member scanned past every attribute, item and port declaration after it. `port` and
+/// the rest of FIRST(`PortUsage`) are added here with the seam that makes a port usage in this
+/// scope carry the whole shared prefix; see `planning/port-usage-prefix-matrix.md` §6 and §10.1.
+pub(crate) const INTERFACE_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b"connect",
+    b"end",
+    b"ref",
+    b"doc",
+    b"attribute",
+    b"item",
+    b"port",
+    b"flow",
+    b"#",
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"in",
+    b"individual",
+    b"inout",
+    b"out",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
+];
 
 /// Skip optional whitespace (space, tab, newline).
 pub(crate) fn ws(input: Input<'_>) -> IResult<Input<'_>, ()> {
