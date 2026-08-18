@@ -254,7 +254,7 @@ Six productions share a FIRST token with a prefixed `PortUsage`.
 | --- | --- | --- | --- |
 | `port` | `PortDefinition` (`DefinitionPrefix 'port' 'def' Definition`) | every scope tries a `port_def` parser first. In the *nested* scopes that parser is `port_def_required`, which is correct. At **package scope** it is `port_def`, which makes `def` optional and therefore claims every keyword-less `port p : T;` as a definition | `port_def` requires `def` in every scope, so package-level `port p : T;` reaches `port_usage`. §7.1 has the evidence for why this is inseparable from the slice |
 | `#` | `PrefixMetadataMember` as a standalone sibling member (`metadata_keyword_prefix`), and `ExtendedDefinition`/`ExtendedUsage` (`metadata_keyword_usage`) | `metadata_keyword_prefix` claimed `#idd` and left `port APIS_HTTP { … }` as a separate unprefixed member | `port_usage` gets first refusal through `occurrence_prefix::starts_contended_prefix`, exactly as the five already-migrated families do. `metadata_keyword_usage` (the `#Tag { … }` / `#Tag def …` spellings, which own a body or a definition) keeps its place ahead of the prefix walk in the scopes that try it first |
-| `ref` | this parser's kinded `connector::ref_decl`, which models `ref port x;` as a `RefDecl` with `kind_keyword = Port` | every scope of §3 -- `port_usage` could not parse a `ref` at all, so `ref port q;` was either a `RefDecl` (port/part bodies) or recovery (package scope) | `port_usage` gets first refusal in the contended pre-dispatch of every scope in §3. `connector::ref_decl` keeps `RefDeclKind::Port` for the declaration shapes `port_usage` does not accept (§11), and every other kind it models is untouched |
+| `ref` | this parser's kinded `connector::ref_decl`, which models `ref port x;` as a `RefDecl` with `kind_keyword = Port` | every scope of §3 -- `port_usage` could not parse a `ref` at all, so `ref port q;` was either a `RefDecl` (port/part bodies) or recovery (package scope) | `port_usage` gets first refusal through a contended pre-dispatch in scopes 2, 3, 4, 6, 7 and 8; scope 5 (the port usage body) already tries it as its first alternative and needs none, and scope 1 selects on the `port` starter, which `port_def` no longer claims. Scope 9 reaches it through the same `variant_usage` chain as before. `connector::ref_decl` keeps `RefDeclKind::Port` for the *keyword-less* `ref` members (`ref self : Port :>> Object::self;`) and every other kind it models; the `ref port …` spellings, including `ref port :>> Interface::participant, BinaryConnection::participant[2] nonunique ordered;`, are `PortUsage`s |
 | `in`/`out`/`inout` | `in_out_decl` (directed parameter member) | `in_out_decl` refuses the kinded forms (`in port`, `in part`, `in item`, …) itself | unchanged |
 | `abstract`/`variation` | every `*_def` parser's `DefinitionPrefix` | each scope's `*_def` arm precedes its `*_usage` sibling | unchanged. `starts_contended_prefix` reports a run of *uncontended* slots as contended only when it reaches `ref` or `#`, so `abstract port def P { … }` still reaches `port_def` -- the PAR-001 bug class a blanket reorder would reopen |
 | `individual`/`snapshot`/`timeslice` | `IndividualUsage`/`PortionUsage` (the keyword-less occurrence spellings, `occurrence_usage`) | `occurrence_usage` refuses when the next word is a reserved keyword (`next_word_is_reserved`), so `individual port p;` is left to the family that owns `port` | unchanged, and load-bearing for `snapshot port …`: without that guard the portion spelling would read `port` as its declaration name |
@@ -412,7 +412,40 @@ Recovery never fabricates a prefix component, and a refused prefix never becomes
 usage: the refusal is at the whole production, so the member becomes one recovery node spanning
 the authored text.
 
-### 10.1 The `interface def` body had no real starter table
+### 10.1 Two body scopes that the change made reachable
+
+`port_usage` claiming `ref port …` moves the *bodies* of those declarations from `RefBody`
+(`Body<PartUsageBodyElement>`) to `PortBody`, whose member set was six variants. The pinned
+Systems Library writes members in both that this scope did not model, so the slice adds them
+rather than regressing the library:
+
+| Member | Evidence | Production |
+| --- | --- | --- |
+| `RefDecl` | `protected ref thisParticipant :>> self;` and `protected ref otherParticipants : Port[1..*] nonunique :> interfacingPorts default …;` inside `ref port :>> participant : Port [2..*] nonunique ordered { … }` (`Systems Library/Interfaces.sysml:52-54`) | `UsageBody = DefinitionBody`; `PortDefBodyElement` already models the same member for the same reason |
+| `VariantUsage` | `variant port autoPort1;` and `variant port autoPort2;` inside `variation port :>> autoPort { … }` (`Variability Examples/VehicleVariabilityModel.sysml:79-81`) | `DefinitionBodyItem -> VariantUsageMember`. Only reachable once `port_usage` could spell `variation`: the whole declaration used to reach recovery | **not added -- see below** |
+
+`RefDecl` is coverage the scope was missing, not new grammar, and is added.
+
+`VariantUsage` is **refused by the type-level cost gate** and is therefore *not* added.
+`PortBodyElement::VariantUsage(Node<VariantUsage>)` closes a new cycle -- `PortBody ->
+PortBodyElement -> VariantUsage -> VariantTypedUsage::Port -> PortUsage -> PortBody` -- and
+`tests/type_level_cost.rs` stops compiling: proving `ParsedDocument: Send` overflows the *default*
+trait-solver recursion limit, which is exactly the consumer-visible regression that test exists to
+catch (`planning/shared-grammar.md`, "Verification strategy"). Raising the limit is the workaround
+that plan forbids, so the member stays unmodelled and `variant port autoPort1;` in a port usage
+body is a recovery node with `unexpected_keyword_in_scope`.
+
+That is still an improvement on the pinned file: the whole `variation port :>> autoPort { … }`
+declaration used to be one recovery node covering four lines, and is now a typed port usage with
+two precisely-spanned recovery members inside it. `PORT_BODY_STARTERS` gains `variant` and the
+three visibility keywords either way, because recovery has to synchronize on where a member
+starts whether or not the member is modelled.
+
+Closing it needs the cycle broken -- an indirection at `VariantTypedUsage`, or a narrower variant
+family for the scope -- which is a type-graph change over every owner of `VariantUsage`, not a
+port-usage change. Recorded in §11.
+
+### 10.2 The `interface def` body had no real starter table
 
 `INTERFACE_DEF_BODY_STARTERS` was `[connect, end, ref, doc]` -- four of the members that scope
 dispatches, out of a dozen. A malformed member in an interface definition body therefore scanned
@@ -441,11 +474,26 @@ member starter while this slice adds the twelve tokens that may precede it.
 - **`end port` is not accepted.** Pilot-only; see §8. `DefaultInterfaceEnd` and `InterfaceEnd`
   stay on `ast::EndDecl` (§1.1).
 - **`connector::ref_decl`'s `RefDeclKind::Port` is not deleted.** `port_usage` gets first refusal
-  in the scopes of §3, so `ref port q;` and `ref port c2 : C;` become `PortUsage`s; but
-  `ref_decl` still models the declaration shapes `PortUsage`'s `Usage` tail does not reach, most
-  visibly a `:>>` redefinition list before the type (`ref port :>> Interface::participant,
-  BinaryConnection::participant[2] nonunique ordered;`, `Systems Library/Interfaces.sysml:70`).
-  Every other kind it models is untouched.
+  in the scopes of §3, so every `ref port …` in the pinned corpus becomes a `PortUsage`; the kind
+  keyword itself stays in `ref_decl` because the parser reaches that declaration from scopes this
+  slice does not touch, and every other kind it models is untouched.
+- **`PortDefinition`'s own `DefinitionPrefix` is not modelled.** `PortDefinition = DefinitionPrefix
+  'port' 'def' Definition` and `ast::PortDef` has no field for the `abstract`/`variation`
+  alternative, so `abstract port def Port :> Object;` (`Systems Library/Ports.sysml:11`) parses,
+  discards `abstract`, and is re-emitted without it; `variation port def V;` is not recognized at
+  all and becomes an `ExtendedLibraryDecl`. That is a *definition* prefix -- the neighbour this
+  slice's own component is deliberately not (`planning/occurrence-usage-prefix-matrix.md` §1.1) --
+  and closing it belongs to the `OccurrenceDefinitionPrefix`/`DefinitionPrefix` slice, together
+  with the identical gap on `part def`, `item def` and the rest. Recorded here because making
+  `port def` project its declaration in three more scopes is what surfaced it.
+- **`variant` in a port usage body is not modelled.** §10.1 has the evidence and the reason: the
+  member is legal (`DefinitionBodyItem -> VariantUsageMember`) and the pinned corpus writes it,
+  but the variant closes a type cycle that costs a downstream consumer its default trait-solver
+  recursion limit. It stays a recovery node until the cycle is broken at `VariantUsage`.
+- **`MultiplicityPart`'s authored order is not retained.** `ordered nonunique` and `nonunique
+  ordered` are both legal and both land in two independent booleans, so emission always writes
+  `ordered nonunique`. That is the representation `PartUsage`, `AttributeUsage` and `RefDecl`
+  already use; changing it is one seam over every usage family, not this one.
 - **Ports are not added to scopes that do not dispatch them.** `StructureUsageElement` reaches a
   `PortUsage` from every definition body in the pin, including attribute, item, metadata,
   occurrence, `use case def`, `calc def` and action bodies, and this parser dispatches none of
@@ -454,6 +502,70 @@ member starter while this slice adds the twelve tokens that may precede it.
   It is recorded here, not widened.
 - **`ordered`/`nonunique` on `PortUsage` are in scope only because §7.1 makes them inseparable.**
   No other `Usage`-tail fact is added.
+
+## 11.1 Allocation and cost
+
+Sizes, `std::mem::size_of`, measured on both sides:
+
+| Type | Before | After |
+| --- | --- | --- |
+| `PortUsage` | 1208 | 1512 (+304, exactly the inline prefix) |
+| `OccurrenceUsagePrefix` | 304 | 304 |
+| `PackageBodyElement` | 1320 | 1320 |
+| `PartDefBodyElement`, `PartUsageBodyElement`, `PortDefBodyElement`, `PortBodyElement`, `InterfaceDefBodyElement`, `ConnectionDefBodyElement` | 1240 | 1176 |
+| `RequirementDefBodyElement` | 1176 | 1176 |
+| `VariantTypedUsage` | 16 | 16 |
+
+The six owning enums that `PortUsage` had been the largest variant of get *smaller*, because the
+variant is now `Box<Node<PortUsage>>` and the second-largest variant dominates. That is one
+allocation per authored port usage rather than 1240 bytes in every member of those scopes,
+including the members that are not ports; `RequirementDefBodyElement` and `VariantTypedUsage`
+already boxed it for the same reason.
+
+Allocation inside the prefix itself is unchanged from
+`planning/occurrence-usage-prefix-matrix.md` §8.2: an unauthored prefix allocates nothing (four
+`Option<Span>`, three `Option<Node<_>>`, and a `Vec` with capacity 0), an authored one allocates
+once and only when a `#tag` was written, and a refused prefix allocates nothing observable --
+`port_usage` runs entirely inside `reference_transaction`, which
+`port_usage_prefix_owning_layer::a_refused_port_prefix_leaves_no_arena_entry` pins over five
+refused members.
+
+Wall clock, `benches/parser_bench.rs`'s `snapshot_parser_corpus/all_sources` over the checked-in
+snapshot corpus, the maintained benchmark. Both sides parse **identical input**: the baseline is
+the pre-slice parser run against *this branch's* corpus, because the corpus grew by four fixtures
+and comparing across two corpora measures the fixtures, not the parser.
+
+```
+cargo bench --bench parser_bench -- 'snapshot_parser_corpus/all_sources'
+```
+
+Environment: macOS 25.3.0 (Darwin, arm64), `cargo bench` release profile with `debug = 1`,
+criterion 0.5, 100 samples per run, no other load pinned.
+
+| Run | Baseline (pre-slice parser, this corpus) | After, first implementation | After, with the first-byte admission test |
+| --- | --- | --- | --- |
+| 1 | 31.343 ms | 32.368 ms | 31.481 ms |
+| 2 | 31.290 ms | 32.497 ms | 31.154 ms |
+| 3 | 31.295 ms | -- | -- |
+| 4 | 31.412 ms | -- | -- |
+
+The first implementation was a reproducible **+3.5%**, with 95% intervals of ±0.3% on both sides
+-- narrow enough that it was a regression, not noise, and worth finding rather than reporting.
+
+The cause is the same one `planning/occurrence-usage-prefix-matrix.md` §8.2 recorded for the seam
+itself: **the failing probe is the hot one.** A sixth family now spells the prefix, and each one
+walks eleven optional keyword slots before it may require its kind keyword, for a member that
+almost never authored any of them. `port_usage` is attempted for every member of every scope with
+no starter table, so the corpus pays that walk twice as often as it did.
+
+The fix is one byte. Every slot of the production opens with `#` or one of `i o d a v c r s t`,
+so `occurrence_usage_prefix` looks the first byte up in a table derived from the keyword list and
+returns the unauthored prefix without probing a slot. It cannot drift: the table is built by a
+`const fn` over the same keyword list the slots use, and
+`occurrence_prefix::tests::each_slot_is_admitted_on_its_own` parses every slot alone. With it the
+difference is inside the machine's own run-to-run spread, so the honest reading is **no material
+change**. Nothing here claims a win from code shape: the admission test recovers a regression this
+slice introduced, and every family that already spelled the prefix gets the same recovery.
 
 ## 12. Why this is one PR
 

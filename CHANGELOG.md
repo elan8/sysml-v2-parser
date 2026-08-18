@@ -9,6 +9,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`PortUsage` migrated onto the shared, typed `OccurrenceUsagePrefix`, and `port def` stops
+  claiming port usages.** Audit and evidence: `planning/port-usage-prefix-matrix.md`.
+  **AST version 172 -> 173.**
+
+  `PortUsage = OccurrenceUsagePrefix 'port' Usage` (SysML BNF 645), so `PortUsage` now carries the
+  same `prefix: OccurrenceUsagePrefix` that `OccurrenceUsage`, `ItemUsage`,
+  `SatisfyRequirementUsage`, `PartUsage` and `ConstraintUsage` already carry, and the five fields
+  that stood in for it -- `direction`, `is_abstract`, `is_derived`, `is_constant`,
+  `is_individual` -- are gone. `variation`, `ref`, `snapshot`/`timeslice` and
+  `UsageExtensionKeyword*` are represented for the first time, each with its authored span.
+
+  - **An illegal prefix order was accepted and silently rewritten; the legal one was refused.**
+    The five fields were probed in the order `individual abstract` direction `derived constant`
+    and emitted in the order direction `derived abstract constant individual`, neither of them the
+    grammar's. `individual abstract in derived constant port x;` parsed with no diagnostic and
+    came back out as `in derived abstract constant individual port x;`, while
+    `in derived abstract constant port y;` -- the only order the production allows -- was
+    recovered as malformed. Five order-free booleans is the shape in which a whole-AST comparison
+    cannot see that.
+  - **`port def` requires `def`.** `PortDefinition = DefinitionPrefix 'port' 'def' Definition`
+    makes the keyword mandatory; this parser made it optional, so every keyword-less package-scope
+    port usage was folded into a definition. `port p1 : T;` came back out as `port def p1 : T;`,
+    and `abstract port ports : Port[0..*] nonunique :> objects;`
+    (`Systems Library/Ports.sysml:48`) lost `abstract`, the multiplicity and `nonunique` and came
+    back out as `port def ports :> objects;` -- on a strict gate that passed, because both sides
+    of the round trip lost them identically. `port_def_required` is therefore gone: there is one
+    `port_def`, and it requires `def`. `PortUsage` gains `ordered`/`nonunique` (`MultiplicityPart`)
+    because the declarations it now claims write them.
+  - **`ref port …` is a port usage.** `BasicUsagePrefix` owns the `ref`, so `ref port q;`
+    (`Simple Tests/PartTest.sysml:21`), `ref port c2 : C;` and `ref port :>> participant : Port
+    [2..*] nonunique ordered { … }` (`Systems Library/Interfaces.sysml:45`) are `PortUsage`s with
+    `ref` in their prefix rather than `RefDecl`s. Every scope that owns a port usage gives it
+    first refusal through `occurrence_prefix::starts_contended_prefix`, so `#idd port APIS_HTTP
+    { … }` (`Arrowhead Framework Example/AHFNorwayTopics.sysml:22`) is one member instead of two,
+    and `connector::ref_decl` keeps every other kind it models.
+  - **`variation port :>> autoPort { … }` parses.**
+    (`Variability Examples/VehicleVariabilityModel.sysml:79`) used to be one recovery node
+    covering four lines; it is now a typed port usage. `PortBodyElement` gains the `RefDecl`
+    member `UsageBody = DefinitionBody` admits and the pinned library writes -- `protected ref
+    thisParticipant :>> self;` inside `Interfaces.sysml`'s `ref port` declaration -- which the
+    scope had no variant for at all. Its `variant` members are *not* modelled: that variant closes
+    a `PortBody -> VariantUsage -> PortUsage -> PortBody` type cycle that costs a downstream
+    consumer its default trait-solver recursion limit, and `tests/type_level_cost.rs` refuses it.
+    They remain recovery nodes with precise spans; matrix §10.1 has the evidence.
+  - **Projection.** A port usage projected its name, its direction and its clauses, with its body
+    reduced to an element count, and three of its nine owning scopes wrote a bare `(port-usage)`
+    marker. All nine now project the whole language-level declaration, prefix first, with the body
+    members matched exhaustively; `port def` likewise projects its declaration instead of a marker
+    in the three scopes that wrote one. `tests/snapshots/sysml/port_usage_prefix_owning_scopes.md`
+    shows every scope with the repeated member byte-identical across all of them.
+  - **Emission.** `port :>> pe = c1.pb;` came back out as `port  :>> pe = c1.pb;`: the kind
+    keyword's trailing space was stranded in front of a clause that supplies its own. Same fix
+    `emit_part_usage` and `emit_attribute_usage` already carry.
+  - **Recovery.** `PORT_BODY_STARTERS`, `PORT_DEF_BODY_STARTERS`, `INTERFACE_DEF_BODY_STARTERS`
+    and `CONNECTION_DEF_BODY_STARTERS` gain the FIRST tokens each lacked, so a malformed member
+    before a prefixed port usage synchronizes at the first prefix token rather than scanning to
+    `port` and consuming the usage. `INTERFACE_DEF_BODY_STARTERS` had listed four of the dozen
+    members that scope dispatches.
+  - **Breaking AST shape.** `PortUsage::{direction, is_abstract, is_derived, is_constant,
+    is_individual}` are replaced by `PortUsage::prefix`; `PortUsage::{ordered, nonunique}` are new;
+    the `PortUsage` variant of `PackageBodyElement`, `PartDefBodyElement`, `PartUsageBodyElement`,
+    `PortDefBodyElement`, `PortBodyElement`, `InterfaceDefBodyElement` and
+    `ConnectionDefBodyElement` is now boxed, which makes six of those enums *smaller* (1240 ->
+    1176 bytes); `PortBodyElement` gains `RefDecl` and `VariantUsage`.
+  - Still open, recorded rather than assumed closed: `PortDefinition`'s own `DefinitionPrefix` has
+    no field, so `abstract port def Port :> Object;` still discards `abstract` and `variation port
+    def V;` is still an `ExtendedLibraryDecl` -- that is the definition-prefix seam, not this one;
+    `then` before a port usage is still unrecognized (no corpus or fixture evidence for it); and
+    the seven definition bodies that the pin lets hold a port usage but this parser does not
+    dispatch one from are listed in the matrix §11.
+
 - **Every scope that can hold a part usage now shows it, and three silent-rewrite bugs the
   projection exposed are fixed.** **AST version 170 -> 172.**
 

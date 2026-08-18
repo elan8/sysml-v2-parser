@@ -1,7 +1,7 @@
 # Factor shared grammatical concepts
 
 > **Status:** Phases 1-3 implemented; Phase 4 active -- the first grammar-owned component is
-> established and five usage families are migrated; the remaining families move only through
+> established and six usage families are migrated; the remaining families move only through
 > separately audited vertical slices
 
 ## Purpose
@@ -425,8 +425,40 @@ related discovery that `part p;` in any calculation-shaped body came apart into 
 expressions with no diagnostic.
 
 Every other family remains exactly as deferred as it was;
-`planning/occurrence-usage-prefix-matrix.md` §9 is still the authoritative ledger, and `PortUsage`
-is the recommended next candidate on its own evidence.
+`planning/occurrence-usage-prefix-matrix.md` §9 is still the authoritative ledger.
+
+#### Continuation: `PortUsage` — done
+
+`PortUsage = OccurrenceUsagePrefix 'port' Usage` (SysML BNF 645) is the sixth owner, audited in
+`planning/port-usage-prefix-matrix.md`. The component again needed no change, and again the AST
+field list predicted almost nothing about the work.
+
+What this slice adds to the phase's own evidence is that **the dispatch half of a slice can be the
+whole of it**. `PortUsage` had one construction path and five prefix fields -- the smallest
+representation change of the six -- and yet:
+
+- the five fields were *parsed* in one order and *emitted* in another, neither of them the
+  grammar's, so `individual abstract in derived constant port x;` was accepted with no diagnostic
+  and silently rewritten by a round trip, while the only legal spelling `in derived abstract
+  constant port y;` was recovered as malformed. Five order-free booleans is exactly the shape in
+  which a whole-AST comparison cannot see that;
+- `port_def` made `'def'` optional, which the pin does not. Every keyword-less package-scope port
+  usage was therefore folded into a `PortDefinition`, and `abstract port ports : Port[0..*]
+  nonunique :> objects;` (`Systems Library/Ports.sysml:48`) lost `abstract`, the multiplicity and
+  `nonunique` and came back out as `port def ports :> objects;` -- on a strict gate that passed,
+  because both sides of the round trip lost them identically. This is the `PartDefinition`/
+  `PartUsage` shared-prefix finding from the previous slice in a different form: a *def-optional
+  definition parser is a usage parser wearing the wrong production's name*;
+- claiming `ref port …` for the family that owns `port` moved those declarations' bodies from
+  `RefBody` to `PortBody`, whose member set was six variants -- and the pinned Systems Library
+  writes two members it did not model. Coverage a body scope never needed until the production
+  above it was parsed correctly.
+
+Two `Usage`-tail facts (`ordered`/`nonunique`) came with the slice because the declarations
+`port def` stopped claiming write them; that is recorded in §7.1 of the matrix as inseparable
+rather than smuggled in. `PortDefinition`'s own `DefinitionPrefix` is *not* modelled here: it is a
+definition prefix, the neighbour this component deliberately is not, and it is recorded as debt
+for the slice that owns it.
 
 Deliverables:
 

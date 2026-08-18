@@ -449,9 +449,10 @@ Parser-side delivery for [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DI
 | P3 AST split, action/requirement bodies | Complete | [PARSER_DEBT_P3_PLAN.md](./PARSER_DEBT_P3_PLAN.md) |
 | P4 view/part bodies, implies, part split | Complete | [PARSER_DEBT_P4_PLAN.md](./PARSER_DEBT_P4_PLAN.md) |
 | Shared grammar Phase 1-3 (traversal, body container, annotating members) | Complete | [shared-grammar.md](../planning/shared-grammar.md) |
-| Shared grammar Phase 4, first family: `OccurrenceUsagePrefix` | Complete for `OccurrenceUsage`, `ItemUsage`, `SatisfyRequirementUsage`, `PartUsage`, `ConstraintUsage`; every other family listed with what it still needs | [occurrence-usage-prefix-matrix.md](../planning/occurrence-usage-prefix-matrix.md) |
+| Shared grammar Phase 4, first family: `OccurrenceUsagePrefix` | Complete for `OccurrenceUsage`, `ItemUsage`, `SatisfyRequirementUsage`, `PartUsage`, `ConstraintUsage`, `PortUsage`; every other family listed with what it still needs | [occurrence-usage-prefix-matrix.md](../planning/occurrence-usage-prefix-matrix.md) |
 | Shared grammar Phase 4, `PartUsage` slice | Complete — all fifteen owning scopes, five construction paths and six competing productions | [part-usage-prefix-matrix.md](../planning/part-usage-prefix-matrix.md) |
-| Shared grammar Phase 4, `ConstraintUsage` slice | Complete — moved because finishing the part-usage projection exposed two round-trip defects in it; `PortUsage` is the recommended next candidate | [constraint-usage-prefix-matrix.md](../planning/constraint-usage-prefix-matrix.md) |
+| Shared grammar Phase 4, `ConstraintUsage` slice | Complete — moved because finishing the part-usage projection exposed two round-trip defects in it | [constraint-usage-prefix-matrix.md](../planning/constraint-usage-prefix-matrix.md) |
+| Shared grammar Phase 4, `PortUsage` slice | Complete — nine owning scopes, one construction path, six competing productions; `port def` no longer makes `def` optional. `ViewUsage`/`RenderingUsage` are the recommended next candidates | [port-usage-prefix-matrix.md](../planning/port-usage-prefix-matrix.md) |
 
 ---
 
