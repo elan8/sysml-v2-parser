@@ -54,10 +54,10 @@ package 'Redefinition Example' {
         part cyl : Cylinder[4..6];
     }
     part def SmallEngine :> Engine {
-        part  :>> cyl[4];
+        part :>> cyl[4];
     }
     part def BigEngine :> Engine {
-        part  :>> cyl[6];
+        part :>> cyl[6];
     }
     part def Cylinder;
 }

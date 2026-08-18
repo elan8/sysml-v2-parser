@@ -1365,6 +1365,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             let elem = PartUsageBodyElement::ItemUsage(usage);
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = part_usage(start) {
+            let elem = PartUsageBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let frag = start.fragment();
     let first_30 = frag.get(..30.min(frag.len())).unwrap_or(frag);

@@ -144,12 +144,12 @@ package '10b-Trade-off Among Alternative Configurations' {
         }
         variation part engineChoice :> engine {
             variant part '4cylEngine' {
-                part  :>> cyl[4];
-                part  :>> cs : '4CylCrankShaft';
+                part :>> cyl[4];
+                part :>> cs : '4CylCrankShaft';
             }
             variant part '6cylEngine' {
-                part  :>> cyl[6];
-                part  :>> cs : '6CylCrankShaft';
+                part :>> cyl[6];
+                part :>> cs : '6CylCrankShaft';
             }
         }
         part vehicle : Vehicle {

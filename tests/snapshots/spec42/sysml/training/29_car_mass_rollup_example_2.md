@@ -69,10 +69,10 @@ package 'Car Mass Rollup 1' {
     private import SI::kg;
     part c :> car {
         attribute :>> simpleMass = 1000 [kg];
-        part  :>> engine {
+        part :>> engine {
             attribute :>> simpleMass = 100 [kg];
         }
-        part  :>> transmission {
+        part :>> transmission {
             attribute :>> simpleMass = 50 [kg];
         }
     }

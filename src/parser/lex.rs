@@ -201,6 +201,17 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
     b"state",
     b"subject",
     b"then",
+    // The rest of FIRST(`OccurrenceUsagePrefix`) on the part usage this scope dispatches;
+    // `abstract`, `in`, `out`, `part` and `ref` were already listed. See
+    // `planning/part-usage-prefix-matrix.md` §6.
+    b"#",
+    b"constant",
+    b"derived",
+    b"individual",
+    b"inout",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
 pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
@@ -302,7 +313,29 @@ pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] = &[
     b"variation",
 ];
 
-pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[b"connect", b"end", b"ref", b"doc"];
+/// `connect`, `end`, `ref`, `doc` -- plus `part` and the rest of FIRST(`OccurrenceUsagePrefix`),
+/// because this scope dispatches `OccurrenceUsage`, `ItemUsage` and `PartUsage`, each of which
+/// may be written with the whole shared prefix. See `planning/part-usage-prefix-matrix.md` §6.
+pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b"connect",
+    b"end",
+    b"ref",
+    b"doc",
+    b"#",
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"in",
+    b"individual",
+    b"inout",
+    b"item",
+    b"occurrence",
+    b"out",
+    b"part",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
+];
 
 /// GH-51: mirrors [`CONNECTION_DEF_BODY_STARTERS`] -- `interface_def_body` previously had no
 /// starter list at all (its own hand-rolled brace loop swallowed unparseable content silently,

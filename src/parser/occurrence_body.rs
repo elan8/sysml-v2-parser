@@ -483,6 +483,10 @@ pub(crate) fn occurrence_body_element(
             let elem = OccurrenceBodyElement::ItemUsage(usage);
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = part_usage(start) {
+            let elem = OccurrenceBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let (input, elem) = alt((
         map(

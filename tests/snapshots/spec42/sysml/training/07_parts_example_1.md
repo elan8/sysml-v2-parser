@@ -54,13 +54,13 @@ package 'Parts Example-1' {
     }
     part def Cylinder;
     part smallVehicle : Vehicle {
-        part  :>> eng {
-            part  :>> cyl[4];
+        part :>> eng {
+            part :>> cyl[4];
         }
     }
     part bigVehicle : Vehicle {
-        part  :>> eng {
-            part  :>> cyl[6];
+        part :>> eng {
+            part :>> cyl[6];
         }
     }
 }

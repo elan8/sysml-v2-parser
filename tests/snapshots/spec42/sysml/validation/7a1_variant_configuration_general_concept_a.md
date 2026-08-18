@@ -113,30 +113,30 @@ package '7a1-Variant Configuration - General Concept-a' {
     }
     part part6;
     abstract part def SubsystemA {
-        abstract part  :>> part3[0..1];
+        abstract part :>> part3[0..1];
     }
     abstract part def SubsystemB {
-        abstract part  :>> part5[1];
+        abstract part :>> part5[1];
     }
     part anyVehicleConfig {
         variation part subsystemA : SubsystemA {
             variant part subsystem1 : SubsystemA {
-                part  :>> part1[1];
-                part  :>> part2[1];
+                part :>> part1[1];
+                part :>> part2[1];
             }
             variant part subsystem2 : SubsystemA {
-                part  :>> part2[1];
-                part  :>> part3[1];
+                part :>> part2[1];
+                part :>> part3[1];
             }
         }
         variation part subsystemB : SubsystemB {
             variant part subsystem3 : SubsystemB {
-                part  :>> part4[1];
-                part  :>> part5[1];
+                part :>> part4[1];
+                part :>> part5[1];
             }
             variant part subsystem4 : SubsystemB {
-                part  :>> part5[1];
-                part  :>> part6[1];
+                part :>> part5[1];
+                part :>> part6[1];
             }
         }
         connect [0..1] subsystemA.part3.p1 to [1] subsystemB.part5.p2;
@@ -145,17 +145,17 @@ package '7a1-Variant Configuration - General Concept-a' {
         }
     }
     part vehicleConfigA :> anyVehicleConfig {
-        part  :>> subsystemA = subsystemA::subsystem1;
-        part  :>> subsystemB = subsystemB::subsystem3 {
-            part  :>> part5 {
+        part :>> subsystemA = subsystemA::subsystem1;
+        part :>> subsystemB = subsystemB::subsystem3 {
+            part :>> part5 {
                 perform action  :>> doXorY = doX;
             }
         }
     }
     part VehicleConfigB :> anyVehicleConfig {
-        part  :>> subsystemA = subsystemA::subsystem2;
-        part  :>> subsystemB = subsystemB::subsystem4 {
-            part  :>> part5 {
+        part :>> subsystemA = subsystemA::subsystem2;
+        part :>> subsystemB = subsystemB::subsystem4 {
+            part :>> part5 {
                 perform action  :>> doXorY = doY;
             }
         }

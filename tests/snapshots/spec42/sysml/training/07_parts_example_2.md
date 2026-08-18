@@ -55,13 +55,13 @@ package 'Parts Example-2' {
         }
     }
     part smallVehicle :> vehicle {
-        part  :>> eng {
-            part  :>> cyl[4];
+        part :>> eng {
+            part :>> cyl[4];
         }
     }
     part bigVehicle :> vehicle {
-        part  :>> eng {
-            part  :>> cyl[6];
+        part :>> eng {
+            part :>> cyl[6];
         }
     }
 }

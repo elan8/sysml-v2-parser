@@ -38,6 +38,10 @@ fn connection_def_body_element(
             let elem = ConnectionDefBodyElement::ItemUsage(usage);
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = part_usage(start) {
+            let elem = ConnectionDefBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let (input, elem) = alt((
         // GH-33: connections allow the fixed `#original`/`#derive` end-role form (tested real usage; see

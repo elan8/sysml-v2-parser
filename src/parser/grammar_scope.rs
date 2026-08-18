@@ -78,6 +78,11 @@ pub(crate) enum PackageProduction {
     Viewpoint,
     FeaturePrefix,
     UsagePrefix,
+    /// `PortionKind` (`snapshot`/`timeslice`), the `OccurrenceUsagePrefix` slot every
+    /// occurrence-usage family spells. It selects `PortionUsage` only when no kind keyword
+    /// follows it, so like the other prefix slots it cannot select a production on its own:
+    /// `snapshot part vehicle_1_t0 { … }` is a `PartUsage` and `snapshot item i;` an `ItemUsage`.
+    OccurrenceUsagePrefix,
     Connector,
     Message,
     Succession,
@@ -106,6 +111,7 @@ impl PackageProduction {
                 | Self::Individual
                 | Self::MemberPrefix
                 | Self::UsagePrefix
+                | Self::OccurrenceUsagePrefix
                 | Self::FeaturePrefix
                 | Self::DefinitionElement
         )
@@ -159,6 +165,7 @@ impl PackageProduction {
             Self::Viewpoint => "ViewpointDefinition | ViewpointUsage",
             Self::FeaturePrefix => "FeaturePrefix",
             Self::UsagePrefix => "UsagePrefix",
+            Self::OccurrenceUsagePrefix => "OccurrenceUsagePrefix",
             Self::Connector => "Connector",
             Self::Message => "Message",
             Self::Succession => "Succession | SuccessionAsUsage",
@@ -225,9 +232,9 @@ grammar_scope!(
         (b"rendering", Rendering),
         (b"rep", TextualRepresentation),
         (b"requirement", Requirement),
-        (b"snapshot", Occurrence),
+        (b"snapshot", OccurrenceUsagePrefix),
         (b"state", Occurrence),
-        (b"timeslice", Occurrence),
+        (b"timeslice", OccurrenceUsagePrefix),
         (b"use", UseCase),
         (b"variation", DefinitionElement),
         (b"verification", VerificationCase),

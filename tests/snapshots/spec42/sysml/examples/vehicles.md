@@ -68,10 +68,10 @@ package VehicleMasses {
     private import SI::*;
     part c :> car {
         attribute :>> mass = 1000 [kg];
-        part  :>> engine {
+        part :>> engine {
             attribute :>> mass = 100 [kg];
         }
-        part  :>> transmission {
+        part :>> transmission {
             attribute :>> mass = 50 [kg];
         }
     }

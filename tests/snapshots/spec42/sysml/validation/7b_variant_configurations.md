@@ -234,12 +234,12 @@ package '7b-Variant Configurations' {
             }
             variation part transmissionChoice :>> transmission {
                 variant part manualTransmission : ManualTransmission {
-                    part  :>> clutch : ManualClutch {
+                    part :>> clutch : ManualClutch {
                         port  :>> clutchPort : ManualClutchPort;
                     }
                 }
                 variant part automaticTransmission : AutomaticTransmission {
-                    part  :>> clutch : AutomaticClutch {
+                    part :>> clutch : AutomaticClutch {
                         port  :>> clutchPort : AutomaticClutchPort;
                     }
                 }
@@ -247,7 +247,7 @@ package '7b-Variant Configurations' {
             assert constraint 'engine-transmission selection constraint' {
                 (engineChoice == engineChoice::'4cylEngine' && transmissionChoice == transmissionChoice::manualTransmission) xor (engineChoice == engineChoice::'6cylEngine' && transmissionChoice == transmissionChoice::automaticTransmission);
             }
-            part  :>> rearAxleAssembly {
+            part :>> rearAxleAssembly {
                 variation part rearWheelChoice :>> rearWheels {
                     variant part narrowRimWheel : NarrowRimWheel;
                     variant part wideRimWheel : WideRimWheel;

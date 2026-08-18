@@ -111,26 +111,26 @@ package 'Vehicle Decomposition - Updated' {
         }
     }
     part 'vehicle model 1' :> vehicle {
-        part  :>> chs {
-            part  :>> rb : LightRollBar[0..1];
-            part  :>> w {
-                part  :>> lb;
+        part :>> chs {
+            part :>> rb : LightRollBar[0..1];
+            part :>> w {
+                part :>> lb;
             }
         }
-        part  :>> eng {
-            part  :>> cyl[4];
+        part :>> eng {
+            part :>> cyl[4];
         }
         ref lugBolts[24] = chs.w.lb;
     }
     part 'vehicle model 2' :> vehicle {
-        part  :>> chs {
-            part  :>> rb[0];
-            part  :>> w {
-                part  :>> lb[6..7];
+        part :>> chs {
+            part :>> rb[0];
+            part :>> w {
+                part :>> lb[6..7];
             }
         }
-        part  :>> eng {
-            part  :>> cyl[6..8];
+        part :>> eng {
+            part :>> cyl[6..8];
         }
     }
 }

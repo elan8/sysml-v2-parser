@@ -174,10 +174,10 @@ library package AHFProfileLib {
     part def SysLocalCloudsDD :> SysLocalCloudsDesign {
         doc
         /* System of Systems Detailed Description */
-        part  :>> locclouds : LocalCloudDD[1..*];
+        part :>> locclouds : LocalCloudDD[1..*];
     }
     part def LocalCloudDD :> LocalCloudDesign {
-        part  :>> systems : SysDD[1..*];
+        part :>> systems : SysDD[1..*];
     }
     part def SysDD :> SysD {
         doc

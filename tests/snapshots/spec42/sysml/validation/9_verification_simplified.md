@@ -189,13 +189,13 @@ package '9-Verification-simplified' {
         }
         part massVerificationSystem : MassVerificationSystem {
             perform vehicleMassTest {
-                in part  :>> testVehicle = vehicleUnderTest;
+                in part :>> testVehicle = vehicleUnderTest;
             }
             ref part vehicleUnderTest : Vehicle;
             part testOperator : TestOperator;
             part scale : Scale {
                 perform vehicleMassTest.collectData {
-                    in part  :>> testVehicle;
+                    in part :>> testVehicle;
                     measurement = testVehicle.mass;
                     out :>> massMeasured = measurement;
                 }

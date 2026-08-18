@@ -142,7 +142,7 @@ package '4a-Functional Allocation' {
 		 */
             in fuelCmd = fuelCmdPort.fuelCmd;
         }
-        part  :>> engine {
+        part :>> engine {
             port  :>> fuelCmdPort {
                 in fuelCmd : FuelCmd;
             }
@@ -154,7 +154,7 @@ package '4a-Functional Allocation' {
                 out engineTorque : Torque;
             }
         }
-        part  :>> transmission {
+        part :>> transmission {
             port  :>> clutchPort {
                 in engineTorque : Torque;
             }
@@ -166,7 +166,7 @@ package '4a-Functional Allocation' {
                 out transmissionTorque : Torque;
             }
         }
-        part  :>> driveshaft {
+        part :>> driveshaft {
             port  :>> shaftPort_b {
                 in transmissionTorque : Torque;
             }
@@ -178,7 +178,7 @@ package '4a-Functional Allocation' {
                 out driveshaftTorque : Torque;
             }
         }
-        part  :>> rearAxleAssembly {
+        part :>> rearAxleAssembly {
             port  :>> shaftPort_d {
                 in driveshaftTorque : Torque;
             }
@@ -187,13 +187,13 @@ package '4a-Functional Allocation' {
                 out wheelTorque1 = rearAxle.leftHalfAxle.axleToWheelPort.wheelTorque;
                 out wheelTorque2 = rearAxle.rightHalfAxle.axleToWheelPort.wheelTorque;
             }
-            part  :>> rearAxle {
-                part  :>> leftHalfAxle {
+            part :>> rearAxle {
+                part :>> leftHalfAxle {
                     port  :>> axleToWheelPort {
                         out wheelTorque : Torque;
                     }
                 }
-                part  :>> rightHalfAxle {
+                part :>> rightHalfAxle {
                     port  :>> axleToWheelPort {
                         out wheelTorque : Torque;
                     }

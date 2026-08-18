@@ -539,6 +539,7 @@ fn unsupported_package_element(
         | PackageProduction::Viewpoint
         | PackageProduction::FeaturePrefix
         | PackageProduction::UsagePrefix
+        | PackageProduction::OccurrenceUsagePrefix
         | PackageProduction::Connector
         | PackageProduction::TextualRepresentationLanguage
         | PackageProduction::Feature

@@ -142,7 +142,7 @@ package VehicleUsages {
         /* Basic Vehicle configuration showing a part hierarchy. */
         part frontAxleAssembly : AxleAssembly {
             part frontWheel[2] :> narrowRimWheel {
-                part  :>> lugbolt[4] {
+                part :>> lugbolt[4] {
                     attribute :>> tighteningTorque = T1;
                 }
             }
@@ -150,7 +150,7 @@ package VehicleUsages {
         }
         part rearAxleAssembly : AxleAssembly {
             part rearWheel[2] :> wideRimWheel {
-                part  :>> lugbolt[6] {
+                part :>> lugbolt[6] {
                     attribute :>> tighteningTorque = T2;
                 }
             }
@@ -160,7 +160,7 @@ package VehicleUsages {
     part vehicle_C2 :> vehicle_C1 {
         doc
         /* Specialized configuration with part-specific ports. */
-        part  :>> frontAxleAssembly {
+        part :>> frontAxleAssembly {
             part leftFrontWheel :> frontWheel = frontWheel#(1);
             part rightFrontWheel :> frontWheel = frontWheel#(2);
             interface leftFrontMount : Mounting connect frontAxle.leftMountingPoint to leftFrontWheel.hub;
@@ -179,8 +179,8 @@ package VehicleUsages {
         part transmission : Transmission {
             port drive : ~DriveIF;
         }
-        part  :>> rearAxleAssembly {
-            part  :>> rearAxle {
+        part :>> rearAxleAssembly {
+            part :>> rearAxle {
                 port drive : DriveIF;
             }
         }

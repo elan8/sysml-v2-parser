@@ -53,7 +53,7 @@ package 'Local Clock Example' {
     item def Start;
     item def Request;
     part def Server {
-        part  :>> localClock = new Time::Clock();
+        part :>> localClock = new Time::Clock();
         attribute today : String;
         port requestPort;
         state ServerBehavior {

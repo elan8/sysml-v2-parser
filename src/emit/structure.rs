@@ -42,7 +42,15 @@ pub(crate) fn emit_part_usage(
     // already migrated families stream through, in the production's slot order, with each
     // keyword written because its slot holds an authored span.
     emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
-    w.push_str("part ");
+    // No trailing space for the anonymous target-only forms: whichever clause follows
+    // (`: Type`, `:>> target`, `:> target`) emits its own leading space, so `part :>> elements`
+    // came back out as `part  :>> elements` and `in part : Engine` as `in part  : Engine`.
+    // Mirrors `emit_attribute_usage`'s identical handling.
+    if usage.short_name.is_none() && usage.name_span.is_none() {
+        w.push_str("part");
+    } else {
+        w.push_str("part ");
+    }
     if let Some(short) = &usage.short_name {
         w.push_char('<');
         w.push_str(&format_name(short));
