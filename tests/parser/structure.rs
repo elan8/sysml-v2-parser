@@ -3620,13 +3620,22 @@ part brushSystem : BrushSystem {
         diag.errors
     );
     let derived_port = nested_port_usage_in_part_usage(&diag.document.root, 0, 0, 0);
-    assert!(derived_port.is_derived);
-    assert!(!derived_port.is_constant);
-    assert_eq!(derived_port.direction, None);
+    assert!(derived_port.prefix.basic.ref_prefix.derived_span.is_some());
+    assert!(derived_port.prefix.basic.ref_prefix.constant_span.is_none());
+    assert!(derived_port.prefix.basic.ref_prefix.direction.is_none());
 
     let directed_port = nested_port_usage_in_part_usage(&diag.document.root, 0, 0, 1);
-    assert_eq!(directed_port.direction, Some(InOut::Out));
-    assert!(!directed_port.is_derived);
+    assert_eq!(
+        directed_port
+            .prefix
+            .basic
+            .ref_prefix
+            .direction
+            .as_ref()
+            .map(|node| node.value),
+        Some(InOut::Out)
+    );
+    assert!(directed_port.prefix.basic.ref_prefix.derived_span.is_none());
 }
 
 #[test]
