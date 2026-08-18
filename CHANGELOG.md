@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Every scope that can hold a part usage now shows it, and three silent-rewrite bugs the
+  projection exposed are fixed.** **AST version 170 -> 172.**
+
+  - **Projection.** `AttributeBody` (the body of every attribute, item and metadata definition and
+    usage), `OccurrenceUsageBody`, `ActionUsageBody`, `ConstraintDefBody`, `VariantUsage` and
+    KerML classifier declarations projected as contentless markers or bare element counts, so
+    every member they owned was invisible to the end-to-end contract -- a part usage among them.
+    All now match their members exhaustively. `ItemDef`, `AttributeDef`, `MetadataDef`,
+    `MetadataUsage`, `ConstraintDef` and `ConstraintUsage` project their declaration and body
+    instead of a marker. `tests/snapshots/sysml/part_usage_prefix_owning_scopes.md` shows all
+    fifteen scopes, with the repeated member byte-identical across every one.
+  - **A contentless projection is not a neutral placeholder: it disables the gates that run
+    through it.** Making `ConstraintDefBody` visible immediately failed the round-trip check on
+    Systems Library `Constraints.sysml`, which had been passing by comparing two markers.
+    `abstract constraint def ConstraintCheck` had been losing its `abstract`, and `ref constraint
+    self : ConstraintCheck :>> BooleanEvaluation::self;` had been coming apart into a bare
+    `'ref';` expression plus a separate usage. `ConstraintUsage` therefore carries
+    `prefix: OccurrenceUsagePrefix` -- the fifth family on that seam, purely additive -- and
+    `ConstraintDefinition` carries the `is_abstract` the shared definition-prefix helper already
+    parsed and had nowhere to put. Audit: `planning/constraint-usage-prefix-matrix.md`.
+  - **`part p;` in a calculation-shaped body** -- `calc def`, `calc` usage, `constraint def`,
+    `constraint` usage, and this crate's KerML type bodies, which share the container -- fell
+    through to the terminal expression arm and came apart into `'part';` plus `p;`, with no
+    diagnostic and a round trip that wrote both back out. `CalculationBodyItem -> ActionBodyItem
+    -> NonBehaviorBodyItem -> StructureUsageMember` admits a `PartUsage`; both scopes now dispatch
+    one, and their keyword guards look past `MemberPrefix` so `private ref constraint hidden;` is
+    claimed rather than shredded.
+  - **An incomplete `#` extension keyword swallowed the member behind it.**
+    `PrefixMetadataUsage`'s `OwnedFeatureTyping` is a `[QualifiedName]`, whose segments are
+    `NAME`s, and a reserved keyword is never a `NAME` -- but the `#` head parsed one anyway, so
+    `# part incompleteExtension : Engine;` became a fabricated reference named `part` plus a
+    separate member. Now refused with the exact authored span and no reference allocated at all.
+    Scoped to the `#` head alone; every other reference keeps the existing lexer, because a type
+    reference, a subsetting target and an expression path all legitimately reach reserved words.
+    A quoted name is never a keyword, so `#'part'` remains valid.
+  - **`then` before an occurrence usage member.**
+    `SourceSuccessionMember : FeatureMembership = 'then' ownedRelatedElement += SourceSuccession`
+    (BNF 597) precedes the membership, which precedes the prefix. `PartUsage` carries
+    `then_span: Option<Span>` -- not a prefix slot -- and `OccurrenceUsage::is_then`, a `bool`
+    that kept no provenance for the same keyword, moves to the same shape. That closes the last
+    diagnostic on `training/28. Individuals/Individuals and Roles-1.sysml`.
+  - Still open, recorded rather than assumed closed: `perform` bodies have no recovery starter
+    table; `variation`/`individual`/extension keywords on a *definition* prefix await the
+    `OccurrenceDefinitionPrefix` component; `ordered`/`nonunique` on a constraint usage has no
+    field, so it is still lost on emission and no round-trip check can see it.
+
 - **`PartUsage` migrated onto the shared, typed `OccurrenceUsagePrefix`.** Audit and evidence:
   `planning/part-usage-prefix-matrix.md`. **AST version 169 -> 170.**
 

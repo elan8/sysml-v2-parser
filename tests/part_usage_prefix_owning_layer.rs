@@ -82,6 +82,11 @@ fn every_prefix_slot_round_trips_and_formats_idempotently() {
         "package P {\n    derived part p : T :>> other;\n}\n",
         "package P {\n    constant part p : T = other;\n}\n",
         "package P {\n    constant part p : T default = other;\n}\n",
+        // `SourceSuccessionMember`'s `then` precedes the membership, which precedes the prefix,
+        // so all three have to survive together and in that order.
+        "package P {\n    part def D {\n        then part p : T;\n    }\n}\n",
+        "package P {\n    part def D {\n        then snapshot part p;\n    }\n}\n",
+        "package P {\n    part def D {\n        then private ref individual part p : T;\n    }\n}\n",
         // Both body forms, and a member inside the braced one.
         "package P {\n    ref individual part p : T {\n        attribute a;\n    }\n}\n",
         "package P {\n    #Tag part p : T {\n        part inner : T;\n    }\n}\n",

@@ -1,7 +1,7 @@
 # Factor shared grammatical concepts
 
 > **Status:** Phases 1-3 implemented; Phase 4 active -- the first grammar-owned component is
-> established and four usage families are migrated; the remaining families move only through
+> established and five usage families are migrated; the remaining families move only through
 > separately audited vertical slices
 
 ## Purpose
@@ -406,6 +406,23 @@ up a package-level dispatch that shared one prefix between `PartDefinition` and 
 `PortionKind` classified as selecting a production rather than prefixing one, five recovery
 starter tables missing FIRST tokens, seven contentless projection sites, and an emitter that
 stranded a keyword's trailing space. None of those was visible from the AST field list.
+
+#### Continuation: `ConstraintUsage` — done, and not chosen
+
+The fifth family did not move because it was next on the list. It moved because finishing the
+`PartUsage` slice's semantic projection -- so that a part usage is visible in *every* scope that
+can hold one -- meant projecting `ConstraintDefBody`, and that made the end-to-end round-trip gate
+able to see two defects it had been unable to see while the scope projected as a contentless
+marker: `abstract` parsed and discarded on both the definition and the usage, and `ref constraint
+self : …` shredded into a bare `'ref';` expression plus a separate usage. Both are in the pinned
+Systems Library, so every corpus gate had been exercising them and passing, by comparing two
+markers.
+
+That is worth recording as a property of the phase, not just of the slice: **a contentless
+projection is not a neutral placeholder — it silently disables the gates that run through it.**
+The audit is `planning/constraint-usage-prefix-matrix.md`, and the same follow-up closed the
+related discovery that `part p;` in any calculation-shaped body came apart into two bare
+expressions with no diagnostic.
 
 Every other family remains exactly as deferred as it was;
 `planning/occurrence-usage-prefix-matrix.md` §9 is still the authoritative ledger, and `PortUsage`

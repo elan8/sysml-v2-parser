@@ -282,8 +282,9 @@ dispatches it:
 | `SatisfyRequirementUsage` | line 1467 | package/namespace/root, `part def`, `part` usage, occurrence body, `view def`, `view` usage, requirement/concern/viewpoint body | **migrated** |
 | `ItemUsage` | 616 | package/namespace/root and structural/attribute/item/part bodies | **migrated** |
 | `PartUsage` | 623 | package/namespace/root, `part def`, `part` usage, attribute/item, metadata, `perform`, `connection def`, occurrence, `use case def`, `calc def`, `action def`, `action` usage, `variant` | **migrated** — `planning/part-usage-prefix-matrix.md` |
+| `ConstraintUsage` | 1382 | package/namespace/root, `constraint def`/`constraint` usage body, `part def`, `part` usage, attribute/item/metadata, `requirement def` | **migrated** — `planning/constraint-usage-prefix-matrix.md` |
 | `PortUsage`, `ViewUsage`, `RenderingUsage`, `ConnectionUsage`, `InterfaceUsage`, `AllocationUsage`, `Message`, `FlowUsage`, `SuccessionFlowUsage` | 646, 1607, 1647, 668, 758, 792, 806, 826, 830 | various | deferred — §9 |
-| `ActionUsage`, `CalculationUsage`, `StateUsage`, `ConstraintUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage`, `PerformActionUsage`, `ExhibitStateUsage`, `IncludeUseCaseUsage`, `AssertConstraintUsage`, `AcceptNode`, `SendNode`, `ActionNodePrefix` | 938–1569 | various | deferred — §9 |
+| `ActionUsage`, `CalculationUsage`, `StateUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage`, `PerformActionUsage`, `ExhibitStateUsage`, `IncludeUseCaseUsage`, `AssertConstraintUsage`, `AcceptNode`, `SendNode`, `ActionNodePrefix` | 938–1569 | various | deferred — §9 |
 | `MergeNode`, `DecisionNode`, `JoinNode`, `ForkNode` | 973–1010 | action bodies | **not this production** — `ControlNodePrefix` (§1.1) |
 
 ### 6.1 Why `OccurrenceUsage` is the representative family
@@ -453,6 +454,7 @@ own audit, and each further family will do the same:
 | `SatisfyRequirementUsage` | `ast::SatisfyRequirementUsage` | `prefix: OccurrenceUsagePrefix` and `membership: Membership` added; nothing deleted, because nothing was there |
 | `ItemUsage` | `ast::ItemUsage` | `is_derived`, `usage_prefix`, `is_constant`, `direction`, and `is_individual` deleted; `prefix: OccurrenceUsagePrefix` added. This was required to stop `ref individual item …` being claimed and reshaped as a keyword-less occurrence usage |
 | `PartUsage` | `ast::PartUsage` | `usage_prefix`, `is_individual`, `is_reference`, `direction`, `is_derived`, `is_constant` deleted; `prefix: OccurrenceUsagePrefix` added, with both `PortionKind` alternatives and `UsageExtensionKeyword*` newly represented. Migrated in a later slice than the three above, on its own audit: `planning/part-usage-prefix-matrix.md` |
+| `ConstraintUsage` | `ast::ConstraintUsage` | `prefix: OccurrenceUsagePrefix` added; nothing deleted, because nothing was there -- a leading `abstract` was consumed and discarded and every other slot was unrecognized. Its own audit is `planning/constraint-usage-prefix-matrix.md`; it moved because completing the part-usage projection made two pre-existing defects in this family visible to the round-trip gate |
 
 Deliberately **not** migrated by this change. None of these has moved; each keeps whatever partial
 prefix fields it already had, and closing each is a separate, family-sized change that reuses the
@@ -462,7 +464,7 @@ component this one defines:
 | --- | --- | --- |
 | `PortUsage` | direction, `is_abstract`, `is_reference`, `is_individual` | spans, `derived`, `variation`, `constant`, `PortionKind`, extension keywords |
 | `ActionUsage` | `is_abstract`, `is_variation`, `is_reference`, `is_individual` | spans, direction, `derived`, `constant`, `PortionKind`, extension keywords |
-| `StateUsage`, `CalcUsage`, `ConstraintUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage` | varying subsets of `abstract`/`variation`/`ref`/`individual`/direction | spans, and the slots each does not carry |
+| `StateUsage`, `CalcUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage` | varying subsets of `abstract`/`variation`/`ref`/`individual`/direction | spans, and the slots each does not carry |
 | `ViewUsage`, `RenderingUsage`, `ConnectionUsage`, `InterfaceUsage`, `AllocationUsage`, `FlowUsage`, `Message`, `SuccessionFlowUsage`, `PerformActionUsage`, `ExhibitStateUsage`, `IncludeUseCaseUsage`, `AssertConstraintUsage`, `AcceptNode`, `SendNode` | little or none | the whole prefix |
 | `MergeNode`, `DecisionNode`, `JoinNode`, `ForkNode` | none | **`ControlNodePrefix`, not this production** — needs its own `RefPrefix`-rooted component, which §5.2's nesting already provides |
 

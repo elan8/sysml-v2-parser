@@ -102,11 +102,11 @@ Common remaining limitations:
 
 **Progress on usage prefixes:** `OccurrenceUsagePrefix` and the two productions it nests are now
 one shared typed component, and `OccurrenceUsage` (with its `IndividualUsage`, `PortionUsage` and
-`EventOccurrenceUsage` spellings), `ItemUsage`, `SatisfyRequirementUsage` and `PartUsage` carry the
-complete prefix with each authored keyword's span. Every other usage family still carries whatever
+`EventOccurrenceUsage` spellings), `ItemUsage`, `SatisfyRequirementUsage`, `PartUsage` and
+`ConstraintUsage` carry the complete prefix with each authored keyword's span. Every other usage family still carries whatever
 partial prefix fields it had; which slots each is missing, and the continuation path, are in
 [`planning/occurrence-usage-prefix-matrix.md`](../planning/occurrence-usage-prefix-matrix.md) §9.
-"incomplete prefix combinations" above therefore no longer applies to those four families and
+"incomplete prefix combinations" above therefore no longer applies to those five families and
 still applies to the rest.
 
 For `PartUsage` specifically, that closed real pinned syntax rather than only provenance:

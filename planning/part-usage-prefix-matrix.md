@@ -421,14 +421,17 @@ changed here.
   `then` on the families this slice did not migrate -- `ItemUsage`, `SatisfyRequirementUsage` and
   the rest -- is still unrecognized; each closes it with its own slice.
 - **`end part` is not accepted.** Pilot-only; see §8.
-- **`calc def` body dispatch is not widened.** `CalcDefBodyElement::PartUsage` stays reachable
-  only through the `in`/`out`/`inout` gate; opening it to bare `part p;` is a change to that
-  scope's selector, not to this production.
-- **`item def` / `attribute def` semantic projection is not extended.** Those definitions project
-  as contentless `(item-def)`/`(attribute-def)` markers in every scope, which hides their whole
-  body — every member, not just a part usage. Fixing that is a definitional-family projection
-  slice; this slice makes every *projected* `(part-usage)` marker complete (§12) and records the
-  rest here.
+- ~~**`calc def` body dispatch is not widened.**~~ — closed by the follow-up. It was not merely
+  narrow: `part p;` in a `calc def`, `calc` usage, `constraint def`, `constraint` usage or KerML
+  type body fell through to the terminal expression arm and came apart into `'part';` plus `p;`,
+  with no diagnostic and a round trip that wrote both back out.
+  `planning/constraint-usage-prefix-matrix.md` §6 has the evidence.
+- ~~**`item def` / `attribute def` semantic projection is not extended.**~~ — closed by the
+  follow-up, together with `metadata def`/`metadata` usage, the occurrence usage body, the action
+  usage body, `variant` members, KerML classifier bodies and constraint definitions and usages.
+  All fifteen scopes that can hold a part usage now project their members;
+  `tests/snapshots/sysml/part_usage_prefix_owning_scopes.md` shows every one, with the repeated
+  member byte-identical across scopes.
 - **`connector::ref_decl`'s `RefDeclKind::Part` is not deleted.** It keeps modelling `ref part`
   in the scopes where it currently wins and nothing else changes about it; only the scopes listed
   in §3 give `part_usage` first refusal.
