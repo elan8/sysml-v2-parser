@@ -989,10 +989,29 @@ pub(crate) enum ReferencePathKind {
     Dotted,
 }
 
+/// Whether the segment starting here is an *unquoted* reserved keyword.
+///
+/// A `QualifiedName`'s segments are `NAME`s, and a reserved keyword is never a `NAME`. A quoted
+/// name is not a keyword however it is spelled, so `#'part'` is a legitimate reference and `#part`
+/// is not. Used only where a reference sits directly in front of another production's keyword --
+/// see [`qualified_reference_without_reserved_names`].
+fn segment_is_reserved_keyword(input: Input<'_>) -> bool {
+    let fragment = input.fragment();
+    if fragment.first().is_some_and(|byte| *byte == b'\'') {
+        return false;
+    }
+    let length = fragment
+        .iter()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+        .count();
+    length > 0 && is_reserved_keyword(&fragment[..length])
+}
+
 fn source_backed_reference(
     input: Input<'_>,
     allow_dot: bool,
     require_qualification: bool,
+    reject_reserved_segments: bool,
 ) -> IResult<Input<'_>, (QualifiedReferenceId, ReferencePathKind)> {
     let (input, _) = ws_and_comments(input)?;
     let reference_start = input;
@@ -1005,6 +1024,12 @@ fn source_backed_reference(
     };
 
     let segments_start = rest;
+    if reject_reserved_segments && segment_is_reserved_keyword(rest) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            rest,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let (next, _) = reference_name_span(rest)?;
     rest = next;
     let mut path_kind = ReferencePathKind::Qualified;
@@ -1027,6 +1052,9 @@ fn source_backed_reference(
         let (after_separator_ws, _) = ws_and_comments(after_separator)?;
         // A `::*`/`::**` import suffix and malformed/trailing separators belong to the caller.
         // Only commit the separator after proving that another authored name follows it.
+        if reject_reserved_segments && segment_is_reserved_keyword(after_separator_ws) {
+            break;
+        }
         let Ok((after_name, source_span)) = reference_name_span(after_separator_ws) else {
             break;
         };
@@ -1100,7 +1128,22 @@ fn source_backed_reference(
 
 /// Parse a source-backed `::`-qualified semantic reference into the document arena.
 pub(crate) fn qualified_reference(input: Input<'_>) -> IResult<Input<'_>, QualifiedReferenceId> {
-    let (input, (reference, _)) = source_backed_reference(input, false, false)?;
+    let (input, (reference, _)) = source_backed_reference(input, false, false, false)?;
+    Ok((input, reference))
+}
+
+/// [`qualified_reference`], refusing any unquoted reserved keyword as a segment.
+///
+/// For the one position where a reference sits immediately in front of another production's kind
+/// keyword: `PrefixMetadataUsage`'s `OwnedFeatureTyping`. An incomplete extension keyword
+/// otherwise swallows the member behind it -- `# part p;` became a metadata reference *named*
+/// `part` plus a separate declaration, and `#Tag:: part p;` a reference `Tag::part`, both with no
+/// diagnostic about the `#` that was never completed. Rejection happens during the validation
+/// walk, before any arena mutation, so nothing speculative is allocated.
+pub(crate) fn qualified_reference_without_reserved_names(
+    input: Input<'_>,
+) -> IResult<Input<'_>, QualifiedReferenceId> {
+    let (input, (reference, _)) = source_backed_reference(input, false, false, true)?;
     Ok((input, reference))
 }
 
@@ -1109,13 +1152,13 @@ pub(crate) fn qualified_reference(input: Input<'_>) -> IResult<Input<'_>, Qualif
 pub(crate) fn qualified_declaration_name(
     input: Input<'_>,
 ) -> IResult<Input<'_>, QualifiedDeclarationName> {
-    let (input, (reference, _)) = source_backed_reference(input, false, true)?;
+    let (input, (reference, _)) = source_backed_reference(input, false, true, false)?;
     Ok((input, QualifiedDeclarationName::new(reference)))
 }
 
 /// Parse a source-backed semantic path with authored `::` and `.` separators.
 pub(crate) fn reference_path(input: Input<'_>) -> IResult<Input<'_>, QualifiedReferenceId> {
-    let (input, (reference, _)) = source_backed_reference(input, true, false)?;
+    let (input, (reference, _)) = source_backed_reference(input, true, false, false)?;
     Ok((input, reference))
 }
 
@@ -1124,7 +1167,7 @@ pub(crate) fn reference_path(input: Input<'_>) -> IResult<Input<'_>, QualifiedRe
 pub(crate) fn classified_reference_path(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (QualifiedReferenceId, ReferencePathKind)> {
-    source_backed_reference(input, true, false)
+    source_backed_reference(input, true, false, false)
 }
 
 /// Skip any content until we see `}` at the same brace level.

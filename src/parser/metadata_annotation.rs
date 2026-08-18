@@ -156,7 +156,7 @@ pub(crate) fn metadata_keyword_head(
     let (input, _) = tag(&b"#"[..]).parse(hash_start)?;
     let hash_span = crate::parser::span::span_from_to(hash_start, input);
     let (input, _) = ws_and_comments(input)?;
-    let (input, reference) = qualified_reference(input)?;
+    let (input, reference) = crate::parser::lex::qualified_reference_without_reserved_names(input)?;
     Ok((input, (hash_span, reference)))
 }
 

@@ -376,7 +376,7 @@ One further pinned spelling is adjacent but is **not** a prefix:
 | missing `part` after a valid prefix (`in derived ref;`) | refused; recovery node covering the prefix and its terminator; no fabricated kind keyword |
 | missing declaration/completion after `part` (`part`) | refused; recovery node |
 | `#;` | refused; recovery node reporting `malformed_annotation_head`. No fabricated reference |
-| `# part p;`, `#Tag:: part p;`, `#$:: part p;` | `PartUsage` refused, and its speculative reference rolled back. The member is then claimed by the standalone `PrefixMetadataMember` parser, which reads `part` as the reference's last segment -- `metadata_keyword_head` accepts a reserved keyword as a reference name segment. That is a defect in the `#`-reference lexer shared by every `#` site, recorded in §11, not one this slice's production owns; what this slice must and does guarantee is that nothing is left in the arena and no `PartUsage` is fabricated |
+| `# part p;`, `#Tag:: part p;`, `#$:: part p;` | refused, with the exact authored span reported and **no reference allocated at all**. `PrefixMetadataUsage`'s `OwnedFeatureTyping` is a `[QualifiedName]`, whose segments are `NAME`s, and a reserved keyword is never a `NAME`, so the `#` head refuses one during its validation walk -- before any arena mutation. Until that was fixed the standalone `PrefixMetadataMember` parser read `part` as the reference's last segment and swallowed the member behind the incomplete `#` |
 | malformed prefix before a named part usage | one recovery node; later siblings survive |
 | malformed prefix before an anonymous or `:>>` part usage | one recovery node; later siblings survive |
 | malformed part usage followed by several valid siblings | all siblings survive |
@@ -425,14 +425,6 @@ changed here.
   body — every member, not just a part usage. Fixing that is a definitional-family projection
   slice; this slice makes every *projected* `(part-usage)` marker complete (§12) and records the
   rest here.
-- **`metadata_keyword_head` is not tightened.** `# part p;` is an incomplete
-  `UsageExtensionKeyword`, but the standalone `PrefixMetadataMember` parser that claims the member
-  after `PartUsage` refuses it reads the reserved keyword `part` as the reference's name segment.
-  A reserved keyword can never be a `NAME`, so this is a lexical defect in the `#`-reference head
-  shared by every `#` site in the crate; closing it belongs to
-  `planning/metadata-sigil-matrix.md`'s seam, and doing it here would change every family's `#`
-  behaviour at once. `tests/snapshots/sysml/part_usage_prefix_recovery.md` pins the current
-  reading so the gap is visible rather than assumed closed.
 - **`connector::ref_decl`'s `RefDeclKind::Part` is not deleted.** It keeps modelling `ref part`
   in the scopes where it currently wins and nothing else changes about it; only the scopes listed
   in §3 give `part_usage` first refusal.
