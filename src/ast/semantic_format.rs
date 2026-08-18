@@ -1518,8 +1518,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::AllocationUsage(_usage) => {
                             self.write_marker(&mut first, "allocation-usage")?;
                         }
-                        PartDefBodyElement::ViewDef(_definition) => {
-                            self.write_marker(&mut first, "view-def")?;
+                        PartDefBodyElement::ViewDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_definition(&definition.value)?;
                         }
                         PartDefBodyElement::ViewUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -2482,8 +2483,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::VerificationCaseUsage(_member) => {
                             self.write_marker(&mut first, "verification-case-usage")?;
                         }
-                        super::PartUsageBodyElement::ViewDef(_definition) => {
-                            self.write_marker(&mut first, "view-def")?;
+                        super::PartUsageBodyElement::ViewDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_definition(&definition.value)?;
                         }
                         super::PartUsageBodyElement::ViewUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -2941,6 +2943,79 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_requirement_body(&definition.body)?;
         self.writer.write_char(')')
+    }
+
+    /// `ViewDefinition` (SysML 8.2.2.26.1).
+    ///
+    /// Was a contentless `(view-def)` marker in all three scopes that own one, so a snapshot
+    /// could show neither the declaration, nor `abstract`, nor the subclassification clause, nor
+    /// a single member of the body -- a `view def` was the one definition family whose entire
+    /// contents were invisible to the end-to-end contract, which is why a satisfy usage inside
+    /// one could only be pinned through `FORMAT`.
+    fn write_view_definition(&mut self, definition: &super::ViewDef) -> io::Result<()> {
+        self.writer.write_str("(view-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, definition.identification.short_name.as_deref())?;
+        self.writer.write_str(") (modifiers")?;
+        if definition.is_abstract {
+            self.writer.write_str(" abstract")?;
+        }
+        self.writer.write_str(") (specializes ")?;
+        match &definition.specializes {
+            Some(specializes) => self.write_typing(&specializes.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_view_def_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_view_def_body(&mut self, body: &super::ViewDefBody) -> io::Result<()> {
+        match body {
+            super::ViewDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::ViewDefBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::ViewDefBodyElement::Unsupported(node) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_unsupported(&node.value, &element.span)?;
+                        }
+                        super::ViewDefBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::ViewDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::ViewDefBodyElement::MetadataKeywordUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&usage.value)?;
+                        }
+                        super::ViewDefBodyElement::Filter(_filter) => {
+                            self.write_marker(&mut first, "filter")?;
+                        }
+                        super::ViewDefBodyElement::ViewRendering(_rendering) => {
+                            self.write_marker(&mut first, "view-rendering")?;
+                        }
+                        super::ViewDefBodyElement::RefDecl(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
+                        }
+                        super::ViewDefBodyElement::ViewpointUsage(_usage) => {
+                            self.write_marker(&mut first, "viewpoint-usage")?;
+                        }
+                        super::ViewDefBodyElement::Satisfy(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_satisfy_requirement_usage(&usage.value)?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
     }
 
     fn write_view_usage(&mut self, usage: &super::ViewUsage) -> io::Result<()> {
@@ -3416,7 +3491,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_calc_definition(&definition.value)
             }
-            PackageBodyElement::ViewDef(_definition) => self.write_marker(first, "view-def"),
+            PackageBodyElement::ViewDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_view_definition(&definition.value)
+            }
             PackageBodyElement::ViewpointDef(_definition) => {
                 self.write_marker(first, "viewpoint-def")
             }
