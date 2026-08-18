@@ -6429,7 +6429,8 @@ macro_rules! ast_traversal {
         pub fn walk_constraint_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConstraintDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConstraintDef { identification, specializes, body, membership } = &$($mutability)? node.value;
+            let ConstraintDef { is_abstract, identification, specializes, body, membership } = &$($mutability)? node.value;
+            let _ = is_abstract;
             visitor.visit_identification(identification);
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);
@@ -6442,7 +6443,8 @@ macro_rules! ast_traversal {
         pub fn walk_constraint_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ConstraintUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ConstraintUsage { name, short_name, type_name, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            let ConstraintUsage { prefix, name, short_name, type_name, multiplicity, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
             visitor.visit_text(name);
             if let Some(inner) = short_name { visitor.visit_text(inner); }
             if let Some(inner) = type_name {
@@ -6506,6 +6508,9 @@ macro_rules! ast_traversal {
                 }
                 ConstraintDefBodyElement::FeatureDecl(field_0) => {
                     visitor.visit_default_reference_usage(&$($mutability)? **field_0);
+                }
+                ConstraintDefBodyElement::PartUsage(field_0) => {
+                    visitor.visit_part_usage(&$($mutability)? **field_0);
                 }
                 ConstraintDefBodyElement::RequireConstraint(field_0) => {
                     visitor.visit_require_constraint(&$($mutability)? **field_0);

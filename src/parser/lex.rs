@@ -253,6 +253,19 @@ pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"constraint",
     b":>>",
     b":>",
+    // `CalculationBody` reaches `StructureUsageMember -> PartUsage`, so `part` and the rest of
+    // FIRST(`OccurrenceUsagePrefix`) are member starters here too. See
+    // `planning/part-usage-prefix-matrix.md` §6.
+    b"part",
+    b"#",
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"individual",
+    b"ref",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
 /// Starters for `RelationshipBody`-shaped brace bodies (alias/import/dependency and other

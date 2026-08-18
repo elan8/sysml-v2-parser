@@ -52,6 +52,7 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
             start,
             input,
             ConstraintDef {
+                is_abstract: prefix.is_abstract,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -73,11 +74,23 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
 /// RequirementConstraintCheck::assumptions;` (redefinition with a qualified feature-chain
 /// target). `abstract` is accepted and discarded, matching `ConstraintDef` itself, which has no
 /// `is_abstract` field either.
+/// `ConstraintUsage = OccurrenceUsagePrefix 'constraint' ConstraintUsageDeclaration
+/// CalculationBody` (SysML BNF 1382).
+///
+/// Wrapped in a reference transaction because the prefix's `UsageExtensionKeyword*` allocates an
+/// arena entry per `#tag` before the production is known to apply.
 pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ConstraintUsage>> {
+    crate::parser::span::reference_transaction(input, constraint_usage_inner)
+}
+
+fn constraint_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ConstraintUsage>> {
     let start = input;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // The whole shared `OccurrenceUsagePrefix`, not a leading `abstract` consumed and thrown
+    // away: `ref constraint self : ConstraintCheck :>> BooleanEvaluation::self;` (Systems Library
+    // `Constraints.sysml:20`) was refused here and shredded into two members by the scope's
+    // expression fallback.
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"constraint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
@@ -100,6 +113,7 @@ pub(crate) fn constraint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Cons
             start,
             input,
             ConstraintUsage {
+                prefix,
                 short_name,
                 name: name_str,
                 type_name: header.type_reference,
@@ -157,6 +171,12 @@ pub(crate) fn constraint_def_body_element(
 ) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `MemberPrefix` precedes the member's own keyword, so the usage guards below look past it;
+    // each arm's parser re-reads it. Without this a `private ref constraint hidden;` matched no
+    // guard and reached the expression fallback.
+    let after_visibility = crate::parser::lex::visibility_prefix(input)
+        .map(|(rest, _)| rest)
+        .unwrap_or(input);
     let (input, elem) = if starts_with_keyword(input.fragment(), b"doc")
         || starts_with_keyword(input.fragment(), b"comment")
         || starts_with_keyword(input.fragment(), b"rep")
@@ -168,6 +188,27 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::Annotating,
         )
         .parse(input)?
+    } else if let Some((next, usage)) =
+        (starts_with_keyword(after_visibility.fragment(), b"constraint")
+            || starts_with_any_keyword(after_visibility.fragment(), PART_USAGE_PREFIX_STARTERS)
+            || crate::parser::occurrence_prefix::starts_contended_prefix(after_visibility))
+        .then(|| constraint_usage(input))
+        .and_then(Result::ok)
+    {
+        // The whole `OccurrenceUsagePrefix` may precede the kind keyword, so the guard cannot be
+        // `constraint` alone: `abstract constraint constraintChecks : …` and `ref constraint
+        // self : …` (Systems Library `Constraints.sysml`) both reached the expression fallback
+        // and were shredded.
+        (next, ConstraintDefBodyElement::Constraint(Box::new(usage)))
+    } else if let Some((next, usage)) = (starts_with_keyword(after_visibility.fragment(), b"part")
+        || starts_with_any_keyword(after_visibility.fragment(), PART_USAGE_PREFIX_STARTERS)
+        || crate::parser::occurrence_prefix::starts_contended_prefix(after_visibility))
+    .then(|| crate::parser::part::part_usage(input))
+    .and_then(Result::ok)
+    {
+        // See `CalcDefBodyElement::PartUsage`: the same `CalculationBody` reaches the same
+        // production, and this scope shredded it the same way.
+        (next, ConstraintDefBodyElement::PartUsage(Box::new(usage)))
     } else if input.fragment().starts_with(b"#") {
         // Both `#` productions: the `ExtendedUsage` member spelling (which owns a `;`/`{}`
         // body) is tried before the `PrefixMetadataMember` spelling, which owns no body and
@@ -197,8 +238,6 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::InOutDecl(Box::new(n))
         })
         .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"constraint") {
-        map(constraint_usage, ConstraintDefBodyElement::Constraint).parse(input)?
     } else if input.fragment().starts_with(b":>>") || input.fragment().starts_with(b":>") {
         map(
             crate::parser::attribute::redefinition_feature_binding,
@@ -1294,6 +1333,23 @@ fn kerml_invariant_member_inner(
     ))
 }
 
+/// The `OccurrenceUsagePrefix` slots that may precede `part` here and head no production this
+/// scope claims first. `ref` and `#` are deliberately absent: they head `ReferenceUsage` and
+/// `PrefixMetadataMember`, and `occurrence_prefix::starts_contended_prefix` is what decides
+/// whether a run reaching one of them is a prefix or a member of its own.
+const PART_USAGE_PREFIX_STARTERS: &[&[u8]] = &[
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"in",
+    b"individual",
+    b"inout",
+    b"out",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
+];
+
 fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
@@ -1306,7 +1362,28 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         || starts_with_keyword(input.fragment(), b"metadata"))
     .then(|| crate::parser::metadata_annotation::metadata_annotation(input))
     .and_then(Result::ok);
-    let (input, elem) = if let Some((next, annotation)) = prefixed_metadata_feature {
+    // `CalculationBodyItem -> ActionBodyItem -> NonBehaviorBodyItem -> StructureUsageMember`
+    // (SysML BNF 1366, 901, 910) admits a `PartUsage` here, and this scope had no arm for one:
+    // `part p;` fell through to the bare-expression fallback and was shredded into two
+    // expressions -- `'part';` and `p;` -- with no diagnostic, which a round trip then wrote
+    // back out as two members.
+    //
+    // Tried before every other arm because the whole `OccurrenceUsagePrefix` may precede the
+    // kind keyword, and two of its FIRST tokens (`#`, `ref`) head productions the arms below
+    // claim first. The guard keeps the attempt off members that cannot be one -- and the attempt
+    // itself is transactional, so a member that really is a metadata annotation or a KerML
+    // feature falls through unchanged.
+    let after_visibility_input = crate::parser::lex::visibility_prefix(input)
+        .map(|(rest, _)| rest)
+        .unwrap_or(input);
+    let part_usage_member = (starts_with_keyword(after_visibility, b"part")
+        || starts_with_any_keyword(after_visibility, PART_USAGE_PREFIX_STARTERS)
+        || crate::parser::occurrence_prefix::starts_contended_prefix(after_visibility_input))
+    .then(|| crate::parser::part::part_usage(input))
+    .and_then(Result::ok);
+    let (input, elem) = if let Some((next, usage)) = part_usage_member {
+        (next, CalcDefBodyElement::PartUsage(Box::new(usage)))
+    } else if let Some((next, annotation)) = prefixed_metadata_feature {
         (
             next,
             CalcDefBodyElement::Annotating(crate::ast::AnnotatingMember::MetadataAnnotation(
@@ -1437,10 +1514,9 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         || starts_with_keyword(input.fragment(), b"out")
         || starts_with_keyword(input.fragment(), b"inout")
     {
-        // Prefer directed `in part …` before plain InOutDecl (which rejects `in part`).
-        if let Ok((input, part)) = crate::parser::part::part_usage(input) {
-            (input, CalcDefBodyElement::PartUsage(Box::new(part)))
-        } else if let Ok((input, param)) = typed_parameter_member(input) {
+        // A directed `in part …` was claimed here before the scope had a `PartUsage` arm at all;
+        // the arm above owns every part usage now, directed or not.
+        if let Ok((input, param)) = typed_parameter_member(input) {
             // `in expr …` / `in bool …` / `in feature …` kinded parameters (Kernel
             // Function/Semantic Libraries), before plain InOutDecl, which would misread the
             // kind keyword as the parameter name.

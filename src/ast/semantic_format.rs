@@ -1369,14 +1369,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         PartDefBodyElement::KermlClassifier(declaration) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(kerml-classifier (keyword ")?;
-                            self.writer.write_str(declaration.value.keyword.as_str())?;
-                            self.writer.write_str(") (name ")?;
-                            write_optional_quoted(
-                                self.writer,
-                                declaration.value.identification.name.as_deref(),
-                            )?;
-                            self.writer.write_str("))")?;
+                            self.write_kerml_classifier(&declaration.value)?;
                         }
                         PartDefBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -1473,11 +1466,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::CalcUsage(_usage) => {
                             self.write_marker(&mut first, "calc-usage")?;
                         }
-                        PartDefBodyElement::ConstraintDef(_definition) => {
-                            self.write_marker(&mut first, "constraint-def")?;
+                        PartDefBodyElement::ConstraintDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_definition(&definition.value)?;
                         }
-                        PartDefBodyElement::ConstraintUsage(_usage) => {
-                            self.write_marker(&mut first, "constraint-usage")?;
+                        PartDefBodyElement::ConstraintUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_usage(&usage.value)?;
                         }
                         PartDefBodyElement::Import(import) => {
                             self.write_item_prefix(&mut first)?;
@@ -1795,6 +1790,127 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     /// be shredded into invented keyword-named features, so a marker for the definition as a whole
     /// could not show whether a member survived at all. Action members reuse the exhaustive
     /// `ActionDefBodyElement` writer rather than restating it.
+    /// A KerML classifier declaration and its body.
+    ///
+    /// Spelled twice, in two different shapes, neither of which projected the body -- so every
+    /// member of a `struct`/`classifier`/`datatype`/... was invisible, including a part usage,
+    /// which this scope silently shredded into two bare expressions until it gained an arm.
+    fn write_kerml_classifier(
+        &mut self,
+        declaration: &super::KermlClassifierDecl,
+    ) -> io::Result<()> {
+        self.writer.write_str("(kerml-classifier (keyword ")?;
+        self.writer.write_str(declaration.keyword.as_str())?;
+        write!(
+            self.writer,
+            ") (abstract {}) (name ",
+            declaration.is_abstract
+        )?;
+        write_optional_quoted(self.writer, declaration.identification.name.as_deref())?;
+        self.writer.write_str(") (specializes ")?;
+        match &declaration.specializes {
+            Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_calc_def_body(&declaration.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// `ConstraintDefBody`, with its members.
+    ///
+    /// `ConstraintDefinition` and `ConstraintUsage` own a `CalculationBody`, and no scope that
+    /// owns one was projected here at all -- so a `constraint def` was a leaf however much it
+    /// declared. Exhaustive, so a new member of this scope is a compile error here.
+    fn write_constraint_def_body(&mut self, body: &super::ConstraintDefBody) -> io::Result<()> {
+        match body {
+            super::ConstraintDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::ConstraintDefBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::ConstraintDefBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::ConstraintDefBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::ConstraintDefBodyElement::MetadataKeywordUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_metadata_keyword_usage(&member.value)?;
+                        }
+                        super::ConstraintDefBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        super::ConstraintDefBodyElement::PartUsage(member) => {
+                            self.write_part_usage_member(&mut first, &member.value)?;
+                        }
+                        super::ConstraintDefBodyElement::Expression(expression) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_expression(expression)?;
+                        }
+                        super::ConstraintDefBodyElement::InOutDecl(_member) => {
+                            self.write_marker(&mut first, "in-out-declaration")?;
+                        }
+                        super::ConstraintDefBodyElement::Constraint(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_usage(&usage.value)?;
+                        }
+                        super::ConstraintDefBodyElement::FeatureDecl(_member) => {
+                            self.write_marker(&mut first, "default-reference-usage")?;
+                        }
+                        super::ConstraintDefBodyElement::RequireConstraint(_member) => {
+                            self.write_marker(&mut first, "require-constraint")?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    /// `ConstraintDefinition = … DefinitionDeclaration CalculationBody` (SysML BNF 1379).
+    fn write_constraint_definition(&mut self, definition: &super::ConstraintDef) -> io::Result<()> {
+        self.writer.write_str("(constraint-def (name ")?;
+        write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.writer.write_str(") (specializes ")?;
+        match &definition.specializes {
+            Some(typing) => self.write_typing(&typing.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_constraint_def_body(&definition.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// `ConstraintUsage = OccurrenceUsagePrefix 'constraint' ConstraintUsageDeclaration
+    /// CalculationBody` (SysML BNF 1382).
+    fn write_constraint_usage(&mut self, usage: &super::ConstraintUsage) -> io::Result<()> {
+        self.writer.write_str("(constraint-usage ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
+        self.writer.write_str(" (declaration-name ")?;
+        self.write_usage_declaration_name(&usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, usage.short_name.as_deref())?;
+        self.writer.write_str(") (type ")?;
+        match usage.type_name {
+            Some(reference) => self.write_reference(reference)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_constraint_def_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     fn write_calc_def_body(&mut self, body: &super::CalcDefBody) -> io::Result<()> {
         match body {
             super::CalcDefBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
@@ -1852,8 +1968,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::AssertConstraint(_member) => {
                             self.write_marker(&mut first, "assert-constraint")?;
                         }
-                        super::CalcDefBodyElement::KermlClassifier(_member) => {
-                            self.write_marker(&mut first, "kerml-classifier")?;
+                        super::CalcDefBodyElement::KermlClassifier(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_kerml_classifier(&declaration.value)?;
                         }
                         super::CalcDefBodyElement::DefaultReferenceUsage(_member) => {
                             self.write_marker(&mut first, "default-reference-usage")?;
@@ -2661,11 +2778,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::AssertConstraint(_member) => {
                             self.write_marker(&mut first, "assert-constraint")?;
                         }
-                        super::PartUsageBodyElement::ConstraintDef(_member) => {
-                            self.write_marker(&mut first, "constraint-def")?;
+                        super::PartUsageBodyElement::ConstraintDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_definition(&definition.value)?;
                         }
-                        super::PartUsageBodyElement::ConstraintUsage(_member) => {
-                            self.write_marker(&mut first, "constraint-usage")?;
+                        super::PartUsageBodyElement::ConstraintUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_usage(&usage.value)?;
                         }
                         super::PartUsageBodyElement::CalcUsage(_member) => {
                             self.write_marker(&mut first, "calc-usage")?;
@@ -2725,8 +2844,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::RenderingUsage(_usage) => {
                             self.write_marker(&mut first, "rendering-usage")?;
                         }
-                        super::PartUsageBodyElement::KermlClassifier(_member) => {
-                            self.write_marker(&mut first, "kerml-classifier")?;
+                        super::PartUsageBodyElement::KermlClassifier(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_kerml_classifier(&declaration.value)?;
                         }
                     }
                 }
@@ -2885,8 +3005,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::AttributeBodyElement::ClassDef(_member) => {
                             self.write_marker(&mut first, "class-def")?;
                         }
-                        super::AttributeBodyElement::KermlClassifier(_member) => {
-                            self.write_marker(&mut first, "kerml-classifier")?;
+                        super::AttributeBodyElement::KermlClassifier(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_kerml_classifier(&declaration.value)?;
                         }
                         super::AttributeBodyElement::Bind(_member) => {
                             self.write_marker(&mut first, "bind")?;
@@ -2900,8 +3021,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::AttributeBodyElement::CalcUsage(_member) => {
                             self.write_marker(&mut first, "calc-usage")?;
                         }
-                        super::AttributeBodyElement::ConstraintUsage(_member) => {
-                            self.write_marker(&mut first, "constraint-usage")?;
+                        super::AttributeBodyElement::ConstraintUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_usage(&usage.value)?;
                         }
                     }
                 }
@@ -3993,18 +4115,13 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::IndividualDef(_definition) => {
                 self.write_marker(first, "individual-def")
             }
-            PackageBodyElement::ConstraintDef(_definition) => {
-                self.write_marker(first, "constraint-def")
+            PackageBodyElement::ConstraintDef(definition) => {
+                self.write_item_prefix(first)?;
+                self.write_constraint_definition(&definition.value)
             }
             PackageBodyElement::ConstraintUsage(usage) => {
                 self.write_item_prefix(first)?;
-                self.writer.write_str("(constraint-usage (name ")?;
-                write_quoted(self.writer, &usage.value.name)?;
-                self.writer.write_str(") (short-name ")?;
-                write_optional_quoted(self.writer, usage.value.short_name.as_deref())?;
-                self.writer.write_str(") (multiplicity ")?;
-                self.write_multiplicity_clause(usage.value.multiplicity.as_ref())?;
-                self.writer.write_str("))")
+                self.write_constraint_usage(&usage.value)
             }
             PackageBodyElement::CalcDef(definition) => {
                 self.write_item_prefix(first)?;
@@ -4141,25 +4258,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::KermlClassifier(declaration) => {
                 self.write_item_prefix(first)?;
-                self.writer.write_str("(kerml-classifier (keyword ")?;
-                self.writer.write_str(declaration.value.keyword.as_str())?;
-                self.writer.write_str(") (abstract ")?;
-                self.writer.write_str(if declaration.value.is_abstract {
-                    "true"
-                } else {
-                    "false"
-                })?;
-                self.writer.write_str(") (name ")?;
-                write_optional_quoted(
-                    self.writer,
-                    declaration.value.identification.name.as_deref(),
-                )?;
-                self.writer.write_str(") (specializes ")?;
-                match &declaration.value.specializes {
-                    Some(typing) => self.write_typing(&typing.value)?,
-                    None => self.writer.write_str("none")?,
-                }
-                self.writer.write_str("))")
+                self.write_kerml_classifier(&declaration.value)
             }
             PackageBodyElement::KermlBareDeclaration(declaration) => {
                 self.write_item_prefix(first)?;

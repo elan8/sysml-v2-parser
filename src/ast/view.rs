@@ -15,6 +15,17 @@ use crate::ast::QualifiedReferenceId;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConstraintDef {
+    /// `abstract` from `OccurrenceDefinitionPrefix -> BasicDefinitionPrefix` (SysML BNF 1378,
+    /// 541). The parser has always consumed it and had nowhere to put it, so `abstract
+    /// constraint def ConstraintCheck :> BooleanEvaluation` (Systems Library `Constraints.sysml`)
+    /// came back out of a round trip as a plain `constraint def`.
+    ///
+    /// A `bool` rather than the two-alternative `DefinitionPrefix` enum because the shared
+    /// `parse_definition_prefix` helper -- which every definition family in this crate routes
+    /// through -- recognizes only `abstract`; `variation` on a *definition* prefix is part of the
+    /// still-unbuilt `OccurrenceDefinitionPrefix` component, not of this slice. See
+    /// `planning/constraint-usage-prefix-matrix.md` §5.
+    pub is_abstract: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConstraintDefBody,
@@ -30,6 +41,17 @@ pub struct ConstraintDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConstraintUsage {
+    /// The complete `OccurrenceUsagePrefix` this usage was written with
+    /// (`ConstraintUsage = OccurrenceUsagePrefix 'constraint' ConstraintUsageDeclaration
+    /// CalculationBody`, SysML BNF 1382).
+    ///
+    /// The same shared component `OccurrenceUsage`, `ItemUsage`, `SatisfyRequirementUsage` and
+    /// `PartUsage` carry. Nothing was deleted to make room, because nothing was here: the parser
+    /// consumed a leading `abstract` and discarded it, and every other slot -- `ref` above all --
+    /// was not recognized, so `ref constraint self : ConstraintCheck :>> BooleanEvaluation::self;`
+    /// (Systems Library `Constraints.sysml:20`) was shredded into a bare `'ref';` expression plus
+    /// a separate constraint usage, with no diagnostic.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
     pub name: String,
     pub short_name: Option<String>,
     pub type_name: Option<QualifiedReferenceId>,
@@ -46,6 +68,13 @@ pub struct ConstraintUsage {
 
 pub type ConstraintDefBody = Body<ConstraintDefBodyElement>;
 
+// `AnnotatingMember` is the whole `AnnotatingElement` production, making it inherently larger
+// than sibling variants like `Error`; boxing just this one variant in just this one enum would be
+// inconsistent with the ~27 other body-element enums sharing the same `Annotating(AnnotatingMember)`
+// shape crate-wide, so the size difference is accepted here rather than partially addressed --
+// exactly as `RequirementDefBodyElement` records for `AttributeUsage`. The lint only became
+// audible once `Constraint` was boxed, which made this enum smaller, not larger.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConstraintDefBodyElement {
@@ -63,7 +92,9 @@ pub enum ConstraintDefBodyElement {
     /// Library's `RequirementConstraintCheck::assumptions`/`::constraints`, redefined/subset
     /// from another constraint). Not boxed: `ConstraintUsage` is a small struct and the
     /// recursion into its own `body: ConstraintDefBody` already passes through a `Vec`.
-    Constraint(Node<ConstraintUsage>),
+    /// Boxed because the shared `OccurrenceUsagePrefix` makes `ConstraintUsage` much the largest
+    /// member of this scope; the indirection keeps the enum the size of its other variants.
+    Constraint(Box<Node<ConstraintUsage>>),
     /// Keyword-less `:>> name = …` binding inside `require name { … }` (validation `10c`).
     AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
     /// Keyword-less feature declaration (`mass : Real;`): a constraint definition body is a
@@ -74,6 +105,12 @@ pub enum ConstraintDefBodyElement {
     /// brace-bodied form previously fell through to the terminal expression arm, which consumed
     /// the name and then could not account for the `{`.
     RequireConstraint(Box<Node<crate::ast::RequireConstraint>>),
+    /// `ConstraintDefinition`/`ConstraintUsage` own a `CalculationBody`, which reaches
+    /// `ActionBodyItem -> NonBehaviorBodyItem -> StructureUsageMember -> PartUsage` (SysML BNF
+    /// 1366, 901, 910, 623). The scope had no variant for one, so `part p : T;` fell through to
+    /// the terminal expression arm and was shredded into `'part';` and `p : T;` with no
+    /// diagnostic -- input a round trip then wrote back out as two members.
+    PartUsage(Box<Node<crate::ast::PartUsage>>),
 }
 
 /// constraint body {}

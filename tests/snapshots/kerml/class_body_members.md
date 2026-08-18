@@ -58,6 +58,6 @@ package Classes {
 (parsed-document
   (references
   )
-  (root (package (name "Classes") (body brace (class-def) (kerml-classifier (keyword behavior) (abstract false) (name "B2") (specializes none)) (package (name "Q") (body brace (kerml-connector))))))
+  (root (package (name "Classes") (body brace (class-def) (kerml-classifier (keyword behavior) (abstract false) (name "B2") (specializes none) (body brace (in-out-declaration))) (package (name "Q") (body brace (kerml-connector))))))
 )
 ~~~

@@ -37,6 +37,6 @@ standard library package Broken {
 (parsed-document
   (references
   )
-  (root (library-package (name "Broken") (standard true) (body brace (kerml-classifier (keyword function) (abstract false) (name "f") (specializes none)))))
+  (root (library-package (name "Broken") (standard true) (body brace (kerml-classifier (keyword function) (abstract false) (name "f") (specializes none) (body brace (malformed (code "recovered_calc_body_element") (found "in : ;") (span (offset 59) (line 3) (column 9) (len 15))) (in-out-declaration) (return-declaration (name none) (short-name none)))))))
 )
 ~~~

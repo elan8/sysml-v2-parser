@@ -305,6 +305,9 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             ConstraintDefBodyElement::RequireConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
             }
+            ConstraintDefBodyElement::PartUsage(pu) => {
+                walk_part_usage_body(report, &p, &pu.value.body)
+            }
             ConstraintDefBodyElement::Expression(_) => {}
         }
     }
@@ -1341,6 +1344,9 @@ fn walk_constraint_body_elements(
             ConstraintDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             ConstraintDefBodyElement::RequireConstraint(n) => {
                 walk_constraint_def_body(report, &p, &n.value.body)
+            }
+            ConstraintDefBodyElement::PartUsage(pu) => {
+                walk_part_usage_body(report, &p, &pu.value.body)
             }
             ConstraintDefBodyElement::Expression(_) => {}
         }
