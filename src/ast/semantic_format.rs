@@ -1171,8 +1171,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::RequirementUsage(_usage) => {
                             self.write_marker(&mut first, "requirement-usage")?;
                         }
-                        UseCaseDefBodyElement::PartUsage(_usage) => {
-                            self.write_marker(&mut first, "part-usage")?;
+                        UseCaseDefBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
                         }
                         UseCaseDefBodyElement::Expression(expression) => {
                             self.write_item_prefix(&mut first)?;
@@ -1390,8 +1390,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_port_usage(&usage.value)?;
                         }
-                        PartDefBodyElement::PartUsage(_usage) => {
-                            self.write_marker(&mut first, "part-usage")?;
+                        PartDefBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
                         }
                         PartDefBodyElement::PartDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1842,8 +1842,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::CalcDef(_member) => {
                             self.write_marker(&mut first, "calc-def")?;
                         }
-                        super::CalcDefBodyElement::PartUsage(_member) => {
-                            self.write_marker(&mut first, "part-usage")?;
+                        super::CalcDefBodyElement::PartUsage(member) => {
+                            self.write_part_usage_member(&mut first, &member.value)?;
                         }
                     }
                 }
@@ -1976,7 +1976,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 }
                 self.writer.write_str("))")
             }
-            ActionDefBodyElement::PartUsage(_part) => self.writer.write_str("(part-usage)"),
+            ActionDefBodyElement::PartUsage(part) => self.write_part_usage(&part.value),
             ActionDefBodyElement::ItemUsage(item) => self.write_item_usage(&item.value),
             ActionDefBodyElement::AssertConstraint(_constraint) => {
                 self.writer.write_str("(assert-constraint)")
@@ -2221,8 +2221,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::SuccessionUsage(_usage) => {
                             self.write_marker(&mut first, "succession-usage")?;
                         }
-                        ConnectionDefBodyElement::PartUsage(_usage) => {
-                            self.write_marker(&mut first, "part-usage")?;
+                        ConnectionDefBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
                         }
                     }
                 }
@@ -2279,27 +2279,77 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
-    /// A part usage and its body.
+    /// A part usage: its whole `OccurrenceUsagePrefix`, its declaration, and its body.
     ///
+    /// `PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623), so the projection names
+    /// every part of that: the shared prefix through the same
+    /// [`write_occurrence_usage_prefix`](Self::write_occurrence_usage_prefix) the other migrated
+    /// families use, then `Identification`'s short name and declared name, then
+    /// `FeatureSpecializationPart`'s typing, multiplicity and its `ordered`/`nonunique`
+    /// modifiers, subsettings and redefinitions, then `UsageCompletion`'s value and body.
+    ///
+    /// It used to show only the name, the typing and the two multiplicity modifiers, and in ten
+    /// of its thirteen owning scopes not even that -- a bare `(part-usage)` marker -- so a
+    /// snapshot could not tell `ref individual snapshot part p[1..*] :> q = r;` from `part p;`.
     /// `PartUsageBody` and `RefBody` are both `Body<PartUsageBodyElement>`, so the exhaustive
-    /// element match in [`write_ref_body`](Self::write_ref_body) already covers this scope; a
-    /// package-level part usage projected as a bare marker only because nothing called it.
+    /// element match in [`write_ref_body`](Self::write_ref_body) covers the body members.
     fn write_part_usage(&mut self, usage: &super::PartUsage) -> io::Result<()> {
-        self.writer.write_str("(part-usage (declaration-name ")?;
+        self.writer.write_str("(part-usage ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
+        self.writer.write_str(" (declaration-name ")?;
         self.write_usage_declaration_name(&usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, usage.short_name.as_deref())?;
         self.writer.write_str(") (typing ")?;
         if let Some(typing) = &usage.typing {
             self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
         write!(
             self.writer,
-            ") (multiplicity-modifiers (ordered {}) (nonunique {})) ",
+            ") (multiplicity-modifiers (ordered {}) (nonunique {})) (subsets ",
             usage.ordered, usage.nonunique
         )?;
+        if let Some((subsets, value)) = &usage.subsets {
+            self.writer.write_str("(clause ")?;
+            self.write_subsetting(&subsets.value)?;
+            self.writer.write_str(" (value ")?;
+            if let Some(value) = value {
+                self.write_expression(value)?;
+            } else {
+                self.writer.write_str("none")?;
+            }
+            self.writer.write_str("))")?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_str(" (value ")?;
+        if let Some(value) = &usage.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
         self.write_ref_body(&usage.body)?;
         self.writer.write_char(')')
+    }
+
+    /// A part usage at a member position, with the scope's item separator in front of it.
+    ///
+    /// Every scope that owns a `PartUsage` routes through here, so the same syntax projects the
+    /// same way wherever it is written; ten of the thirteen used to write a bare marker instead.
+    fn write_part_usage_member(
+        &mut self,
+        first: &mut bool,
+        usage: &super::PartUsage,
+    ) -> io::Result<()> {
+        self.write_item_prefix(first)?;
+        self.write_part_usage(usage)
     }
 
     fn write_action_usage(&mut self, usage: &super::ActionUsage) -> io::Result<()> {
@@ -2354,8 +2404,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::EnumerationUsage(_member) => {
                             self.write_marker(&mut first, "enumeration-usage")?;
                         }
-                        super::PartUsageBodyElement::PartUsage(_member) => {
-                            self.write_marker(&mut first, "part-usage")?;
+                        super::PartUsageBodyElement::PartUsage(member) => {
+                            self.write_part_usage_member(&mut first, &member.value)?;
                         }
                         super::PartUsageBodyElement::OccurrenceUsage(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -2902,8 +2952,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PerformBodyElement::Action(_action) => {
                             self.write_marker(&mut first, "action")?;
                         }
-                        PerformBodyElement::PartUsage(_usage) => {
-                            self.write_marker(&mut first, "part-usage")?;
+                        PerformBodyElement::PartUsage(usage) => {
+                            self.write_part_usage_member(&mut first, &usage.value)?;
                         }
                         PerformBodyElement::ItemUsage(usage) => {
                             self.write_item_usage_member(&mut first, &usage.value)?;

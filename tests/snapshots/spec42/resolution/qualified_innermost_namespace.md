@@ -42,6 +42,6 @@ package C {
   (references
     (reference r0 (scope relative) (span (offset 97) (line 8) (column 14) (len 4)) (segments (segment 0 (token "A") (name "A") (separator none) (span (offset 97) (line 8) (column 14) (len 1))) (segment 1 (token "T") (name "T") (separator colon-colon) (span (offset 100) (line 8) (column 17) (len 1)))))
   )
-  (root (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (package (name "C") (body brace (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (part-usage (declaration-name "p") (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity-modifiers (ordered false) (nonunique false)) (body semicolon)))))
+  (root (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (package (name "C") (body brace (package (name "A") (body brace (part-def (name "T") (body semicolon)))) (part-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "p") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines none) (value none) (body semicolon)))))
 )
 ~~~
