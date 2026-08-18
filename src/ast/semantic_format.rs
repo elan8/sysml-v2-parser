@@ -3868,18 +3868,35 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// A port usage, projected from its pinned production
+    /// (`PortUsage = OccurrenceUsagePrefix 'port' Usage`, SysML BNF 645).
+    ///
+    /// The prefix comes first, exactly as `write_part_usage` shows it, then `Identification`'s
+    /// short name and declared name, then `FeatureSpecializationPart`'s typing, multiplicity and
+    /// its `ordered`/`nonunique` modifiers, the specialization clauses, and finally
+    /// `UsageCompletion`'s value and body. It used to show only the name, the direction and the
+    /// clauses, with the body reduced to an element count, so a snapshot could not tell
+    /// `individual derived port p;` from `port p;` nor see a single member of a port body.
     fn write_port_usage(&mut self, usage: &super::PortUsage) -> io::Result<()> {
-        self.writer.write_str("(port-usage (declaration-name ")?;
+        self.writer.write_str("(port-usage ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
+        self.writer.write_str(" (declaration-name ")?;
         self.write_usage_declaration_name(&usage.name)?;
-        self.writer.write_str(") (direction ")?;
-        self.write_direction(usage.direction)?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, usage.short_name.as_deref())?;
         self.writer.write_str(") (typing ")?;
         if let Some(typing) = &usage.typing {
             self.write_typing(&typing.value)?;
         } else {
             self.writer.write_str("none")?;
         }
-        self.writer.write_str(") (subsets ")?;
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        write!(
+            self.writer,
+            ") (multiplicity-modifiers (ordered {}) (nonunique {})) (subsets ",
+            usage.ordered, usage.nonunique
+        )?;
         if let Some((subsets, value)) = &usage.subsets {
             self.writer.write_str("(clause ")?;
             self.write_subsetting(&subsets.value)?;
@@ -3907,14 +3924,62 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         } else {
             self.writer.write_str("none")?;
         }
-        self.writer.write_str(") (body ")?;
-        match &usage.body {
-            super::PortBody::Semicolon { .. } => self.writer.write_str("semicolon")?,
+        self.writer.write_str(") ")?;
+        self.write_port_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// A port usage at a member position, with the scope's item separator in front of it.
+    ///
+    /// Every scope that owns a `PortUsage` routes through here, so the same syntax projects the
+    /// same way wherever it is written; three of the nine used to write a bare marker instead.
+    fn write_port_usage_member(
+        &mut self,
+        first: &mut bool,
+        usage: &super::PortUsage,
+    ) -> io::Result<()> {
+        self.write_item_prefix(first)?;
+        self.write_port_usage(usage)
+    }
+
+    /// The members of a port usage body, which used to project as an element count.
+    fn write_port_body(&mut self, body: &super::PortBody) -> io::Result<()> {
+        match body {
+            super::PortBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
             super::PortBody::Brace { elements, .. } => {
-                write!(self.writer, "brace (element-count {})", elements.len())?;
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::PortBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::PortBodyElement::InOutDecl(_declaration) => {
+                            self.write_marker(&mut first, "in-out-declaration")?;
+                        }
+                        super::PortBodyElement::PortUsage(usage) => {
+                            self.write_port_usage_member(&mut first, &usage.value)?;
+                        }
+                        super::PortBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::PortBodyElement::AttributeUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_attribute_usage(&usage.value)?;
+                        }
+                        super::PortBodyElement::ItemUsage(usage) => {
+                            self.write_item_usage_member(&mut first, &usage.value)?;
+                        }
+                        super::PortBodyElement::RefDecl(declaration) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_ref_declaration(&declaration.value)?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
             }
         }
-        self.writer.write_str("))")
     }
 
     fn write_port_definition(&mut self, definition: &super::PortDef) -> io::Result<()> {

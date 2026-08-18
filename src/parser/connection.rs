@@ -13,7 +13,7 @@ use crate::parser::occurrence_body::{
     assert_constraint_member, occurrence_usage, succession_usage,
 };
 use crate::parser::part::part_usage;
-use crate::parser::port::{port_def_required, port_usage};
+use crate::parser::port::{port_def, port_usage};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -75,8 +75,10 @@ fn connection_def_body_element(
         map(attribute_usage, ConnectionDefBodyElement::AttributeUsage),
         map(item_def_required, ConnectionDefBodyElement::ItemDef),
         map(item_usage, ConnectionDefBodyElement::ItemUsage),
-        map(port_def_required, ConnectionDefBodyElement::PortDef),
-        map(port_usage, ConnectionDefBodyElement::PortUsage),
+        map(port_def, ConnectionDefBodyElement::PortDef),
+        map(port_usage, |p| {
+            ConnectionDefBodyElement::PortUsage(Box::new(p))
+        }),
         // GH-51: real Systems/Domain Library connection defs use these member kinds too --
         // see `ConnectionDefBodyElement`'s doc comment for the exact real-usage citations.
         map(

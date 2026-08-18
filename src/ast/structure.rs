@@ -96,7 +96,7 @@ pub enum PartDefBodyElement {
     ItemDef(Node<ItemDef>),
     ItemUsage(Node<ItemUsage>),
     Ref(Node<RefDecl>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     PartUsage(Box<Node<PartUsage>>),
     PartDef(Node<PartDef>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
@@ -162,7 +162,7 @@ pub enum PartDefBodyElement {
     /// `connection def` nested inside a part definition body (PAR-002: previously only
     /// `ConnectionUsageMember`, a usage shape, was reachable here).
     ConnectionDef(Node<ConnectionDef>),
-    /// `port def` nested inside a part definition body, using `port_def_required` (PAR-002:
+    /// `port def` nested inside a part definition body, using `port_def` (PAR-002:
     /// previously only `PortUsage` was reachable here).
     PortDef(Node<PortDef>),
     /// `calc def` nested inside a part definition body, using `calc_def_required` (PAR-002:
@@ -674,7 +674,7 @@ pub enum PartUsageBodyElement {
     EnumerationUsage(Node<EnumerationUsage>),
     PartUsage(Box<Node<PartUsage>>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     Bind(Node<Bind>),
     /// `ref` name `:` type body (reference binding in part usage).
     Ref(Node<RefDecl>),
@@ -708,7 +708,7 @@ pub enum PartUsageBodyElement {
     RequirementDef(Node<crate::ast::requirement::RequirementDef>),
     /// `occurrence def` nested inside a part usage body. See `StateDef`.
     OccurrenceDef(Node<OccurrenceDef>),
-    /// `port def` nested inside a part usage body, using `port_def_required`. See `StateDef`.
+    /// `port def` nested inside a part usage body, using `port_def`. See `StateDef`.
     PortDef(Node<PortDef>),
     /// `calc def` nested inside a part usage body, using `calc_def_required`. See `StateDef`.
     CalcDef(Node<crate::ast::view::CalcDef>),
@@ -1069,7 +1069,7 @@ pub struct PortDef {
     pub body: PortDefBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
     /// [`crate::ast::MembershipKind::OwningMembership`]. Like `PartDef`, `port_def`/
-    /// `port_def_required` did not previously accept a visibility prefix at all (BNF
+    /// `port_def` did not previously accept a visibility prefix at all (BNF
     /// `DefinitionMember : OwningMembership = MemberPrefix ownedRelatedElement +=
     /// DefinitionElement` legally allows one before any definition) -- confirmed as a genuine
     /// parsing gap the same way as `PartDef::membership`. See `port::parse_port_def`.
@@ -1098,7 +1098,7 @@ pub enum PortDefBodyElement {
     ItemUsage(Node<ItemUsage>),
     /// Enumeration usage nested inside a port definition body (PAR-002 widening).
     EnumerationUsage(Node<EnumerationUsage>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     /// `#keyword` metadata tag nested inside a port definition body, either the bare form or the
     /// `PrefixMetadataMember`-style form prefixing the next port-body member (e.g. `#idd port
     /// APIS_HTTP { ... }`) -- previously port definition bodies had no `#`/`@` annotation support
@@ -1115,24 +1115,28 @@ pub enum PortDefBodyElement {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortUsage {
-    /// Direction prefix when parsed as `in`/`out`/`inout port ...` (BNF `RefPrefix`, reachable
-    /// through `OccurrenceUsagePrefix` -> `BasicUsagePrefix` -> `RefPrefix`).
-    pub direction: Option<InOut>,
-    /// Leading `abstract` keyword (Systems Library e.g. `abstract port ownedPorts`).
-    pub is_abstract: bool,
-    /// `derived` keyword from `RefPrefix`. See `AttributeUsage::is_derived`.
-    pub is_derived: bool,
-    /// `constant` keyword from `RefPrefix`. See `AttributeUsage::is_constant`.
-    pub is_constant: bool,
-    /// `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual port po1;`
-    /// (gap #7). Mirrors `ItemUsage::is_individual`/`ActionUsage::is_individual`.
-    pub is_individual: bool,
+    /// `PortUsage = OccurrenceUsagePrefix 'port' Usage` (SysML BNF 645): the whole shared prefix,
+    /// in the one order the production allows, each slot carrying the authored keyword's span.
+    ///
+    /// Replaced five spanless fields -- `direction`, `is_abstract`, `is_derived`, `is_constant`,
+    /// `is_individual` -- that between them represented neither `variation`, `ref`, a
+    /// `PortionKind` nor a `UsageExtensionKeyword`, and were parsed and emitted in two different
+    /// orders, neither of them the grammar's. See `planning/port-usage-prefix-matrix.md`.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
     pub name: String,
     /// Short name from `< ... >` when present. See `AttributeUsage::short_name`.
     pub short_name: Option<String>,
     /// Structured, multi-target typing clause after `:` / `typed by` / `defined by`.
     pub typing: Option<Node<TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `MultiplicityPart`'s `isOrdered ?= 'ordered'` (BNF §8.2.2.6.2), e.g. `port ports :
+    /// Port[0..*] nonunique ordered;`. Reachable through `Usage -> UsageDeclaration ->
+    /// FeatureSpecializationPart -> MultiplicityPart`, like `PartUsage::ordered`.
+    pub ordered: bool,
+    /// `MultiplicityPart`'s `isNonunique ?= 'nonunique'`; see [`PortUsage::ordered`]. Written on
+    /// the keyword-less package-scope declarations of `Systems Library/Ports.sysml`, which the
+    /// `def`-optional port-definition parser used to claim and discard.
+    pub nonunique: bool,
     /// Subsets feature and optional value expression.
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
     pub redefines: Option<Node<SubsettingRelationship>>,
@@ -1161,15 +1165,13 @@ pub struct PortUsage {
 
 impl PartialEq for PortUsage {
     fn eq(&self, other: &Self) -> bool {
-        self.direction == other.direction
-            && self.is_abstract == other.is_abstract
-            && self.is_derived == other.is_derived
-            && self.is_constant == other.is_constant
-            && self.is_individual == other.is_individual
+        self.prefix == other.prefix
             && self.name == other.name
             && self.short_name == other.short_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
+            && self.ordered == other.ordered
+            && self.nonunique == other.nonunique
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.references == other.references
@@ -1191,7 +1193,7 @@ pub type PortBody = Body<PortBodyElement>;
 pub enum PortBodyElement {
     Error(Node<ParseErrorNode>),
     InOutDecl(Node<InOutDecl>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     /// Attribute usage nested inside a port usage body (PAR-002 widening; this enum previously
@@ -1199,6 +1201,16 @@ pub enum PortBodyElement {
     AttributeUsage(Node<AttributeUsage>),
     /// Item usage nested inside a port usage body. See `AttributeUsage`.
     ItemUsage(Node<ItemUsage>),
+    /// `ref`-prefixed feature declaration, e.g. `protected ref thisParticipant :>> self;` and
+    /// `protected ref otherParticipants : Port[1..*] nonunique :> interfacingPorts default …;`
+    /// (Systems Library `Interfaces.sysml:52-54`, inside `ref port :>> participant : Port [2..*]
+    /// nonunique ordered { … }`).
+    ///
+    /// `UsageBody = DefinitionBody`, so a port usage body owns the same `ref` member a port
+    /// *definition* body already models as [`PortDefBodyElement::RefDecl`]; this scope carried no
+    /// `ref` member at all, which only became reachable when `port_usage` started claiming the
+    /// `ref port …` declarations that own these bodies.
+    RefDecl(Node<RefDecl>),
 }
 
 /// Connect statement in interface def or usage: `connect` from `to` to body, or the SysML v2
@@ -1266,9 +1278,9 @@ pub enum InterfaceDefBodyElement {
     /// `item def`, using `item_def_required`. See `AttributeDef`.
     ItemDef(Node<ItemDef>),
     ItemUsage(Node<ItemUsage>),
-    /// `port def`, using `port_def_required`. See `AttributeDef`.
+    /// `port def`, using `port_def`. See `AttributeDef`.
     PortDef(Node<PortDef>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     /// GH-85: bare `flow <a> to <b>;` shorthand connecting two of this interface's own ends, e.g.
     /// `flow p1.torque to p2.torque;` (OMG spec Annex `Vehicle Example/SysML v2 Spec Annex A
     /// SimpleVehicleModel.sysml`). Previously unmodeled -- this body had no flow arm at all.
@@ -1575,9 +1587,9 @@ pub enum ConnectionDefBodyElement {
     /// `item def`, using `item_def_required`. See `AttributeDef`.
     ItemDef(Node<ItemDef>),
     ItemUsage(Node<ItemUsage>),
-    /// `port def`, using `port_def_required`. See `AttributeDef`.
+    /// `port def`, using `port_def`. See `AttributeDef`.
     PortDef(Node<PortDef>),
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     /// GH-51: real Systems/Domain Library connection defs own `assert constraint`
     /// (`Cause and Effect/CausationConnections.sysml`, `Requirement Derivation/
     /// DerivationConnections.sysml`) and `occurrence` usages with `abstract`/`constant`/`ref`

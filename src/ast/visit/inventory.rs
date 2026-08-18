@@ -3454,14 +3454,8 @@ macro_rules! ast_traversal {
         pub fn walk_port_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<PortUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let PortUsage { direction, is_abstract, is_derived, is_constant, is_individual, name, short_name, typing, multiplicity, subsets, redefines, references, crosses, intersects, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
-            if let Some(inner) = direction {
-                visitor.visit_in_out_value(inner);
-            }
-            let _ = is_abstract;
-            let _ = is_derived;
-            let _ = is_constant;
-            let _ = is_individual;
+            let PortUsage { prefix, name, short_name, typing, multiplicity, ordered, nonunique, subsets, redefines, references, crosses, intersects, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
             visitor.visit_text(name);
             if let Some(inner) = short_name {
                 visitor.visit_text(inner);
@@ -3472,6 +3466,8 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            let _ = ordered;
+            let _ = nonunique;
             if let Some(inner) = subsets {
                 let (tuple_0, tuple_1) = inner;
                 visitor.visit_subsetting_relationship(tuple_0);
@@ -3543,6 +3539,9 @@ macro_rules! ast_traversal {
                 }
                 PortBodyElement::ItemUsage(field_0) => {
                     visitor.visit_item_usage(field_0);
+                }
+                PortBodyElement::RefDecl(field_0) => {
+                    visitor.visit_ref_decl(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);

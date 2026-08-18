@@ -773,6 +773,7 @@ fn walk_port_body(report: &mut OpacityReport, path: &str, body: &PortBody) {
         match &element.value {
             PortBodyElement::Error(_) => hit(report, &p, OpacityKind::ParseError),
             PortBodyElement::PortUsage(n) => walk_port_body(report, &p, &n.value.body),
+            PortBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
             PortBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortBodyElement::ItemUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PortBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),

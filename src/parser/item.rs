@@ -16,7 +16,7 @@ use nom::Parser;
 /// Item definition: `item def` Identification body. `def` is mandatory here (unlike some sibling
 /// `*_def` parsers) so a bodyless `individual item i1;` short usage form is never misclassified
 /// as an `ItemDef` with `i1` as the definition's identification name -- see the package-level
-/// dispatch site in `package.rs` (gap #7) and `port_def_required`/`connection_def`'s analogous
+/// dispatch site in `package.rs` (gap #7) and `port_def`/`connection_def`'s analogous
 /// `_required` naming.
 pub(crate) fn item_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<ItemDef>> {
     let start = input;
