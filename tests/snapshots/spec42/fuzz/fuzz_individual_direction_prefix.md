@@ -11,7 +11,6 @@ in individual it;
 (fixture-diagnostics
   (document "fuzz_individual_direction_prefix.md"
     (diagnostics
-      (diagnostic (code "expected_keyword") (severity error) (category parseerror) (span (offset 0) (line 1) (column 1) (len 17)) (message "expected a specific keyword or punctuation token"))
     )
   )
 )
@@ -25,6 +24,6 @@ in individual it;
 (parsed-document
   (references
   )
-  (root (malformed (code "expected_keyword") (found "in individual it;") (span (offset 0) (line 1) (column 1) (len 17))))
+  (root (occurrence (prefix (direction in) (derived false) (variance none) (constant false) (reference false) (individual true) (portion none) (extensions)) (declaration "it") (short-name none) (target none)))
 )
 ~~~

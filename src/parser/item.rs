@@ -1,14 +1,13 @@
 //! Item definition and usage parsing.
 
 use crate::ast::{ItemDef, ItemUsage, Node};
-use crate::parser::attribute::{attribute_body, direction_prefix};
+use crate::parser::attribute::attribute_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, short_name_prefix, ws1, ws_and_comments};
+use crate::parser::lex::{name, short_name_prefix, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::usage::multiplicity_node;
 use crate::parser::Input;
-use nom::bytes::complete::tag;
 use nom::combinator::opt;
 use nom::sequence::preceded;
 use nom::IResult;
@@ -48,23 +47,25 @@ pub(crate) fn item_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<Ite
 
 /// Item usage in a part definition body: `item` (name | `:>>` redefines)? multiplicity? (`:`
 /// type)? (`=` value)? body.
+/// `ItemUsage = OccurrenceUsagePrefix 'item' Usage` (SysML BNF 616).
+///
+/// Wrapped in a reference transaction because the prefix's `UsageExtensionKeyword*` allocates an
+/// arena entry per `#tag` before the production is known to apply.
 pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
+    crate::parser::span::reference_transaction(input, item_usage_inner)
+}
+
+fn item_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `MemberPrefix` precedes the usage's own prefix.
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    // BNF `RefPrefix = 'derived'? ('abstract' | 'variation')? 'constant'?`, e.g. the package-level
-    // `abstract item items : Item[0..*] nonunique :> objects { ... }` (Systems Library
-    // `Items.sysml`) and `derived item ownedActorParameter : PartUsage[1..1] redefines
-    // ownedMemberParameter subsets Metadata::metadataItems;` (`sysml.library/Systems
-    // Library/SysML.sysml:28`). Only `abstract` was accepted before, so the `derived` form fell
-    // through to unsupported-grammar capture. `ref item` stays with `connector::ref_decl`, which
-    // owns the `ref` kind-keyword forms.
-    let (input, prefix) = crate::parser::usage::ref_prefix(input)?;
-    // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1), e.g. `individual
-    // item ii : II1;` (Simple Tests/IndividualTest.sysml:4).
-    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"item"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // The whole shared `OccurrenceUsagePrefix`, not a hand-rolled subset: this parser previously
+    // accepted `RefPrefix` plus `individual` and nothing else, so `ref individual item :>> driver
+    // : Alice;` (`training/28. Individuals/Individuals and Time Slices.sysml:10`) was refused
+    // here and misread as an occurrence usage named `item`.
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
+    let (input, _) = crate::parser::occurrence_prefix::keyword_token(input, b"item")?;
     // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2) -- see
     // `attribute::attribute_usage`'s identical short-name handling for the confirmed real-usage
     // citation (the same `VehicleGeometryAndCoordinateFrames.sysml` example this function's
@@ -94,9 +95,7 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
             start,
             input,
             ItemUsage {
-                is_derived: prefix.is_derived,
-                usage_prefix: prefix.usage_prefix,
-                is_constant: prefix.is_constant,
+                prefix,
                 name,
                 short_name,
                 type_name: header.type_reference,
@@ -107,22 +106,10 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
                 nonunique: header.nonunique,
                 value,
                 body,
-                direction: prefix.direction,
-                is_individual: is_individual.is_some(),
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },
         ),
     ))
-}
-
-/// `in`/`out`/`inout item` usage (port def bodies): direction + [`item_usage`].
-pub(crate) fn directed_item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, direction) = direction_prefix(input)?;
-    let (input, mut usage) = item_usage(input)?;
-    usage.value.direction = Some(direction);
-    Ok((input, node_from_to(start, input, usage.value)))
 }
 
 #[cfg(test)]

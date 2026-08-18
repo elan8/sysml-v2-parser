@@ -43,7 +43,6 @@ package 'Conditional Succession Example-1' {
   (document "16_conditional_succession_example_1.md"
     (diagnostics
       (diagnostic (code "missing_semicolon") (severity error) (category parseerror) (span (offset 508) (line 21) (column 3) (len 62)) (message "missing semicolon before next declaration"))
-      (diagnostic (code "recovered_action_body_element") (severity error) (category parseerror) (span (offset 637) (line 27) (column 4) (len 13)) (message "unexpected token in action body"))
     )
   )
 )

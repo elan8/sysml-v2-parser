@@ -43,6 +43,16 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"flow",
     b"import",
     b"individual",
+    // The rest of FIRST(`OccurrenceUsagePrefix`) -- see
+    // `planning/occurrence-usage-prefix-matrix.md` §4. `abstract`, `individual`, `ref`,
+    // `snapshot`, `timeslice` and `variation` were already listed; these five were not, so a
+    // malformed member before `in individual :>> v : V;` or `derived occurrence o;` scanned past
+    // the prefix and consumed the whole usage.
+    b"constant",
+    b"derived",
+    b"in",
+    b"inout",
+    b"out",
     b"message",
     b"interface",
     b"item",
@@ -115,6 +125,19 @@ pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"require",
     b"requirement",
     b"satisfy",
+    // FIRST(`OccurrenceUsagePrefix`), which a `SatisfyRequirementUsage` in this scope now spells
+    // ahead of `assert`/`not`/`satisfy` -- see `planning/occurrence-usage-prefix-matrix.md` §4.
+    // `#` and `ref` were already listed.
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"in",
+    b"individual",
+    b"inout",
+    b"out",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
     b"subject",
     b"actor",
     b"stakeholder",
@@ -240,10 +263,43 @@ pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"ref",
     b"satisfy",
     b"abstract",
+    // FIRST(`OccurrenceUsagePrefix`) on the satisfy usage this scope dispatches; `abstract`,
+    // `ref` and the three satisfy keywords were already listed. See
+    // `planning/occurrence-usage-prefix-matrix.md` §4.
+    b"#",
+    b"constant",
+    b"derived",
+    b"in",
+    b"individual",
+    b"inout",
+    b"out",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
 pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] = &[
-    b"assert", b"doc", b"expose", b"filter", b"not", b"render", b"satisfy",
+    b"assert",
+    b"doc",
+    b"expose",
+    b"filter",
+    b"not",
+    b"render",
+    b"satisfy",
+    // FIRST(`OccurrenceUsagePrefix`) on the satisfy usage this scope dispatches. See
+    // `planning/occurrence-usage-prefix-matrix.md` §4.
+    b"#",
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"in",
+    b"individual",
+    b"inout",
+    b"out",
+    b"ref",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
 pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[b"connect", b"end", b"ref", b"doc"];

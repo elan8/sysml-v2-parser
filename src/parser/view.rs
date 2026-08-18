@@ -28,6 +28,15 @@ const VIEW_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+        if let Ok((next, usage)) = crate::parser::requirement::satisfy(input) {
+            let elem = ViewDefBodyElement::Satisfy(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,

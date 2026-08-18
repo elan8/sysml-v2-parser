@@ -65,6 +65,14 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 
 **Current AST caveat:** `attribute_usage` accepts extra specialization clauses for grammar coverage, but the existing public `AttributeUsage` AST only stores `typing` and `redefines`. `occurrence_usage` stores `type_name`, `subsets`, and `redefines`, using last-wins behavior for multiple clauses. Structured AST fidelity for `references` / `crosses` and richer body members remains a later tranche.
 
+### 7. Usage *prefixes* — one shared component, three families migrated
+
+[`src/parser/occurrence_prefix.rs`](../src/parser/occurrence_prefix.rs) and [`src/ast/occurrence_prefix.rs`](../src/ast/occurrence_prefix.rs) own the pinned `OccurrenceUsagePrefix` and the two productions it nests (`BasicUsagePrefix`, `RefPrefix`). Before it, the prefix was respelled per family: five parsers in `occurrence_body.rs` alone, each accepting a different subset in a different order, and the AST recorded it as independent booleans with no authored span — `derived`, `variation` and `UsageExtensionKeyword*` were not represented at all, and `abstract`/`variation`, `in`/`out`/`inout`, `snapshot`/`timeslice` could each be held in impossible combinations.
+
+`OccurrenceUsage`, `ItemUsage` and `SatisfyRequirementUsage` carry the shared component; every other family still carries whatever partial prefix fields it had. The audit, the corpus evidence, the per-family migration status and the continuation path are [`planning/occurrence-usage-prefix-matrix.md`](../planning/occurrence-usage-prefix-matrix.md) — that file, not this one, is where a family's status lives.
+
+Two neighbouring productions are deliberately **not** this one and must not reuse the whole component: `UsagePrefix` admits `end` and no `individual`/`PortionKind`, and `ControlNodePrefix` admits no `ref`. The nesting exists so each of them can later reuse the exact sub-component its production names.
+
 ## What is not wasteful duplication
 
 | Pattern | Why it stays |

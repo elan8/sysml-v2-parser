@@ -132,6 +132,10 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Import Tests/CircularImport.sysml",
     "Import Tests/PrivateImportTest.sysml",
     "Import Tests/QualifiedNameImportTest.sysml",
+    // Promoted by the shared `OccurrenceUsagePrefix` seam: `timeslice item … [*] : UnitedStates`
+    // was a recovery node because a portion usage could not carry the `item` kind keyword, and
+    // the surviving members' clause order and indentation did not survive re-emission.
+    "Individuals Examples/JohnIndividualExample.sysml",
     "Interaction Sequencing Examples/ServerSequenceModel.sysml",
     // Promoted by the KerML declaration-grammar work: the anonymous `:>> target = expr;`
     // binding and RefDecl kind-keyword retention fixed these fixtures' reparse.
@@ -167,6 +171,10 @@ const EXAMPLES_ROUNDTRIP_PASS: &[&str] = &[
     "Simple Tests/IndividualTest.sysml",
     // Promoted by the KerML declaration-grammar work (see ServerSequenceModelOutside above).
     "Simple Tests/ItemTest.sysml",
+    // Promoted by the shared `OccurrenceUsagePrefix` seam: `individual snapshot s : Ind;` and
+    // `individual timeslice t3 :> ind;` are `PortionUsage`'s `('individual')? PortionKind` slots,
+    // which no portion parser accepted before.
+    "Simple Tests/OccurrenceTest.sysml",
     "Simple Tests/MultiplicityTest.sysml",
     "Simple Tests/ParameterTest.sysml",
     "Simple Tests/RootPackageTest.sysml",

@@ -2,7 +2,7 @@ use super::body::{connection_usage_member, exhibit_state};
 use super::prelude::*;
 use crate::parser::attribute::directed_attribute_usage;
 use crate::parser::feature_value_part as usage_value_part;
-use crate::parser::item::directed_item_usage;
+use crate::parser::item::item_usage;
 
 fn usage_ordered_modifier(input: Input<'_>) -> IResult<Input<'_>, (bool, bool)> {
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
@@ -464,9 +464,7 @@ fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBody
         // duplicating the grammar here. Placed before `variant`/`action` so simple `in name =`
         // bindings still win via `perform_in_out_binding` above.
         map(part_usage, |p| PerformBodyElement::PartUsage(Box::new(p))),
-        map(directed_item_usage, |i| {
-            PerformBodyElement::ItemUsage(Box::new(i))
-        }),
+        map(item_usage, |i| PerformBodyElement::ItemUsage(Box::new(i))),
         map(directed_attribute_usage, |a| {
             PerformBodyElement::AttributeUsage(Box::new(a))
         }),
@@ -1377,6 +1375,23 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             ));
         }
     }
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = occurrence_usage(start) {
+            let elem = PartUsageBodyElement::OccurrenceUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = satisfy(start) {
+            let elem = PartUsageBodyElement::Satisfy(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = item_usage(start) {
+            let elem = PartUsageBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let frag = start.fragment();
     let first_30 = frag.get(..30.min(frag.len())).unwrap_or(frag);
     log::debug!(
@@ -1444,18 +1459,6 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 map(enum_usage, PartUsageBodyElement::EnumerationUsage),
                 map(part_usage, |p| PartUsageBodyElement::PartUsage(Box::new(p))),
             )),
-            map(individual_usage, |n| {
-                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(snapshot_usage, |n| {
-                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(timeslice_usage, |n| {
-                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(then_timeslice_usage, |n| {
-                PartUsageBodyElement::OccurrenceUsage(Box::new(n))
-            }),
             map(occurrence_usage, |n| {
                 PartUsageBodyElement::OccurrenceUsage(Box::new(n))
             }),

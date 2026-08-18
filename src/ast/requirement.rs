@@ -1,9 +1,8 @@
-use super::behavior::{AssignStmt, ForLoop, InOut, ThenAction};
+use super::behavior::{AssignStmt, ForLoop, ThenAction};
 use super::body::Body;
 use super::common::{AnnotatingMember, Identification, Import, ParseErrorNode, Visibility};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
-use super::structure::DefinitionPrefix;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
     AttributeBody, AttributeDef, AttributeUsage, MetadataKeywordUsage, VariantUsage,
@@ -220,6 +219,21 @@ pub struct VerifyRequirementMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SatisfyRequirementUsage {
+    /// The production's own first element: `OccurrenceUsagePrefix`.
+    ///
+    /// The shared component, not a satisfy-local one -- every `OccurrenceUsageElement` spells the
+    /// same prefix, and `planning/occurrence-usage-prefix-matrix.md` records which families now
+    /// use it. It precedes `assert`, so its spans all sit before
+    /// [`assert_span`](Self::assert_span).
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
+    /// `MemberPrefix`'s `visibility = VisibilityIndicator`, from
+    /// `BehaviorUsageMember : FeatureMembership = MemberPrefix ownedRelatedElement +=
+    /// BehaviorUsageElement`.
+    ///
+    /// The visibility keyword belongs to the *membership*, not to the usage, so it is a separate
+    /// field rather than a slot of [`prefix`](Self::prefix) -- and it precedes the prefix in the
+    /// source. `kind` is always [`crate::ast::MembershipKind::FeatureMembership`].
+    pub membership: Membership,
     /// Exact `assert` keyword token, or `None` when the author omitted it.
     ///
     /// Presence is a grammatical fact emission reproduces, so it is a span rather than a flag:
@@ -360,17 +374,17 @@ pub struct RequirementUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemUsage {
-    /// `derived` from BNF `RefPrefix`, e.g. `derived item ownedActorParameter : PartUsage[1..1]
-    /// redefines ownedMemberParameter subsets Metadata::metadataItems;` (`sysml.library/Systems
-    /// Library/SysML.sysml:28`).
-    pub is_derived: bool,
-    /// `abstract` or `variation` from `RefPrefix` -- alternatives there, so one field, matching
-    /// [`crate::ast::AttributeUsage::usage_prefix`]. E.g. the package-level `abstract item items :
-    /// Item[0..*] nonunique :> objects { ... }` (Systems Library `Items.sysml`). Was a bare
-    /// `is_abstract` flag, which could not represent the `variation` alternative at all.
-    pub usage_prefix: Option<DefinitionPrefix>,
-    /// `constant` from `RefPrefix`. See [`crate::ast::AttributeUsage::is_constant`].
-    pub is_constant: bool,
+    /// The complete `OccurrenceUsagePrefix` this usage was written with
+    /// (`ItemUsage = OccurrenceUsagePrefix 'item' Usage`, SysML BNF 616).
+    ///
+    /// The same shared component `OccurrenceUsage` and `SatisfyRequirementUsage` carry; see
+    /// `planning/occurrence-usage-prefix-matrix.md`. It replaced five independent fields
+    /// (`is_derived`, `usage_prefix`, `is_constant`, `direction`, `is_individual`) that between
+    /// them kept no authored span and represented neither `ref` nor a `PortionKind` nor a
+    /// `UsageExtensionKeyword`, so `ref individual item :>> driver : Alice;` (`training/28.
+    /// Individuals/Individuals and Time Slices.sysml:10`) was read as an occurrence usage
+    /// *named* `item` and re-emitted as one.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
     /// Empty for the anonymous redefinition form (`item :>> shape : Cylinder { ... }`), matching
     /// `PartUsage::name`'s existing convention.
     pub name: String,
@@ -395,11 +409,6 @@ pub struct ItemUsage {
     /// Value expression (`= expr`, `default = expr`, `:= expr`), e.g. `new Box(...)`.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,
-    /// Set when parsed as `in`/`out`/`inout item` in port def bodies.
-    pub direction: Option<InOut>,
-    /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual
-    /// item ii : II1;` (`Simple Tests/IndividualTest.sysml:4`).
-    pub is_individual: bool,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
     /// [`crate::ast::MembershipKind::FeatureMembership`]. See
     /// [`crate::ast::PortDef::membership`] for the same "genuine new grammar coverage, not just

@@ -33,9 +33,7 @@ use crate::parser::lex::{
 };
 use crate::parser::metadata::{metadata_def, metadata_usage};
 use crate::parser::node_from_to;
-use crate::parser::occurrence::{
-    individual_usage, occurrence_def, occurrence_usage, snapshot_usage, timeslice_usage,
-};
+use crate::parser::occurrence::{occurrence_def, occurrence_usage};
 use crate::parser::part::{interface_usage, part_def_or_usage, PartDefOrUsage};
 use crate::parser::port::{port_def, port_usage};
 use crate::parser::requirement::{
@@ -1652,24 +1650,6 @@ fn try_package_body_structure<'a>(
     try_package_body_dispatch!(
         input,
         start,
-        individual_usage,
-        PackageBodyElement::OccurrenceUsage
-    );
-    try_package_body_dispatch!(
-        input,
-        start,
-        snapshot_usage,
-        PackageBodyElement::OccurrenceUsage
-    );
-    try_package_body_dispatch!(
-        input,
-        start,
-        timeslice_usage,
-        PackageBodyElement::OccurrenceUsage
-    );
-    try_package_body_dispatch!(
-        input,
-        start,
         starter,
         Allocation,
         allocation_def,
@@ -1899,6 +1879,21 @@ fn try_package_body_requirement<'a>(
         satisfy,
         |n| PackageBodyElement::Satisfy(Box::new(n))
     );
+    // A prefixed satisfy usage leads with an `OccurrenceUsagePrefix` token, and the starter table
+    // maps each of those to a prefix production (`#`, `abstract`/`variation`, `individual`, the
+    // `UsagePrefix` keywords) or -- for `snapshot`/`timeslice` -- to `Occurrence`, never to this
+    // one. The two guarded attempts above are therefore skipped for exactly the spellings the
+    // prefix seam added, so attempt it again for those starters; the parse fails immediately
+    // unless `satisfy` really follows the prefix, and the transaction rolls the arena back when
+    // it does not.
+    if starter.is_some_and(|production| {
+        production.is_prefix()
+            || production == crate::parser::grammar_scope::PackageProduction::Occurrence
+    }) {
+        try_package_body_dispatch!(input, start, satisfy, |n| PackageBodyElement::Satisfy(
+            Box::new(n)
+        ));
+    }
     try_package_body_dispatch!(
         input,
         start,

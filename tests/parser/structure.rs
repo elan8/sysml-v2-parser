@@ -2388,7 +2388,15 @@ port def DebrisPort {
     let result = parse(input).expect("directed item inout should parse");
     let item = port_def_body_item_usage(&result, 0, 0);
     assert_eq!(item.name, "debris");
-    assert_eq!(item.direction, Some(sysml_v2_parser::ast::InOut::InOut));
+    assert_eq!(
+        item.prefix
+            .basic
+            .ref_prefix
+            .direction
+            .as_ref()
+            .map(|node| node.value),
+        Some(sysml_v2_parser::ast::InOut::InOut)
+    );
     match &item.body {
         sysml_v2_parser::ast::AttributeBody::Brace { elements, .. } => {
             assert_eq!(elements.len(), 2);

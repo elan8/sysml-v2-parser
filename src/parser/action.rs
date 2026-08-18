@@ -724,6 +724,15 @@ pub(crate) fn action_def_body_element(
 
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
+    // `metadata_keyword_prefix` below would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
+            let elem = ActionDefBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = nom::branch::alt((
         map(assign_stmt, ActionDefBodyElement::Assign),
         map(for_loop, ActionDefBodyElement::ForLoop),
@@ -802,10 +811,6 @@ pub(crate) fn action_def_body_element(
                     ActionDefBodyElement::PartUsage(Box::new(p))
                 }),
                 map(
-                    crate::parser::item::directed_item_usage,
-                    ActionDefBodyElement::ItemUsage,
-                ),
-                map(
                     crate::parser::item::item_usage,
                     ActionDefBodyElement::ItemUsage,
                 ),
@@ -813,15 +818,6 @@ pub(crate) fn action_def_body_element(
                     crate::parser::occurrence_body::assert_constraint_member,
                     ActionDefBodyElement::AssertConstraint,
                 ),
-                // `in occurrence …` reaches here after `in_out_decl` rejects the keyword,
-                // same as directed `in item`/`in part` above.
-                map(
-                    crate::parser::occurrence_body::directed_occurrence_usage,
-                    |n| ActionDefBodyElement::OccurrenceUsage(Box::new(n)),
-                ),
-                map(crate::parser::occurrence_body::snapshot_usage, |n| {
-                    ActionDefBodyElement::OccurrenceUsage(Box::new(n))
-                }),
             )),
             // §6 G26: last, so every keyword-led member above keeps priority over the
             // keyword-less `name = expr;` binding.
@@ -1266,6 +1262,15 @@ pub(crate) fn action_usage_body_element(
 
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
+    // `metadata_keyword_prefix` below would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
+            let elem = ActionUsageBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         map(assign_stmt, ActionUsageBodyElement::Assign),
         map(for_loop, ActionUsageBodyElement::ForLoop),
@@ -1341,10 +1346,6 @@ pub(crate) fn action_usage_body_element(
                     ActionUsageBodyElement::PartUsage(Box::new(p))
                 }),
                 map(
-                    crate::parser::item::directed_item_usage,
-                    ActionUsageBodyElement::ItemUsage,
-                ),
-                map(
                     crate::parser::item::item_usage,
                     ActionUsageBodyElement::ItemUsage,
                 ),
@@ -1352,15 +1353,6 @@ pub(crate) fn action_usage_body_element(
                     crate::parser::occurrence_body::assert_constraint_member,
                     ActionUsageBodyElement::AssertConstraint,
                 ),
-                // `in occurrence …` reaches here after `in_out_decl` rejects the keyword,
-                // same as directed `in item`/`in part` above.
-                map(
-                    crate::parser::occurrence_body::directed_occurrence_usage,
-                    |n| ActionUsageBodyElement::OccurrenceUsage(Box::new(n)),
-                ),
-                map(crate::parser::occurrence_body::snapshot_usage, |n| {
-                    ActionUsageBodyElement::OccurrenceUsage(Box::new(n))
-                }),
             )),
             // GH-89.7: `variant name;` referencing a sibling variation action's variant, e.g.
             // `variant generateTorque4Cyl;` (Variability Examples/VehicleVariabilityModel.sysml:128).
@@ -2099,7 +2091,7 @@ mod control_node_gap_tests {
         match node.value {
             ActionDefBodyElement::OccurrenceUsage(o) => {
                 assert_eq!(
-                    o.value.portion_kind,
+                    o.value.prefix.portion.as_ref().map(|node| node.value),
                     Some(crate::ast::OccurrencePortionKind::Snapshot)
                 );
                 assert_eq!(o.value.name, "trued");

@@ -37,7 +37,6 @@ package 'Action Decomposition' {
 (fixture-diagnostics
   (document "15_action_decomposition.md"
     (diagnostics
-      (diagnostic (code "recovered_action_body_element") (severity error) (category parseerror) (span (offset 518) (line 22) (column 4) (len 13)) (message "unexpected token in action body"))
     )
   )
 )

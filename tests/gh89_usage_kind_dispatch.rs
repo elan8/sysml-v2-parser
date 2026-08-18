@@ -582,5 +582,13 @@ fn gh89_9_directed_item_usage_in_part_def_body() {
     let item = item.expect("expected an ItemUsage element");
     assert_eq!(item.name, "pwrCmd");
     assert!(item.type_name.is_some());
-    assert_eq!(item.direction, Some(sysml_v2_parser::ast::InOut::Out));
+    assert_eq!(
+        item.prefix
+            .basic
+            .ref_prefix
+            .direction
+            .as_ref()
+            .map(|node| node.value),
+        Some(sysml_v2_parser::ast::InOut::Out)
+    );
 }

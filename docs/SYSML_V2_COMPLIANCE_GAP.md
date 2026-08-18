@@ -93,6 +93,15 @@ Common remaining limitations:
 - simplified handling of nested forms
 - dedicated nodes for top-level declarations without equally deep body modeling
 
+**Progress on usage prefixes:** `OccurrenceUsagePrefix` and the two productions it nests are now
+one shared typed component, and `OccurrenceUsage` (with its `IndividualUsage`, `PortionUsage` and
+`EventOccurrenceUsage` spellings), `ItemUsage` and `SatisfyRequirementUsage` carry the complete
+prefix with each authored keyword's span. Every other usage family still carries whatever partial
+prefix fields it had; which slots each is missing, and the continuation path, are in
+[`planning/occurrence-usage-prefix-matrix.md`](../planning/occurrence-usage-prefix-matrix.md) §9.
+"incomplete prefix combinations" above therefore no longer applies to those three families and
+still applies to the rest.
+
 The strongest areas today are still packages/imports, parts, requirements, and the general library-validation path.
 
 ### Some bodies are still accepted permissively

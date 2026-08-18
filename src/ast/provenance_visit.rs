@@ -9,7 +9,8 @@
 
 use super::visit::{
     walk_comment_annotation, walk_first_merge_brace_body, walk_import_target,
-    walk_metadata_annotation, walk_metadata_keyword_usage, walk_satisfy_requirement_usage, Visitor,
+    walk_metadata_annotation, walk_metadata_keyword_usage, walk_occurrence_usage_prefix,
+    walk_satisfy_requirement_usage, walk_usage_extension_keyword, Visitor,
 };
 use super::*;
 
@@ -371,6 +372,129 @@ impl Visitor for ProvenanceValidator<'_> {
             }
         }
         walk_satisfy_requirement_usage(self, node);
+    }
+
+    /// `OccurrenceUsagePrefix` records one span per authored keyword, and the production fixes
+    /// their order.
+    ///
+    /// Every component is written back from its own span, so a wire document that points one at
+    /// other text -- or reorders two of them -- would change what the document says while every
+    /// reference in it still resolved. The type already makes the three mutually exclusive slots
+    /// (`in`/`out`/`inout`, `abstract`/`variation`, `snapshot`/`timeslice`) unrepresentable in
+    /// combination; what a type cannot express, and this checks, is that each span covers the
+    /// keyword its slot claims, that each lies inside the declaration that owns it, and that the
+    /// authored order is
+    /// `[direction] [derived] [abstract|variation] [constant] [ref] [individual] [portion] ('#' Ref)*`.
+    fn visit_occurrence_usage_prefix(&mut self, prefix: &OccurrenceUsagePrefix) {
+        if self.error.is_some() {
+            return;
+        }
+        let ref_prefix = &prefix.basic.ref_prefix;
+        let direction = ref_prefix.direction.as_ref();
+        let variance = ref_prefix.variance.as_ref();
+        let portion = prefix.portion.as_ref();
+        // In production order, so the same slice drives both the token check and the ordering
+        // check below and the two cannot disagree about what the order is.
+        let slots: [(Option<&Span>, &str, &str); 7] = [
+            (
+                direction.map(|node| &node.span),
+                match direction.map(|node| node.value) {
+                    Some(InOut::In) => "in",
+                    Some(InOut::Out) => "out",
+                    Some(InOut::InOut) => "inout",
+                    None => "",
+                },
+                "usage prefix direction keyword",
+            ),
+            (
+                ref_prefix.derived_span.as_ref(),
+                "derived",
+                "usage prefix `derived` keyword",
+            ),
+            (
+                variance.map(|node| &node.span),
+                match variance.map(|node| node.value) {
+                    Some(DefinitionPrefix::Abstract) => "abstract",
+                    Some(DefinitionPrefix::Variation) => "variation",
+                    None => "",
+                },
+                "usage prefix variance keyword",
+            ),
+            (
+                ref_prefix.constant_span.as_ref(),
+                "constant",
+                "usage prefix `constant` keyword",
+            ),
+            (
+                prefix.basic.reference_span.as_ref(),
+                "ref",
+                "usage prefix `ref` keyword",
+            ),
+            (
+                prefix.individual_span.as_ref(),
+                "individual",
+                "occurrence prefix `individual` keyword",
+            ),
+            (
+                portion.map(|node| &node.span),
+                match portion.map(|node| node.value) {
+                    Some(OccurrencePortionKind::Snapshot) => "snapshot",
+                    Some(OccurrencePortionKind::Timeslice) => "timeslice",
+                    None => "",
+                },
+                "occurrence prefix portion keyword",
+            ),
+        ];
+        for (span, token, role) in slots {
+            let Some(span) = span else { continue };
+            if self.error.is_none() {
+                self.check(self.delimiter(span, token, role));
+            }
+            if self.error.is_none() {
+                self.check(self.owned(span, role));
+            }
+        }
+        if self.error.is_none() {
+            let mut previous: Option<(usize, &str)> = None;
+            let ordered = slots
+                .into_iter()
+                .filter_map(|(span, _, role)| span.map(|span| (span, role)))
+                .chain(
+                    prefix
+                        .extension_keywords
+                        .iter()
+                        .map(|keyword| (&keyword.value.hash_span, "usage extension keyword")),
+                );
+            for (span, role) in ordered {
+                if let Some((end, before)) = previous {
+                    if span.offset < end {
+                        self.error = Some(format!(
+                            "{role} at {} does not follow the {before} before it, which ends at {end}",
+                            span.offset
+                        ));
+                        return;
+                    }
+                }
+                previous = Some((span_end(span), role));
+            }
+        }
+        walk_occurrence_usage_prefix(self, prefix);
+    }
+
+    /// The `#` of a `UsageExtensionKeyword` is syntax, not part of the reference behind it.
+    fn visit_usage_extension_keyword(&mut self, node: &Node<UsageExtensionKeyword>) {
+        if self.error.is_some() {
+            return;
+        }
+        self.check(self.delimiter(&node.value.hash_span, "#", "usage extension keyword sigil"));
+        if self.error.is_none() {
+            self.check(sigil_within(
+                &node.value.hash_span,
+                &node.span,
+                "usage extension keyword sigil",
+            ));
+        }
+        walk_usage_extension_keyword(self, node);
     }
 
     /// A `first`/`merge`/`decide`/`join`/`fork` brace body records both delimiters explicitly.

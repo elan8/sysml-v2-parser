@@ -264,16 +264,6 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(crate::parser::occurrence_body::occurrence_usage, |n| {
             AttributeBodyElement::OccurrenceUsage(Box::new(n))
         }),
-        // GH-90.2: `timeslice`/`snapshot` portion usages inside attribute/item bodies, e.g.
-        // `timeslice asPresident : Person [0..*] { ... }` (Individuals Examples/
-        // JohnIndividualExample.sysml:11). Both already fully parse via `timeslice_usage`/
-        // `snapshot_usage` (used elsewhere, e.g. part def bodies) -- just not dispatched here.
-        map(crate::parser::occurrence_body::timeslice_usage, |n| {
-            AttributeBodyElement::OccurrenceUsage(Box::new(n))
-        }),
-        map(crate::parser::occurrence_body::snapshot_usage, |n| {
-            AttributeBodyElement::OccurrenceUsage(Box::new(n))
-        }),
         // This body is also shared with `item def`/`item` usage bodies, which legally own
         // connector members (`connect a to b;`) and metadata tags (`#keyword`, bare or
         // prefixing the next member) -- see the OMG spec Annex `14c-Language Extensions.sysml`

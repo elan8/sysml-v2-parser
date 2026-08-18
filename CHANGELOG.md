@@ -9,6 +9,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **One shared, typed `OccurrenceUsagePrefix`, and three families migrated onto it.** Audit and
+  evidence: `planning/occurrence-usage-prefix-matrix.md`. **AST version 168 -> 169.**
+
+  - `OccurrenceUsagePrefix = BasicUsagePrefix ('individual')? PortionKind?
+    UsageExtensionKeyword*`, over `BasicUsagePrefix = RefPrefix ('ref')?` and `RefPrefix =
+    FeatureDirection? 'derived'? ('abstract'|'variation')? 'constant'?`. Every production that
+    spells this prefix spells all of it in this order, so the components are shared rather than
+    re-declared per family. The nesting is the grammar's own, so a later migration of `UsagePrefix`
+    or `ControlNodePrefix` reuses the exact sub-component its production names instead of a
+    superset that would make `ref merge m;` representable.
+  - The three mutually exclusive slots -- `in`/`out`/`inout`, `abstract`/`variation`,
+    `snapshot`/`timeslice` -- are one optional field holding an enum each, so an illegal
+    combination is unrepresentable rather than validated away. The four independent modifiers are
+    `Option<Span>`: presence is the property, so no second boolean can drift from the authored
+    span, and emission writes each keyword because the author did.
+  - `OccurrenceUsage` loses `direction`, `is_abstract`, `is_constant`, `is_reference`,
+    `is_individual` and `portion_kind`; `ItemUsage` loses `is_derived`, `usage_prefix`,
+    `is_constant`, `direction` and `is_individual`. Both carry `prefix` instead.
+    `SatisfyRequirementUsage` gains `prefix` and the `MemberPrefix` visibility it never modelled.
+    `OccurrencePortionKind` moves module but keeps its name; `DefinitionPrefix` gains `Copy`;
+    `RefPrefix`, `BasicUsagePrefix`, `OccurrenceUsagePrefix` and `UsageExtensionKeyword` are new
+    public types.
+  - Five parsers become one. `occurrence_usage`, `individual_usage`, `snapshot_usage`,
+    `timeslice_usage`, `then_timeslice_usage` and `directed_occurrence_usage` each accepted a
+    different subset of the prefix in a different order; `ItemUsage`'s `directed_item_usage` twin
+    is gone for the same reason. What that makes parse, all of it in the pinned corpus and all of
+    it previously a recovery node: `individual snapshot s : Ind;` and `individual timeslice t3 :>
+    ind;` (`Simple Tests/OccurrenceTest.sysml`), `in individual :>> testVehicle : TestVehicle1 {
+    … }` (`training/34. Verification`), `derived` and `variation` on any occurrence usage, `in
+    item;`, and every prefix at all on a satisfy usage.
+  - `ref individual item :>> driver : Alice;` (`training/28. Individuals/Individuals and Time
+    Slices.sysml:10`) was read as an occurrence usage *named* `item` and re-emitted as `ref
+    individual 'item' : Alice :>> driver;`. `item` is `ItemUsage`'s kind keyword; a reserved
+    keyword is never an unquoted declaration label, and the keyword-less spellings now refuse it.
+  - `UsageExtensionKeyword*` is the prefix's last slot, so a `#tag` run followed by a migrated
+    head is that usage's prefix rather than a sibling `PrefixMetadataMember`. `ReferenceUsage` and
+    a standalone `PrefixMetadataMember` share two of the prefix's FIRST tokens and run first in
+    several scopes; the migrated families now get first refusal when the prefix run reaches a
+    `ref` or a `#`, which also stops `derived ref item x;` from being read as an anonymous
+    `ReferenceUsage` named `item`.
+  - Recovery starter tables gain the FIRST tokens the prefix adds (`constant`, `derived`, `in`,
+    `inout`, `out`, `variation` and, for the satisfy scopes, the whole set), so a malformed member
+    before a prefixed usage no longer scans past the prefix and consumes it.
+  - Deserialization rejects a prefix keyword span that covers the wrong token, a direction or
+    portion claiming the wrong alternative, slots written out of the production's order, a sigil
+    that is not a `#`, an extension identity with no arena entry, and a keyword belonging to a
+    different member.
+  - A `connection def` body could not re-emit an occurrence usage at all; it can now. An anonymous
+    declaration (`ref individual :>> driver : Alice;`) no longer strands the keyword's trailing
+    space before a clause that brings its own.
+
 - **Closed the remaining verified parser-owned gaps from the spec42 upstream audit.** KerML
   feature bodies now dispatch the complete pinned `MetadataFeature` production, retaining ordered
   `#` prefixes and the authored `@`/`metadata` introducer instead of lowering `metadata` as an

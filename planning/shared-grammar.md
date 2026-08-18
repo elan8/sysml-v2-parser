@@ -1,6 +1,6 @@
 # Factor shared grammatical concepts
 
-> **Status:** Phases 1-3 implemented; Phase 4 proposed
+> **Status:** Phases 1-3 implemented; Phase 4 started -- first family migrated, the rest proposed
 
 ## Purpose
 
@@ -330,6 +330,32 @@ Likely candidates include `DefinitionHeader`, `UsageHeader`, `StructuralMember`,
 `BehavioralMember`. These names do not imply that one header type must cover every definition or
 usage. Prefer several precise components over a generic struct containing many irrelevant
 `Option` fields or flags.
+
+#### First family: `OccurrenceUsagePrefix` — done
+
+`planning/occurrence-usage-prefix-matrix.md` is the matrix this phase asks for, and
+`ast::OccurrenceUsagePrefix` (over `BasicUsagePrefix` over `RefPrefix`) is the shared component it
+justified. It answers the phase's own questions concretely:
+
+- steps 1-4 are §§1-5 of that matrix: the productions and their FIRST sets, the scopes and
+  alternatives, which fields are shared versus merely similarly named -- three neighbouring
+  prefixes (`UsagePrefix`, `ControlNodePrefix`, `OccurrenceDefinitionPrefix`) are *not* this
+  production and are recorded with what distinguishes each -- and the mutually exclusive slots
+  kept as enums;
+- step 5's "representative pair" is `SatisfyRequirementUsage` (the production whose prefix was
+  entirely unmodelled) plus `OccurrenceUsage` (the production the prefix is named for, whose three
+  sibling spellings exercise every slot). `ItemUsage` followed because refusing `ref individual
+  item …` correctly is only an improvement if the family that owns `item` can then claim it;
+- step 6 -- the remaining confirmed scopes -- is deliberately *not* done in one sweep. Every
+  unmigrated family is listed in §9 of that matrix with the slots it still lacks and the
+  continuation path, and none of them claims to have moved.
+
+The nesting is what makes the component reusable rather than merely shared: `RefPrefix` and
+`BasicUsagePrefix` are separately named productions that `UsagePrefix` and `ControlNodePrefix`
+also reach, so migrating either of those later uses the exact sub-component its production names.
+Flattening them into one struct would have made `ref merge m;` -- which `ControlNodePrefix`
+forbids -- representable, which is precisely the failure mode this phase's "preserve distinct
+enums for mutually exclusive syntax shapes" step exists to prevent.
 
 Deliverables:
 

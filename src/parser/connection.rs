@@ -26,6 +26,19 @@ fn connection_def_body_element(
 ) -> IResult<Input<'_>, Node<ConnectionDefBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = occurrence_usage(start) {
+            let elem = ConnectionDefBodyElement::OccurrenceUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
+            let elem = ConnectionDefBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         // GH-33: connections allow the fixed `#original`/`#derive` end-role form (tested real usage; see
         // `connector::end_decl`'s doc comment); interfaces don't.

@@ -10,6 +10,7 @@ mod body;
 mod common;
 mod feature_value;
 mod membership;
+mod occurrence_prefix;
 mod package;
 #[cfg(feature = "serde")]
 mod provenance_visit;
@@ -26,6 +27,7 @@ pub use body::*;
 pub use common::*;
 pub use feature_value::*;
 pub use membership::*;
+pub use occurrence_prefix::*;
 pub use package::*;
 pub use qualified_reference::*;
 pub use requirement::*;

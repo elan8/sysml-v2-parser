@@ -36,10 +36,7 @@ pub(crate) use crate::parser::lex::{
 };
 pub(crate) use crate::parser::metadata::{metadata_def, metadata_usage};
 pub(crate) use crate::parser::node_from_to;
-pub(crate) use crate::parser::occurrence::{
-    individual_usage, occurrence_def, occurrence_usage, snapshot_usage, then_timeslice_usage,
-    timeslice_usage,
-};
+pub(crate) use crate::parser::occurrence::{occurrence_def, occurrence_usage};
 pub(crate) use crate::parser::port::{port_def_required, port_usage};
 pub(crate) use crate::parser::requirement::{requirement_def, requirement_usage, satisfy};
 pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
