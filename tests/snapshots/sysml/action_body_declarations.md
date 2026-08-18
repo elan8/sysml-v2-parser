@@ -60,7 +60,8 @@ package ActionBodyDeclarations {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 474) (line 17) (column 15) (len 6)) (segments (segment 0 (token "marker") (name "marker") (separator none) (span (offset 474) (line 17) (column 15) (len 6)))))
   )
-  (root (package (name "ActionBodyDeclarations") (body brace (action-def (name "Dynamics") (specializes none) (body brace (attribute-usage) (calc-usage) (occurrence-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions))) (action-def))) (action-usage (name "mission") (short-name none)))))
+  (root (package (name "ActionBodyDeclarations") (body brace (action-def (name "Dynamics") (specializes none) (body brace (attribute-usage) (calc-usage) (occurrence-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions))) (action-def))) (action-usage (name "mission") (short-name none) (body brace (attribute-usage (declaration-name "duration") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing none) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value (feature-value (kind bind) (default false) (expression (expression (span (offset 456) (line 16) (column 30) (len 2)) (integer 10))))) (body semicolon)) (occurrence (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "") (short-name none) (target (ref r0)) (body semicolon)))))))
 )
 ~~~

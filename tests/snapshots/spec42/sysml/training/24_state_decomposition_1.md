@@ -63,6 +63,6 @@ package 'State Decomposition-1' {
 (parsed-document
   (references
   )
-  (root (package (name "State Decomposition-1") (body brace (attribute-def (name "VehicleStartSignal") (multiplicity none)) (attribute-def (name "VehicleOnSignal") (multiplicity none)) (attribute-def (name "VehicleOffSignal") (multiplicity none)) (state-def (name "VehicleStates") (body semicolon)) (state-usage))))
+  (root (package (name "State Decomposition-1") (body brace (attribute-def (declaration-name "VehicleStartSignal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (value none) (body semicolon)) (attribute-def (declaration-name "VehicleOnSignal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (value none) (body semicolon)) (attribute-def (declaration-name "VehicleOffSignal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (value none) (body semicolon)) (state-def (name "VehicleStates") (body semicolon)) (state-usage))))
 )
 ~~~
