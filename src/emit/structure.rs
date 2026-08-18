@@ -38,21 +38,10 @@ pub(crate) fn emit_part_usage(
     usage: &PartUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if let Some(dir) = usage.direction {
-        emit_direction(w, dir);
-    }
-    emit_ref_prefix(
-        w,
-        usage.is_derived,
-        usage.usage_prefix.as_ref(),
-        usage.is_constant,
-    );
-    if usage.is_reference {
-        w.push_str("ref ");
-    }
-    if usage.is_individual {
-        w.push_str("individual ");
-    }
+    // `PartUsage = OccurrenceUsagePrefix 'part' Usage`: the same typed prefix boundary the
+    // already migrated families stream through, in the production's slot order, with each
+    // keyword written because its slot holds an authored span.
+    emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("part ");
     if let Some(short) = &usage.short_name {
         w.push_char('<');

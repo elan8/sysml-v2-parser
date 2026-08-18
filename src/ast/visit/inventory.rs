@@ -2865,17 +2865,8 @@ macro_rules! ast_traversal {
         pub fn walk_part_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<PartUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let PartUsage { usage_prefix, is_individual, is_reference, direction, is_derived, is_constant, name, short_name, typing, multiplicity, ordered, nonunique, subsets, redefines, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
-            if let Some(inner) = usage_prefix {
-                visitor.visit_definition_prefix_value(inner);
-            }
-            let _ = is_individual;
-            let _ = is_reference;
-            if let Some(inner) = direction {
-                visitor.visit_in_out_value(inner);
-            }
-            let _ = is_derived;
-            let _ = is_constant;
+            let PartUsage { prefix, name, short_name, typing, multiplicity, ordered, nonunique, subsets, redefines, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
             visitor.visit_text(name);
             if let Some(inner) = short_name {
                 visitor.visit_text(inner);
