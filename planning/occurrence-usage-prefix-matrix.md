@@ -281,7 +281,8 @@ dispatches it:
 | `OccurrenceUsage`, `IndividualUsage`, `PortionUsage`, `EventOccurrenceUsage` | lines 573–589 | package/namespace/root, `part def`, `part` usage, occurrence body, `action def`, `action` usage, attribute body, `connection def`, connector-nested | **migrated** |
 | `SatisfyRequirementUsage` | line 1467 | package/namespace/root, `part def`, `part` usage, occurrence body, `view def`, `view` usage, requirement/concern/viewpoint body | **migrated** |
 | `ItemUsage` | 616 | package/namespace/root and structural/attribute/item/part bodies | **migrated** |
-| `PartUsage`, `PortUsage`, `ViewUsage`, `RenderingUsage`, `ConnectionUsage`, `InterfaceUsage`, `AllocationUsage`, `Message`, `FlowUsage`, `SuccessionFlowUsage` | 624, 646, 1607, 1647, 668, 758, 792, 806, 826, 830 | various | deferred — §9 |
+| `PartUsage` | 623 | package/namespace/root, `part def`, `part` usage, attribute/item, metadata, `perform`, `connection def`, occurrence, `use case def`, `calc def`, `action def`, `action` usage, `variant` | **migrated** — `planning/part-usage-prefix-matrix.md` |
+| `PortUsage`, `ViewUsage`, `RenderingUsage`, `ConnectionUsage`, `InterfaceUsage`, `AllocationUsage`, `Message`, `FlowUsage`, `SuccessionFlowUsage` | 646, 1607, 1647, 668, 758, 792, 806, 826, 830 | various | deferred — §9 |
 | `ActionUsage`, `CalculationUsage`, `StateUsage`, `ConstraintUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage`, `PerformActionUsage`, `ExhibitStateUsage`, `IncludeUseCaseUsage`, `AssertConstraintUsage`, `AcceptNode`, `SendNode`, `ActionNodePrefix` | 938–1569 | various | deferred — §9 |
 | `MergeNode`, `DecisionNode`, `JoinNode`, `ForkNode` | 973–1010 | action bodies | **not this production** — `ControlNodePrefix` (§1.1) |
 
@@ -442,13 +443,16 @@ that growth is not what costs.
 
 ## 9. Migration status, family by family
 
-Migrated by this change — no legacy prefix field or parser path remains for these families:
+Migrated onto the shared component — no legacy prefix field or parser path remains for these
+families. The first three moved with the seam itself; `PartUsage` moved in a later slice on its
+own audit, and each further family will do the same:
 
 | Family | AST type | What moved |
 | --- | --- | --- |
 | `OccurrenceUsage` / `IndividualUsage` / `PortionUsage` / `EventOccurrenceUsage` | `ast::OccurrenceUsage` | `direction`, `is_abstract`, `is_constant`, `is_reference`, `is_individual`, `portion_kind` deleted; `prefix: OccurrenceUsagePrefix` added, with `derived`, `variation` and `UsageExtensionKeyword*` newly represented |
 | `SatisfyRequirementUsage` | `ast::SatisfyRequirementUsage` | `prefix: OccurrenceUsagePrefix` and `membership: Membership` added; nothing deleted, because nothing was there |
 | `ItemUsage` | `ast::ItemUsage` | `is_derived`, `usage_prefix`, `is_constant`, `direction`, and `is_individual` deleted; `prefix: OccurrenceUsagePrefix` added. This was required to stop `ref individual item …` being claimed and reshaped as a keyword-less occurrence usage |
+| `PartUsage` | `ast::PartUsage` | `usage_prefix`, `is_individual`, `is_reference`, `direction`, `is_derived`, `is_constant` deleted; `prefix: OccurrenceUsagePrefix` added, with both `PortionKind` alternatives and `UsageExtensionKeyword*` newly represented. Migrated in a later slice than the three above, on its own audit: `planning/part-usage-prefix-matrix.md` |
 
 Deliberately **not** migrated by this change. None of these has moved; each keeps whatever partial
 prefix fields it already had, and closing each is a separate, family-sized change that reuses the
@@ -456,7 +460,6 @@ component this one defines:
 
 | Family | Prefix facts it already models | Still missing |
 | --- | --- | --- |
-| `PartUsage` | `is_abstract`, `is_variation`, `is_reference`, `is_individual` | spans, direction, `derived`, `constant`, `PortionKind`, extension keywords |
 | `PortUsage` | direction, `is_abstract`, `is_reference`, `is_individual` | spans, `derived`, `variation`, `constant`, `PortionKind`, extension keywords |
 | `ActionUsage` | `is_abstract`, `is_variation`, `is_reference`, `is_individual` | spans, direction, `derived`, `constant`, `PortionKind`, extension keywords |
 | `StateUsage`, `CalcUsage`, `ConstraintUsage`, `RequirementUsage`, `ConcernUsage`, `CaseUsage`, `AnalysisCaseUsage`, `VerificationCaseUsage`, `UseCaseUsage` | varying subsets of `abstract`/`variation`/`ref`/`individual`/direction | spans, and the slots each does not carry |
@@ -481,11 +484,17 @@ type that component in place of its current fields; route its parser through
 superseded fields, parser branches and emitter logic; and add the scope's missing FIRST tokens
 from §4.
 
-`PartUsage` was the recommended next audit candidate, and that audit is
+`PartUsage` was the recommended next audit candidate, and it has now moved. Its audit is
 `planning/part-usage-prefix-matrix.md`: a narrowly focused linked matrix rather than a section
 here, because it enumerates thirteen owning scopes, five construction paths, six competing
 productions and a recovery contract of its own, and none of that is shared with the families
-already migrated. It is the authoritative record for that family; this document stays the
-cross-family ledger (§9). `PortUsage` is the natural following structural candidate. Behavioral
-families such as `ActionUsage` must be separate slices because several specialized textual
-productions currently construct their AST types.
+already migrated. That file is the authoritative record for that family; this document stays the
+cross-family ledger (§9), and §6/§9 above are what say `PartUsage` is done.
+
+`PortUsage` is the natural following structural candidate: `PortUsage = OccurrenceUsagePrefix
+'port' Usage` (646) names the same production, and `PortUsage` already models direction,
+`is_abstract`, `is_reference` and `is_individual`, so the shape of the change is the one this
+slice just made. Its own matrix must still establish its scopes, construction paths, competing
+`ref`/`#` dispatch and recovery before any production edit, exactly as `PartUsage`'s did.
+Behavioral families such as `ActionUsage` must be separate slices because several specialized
+textual productions currently construct their AST types.

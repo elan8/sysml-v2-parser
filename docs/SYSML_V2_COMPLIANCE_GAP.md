@@ -102,12 +102,19 @@ Common remaining limitations:
 
 **Progress on usage prefixes:** `OccurrenceUsagePrefix` and the two productions it nests are now
 one shared typed component, and `OccurrenceUsage` (with its `IndividualUsage`, `PortionUsage` and
-`EventOccurrenceUsage` spellings), `ItemUsage` and `SatisfyRequirementUsage` carry the complete
-prefix with each authored keyword's span. Every other usage family still carries whatever partial
-prefix fields it had; which slots each is missing, and the continuation path, are in
+`EventOccurrenceUsage` spellings), `ItemUsage`, `SatisfyRequirementUsage` and `PartUsage` carry the
+complete prefix with each authored keyword's span. Every other usage family still carries whatever
+partial prefix fields it had; which slots each is missing, and the continuation path, are in
 [`planning/occurrence-usage-prefix-matrix.md`](../planning/occurrence-usage-prefix-matrix.md) §9.
-"incomplete prefix combinations" above therefore no longer applies to those three families and
+"incomplete prefix combinations" above therefore no longer applies to those four families and
 still applies to the rest.
+
+For `PartUsage` specifically, that closed real pinned syntax rather than only provenance:
+`snapshot part vehicle_1_t0 { … }` and `timeslice part …` were recovered as malformed, `#logical
+part vehicleLogical : Vehicle { … }` became two sibling members instead of one prefixed usage,
+and at package scope a part usage accepted no direction, no `derived` and no `constant` at all.
+The audit is [`planning/part-usage-prefix-matrix.md`](../planning/part-usage-prefix-matrix.md),
+whose §11 lists what it deliberately left open.
 
 The strongest areas today are still packages/imports, parts, requirements, and the general library-validation path.
 

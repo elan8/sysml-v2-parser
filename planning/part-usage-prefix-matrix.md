@@ -437,6 +437,73 @@ changed here.
   in the scopes where it currently wins and nothing else changes about it; only the scopes listed
   in §3 give `part_usage` first refusal.
 
+## 11.1 Allocation and cost
+
+Measured with `benches/parser_bench.rs` over the checked-in snapshot corpus, the maintained
+benchmark. Both sides parse **identical input**: the baseline is the pre-slice parser run against
+*this branch's* corpus, because the corpus itself grew by four fixtures and comparing across two
+different corpora measures the fixtures, not the parser.
+
+Command, run three times per side, alternating:
+
+```
+cargo bench --bench parser_bench -- 'snapshot_parser_corpus/all_sources'
+```
+
+Environment: macOS 25.3.0 (Darwin, arm64), `cargo bench` release profile with `debug = 1`,
+criterion 0.5, 100 samples per run, no other load pinned.
+
+| Run | Baseline (pre-slice parser, this corpus) | After |
+| --- | --- | --- |
+| 1 | 33.64 ms | 33.00 ms |
+| 2 | 34.74 ms | 31.99 ms |
+| 3 | 31.51 ms | 31.92 ms |
+
+The machine's run-to-run spread (±10% on the baseline alone) is wider than the difference between
+the two sides, so the honest reading is **no material change**, not an improvement. Nothing here
+claims a win from code shape.
+
+Per fixture, on the second measurement of each (the first run of a cold machine was discarded on
+both sides after it moved a 22 µs fixture by 14%):
+
+| Fixture | Baseline | After | Change |
+| --- | --- | --- | --- |
+| `sysml/part_usage_prefix_alternatives` | 172.1 µs | 126.6 µs | −26% — most of its members did not parse before, so the baseline is paying for recovery |
+| `spec42/sysml/training/07_parts_example_1` (part usages and nothing else) | 22.04 µs | 22.72 µs | +3.1% |
+| `sysml/ref_prefix_coverage` | 39.36 µs | 41.25 µs | +4.8% |
+| `kerml/type_body_relationship_members` (no part usage at all) | 81.60 µs | 82.08 µs | +0.6%, i.e. the probe itself is not what costs |
+| `spec42/sysml.library/isq_mechanics` (large, no part usage) | 1.579 ms | 1.642 ms | +4.0% |
+
+Sizes, `std::mem::size_of`:
+
+| Type | Before | After |
+| --- | --- | --- |
+| `PartUsage` | 920 | 1224 (+304, exactly the inline prefix) |
+| `OccurrenceUsagePrefix` | 304 | 304 |
+| `PartDefBodyElement`, `PartUsageBodyElement`, `ConnectionDefBodyElement` | 1240 | 1240 |
+| `PackageBodyElement` | 1280 | 1280 |
+| `AttributeBodyElement`, `OccurrenceBodyElement`, `UseCaseDefBodyElement` | 1176 | 1176 |
+| `ActionDefBodyElement`, `ActionUsageBodyElement` | 984 | 984 |
+| `CalcDefBodyElement`, `PerformBodyElement` | 368 | 368 |
+| `VariantTypedUsage` | 16 | 16 |
+
+No owning enum changed size: every one was already dominated by a larger variant, so the +304
+bytes on `PartUsage` are absorbed.
+
+Allocation:
+
+- **An unauthored prefix allocates nothing.** Its four independent modifiers are `Option<Span>`,
+  its three exclusive slots are `Option<Node<_>>`, and `extension_keywords` is a `Vec` whose
+  default capacity is 0 -- checked directly, not assumed.
+- **An authored prefix allocates once**, and only when a `#tag` was written: one `Vec` for the
+  whole run, not one per keyword. No owned token `String` and no per-modifier allocation exists
+  anywhere in the component.
+- **Failed speculation does not grow the arena.** The whole family parse runs inside
+  `reference_transaction`, pinned by
+  `part_usage_prefix_owning_layer::a_refused_part_prefix_leaves_no_arena_entry` over five refused
+  members, including `#Ghost 123;` (which allocates a reference before the production is refused)
+  and `ref part def B;`.
+
 ## 12. Why this is one PR
 
 The six fields, their five construction paths, thirteen owning scopes, one emitter, seven

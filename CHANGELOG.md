@@ -9,6 +9,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`PartUsage` migrated onto the shared, typed `OccurrenceUsagePrefix`.** Audit and evidence:
+  `planning/part-usage-prefix-matrix.md`. **AST version 169 -> 170.**
+
+  - `PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623), so `PartUsage` carries one
+    `prefix: OccurrenceUsagePrefix` -- the same component `OccurrenceUsage`, `ItemUsage` and
+    `SatisfyRequirementUsage` already carry -- and the six fields that stood in for it are
+    **removed**: `usage_prefix`, `is_individual`, `is_reference`, `direction`, `is_derived`,
+    `is_constant`. Between them they kept no authored span and represented neither a `PortionKind`
+    nor a `UsageExtensionKeyword`. This is a breaking public AST and serialized-shape change; a
+    consumer reads `usage.prefix.basic.ref_prefix.direction`, `usage.prefix.individual_span` and so
+    on, each of which is the authored keyword's span rather than a boolean beside one.
+  - **Pinned corpus syntax that did not parse before.** `snapshot part vehicle_1_t0 { … }` and
+    `timeslice part …` reached recovery (`training/28. Individuals/Individuals and Roles-1.sysml`,
+    `Individuals and Snapshots Example.sysml`); `#logical part vehicleLogical : Vehicle { … }`
+    became a metadata member plus a separate unprefixed usage (`Vehicle Example/SysML v2 Spec
+    Annex A SimpleVehicleModel.sysml:487`); and at package scope a part usage accepted no
+    direction, no `derived` and no `constant`, because `part_def_or_usage` parsed one prefix and
+    shared it between `PartDefinition` and `PartUsage` -- two different productions
+    (`OccurrenceDefinitionPrefix` vs `OccurrenceUsagePrefix`). It now tries `part_def`, which
+    requires `def`, and falls back to `part_usage`, each reading its own `MemberPrefix` and its
+    own prefix. `ref part def P;` is consequently no longer read as a usage *named* `def`.
+  - **`ref part …` is a `PartUsage` everywhere.** `ReferenceUsage`'s `Usage` opens with an
+    `Identification` whose name is a `NAME`, and `part` is a reserved keyword, so `ref part c : C;`
+    was never a `ReferenceUsage`. Attribute, item, metadata and use-case bodies read it as a
+    `RefDecl` because `connector::ref_decl` ran first; those scopes now give the part-usage parser
+    first refusal through `occurrence_prefix::starts_contended_prefix`, as part, occurrence,
+    action and connection bodies already did. `connector::ref_decl` keeps every other kind it
+    models, and no `*_def`-before-`*_usage` ordering moves: `abstract part def P { … }` still
+    reaches `part_def`.
+  - **`snapshot`/`timeslice` are a prefix slot, not a production selector.** The package grammar
+    table classified them as selecting `OccurrenceDefinition | OccurrenceUsage`, which skipped the
+    part dispatch entirely. They are a `PortionKind` that every occurrence-usage family spells, and
+    select `PortionUsage` only when no kind keyword follows.
+  - **Recovery starter tables** gained the FIRST tokens each scope lacked, so a malformed member
+    before a prefixed part usage synchronizes at the first prefix token instead of scanning to
+    `part` and consuming the usage: `ATTRIBUTE_BODY_STARTERS`, `METADATA_BODY_STARTERS`,
+    `CONNECTION_DEF_BODY_STARTERS`, `USE_CASE_BODY_STARTERS`, `ACTION_BODY_STARTERS`.
+  - **The semantic projection is complete in every scope that reaches it.** `write_part_usage`
+    showed a name, a typing and two multiplicity modifiers, and in ten of the thirteen owning
+    scopes only a contentless `(part-usage)` marker. It now names the whole prefix, the short
+    name, the typing, the multiplicity and its modifiers, subsets, redefines, the value and the
+    body, through one member entry point, so identical syntax projects identically wherever it is
+    written.
+  - **Emission** streams `PartUsage::prefix` through `emit_occurrence_usage_prefix`, the typed
+    boundary the migrated families already use, and stops emitting a stranded space after `part`
+    for the anonymous target-only forms (`ref part  :>> elements : SparePart;`).
+  - Coverage: `tests/snapshots/sysml/part_usage_prefix_alternatives.md`,
+    `..._owning_scopes.md`, `..._recovery.md`, `..._unterminated.md`, and
+    `tests/part_usage_prefix_owning_layer.rs` for arena rollback, strict/editor equivalence,
+    round-trip idempotence and validated-envelope rejection.
+  - Deliberately **not** done, with grammar evidence in that matrix §11: no other usage family
+    moves; `then` (`SourceSuccessionMember`) is not added to `PartUsage`, so `then snapshot part
+    …` is still a recovery node; `end part` (Pilot-only, newer than the 2026-04 pin) is not
+    accepted; `calc def` body dispatch is not widened; `item def`/`attribute def`/occurrence
+    body/action usage body/`variant` projections are still contentless markers of their own; and
+    `metadata_keyword_head` still accepts a reserved keyword as a reference segment.
+
 - **Three pre-existing gaps the occurrence-prefix seam surfaced but did not own.**
 
   - A `connection def` body is an ordinary `DefinitionBody`, so it owns occurrence usages and

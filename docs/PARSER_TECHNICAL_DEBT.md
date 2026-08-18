@@ -65,11 +65,19 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 
 **Current AST caveat:** `attribute_usage` accepts extra specialization clauses for grammar coverage, but the existing public `AttributeUsage` AST only stores `typing` and `redefines`. `occurrence_usage` stores `type_name`, `subsets`, and `redefines`, using last-wins behavior for multiple clauses. Structured AST fidelity for `references` / `crosses` and richer body members remains a later tranche.
 
-### 7. Usage *prefixes* — one shared component, three families migrated
+### 7. Usage *prefixes* — one shared component, four families migrated
 
 [`src/parser/occurrence_prefix.rs`](../src/parser/occurrence_prefix.rs) and [`src/ast/occurrence_prefix.rs`](../src/ast/occurrence_prefix.rs) own the pinned `OccurrenceUsagePrefix` and the two productions it nests (`BasicUsagePrefix`, `RefPrefix`). Before it, the prefix was respelled per family: five parsers in `occurrence_body.rs` alone, each accepting a different subset in a different order, and the AST recorded it as independent booleans with no authored span — `derived`, `variation` and `UsageExtensionKeyword*` were not represented at all, and `abstract`/`variation`, `in`/`out`/`inout`, `snapshot`/`timeslice` could each be held in impossible combinations.
 
-`OccurrenceUsage`, `ItemUsage` and `SatisfyRequirementUsage` carry the shared component; every other family still carries whatever partial prefix fields it had. The audit, the corpus evidence, the per-family migration status and the continuation path are [`planning/occurrence-usage-prefix-matrix.md`](../planning/occurrence-usage-prefix-matrix.md) — that file, not this one, is where a family's status lives.
+`OccurrenceUsage`, `ItemUsage`, `SatisfyRequirementUsage` and `PartUsage` carry the shared component; every other family still carries whatever partial prefix fields it had. The audit, the corpus evidence, the per-family migration status and the continuation path are [`planning/occurrence-usage-prefix-matrix.md`](../planning/occurrence-usage-prefix-matrix.md) — that file, not this one, is where a family's status lives. `PartUsage`'s own slice has a linked matrix, [`planning/part-usage-prefix-matrix.md`](../planning/part-usage-prefix-matrix.md), because its thirteen owning scopes, five construction paths and six competing productions are specific to it.
+
+**Debt that slice surfaced and did not close**, each recorded with grammar evidence in that matrix §11:
+
+- `then` (`SourceSuccessionMember`) precedes an `OccurrenceUsageMember` and so may precede any occurrence usage, but only `OccurrenceUsage` models it. `then snapshot part vehicle_1_t1 { … }` (`training/28. Individuals/Individuals and Roles-1.sysml:18`) is still a recovery node.
+- `item def`, `attribute def`, an occurrence usage body, an action usage body and a `variant` member all project as contentless semantic markers, which hides every member they own — a part usage among them. Five of the thirteen scopes therefore show nothing in a snapshot, not because `PartUsage` lacks a projection but because their own families do.
+- `metadata_keyword_head` accepts a reserved keyword as a reference name segment, so an incomplete extension keyword (`# part p;`) is read as `#part` plus a separate member rather than refused. A `NAME` can never be a reserved keyword; the fix belongs to the `#`-sigil seam ([`planning/metadata-sigil-matrix.md`](../planning/metadata-sigil-matrix.md)) because it changes every `#` site at once.
+- `calc def` bodies dispatch a part usage only behind an `in`/`out`/`inout` gate, so a bare `part p;` there is not reached at all. That is the scope's own selector, not this production.
+- `perform` bodies parse their members with a bare `many0` and no starter table, so unrecognized content ends the body instead of becoming a recovery node.
 
 Two neighbouring productions are deliberately **not** this one and must not reuse the whole component: `UsagePrefix` admits `end` and no `individual`/`PortionKind`, and `ControlNodePrefix` admits no `ref`. The nesting exists so each of them can later reuse the exact sub-component its production names.
 

@@ -1,7 +1,7 @@
 # Factor shared grammatical concepts
 
 > **Status:** Phases 1-3 implemented; Phase 4 active -- the first grammar-owned component is
-> established and three usage families are migrated; the remaining families move only through
+> established and four usage families are migrated; the remaining families move only through
 > separately audited vertical slices
 
 ## Purpose
@@ -387,6 +387,29 @@ also reach, so migrating either of those later uses the exact sub-component its 
 Flattening them into one struct would have made `ref merge m;` -- which `ControlNodePrefix`
 forbids -- representable, which is precisely the failure mode this phase's "preserve distinct
 enums for mutually exclusive syntax shapes" step exists to prevent.
+
+#### Continuation: `PartUsage` — done
+
+Step 6 -- "the remaining confirmed owners in reviewable family-sized slices, atomically per owner
+and all of that owner's legal scopes" -- has taken its first step beyond the initial three.
+`PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623) now carries the same component,
+and its six superseded fields are gone. The audit that had to exist first is
+`planning/part-usage-prefix-matrix.md`, a linked matrix rather than a section of the seam's own,
+because thirteen owning scopes, five construction paths, six competing productions and a recovery
+contract are specific to that family and are not shared with the three already migrated.
+
+What it demonstrates about the phase's own claims: the shared component needed no change at all
+to take a fourth owner, which is the evidence that "reuse the exact sub-component the production
+names" is a real seam and not a coincidence of the first three. What it also demonstrates is that
+the *slice* is still family-sized work rather than a mechanical field swap -- the migration turned
+up a package-level dispatch that shared one prefix between `PartDefinition` and `PartUsage`, a
+`PortionKind` classified as selecting a production rather than prefixing one, five recovery
+starter tables missing FIRST tokens, seven contentless projection sites, and an emitter that
+stranded a keyword's trailing space. None of those was visible from the AST field list.
+
+Every other family remains exactly as deferred as it was;
+`planning/occurrence-usage-prefix-matrix.md` §9 is still the authoritative ledger, and `PortUsage`
+is the recommended next candidate on its own evidence.
 
 Deliverables:
 
