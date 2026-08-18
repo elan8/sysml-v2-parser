@@ -938,8 +938,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_requirement_definition(&definition.value)?;
                         }
                         RequirementDefBodyElement::PortUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_port_usage(&usage.value)?;
+                            self.write_port_usage_member(&mut first, &usage.value)?;
                         }
                         RequirementDefBodyElement::AllocationUsage(_usage) => {
                             self.write_marker(&mut first, "allocation-usage")?;
@@ -1409,8 +1408,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_ref_declaration(&declaration.value)?;
                         }
                         PartDefBodyElement::PortUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_port_usage(&usage.value)?;
+                            self.write_port_usage_member(&mut first, &usage.value)?;
                         }
                         PartDefBodyElement::PartUsage(usage) => {
                             self.write_part_usage_member(&mut first, &usage.value)?;
@@ -1530,8 +1528,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_connection_definition(&definition.value)?;
                         }
-                        PartDefBodyElement::PortDef(_definition) => {
-                            self.write_marker(&mut first, "port-def")?;
+                        PartDefBodyElement::PortDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_definition(&definition.value)?;
                         }
                         PartDefBodyElement::CalcDef(_definition) => {
                             self.write_marker(&mut first, "calc-def")?;
@@ -2300,8 +2299,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_port_definition(&definition.value)?;
                         }
                         InterfaceDefBodyElement::PortUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_port_usage(&usage.value)?;
+                            self.write_port_usage_member(&mut first, &usage.value)?;
                         }
                         InterfaceDefBodyElement::FlowUsage(_usage) => {
                             self.write_marker(&mut first, "flow-usage")?;
@@ -2358,11 +2356,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         ConnectionDefBodyElement::ItemUsage(usage) => {
                             self.write_item_usage_member(&mut first, &usage.value)?;
                         }
-                        ConnectionDefBodyElement::PortDef(_definition) => {
-                            self.write_marker(&mut first, "port-def")?;
+                        ConnectionDefBodyElement::PortDef(definition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_definition(&definition.value)?;
                         }
-                        ConnectionDefBodyElement::PortUsage(_usage) => {
-                            self.write_marker(&mut first, "port-usage")?;
+                        ConnectionDefBodyElement::PortUsage(usage) => {
+                            self.write_port_usage_member(&mut first, &usage.value)?;
                         }
                         ConnectionDefBodyElement::AssertConstraint(_constraint) => {
                             self.write_marker(&mut first, "assert-constraint")?;
@@ -2700,8 +2699,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_occurrence(&member.value)?;
                         }
-                        super::PartUsageBodyElement::PortUsage(_member) => {
-                            self.write_marker(&mut first, "port-usage")?;
+                        super::PartUsageBodyElement::PortUsage(member) => {
+                            self.write_port_usage_member(&mut first, &member.value)?;
                         }
                         super::PartUsageBodyElement::Bind(_member) => {
                             self.write_marker(&mut first, "bind")?;
@@ -2764,8 +2763,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::OccurrenceDef(_member) => {
                             self.write_marker(&mut first, "occurrence-def")?;
                         }
-                        super::PartUsageBodyElement::PortDef(_member) => {
-                            self.write_marker(&mut first, "port-def")?;
+                        super::PartUsageBodyElement::PortDef(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_port_definition(&member.value)?;
                         }
                         super::PartUsageBodyElement::CalcDef(_member) => {
                             self.write_marker(&mut first, "calc-def")?;
@@ -3107,9 +3107,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             Some(super::VariantTypedUsage::Attribute(usage)) => {
                 self.write_attribute_usage(&usage.value)?
             }
-            Some(super::VariantTypedUsage::Port(_usage)) => {
-                self.writer.write_str("(port-usage)")?
-            }
+            Some(super::VariantTypedUsage::Port(usage)) => self.write_port_usage(&usage.value)?,
             Some(super::VariantTypedUsage::Perform(_usage)) => {
                 self.writer.write_str("(perform)")?
             }
@@ -4037,8 +4035,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_marker(&mut first, "enumeration-usage")?;
                         }
                         PortDefBodyElement::PortUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_port_usage(&usage.value)?;
+                            self.write_port_usage_member(&mut first, &usage.value)?;
                         }
                         PortDefBodyElement::MetadataKeywordUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -4372,7 +4369,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ItemUsage(usage) => {
                 self.write_item_usage_member(first, &usage.value)
             }
-            PackageBodyElement::PortUsage(_usage) => self.write_marker(first, "port-usage"),
+            PackageBodyElement::PortUsage(usage) => {
+                self.write_port_usage_member(first, &usage.value)
+            }
             PackageBodyElement::ConnectionUsage(_usage) => {
                 self.write_marker(first, "connection-usage")
             }
