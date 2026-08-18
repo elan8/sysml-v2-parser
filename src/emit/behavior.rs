@@ -1337,7 +1337,7 @@ pub(crate) fn emit_occurrence_usage(
     usage: &crate::ast::OccurrenceUsage,
 ) -> Result<(), EmitError> {
     // `SourceSuccessionMember` precedes the membership, which precedes the usage's own prefix.
-    if usage.is_then {
+    if usage.then_span.is_some() {
         w.push_str("then ");
     }
     emit_visibility(w, usage.membership.visibility);

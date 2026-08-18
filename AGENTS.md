@@ -81,6 +81,16 @@ not precedent: do not copy or extend them, and do not disguise them with compati
 - Model grammar alternatives with enums and structured fields. Booleans are appropriate only for
   genuinely independent binary properties, not as a compressed encoding of mutually exclusive
   syntax shapes.
+- Factor shared syntax only at boundaries owned by an authoritative grammar production or by an
+  explicitly documented syntax-layer invariant. Similar Rust fields, repeated parser code, or a
+  desire to reduce type count are not sufficient evidence. Prefer several precise composable
+  components over a universal definition, usage, header, member, or body node containing
+  discriminator tags and mostly irrelevant optional fields.
+- Evolve shared grammar incrementally by coherent vertical slice. Establish the pinned productions,
+  FIRST sets, legal scopes, corpus evidence, recovery behavior, and allocation implications before
+  introducing a component; migrate representative owning families and every one of their consumers
+  atomically; delete their superseded representations; then expand only to families proven to name
+  the same production. Do not stage a repository-wide flag-day rewrite or committed dual model.
 - Matches over AST and syntax enums are exhaustive. Do not use `_`, silent omission, or generic
   fallback output in emitters, validators, serializers, normalizers, visitors, or snapshot formatters.
   Adding a variant must produce compile failures at every policy boundary that needs a decision.

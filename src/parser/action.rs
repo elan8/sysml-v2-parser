@@ -62,6 +62,15 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"if",
     b"@",
     b"#",
+    // The rest of FIRST(`OccurrenceUsagePrefix`) on the item and part usages this scope
+    // dispatches; `#`, `in`, `out`, `part`, `ref`, `snapshot` and `variation` were already
+    // listed. See `planning/part-usage-prefix-matrix.md` §6.
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"individual",
+    b"inout",
+    b"timeslice",
 ];
 
 const CONTROL_NODE_KEYWORDS: &[&[u8]] = &[b"accept", b"send", b"terminate", b"while", b"if"];
@@ -732,6 +741,10 @@ pub(crate) fn action_def_body_element(
             let elem = ActionDefBodyElement::ItemUsage(usage);
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
+            let elem = ActionDefBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let (input, elem) = nom::branch::alt((
         map(assign_stmt, ActionDefBodyElement::Assign),
@@ -1268,6 +1281,10 @@ pub(crate) fn action_usage_body_element(
     if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
         if let Ok((next, usage)) = crate::parser::item::item_usage(start) {
             let elem = ActionUsageBodyElement::ItemUsage(usage);
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
+            let elem = ActionUsageBodyElement::PartUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
     }

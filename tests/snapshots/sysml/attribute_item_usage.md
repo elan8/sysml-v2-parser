@@ -28,7 +28,8 @@ package Messaging {
 ~~~sexpr
 (parsed-document
   (references
+    (reference r0 (scope relative) (span (offset 68) (line 3) (column 24) (len 7)) (segments (segment 0 (token "Picture") (name "Picture") (separator none) (span (offset 68) (line 3) (column 24) (len 7)))))
   )
-  (root (package (name "Messaging") (body brace (attribute-def (name "Show") (multiplicity none)) (item-def))))
+  (root (package (name "Messaging") (body brace (attribute-def (declaration-name "Show") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (value none) (body brace (item-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration "picture") (short-name none) (type (ref r0)) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines none) (value none) (body semicolon)))) (item-def (name "Picture") (individual false) (specializes none) (body semicolon)))))
 )
 ~~~

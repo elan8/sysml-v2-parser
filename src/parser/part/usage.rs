@@ -10,10 +10,30 @@ fn usage_ordered_modifier(input: Input<'_>) -> IResult<Input<'_>, (bool, bool)> 
     Ok((input, (ordered.is_some(), nonunique.is_some())))
 }
 
+/// Everything a `PartUsage` head recognizes before the declaration.
+///
+/// `PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623), and `Usage` opens with
+/// `Identification`, whose `( '<' ShortName '>' )?` half is read once at the head rather than in
+/// each of the three declaration tails. `MemberPrefix`'s visibility belongs to the
+/// `OccurrenceUsageMember`/`PackageMember` around the usage, not to the prefix, so it travels
+/// here as a [`Membership`] and is stored as one.
+///
+/// The tails take this by reference and clone it into the node they build. Before this seam each
+/// tail defaulted six prefix fields and each head assigned over them one by one, which is how
+/// `part_def_or_usage` came to accept a different set of slots than `part_usage`.
+pub(crate) struct PartUsageHead {
+    prefix: crate::ast::OccurrenceUsagePrefix,
+    /// `SourceSuccessionMember`'s `then`, which precedes the membership and therefore the prefix.
+    then_span: Option<crate::ast::Span>,
+    short_name: Option<String>,
+    membership: Membership,
+}
+
 /// Part usage redefines-only: (`:>>` | `redefines`) qualified_name multiplicity? ordered? value? body.
-pub(crate) fn part_usage_redefines_only<'a>(
+fn part_usage_redefines_only<'a>(
     start: Input<'a>,
     input: Input<'a>,
+    head: &PartUsageHead,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, (_, redefines_qname)) = prefix_redefinition_target(input)?;
     // GH-92.2: an explicit `: Type` clause may follow the redefines target, e.g. `part redefines
@@ -34,14 +54,10 @@ pub(crate) fn part_usage_redefines_only<'a>(
             start,
             input,
             PartUsage {
-                usage_prefix: None,
-                is_individual: false,
-                is_reference: false,
-                direction: None,
-                is_derived: false,
-                is_constant: false,
+                prefix: head.prefix.clone(),
+                then_span: head.then_span.clone(),
                 name: String::new(),
-                short_name: None,
+                short_name: head.short_name.clone(),
                 typing,
                 multiplicity: multiplicity_opt,
                 ordered,
@@ -52,16 +68,17 @@ pub(crate) fn part_usage_redefines_only<'a>(
                 body,
                 name_span: None,
                 type_ref_span,
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
+                membership: head.membership.clone(),
             },
         ),
     ))
 }
 
 /// Part usage with name (and optional type, redefines, etc.): (':>>')? name ':' type_name? ...
-pub(crate) fn part_usage_named<'a>(
+fn part_usage_named<'a>(
     start: Input<'a>,
     input: Input<'a>,
+    head: &PartUsageHead,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, _) = opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -113,14 +130,10 @@ pub(crate) fn part_usage_named<'a>(
             start,
             input,
             PartUsage {
-                usage_prefix: None,
-                is_individual: false,
-                is_reference: false,
-                direction: None,
-                is_derived: false,
-                is_constant: false,
+                prefix: head.prefix.clone(),
+                then_span: head.then_span.clone(),
                 name: name_str,
-                short_name: None,
+                short_name: head.short_name.clone(),
                 typing,
                 multiplicity: multiplicity_opt,
                 ordered,
@@ -131,45 +144,41 @@ pub(crate) fn part_usage_named<'a>(
                 body,
                 name_span: Some(name_span),
                 type_ref_span,
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
+                membership: head.membership.clone(),
             },
         ),
     ))
 }
 
-/// Part usage: (`ref`)? 'part' ( ':>>' qualified_name | (':>>')? name ':' type_name? ... ) multiplicity? ... body
+/// `PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623).
 ///
-/// Prefix keywords follow BNF `RefPrefix`/`OccurrenceUsagePrefix` order (§8.2.2.6.2, §8.2.2.9.2,
-/// reached via `PartUsage = OccurrenceUsagePrefix 'part' Usage` -> `OccurrenceUsagePrefix :
-/// BasicUsagePrefix ...` -> `BasicUsagePrefix : RefPrefix ...`): direction, `derived`,
-/// (`abstract`|`variation`), `constant`, `ref` (`BasicUsagePrefix.isReference`), then `individual`.
+/// One parser for every legal spelling and every scope of §3 in
+/// `planning/part-usage-prefix-matrix.md`. The prefix is the shared component
+/// [`occurrence_usage_prefix`](crate::parser::occurrence_prefix::occurrence_usage_prefix), not a
+/// hand-rolled subset: this function previously accepted `RefPrefix` plus `ref` plus
+/// `individual` and nothing else, so `snapshot part vehicle_1_t0 { ... }` (`training/28.
+/// Individuals/Individuals and Roles-1.sysml:14`) reached recovery and `#logical part
+/// vehicleLogical : Vehicle { ... }` (`Vehicle Example/SysML v2 Spec Annex A
+/// SimpleVehicleModel.sysml:487`) became two sibling members.
+///
+/// Wrapped in a reference transaction because the prefix's `UsageExtensionKeyword*` allocates an
+/// arena entry per `#tag` before the production is known to apply. A prefix followed by anything
+/// other than `part` fails the whole production, so the member reaches recovery as one node
+/// rather than being reinterpreted as an unprefixed usage.
 pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
+    crate::parser::span::reference_transaction(input, part_usage_inner)
+}
+
+fn part_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // `DefinitionBodyItem`/`NonBehaviorBodyItem` = `( SourceSuccessionMember )? …UsageMember`, so
+    // `then` precedes the membership, and `OccurrenceUsageMember = MemberPrefix …`, so the
+    // visibility keyword precedes the usage's own prefix. All three in that order.
+    let (input, then_span) =
+        crate::parser::occurrence_prefix::optional_keyword_token(input, b"then")?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, direction) = opt(crate::parser::attribute::direction_prefix).parse(input)?;
-    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    let (input, usage_prefix) = opt(alt((
-        map(preceded(tag(&b"abstract"[..]), ws1), |_| {
-            DefinitionPrefix::Abstract
-        }),
-        map(preceded(tag(&b"variation"[..]), ws1), |_| {
-            DefinitionPrefix::Variation
-        }),
-    )))
-    .parse(input)?;
-    let (input, is_constant) = opt(preceded(tag(&b"constant"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    // `BasicUsagePrefix.isReference` — must come before `individual` / `'part'`.
-    let (input, is_reference) = opt(preceded(tag(&b"ref"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
     let (input, _) = tag(&b"part"[..]).parse(input)?;
     // Allow `part: Type` with no whitespace (anonymous UsageDeclaration).
     let (after_kw, _) = ws_and_comments(input)?;
@@ -194,58 +203,37 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
     };
     // `Identification`'s `( '<' ShortName '>' )?` half (BNF §8.2.2.2) -- see
     // `attribute::attribute_usage`'s identical short-name handling for the confirmed real-usage
-    // citation. Parsed once here at the dispatch level (rather than inside each of the three
-    // branches below) and threaded through post-hoc, mirroring how `usage_prefix`/`is_individual`/
-    // etc. are already applied to whichever branch matches.
+    // citation. Parsed once here at the dispatch level rather than inside each of the three
+    // declaration tails below, which is why it travels in [`PartUsageHead`].
     let (input, short_name) = short_name_prefix(input)?;
     // Consume (not just peek) whitespace/comments after the short name's closing `>` -- see
     // `attribute::attribute_usage`'s identical fix for why this can't reuse `ws1`'s earlier
     // consumption (a short name leaves fresh un-consumed whitespace after it).
     let (input, _) = ws_and_comments(input)?;
+    let head = PartUsageHead {
+        prefix,
+        then_span,
+        short_name,
+        membership: Membership::feature(visibility, visibility_span),
+    };
     let peek = input;
     if (peek.fragment().starts_with(b":")
         && !peek.fragment().starts_with(b":>")
         && !peek.fragment().starts_with(b":>>"))
         || starts_with_keyword(peek.fragment(), b"defined")
     {
-        let (input, mut usage) = anonymous_part_usage(start, input)?;
-        usage.value.usage_prefix = usage_prefix;
-        usage.value.is_individual = is_individual;
-        usage.value.is_reference = is_reference;
-        usage.value.direction = direction;
-        usage.value.is_derived = is_derived;
-        usage.value.is_constant = is_constant;
-        usage.value.short_name = short_name;
-        usage.value.membership = Membership::feature(visibility, visibility_span);
+        return anonymous_part_usage(start, input, &head);
+    }
+    if let Ok((input, usage)) = part_usage_redefines_only(start, input, &head) {
         return Ok((input, usage));
     }
-    if let Ok((input, usage)) = part_usage_redefines_only(start, input) {
-        let mut usage = usage;
-        usage.value.usage_prefix = usage_prefix;
-        usage.value.is_individual = is_individual;
-        usage.value.is_reference = is_reference;
-        usage.value.direction = direction;
-        usage.value.is_derived = is_derived;
-        usage.value.is_constant = is_constant;
-        usage.value.short_name = short_name;
-        usage.value.membership = Membership::feature(visibility, visibility_span);
-        return Ok((input, usage));
-    }
-    let (input, mut usage) = part_usage_named(start, input)?;
-    usage.value.usage_prefix = usage_prefix;
-    usage.value.is_individual = is_individual;
-    usage.value.is_reference = is_reference;
-    usage.value.direction = direction;
-    usage.value.is_derived = is_derived;
-    usage.value.is_constant = is_constant;
-    usage.value.short_name = short_name;
-    usage.value.membership = Membership::feature(visibility, visibility_span);
-    Ok((input, usage))
+    part_usage_named(start, input, &head)
 }
 
 fn anonymous_part_usage<'a>(
     start: Input<'a>,
     input: Input<'a>,
+    head: &PartUsageHead,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, multiplicity_before) = opt(multiplicity_node).parse(input)?;
     let (input, (ordered_before_type, nonunique_before_type)) = usage_ordered_modifier(input)?;
@@ -275,14 +263,10 @@ fn anonymous_part_usage<'a>(
             start,
             input,
             PartUsage {
-                usage_prefix: None,
-                is_individual: false,
-                is_reference: false,
-                direction: None,
-                is_derived: false,
-                is_constant: false,
+                prefix: head.prefix.clone(),
+                then_span: head.then_span.clone(),
                 name: String::new(),
-                short_name: None,
+                short_name: head.short_name.clone(),
                 typing,
                 multiplicity: multiplicity_opt,
                 ordered,
@@ -293,7 +277,7 @@ fn anonymous_part_usage<'a>(
                 body,
                 name_span: None,
                 type_ref_span: Some(type_ref_span),
-                membership: Membership::feature(None, crate::ast::Span::dummy()),
+                membership: head.membership.clone(),
             },
         ),
     ))
@@ -1391,6 +1375,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             let elem = PartUsageBodyElement::ItemUsage(usage);
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = part_usage(start) {
+            let elem = PartUsageBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let frag = start.fragment();
     let first_30 = frag.get(..30.min(frag.len())).unwrap_or(frag);
@@ -2086,7 +2074,7 @@ mod short_name_tests {
         let (rest, node) =
             part_usage(input("ref part origin : Remote :> remotes;")).expect("ref part usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_reference);
+        assert!(node.value.prefix.basic.reference_span.is_some());
         assert_eq!(node.value.name, "origin");
         assert_eq!(
             node.value
@@ -2108,14 +2096,14 @@ mod short_name_tests {
     fn part_usage_accepts_ref_prefix_with_subsetting_only() {
         let (rest, node) = part_usage(input("ref part origin :> mesolab;")).expect("ref part");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_reference);
+        assert!(node.value.prefix.basic.reference_span.is_some());
         assert!(node.value.subsets.is_some());
     }
 
     #[test]
     fn part_usage_without_ref_prefix_is_not_reference() {
         let (_, node) = part_usage(input("part origin : Remote :> remotes;")).expect("part");
-        assert!(!node.value.is_reference);
+        assert!(node.value.prefix.basic.reference_span.is_none());
         assert!(node.value.subsets.is_some());
     }
 
@@ -2126,7 +2114,7 @@ mod short_name_tests {
         let (rest, node) =
             part_usage(input("ref part :>> elements: SparePart;")).expect("ref part :>>");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_reference);
+        assert!(node.value.prefix.basic.reference_span.is_some());
         assert!(node.value.name.is_empty());
         assert!(node.value.redefines.is_some());
         assert_eq!(

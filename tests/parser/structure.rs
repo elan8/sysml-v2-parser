@@ -2070,7 +2070,11 @@ fn test_part_usage_body_ref_part_assignments_parse() {
     let refs: Vec<_> = elements
         .iter()
         .filter_map(|element| match &element.value {
-            PartUsageBodyElement::PartUsage(part) if part.value.is_reference => Some(&part.value),
+            PartUsageBodyElement::PartUsage(part)
+                if part.value.prefix.basic.reference_span.is_some() =>
+            {
+                Some(&part.value)
+            }
             _ => None,
         })
         .collect();
@@ -2141,7 +2145,7 @@ fn test_ref_part_accepts_subsetting_in_def_and_usage_body() {
             _ => None,
         })
         .expect("ref part origin as PartUsage");
-    assert!(origin.is_reference);
+    assert!(origin.prefix.basic.reference_span.is_some());
     assert!(origin.subsets.is_some(), "expected :> mesolab subsets");
 }
 
@@ -3559,18 +3563,27 @@ part def Foo {
         diag.errors
     );
     let derived = part_def_body_part_usage(&diag.document.root, 0, 0);
-    assert!(derived.is_derived);
-    assert!(!derived.is_constant);
-    assert_eq!(derived.direction, None);
+    assert!(derived.prefix.basic.ref_prefix.derived_span.is_some());
+    assert!(derived.prefix.basic.ref_prefix.constant_span.is_none());
+    assert!(derived.prefix.basic.ref_prefix.direction.is_none());
 
     let constant = part_def_body_part_usage(&diag.document.root, 0, 1);
-    assert!(constant.is_constant);
-    assert!(!constant.is_derived);
+    assert!(constant.prefix.basic.ref_prefix.constant_span.is_some());
+    assert!(constant.prefix.basic.ref_prefix.derived_span.is_none());
 
     let directed = part_def_body_part_usage(&diag.document.root, 0, 2);
-    assert_eq!(directed.direction, Some(InOut::In));
-    assert!(!directed.is_derived);
-    assert!(!directed.is_constant);
+    assert_eq!(
+        directed
+            .prefix
+            .basic
+            .ref_prefix
+            .direction
+            .as_ref()
+            .map(|node| node.value),
+        Some(InOut::In)
+    );
+    assert!(directed.prefix.basic.ref_prefix.derived_span.is_none());
+    assert!(directed.prefix.basic.ref_prefix.constant_span.is_none());
 }
 
 #[test]
@@ -3582,9 +3595,9 @@ part def Foo {
 }"#;
     let result = parse(input).expect("parse should succeed");
     let plain = part_def_body_part_usage(&result, 0, 0);
-    assert!(!plain.is_derived);
-    assert!(!plain.is_constant);
-    assert_eq!(plain.direction, None);
+    assert!(plain.prefix.basic.ref_prefix.derived_span.is_none());
+    assert!(plain.prefix.basic.ref_prefix.constant_span.is_none());
+    assert!(plain.prefix.basic.ref_prefix.direction.is_none());
 }
 
 #[test]

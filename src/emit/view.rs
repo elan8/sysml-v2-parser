@@ -17,6 +17,9 @@ pub(crate) fn emit_constraint_def(
     def: &ConstraintDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    if def.is_abstract {
+        w.push_str("abstract ");
+    }
     w.push_str("constraint def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -31,6 +34,9 @@ pub(crate) fn emit_constraint_usage(
     usage: &ConstraintUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
+    // `ConstraintUsage = OccurrenceUsagePrefix 'constraint' …`: the same typed prefix boundary
+    // the other migrated families stream through.
+    crate::emit::structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     // No trailing space for the anonymous body-only form (`constraint { ... }`, spec42
     // Gap 49a): the body emits its own leading space.
     w.push_str("constraint");
@@ -109,6 +115,9 @@ pub(crate) fn emit_constraint_body_element(
         }
         ConstraintDefBodyElement::RequireConstraint(require) => {
             super::requirement::emit_require_constraint(w, path, &require.value)
+        }
+        ConstraintDefBodyElement::PartUsage(p) => {
+            super::structure::emit_part_usage(w, path, &p.value)
         }
         ConstraintDefBodyElement::AttributeUsage(a) => {
             // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).

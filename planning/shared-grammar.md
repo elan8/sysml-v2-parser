@@ -1,6 +1,8 @@
 # Factor shared grammatical concepts
 
-> **Status:** Phases 1-3 implemented; Phase 4 started -- first family migrated, the rest proposed
+> **Status:** Phases 1-3 implemented; Phase 4 active -- the first grammar-owned component is
+> established and five usage families are migrated; the remaining families move only through
+> separately audited vertical slices
 
 ## Purpose
 
@@ -22,6 +24,12 @@ arena. The goal is to factor concepts that the pinned grammar itself shares whil
 This is a representation and traversal refactor, not permission to widen accepted syntax, infer
 structure from text, or merge distinct grammar productions because their Rust fields happen to
 look alike.
+
+In this plan, **unified grammar layer** means a set of small types and parser entry points that each
+own one pinned grammar production and are composed by distinct family ASTs. It does **not** mean one
+universal definition or usage node, a generic parser framework, a bag of optional fields, or a
+repository-wide replacement performed in one change. The long-term destination is grammar unity,
+not AST uniformity.
 
 ## Problem statement
 
@@ -84,6 +92,22 @@ semantic snapshots.
 Each migrated concept has one AST representation. Do not retain old and new fields, add conversion
 fallbacks, or introduce compatibility mirrors. A phase may be split into small commits or pull
 requests, but each merged migration must update parser construction and all consumers atomically.
+
+### Evidence before abstraction
+
+A shared component is justified only when its planning matrix demonstrates all of the following:
+
+- the pinned grammar names the production or the repository documents the exact syntax-layer
+  invariant it owns;
+- every proposed owner reaches that same production with the same cardinality and ordering;
+- distinct neighbouring productions and their non-interchangeable alternatives are recorded;
+- FIRST sets, parser precedence, speculation rollback, and recovery synchronization are known;
+- authored spans and document-local identities have an owning representation;
+- corpus evidence shows the current exact, partial, discarded, unsupported, malformed, and legacy
+  cases; and
+- the component removes a correctness hazard or enables typed coverage, not merely repeated lines.
+
+If those facts are not established, keep the family-specific type and investigate further.
 
 ### Prefer typed owned nodes before considering arena storage
 
@@ -317,6 +341,11 @@ The matrices and FIRST-set evidence below are a precondition for starting, not a
 produced alongside the migration. Until they exist for a given family, that family is not ready to
 factor, and each family is evaluated and migrated separately rather than as one broad sweep.
 
+Phase 4 is the incremental implementation of the long-term grammar layer; it is not blocked on, and
+must never accumulate toward, a flag-day rewrite. Each slice must leave `main` in a valid final
+architecture with no temporary compatibility model. A later slice may reuse an established nested
+component only when its own production names that component.
+
 For each proposed family:
 
 1. list the authoritative productions and their FIRST sets;
@@ -324,7 +353,8 @@ For each proposed family:
 3. identify fields that are truly shared versus merely similarly named;
 4. preserve distinct enums for mutually exclusive syntax shapes;
 5. migrate one representative pair and validate the abstraction; and
-6. migrate the remaining confirmed scopes atomically by concept.
+6. migrate the remaining confirmed owners in reviewable family-sized slices, atomically per owner
+   and all of that owner's legal scopes.
 
 Likely candidates include `DefinitionHeader`, `UsageHeader`, `StructuralMember`, and
 `BehavioralMember`. These names do not imply that one header type must cover every definition or
@@ -348,7 +378,8 @@ justified. It answers the phase's own questions concretely:
   item …` correctly is only an improvement if the family that owns `item` can then claim it;
 - step 6 -- the remaining confirmed scopes -- is deliberately *not* done in one sweep. Every
   unmigrated family is listed in §9 of that matrix with the slots it still lacks and the
-  continuation path, and none of them claims to have moved.
+  continuation path. `ItemUsage` is migrated; every family still listed as deferred remains on its
+  legacy partial representation.
 
 The nesting is what makes the component reusable rather than merely shared: `RefPrefix` and
 `BasicUsagePrefix` are separately named productions that `UsagePrefix` and `ControlNodePrefix`
@@ -356,6 +387,46 @@ also reach, so migrating either of those later uses the exact sub-component its 
 Flattening them into one struct would have made `ref merge m;` -- which `ControlNodePrefix`
 forbids -- representable, which is precisely the failure mode this phase's "preserve distinct
 enums for mutually exclusive syntax shapes" step exists to prevent.
+
+#### Continuation: `PartUsage` — done
+
+Step 6 -- "the remaining confirmed owners in reviewable family-sized slices, atomically per owner
+and all of that owner's legal scopes" -- has taken its first step beyond the initial three.
+`PartUsage = OccurrenceUsagePrefix 'part' Usage` (SysML BNF 623) now carries the same component,
+and its six superseded fields are gone. The audit that had to exist first is
+`planning/part-usage-prefix-matrix.md`, a linked matrix rather than a section of the seam's own,
+because thirteen owning scopes, five construction paths, six competing productions and a recovery
+contract are specific to that family and are not shared with the three already migrated.
+
+What it demonstrates about the phase's own claims: the shared component needed no change at all
+to take a fourth owner, which is the evidence that "reuse the exact sub-component the production
+names" is a real seam and not a coincidence of the first three. What it also demonstrates is that
+the *slice* is still family-sized work rather than a mechanical field swap -- the migration turned
+up a package-level dispatch that shared one prefix between `PartDefinition` and `PartUsage`, a
+`PortionKind` classified as selecting a production rather than prefixing one, five recovery
+starter tables missing FIRST tokens, seven contentless projection sites, and an emitter that
+stranded a keyword's trailing space. None of those was visible from the AST field list.
+
+#### Continuation: `ConstraintUsage` — done, and not chosen
+
+The fifth family did not move because it was next on the list. It moved because finishing the
+`PartUsage` slice's semantic projection -- so that a part usage is visible in *every* scope that
+can hold one -- meant projecting `ConstraintDefBody`, and that made the end-to-end round-trip gate
+able to see two defects it had been unable to see while the scope projected as a contentless
+marker: `abstract` parsed and discarded on both the definition and the usage, and `ref constraint
+self : …` shredded into a bare `'ref';` expression plus a separate usage. Both are in the pinned
+Systems Library, so every corpus gate had been exercising them and passing, by comparing two
+markers.
+
+That is worth recording as a property of the phase, not just of the slice: **a contentless
+projection is not a neutral placeholder — it silently disables the gates that run through it.**
+The audit is `planning/constraint-usage-prefix-matrix.md`, and the same follow-up closed the
+related discovery that `part p;` in any calculation-shaped body came apart into two bare
+expressions with no diagnostic.
+
+Every other family remains exactly as deferred as it was;
+`planning/occurrence-usage-prefix-matrix.md` §9 is still the authoritative ledger, and `PortUsage`
+is the recommended next candidate on its own evidence.
 
 Deliverables:
 
@@ -373,6 +444,30 @@ Completion criteria:
 - matches remain exhaustive at every policy boundary; and
 - the resulting types contain no discriminator booleans or empty/sentinel values standing in for
   grammar alternatives.
+
+### Phase 4 slice entry and exit gates
+
+Before production edits, a slice must name its owning production, selected family or families,
+legal scopes, current defects, and explicit non-goals. It must also explain why the change belongs
+to one review unit rather than to smaller independent migrations.
+
+A slice may land only when:
+
+- all construction paths for each selected AST family use the shared component;
+- every legacy field, helper, emitter branch, serializer rule, and test normalization for the
+  migrated fact is removed;
+- parser precedence and complete scope FIRST sets are tested, including competing productions;
+- malformed input retains exact spans, makes progress, preserves later siblings, and leaks no arena
+  identities during speculation;
+- semantic snapshots expose the language-level structure rather than the Rust wrapper;
+- parse/emit/reparse equivalence, formatting idempotence, strict/editor equivalence, validated serde,
+  and the relevant corpus gates pass; and
+- the authoritative migration matrix and all summary documents agree about what moved and what is
+  still deferred.
+
+Do not measure success by fewer structs, fewer parser functions, or reduced source lines. Measure it
+by complete typed grammar coverage, impossible invalid states, exact provenance, deterministic
+recovery and emission, and fewer independently drifting policy paths.
 
 ## Verification strategy
 

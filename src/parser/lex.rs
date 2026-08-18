@@ -72,6 +72,9 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"timeslice",
     b"variant",
     b"variation",
+    // `DefinitionBodyItem = ( SourceSuccessionMember )? OccurrenceUsageMember`, so `then` is the
+    // first token of a member here, not part of the one before it.
+    b"then",
     b"analysis",
     b"metadata",
     // KerML classifier-keyword family dispatched via `kerml_classifier_structured`
@@ -201,6 +204,17 @@ pub(crate) const USE_CASE_BODY_STARTERS: &[&[u8]] = &[
     b"state",
     b"subject",
     b"then",
+    // The rest of FIRST(`OccurrenceUsagePrefix`) on the part usage this scope dispatches;
+    // `abstract`, `in`, `out`, `part` and `ref` were already listed. See
+    // `planning/part-usage-prefix-matrix.md` §6.
+    b"#",
+    b"constant",
+    b"derived",
+    b"individual",
+    b"inout",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
 pub(crate) const CALC_DEF_BODY_STARTERS: &[&[u8]] = &[
@@ -242,6 +256,19 @@ pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"constraint",
     b":>>",
     b":>",
+    // `CalculationBody` reaches `StructureUsageMember -> PartUsage`, so `part` and the rest of
+    // FIRST(`OccurrenceUsagePrefix`) are member starters here too. See
+    // `planning/part-usage-prefix-matrix.md` §6.
+    b"part",
+    b"#",
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"individual",
+    b"ref",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
 /// Starters for `RelationshipBody`-shaped brace bodies (alias/import/dependency and other
@@ -302,7 +329,29 @@ pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] = &[
     b"variation",
 ];
 
-pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[b"connect", b"end", b"ref", b"doc"];
+/// `connect`, `end`, `ref`, `doc` -- plus `part` and the rest of FIRST(`OccurrenceUsagePrefix`),
+/// because this scope dispatches `OccurrenceUsage`, `ItemUsage` and `PartUsage`, each of which
+/// may be written with the whole shared prefix. See `planning/part-usage-prefix-matrix.md` §6.
+pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b"connect",
+    b"end",
+    b"ref",
+    b"doc",
+    b"#",
+    b"abstract",
+    b"constant",
+    b"derived",
+    b"in",
+    b"individual",
+    b"inout",
+    b"item",
+    b"occurrence",
+    b"out",
+    b"part",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
+];
 
 /// GH-51: mirrors [`CONNECTION_DEF_BODY_STARTERS`] -- `interface_def_body` previously had no
 /// starter list at all (its own hand-rolled brace loop swallowed unparseable content silently,
@@ -943,10 +992,29 @@ pub(crate) enum ReferencePathKind {
     Dotted,
 }
 
+/// Whether the segment starting here is an *unquoted* reserved keyword.
+///
+/// A `QualifiedName`'s segments are `NAME`s, and a reserved keyword is never a `NAME`. A quoted
+/// name is not a keyword however it is spelled, so `#'part'` is a legitimate reference and `#part`
+/// is not. Used only where a reference sits directly in front of another production's keyword --
+/// see [`qualified_reference_without_reserved_names`].
+fn segment_is_reserved_keyword(input: Input<'_>) -> bool {
+    let fragment = input.fragment();
+    if fragment.first().is_some_and(|byte| *byte == b'\'') {
+        return false;
+    }
+    let length = fragment
+        .iter()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'_')
+        .count();
+    length > 0 && is_reserved_keyword(&fragment[..length])
+}
+
 fn source_backed_reference(
     input: Input<'_>,
     allow_dot: bool,
     require_qualification: bool,
+    reject_reserved_segments: bool,
 ) -> IResult<Input<'_>, (QualifiedReferenceId, ReferencePathKind)> {
     let (input, _) = ws_and_comments(input)?;
     let reference_start = input;
@@ -959,6 +1027,12 @@ fn source_backed_reference(
     };
 
     let segments_start = rest;
+    if reject_reserved_segments && segment_is_reserved_keyword(rest) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            rest,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     let (next, _) = reference_name_span(rest)?;
     rest = next;
     let mut path_kind = ReferencePathKind::Qualified;
@@ -981,6 +1055,9 @@ fn source_backed_reference(
         let (after_separator_ws, _) = ws_and_comments(after_separator)?;
         // A `::*`/`::**` import suffix and malformed/trailing separators belong to the caller.
         // Only commit the separator after proving that another authored name follows it.
+        if reject_reserved_segments && segment_is_reserved_keyword(after_separator_ws) {
+            break;
+        }
         let Ok((after_name, source_span)) = reference_name_span(after_separator_ws) else {
             break;
         };
@@ -1054,7 +1131,22 @@ fn source_backed_reference(
 
 /// Parse a source-backed `::`-qualified semantic reference into the document arena.
 pub(crate) fn qualified_reference(input: Input<'_>) -> IResult<Input<'_>, QualifiedReferenceId> {
-    let (input, (reference, _)) = source_backed_reference(input, false, false)?;
+    let (input, (reference, _)) = source_backed_reference(input, false, false, false)?;
+    Ok((input, reference))
+}
+
+/// [`qualified_reference`], refusing any unquoted reserved keyword as a segment.
+///
+/// For the one position where a reference sits immediately in front of another production's kind
+/// keyword: `PrefixMetadataUsage`'s `OwnedFeatureTyping`. An incomplete extension keyword
+/// otherwise swallows the member behind it -- `# part p;` became a metadata reference *named*
+/// `part` plus a separate declaration, and `#Tag:: part p;` a reference `Tag::part`, both with no
+/// diagnostic about the `#` that was never completed. Rejection happens during the validation
+/// walk, before any arena mutation, so nothing speculative is allocated.
+pub(crate) fn qualified_reference_without_reserved_names(
+    input: Input<'_>,
+) -> IResult<Input<'_>, QualifiedReferenceId> {
+    let (input, (reference, _)) = source_backed_reference(input, false, false, true)?;
     Ok((input, reference))
 }
 
@@ -1063,13 +1155,13 @@ pub(crate) fn qualified_reference(input: Input<'_>) -> IResult<Input<'_>, Qualif
 pub(crate) fn qualified_declaration_name(
     input: Input<'_>,
 ) -> IResult<Input<'_>, QualifiedDeclarationName> {
-    let (input, (reference, _)) = source_backed_reference(input, false, true)?;
+    let (input, (reference, _)) = source_backed_reference(input, false, true, false)?;
     Ok((input, QualifiedDeclarationName::new(reference)))
 }
 
 /// Parse a source-backed semantic path with authored `::` and `.` separators.
 pub(crate) fn reference_path(input: Input<'_>) -> IResult<Input<'_>, QualifiedReferenceId> {
-    let (input, (reference, _)) = source_backed_reference(input, true, false)?;
+    let (input, (reference, _)) = source_backed_reference(input, true, false, false)?;
     Ok((input, reference))
 }
 
@@ -1078,7 +1170,7 @@ pub(crate) fn reference_path(input: Input<'_>) -> IResult<Input<'_>, QualifiedRe
 pub(crate) fn classified_reference_path(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (QualifiedReferenceId, ReferencePathKind)> {
-    source_backed_reference(input, true, false)
+    source_backed_reference(input, true, false, false)
 }
 
 /// Skip any content until we see `}` at the same brace level.

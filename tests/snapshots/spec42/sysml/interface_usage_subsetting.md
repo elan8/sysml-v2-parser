@@ -29,6 +29,6 @@ package InterfaceUsageSubsettingExample {
 (parsed-document
   (references
   )
-  (root (package (name "InterfaceUsageSubsettingExample") (body brace (part-usage (declaration-name "a") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body semicolon)) (part-usage (declaration-name "b") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body semicolon)) (interface-usage) (interface-usage))))
+  (root (package (name "InterfaceUsageSubsettingExample") (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "a") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines none) (value none) (body semicolon)) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "b") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines none) (value none) (body semicolon)) (interface-usage) (interface-usage))))
 )
 ~~~

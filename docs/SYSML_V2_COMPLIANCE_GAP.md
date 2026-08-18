@@ -70,9 +70,16 @@ This does not mean every production in those families is fully grammar-faithful,
 
 ## What is still partial or permissive
 
-### Generic definition and usage grammar remains the largest architectural gap
+### Grammar-production-owned definition and usage components remain the largest architectural gap
 
-The spec's shared definition/usage/specialization layer is still only partially modeled. Much of that logic remains distributed across construct-specific parsers such as parts, ports, attributes, actions, and states instead of being represented by a unified grammar layer.
+The spec's shared definition/usage/specialization productions are still only partially modeled as
+shared typed components. Much of that logic remains distributed across construct-specific parsers
+such as parts, ports, attributes, actions, and states.
+
+The intended “unified grammar layer” is compositional: one precise component per justified pinned
+production, retained inside distinct family ASTs. It is not a universal definition/usage node,
+generic optional-field bag, or monolithic parser rewrite. Migrations proceed through the matrix and
+vertical-slice gates in [`planning/shared-grammar.md`](../planning/shared-grammar.md).
 
 Impact:
 
@@ -95,12 +102,19 @@ Common remaining limitations:
 
 **Progress on usage prefixes:** `OccurrenceUsagePrefix` and the two productions it nests are now
 one shared typed component, and `OccurrenceUsage` (with its `IndividualUsage`, `PortionUsage` and
-`EventOccurrenceUsage` spellings), `ItemUsage` and `SatisfyRequirementUsage` carry the complete
-prefix with each authored keyword's span. Every other usage family still carries whatever partial
-prefix fields it had; which slots each is missing, and the continuation path, are in
+`EventOccurrenceUsage` spellings), `ItemUsage`, `SatisfyRequirementUsage`, `PartUsage` and
+`ConstraintUsage` carry the complete prefix with each authored keyword's span. Every other usage family still carries whatever
+partial prefix fields it had; which slots each is missing, and the continuation path, are in
 [`planning/occurrence-usage-prefix-matrix.md`](../planning/occurrence-usage-prefix-matrix.md) §9.
-"incomplete prefix combinations" above therefore no longer applies to those three families and
+"incomplete prefix combinations" above therefore no longer applies to those five families and
 still applies to the rest.
+
+For `PartUsage` specifically, that closed real pinned syntax rather than only provenance:
+`snapshot part vehicle_1_t0 { … }` and `timeslice part …` were recovered as malformed, `#logical
+part vehicleLogical : Vehicle { … }` became two sibling members instead of one prefixed usage,
+and at package scope a part usage accepted no direction, no `derived` and no `constant` at all.
+The audit is [`planning/part-usage-prefix-matrix.md`](../planning/part-usage-prefix-matrix.md),
+whose §11 lists what it deliberately left open.
 
 The strongest areas today are still packages/imports, parts, requirements, and the general library-validation path.
 
@@ -150,7 +164,8 @@ This means package-level fallback elimination is no longer the main quality prob
 
 The parser is not blocked on missing top-level support for major SysML families anymore. "Not finished" now means:
 
-1. generic definition/usage/specialization grammar is not yet unified
+1. shared definition/usage/specialization productions are not yet consistently represented by
+   grammar-owned components across all families
 2. body-level modeling is still permissive in several modules
 3. action/state/expression coverage is still subset-oriented compared with the full grammar
 4. language-server recovery quality still needs hardening beyond the current solid baseline

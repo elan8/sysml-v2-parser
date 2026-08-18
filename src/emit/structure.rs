@@ -37,23 +37,25 @@ pub(crate) fn emit_part_usage(
     path: &str,
     usage: &PartUsage,
 ) -> Result<(), EmitError> {
+    // `( SourceSuccessionMember )? OccurrenceUsageMember`, and `OccurrenceUsageMember =
+    // MemberPrefix …`: `then` precedes the visibility keyword, which precedes the prefix.
+    if usage.then_span.is_some() {
+        w.push_str("then ");
+    }
     emit_visibility(w, usage.membership.visibility);
-    if let Some(dir) = usage.direction {
-        emit_direction(w, dir);
+    // `PartUsage = OccurrenceUsagePrefix 'part' Usage`: the same typed prefix boundary the
+    // already migrated families stream through, in the production's slot order, with each
+    // keyword written because its slot holds an authored span.
+    emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
+    // No trailing space for the anonymous target-only forms: whichever clause follows
+    // (`: Type`, `:>> target`, `:> target`) emits its own leading space, so `part :>> elements`
+    // came back out as `part  :>> elements` and `in part : Engine` as `in part  : Engine`.
+    // Mirrors `emit_attribute_usage`'s identical handling.
+    if usage.short_name.is_none() && usage.name_span.is_none() {
+        w.push_str("part");
+    } else {
+        w.push_str("part ");
     }
-    emit_ref_prefix(
-        w,
-        usage.is_derived,
-        usage.usage_prefix.as_ref(),
-        usage.is_constant,
-    );
-    if usage.is_reference {
-        w.push_str("ref ");
-    }
-    if usage.is_individual {
-        w.push_str("individual ");
-    }
-    w.push_str("part ");
     if let Some(short) = &usage.short_name {
         w.push_char('<');
         w.push_str(&format_name(short));

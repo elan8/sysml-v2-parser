@@ -37,7 +37,7 @@ fn individual_part_definition_and_usage_parse_as_parts() {
 
     match &elements[1].value {
         PackageBodyElement::PartUsage(usage) => {
-            assert!(usage.value.is_individual);
+            assert!(usage.value.prefix.individual_span.is_some());
             assert_eq!(usage.value.name, "crewMember");
         }
         other => panic!("expected individual part usage, got {other:?}"),
@@ -368,7 +368,9 @@ fn anonymous_individual_parts_and_body_trailing_subsets_parse() {
     let crew_members: Vec<_> = elements
         .iter()
         .filter_map(|e| match &e.value {
-            PartUsageBodyElement::PartUsage(usage) if usage.value.is_individual => {
+            PartUsageBodyElement::PartUsage(usage)
+                if usage.value.prefix.individual_span.is_some() =>
+            {
                 Some(&usage.value)
             }
             _ => None,
@@ -921,7 +923,7 @@ fn system_part_body_accepts_named_interface_and_individual_members() {
         _ => panic!("expected individual part usage"),
     };
     assert_eq!(csm.name, "csm");
-    assert!(csm.is_individual);
+    assert!(csm.prefix.individual_span.is_some());
     assert!(csm.typing.is_some());
     assert!(csm.redefines.is_some());
     assert!(elements

@@ -8,8 +8,8 @@
 
 use sysml_v2_parser::ast::{
     AliasBody, AnnotatingMember, ConnectionDefBody, ConnectionDefBodyElement, PackageBody,
-    PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBodyElement, RefBody,
-    RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
+    PackageBodyElement, PartDefBody, PartDefBodyElement, PartUsageBody, PartUsageBodyElement,
+    RefBody, RelationshipBodyElement, RootElement, StateDefBody, StateDefBodyElement,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
@@ -137,8 +137,16 @@ fn plain_connect_statement_retains_doc_comment() {
     );
 }
 
+/// `ref part sensor : Anything { doc … }` in a `connection def` body keeps its annotation.
+///
+/// The member is a `PartUsage` whose `OccurrenceUsagePrefix` authored `ref`
+/// (`PartUsage = OccurrenceUsagePrefix 'part' Usage`), not a `ReferenceUsage`: `part` is a
+/// reserved keyword and so can never be the `NAME` a `ReferenceUsage`'s `Identification` would
+/// need. It was read as a `RefDecl` here until this scope gave the migrated part-usage parser
+/// first refusal on a contended `ref`. Its body is the same `Body<PartUsageBodyElement>` either
+/// way, which is what this test is about.
 #[test]
-fn connection_ref_body_retains_doc_comment() {
+fn connection_ref_part_body_retains_doc_comment() {
     let input =
         "package P {\nconnection def C {\nref part sensor : Anything {\ndoc /* ref annotation */\n}\n}\n}";
     let elements = package_elements(input);
@@ -152,15 +160,16 @@ fn connection_ref_body_retains_doc_comment() {
     let ConnectionDefBody::Brace { elements, .. } = &connection.body else {
         panic!("expected brace connection def body");
     };
-    let ref_decl = elements
+    let part_usage = elements
         .iter()
         .find_map(|e| match &e.value {
-            ConnectionDefBodyElement::RefDecl(r) => Some(&r.value),
+            ConnectionDefBodyElement::PartUsage(part) => Some(&part.value),
             _ => None,
         })
-        .expect("expected ref declaration");
-    let RefBody::Brace { elements, .. } = &ref_decl.body else {
-        panic!("expected brace ref body");
+        .expect("expected ref part usage");
+    assert!(part_usage.prefix.basic.reference_span.is_some());
+    let PartUsageBody::Brace { elements, .. } = &part_usage.body else {
+        panic!("expected brace part usage body");
     };
     assert!(
         elements.iter().any(|e| matches!(

@@ -213,6 +213,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             let elem = PartDefBodyElement::ItemUsage(usage);
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = part_usage(start) {
+            let elem = PartDefBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let (input, elem) = alt((
         alt((
@@ -949,7 +953,7 @@ mod par_002_nested_def_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match node.value {
             PartDefBodyElement::PartUsage(part) => {
-                assert!(part.value.is_reference);
+                assert!(part.value.prefix.basic.reference_span.is_some());
                 assert_eq!(part.value.name, "origin");
                 assert_eq!(
                     part.value

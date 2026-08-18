@@ -71,6 +71,17 @@ const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
     b"function",
     b"multiplicity",
     b"type",
+    // The rest of FIRST(`OccurrenceUsagePrefix`), which a `PartUsage` in this scope now spells
+    // ahead of `part` -- see `planning/part-usage-prefix-matrix.md` §6. `#`, `abstract`,
+    // `derived`, `part` and `ref` were already listed.
+    b"constant",
+    b"in",
+    b"individual",
+    b"inout",
+    b"out",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
 const ATTRIBUTE_OPAQUE_STARTERS: &[&[u8]] = &[
@@ -106,6 +117,17 @@ const METADATA_BODY_STARTERS: &[&[u8]] = &[
     b"part",
     b"connect",
     b"assert",
+    // The rest of FIRST(`OccurrenceUsagePrefix`) -- see
+    // `planning/part-usage-prefix-matrix.md` §6.
+    b"#",
+    b"constant",
+    b"in",
+    b"individual",
+    b"inout",
+    b"out",
+    b"snapshot",
+    b"timeslice",
+    b"variation",
 ];
 
 const METADATA_OPAQUE_STARTERS: &[&[u8]] = &[b"derived", b"item", b"abstract", b"ref"];
@@ -221,6 +243,17 @@ enum MetadataBindingPrefix {
 fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a
+    // `RefDecl` and `metadata_keyword_prefix` reads `#Tag` as a standalone member, and neither
+    // knows about the `part` keyword that follows, so `PartUsage` gets first refusal.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
+            let elem = AttributeBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -1279,6 +1312,17 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
 fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first; see
+    // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a
+    // `RefDecl` and `metadata_keyword_prefix` reads `#Tag` as a standalone member, and neither
+    // knows about the `part` keyword that follows, so `PartUsage` gets first refusal.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(start) {
+        if let Ok((next, usage)) = crate::parser::part::part_usage(start) {
+            let elem = AttributeBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -1856,22 +1900,54 @@ mod attribute_body_tests {
         ));
     }
 
-    /// Attribute / item bodies own `ref` members (validation 15_11 / 17a).
+    /// Attribute / item bodies own `ref part` members (validation 15_11 / 17a).
+    ///
+    /// `ref part …` is a `PartUsage` whose `OccurrenceUsagePrefix` authored `ref`, not a
+    /// `ReferenceUsage`: `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` and
+    /// `Usage` opens with `Identification`, whose name is a `NAME` -- and `part` is a reserved
+    /// keyword, so it can never be one. This scope used to reach `connector::ref_decl` first,
+    /// which models the shape as a `RefDecl` carrying `RefDeclKind::Part`; the migrated
+    /// `PartUsage` now gets first refusal here as it already did in part, occurrence and action
+    /// bodies, so the same source is the same node in every scope.
     #[test]
-    fn attribute_body_accepts_ref_part_redefines() {
+    fn attribute_body_reads_ref_part_redefines_as_a_part_usage() {
         let (rest, node) =
             attribute_body_element(input("ref part :>> elements: Person;")).expect("ref part :>>");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(matches!(node.value, AttributeBodyElement::RefDecl(_)));
+        match &node.value {
+            AttributeBodyElement::PartUsage(part) => {
+                assert!(part.value.prefix.basic.reference_span.is_some());
+                assert!(part.value.name.is_empty());
+                assert!(part.value.redefines.is_some());
+                assert!(part.value.typing.is_some());
+            }
+            other => panic!("expected PartUsage, got {other:?}"),
+        }
     }
 
     #[test]
-    fn attribute_body_accepts_ref_part_name() {
+    fn attribute_body_reads_ref_part_name_as_a_part_usage() {
         let (rest, node) =
             attribute_body_element(input("ref part subscriber;")).expect("ref part name");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         match &node.value {
-            AttributeBodyElement::RefDecl(r) => assert_eq!(r.value.name, "subscriber"),
+            AttributeBodyElement::PartUsage(part) => {
+                assert!(part.value.prefix.basic.reference_span.is_some());
+                assert_eq!(part.value.name, "subscriber");
+            }
+            other => panic!("expected PartUsage, got {other:?}"),
+        }
+    }
+
+    /// The sibling shapes `connector::ref_decl` still owns are untouched: a bare `ref` with no
+    /// kind keyword, and a kinded `ref` for a family that has not migrated.
+    #[test]
+    fn attribute_body_still_reads_a_bare_ref_as_a_ref_declaration() {
+        let (rest, node) =
+            attribute_body_element(input("ref subscriber : Person;")).expect("bare ref");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        match &node.value {
+            AttributeBodyElement::RefDecl(decl) => assert_eq!(decl.value.name, "subscriber"),
             other => panic!("expected RefDecl, got {other:?}"),
         }
     }

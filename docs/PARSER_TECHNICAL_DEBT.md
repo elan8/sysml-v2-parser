@@ -65,11 +65,24 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 
 **Current AST caveat:** `attribute_usage` accepts extra specialization clauses for grammar coverage, but the existing public `AttributeUsage` AST only stores `typing` and `redefines`. `occurrence_usage` stores `type_name`, `subsets`, and `redefines`, using last-wins behavior for multiple clauses. Structured AST fidelity for `references` / `crosses` and richer body members remains a later tranche.
 
-### 7. Usage *prefixes* — one shared component, three families migrated
+### 7. Usage *prefixes* — one shared component, five families migrated
 
 [`src/parser/occurrence_prefix.rs`](../src/parser/occurrence_prefix.rs) and [`src/ast/occurrence_prefix.rs`](../src/ast/occurrence_prefix.rs) own the pinned `OccurrenceUsagePrefix` and the two productions it nests (`BasicUsagePrefix`, `RefPrefix`). Before it, the prefix was respelled per family: five parsers in `occurrence_body.rs` alone, each accepting a different subset in a different order, and the AST recorded it as independent booleans with no authored span — `derived`, `variation` and `UsageExtensionKeyword*` were not represented at all, and `abstract`/`variation`, `in`/`out`/`inout`, `snapshot`/`timeslice` could each be held in impossible combinations.
 
-`OccurrenceUsage`, `ItemUsage` and `SatisfyRequirementUsage` carry the shared component; every other family still carries whatever partial prefix fields it had. The audit, the corpus evidence, the per-family migration status and the continuation path are [`planning/occurrence-usage-prefix-matrix.md`](../planning/occurrence-usage-prefix-matrix.md) — that file, not this one, is where a family's status lives.
+`OccurrenceUsage`, `ItemUsage`, `SatisfyRequirementUsage`, `PartUsage` and `ConstraintUsage` carry the shared component; every other family still carries whatever partial prefix fields it had. The audit, the corpus evidence, the per-family migration status and the continuation path are [`planning/occurrence-usage-prefix-matrix.md`](../planning/occurrence-usage-prefix-matrix.md) — that file, not this one, is where a family's status lives. `PartUsage`'s own slice has a linked matrix, [`planning/part-usage-prefix-matrix.md`](../planning/part-usage-prefix-matrix.md), because its thirteen owning scopes, five construction paths and six competing productions are specific to it.
+
+**Debt that slice surfaced.** Four of the five were closed by its follow-up; each is recorded with grammar evidence in that matrix §11 and in [`planning/constraint-usage-prefix-matrix.md`](../planning/constraint-usage-prefix-matrix.md).
+
+- ~~`then` (`SourceSuccessionMember`) is modelled only on `OccurrenceUsage`~~ — closed. `PartUsage` carries `then_span`, `OccurrenceUsage`'s spanless `is_then` bool moved to the same shape, and `training/28. Individuals/Individuals and Roles-1.sysml` is now diagnostic-free. Still unrecognized on the families this seam has not migrated.
+- ~~Five owning scopes project as contentless markers~~ — closed. All fifteen scopes that can hold a part usage project their members.
+- ~~`metadata_keyword_head` accepts a reserved keyword as a reference name segment~~ — closed, scoped to the `#` head alone through `qualified_reference_without_reserved_names`; every other reference keeps the existing lexer, because a type reference, a subsetting target and an expression path all legitimately reach words this crate reserves.
+- ~~`calc def` bodies dispatch a part usage only behind an `in`/`out`/`inout` gate~~ — closed, and it was worse than a missing dispatch: `part p;` in any calculation-shaped body (including this crate's KerML type bodies, which share the container) fell through to the terminal expression arm and came apart into `'part';` plus `p;`, with no diagnostic.
+- `perform` bodies parse their members with a bare `many0` and no starter table, so unrecognized content ends the body instead of becoming a recovery node. **Still open.**
+
+**New debt the follow-up recorded rather than closed**, in `planning/constraint-usage-prefix-matrix.md` §8:
+
+- `variation`, `individual` and definition extension keywords on a *definition* prefix. `parse_definition_prefix` — the helper every definition family routes through — recognizes only `abstract`, so `variation constraint def C` is unrepresentable. Closing it means building the `OccurrenceDefinitionPrefix` component, a ~20-family seam.
+- `ordered`/`nonunique` on a constraint usage: `ConstraintUsage` has no `MultiplicityPart` modifier fields, so `constraint c : T[0..*] nonunique` loses `nonunique` on emission (Systems Library `Constraints.sysml:23`). No round-trip check can see it, because nothing records it.
 
 Two neighbouring productions are deliberately **not** this one and must not reuse the whole component: `UsagePrefix` admits `end` and no `individual`/`PortionKind`, and `ControlNodePrefix` admits no `ref`. The nesting exists so each of them can later reuse the exact sub-component its production names.
 
@@ -86,7 +99,10 @@ Two neighbouring productions are deliberately **not** this one and must not reus
 
 From [`SYSML_V2_COMPLIANCE_GAP.md`](./SYSML_V2_COMPLIANCE_GAP.md):
 
-1. **Generic definition/usage/specialization** — still distributed across construct-specific parsers instead of one unified layer (largest architectural gap).
+1. **Grammar-production-owned definition/usage/specialization components** — still distributed
+   across construct-specific parsers instead of precise shared components composed by distinct
+   family ASTs (largest architectural gap). This is a destination reached by audited vertical
+   slices, not a request for a universal usage node or repository-wide rewrite.
 2. **Permissive bodies** — `skip_until_brace_end` still appears in alias, import, connect-body fallbacks, and deep behavioral body parsers.
 3. **Expression subset** — `expr.rs` is precedence-aware but not full `OwnedExpression`.
 4. **Recovery / LSP** — solid baseline; more specific diagnostics and coverage still wanted (see the [`tech-debt`](https://github.com/elan8/sysml-v2-parser/issues?q=is%3Aissue+label%3Atech-debt) and general issue trackers for concrete open items).
@@ -96,15 +112,23 @@ Duplication in code and "partial grammar" in the spec sense overlap: the same mi
 ## What to avoid
 
 - **Monolithic "parser framework" rewrite** while validation and library gates are green — high risk of re-breaking `ExtendedLibraryDecl` and strict diagnostics tests.
+- **Universal definition/usage structs** with discriminator tags or mostly irrelevant optional
+  fields — they make illegal cross-family combinations representable and move grammar enforcement
+  from exhaustive types into runtime validation.
 - **Dedup-only refactors** without grammar tests — merging code paths without fixture coverage tends to hide regressions until the full library suite runs.
 - **Removing fallback nodes prematurely** — keep `ExtendedLibraryDecl` at zero via dedicated parsers, not by deleting the fallback.
 
 ## Recommended workflow for refactors
 
-1. Introduce a small shared primitive (like `parse_optional_definition_header_after_identification`).
-2. Add or extend unit tests on the primitive and one representative family parser.
-3. Migrate similar families in a single PR; run `cargo test -- --include-ignored`.
-4. File or update a [`tech-debt`](https://github.com/elan8/sysml-v2-parser/issues?q=is%3Aissue+label%3Atech-debt)-labeled issue for any family that still uses opaque bodies or duplicated logic afterward — not a note in this file.
+1. Check in a matrix for the exact pinned production, neighbouring alternatives, FIRST sets, legal
+   scopes, corpus evidence, recovery, and provenance requirements.
+2. Introduce the smallest shared typed component that the matrix justifies.
+3. Migrate a representative family and all its construction and consumer paths atomically; remove
+   its superseded representation in the same change.
+4. Expand only to families proven to name the same component, in reviewable family-sized slices;
+   run the full gates documented by `planning/shared-grammar.md`.
+5. Keep the owning matrix current for intentionally deferred families. Do not use this summary as a
+   second migration-status ledger.
 
 ## Summary
 
@@ -113,4 +137,4 @@ Duplication in code and "partial grammar" in the spec sense overlap: the same mi
 | Is there a lot of duplication? | **Yes** — especially definition prefixes, body terminators, recovery loops, and (concretely) `connection.rs`/`interface.rs`. |
 | Is the codebase unmaintainable? | **No** — modules and tests are coherent; debt is known and issue-tracked. |
 | Where's the current backlog? | Grammar-coverage work: [`PARSER_BACKLOG_ROADMAP.md`](./PARSER_BACKLOG_ROADMAP.md). Architecture/duplication work: issues labeled [`tech-debt`](https://github.com/elan8/sysml-v2-parser/issues?q=is%3Aissue+label%3Atech-debt). |
-| Largest long-term gap? | **Unified definition/usage/specialization grammar** plus deeper body parsing, not more top-level `*_def` files. |
+| Largest long-term gap? | **Grammar-production-owned definition/usage/specialization components** plus deeper body parsing, not a universal AST and not more top-level `*_def` files. |

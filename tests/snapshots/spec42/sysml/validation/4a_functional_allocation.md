@@ -142,7 +142,7 @@ package '4a-Functional Allocation' {
 		 */
             in fuelCmd = fuelCmdPort.fuelCmd;
         }
-        part  :>> engine {
+        part :>> engine {
             port  :>> fuelCmdPort {
                 in fuelCmd : FuelCmd;
             }
@@ -154,7 +154,7 @@ package '4a-Functional Allocation' {
                 out engineTorque : Torque;
             }
         }
-        part  :>> transmission {
+        part :>> transmission {
             port  :>> clutchPort {
                 in engineTorque : Torque;
             }
@@ -166,7 +166,7 @@ package '4a-Functional Allocation' {
                 out transmissionTorque : Torque;
             }
         }
-        part  :>> driveshaft {
+        part :>> driveshaft {
             port  :>> shaftPort_b {
                 in transmissionTorque : Torque;
             }
@@ -178,7 +178,7 @@ package '4a-Functional Allocation' {
                 out driveshaftTorque : Torque;
             }
         }
-        part  :>> rearAxleAssembly {
+        part :>> rearAxleAssembly {
             port  :>> shaftPort_d {
                 in driveshaftTorque : Torque;
             }
@@ -187,13 +187,13 @@ package '4a-Functional Allocation' {
                 out wheelTorque1 = rearAxle.leftHalfAxle.axleToWheelPort.wheelTorque;
                 out wheelTorque2 = rearAxle.rightHalfAxle.axleToWheelPort.wheelTorque;
             }
-            part  :>> rearAxle {
-                part  :>> leftHalfAxle {
+            part :>> rearAxle {
+                part :>> leftHalfAxle {
                     port  :>> axleToWheelPort {
                         out wheelTorque : Torque;
                     }
                 }
-                part  :>> rightHalfAxle {
+                part :>> rightHalfAxle {
                     port  :>> axleToWheelPort {
                         out wheelTorque : Torque;
                     }
@@ -210,7 +210,15 @@ package '4a-Functional Allocation' {
     (reference r0 (scope relative) (span (offset 53) (line 2) (column 17) (len 26)) (segments (segment 0 (token "'2a-Parts Interconnection'") (name "2a-Parts Interconnection") (separator none) (span (offset 53) (line 2) (column 17) (len 26)))))
     (reference r1 (scope relative) (span (offset 100) (line 3) (column 17) (len 30)) (segments (segment 0 (token "'3a-Function-based Behavior-1'") (name "3a-Function-based Behavior-1") (separator none) (span (offset 100) (line 3) (column 17) (len 30)))))
     (reference r2 (scope relative) (span (offset 151) (line 4) (column 17) (len 47)) (segments (segment 0 (token "'3a-Function-based Behavior-1'") (name "3a-Function-based Behavior-1") (separator none) (span (offset 151) (line 4) (column 17) (len 30))) (segment 1 (token "'provide power'") (name "provide power") (separator colon-colon) (span (offset 183) (line 4) (column 49) (len 15)))))
+    (reference r3 (scope relative) (span (offset 249) (line 6) (column 44) (len 11)) (segments (segment 0 (token "vehicle1_c1") (name "vehicle1_c1") (separator none) (span (offset 249) (line 6) (column 44) (len 11)))))
+    (reference r4 (scope relative) (span (offset 1172) (line 36) (column 12) (len 6)) (segments (segment 0 (token "engine") (name "engine") (separator none) (span (offset 1172) (line 36) (column 12) (len 6)))))
+    (reference r5 (scope relative) (span (offset 1574) (line 55) (column 12) (len 12)) (segments (segment 0 (token "transmission") (name "transmission") (separator none) (span (offset 1574) (line 55) (column 12) (len 12)))))
+    (reference r6 (scope relative) (span (offset 1908) (line 70) (column 12) (len 10)) (segments (segment 0 (token "driveshaft") (name "driveshaft") (separator none) (span (offset 1908) (line 70) (column 12) (len 10)))))
+    (reference r7 (scope relative) (span (offset 2245) (line 85) (column 12) (len 16)) (segments (segment 0 (token "rearAxleAssembly") (name "rearAxleAssembly") (separator none) (span (offset 2245) (line 85) (column 12) (len 16)))))
+    (reference r8 (scope relative) (span (offset 2610) (line 96) (column 13) (len 8)) (segments (segment 0 (token "rearAxle") (name "rearAxle") (separator none) (span (offset 2610) (line 96) (column 13) (len 8)))))
+    (reference r9 (scope relative) (span (offset 2634) (line 97) (column 14) (len 12)) (segments (segment 0 (token "leftHalfAxle") (name "leftHalfAxle") (separator none) (span (offset 2634) (line 97) (column 14) (len 12)))))
+    (reference r10 (scope relative) (span (offset 2738) (line 102) (column 14) (len 13)) (segments (segment 0 (token "rightHalfAxle") (name "rightHalfAxle") (separator none) (span (offset 2738) (line 102) (column 14) (len 13)))))
   )
-  (root (package (name "4a-Functional Allocation") (body brace (import (target (span (span (offset 53) (line 2) (column 17) (len 29))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 79) (line 2) (column 43) (len 3))) (separator (span (offset 79) (line 2) (column 43) (len 2))) (marker (span (offset 81) (line 2) (column 45) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 100) (line 3) (column 17) (len 33))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 130) (line 3) (column 47) (len 3))) (separator (span (offset 130) (line 3) (column 47) (len 2))) (marker (span (offset 132) (line 3) (column 49) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 151) (line 4) (column 17) (len 50))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 198) (line 4) (column 64) (len 3))) (separator (span (offset 198) (line 4) (column 64) (len 2))) (marker (span (offset 200) (line 4) (column 66) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-usage (declaration-name "vehicle1_c1_functional_allocation") (typing none) (multiplicity-modifiers (ordered false) (nonunique false)) (body brace (port-usage) (perform) (part-usage) (part-usage) (part-usage) (part-usage))))))
+  (root (package (name "4a-Functional Allocation") (body brace (import (target (span (span (offset 53) (line 2) (column 17) (len 29))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 79) (line 2) (column 43) (len 3))) (separator (span (offset 79) (line 2) (column 43) (len 2))) (marker (span (offset 81) (line 2) (column 45) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 100) (line 3) (column 17) (len 33))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 130) (line 3) (column 47) (len 3))) (separator (span (offset 130) (line 3) (column 47) (len 2))) (marker (span (offset 132) (line 3) (column 49) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 151) (line 4) (column 17) (len 50))) (all none) (ref r2) (shape (namespace (wildcard-suffix (span (span (offset 198) (line 4) (column 64) (len 3))) (separator (span (offset 198) (line 4) (column 64) (len 2))) (marker (span (offset 200) (line 4) (column 66) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "vehicle1_c1_functional_allocation") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets (clause (relationship (kind subsets) (implied false) (targets (ref r3))) (value none))) (redefines none) (value none) (body brace (port-usage) (perform) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r4)))) (value none) (body brace (port-usage) (perform) (port-usage))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r5)))) (value none) (body brace (port-usage) (perform) (port-usage))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r6)))) (value none) (body brace (port-usage) (perform) (port-usage))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r7)))) (value none) (body brace (port-usage) (perform) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r8)))) (value none) (body brace (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r9)))) (value none) (body brace (port-usage))) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines (relationship (kind redefines) (implied false) (targets (ref r10)))) (value none) (body brace (port-usage))))))))))))
 )
 ~~~
