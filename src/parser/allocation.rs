@@ -23,6 +23,7 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
     let (input, prefix) = parse_definition_prefix(
         input,
         DefinitionPrefixOptions::new(b"allocation")
+            .variation_allowed()
             .def_required()
             .individual_allowed()
             .with_captured_visibility(),
@@ -34,9 +35,7 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
             start,
             input,
             AllocationDef {
-                definition_prefix: prefix
-                    .is_abstract
-                    .then_some(crate::ast::DefinitionPrefix::Abstract),
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,

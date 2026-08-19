@@ -3,8 +3,8 @@
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::emit_identification;
 use super::structure::{
-    self, emit_definition_prefix, emit_direction, emit_multiplicity, emit_multiplicity_modifiers,
-    emit_subsetting_clause, emit_typing_clause,
+    self, emit_definition_prefix, emit_definition_prefix_value, emit_direction, emit_multiplicity,
+    emit_multiplicity_modifiers, emit_subsetting_clause, emit_typing_clause,
 };
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
@@ -503,7 +503,7 @@ pub(crate) fn emit_perform(
     path: &str,
     perform: &Perform,
 ) -> Result<(), EmitError> {
-    emit_definition_prefix(w, perform.usage_prefix.as_ref());
+    emit_definition_prefix_value(w, perform.usage_prefix.as_ref());
     w.push_str("perform ");
     if let Some(action_reference) = perform.action_reference {
         w.push_qualified_reference(path, action_reference)?;

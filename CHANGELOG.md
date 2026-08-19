@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`BasicDefinitionPrefix` keeps its authored span, and `variation` reaches the connection-like
+  definitions.** Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap 58).
+  **AST version 174 -> 175.**
+
+  `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'` (SysML BNF 219)
+  is one slot with two alternatives. `PartDef`, `ExtendedDefinition`, `ConnectionDef`, `FlowDef`,
+  `AllocationDef` and `InterfaceDef` stored it as a spanless `Option<DefinitionPrefix>`; all six
+  now carry `Option<Node<DefinitionPrefix>>`, so a consumer can point at the keyword instead of
+  searching the source for it. The semantic projection shows the authored span alongside the
+  spelling.
+
+  - **`variation` was refused on every connection-like definition.**
+    `OccurrenceDefinitionPrefix` (SysML BNF 541) opens with `BasicDefinitionPrefix?`, so
+    `variation connection def V;` is legal, but it fell through to the unimplemented
+    extended-library declaration production. `connection`, `flow`, `allocation` and `interface`
+    definitions now accept it in the same slot as `abstract`, with the same span.
+  - **Three hand-rolled copies of the slot are now one.** `part_def` and
+    `extended_definition_inner` each re-spelled the `abstract`/`variation` alternation; both call
+    the shared parser, which is where the span is captured once.
+
+  `variation` remains refused on the definition kinds that still store this slot as a bare
+  `is_abstract` bool, because accepting it there would consume the keyword and drop it. That
+  narrowing, and the list of nodes it applies to, is recorded in the audit.
+
 - **`MultiplicityPart`'s ordering and uniqueness keywords are retained with their authored spans;
   `unique` and `nonordered` stop being swallowed.** Audit and evidence:
   `planning/spec42-upstream-gap-audit.md` (spec42 Gap 52). **AST version 173 -> 174.**

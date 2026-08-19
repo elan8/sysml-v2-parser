@@ -510,7 +510,7 @@ pub enum ActionUsageBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FlowDef {
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
@@ -812,7 +812,7 @@ pub struct Allocate {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AllocationDef {
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,

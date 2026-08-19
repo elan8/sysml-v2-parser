@@ -1711,7 +1711,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.write_reference(keyword.value.reference)?;
         }
         self.writer.write_str(")) (definition-prefix ")?;
-        match definition.definition_prefix {
+        match definition
+            .definition_prefix
+            .as_ref()
+            .map(|prefix| prefix.value)
+        {
             Some(super::DefinitionPrefix::Abstract) => self.writer.write_str("abstract")?,
             Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
             None => self.writer.write_str("none")?,
@@ -2221,14 +2225,21 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
 
     fn write_occurrence_definition_modifiers(
         &mut self,
-        prefix: Option<&super::DefinitionPrefix>,
+        prefix: Option<&Node<super::DefinitionPrefix>>,
         is_individual: bool,
     ) -> io::Result<()> {
         self.writer.write_str(") (modifiers")?;
-        match prefix {
-            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str(" abstract")?,
-            Some(super::DefinitionPrefix::Variation) => self.writer.write_str(" variation")?,
-            None => {}
+        if let Some(prefix) = prefix {
+            // The authored span travels with the keyword: the whole point of the slot is that a
+            // consumer can tell `abstract` from `variation` from neither, *and* point at it.
+            self.writer.write_str(" (")?;
+            self.writer.write_str(match prefix.value {
+                super::DefinitionPrefix::Abstract => "abstract",
+                super::DefinitionPrefix::Variation => "variation",
+            })?;
+            self.writer.write_char(' ')?;
+            write_span(self.writer, &prefix.span)?;
+            self.writer.write_char(')')?;
         }
         if is_individual {
             self.writer.write_str(" individual")?;

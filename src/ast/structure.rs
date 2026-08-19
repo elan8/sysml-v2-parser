@@ -20,7 +20,7 @@ use crate::ast::QualifiedReferenceId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartDef {
     /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix).
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// Whether this is an `individual part def`.
     pub is_individual: bool,
     pub identification: Identification,
@@ -53,7 +53,7 @@ pub struct ExtendedDefinition {
     pub prefix_keywords: Vec<Node<MetadataKeywordUsage>>,
     /// Optional `abstract` or `variation` prefix (BNF BasicDefinitionPrefix), which may precede
     /// the `#`-prefix keywords (`abstract #situation def AbstractFailure;`).
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// Whether the `def` keyword was authored: `true` for the `ExtendedDefinition` form
     /// (`#situation def Failure;`), `false` for the bare extended-usage shorthand
     /// (`#clouddd ArrowheadCore { ... }`, spec42 Gap 39).
@@ -1231,7 +1231,7 @@ pub struct ConnectStmt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InterfaceDef {
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub is_individual: bool,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
@@ -1534,7 +1534,7 @@ pub enum DerivationConnectionRole {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionDef {
-    pub definition_prefix: Option<DefinitionPrefix>,
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual connection def ...` (BNF `OccurrenceUsagePrefix`/definition-prefix
     /// `isIndividual`, GH-90.1), mirroring `ActionDef::is_individual`.
     pub is_individual: bool,

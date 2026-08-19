@@ -2392,7 +2392,7 @@ macro_rules! ast_traversal {
             visitor.visit_span(&$($mutability)? node.span);
             let PartDef { definition_prefix, is_individual, identification, specializes, body, membership } = &$($mutability)? node.value;
             if let Some(inner) = definition_prefix {
-                visitor.visit_definition_prefix_value(inner);
+                visitor.visit_definition_prefix(inner);
             }
             let _ = is_individual;
             visitor.visit_identification(identification);
@@ -2412,7 +2412,7 @@ macro_rules! ast_traversal {
                 visitor.visit_metadata_keyword_usage(inner);
             }
             if let Some(inner) = definition_prefix {
-                visitor.visit_definition_prefix_value(inner);
+                visitor.visit_definition_prefix(inner);
             }
             let _ = has_def_keyword;
             visitor.visit_identification(identification);

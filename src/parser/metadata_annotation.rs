@@ -1,8 +1,8 @@
 //! Metadata/annotation parsing helpers.
 
 use crate::ast::{
-    DefinitionPrefix, ExtendedDefinition, MetadataAnnotation, MetadataDeclaredName,
-    MetadataFeatureIntroducer, MetadataKeywordUsage, MetadataTypedBy, Node,
+    ExtendedDefinition, MetadataAnnotation, MetadataDeclaredName, MetadataFeatureIntroducer,
+    MetadataKeywordUsage, MetadataTypedBy, Node,
 };
 use crate::parser::attribute::metadata_body;
 use crate::parser::lex::{
@@ -14,7 +14,7 @@ use crate::parser::specialization::parse_optional_definition_specialization;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, opt};
+use nom::combinator::opt;
 use nom::multi::{many1, separated_list1};
 use nom::sequence::preceded;
 use nom::IResult;
@@ -242,15 +242,8 @@ pub(crate) fn extended_definition(
 fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedDefinition>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, definition_prefix) = opt(nom::branch::alt((
-        map(preceded(tag(&b"abstract"[..]), ws1), |_| {
-            DefinitionPrefix::Abstract
-        }),
-        map(preceded(tag(&b"variation"[..]), ws1), |_| {
-            DefinitionPrefix::Variation
-        }),
-    )))
-    .parse(input)?;
+    let (input, definition_prefix) =
+        crate::parser::definition_prefix::parse_basic_definition_prefix(input, true)?;
     let (input, prefix_keywords) =
         many1(preceded(ws_and_comments, extended_definition_prefix_tag)).parse(input)?;
     // `def` is optional: the bare extended-usage shorthand `#clouddd ArrowheadCore { ... }`

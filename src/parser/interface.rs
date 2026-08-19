@@ -157,6 +157,7 @@ fn parse_interface_def(
 ) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
     let mut options = DefinitionPrefixOptions::new(b"interface")
+        .variation_allowed()
         .individual_allowed()
         .with_captured_visibility()
         .reject_header_keyword(b"connect");
@@ -171,9 +172,7 @@ fn parse_interface_def(
             start,
             input,
             InterfaceDef {
-                definition_prefix: prefix
-                    .is_abstract
-                    .then_some(crate::ast::DefinitionPrefix::Abstract),
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,

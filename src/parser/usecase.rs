@@ -543,7 +543,9 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
             UseCaseDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                is_abstract: prefix.is_abstract,
+                is_abstract: crate::parser::definition_prefix::slot_is_abstract(
+                    prefix.basic_prefix.as_ref(),
+                ),
                 body,
                 membership: crate::ast::Membership::owning(
                     prefix.visibility,

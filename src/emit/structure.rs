@@ -1287,13 +1287,25 @@ pub(crate) fn emit_ref_prefix(
     if is_derived {
         w.push_str("derived ");
     }
-    emit_definition_prefix(w, usage_prefix);
+    emit_definition_prefix_value(w, usage_prefix);
     if is_constant {
         w.push_str("constant ");
     }
 }
 
-pub(crate) fn emit_definition_prefix(w: &mut EmitWriter<'_>, prefix: Option<&DefinitionPrefix>) {
+pub(crate) fn emit_definition_prefix(
+    w: &mut EmitWriter<'_>,
+    prefix: Option<&Node<DefinitionPrefix>>,
+) {
+    emit_definition_prefix_value(w, prefix.map(|prefix| &prefix.value));
+}
+
+/// The same slot where it is stored without a node wrapper -- `RefPrefix`'s `variance` reached
+/// through the spanless `usage_prefix` fields that have not yet migrated onto it.
+pub(crate) fn emit_definition_prefix_value(
+    w: &mut EmitWriter<'_>,
+    prefix: Option<&DefinitionPrefix>,
+) {
     match prefix {
         Some(DefinitionPrefix::Abstract) => w.push_str("abstract "),
         Some(DefinitionPrefix::Variation) => w.push_str("variation "),
