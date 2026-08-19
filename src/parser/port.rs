@@ -196,11 +196,9 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
     let (input, multiplicity) = opt(multiplicity_node).parse(input)?;
     // `MultiplicityPart`'s `ordered`/`nonunique`, which may sit either side of a specialization
     // clause: `port ports : Port[0..*] nonunique :> objects;` (`Systems Library/Ports.sysml:48`).
-    let (input, (ordered_before, nonunique_before)) =
-        crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers_before) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, clauses) = specialization_clauses(input)?;
-    let (input, (ordered_after, nonunique_after)) =
-        crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers_after) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let redefines = clauses.redefines.or(prefix_redefines);
     // §6 G11: `port :>> pe = c1.pb;` -- a port usage may carry a feature value, which binds it to
     // another port rather than declaring a fresh one.
@@ -221,8 +219,7 @@ fn port_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
                 short_name,
                 typing,
                 multiplicity,
-                ordered: ordered_before || ordered_after,
-                nonunique: nonunique_before || nonunique_after,
+                multiplicity_modifiers: modifiers_before.merge(modifiers_after),
                 subsets: clauses.subsets,
                 redefines,
                 references: clauses.references,
@@ -461,8 +458,8 @@ mod par_002_widening_tests {
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.prefix.basic.ref_prefix.variance.is_some());
         assert!(node.value.multiplicity.is_some());
-        assert!(node.value.nonunique);
-        assert!(!node.value.ordered);
+        assert!(!node.value.multiplicity_modifiers.is_unique());
+        assert!(!node.value.multiplicity_modifiers.is_ordered());
         assert!(node.value.subsets.is_some());
     }
 

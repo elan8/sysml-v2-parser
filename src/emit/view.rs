@@ -3,7 +3,9 @@
 use super::behavior::emit_inout_decl;
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::emit_identification;
-use super::structure::{emit_multiplicity, emit_subsetting_clause, emit_typing_clause};
+use super::structure::{
+    emit_multiplicity, emit_multiplicity_modifiers, emit_subsetting_clause, emit_typing_clause,
+};
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
 use crate::ast::{
@@ -326,12 +328,7 @@ pub(crate) fn emit_kerml_feature_member(
     if let Some(multiplicity) = &feature.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if feature.ordered {
-        w.push_str(" ordered");
-    }
-    if feature.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &feature.multiplicity_modifiers);
     if let Some(redefines) = &feature.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
@@ -533,12 +530,7 @@ pub(crate) fn emit_typed_parameter(
     if let Some(multiplicity) = &param.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if param.ordered {
-        w.push_str(" ordered");
-    }
-    if param.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &param.multiplicity_modifiers);
     if let Some(redefines) = &param.redefines {
         super::structure::emit_subsetting_clause(w, &redefines.value)?;
     }
@@ -576,12 +568,7 @@ pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Resu
     if let Some(multiplicity) = &ret.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if ret.ordered {
-        w.push_str(" ordered");
-    }
-    if ret.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &ret.multiplicity_modifiers);
     if let Some(value) = &ret.value {
         emit_feature_value(w, value)?;
     }
@@ -707,12 +694,7 @@ pub(crate) fn emit_view_usage(
         if let Some(mult) = &usage.multiplicity {
             super::structure::emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     } else {
         if let Some(ty) = &usage.type_name {
             w.push_str(" : ");
@@ -721,12 +703,7 @@ pub(crate) fn emit_view_usage(
         if let Some(mult) = &usage.multiplicity {
             super::structure::emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
         if let Some(redefines) = &usage.redefines {
             emit_typing_clause_as_subset(w, &redefines.value)?;
         }
@@ -954,12 +931,7 @@ pub(crate) fn emit_rendering_usage(
     if let Some(multiplicity) = &usage.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if usage.ordered {
-        w.push_str(" ordered");
-    }
-    if usage.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }

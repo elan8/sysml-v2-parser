@@ -1101,7 +1101,7 @@ fn part_usage_ordered_before_colon_parses_without_recovery() {
             _ => None,
         })
         .expect("engines part usage");
-    assert!(engines.ordered);
+    assert!(engines.multiplicity_modifiers.is_ordered());
     assert!(engines.typing.is_some());
 }
 

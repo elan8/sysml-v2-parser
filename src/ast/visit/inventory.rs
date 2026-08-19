@@ -602,6 +602,31 @@ macro_rules! ast_traversal {
                 walk_occurrence_portion_kind_value(self, value)
             }
 
+            /// Visits a [`MultiplicityOrdering`] keyword slot.
+            fn visit_multiplicity_ordering(&mut self, node: &$($mutability)? Node<MultiplicityOrdering>) {
+                walk_multiplicity_ordering(self, node)
+            }
+
+            /// Visits a [`MultiplicityOrdering`] stored without a node wrapper.
+            fn visit_multiplicity_ordering_value(&mut self, value: &$($mutability)? MultiplicityOrdering) {
+                walk_multiplicity_ordering_value(self, value)
+            }
+
+            /// Visits a [`MultiplicityUniqueness`] keyword slot.
+            fn visit_multiplicity_uniqueness(&mut self, node: &$($mutability)? Node<MultiplicityUniqueness>) {
+                walk_multiplicity_uniqueness(self, node)
+            }
+
+            /// Visits a [`MultiplicityUniqueness`] stored without a node wrapper.
+            fn visit_multiplicity_uniqueness_value(&mut self, value: &$($mutability)? MultiplicityUniqueness) {
+                walk_multiplicity_uniqueness_value(self, value)
+            }
+
+            /// Visits [`MultiplicityModifiers`]; the default implementation walks its children.
+            fn visit_multiplicity_modifiers(&mut self, node: &$($mutability)? MultiplicityModifiers) {
+                walk_multiplicity_modifiers(self, node)
+            }
+
             /// Visits [`RefPrefix`]; the default implementation walks its children.
             fn visit_ref_prefix(&mut self, node: &$($mutability)? RefPrefix) {
                 walk_ref_prefix(self, node)
@@ -2701,7 +2726,7 @@ macro_rules! ast_traversal {
         pub fn walk_attribute_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<AttributeDef>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let AttributeDef { name, short_name, typing, multiplicity, value, body, name_span, typing_span, value_span, ordered, nonunique, membership } = &$($mutability)? node.value;
+            let AttributeDef { name, short_name, typing, multiplicity, value, body, name_span, typing_span, value_span, multiplicity_modifiers, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
             if let Some(inner) = short_name {
                 visitor.visit_text(inner);
@@ -2725,8 +2750,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = value_span {
                 visitor.visit_span(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -2865,7 +2889,7 @@ macro_rules! ast_traversal {
         pub fn walk_part_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<PartUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let PartUsage { prefix, then_span, name, short_name, typing, multiplicity, ordered, nonunique, subsets, redefines, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            let PartUsage { prefix, then_span, name, short_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
             if let Some(inner) = then_span {
                 visitor.visit_span(inner);
@@ -2880,8 +2904,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
                 let (tuple_0, tuple_1) = inner;
                 visitor.visit_subsetting_relationship(tuple_0);
@@ -3272,7 +3295,7 @@ macro_rules! ast_traversal {
         pub fn walk_attribute_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<AttributeUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let AttributeUsage { name, short_name, typing, subsets, redefines, references, crosses, intersects, value, body, name_span, typing_span, redefines_span, direction, multiplicity, ordered, nonunique, is_derived, usage_prefix, is_constant, is_reference, is_end, membership } = &$($mutability)? node.value;
+            let AttributeUsage { name, short_name, typing, subsets, redefines, references, crosses, intersects, value, body, name_span, typing_span, redefines_span, direction, multiplicity, multiplicity_modifiers, is_derived, usage_prefix, is_constant, is_reference, is_end, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
             if let Some(inner) = short_name {
                 visitor.visit_text(inner);
@@ -3314,8 +3337,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             let _ = is_derived;
             if let Some(inner) = usage_prefix {
                 visitor.visit_definition_prefix_value(inner);
@@ -3454,7 +3476,7 @@ macro_rules! ast_traversal {
         pub fn walk_port_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<PortUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let PortUsage { prefix, name, short_name, typing, multiplicity, ordered, nonunique, subsets, redefines, references, crosses, intersects, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            let PortUsage { prefix, name, short_name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, intersects, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
             visitor.visit_text(name);
             if let Some(inner) = short_name {
@@ -3466,8 +3488,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
                 let (tuple_0, tuple_1) = inner;
                 visitor.visit_subsetting_relationship(tuple_0);
@@ -3716,7 +3737,7 @@ macro_rules! ast_traversal {
         pub fn walk_ref_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RefDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RefDecl { direction, is_derived, usage_prefix, is_constant, kind_keyword, name, short_name, typing, redefines, subsets, multiplicity, ordered, nonunique, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
+            let RefDecl { direction, is_derived, usage_prefix, is_constant, kind_keyword, name, short_name, typing, redefines, subsets, multiplicity, multiplicity_modifiers, value, body, name_span, type_ref_span, membership } = &$($mutability)? node.value;
             if let Some(inner) = direction {
                 visitor.visit_in_out_value(inner);
             }
@@ -3742,8 +3763,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
@@ -4074,6 +4094,44 @@ macro_rules! ast_traversal {
             match node {
                 OccurrencePortionKind::Snapshot => {}
                 OccurrencePortionKind::Timeslice => {}
+            }
+        }
+
+        pub fn walk_multiplicity_ordering<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MultiplicityOrdering>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            visitor.visit_multiplicity_ordering_value(&$($mutability)? node.value);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_multiplicity_ordering_value<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? MultiplicityOrdering) {
+            match node {
+                MultiplicityOrdering::Ordered => {}
+                MultiplicityOrdering::Nonordered => {}
+            }
+        }
+
+        pub fn walk_multiplicity_uniqueness<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MultiplicityUniqueness>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            visitor.visit_multiplicity_uniqueness_value(&$($mutability)? node.value);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_multiplicity_uniqueness_value<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? MultiplicityUniqueness) {
+            match node {
+                MultiplicityUniqueness::Unique => {}
+                MultiplicityUniqueness::Nonunique => {}
+            }
+        }
+
+        pub fn walk_multiplicity_modifiers<V: $Visitor>(visitor: &mut V, node: &$($mutability)? MultiplicityModifiers) {
+            let MultiplicityModifiers { ordering, uniqueness } = node;
+            if let Some(inner) = ordering {
+                visitor.visit_multiplicity_ordering(inner);
+            }
+            if let Some(inner) = uniqueness {
+                visitor.visit_multiplicity_uniqueness(inner);
             }
         }
 
@@ -4640,7 +4698,7 @@ macro_rules! ast_traversal {
         pub fn walk_in_out_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<InOutDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let InOutDecl { direction, is_reference, is_var, name, subsets, type_name, multiplicity, ordered, nonunique, redefines, value, body } = &$($mutability)? node.value;
+            let InOutDecl { direction, is_reference, is_var, name, subsets, type_name, multiplicity, multiplicity_modifiers, redefines, value, body } = &$($mutability)? node.value;
             visitor.visit_in_out_value(direction);
             let _ = is_reference;
             let _ = is_var;
@@ -4654,8 +4712,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -4673,7 +4730,7 @@ macro_rules! ast_traversal {
         pub fn walk_typed_parameter_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<TypedParameterMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let TypedParameterMember { direction, is_abstract, kind, name, redefines, type_name, multiplicity, ordered, nonunique, value, body } = &$($mutability)? node.value;
+            let TypedParameterMember { direction, is_abstract, kind, name, redefines, type_name, multiplicity, multiplicity_modifiers, value, body } = &$($mutability)? node.value;
             visitor.visit_in_out_value(direction);
             let _ = is_abstract;
             visitor.visit_kerml_parameter_kind(kind);
@@ -4687,8 +4744,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
@@ -5704,8 +5760,7 @@ macro_rules! ast_traversal {
                 requirement,
                 typing,
                 multiplicity,
-                ordered,
-                nonunique,
+                multiplicity_modifiers,
                 subsets,
                 redefines,
                 references,
@@ -5730,8 +5785,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -5819,7 +5873,7 @@ macro_rules! ast_traversal {
         pub fn walk_item_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ItemUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ItemUsage { prefix, name, type_name, redefines, subsets, short_name, multiplicity, ordered, nonunique, value, body, membership } = &$($mutability)? node.value;
+            let ItemUsage { prefix, name, type_name, redefines, subsets, short_name, multiplicity, multiplicity_modifiers, value, body, membership } = &$($mutability)? node.value;
             visitor.visit_occurrence_usage_prefix(prefix);
             visitor.visit_text(name);
             if let Some(inner) = type_name {
@@ -5837,8 +5891,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
@@ -6661,7 +6714,7 @@ macro_rules! ast_traversal {
         pub fn walk_return_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ReturnDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ReturnDecl { kind_keyword, name, short_name, type_name, is_redefine, is_subsetting, multiplicity, ordered, nonunique, redefines, value, body } = &$($mutability)? node.value;
+            let ReturnDecl { kind_keyword, name, short_name, type_name, is_redefine, is_subsetting, multiplicity, multiplicity_modifiers, redefines, value, body } = &$($mutability)? node.value;
             if let Some(inner) = kind_keyword {
                 visitor.visit_return_kind_keyword(inner);
             }
@@ -6675,8 +6728,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -6883,7 +6935,7 @@ macro_rules! ast_traversal {
         pub fn walk_view_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ViewUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ViewUsage { name, short_name, type_name, subsets, redefines, multiplicity, ordered, nonunique, body, membership } = &$($mutability)? node.value;
+            let ViewUsage { name, short_name, type_name, subsets, redefines, multiplicity, multiplicity_modifiers, body, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
             if let Some(inner) = short_name { visitor.visit_text(inner); }
             if let Some(inner) = type_name {
@@ -6898,8 +6950,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             visitor.visit_view_body(body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
@@ -6983,7 +7034,7 @@ macro_rules! ast_traversal {
         pub fn walk_rendering_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RenderingUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RenderingUsage { is_abstract, name, type_name, multiplicity, ordered, nonunique, subsets, redefines, value, body, membership } = &$($mutability)? node.value;
+            let RenderingUsage { is_abstract, name, type_name, multiplicity, multiplicity_modifiers, subsets, redefines, value, body, membership } = &$($mutability)? node.value;
             let _ = is_abstract;
             visitor.visit_text(name);
             if let Some(inner) = type_name {
@@ -6992,8 +7043,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }
@@ -7154,7 +7204,7 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_feature_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeatureMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeatureMember { is_member, is_derived, is_abstract, is_composite, is_portion, is_var, is_const, is_end, kind, has_kind_keyword, is_all, name, typing, multiplicity, ordered, nonunique, subsets, redefines, references, crosses, chains, inverse_of, type_relationships, value, body, membership } = &$($mutability)? node.value;
+            let KermlFeatureMember { is_member, is_derived, is_abstract, is_composite, is_portion, is_var, is_const, is_end, kind, has_kind_keyword, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, chains, inverse_of, type_relationships, value, body, membership } = &$($mutability)? node.value;
             let _ = is_member;
             let _ = is_derived;
             let _ = is_abstract;
@@ -7173,8 +7223,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
-            let _ = ordered;
-            let _ = nonunique;
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = subsets {
                 visitor.visit_subsetting_relationship(inner);
             }

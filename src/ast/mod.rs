@@ -10,6 +10,7 @@ mod body;
 mod common;
 mod feature_value;
 mod membership;
+mod multiplicity_part;
 mod occurrence_prefix;
 mod package;
 #[cfg(feature = "serde")]
@@ -27,6 +28,7 @@ pub use body::*;
 pub use common::*;
 pub use feature_value::*;
 pub use membership::*;
+pub use multiplicity_part::*;
 pub use occurrence_prefix::*;
 pub use package::*;
 pub use qualified_reference::*;

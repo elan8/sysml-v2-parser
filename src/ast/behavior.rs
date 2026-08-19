@@ -180,11 +180,9 @@ pub struct InOutDecl {
     /// it (`inout replacementValues : Anything[0..*] nonunique;`, `Actions.sysml`); the parser
     /// accepts one clause in either position.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (`in seq[1..*] nonunique ordered;`,
-    /// Systems Library `Interfaces.sysml`).
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Arena-backed redefinition targets, from either position the grammar allows: the leading
     /// unnamed form (`in :>> target = expr;`, validation `08`; `name` is empty) or trailing a
     /// named declaration (`in transitionLinkSource : Action :>> A::x, B::y;`, Systems Library
@@ -227,10 +225,9 @@ pub struct TypedParameterMember {
     pub type_name: Option<QualifiedReferenceId>,
     /// Multiplicity clause, accepted before or after the typing.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart`.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Value clause: `= expr` or `default (=|:=)? expr`.
     pub value: Option<Node<FeatureValue>>,
     /// Body following the calc-body member grammar: `;` or `{ ... }`.

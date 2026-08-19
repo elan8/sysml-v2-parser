@@ -300,11 +300,9 @@ pub struct AttributeDef {
     pub typing_span: Option<Span>,
     /// Span of the default/binding expression value, when present.
     pub value_span: Option<Span>,
-    /// `ordered` keyword from `MultiplicityPart` (BNF §8.2.2.6.6). Legal on a feature
-    /// declaration generally; previously consumed and discarded by `ignored_feature_modifiers`.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006). `kind` is always
     /// [`crate::ast::MembershipKind::OwningMembership`] for a `*Def` -- a nested attribute definition becomes
     /// a new named member of its owning namespace, not a feature of it. `visibility` captures an
@@ -324,8 +322,7 @@ impl PartialEq for AttributeDef {
             && self.multiplicity == other.multiplicity
             && self.value == other.value
             && self.body == other.body
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.membership == other.membership
     }
 }
@@ -483,8 +480,9 @@ pub struct PartUsage {
     pub typing: Option<Node<TypingRelationship>>,
     /// Multiplicity, e.g. `[2]` parsed into structured lower/upper bounds.
     pub multiplicity: Option<Node<Multiplicity>>,
-    pub ordered: bool,
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional `subsets` feature and value expression.
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
     /// Redefines target, e.g. `frontAxleAssembly` or `vehicle1::mass`.
@@ -511,8 +509,7 @@ impl PartialEq for PartUsage {
             && self.short_name == other.short_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.value == other.value
@@ -929,10 +926,9 @@ pub struct AttributeUsage {
     pub direction: Option<InOut>,
     /// Structured multiplicity range from `MultiplicityPart` (e.g. `[0..1]`), when present.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (BNF §8.2.2.6.6).
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `derived` keyword from `RefPrefix` (BNF §8.2.2.6.2) -- usage-only, no `Definition`
     /// equivalent (`AttributeDefinition` uses `DefinitionPrefix`, which has no `derived`).
     pub is_derived: bool,
@@ -974,8 +970,7 @@ impl PartialEq for AttributeUsage {
             && self.body == other.body
             && self.direction == other.direction
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.is_derived == other.is_derived
             && self.is_constant == other.is_constant
             && self.is_end == other.is_end
@@ -1129,14 +1124,9 @@ pub struct PortUsage {
     /// Structured, multi-target typing clause after `:` / `typed by` / `defined by`.
     pub typing: Option<Node<TypingRelationship>>,
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `MultiplicityPart`'s `isOrdered ?= 'ordered'` (BNF §8.2.2.6.2), e.g. `port ports :
-    /// Port[0..*] nonunique ordered;`. Reachable through `Usage -> UsageDeclaration ->
-    /// FeatureSpecializationPart -> MultiplicityPart`, like `PartUsage::ordered`.
-    pub ordered: bool,
-    /// `MultiplicityPart`'s `isNonunique ?= 'nonunique'`; see [`PortUsage::ordered`]. Written on
-    /// the keyword-less package-scope declarations of `Systems Library/Ports.sysml`, which the
-    /// `def`-optional port-definition parser used to claim and discard.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Subsets feature and optional value expression.
     pub subsets: Option<(Node<SubsettingRelationship>, Option<Node<Expression>>)>,
     pub redefines: Option<Node<SubsettingRelationship>>,
@@ -1170,8 +1160,7 @@ impl PartialEq for PortUsage {
             && self.short_name == other.short_name
             && self.typing == other.typing
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.subsets == other.subsets
             && self.redefines == other.redefines
             && self.references == other.references
@@ -1414,10 +1403,9 @@ pub struct RefDecl {
     /// otherParticipants : Port [1..*] nonunique :> ...`, Systems Library `Interfaces.sysml`).
     /// Previously parsed and discarded by `connector::ref_decl`.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart`. See `multiplicity`.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `multiplicity`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Optional binding value: `= expr` (SysML shorthand binding for references).
     pub value: Option<Node<FeatureValue>>,
     pub body: RefBody,
@@ -1443,8 +1431,7 @@ impl PartialEq for RefDecl {
             && self.redefines == other.redefines
             && self.subsets == other.subsets
             && self.multiplicity == other.multiplicity
-            && self.ordered == other.ordered
-            && self.nonunique == other.nonunique
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.value == other.value
             && self.body == other.body
             && self.membership == other.membership

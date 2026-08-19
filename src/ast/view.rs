@@ -257,11 +257,9 @@ pub struct ReturnDecl {
     /// Multiplicity clause after the type, e.g. `return : Real[1] = x;` (Kernel Function
     /// Library). Previously unparseable.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (`return : Anything[0..*] ordered nonunique;`,
-    /// Kernel Function Library `BaseFunctions.kerml`).
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Trailing redefinition targets; repeated `redefines` clauses merge their targets
     /// (`return resultValues : Anything [*] nonunique redefines result redefines values;`,
     /// Kernel Semantic Library `FeatureReferencingPerformances.kerml`).
@@ -454,11 +452,9 @@ pub struct ViewUsage {
     /// columnView[0..*] ordered { ... }` (Systems Library `Views.sysml`). Previously captured
     /// only by the anonymous redefinition form and discarded on the named path.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (`view columnView[0..*] ordered { ... }`).
-    /// Previously skipped and discarded.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     pub body: ViewBody,
     pub membership: Membership,
 }
@@ -532,12 +528,9 @@ pub struct RenderingUsage {
     /// GraphicalRendering[1]` (Systems Library `Views.sysml`). Previously parsed and discarded
     /// inside the shared usage header.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart` (`abstract rendering renderings :
-    /// Rendering[0..*] nonunique :> parts`, Systems Library `Views.sysml`). Previously skipped
-    /// inside the shared usage header.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`. See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `:>` subsets clause, e.g. `: GraphicalRendering[1] :> renderings`. Previously parsed and
     /// discarded.
     pub subsets: Option<Node<SubsettingRelationship>>,

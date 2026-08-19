@@ -255,10 +255,9 @@ pub struct SatisfyRequirementUsage {
     pub typing: Option<Node<TypingRelationship>>,
     /// `MultiplicityPart`'s `OwnedMultiplicity`, e.g. `[1]`.
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `MultiplicityPart`'s `isOrdered ?= 'ordered'`.
-    pub ordered: bool,
-    /// `MultiplicityPart`'s `'nonunique'`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `FeatureSpecialization`'s `Subsettings` clause (`:>` / `subsets`).
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// `FeatureSpecialization`'s `Redefinitions` clause (`:>>` / `redefines`).
@@ -401,11 +400,9 @@ pub struct ItemUsage {
     /// Short name from `< ... >` when present. See `crate::ast::AttributeUsage::short_name`.
     pub short_name: Option<String>,
     pub multiplicity: Option<Node<Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart`. Previously skipped and discarded.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart` (`Item[0..*] nonunique`, Systems Library
-    /// `Items.sysml`). See `ordered`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// Value expression (`= expr`, `default = expr`, `:= expr`), e.g. `new Box(...)`.
     pub value: Option<Node<FeatureValue>>,
     pub body: AttributeBody,

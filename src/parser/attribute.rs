@@ -169,39 +169,32 @@ fn is_reserved_shorthand_starter(name: &str) -> bool {
 }
 
 /// Multiplicity-adjacent modifiers from `MultiplicityPart` (BNF §8.2.2.6.6): an optional
-/// multiplicity range plus `ordered`/`nonunique` (and their negations `nonordered`/`unique`).
-/// Results are OR-merged / first-wins across every occurrence -- callers that invoke this more
-/// than once per declaration (leading and trailing modifier positions) fold the results together.
+/// multiplicity range plus the ordering and uniqueness keyword slots.
+///
+/// Results are merged first-wins across every occurrence -- callers that invoke this more than
+/// once per declaration (leading and trailing modifier positions) fold the results together.
 #[derive(Default, Clone)]
 struct FeatureModifiers {
     multiplicity: Option<Node<Multiplicity>>,
-    ordered: bool,
-    nonunique: bool,
+    modifiers: crate::ast::MultiplicityModifiers,
 }
 
 impl FeatureModifiers {
     fn merge(self, other: FeatureModifiers) -> FeatureModifiers {
         FeatureModifiers {
             multiplicity: self.multiplicity.or(other.multiplicity),
-            ordered: self.ordered || other.ordered,
-            nonunique: self.nonunique || other.nonunique,
+            modifiers: self.modifiers.merge(other.modifiers),
         }
     }
 }
 
-/// Consume `literal` if the input starts with it, matching `nom`'s `tag` (no word boundary).
-fn consume_literal<'a>(input: Input<'a>, literal: &[u8]) -> Option<Input<'a>> {
-    input
-        .fragment()
-        .starts_with(literal)
-        .then(|| nom::Input::take_from(&input, literal.len()))
-}
-
 /// Parse the multiplicity and ordering/uniqueness modifiers that may follow a feature.
 ///
-/// Modifiers accumulate directly into the returned struct. Collecting them into a `Vec` first
-/// would allocate on a path the grammar re-enters speculatively for every attribute declaration,
-/// only to fold the result into these same three fields.
+/// The keyword slots themselves belong to [`crate::parser::usage::multiplicity_modifier_slots`],
+/// which owns the spellings and their spans; this adds only the range the same production admits
+/// beside them. Modifiers accumulate directly into the returned struct: collecting them into a
+/// `Vec` first would allocate on a path the grammar re-enters speculatively for every attribute
+/// declaration, only to fold the result into these same two fields.
 fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
     let mut result = FeatureModifiers::default();
     let mut input = input;
@@ -215,22 +208,13 @@ fn feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, FeatureModifiers> {
             input = rest;
             continue;
         }
-        // `unique` and `nonordered` are the defaults: recognized and consumed, but not recorded.
-        // These match as bare prefixes, exactly as the `tag` alternatives they replace did.
-        if let Some(rest) = consume_literal(after_ws, b"nonunique") {
-            result.nonunique = true;
-            input = rest;
-        } else if let Some(rest) = consume_literal(after_ws, b"unique") {
-            input = rest;
-        } else if let Some(rest) = consume_literal(after_ws, b"ordered") {
-            result.ordered = true;
-            input = rest;
-        } else if let Some(rest) = consume_literal(after_ws, b"nonordered") {
-            input = rest;
-        } else {
+        let (rest, slots) = crate::parser::usage::multiplicity_modifier_slots(input)?;
+        if !slots.is_authored() {
             // No modifier here: leave the whitespace before it unconsumed, as `preceded` did.
             return Ok((input, result));
         }
+        result.modifiers = std::mem::take(&mut result.modifiers).merge(slots);
+        input = rest;
     }
 }
 
@@ -484,8 +468,7 @@ pub(crate) fn attribute_feature_binding(
                 redefines_span: None,
                 direction: None,
                 multiplicity: mods.multiplicity,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 is_derived: false,
                 usage_prefix: None,
                 is_constant: false,
@@ -846,8 +829,7 @@ pub(crate) fn attribute_def(
                 name_span,
                 typing_span,
                 value_span,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 membership: Membership::owning(visibility, visibility_span),
             },
         ),
@@ -1183,8 +1165,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 // with the direction it consumed itself, which is the same value.
                 direction: prefix_direction,
                 multiplicity: mods.multiplicity,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 is_derived,
                 usage_prefix,
                 is_constant,
@@ -1294,8 +1275,7 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
                 redefines_span: None,
                 direction: None,
                 multiplicity: mods.multiplicity,
-                ordered: mods.ordered,
-                nonunique: mods.nonunique,
+                multiplicity_modifiers: mods.modifiers.clone(),
                 is_derived: false,
                 usage_prefix: None,
                 is_constant: false,
@@ -1695,8 +1675,8 @@ mod attribute_body_tests {
         let text = "attribute readings: Real[0..*] ordered;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.ordered);
-        assert!(!node.value.nonunique);
+        assert!(node.value.multiplicity_modifiers.is_ordered());
+        assert!(node.value.multiplicity_modifiers.is_unique());
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
         assert!(matches!(
             multiplicity.value.lower.as_deref().map(|node| &node.value),
@@ -1710,8 +1690,8 @@ mod attribute_body_tests {
         let text = "attribute tags: String[0..*] nonunique;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.nonunique);
-        assert!(!node.value.ordered);
+        assert!(!node.value.multiplicity_modifiers.is_unique());
+        assert!(!node.value.multiplicity_modifiers.is_ordered());
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
         assert!(matches!(
             multiplicity.value.lower.as_deref().map(|node| &node.value),
@@ -1725,7 +1705,7 @@ mod attribute_body_tests {
         let text = "attribute a [0..1] ordered;";
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.ordered);
+        assert!(node.value.multiplicity_modifiers.is_ordered());
         let multiplicity = node.value.multiplicity.expect("multiplicity retained");
         assert!(matches!(
             multiplicity.value.lower.as_deref().map(|node| &node.value),
@@ -1742,8 +1722,8 @@ mod attribute_body_tests {
         let text = "attribute def Samples :> Real[0..*] ordered nonunique;";
         let (rest, node) = attribute_def(input(text), false).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.ordered);
-        assert!(node.value.nonunique);
+        assert!(node.value.multiplicity_modifiers.is_ordered());
+        assert!(!node.value.multiplicity_modifiers.is_unique());
     }
 
     #[test]
@@ -1772,8 +1752,8 @@ mod attribute_body_tests {
         let (rest, node) = attribute_usage(input(text)).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.multiplicity.is_none());
-        assert!(!node.value.ordered);
-        assert!(!node.value.nonunique);
+        assert!(!node.value.multiplicity_modifiers.is_ordered());
+        assert!(node.value.multiplicity_modifiers.is_unique());
         assert!(!node.value.is_derived);
         assert!(!node.value.is_constant);
     }

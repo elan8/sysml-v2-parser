@@ -215,11 +215,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
-        write!(
-            self.writer,
-            ") (multiplicity-modifiers (ordered {}) (nonunique {})) ",
-            usage.ordered, usage.nonunique
-        )?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
         self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
@@ -704,11 +702,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
-        write!(
-            self.writer,
-            ") (ordered {}) (nonunique {})",
-            usage.ordered, usage.nonunique
-        )?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
         for (role, clause) in [
             ("subsets", usage.subsets.as_ref()),
             ("references", usage.references.as_ref()),
@@ -756,6 +751,29 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             None => self.writer.write_str("unbounded")?,
         }
         self.writer.write_char(')')
+    }
+
+    /// `MultiplicityPart`'s two keyword slots, each shown as the authored spelling or `none`.
+    ///
+    /// Distinguishing `none` from an authored default -- `unique`, `nonordered` -- is the whole
+    /// point of the slots, so the projection names the spelling rather than the boolean the
+    /// spelling implies.
+    fn write_multiplicity_modifiers(
+        &mut self,
+        modifiers: &super::MultiplicityModifiers,
+    ) -> io::Result<()> {
+        self.writer
+            .write_str("(multiplicity-modifiers (ordering ")?;
+        match &modifiers.ordering {
+            Some(ordering) => self.writer.write_str(ordering.value.keyword())?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (uniqueness ")?;
+        match &modifiers.uniqueness {
+            Some(uniqueness) => self.writer.write_str(uniqueness.value.keyword())?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str("))")
     }
 
     fn write_named_multiplicity(
@@ -2051,19 +2069,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 } else {
                     self.writer.write_str("none")?;
                 }
-                self.writer.write_str(") (ordered ")?;
-                self.writer.write_str(if declaration.value.ordered {
-                    "true"
-                } else {
-                    "false"
-                })?;
-                self.writer.write_str(") (nonunique ")?;
-                self.writer.write_str(if declaration.value.nonunique {
-                    "true"
-                } else {
-                    "false"
-                })?;
                 self.writer.write_str(") ")?;
+                self.write_multiplicity_modifiers(&declaration.value.multiplicity_modifiers)?;
+                self.writer.write_char(' ')?;
                 self.write_optional_subsetting("redefines", declaration.value.redefines.as_ref())?;
                 self.writer.write_str(" (value ")?;
                 if let Some(value) = &declaration.value.value {
@@ -2464,11 +2472,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
-        write!(
-            self.writer,
-            ") (multiplicity-modifiers (ordered {}) (nonunique {})) (subsets ",
-            usage.ordered, usage.nonunique
-        )?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_str(" (subsets ")?;
         if let Some((subsets, value)) = &usage.subsets {
             self.writer.write_str("(clause ")?;
             self.write_subsetting(&subsets.value)?;
@@ -3073,11 +3079,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(definition.multiplicity.as_ref())?;
-        write!(
-            self.writer,
-            ") (multiplicity-modifiers (ordered {}) (nonunique {})) (value ",
-            definition.ordered, definition.nonunique
-        )?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&definition.multiplicity_modifiers)?;
+        self.writer.write_str(" (value ")?;
         match &definition.value {
             Some(value) => self.write_feature_value(&value.value)?,
             None => self.writer.write_str("none")?,
@@ -3890,11 +3894,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         }
         self.writer.write_str(") (multiplicity ")?;
         self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
-        write!(
-            self.writer,
-            ") (multiplicity-modifiers (ordered {}) (nonunique {})) (subsets ",
-            usage.ordered, usage.nonunique
-        )?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_str(" (subsets ")?;
         if let Some((subsets, value)) = &usage.subsets {
             self.writer.write_str("(clause ")?;
             self.write_subsetting(&subsets.value)?;

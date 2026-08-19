@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`MultiplicityPart`'s ordering and uniqueness keywords are retained with their authored spans;
+  `unique` and `nonordered` stop being swallowed.** Audit and evidence:
+  `planning/spec42-upstream-gap-audit.md` (spec42 Gap 52). **AST version 173 -> 174.**
+
+  `MultiplicityPart` (SysML BNF 495, KerML BNF 639) spells two independent keyword slots after the
+  multiplicity range. Thirteen nodes modelled them as an `ordered: bool` + `nonunique: bool` pair;
+  all thirteen now carry one `multiplicity_modifiers: MultiplicityModifiers`, whose slots are
+  `Option<Node<MultiplicityOrdering>>` and `Option<Node<MultiplicityUniqueness>>`.
+
+  - **An authored keyword was consumed and recorded nowhere.** `unique` and `nonordered` -- the
+    explicit spellings of the two metamodel defaults -- were "recognized and consumed, but not
+    recorded", so `attribute a : Real[0..*] unique;` re-emitted as `attribute a : Real[0..*];`.
+    Both spellings now reach a field, so an authored default is distinguishable from omission and
+    the formatter reproduces the document it was given.
+  - **A boolean pair could not carry a span.** Presence is now the authored fact and each slot
+    keeps the keyword's exact span, so a consumer highlighting or reporting on `nonunique` no
+    longer has to find it in the source itself.
+  - **Emission imposed its own order on the source.** The two slots are independent, so
+    `ordered nonunique` and `nonunique ordered` are both legal; the emitter always wrote `ordered`
+    first. It now orders by the authored spans, and `nonunique ordered` survives a round trip.
+  - **Modifier keywords matched without a token boundary.** `attribute a : Real[0..*] orderedBy;`
+    consumed `ordered` and left `By` behind. Keywords now match on a token boundary.
+
+  `readonly` and SysML `variable`, requested by the same gap, are spelled by no production in the
+  2026-04 pin and occur nowhere in its corpus; they continue to reach recovery with a stable
+  diagnostic and an exact span, now pinned by
+  `tests/snapshots/spec42/multiplicity_modifier_slots.md`.
+
 - **`PortUsage` migrated onto the shared, typed `OccurrenceUsagePrefix`, and `port def` stops
   claiming port usages.** Audit and evidence: `planning/port-usage-prefix-matrix.md`.
   **AST version 172 -> 173.**

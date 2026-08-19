@@ -81,12 +81,7 @@ pub(crate) fn emit_part_usage(
         if let Some(mult) = &usage.multiplicity {
             emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     }
     if let Some((subsets, subset_value)) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -104,12 +99,7 @@ pub(crate) fn emit_part_usage(
         if let Some(mult) = &usage.multiplicity {
             emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     }
     if let Some(value) = &usage.value {
         // Avoid double-emitting when subsets already carried `= expr`.
@@ -144,12 +134,7 @@ pub(crate) fn emit_attribute_def(
     if let Some(multiplicity) = &def.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if def.ordered {
-        w.push_str(" ordered");
-    }
-    if def.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &def.multiplicity_modifiers);
     if let Some(value) = &def.value {
         emit_feature_value(w, value)?;
     }
@@ -211,12 +196,7 @@ pub(crate) fn emit_attribute_usage(
         if let Some(mult) = &usage.multiplicity {
             emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     }
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -234,12 +214,7 @@ pub(crate) fn emit_attribute_usage(
         if let Some(mult) = &usage.multiplicity {
             emit_multiplicity(w, &mult.value)?;
         }
-        if usage.ordered {
-            w.push_str(" ordered");
-        }
-        if usage.nonunique {
-            w.push_str(" nonunique");
-        }
+        emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     }
     if let Some(crosses) = &usage.crosses {
         emit_subsetting_clause(w, &crosses.value)?;
@@ -675,12 +650,7 @@ pub(crate) fn emit_port_usage(
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
     }
-    if usage.ordered {
-        w.push_str(" ordered");
-    }
-    if usage.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some((subsets, subset_value)) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
         if let Some(expr) = subset_value {
@@ -1197,12 +1167,7 @@ pub(crate) fn emit_ref_decl(
     if let Some(multiplicity) = &decl.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if decl.ordered {
-        w.push_str(" ordered");
-    }
-    if decl.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &decl.multiplicity_modifiers);
     if let Some(redefines) = &decl.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
@@ -1450,6 +1415,33 @@ pub(crate) fn emit_multiplicity(
     }
     w.push_char(']');
     Ok(())
+}
+
+/// Emit `MultiplicityPart`'s ordering and uniqueness keyword slots in the order the author
+/// wrote them.
+///
+/// The two slots are independent, so the grammar admits `ordered nonunique` and
+/// `nonunique ordered` alike. Ordering by the authored spans reproduces whichever was written
+/// instead of imposing this emitter's own field order on the source.
+pub(crate) fn emit_multiplicity_modifiers(
+    w: &mut EmitWriter<'_>,
+    modifiers: &crate::ast::MultiplicityModifiers,
+) {
+    let mut slots: [Option<(usize, &'static str)>; 2] = [
+        modifiers
+            .ordering
+            .as_ref()
+            .map(|slot| (slot.span.offset, slot.value.keyword())),
+        modifiers
+            .uniqueness
+            .as_ref()
+            .map(|slot| (slot.span.offset, slot.value.keyword())),
+    ];
+    slots.sort_by_key(|slot| slot.map(|(offset, _)| offset));
+    for (_, keyword) in slots.into_iter().flatten() {
+        w.push_char(' ');
+        w.push_str(keyword);
+    }
 }
 
 fn emit_bound(

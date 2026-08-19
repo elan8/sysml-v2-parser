@@ -3,8 +3,8 @@
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::emit_identification;
 use super::structure::{
-    self, emit_definition_prefix, emit_direction, emit_multiplicity, emit_subsetting_clause,
-    emit_typing_clause,
+    self, emit_definition_prefix, emit_direction, emit_multiplicity, emit_multiplicity_modifiers,
+    emit_subsetting_clause, emit_typing_clause,
 };
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
@@ -45,12 +45,7 @@ pub(crate) fn emit_inout_decl(
     if let Some(multiplicity) = &decl.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
-    if decl.ordered {
-        w.push_str(" ordered");
-    }
-    if decl.nonunique {
-        w.push_str(" nonunique");
-    }
+    emit_multiplicity_modifiers(w, &decl.multiplicity_modifiers);
     if !leading_redefinition {
         if let Some(redefines) = &decl.redefines {
             w.push_char(' ');

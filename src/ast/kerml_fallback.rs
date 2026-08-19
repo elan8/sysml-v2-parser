@@ -310,10 +310,9 @@ pub struct KermlFeatureMember {
     /// Multiplicity clause, accepted before or after the typing (and after a leading
     /// redefinition target).
     pub multiplicity: Option<Node<crate::ast::Multiplicity>>,
-    /// `ordered` keyword from `MultiplicityPart`.
-    pub ordered: bool,
-    /// `nonunique` keyword from `MultiplicityPart`.
-    pub nonunique: bool,
+    /// `MultiplicityPart`'s `isOrdered`/`isUnique` keyword slots, each carrying the authored
+    /// spelling and its exact span. See [`MultiplicityModifiers`](crate::ast::MultiplicityModifiers).
+    pub multiplicity_modifiers: crate::ast::MultiplicityModifiers,
     /// `subsets`/`:>` clause (multi-target, chains allowed).
     pub subsets: Option<Node<crate::ast::SubsettingRelationship>>,
     /// `redefines`/`:>>` clause (multi-target).

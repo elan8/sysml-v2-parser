@@ -605,7 +605,7 @@ fn typed_parameter_member_inner(
     } else {
         (input, None)
     };
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, redefines) = if leading_redefines.is_none() {
         opt(preceded(
             ws_and_comments,
@@ -641,8 +641,7 @@ fn typed_parameter_member_inner(
         } else {
             (input, None)
         };
-    let (input, (post_ordered, post_nonunique)) =
-        crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, post_modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
     let (input, body) = calc_def_body(input)?;
     Ok((
@@ -660,8 +659,7 @@ fn typed_parameter_member_inner(
                 multiplicity: leading_multiplicity
                     .or(trailing_multiplicity)
                     .or(post_redefines_multiplicity),
-                ordered: ordered || post_ordered,
-                nonunique: nonunique || post_nonunique,
+                multiplicity_modifiers: modifiers.merge(post_modifiers),
                 value,
                 body,
             },
@@ -1198,7 +1196,7 @@ fn kerml_feature_member_inner(
     } else {
         (input, None)
     };
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, clauses) = crate::parser::usage::specialization_clauses(input)?;
     let subsets = clauses.subsets.map(|(target, _value)| target);
     let redefines = leading_redefines.or(clauses.redefines);
@@ -1268,8 +1266,7 @@ fn kerml_feature_member_inner(
                 name: name_str,
                 typing,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
-                ordered,
-                nonunique,
+                multiplicity_modifiers: modifiers,
                 subsets,
                 redefines,
                 references,
@@ -1772,7 +1769,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     // Trailing redefinitions; repeated clauses merge targets (`... redefines result redefines
     // values;`, `FeatureReferencingPerformances.kerml`).
     let mut input = input;
@@ -1805,8 +1802,7 @@ fn return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {
                 is_redefine,
                 is_subsetting,
                 multiplicity,
-                ordered,
-                nonunique,
+                multiplicity_modifiers: modifiers,
                 redefines,
                 value,
                 body,

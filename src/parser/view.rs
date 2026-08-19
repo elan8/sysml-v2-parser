@@ -500,8 +500,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
                 subsets: header.subsets,
                 redefines: header.redefines,
                 multiplicity: header.multiplicity,
-                ordered: header.ordered,
-                nonunique: header.nonunique,
+                multiplicity_modifiers: header.multiplicity_modifiers.clone(),
                 body,
                 membership: Membership::feature(visibility, visibility_span),
             },
@@ -519,7 +518,7 @@ fn view_usage_redefines_only<'a>(
 ) -> IResult<Input<'a>, Node<ViewUsage>> {
     let (input, (_, redefines_target)) = prefix_redefinition_target(input)?;
     let (input, multiplicity_opt) = opt(multiplicity_node).parse(input)?;
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, body) = view_body(input)?;
     Ok((
         input,
@@ -533,8 +532,7 @@ fn view_usage_redefines_only<'a>(
                 subsets: None,
                 redefines: Some(redefines_target),
                 multiplicity: multiplicity_opt,
-                ordered,
-                nonunique,
+                multiplicity_modifiers: modifiers,
                 body,
                 membership: Membership::feature(None, crate::ast::Span::dummy()),
             },
@@ -614,7 +612,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     } else {
         (input, None)
     };
-    let (input, (ordered, nonunique)) = crate::parser::usage::usage_feature_modifier_flags(input)?;
+    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, redefines) = if leading_redefines.is_none() {
         opt(preceded(
             ws_and_comments,
@@ -640,8 +638,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
                 name: name_str,
                 type_name,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
-                ordered,
-                nonunique,
+                multiplicity_modifiers: modifiers,
                 subsets,
                 redefines,
                 value,
