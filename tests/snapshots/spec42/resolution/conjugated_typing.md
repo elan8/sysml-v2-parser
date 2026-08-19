@@ -21,13 +21,8 @@ package ConjugatedTypingCoverage {
 )
 ~~~
 # FORMAT
-~~~sysml
-package ConjugatedTypingCoverage {
-    port def InputPort;
-    port def OutputPort;
-    port def source : ~InputPort;
-    port def target : ~OutputPort;
-}
+~~~sexpr
+(stable-idempotent)
 ~~~
 # AST
 ~~~sexpr
@@ -36,6 +31,6 @@ package ConjugatedTypingCoverage {
     (reference r0 (scope relative) (span (offset 103) (line 4) (column 20) (len 9)) (segments (segment 0 (token "InputPort") (name "InputPort") (separator none) (span (offset 103) (line 4) (column 20) (len 9)))))
     (reference r1 (scope relative) (span (offset 133) (line 5) (column 20) (len 10)) (segments (segment 0 (token "OutputPort") (name "OutputPort") (separator none) (span (offset 133) (line 5) (column 20) (len 10)))))
   )
-  (root (package (name "ConjugatedTypingCoverage") (body brace (port-def (name "InputPort") (specializes none) (body semicolon)) (port-def (name "OutputPort") (specializes none) (body semicolon)) (port-def (name "source") (specializes (typing (kind typing) (conjugated true) (implied false) (targets (ref r0)))) (body semicolon)) (port-def (name "target") (specializes (typing (kind typing) (conjugated true) (implied false) (targets (ref r1)))) (body semicolon)))))
+  (root (package (name "ConjugatedTypingCoverage") (body brace (port-def (name "InputPort") (specializes none) (body semicolon)) (port-def (name "OutputPort") (specializes none) (body semicolon)) (port-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "source") (short-name none) (typing (typing (kind typing) (conjugated true) (implied false) (targets (ref r0)))) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (port-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "target") (short-name none) (typing (typing (kind typing) (conjugated true) (implied false) (targets (ref r1)))) (multiplicity none) (multiplicity-modifiers (ordered false) (nonunique false)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))))
 )
 ~~~

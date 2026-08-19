@@ -2,14 +2,13 @@
 
 use crate::ast::{InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, Membership, Node};
 use crate::parser::attribute::{attribute_def, attribute_usage};
-use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{ws_and_comments, INTERFACE_DEF_BODY_STARTERS};
 use crate::parser::node_from_to;
-use crate::parser::port::{port_def_required, port_usage};
+use crate::parser::port::{port_def, port_usage};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -22,6 +21,15 @@ fn interface_def_body_element(
 ) -> IResult<Input<'_>, Node<InterfaceDefBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
+    // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
+    // production in this scope would otherwise claim first -- the two `#` arms and
+    // `connector::ref_decl` below; see `occurrence_prefix::starts_contended_prefix`.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+        if let Ok((next, usage)) = port_usage(input) {
+            let elem = InterfaceDefBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+    }
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -47,7 +55,7 @@ fn interface_def_body_element(
         map(ref_decl, InterfaceDefBodyElement::RefDecl),
         map(connect_stmt, InterfaceDefBodyElement::ConnectStmt),
         // PAR-002 widening: this body previously had no attribute/item/port coverage at all.
-        // `item_def_required`/`port_def_required` tried before their usage siblings, same
+        // `item_def_required`/`port_def` tried before their usage siblings, same
         // def-before-usage discipline as the other body enums wired in prior increments (their
         // usage parsers have no guard against a bare `def` token).
         map(
@@ -57,8 +65,10 @@ fn interface_def_body_element(
         map(attribute_usage, InterfaceDefBodyElement::AttributeUsage),
         map(item_def_required, InterfaceDefBodyElement::ItemDef),
         map(item_usage, InterfaceDefBodyElement::ItemUsage),
-        map(port_def_required, InterfaceDefBodyElement::PortDef),
-        map(port_usage, InterfaceDefBodyElement::PortUsage),
+        map(port_def, InterfaceDefBodyElement::PortDef),
+        map(port_usage, |p| {
+            InterfaceDefBodyElement::PortUsage(Box::new(p))
+        }),
         // GH-85: bare `flow <a> to <b>;` connecting two of this interface's own ends (OMG spec
         // Annex `Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml`).
         map(
@@ -104,13 +114,14 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
             },
         ));
     }
-    let (input, members) = parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members_with_skip(
         input,
         INTERFACE_DEF_BODY_STARTERS,
         "interface definition body",
         "recovered_interface_def_body_element",
         interface_def_body_element,
         interface_def_body_recovery,
+        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }
@@ -223,11 +234,11 @@ mod par_002_widening_tests {
     }
 
     /// PAR-002 acceptance criterion: `port def` yields the same underlying parse (via the shared
-    /// `port_def_required` parser) whether reached through `InterfaceDefBodyElement::PortDef` or
+    /// `port_def` parser) whether reached through `InterfaceDefBodyElement::PortDef` or
     /// any other body enum wired to the same parser in prior increments (e.g.
     /// `PartDefBodyElement::PortDef`).
     #[test]
-    fn port_def_is_same_variant_kind_in_interface_def_body_as_port_def_required_parser() {
+    fn port_def_is_same_variant_kind_in_interface_def_body_as_port_def_parser() {
         let text = "port def MyPort;";
         let (_, iface_node) =
             interface_def_body_element(input(text)).expect("nested in interface def body");
@@ -235,11 +246,8 @@ mod par_002_widening_tests {
             iface_node.value,
             InterfaceDefBodyElement::PortDef(_)
         ));
-        let result = port_def_required(input(text));
-        assert!(
-            result.is_ok(),
-            "port_def_required should also accept {text:?}"
-        );
+        let result = port_def(input(text));
+        assert!(result.is_ok(), "port_def should also accept {text:?}");
     }
 }
 

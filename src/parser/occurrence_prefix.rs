@@ -266,6 +266,50 @@ pub(crate) fn next_word_is_reserved(input: Input<'_>) -> bool {
     word_len > 0 && crate::parser::lex::is_reserved_keyword(&fragment[..word_len])
 }
 
+/// Whether the first byte can open any slot of the production.
+///
+/// Every one of the thirteen slots is optional, so the overwhelmingly common case is a member
+/// that authored none of them -- and that case has to pay for eleven failed keyword comparisons
+/// before the caller can require its kind keyword. Six families now spell this prefix, so that
+/// bill is paid six times per member of a body scope with no starter table.
+///
+/// The first byte of every slot is one of `# i o d a v c r s t`, so one table lookup answers
+/// "could this be a prefix at all" and returns the unauthored prefix without probing a slot.
+/// The table is derived from the keyword list rather than written out, so a new slot cannot be
+/// added without extending it.
+const fn prefix_slot_first_bytes() -> [bool; 256] {
+    let mut table = [false; 256];
+    table[b'#' as usize] = true;
+    let keywords: [&[u8]; 11] = [
+        b"in",
+        b"out",
+        b"inout",
+        b"derived",
+        b"abstract",
+        b"variation",
+        b"constant",
+        b"ref",
+        b"individual",
+        b"snapshot",
+        b"timeslice",
+    ];
+    let mut index = 0;
+    while index < keywords.len() {
+        table[keywords[index][0] as usize] = true;
+        index += 1;
+    }
+    table
+}
+
+const PREFIX_SLOT_FIRST_BYTES: [bool; 256] = prefix_slot_first_bytes();
+
+fn starts_a_prefix_slot(fragment: &[u8]) -> bool {
+    match fragment.first() {
+        Some(byte) => PREFIX_SLOT_FIRST_BYTES[*byte as usize],
+        None => false,
+    }
+}
+
 /// `OccurrenceUsagePrefix`, the whole production.
 ///
 /// Never fails: every slot is optional, and an all-absent result is the ordinary "no prefix
@@ -283,6 +327,9 @@ pub(crate) fn occurrence_usage_prefix(
     // Consume leading trivia once; every slot below then probes trivia-free input and
     // re-establishes that invariant after its own token. See [`slot_keyword`].
     let (input, _) = ws_and_comments(input)?;
+    if !starts_a_prefix_slot(input.fragment()) {
+        return Ok((input, OccurrenceUsagePrefix::default()));
+    }
     let (input, basic) = basic_usage_prefix(input);
     let (input, individual_span) = match slot_keyword(input, b"individual") {
         Some((rest, span)) => (rest, Some(span)),
@@ -414,6 +461,30 @@ mod tests {
         assert!(prefix.basic.ref_prefix.direction.is_some());
         assert!(prefix.basic.ref_prefix.derived_span.is_some());
         assert!(rest.fragment().starts_with(b"occurrence"));
+    }
+
+    /// Every slot alone, so a missing entry in the first-byte admission table shows up as a
+    /// prefix the parser silently stops seeing rather than as a compile error.
+    #[test]
+    fn each_slot_is_admitted_on_its_own() {
+        for (text, authored) in [
+            ("in occurrence o;", true),
+            ("out occurrence o;", true),
+            ("inout occurrence o;", true),
+            ("derived occurrence o;", true),
+            ("abstract occurrence o;", true),
+            ("variation occurrence o;", true),
+            ("constant occurrence o;", true),
+            ("ref occurrence o;", true),
+            ("individual occurrence o;", true),
+            ("snapshot occurrence o;", true),
+            ("timeslice occurrence o;", true),
+            ("#Tag occurrence o;", true),
+            ("occurrence o;", false),
+        ] {
+            let (_, prefix) = occurrence_usage_prefix(input(text)).expect("prefix");
+            assert_eq!(prefix.is_authored(), authored, "for {text:?}");
+        }
     }
 
     #[test]

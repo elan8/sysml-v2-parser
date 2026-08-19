@@ -191,7 +191,7 @@ pub enum PackageBodyElement {
     /// Standalone item usage at package level. See `AttributeUsage`.
     ItemUsage(Node<ItemUsage>),
     /// Standalone port usage at package level. See `AttributeUsage`.
-    PortUsage(Node<PortUsage>),
+    PortUsage(Box<Node<PortUsage>>),
     /// Standalone connection usage at package level. See `AttributeUsage`.
     ConnectionUsage(Node<ConnectionUsageMember>),
     /// Standalone interface usage at package level (PAR-007: previously there was no

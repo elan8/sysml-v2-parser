@@ -2,7 +2,6 @@
 
 use crate::ast::{ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, Node};
 use crate::parser::attribute::{attribute_def, attribute_usage};
-use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -13,7 +12,7 @@ use crate::parser::occurrence_body::{
     assert_constraint_member, occurrence_usage, succession_usage,
 };
 use crate::parser::part::part_usage;
-use crate::parser::port::{port_def_required, port_usage};
+use crate::parser::port::{port_def, port_usage};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -40,6 +39,10 @@ fn connection_def_body_element(
         }
         if let Ok((next, usage)) = part_usage(start) {
             let elem = ConnectionDefBodyElement::PartUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
+        if let Ok((next, usage)) = port_usage(start) {
+            let elem = ConnectionDefBodyElement::PortUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
     }
@@ -75,8 +78,10 @@ fn connection_def_body_element(
         map(attribute_usage, ConnectionDefBodyElement::AttributeUsage),
         map(item_def_required, ConnectionDefBodyElement::ItemDef),
         map(item_usage, ConnectionDefBodyElement::ItemUsage),
-        map(port_def_required, ConnectionDefBodyElement::PortDef),
-        map(port_usage, ConnectionDefBodyElement::PortUsage),
+        map(port_def, ConnectionDefBodyElement::PortDef),
+        map(port_usage, |p| {
+            ConnectionDefBodyElement::PortUsage(Box::new(p))
+        }),
         // GH-51: real Systems/Domain Library connection defs use these member kinds too --
         // see `ConnectionDefBodyElement`'s doc comment for the exact real-usage citations.
         map(
@@ -127,13 +132,14 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
             },
         ));
     }
-    let (input, members) = parse_structured_brace_members(
+    let (input, members) = crate::parser::body::parse_structured_brace_members_with_skip(
         input,
         CONNECTION_DEF_BODY_STARTERS,
         "connection definition body",
         "recovered_connection_def_body_element",
         connection_def_body_element,
         connection_def_body_recovery,
+        crate::parser::body::BraceMemberSkip::BodyElementRecover,
     )?;
     Ok((input, members.into_body()))
 }

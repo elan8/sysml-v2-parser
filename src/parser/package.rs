@@ -1509,14 +1509,9 @@ fn try_package_body_structure<'a>(
     // PAR-002: standalone port usage at package level, tried after `port_def` above (which is
     // `def`-optional per its own doc comment and already captures the bare def-less form) -- see
     // `AttributeUsage` above for the same rationale.
-    try_package_body_dispatch!(
-        input,
-        start,
-        starter,
-        Port,
-        port_usage,
-        PackageBodyElement::PortUsage
-    );
+    try_package_body_dispatch!(input, start, starter, Port, port_usage, |p| {
+        PackageBodyElement::PortUsage(Box::new(p))
+    });
     try_package_body_dispatch!(
         input,
         start,

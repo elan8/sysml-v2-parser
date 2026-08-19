@@ -1379,6 +1379,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             let elem = PartUsageBodyElement::PartUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = crate::parser::port::port_usage(start) {
+            let elem = PartUsageBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let frag = start.fragment();
     let first_30 = frag.get(..30.min(frag.len())).unwrap_or(frag);
@@ -1452,7 +1456,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             }),
         )),
         // PAR-002: nested `def` kinds -- usage bodies legally contain nested definitions per BNF
-        // `UsageBody = DefinitionBody`. `port_def_required`/`calc_def_required`/
+        // `UsageBody = DefinitionBody`. `port_def`/`calc_def_required`/
         // `connection_def_required` must be tried before `port_usage`/`connection_usage_member`
         // -- both usage-form parsers have no guard against a bare `def` keyword (same bug class
         // fixed for `PartDefBodyElement` in a prior increment), so `port def Foo;`/
@@ -1489,10 +1493,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             map(crate::parser::import::import_, PartUsageBodyElement::Import),
             map(connection_def_required, PartUsageBodyElement::ConnectionDef),
             map(connection_usage_member, PartUsageBodyElement::Connection),
-            map(port_def_required, PartUsageBodyElement::PortDef),
+            map(port_def, PartUsageBodyElement::PortDef),
         )),
         alt((
-            map(port_usage, PartUsageBodyElement::PortUsage),
+            map(port_usage, |p| PartUsageBodyElement::PortUsage(Box::new(p))),
             map(part_ref_usage, PartUsageBodyElement::Ref),
             // Kinded `ref item :>> a, b, c;` (Domain Libraries `SpatialItems.sysml`), which
             // `part_ref_usage` deliberately rejects; `connector::ref_decl` owns that shape.

@@ -645,23 +645,18 @@ pub(crate) fn emit_port_usage(
     usage: &PortUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if let Some(dir) = usage.direction {
-        emit_direction(w, dir);
+    // `PortUsage = OccurrenceUsagePrefix 'port' Usage`: the same typed prefix boundary the other
+    // migrated families stream through, in the production's slot order, with each keyword written
+    // because its slot holds an authored span.
+    emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
+    // No trailing space for the anonymous target-only forms: whichever clause follows (`: Type`,
+    // `:>> target`, `:> target`) emits its own leading space, so `port :>> pe` came back out as
+    // `port  :>> pe`. Mirrors `emit_part_usage`/`emit_attribute_usage`.
+    if usage.short_name.is_none() && usage.name_span.is_none() {
+        w.push_str("port");
+    } else {
+        w.push_str("port ");
     }
-    // `OccurrenceUsagePrefix = BasicUsagePrefix ('individual')?` puts `individual` after the
-    // `RefPrefix` keywords, not before them.
-    emit_ref_prefix(
-        w,
-        usage.is_derived,
-        usage
-            .is_abstract
-            .then_some(&crate::ast::DefinitionPrefix::Abstract),
-        usage.is_constant,
-    );
-    if usage.is_individual {
-        w.push_str("individual ");
-    }
-    w.push_str("port ");
     if let Some(short) = &usage.short_name {
         w.push_char('<');
         w.push_str(&format_name(short));
@@ -679,6 +674,12 @@ pub(crate) fn emit_port_usage(
     }
     if let Some(mult) = &usage.multiplicity {
         emit_multiplicity(w, &mult.value)?;
+    }
+    if usage.ordered {
+        w.push_str(" ordered");
+    }
+    if usage.nonunique {
+        w.push_str(" nonunique");
     }
     if let Some((subsets, subset_value)) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
@@ -806,6 +807,7 @@ fn emit_port_body_element(
         PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),
+        PortBodyElement::RefDecl(r) => emit_ref_decl(w, path, &r.value),
     }
 }
 

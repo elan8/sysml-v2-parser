@@ -217,6 +217,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             let elem = PartDefBodyElement::PartUsage(Box::new(usage));
             return Ok((next, node_from_to(start, next, elem)));
         }
+        if let Ok((next, usage)) = crate::parser::port::port_usage(start) {
+            let elem = PartDefBodyElement::PortUsage(Box::new(usage));
+            return Ok((next, node_from_to(start, next, elem)));
+        }
     }
     let (input, elem) = alt((
         alt((
@@ -279,11 +283,11 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         alt((
             map(interface_usage, PartDefBodyElement::InterfaceUsage),
             map(interface_def_required, PartDefBodyElement::InterfaceDef),
-            // `port_def_required` must be tried before `port_usage`: `port_usage` has no guard
+            // `port_def` must be tried before `port_usage`: `port_usage` has no guard
             // against a bare `def` keyword (same bug class caught for `flow_usage_member` above),
             // so `port def Foo {}` would otherwise misparse as `PortUsage { name: "def" }`.
-            map(port_def_required, PartDefBodyElement::PortDef),
-            map(port_usage, PartDefBodyElement::PortUsage),
+            map(port_def, PartDefBodyElement::PortDef),
+            map(port_usage, |p| PartDefBodyElement::PortUsage(Box::new(p))),
             // GH-14: `action_def` must be tried before `action_usage` -- the latter has no guard
             // against a bare `def` keyword being consumed as the usage's name for most kinds (same
             // bug class as `flow_usage_member`/`port_usage`/`calc_usage` above), but here it

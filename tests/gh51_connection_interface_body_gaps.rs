@@ -161,10 +161,13 @@ fn connection_def_body_accepts_named_succession_usage() {
 /// nonunique ordered { ... }` (anonymous -- no name at all, just a kind keyword + redefines +
 /// type + multiplicity + modifiers) and `ref port :>> Interface::participant,
 /// BinaryConnection::participant[2] nonunique ordered;` (comma-separated multi-target redefines).
-/// `ref_decl` previously required a name and a `:` type unconditionally, with no redefines or
-/// multiplicity support at all.
+///
+/// `PortUsage = OccurrenceUsagePrefix 'port' Usage` and `BasicUsagePrefix` owns the `ref`, so
+/// this is a port usage whose prefix authored `ref`, not a `ReferenceUsage`. It was a `RefDecl`
+/// until `port_usage` could spell a `ref` at all; `ref_decl` keeps every other kind it models,
+/// exercised by the `ref requirement` cases below.
 #[test]
-fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() {
+fn interface_def_body_accepts_anonymous_ref_port_with_redefines_type_and_modifiers() {
     let input = "package P {\nport def Port;\ninterface def I {\nref port :>> participant : Port [2..*] nonunique ordered {\n}\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
@@ -189,19 +192,25 @@ fn interface_def_body_accepts_anonymous_ref_with_redefines_type_and_modifiers() 
     let InterfaceDefBody::Brace { elements, .. } = &interface.body else {
         panic!("expected interface def brace body");
     };
-    let ref_decl = elements
+    let port = elements
         .iter()
         .find_map(|e| match &e.value {
-            InterfaceDefBodyElement::RefDecl(r) => Some(&r.value),
+            InterfaceDefBodyElement::PortUsage(p) => Some(&p.value),
             _ => None,
         })
-        .expect("expected ref decl");
-    assert_eq!(ref_decl.name, "");
+        .expect("expected port usage");
+    assert!(
+        port.prefix.basic.reference_span.is_some(),
+        "the `ref` belongs to the port usage's own BasicUsagePrefix"
+    );
+    assert_eq!(port.name, "");
     assert_eq!(
-        ref_decl.redefines.as_ref().map(|n| n.value.target.len()),
+        port.redefines.as_ref().map(|n| n.value.target.len()),
         Some(1)
     );
-    assert!(ref_decl.typing.is_some());
+    assert!(port.typing.is_some());
+    assert!(port.multiplicity.is_some());
+    assert!(port.ordered && port.nonunique);
 }
 
 /// Real usage: Domain Library `Requirement Derivation/DerivationConnections.sysml`'s `ref
