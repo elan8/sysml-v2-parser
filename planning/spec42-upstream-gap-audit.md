@@ -182,9 +182,13 @@ stays trivia -- the grammar has no member there for it to be. A scope whose memb
 hold an annotating element falls back to consuming it as trivia, so this widening cannot turn a
 previously-parsing document into a recovered one.
 
-The corpus supports the boundary exactly: of the 2 650 bare block comments in the pinned release,
-every one follows `}`, `;`, or the start of the file -- i.e. a member position. None sits inside a
-declaration.
+The corpus supports the boundary. The pinned release contains 2 857 `REGULAR_COMMENT`s. All but
+thirteen either follow a `doc`/`comment`/`rep` keyword clause or sit at a member position -- after
+`}`, after `;`, or at the start of the file. Of the thirteen, most are the `comment about X
+/* ... */` spelling, which the keyworded parser already owned; the remainder sit between the tokens
+of a declaration (`package /* ... */ Name {`, `sysml/src/examples/Simple Tests/CommentTest.sysml:5`)
+and stay trivia, which is what leaving `ws_and_comments` in place everywhere but the member
+boundaries preserves.
 
 Comment, documentation and textual-representation bodies keep their authored bytes in `text` and
 gain `body_span` for provenance, and `normalize_comment_body` implements the pinned processing
@@ -278,5 +282,17 @@ Found during the audit, out of scope for these commits, recorded so it is not re
 - The parser accepts `derived end feature`, `abstract end feature` and `composite end feature`,
   which `EndFeaturePrefix` does not spell. Narrowing that is the mirror image of gap 59 and needs
   corpus evidence for what tolerated it.
-- The `(typed-parameter)`, `(kerml-feature)` and `(calc-usage)` semantic projections emit far fewer
-  fields than their nodes carry, so several invariants are only observable through `FORMAT`.
+- The `(typed-parameter)` and `(kerml-feature)` semantic projections emit far fewer fields than
+  their nodes carry, so several invariants are only observable through `FORMAT`.
+- `variation` is still refused on the definition kinds that store `BasicDefinitionPrefix` as a bare
+  `is_abstract` bool -- `RequirementDef`, `CaseDef`, `AnalysisCaseDef`, `VerificationCaseDef`,
+  `UseCaseDef`, `ConstraintDef`, `ViewDef`, `RenderingDef`, `MetadataDef`, `OccurrenceDef` -- and on
+  `attribute def`, `item def`, `enum def` and `state def`, all of which the pin allows it on. Each
+  needs the same one-slot conversion the six connection-like and part definitions received.
+- `attribute x : Real;` at namespace level reaches `AttributeDef` and re-emits as
+  `attribute def x : Real;`, inventing a `def` keyword no production spells. `AttributeUsage`
+  exists and is reached by other spellings, so this is a dispatch-order question, not a missing
+  node. The same shape produced the `calc` gap that Gap 53 closed.
+- `feature_modifiers` accepts the two `MultiplicityPart` keyword slots in any order and any
+  repetition, which is wider than the production (at most one of each, `ordered` first or
+  `nonunique` first).
