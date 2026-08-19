@@ -539,6 +539,7 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
 fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, _) = ws_and_comments(input)?;
 
     // `subject` name? redefines? (`:` type)? redefines? multiplicity? value? `;`
@@ -599,6 +600,7 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
             input,
             SubjectDecl {
                 name: n,
+                short_name,
                 type_name,
                 redefines,
                 multiplicity,
@@ -622,6 +624,7 @@ pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<Requiremen
             decl.span,
             RequirementActorDecl {
                 name: decl.value.name,
+                short_name: decl.value.short_name,
                 type_name,
                 multiplicity: decl.value.multiplicity,
             },
@@ -636,6 +639,7 @@ fn requirement_parameter_decl<'a>(
 ) -> IResult<Input<'a>, Node<SubjectDecl>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(keyword)).parse(input)?;
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     let (input, n) = {
         let (after_gap, _) = ws_and_comments(input)?;
         if after_gap.fragment().starts_with(b":") {
@@ -665,6 +669,7 @@ fn requirement_parameter_decl<'a>(
             input,
             SubjectDecl {
                 name: n,
+                short_name,
                 type_name: Some(type_name),
                 redefines: None,
                 multiplicity,

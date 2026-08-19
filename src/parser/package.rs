@@ -239,6 +239,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::ConstraintDef(_)
         | PackageBodyElement::ConstraintUsage(_)
         | PackageBodyElement::CalcDef(_)
+        | PackageBodyElement::CalcUsage(_)
         | PackageBodyElement::ViewDef(_)
         | PackageBodyElement::ViewpointDef(_)
         | PackageBodyElement::RenderingDef(_)
@@ -1818,6 +1819,19 @@ fn try_package_body_behavior<'a>(
         Calculation,
         calc_def,
         PackageBodyElement::CalcDef
+    );
+    // After `calc_def`, never before it: `calc_def` is deliberately `def`-optional here (see
+    // `definition_prefix`'s module doc) because the Systems Library authors bare `calc Name : T;`
+    // definitions at namespace level. This arm catches only what that grammar refuses -- a
+    // `CalculationUsage`'s multiplicity, `ordered`/`nonunique` and value clauses -- which
+    // previously fell through to the unimplemented extended-library declaration.
+    try_package_body_dispatch!(
+        input,
+        start,
+        starter,
+        Calculation,
+        crate::parser::constraint::calc_usage,
+        PackageBodyElement::CalcUsage
     );
     // Standalone `perform <action-path>;` performance usage at package level (e.g. `perform
     // process;`, OMG spec Annex `4a-Fundamental Activities.sysml`-style shorthand form).

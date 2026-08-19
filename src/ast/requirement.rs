@@ -136,6 +136,9 @@ impl PartialEq for PurposeMember {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubjectDecl {
     pub name: String,
+    /// `Identification`'s `( '<' declaredShortName '>' )?`, reached through `UsageDeclaration`
+    /// (SysML BNF 42/308). See `crate::ast::AttributeUsage::short_name`.
+    pub short_name: Option<String>,
     pub type_name: Option<QualifiedReferenceId>,
     /// `:>>`/`redefines` redefinition clause (`subject subj :>> Case::subj;`, or the type-less
     /// anonymous form `subject :>> vehicle = vehicle_large;`; spec42 Gap 35).
@@ -152,6 +155,8 @@ pub struct SubjectDecl {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RequirementActorDecl {
     pub name: String,
+    /// `Identification`'s `( '<' declaredShortName '>' )?`. See [`SubjectDecl::short_name`].
+    pub short_name: Option<String>,
     pub type_name: QualifiedReferenceId,
     pub multiplicity: Option<Node<Multiplicity>>,
 }
@@ -833,6 +838,10 @@ pub enum UseCaseDefBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActorUsage {
     pub name: String,
+    /// `Identification`'s `( '<' declaredShortName '>' )?`. `ActorUsage : PartUsage =
+    /// 'actor' Usage` (SysML BNF 1512) reaches it through `UsageDeclaration`, so
+    /// `actor <a> operator : Person;` is legal; it previously reached recovery.
+    pub short_name: Option<String>,
     /// `None` for the bare untyped form `actor environment;` / `actor passenger [0..4];`
     /// (OMG spec Annex A; spec42 Gap 46).
     pub type_name: Option<QualifiedReferenceId>,

@@ -777,6 +777,10 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
     let (input, (visibility_span, visibility)) =
         preceded(ws_and_comments, visibility_prefix).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"actor"[..])).parse(input)?;
+    // `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` (SysML BNF 42), reached
+    // through `ActorUsage : PartUsage = 'actor' Usage`, so both halves are optional and either
+    // may be written alone.
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
     // SysML allows anonymous actors: `actor : User;` (Identification may be empty).
     let (after_gap, _) = ws_and_comments(input)?;
     let (input, n) = if after_gap.fragment().starts_with(b":")
@@ -811,6 +815,7 @@ fn actor_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ActorUsage>> {
             input,
             ActorUsage {
                 name: n,
+                short_name,
                 type_name,
                 multiplicity,
                 membership: Membership::actor(visibility, visibility_span),

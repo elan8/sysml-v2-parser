@@ -21,8 +21,8 @@ use super::structure::{
     OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
-    CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
-    ViewpointDef, ViewpointUsage,
+    CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef,
+    ViewUsage, ViewpointDef, ViewpointUsage,
 };
 use crate::ast::core::Node;
 use crate::ast::QualifiedReferenceId;
@@ -135,6 +135,12 @@ pub enum PackageBodyElement {
     ConstraintDef(Node<ConstraintDef>),
     ConstraintUsage(Node<ConstraintUsage>),
     CalcDef(Node<CalcDef>),
+    /// `CalculationUsage = OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
+    /// (SysML BNF 1354), a `BehaviorUsageElement` and therefore a legal `PackageMember`.
+    /// Dispatched after [`Self::CalcDef`], which stays `def`-optional for the bare namespace-level
+    /// definitions the Systems Library authors; this variant catches the usage shapes that
+    /// definition grammar cannot accept, such as the multiplicity in `calc estimate [1];`.
+    CalcUsage(Node<crate::ast::CalcUsage>),
     ViewDef(Node<ViewDef>),
     ViewpointDef(Node<ViewpointDef>),
     RenderingDef(Node<RenderingDef>),

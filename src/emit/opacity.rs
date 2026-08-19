@@ -188,6 +188,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
             walk_constraint_def_body(report, path, &c.value.body)
         }
         PackageBodyElement::CalcDef(c) => walk_calc_def_body(report, path, &c.value.body),
+        PackageBodyElement::CalcUsage(c) => walk_calc_def_body(report, path, &c.value.body),
         PackageBodyElement::MetadataDef(m) => walk_attribute_body(report, path, &m.value.body),
         PackageBodyElement::MetadataUsage(m) => walk_attribute_body(report, path, &m.value.body),
         PackageBodyElement::ConcernUsage(c) => {

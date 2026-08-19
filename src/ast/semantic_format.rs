@@ -832,6 +832,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(subject (name ")?;
                             write_quoted(self.writer, &subject.value.name)?;
+                            self.writer.write_str(") (short-name ")?;
+                            write_optional_quoted(
+                                self.writer,
+                                subject.value.short_name.as_deref(),
+                            )?;
                             self.writer.write_str(") (type ")?;
                             if let Some(reference) = subject.value.type_name {
                                 self.write_reference(reference)?;
@@ -858,6 +863,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(actor (name ")?;
                             write_quoted(self.writer, &actor.value.name)?;
+                            self.writer.write_str(") (short-name ")?;
+                            write_optional_quoted(self.writer, actor.value.short_name.as_deref())?;
                             self.writer.write_str(") (type ")?;
                             self.write_reference(actor.value.type_name)?;
                             self.writer.write_str(") (multiplicity ")?;
@@ -1060,11 +1067,15 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.writer.write_str("(actor (name ")?;
                             write_quoted(self.writer, &actor.value.name)?;
+                            self.writer.write_str(") (short-name ")?;
+                            write_optional_quoted(self.writer, actor.value.short_name.as_deref())?;
                             self.writer.write_str(") (type ")?;
                             match actor.value.type_name {
                                 Some(reference) => self.write_reference(reference)?,
                                 None => self.writer.write_str("none")?,
                             }
+                            self.writer.write_str(") (multiplicity ")?;
+                            self.write_multiplicity_clause(actor.value.multiplicity.as_ref())?;
                             self.writer.write_str("))")?;
                         }
                         UseCaseDefBodyElement::ActorRedefinitionAssignment(actor) => {
@@ -1929,6 +1940,57 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
         self.writer.write_char(' ')?;
         self.write_constraint_def_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// `CalculationUsage = OccurrenceUsagePrefix 'calc' ActionUsageDeclaration CalculationBody`
+    /// (SysML BNF 1354).
+    ///
+    /// `CalcUsage` has not migrated onto the shared `OccurrenceUsagePrefix` component yet, so the
+    /// prefix slots it does carry are shown individually rather than through
+    /// `write_occurrence_usage_prefix`.
+    fn write_calculation_usage(&mut self, usage: &super::CalcUsage) -> io::Result<()> {
+        self.writer.write_str("(calc-usage (name ")?;
+        write_optional_quoted(self.writer, usage.identification.name.as_deref())?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, usage.identification.short_name.as_deref())?;
+        self.writer.write_str(") (direction ")?;
+        match usage.direction {
+            Some(InOut::In) => self.writer.write_str("in")?,
+            Some(InOut::Out) => self.writer.write_str("out")?,
+            Some(InOut::InOut) => self.writer.write_str("inout")?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(
+            self.writer,
+            ") (abstract {}) (reference {}) (type ",
+            usage.is_abstract, usage.is_reference
+        )?;
+        match usage.type_name {
+            Some(reference) => self.write_reference(reference)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_str(" (redefines")?;
+        match &usage.redefines {
+            Some(targets) => {
+                for target in targets {
+                    self.writer.write_char(' ')?;
+                    self.write_reference(*target)?;
+                }
+            }
+            None => self.writer.write_str(" none")?,
+        }
+        self.writer.write_str(") (value ")?;
+        match &usage.value {
+            Some(value) => self.write_feature_value(&value.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") ")?;
+        self.write_calc_def_body(&usage.body)?;
         self.writer.write_char(')')
     }
 
@@ -4201,6 +4263,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ConstraintUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_constraint_usage(&usage.value)
+            }
+            PackageBodyElement::CalcUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_calculation_usage(&usage.value)
             }
             PackageBodyElement::CalcDef(definition) => {
                 self.write_item_prefix(first)?;

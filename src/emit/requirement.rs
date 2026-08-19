@@ -162,6 +162,11 @@ fn emit_requirement_body_element(
         }
         RequirementDefBodyElement::RequirementActorDecl(a) => {
             w.push_str("actor ");
+            if let Some(short) = &a.value.short_name {
+                w.push_char('<');
+                w.push_str(&format_name(short));
+                w.push_str("> ");
+            }
             if !a.value.name.is_empty() {
                 w.push_str(&format_name(&a.value.name));
             }
@@ -316,6 +321,11 @@ fn emit_verify_requirement(
 
 fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<(), EmitError> {
     w.push_str("subject");
+    if let Some(short) = &subject.short_name {
+        w.push_str(" <");
+        w.push_str(&format_name(short));
+        w.push_char('>');
+    }
     if !subject.name.is_empty() {
         w.push_char(' ');
         w.push_str(&format_name(&subject.name));
@@ -717,6 +727,11 @@ fn emit_use_case_body_element(
         UseCaseDefBodyElement::ActorUsage(a) => {
             emit_visibility(w, a.value.membership.visibility);
             w.push_str("actor");
+            if let Some(short) = &a.value.short_name {
+                w.push_str(" <");
+                w.push_str(&format_name(short));
+                w.push_char('>');
+            }
             if !a.value.name.is_empty() {
                 w.push_char(' ');
                 w.push_str(&format_name(&a.value.name));

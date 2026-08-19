@@ -2218,6 +2218,9 @@ macro_rules! ast_traversal {
                 PackageBodyElement::ConstraintUsage(field_0) => {
                     visitor.visit_constraint_usage(field_0);
                 }
+                PackageBodyElement::CalcUsage(field_0) => {
+                    visitor.visit_calc_usage(field_0);
+                }
                 PackageBodyElement::CalcDef(field_0) => {
                     visitor.visit_calc_def(field_0);
                 }
@@ -5686,8 +5689,11 @@ macro_rules! ast_traversal {
         pub fn walk_subject_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<SubjectDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let SubjectDecl { name, type_name, redefines, multiplicity, value } = &$($mutability)? node.value;
+            let SubjectDecl { name, short_name, type_name, redefines, multiplicity, value } = &$($mutability)? node.value;
             visitor.visit_text(name);
+            if let Some(inner) = short_name {
+                visitor.visit_text(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }
@@ -5706,8 +5712,11 @@ macro_rules! ast_traversal {
         pub fn walk_requirement_actor_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<RequirementActorDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let RequirementActorDecl { name, type_name, multiplicity } = &$($mutability)? node.value;
+            let RequirementActorDecl { name, short_name, type_name, multiplicity } = &$($mutability)? node.value;
             visitor.visit_text(name);
+            if let Some(inner) = short_name {
+                visitor.visit_text(inner);
+            }
             visitor.visit_qualified_reference(type_name);
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
@@ -6460,8 +6469,11 @@ macro_rules! ast_traversal {
         pub fn walk_actor_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ActorUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ActorUsage { name, type_name, multiplicity, membership } = &$($mutability)? node.value;
+            let ActorUsage { name, short_name, type_name, multiplicity, membership } = &$($mutability)? node.value;
             visitor.visit_text(name);
+            if let Some(inner) = short_name {
+                visitor.visit_text(inner);
+            }
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
             }

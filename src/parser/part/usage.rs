@@ -1140,7 +1140,15 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
         preceded(tag(&b":>>"[..]), ws_and_comments),
     ))
     .parse(input)?;
-    let (input, name_str) = name(input)?;
+    // `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` (SysML BNF 335) reaches
+    // `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` through
+    // `UsageDeclaration`, so `ref <rd> rd : T;` is legal. This parser went straight to the name
+    // and left the whole member to recovery; `connector::ref_decl`, which owns the same
+    // production in the definition-body scopes, already reads it.
+    let (input, short_name) = crate::parser::lex::short_name_prefix(input)?;
+    let (input, (name_span, name_str)) = preceded(ws_and_comments, with_span(name)).parse(input)?;
+    let (input, leading_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
     let (input, type_result) = crate::parser::usage::optional_typings(input)?;
     let (type_ref_span, _, typing) =
         crate::parser::usage::typing_reference_fields_from_result(type_result);
@@ -1163,6 +1171,9 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     };
     // `:>` subsets, independent of and in addition to `:>>` redefines (mirrors
     // `connector::ref_decl`).
+    let (input, trailing_multiplicity) =
+        opt(preceded(ws_and_comments, multiplicity_node)).parse(input)?;
+    let (input, multiplicity_modifiers) = usage_ordered_modifier(input)?;
     let (input, subsets) =
         opt(preceded(ws_and_comments, crate::parser::usage::subsetting)).parse(input)?;
     let subsets = subsets.map(|(target, _value)| target);
@@ -1179,7 +1190,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             start,
             input,
             RefDecl {
-                short_name: None,
+                short_name,
                 is_derived: prefix.is_derived,
                 usage_prefix: prefix.usage_prefix,
                 is_constant: prefix.is_constant,
@@ -1189,11 +1200,11 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
                 typing,
                 redefines,
                 subsets,
-                multiplicity: None,
-                multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
+                multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                multiplicity_modifiers,
                 value,
                 body,
-                name_span: None,
+                name_span: Some(name_span),
                 type_ref_span,
                 membership: crate::ast::Membership::feature(visibility, visibility_span),
             },

@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`ref`, `subject`, `actor` and namespace-level `calc` reach the declaration surface their
+  production gives them.** Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap
+  53). **AST version 175 -> 176.**
+
+  `UsageDeclaration = Identification FeatureSpecializationPart?` and
+  `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` (SysML BNF 42/308), so every
+  usage may carry a short name. Four declarations refused theirs and reached recovery instead:
+
+  - `part_ref_usage` -- the `ReferenceUsage` parser for namespace and part-definition bodies --
+    went straight to the declared name, so `ref <rd> rd : T;` was reported as an unrecognized
+    declaration even though `connector::ref_decl`, which owns the same production in the
+    definition-body scopes, already read it. It also discarded the multiplicity and the
+    `ordered`/`nonunique` slots, which the same `FeatureSpecializationPart` admits.
+  - `subject`, `actor` in a requirement body, and `actor` in a use-case body all rejected
+    `<shortName>`. `SubjectDecl`, `RequirementActorDecl` and `ActorUsage` now carry `short_name`,
+    and the use-case actor's multiplicity -- parsed but never projected -- is visible.
+
+  `CalculationUsage` is a `BehaviorUsageElement` and therefore a legal `PackageMember`, but no
+  namespace scope dispatched it: `calc estimate [1];` fell through to the unimplemented
+  extended-library declaration. `PackageBodyElement::CalcUsage` dispatches it *after* `calc_def`,
+  which stays `def`-optional for the bare definitions the Systems Library authors, so this arm
+  catches only what that grammar refuses.
+
 - **`BasicDefinitionPrefix` keeps its authored span, and `variation` reaches the connection-like
   definitions.** Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap 58).
   **AST version 174 -> 175.**

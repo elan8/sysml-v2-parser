@@ -305,6 +305,7 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::ConstraintDef(c) => view::emit_constraint_def(w, path, &c.value),
         PackageBodyElement::ConstraintUsage(c) => view::emit_constraint_usage(w, path, &c.value),
         PackageBodyElement::CalcDef(c) => view::emit_calc_def(w, path, &c.value),
+        PackageBodyElement::CalcUsage(c) => view::emit_calc_usage(w, path, &c.value),
         PackageBodyElement::ConcernUsage(c) => requirement::emit_concern_usage(w, path, &c.value),
         PackageBodyElement::UseCaseDef(u) => requirement::emit_use_case_def(w, path, &u.value),
         PackageBodyElement::UseCaseUsage(u) => requirement::emit_use_case_usage(w, path, &u.value),
