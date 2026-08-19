@@ -380,9 +380,6 @@ pub enum AttributeBodyElement {
     /// KerML connector member (`connector a ::> a.x to b;`) nested in a KerML type body; see
     /// [`crate::ast::KermlConnectorMember`].
     KermlConnector(Box<Node<crate::ast::KermlConnectorMember>>),
-    /// Nested KerML `class` definition (`class Outer { class Inner { ... } }`); see
-    /// [`ClassDef`].
-    ClassDef(Box<Node<ClassDef>>),
     /// Nested KerML classifier declaration for the rest of the keyword family (`struct`,
     /// `classifier`, `datatype`, `assoc`, `behavior`, ...; spec42 Gap 38); see
     /// [`crate::ast::KermlClassifierDecl`].
@@ -426,19 +423,6 @@ pub struct ItemDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IndividualDef {
-    pub identification: Identification,
-    pub specializes: Option<Node<TypingRelationship>>,
-    pub body: AttributeBody,
-    pub membership: Membership,
-}
-
-/// KerML `class` classifier definition: `class` Identification (`:>` | `specializes`) type? body,
-/// e.g. `class B :> A { }`. Mirrors `IndividualDef` (same `def`-optional, `:>`-specialized,
-/// `AttributeBody`-bodied shape) -- previously only reachable through the opaque
-/// `classifier_decl` KerML fallback alongside `classifier`/`struct`/`structure`/`subclassifier`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ClassDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,

@@ -261,12 +261,8 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         map(crate::parser::constraint::kerml_connector_member, |n| {
             AttributeBodyElement::KermlConnector(Box::new(n))
         }),
-        map(crate::parser::package::class_def, |n| {
-            AttributeBodyElement::ClassDef(Box::new(n))
-        }),
-        // The rest of the KerML classifier-keyword family (`struct`, `classifier`, `datatype`,
-        // `assoc`, `behavior`, ...) nested in a type body (spec42 Gap 38); `class` stays on the
-        // `class_def` arm above.
+        // The KerML classifier-keyword family (`class`, `struct`, `classifier`, `datatype`,
+        // `assoc`, `behavior`, ...) nested in a type body (spec42 Gap 38).
         map(crate::parser::package::kerml_classifier_structured, |n| {
             AttributeBodyElement::KermlClassifier(Box::new(n))
         }),

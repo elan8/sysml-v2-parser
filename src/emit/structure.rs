@@ -569,7 +569,6 @@ fn emit_attribute_body_element(
         AttributeBodyElement::KermlConnector(n) => {
             super::view::emit_kerml_connector_member(w, path, &n.value)
         }
-        AttributeBodyElement::ClassDef(n) => emit_class_def(w, path, &n.value),
         AttributeBodyElement::KermlClassifier(n) => {
             super::root::emit_kerml_classifier_decl(w, path, &n.value)
         }
@@ -1545,20 +1544,6 @@ pub(crate) fn emit_individual_def(
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
     w.push_str("individual def ");
-    emit_identification(w, &def.identification);
-    if let Some(spec) = &def.specializes {
-        emit_typing_clause(w, &spec.value)?;
-    }
-    emit_attribute_body(w, path, &def.body)
-}
-
-pub(crate) fn emit_class_def(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    def: &crate::ast::ClassDef,
-) -> Result<(), EmitError> {
-    emit_visibility(w, def.membership.visibility);
-    w.push_str("class def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
         emit_typing_clause(w, &spec.value)?;

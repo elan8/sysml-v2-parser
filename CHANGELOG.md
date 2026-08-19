@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`class` joins the other KerML classifier keywords; the bespoke `ClassDef` node is deleted.**
+  Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap 59).
+  **AST version 176 -> 177.**
+
+  `class` was the one keyword in `KERML_CLASSIFIER_KEYWORDS` routed to its own `ClassDef` node
+  with an attribute body, ahead of the shared `KermlClassifierDecl` that `type`, `struct`,
+  `behavior`, `datatype` and the rest reach. Three things followed from that:
+
+  - **A legal member was refused.** `BasicFeaturePrefix` opens with `( direction =
+    FeatureDirection )?` (KerML BNF 582), and the Kernel Semantic Library authors `in feature`,
+    `out feature` and `inout feature` throughout, but the attribute body has no directed-parameter
+    member, so `class C { in feature x : T; }` reached recovery while `struct C { ... }` and
+    `behavior C { ... }` accepted the same line.
+  - **The formatter invented a keyword.** No production spells `class def`, yet `class C { ... }`
+    was re-emitted as `class def C { ... }`.
+  - **`abstract` was refused**, because `class_def` was configured `.no_abstract()`.
+
+  The semantic projection also improves from the bare `(class-def)` marker to the full classifier
+  declaration with its keyword, abstractness, specialization and body members. `class` and
+  `association` are added to the nested-classifier keyword set inside a type body, so
+  `class Inner { ... }` nests as its siblings already did.
+
+  This is the reachable half of spec42's Gap 59. The other half -- a direction beside `end` -- is
+  unauthorable in the pinned grammar and is pinned as recovery instead; see the audit.
+
 - **`ref`, `subject`, `actor` and namespace-level `calc` reach the declaration surface their
   production gives them.** Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap
   53). **AST version 175 -> 176.**

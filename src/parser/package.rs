@@ -289,7 +289,6 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::AssertConstraint(_)
         | PackageBodyElement::PerformUsage(_)
         | PackageBodyElement::BindingConnectorUsage(_)
-        | PackageBodyElement::ClassDef(_)
         | PackageBodyElement::Succession(_)
         | PackageBodyElement::ExhibitState(_)
         | PackageBodyElement::IncludeUseCase(_)
@@ -1070,36 +1069,6 @@ fn feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureDecl>> {
     ))
 }
 
-/// KerML `class` classifier definition: `class` Identification (`:>`|`specializes`) type? body.
-/// Mirrors `individual_def` exactly (same `def`-optional, `no_abstract`, captured-visibility
-/// shape) -- see `crate::ast::ClassDef`'s doc comment.
-pub(crate) fn class_def(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::ClassDef>> {
-    let start = input;
-    let (input, prefix) = crate::parser::definition_prefix::parse_definition_prefix(
-        input,
-        crate::parser::definition_prefix::DefinitionPrefixOptions::new(b"class")
-            .no_abstract()
-            .with_captured_visibility(),
-    )?;
-    let (input, body) = crate::parser::attribute::attribute_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::ClassDef {
-                identification: prefix.identification,
-                specializes: prefix.specializes,
-                body,
-                membership: crate::ast::Membership::owning(
-                    prefix.visibility,
-                    prefix.visibility_span,
-                ),
-            },
-        ),
-    ))
-}
-
 fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>> {
     let start = input;
     let starters: &[&[u8]] = &[
@@ -1774,16 +1743,6 @@ fn try_package_body_behavior<'a>(
         Individual,
         individual_def,
         PackageBodyElement::IndividualDef
-    );
-    // KerML `class` classifier definition (e.g. `class B :> A { }`), previously only reachable
-    // through the opaque `classifier_decl` fallback -- see `class_def`'s doc comment.
-    try_package_body_dispatch!(
-        input,
-        start,
-        starter,
-        Class,
-        class_def,
-        PackageBodyElement::ClassDef
     );
     // KerML bare `feature` usage declaration (e.g. `feature x;`, `feature x : Type;`, `feature x
     // :> Target;`), previously only reachable through the opaque `kerml_feature_decl` fallback --

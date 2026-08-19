@@ -21,8 +21,8 @@ use super::structure::{
     OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, Perform, PortDef, PortUsage, RefDecl,
 };
 use super::view::{
-    CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef,
-    ViewUsage, ViewpointDef, ViewpointUsage,
+    CalcDef, ConstraintDef, ConstraintUsage, RenderingDef, RenderingUsage, ViewDef, ViewUsage,
+    ViewpointDef, ViewpointUsage,
 };
 use crate::ast::core::Node;
 use crate::ast::QualifiedReferenceId;
@@ -235,9 +235,6 @@ pub enum PackageBodyElement {
     /// Package-level `BindingConnectorAsUsage`, e.g. `binding instant[instantNum] of startShot =
     /// endShot;`. See `crate::ast::BindingConnectorUsage`'s doc comment for the full grammar.
     BindingConnectorUsage(Node<crate::ast::BindingConnectorUsage>),
-    /// KerML `class` classifier definition, e.g. `class B :> A { }`. See
-    /// `crate::ast::ClassDef`'s doc comment.
-    ClassDef(Node<crate::ast::ClassDef>),
     /// Package-level `SuccessionAsUsage` (BNF §8.2.2.13.3), e.g. `succession s1 : AB first a then
     /// b;`, `first a then b;`. Reuses [`FirstStmt`], the identical shape already parsed inside
     /// action bodies (GH-38): optional `succession` name/type/multiplicity prefix, `first`

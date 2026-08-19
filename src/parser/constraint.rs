@@ -1496,6 +1496,11 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             b"datatype",
             b"metaclass",
             b"assoc",
+            b"association",
+            // `class` joined this list when `ClassDef` was deleted: it is an ordinary
+            // `KermlClassifierDecl` keyword like its siblings, and a nested `class Inner { ... }`
+            // inside a type body had been reaching the old bespoke node instead.
+            b"class",
             b"classifier",
             b"function",
             b"behavior",

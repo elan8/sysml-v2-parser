@@ -362,11 +362,6 @@ macro_rules! ast_traversal {
                 walk_individual_def(self, node)
             }
 
-            /// Visits [`ClassDef`]; the default implementation walks its children.
-            fn visit_class_def(&mut self, node: &$($mutability)? Node<ClassDef>) {
-                walk_class_def(self, node)
-            }
-
             /// Visits [`PartUsage`]; the default implementation walks its children.
             fn visit_part_usage(&mut self, node: &$($mutability)? Node<PartUsage>) {
                 walk_part_usage(self, node)
@@ -2371,9 +2366,6 @@ macro_rules! ast_traversal {
                 PackageBodyElement::BindingConnectorUsage(field_0) => {
                     visitor.visit_binding_connector_usage(field_0);
                 }
-                PackageBodyElement::ClassDef(field_0) => {
-                    visitor.visit_class_def(field_0);
-                }
                 PackageBodyElement::Succession(field_0) => {
                     visitor.visit_first_stmt(field_0);
                 }
@@ -2821,9 +2813,6 @@ macro_rules! ast_traversal {
                 AttributeBodyElement::KermlConnector(field_0) => {
                     visitor.visit_kerml_connector_member(&$($mutability)? **field_0);
                 }
-                AttributeBodyElement::ClassDef(field_0) => {
-                    visitor.visit_class_def(&$($mutability)? **field_0);
-                }
                 AttributeBodyElement::KermlClassifier(field_0) => {
                     visitor.visit_kerml_classifier_decl(&$($mutability)? **field_0);
                 }
@@ -2867,19 +2856,6 @@ macro_rules! ast_traversal {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
             let IndividualDef { identification, specializes, body, membership } = &$($mutability)? node.value;
-            visitor.visit_identification(identification);
-            if let Some(inner) = specializes {
-                visitor.visit_typing_relationship(inner);
-            }
-            visitor.visit_attribute_body(body);
-            visitor.visit_membership(membership);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_class_def<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ClassDef>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let ClassDef { identification, specializes, body, membership } = &$($mutability)? node.value;
             visitor.visit_identification(identification);
             if let Some(inner) = specializes {
                 visitor.visit_typing_relationship(inner);

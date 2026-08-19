@@ -207,7 +207,6 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         }
         PackageBodyElement::PerformUsage(p) => walk_perform_body(report, path, &p.value.body),
         PackageBodyElement::BindingConnectorUsage(b) => walk_ref_body(report, path, &b.value.body),
-        PackageBodyElement::ClassDef(c) => walk_attribute_body(report, path, &c.value.body),
         PackageBodyElement::Succession(first) => {
             walk_first_merge_body(report, path, &first.value.body)
         }
@@ -703,7 +702,6 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             AttributeBodyElement::KermlConnector(n) => {
                 walk_calc_def_body(report, &p, &n.value.body)
             }
-            AttributeBodyElement::ClassDef(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::Bind(n) => walk_bind(report, &p, &n.value),
             AttributeBodyElement::Connection(n) => {
                 walk_connection_def_body(report, &p, &n.value.body)

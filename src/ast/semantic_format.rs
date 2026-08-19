@@ -3085,9 +3085,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::AttributeBodyElement::KermlConnector(_member) => {
                             self.write_marker(&mut first, "kerml-connector")?;
                         }
-                        super::AttributeBodyElement::ClassDef(_member) => {
-                            self.write_marker(&mut first, "class-def")?;
-                        }
                         super::AttributeBodyElement::KermlClassifier(declaration) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_kerml_classifier(&declaration.value)?;
@@ -4489,7 +4486,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::BindingConnectorUsage(_binding) => {
                 self.write_marker(first, "binding-connector-usage")
             }
-            PackageBodyElement::ClassDef(_definition) => self.write_marker(first, "class-def"),
             PackageBodyElement::Succession(statement) => {
                 self.write_item_prefix(first)?;
                 self.write_first_statement(&statement.value)
