@@ -429,7 +429,9 @@ fn perform_in_out_binding_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Per
 /// Perform body element: doc comment, in/out binding, or `variant` member.
 fn perform_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PerformBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -1349,7 +1351,9 @@ fn variant_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage
 }
 
 fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsageBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
     // In SysML part bodies, `metadata name ...` is the dedicated MetadataUsage production.
     // It shares its prefix with KerML MetadataFeature, so give the scope-specific production

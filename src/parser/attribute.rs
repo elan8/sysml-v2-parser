@@ -226,7 +226,9 @@ enum MetadataBindingPrefix {
 
 fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a
@@ -1287,7 +1289,9 @@ fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>
 
 fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`. `connector::ref_decl` reads `ref part …` as a

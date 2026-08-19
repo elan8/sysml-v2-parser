@@ -93,8 +93,9 @@ fn test_parse_fixture_exact_start() {
         Ok(ast) => ast,
         Err(e) => panic!("fixture start should parse: {:?}", e),
     };
-    assert_eq!(root.elements.len(), 1);
-    let pkg = match &root.elements[0].value {
+    // Element 0 is the file's leading `/* ... */` header, a keyword-less `Comment` member.
+    assert_eq!(root.elements.len(), 2);
+    let pkg = match &root.elements[1].value {
         sysml_v2_parser::ast::RootElement::Package(p) => &p.value,
         other => panic!("expected Package, got {:?}", other),
     };

@@ -172,7 +172,9 @@ pub(crate) fn constraint_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<ConstraintDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // `MemberPrefix` precedes the member's own keyword, so the usage guards below look past it;
     // each arm's parser re-reads it. Without this a `private ref constraint hidden;` matched no
     // guard and reached the expression fallback.
@@ -1351,7 +1353,9 @@ const PART_USAGE_PREFIX_STARTERS: &[&[u8]] = &[
 
 fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // Keyword dispatch looks past an optional visibility prefix (`private attribute ...`,
     // `private connector all ...`); each arm's parser re-parses the prefix itself.
     let after_visibility = crate::parser::lex::visibility_prefix(input)

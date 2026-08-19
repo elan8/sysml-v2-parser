@@ -65,6 +65,7 @@ package 'State Decomposition-1' {
             transition accept VehicleOffSignal then off;
         }
         state healthStates {
+            /* ... */
         }
     }
 }

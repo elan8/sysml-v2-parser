@@ -2964,6 +2964,23 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             Some(locale) => write_quoted(self.writer, locale)?,
             None => self.writer.write_str("none")?,
         }
+        self.writer.write_str(") ")?;
+        self.write_annotation_body(&comment.body_span, &comment.normalized_text())?;
+        self.writer.write_char(')')
+    }
+
+    /// The `REGULAR_COMMENT` body of an annotating element: where it is in the source, and what
+    /// the pinned processing rules (KerML BNF 214 note 1) make of it.
+    ///
+    /// The raw bytes are not repeated here -- the span already names them, and a projection that
+    /// showed both would be showing the same fact twice. The normalized text is shown because
+    /// every consumer is required to agree on it, and an invariant nobody can see is one that
+    /// drifts.
+    fn write_annotation_body(&mut self, body_span: &Span, normalized: &str) -> io::Result<()> {
+        self.writer.write_str("(body ")?;
+        write_span(self.writer, body_span)?;
+        self.writer.write_str(" (normalized ")?;
+        write_quoted(self.writer, normalized)?;
         self.writer.write_str("))")
     }
 
@@ -3268,7 +3285,26 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
 
     fn write_annotating_member(&mut self, member: &super::AnnotatingMember) -> io::Result<()> {
         match member {
-            super::AnnotatingMember::Doc(_) => self.writer.write_str("(doc)"),
+            super::AnnotatingMember::Doc(doc) => {
+                self.writer.write_str("(doc (name ")?;
+                match doc
+                    .value
+                    .identification
+                    .as_ref()
+                    .and_then(|i| i.name.as_ref())
+                {
+                    Some(name) => write_quoted(self.writer, name)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str(") (locale ")?;
+                match &doc.value.locale {
+                    Some(locale) => write_quoted(self.writer, locale)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str(") ")?;
+                self.write_annotation_body(&doc.value.body_span, &doc.value.normalized_text())?;
+                self.writer.write_char(')')
+            }
             // The keyword and the locale are grammatical facts, not formatting: a comment member
             // emitted without its authored keyword becomes a bare block comment, which reparses
             // as trivia and disappears. A bare `(comment)` marker could not tell the two
@@ -3276,7 +3312,23 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::AnnotatingMember::Comment(comment) => {
                 self.write_comment_annotation(&comment.value)
             }
-            super::AnnotatingMember::TextualRep(_) => self.writer.write_str("(textual-rep)"),
+            super::AnnotatingMember::TextualRep(rep) => {
+                self.writer.write_str("(textual-rep (name ")?;
+                match rep
+                    .value
+                    .rep_identification
+                    .as_ref()
+                    .and_then(|i| i.name.as_ref())
+                {
+                    Some(name) => write_quoted(self.writer, name)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str(") (language ")?;
+                write_quoted(self.writer, &rep.value.language)?;
+                self.writer.write_str(") ")?;
+                self.write_annotation_body(&rep.value.body_span, &rep.value.normalized_text())?;
+                self.writer.write_char(')')
+            }
             super::AnnotatingMember::MetadataAnnotation(annotation) => {
                 self.write_metadata_annotation(&annotation.value)
             }

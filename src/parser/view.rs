@@ -27,7 +27,9 @@ const VIEW_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 
 fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see
     // `occurrence_prefix::starts_contended_prefix`.
@@ -96,7 +98,9 @@ fn rendering_usage_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingUsageBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -277,7 +281,9 @@ fn rendering_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<RenderingDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -371,7 +377,9 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
 
 fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, elem) = alt((
         map(
             crate::parser::body::annotating_member,

@@ -44,12 +44,14 @@ fn test_parse_surveillance_drone() {
         Err(e) => panic!("parse should succeed for SurveillanceDrone.sysml: {:?}", e),
     };
 
+    // The file's leading `/* ... */` header is the keyword-less `Comment` spelling, so it is a
+    // root member of its own ahead of the package.
     assert_eq!(
         root.elements.len(),
-        1,
-        "expected exactly one root element (package SurveillanceDrone)"
+        2,
+        "expected the header comment and the package SurveillanceDrone"
     );
-    let first = &root.elements[0];
+    let first = &root.elements[1];
     let package = match &first.value {
         RootElement::Package(p) => &p.value,
         other => panic!("expected root to be a Package, got {:?}", other),
@@ -252,13 +254,14 @@ fn test_surveillance_drone_errors_reports_all_errors() {
             .collect::<Vec<_>>()
     );
 
-    // All four packages are recovered as separate root elements (invalid members are skipped).
+    // The file's leading `/* ... */` header is a root member of its own, then all four packages
+    // are recovered as separate root elements (invalid members are skipped).
     assert_eq!(
         result.document.root.elements.len(),
-        4,
-        "partial AST should contain all four packages"
+        5,
+        "partial AST should contain the header comment and all four packages"
     );
-    let first = match &result.document.root.elements[0].value {
+    let first = match &result.document.root.elements[1].value {
         RootElement::Package(p) => &p.value,
         other => panic!(
             "expected first root element to be a Package, got {:?}",

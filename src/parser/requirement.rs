@@ -32,7 +32,9 @@ use nom::{IResult, Parser};
 fn other_requirement_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, RequirementDefBodyElement> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start_after_ws = input;
 
     // If this looks like a genuine syntax error we have a targeted diagnostic for, let the
@@ -784,10 +786,7 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
         (input, ident_parsed, locale)
     };
     // Use ws (not ws_and_comments) so we don't consume the doc body as a block comment.
-    let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
-    let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
-    let (input, _) = tag(&b"*/"[..]).parse(input)?;
-    let text = String::from_utf8_lossy(text_bytes.fragment()).to_string();
+    let (input, (text, body_span)) = preceded(ws, comment_body).parse(input)?;
     let ident = ident_parsed.filter(|i| i.short_name.is_some() || i.name.is_some());
     Ok((
         input,
@@ -798,6 +797,7 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
                 identification: ident,
                 locale,
                 text,
+                body_span,
             },
         ),
     ))
@@ -809,16 +809,28 @@ pub(crate) fn doc_comment(input: Input<'_>) -> IResult<Input<'_>, Node<DocCommen
 /// `comment_annotation` below requires the `comment` keyword unconditionally, so this handles
 /// the omitted-keyword case as its own small parser rather than widening that one (which is
 /// reused across many other body contexts). Real usage: `Simple Tests/CommentTest.sysml:25`.
+/// Consume a `REGULAR_COMMENT` body (`'/*' COMMENT_TEXT '*/'`, KerML BNF 38) and return the
+/// authored text together with the span it occupies.
+///
+/// Takes trivia-free input: every caller reaches this after `ws`, never `ws_and_comments`, so the
+/// member's own body is not skipped as trivia before it can be read.
+fn comment_body(input: Input<'_>) -> IResult<Input<'_>, (String, crate::ast::Span)> {
+    let (input, _) = tag(&b"/*"[..]).parse(input)?;
+    let body_start = input;
+    let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
+    let body_span = crate::parser::span_from_to(body_start, input);
+    let (input, _) = tag(&b"*/"[..]).parse(input)?;
+    let text = String::from_utf8_lossy(text_bytes.fragment()).to_string();
+    Ok((input, (text, body_span)))
+}
+
 pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"locale"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, locale) = string_value(input)?;
     // Use ws (not ws_and_comments) so we don't consume the comment body as a block comment.
-    let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
-    let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
-    let (input, _) = tag(&b"*/"[..]).parse(input)?;
-    let text = String::from_utf8_lossy(text_bytes.fragment()).to_string();
+    let (input, (text, body_span)) = preceded(ws, comment_body).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -830,6 +842,7 @@ pub(crate) fn bare_locale_comment(input: Input<'_>) -> IResult<Input<'_>, Node<C
                 about_targets: Vec::new(),
                 locale: Some(locale),
                 text,
+                body_span,
             },
         ),
     ))
@@ -888,10 +901,7 @@ fn comment_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Comment
     ))
     .parse(input)?;
     // Use ws so we don't consume the comment body as a block comment.
-    let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
-    let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
-    let (input, _) = tag(&b"*/"[..]).parse(input)?;
-    let text = String::from_utf8_lossy(text_bytes.fragment()).to_string();
+    let (input, (text, body_span)) = preceded(ws, comment_body).parse(input)?;
     let ident = ident_parsed.filter(|i| i.short_name.is_some() || i.name.is_some());
     Ok((
         input,
@@ -904,6 +914,38 @@ fn comment_annotation_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Comment
                 about_targets,
                 locale,
                 text,
+                body_span,
+            },
+        ),
+    ))
+}
+
+/// The keyword-less `Comment` spelling: a bare `/* ... */` at a member position.
+///
+/// `Comment = ( 'comment' Identification ( 'about' ... )? )? ( 'locale' ... )? body` (KerML BNF
+/// 199) makes every group before the body optional, and `Comment` is an `AnnotatingElement` (BNF
+/// 188), so this is the production's shortest legal spelling -- not trivia. It reaches the AST
+/// with `keyword_span: None`, which is exactly the state
+/// [`CommentAnnotation::keyword_span`](crate::ast::CommentAnnotation::keyword_span) already
+/// documented and no parser had ever produced.
+///
+/// Takes trivia-free input and must be tried only where a member may begin; see
+/// [`crate::parser::lex::ws_and_notes`].
+pub(crate) fn bare_comment(input: Input<'_>) -> IResult<Input<'_>, Node<CommentAnnotation>> {
+    let start = input;
+    let (input, (text, body_span)) = comment_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            CommentAnnotation {
+                keyword_span: None,
+                identification: None,
+                about_targets: Vec::new(),
+                locale: None,
+                text,
+                body_span,
             },
         ),
     ))
@@ -960,10 +1002,7 @@ pub(crate) fn textual_representation(
         }
     };
     // Use ws so we don't consume the body as a block comment.
-    let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
-    let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
-    let (input, _) = tag(&b"*/"[..]).parse(input)?;
-    let text = String::from_utf8_lossy(text_bytes.fragment()).to_string();
+    let (input, (text, body_span)) = preceded(ws, comment_body).parse(input)?;
     Ok((
         input,
         node_from_to(
@@ -974,6 +1013,7 @@ pub(crate) fn textual_representation(
                 language,
                 language_span,
                 text,
+                body_span,
             },
         ),
     ))

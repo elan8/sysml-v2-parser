@@ -345,7 +345,9 @@ fn case_return_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<CaseRetur
 
 fn return_ref_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let (input, element) = alt((
         map(
             crate::parser::body::annotating_member,
@@ -437,7 +439,9 @@ fn map_use_case_body_recovery(start: Input<'_>, end: Input<'_>) -> UseCaseDefBod
 }
 
 fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBodyElement> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start_after_ws = input;
 
     // If this looks like a genuine syntax error we have a targeted diagnostic for (e.g. `actor: User;`),
@@ -575,7 +579,9 @@ fn use_case_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBod
 pub(crate) fn use_case_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<UseCaseDefBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first; see

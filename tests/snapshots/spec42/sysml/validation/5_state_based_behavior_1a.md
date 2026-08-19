@@ -259,12 +259,22 @@ package '5-State-based Behavior-1a' {
     private import ISQ::*;
     package Definitions {
         part def VehicleA {
+            /*
+			 * The following declare that 'VehicleA' performs a
+			 * 'provide power' action and exhibits some 'vehicle states',
+			 * without giving details about these behaviors.
+			 */
             perform action 'provide power' : 'Provide Power';
             exhibit state 'vehicle states' : 'Vehicle States';
         }
         part def VehicleController {
             exhibit state 'controller states' : 'Controller States';
         }
+        /*
+		 * Black box specifications for state definitions may also have
+		 * input and output parameters, like activities, though none
+		 * are used here.
+		 */
         state def 'Vehicle States';
         state def 'Controller States';
         action def 'Provide Power';
@@ -284,11 +294,19 @@ package '5-State-based Behavior-1a' {
     }
     package Usages {
         private import Definitions::*;
+        /*
+		 * These actions are used enabled in the state usage 
+		 * 'vehicle states', in addition to 'provide power'.
+		 */
         action 'provide power' : 'Provide Power';
         action 'perform self test' : 'Perform Self Test';
         action 'apply parking brake' : 'Apply Parking Brake';
         action 'sense temperature' : 'Sense Temperature';
         state 'vehicle states' : 'Vehicle States' {
+            /*
+			 * This is a usage of the state definition 'Vehicle States'.
+			 * Note that it depends specifically on on the part 'vehicle1_c1'.
+			 */
             state 'operational states' {
                 doc
                 /*
@@ -307,6 +325,11 @@ package '5-State-based Behavior-1a' {
                 state starting;
                 transition 'starting-on' first starting accept 'Vehicle On Signal' then on;
                 state on {
+                    /*
+					 * A state may have a "entry" action that is performed on entry into
+					 * the state, a "do" action that is performed while in the state
+					 * and an "exit" action that is performed on exit from the state.
+					 */
                     entry 'perform self test';
                     do 'provide power';
                     exit 'apply parking brake';
@@ -314,9 +337,16 @@ package '5-State-based Behavior-1a' {
                 transition 'on-off' first on accept 'Vehicle Off Signal' then off;
             }
             state 'health states' {
+                /*
+				 * 'health states' is concurrent with 'operational states', because the
+				 * containing state usage is "parallel".
+				 */
                 entry action initial;
                 do 'sense temperature' {
                     out temp;
+                    /*
+					 * State-behavior actions may have input and output parameters.
+					 */
                 }
                 transition initial then normal;
                 state normal;
@@ -342,6 +372,10 @@ package '5-State-based Behavior-1a' {
             port fuelCmdPort {
                 in fuelCmd : FuelCmd;
             }
+            /*
+			 * These attribute properties are used in the specification for
+			 * 'vehicle states'.
+			 */
             attribute 'brake pedal depressed' : Boolean;
             attribute maintenanceTime : Time::DateTime;
             attribute Tmax : TemperatureValue;
@@ -354,6 +388,11 @@ package '5-State-based Behavior-1a' {
                 in fuelCmd = fuelCmdPort.fuelCmd;
             }
             state 'vehicle states' :>> VehicleA::'vehicle states' {
+                /*
+				 * This allocates the state usage 'vehicle states' as the detailed
+				 * state-based behavior for 'vehicle1_c1' that fills in the generic
+				 * declaration in 'VehicleA'.
+				 */
             }
             part vehicleController : VehicleController {
                 state 'controller states' :>> VehicleController::'controller states';
@@ -377,6 +416,6 @@ package '5-State-based Behavior-1a' {
     (reference r8 (scope relative) (span (offset 5038) (line 201) (column 20) (len 16)) (segments (segment 0 (token "TemperatureValue") (name "TemperatureValue") (separator none) (span (offset 5038) (line 201) (column 20) (len 16)))))
     (reference r9 (scope relative) (span (offset 5991) (line 232) (column 28) (len 17)) (segments (segment 0 (token "VehicleController") (name "VehicleController") (separator none) (span (offset 5991) (line 232) (column 28) (len 17)))))
   )
-  (root (package (name "5-State-based Behavior-1a") (body brace (import (target (span (span (offset 54) (line 2) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 66) (line 2) (column 29) (len 3))) (separator (span (offset 66) (line 2) (column 29) (len 2))) (marker (span (offset 68) (line 2) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 87) (line 3) (column 17) (len 6))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 90) (line 3) (column 20) (len 3))) (separator (span (offset 90) (line 3) (column 20) (len 2))) (marker (span (offset 92) (line 3) (column 22) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "Definitions") (body brace (part-def (name "VehicleA") (body brace (perform (declaration "provide power") (action none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (subsets none) (redefines none) (body semicolon)) (exhibit (declaration "vehicle states") (state none)))) (part-def (name "VehicleController") (body brace (exhibit (declaration "controller states") (state none)))) (state-def (name "Vehicle States") (body semicolon)) (state-def (name "Controller States") (body semicolon)) (action-def (name "Provide Power") (specializes none) (body semicolon)) (action-def (name "Perform Self Test") (specializes none) (body semicolon)) (action-def (name "Apply Parking Brake") (specializes none) (body semicolon)) (action-def (name "Sense Temperature") (specializes none) (body brace (in-out (direction out) (reference false) (declaration "temp") (subsets none) (type (ref r3)) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (redefines none) (value none) (span (offset 895) (line 32) (column 36) (len 27))))) (attribute-def (declaration-name "FuelCmd") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Vehicle Start Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Vehicle On Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Vehicle Off Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Start Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Off Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Over Temp") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Return to Normal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)))) (package (name "Usages") (body brace (import (target (span (span (offset 1241) (line 47) (column 18) (len 14))) (all none) (ref r4) (shape (namespace (wildcard-suffix (span (span (offset 1252) (line 47) (column 29) (len 3))) (separator (span (offset 1252) (line 47) (column 29) (len 2))) (marker (span (offset 1254) (line 47) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (action-usage (name "provide power") (short-name none) (body semicolon)) (action-usage (name "perform self test") (short-name none) (body semicolon)) (action-usage (name "apply parking brake") (short-name none) (body semicolon)) (action-usage (name "sense temperature") (short-name none) (body semicolon)) (state-usage) (state-usage) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "vehicle1_c1") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r5)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (port-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "fuelCmdPort") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (in-out-declaration))) (attribute-usage (declaration-name "brake pedal depressed") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name "maintenanceTime") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r7)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name "Tmax") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r8)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (perform) (state-usage) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "vehicleController") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r9)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (state-usage))))))))))
+  (root (package (name "5-State-based Behavior-1a") (body brace (import (target (span (span (offset 54) (line 2) (column 17) (len 15))) (all none) (ref r0) (shape (namespace (wildcard-suffix (span (span (offset 66) (line 2) (column 29) (len 3))) (separator (span (offset 66) (line 2) (column 29) (len 2))) (marker (span (offset 68) (line 2) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (import (target (span (span (offset 87) (line 3) (column 17) (len 6))) (all none) (ref r1) (shape (namespace (wildcard-suffix (span (span (offset 90) (line 3) (column 20) (len 3))) (separator (span (offset 90) (line 3) (column 20) (len 2))) (marker (span (offset 92) (line 3) (column 22) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (package (name "Definitions") (body brace (part-def (name "VehicleA") (body brace (comment (keyword none) (name none) (about) (locale none) (body (span (offset 147) (line 7) (column 6) (len 177)) (normalized "The following declare that 'VehicleA' performs a\n'provide power' action and exhibits some 'vehicle states',\nwithout giving details about these behaviors.\n"))) (perform (declaration "provide power") (action none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r2)))) (subsets none) (redefines none) (body semicolon)) (exhibit (declaration "vehicle states") (state none)))) (part-def (name "VehicleController") (body brace (exhibit (declaration "controller states") (state none)))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 538) (line 20) (column 5) (len 153)) (normalized "Black box specifications for state definitions may also have\ninput and output parameters, like activities, though none\nare used here.\n"))) (state-def (name "Vehicle States") (body semicolon)) (state-def (name "Controller States") (body semicolon)) (action-def (name "Provide Power") (specializes none) (body semicolon)) (action-def (name "Perform Self Test") (specializes none) (body semicolon)) (action-def (name "Apply Parking Brake") (specializes none) (body semicolon)) (action-def (name "Sense Temperature") (specializes none) (body brace (in-out (direction out) (reference false) (declaration "temp") (subsets none) (type (ref r3)) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (redefines none) (value none) (span (offset 895) (line 32) (column 36) (len 27))))) (attribute-def (declaration-name "FuelCmd") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Vehicle Start Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Vehicle On Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Vehicle Off Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Start Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Off Signal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Over Temp") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "Return to Normal") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)))) (package (name "Usages") (body brace (import (target (span (span (offset 1241) (line 47) (column 18) (len 14))) (all none) (ref r4) (shape (namespace (wildcard-suffix (span (span (offset 1252) (line 47) (column 29) (len 3))) (separator (span (offset 1252) (line 47) (column 29) (len 2))) (marker (span (offset 1254) (line 47) (column 31) (len 1)))) (recursive-suffix none) (combined-recursive-suffix-span none))))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 1264) (line 49) (column 5) (len 115)) (normalized "These actions are used enabled in the state usage \n'vehicle states', in addition to 'provide power'.\n"))) (action-usage (name "provide power") (short-name none) (body semicolon)) (action-usage (name "perform self test") (short-name none) (body semicolon)) (action-usage (name "apply parking brake") (short-name none) (body semicolon)) (action-usage (name "sense temperature") (short-name none) (body semicolon)) (state-usage) (state-usage) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "vehicle1_c1") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r5)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (port-usage (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "fuelCmdPort") (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body brace (in-out-declaration))) (comment (keyword none) (name none) (about) (locale none) (body (span (offset 4825) (line 195) (column 6) (len 96)) (normalized "These attribute properties are used in the specification for\n'vehicle states'.\n"))) (attribute-usage (declaration-name "brake pedal depressed") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r6)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name "maintenanceTime") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r7)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (attribute-usage (declaration-name "Tmax") (direction none) (derived false) (usage-prefix none) (constant false) (reference false) (end false) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r8)))) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (perform) (state-usage) (part-usage (then false) (prefix (direction none) (derived false) (variance none) (constant false) (reference false) (individual false) (portion none) (extensions)) (declaration-name "vehicleController") (short-name none) (typing (typing (kind typing) (conjugated false) (implied false) (targets (ref r9)))) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (value none) (body brace (state-usage))))))))))
 )
 ~~~

@@ -170,12 +170,31 @@ strip white space through the first line terminator, then per line strip leading
 leading `*`, and one following space), and BNF 231 note 1 applies the same processing to
 `TextualRepresentation`.
 
-**Disposition. Fixed.** A bare `/* ... */` in a member position now parses as an unkeyworded
-`CommentAnnotation` rather than being discarded, so the formatter no longer deletes it. Comment,
-documentation and textual-representation bodies keep their raw span *and* gain the pinned
-normalization through one owning API, so consumers cannot disagree about the text. A `/* ... */`
-that is not in a member position -- between the tokens of a declaration -- stays trivia, as the
-grammar has no member there to own it.
+**Disposition. Fixed.** A bare `/* ... */` in a member position parses as an unkeyworded
+`CommentAnnotation` rather than being discarded, so the formatter no longer deletes it, and
+`/** ... */` reaches the same node -- it is not given a production of its own, because the pin does
+not give it one.
+
+The seam is one new lexical helper, `lex::ws_and_notes`, used exactly where a member may begin: the
+root loop of both entry points, the two brace-member loops, and every `*_body_element` dispatcher.
+Every other position keeps `ws_and_comments`, so a comment between the tokens of a declaration
+stays trivia -- the grammar has no member there for it to be. A scope whose member set cannot yet
+hold an annotating element falls back to consuming it as trivia, so this widening cannot turn a
+previously-parsing document into a recovered one.
+
+The corpus supports the boundary exactly: of the 2 650 bare block comments in the pinned release,
+every one follows `}`, `;`, or the start of the file -- i.e. a member position. None sits inside a
+declaration.
+
+Comment, documentation and textual-representation bodies keep their authored bytes in `text` and
+gain `body_span` for provenance, and `normalize_comment_body` implements the pinned processing
+rules once for all three. Normalization is deliberately a view rather than a parse-time rewrite:
+the formatter needs the authored bytes to reproduce the document.
+
+Pinned by `tests/snapshots/spec42/comment_annotating_elements.md`, which authors a bare comment at
+file level, between a brace and its first member, after a member, nested one body down, and closing
+the file, beside the `//` and `//*` notes that stay trivia and a mid-declaration comment that also
+stays trivia.
 
 ## Gap 56 -- enumeration body annotations, literal bodies, initializers
 

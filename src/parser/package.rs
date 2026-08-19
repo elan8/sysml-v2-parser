@@ -188,7 +188,7 @@ fn namespace_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDe
 /// Dedicated variants for package / namespace / import keep existing consumers stable; all other
 /// legal package-body members (e.g. `part def` at file root) become [`RootElement::Member`].
 pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElement>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
     if let Ok((next, elem)) = crate::parser::span::reference_transaction(input, |input| {
         map(import_, |import| RootElement::Import(Box::new(import))).parse(input)
@@ -1143,7 +1143,9 @@ fn package_body_brace_inner(input: Input<'_>) -> IResult<Input<'_>, PackageBody>
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        // See `crate::parser::body::parse_structured_brace_members_inner`: a bare `/* ... */` at
+        // a member boundary is the `Comment` production, not trivia.
+        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
         if input.fragment().is_empty() {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -2145,7 +2147,22 @@ fn package_bare_binding_inner(
 pub(crate) fn package_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Box<Node<PackageBodyElement>>> {
-    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // The keyword-less `Comment` spelling, ahead of the starter lookup: `/*` selects no
+    // production keyword, so the lookup would classify the member as unrecognized.
+    if input.fragment().starts_with(b"/*") {
+        let start = input;
+        if let Ok((rest, member)) = crate::parser::requirement::bare_comment(input) {
+            return Ok((
+                rest,
+                Box::new(node_from_to(
+                    start,
+                    rest,
+                    PackageBodyElement::Annotating(crate::ast::AnnotatingMember::Comment(member)),
+                )),
+            ));
+        }
+    }
     let start = input;
     // One lookup selects the production this element can be: every alternative belonging to a
     // different production is then skipped rather than parsed and rolled back. A prefix-only or
@@ -2335,8 +2352,12 @@ pub(crate) fn package_body_element(
 
 /// Root: (package | namespace)*
 pub(crate) fn root_namespace(input: Input<'_>) -> IResult<Input<'_>, RootNamespace> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, elements) = many0(preceded(ws_and_comments, root_element)).parse(input)?;
+    // `ws_and_notes` at every member boundary, matching the editor entry point's own loop: a bare
+    // `/* ... */` between root members is the `Comment` production, and skipping it here would
+    // make strict and editor parsing disagree about the document.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    let (input, elements) =
+        many0(preceded(crate::parser::lex::ws_and_notes, root_element)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     Ok((input, RootNamespace { elements }))
 }

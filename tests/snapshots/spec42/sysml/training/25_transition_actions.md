@@ -87,8 +87,10 @@ package 'Transition Actions' {
                 in vehicle = operatingVehicle;
             }
             do action providePower {
+                /* ... */
             }
             exit action applyParkingBrake {
+                /* ... */
             }
         }
         transition accept VehicleOffSignal then off;

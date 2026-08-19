@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A bare `/* ... */` is a `Comment`, not trivia, and every annotating body keeps its raw span
+  and one normalization policy.** Audit and evidence: `planning/spec42-upstream-gap-audit.md`
+  (spec42 Gap 55). **AST version 177 -> 178.**
+
+  The pinned grammar defines three lexical forms and only two of them are notes:
+
+  ```text
+  SINGLE_LINE_NOTE = '//' LINE_TEXT
+  MULTILINE_NOTE   = '//*' COMMENT_TEXT '*/'
+  REGULAR_COMMENT  = '/*'  COMMENT_TEXT '*/'
+  ```
+
+  (KerML BNF 32-39.) Every group before the body in `Comment = ( 'comment' Identification
+  ( 'about' ... )? )? ( 'locale' ... )? body = REGULAR_COMMENT` (BNF 199) is optional, and
+  `Comment` is an `AnnotatingElement` (BNF 188), so a bare `/* ... */` at a member position is
+  syntax. `/** ... */` is not a separate production: it is a `Comment` whose body happens to begin
+  with `*`.
+
+  - **Legal members were deleted.** Both spellings were consumed as lexer trivia and were
+    unreachable from any AST node, so `package P { /* why this exists */ part def A; }` re-emitted
+    without the comment. They now reach `CommentAnnotation` with `keyword_span: None` -- the state
+    that field has documented since it was introduced and no parser had ever produced. Member
+    boundaries skip whitespace and notes only (`lex::ws_and_notes`); every other position keeps
+    skipping block comments, because the grammar has no member between the tokens of a declaration
+    for a comment there to be. A scope whose member set cannot yet hold an annotating element
+    still treats one as trivia rather than reporting it, so no previously-parsing document becomes
+    a recovered one.
+  - **Every consumer had to invent its own normalization.** `DocComment::text` was the raw slice
+    between `/*` and `*/` with no leading-`*` stripping and no dedent. The authored bytes still
+    live there -- that is what lets the formatter reproduce them -- and `normalize_comment_body`
+    now implements the pinned processing rules (KerML BNF 214 note 1, extended to
+    `TextualRepresentation` by BNF 231 note 1) once, exposed as `normalized_text()` on all three
+    types.
+  - **The body had no provenance.** `DocComment`, `CommentAnnotation` and `TextualRepresentation`
+    each gained `body_span`, the exact source span of the authored body text.
+
+  The semantic projection for `doc` and `rep` grows from a bare marker to the name, locale or
+  language, the body span, and the normalized text.
+
 - **`class` joins the other KerML classifier keywords; the bespoke `ClassDef` node is deleted.**
   Audit and evidence: `planning/spec42-upstream-gap-audit.md` (spec42 Gap 59).
   **AST version 176 -> 177.**

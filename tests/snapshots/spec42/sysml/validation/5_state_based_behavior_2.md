@@ -180,6 +180,10 @@ package '5-State-based Behavior-2' {
             state 'operational states' {
                 entry;
                 then off;
+                /*
+				 * The following uses a shorthand for a transition whose source 
+				 * is the immediately preceding state.
+				 */
                 state off;
                 transition accept 'Vehicle Start Signal' if vehicle1_c1.'brake pedal depressed' do send new 'Start Signal'() to vehicle1_c1.vehicleController then starting;
                 state starting;
@@ -197,6 +201,10 @@ package '5-State-based Behavior-2' {
                 do 'sense temperature' {
                     out temp;
                 }
+                /*
+				 * The shorthand can be used for multiple transitions after
+				 * a single state.
+				 */
                 state normal;
                 transition accept at vehicle1_c1.maintenanceTime then maintenance;
                 transition accept when 'sense temperature'.temp > vehicle1_c1.Tmax do send new 'Over Temp'() to vehicle1_c1.vehicleController then degraded;

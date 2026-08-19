@@ -46,6 +46,6 @@ package DependencyBodies {
     (reference r3 (scope relative) (span (offset 109) (line 5) (column 21) (len 1)) (segments (segment 0 (token "x") (name "x") (separator none) (span (offset 109) (line 5) (column 21) (len 1)))))
     (reference r4 (scope relative) (span (offset 112) (line 5) (column 24) (len 1)) (segments (segment 0 (token "y") (name "y") (separator none) (span (offset 112) (line 5) (column 24) (len 1)))))
   )
-  (root (package (name "DependencyBodies") (body brace (kerml-feature (name "x") (body semicolon)) (kerml-feature (name "y") (body semicolon)) (dependency (clients (ref r0)) (suppliers (ref r1)) (body semicolon)) (dependency (clients (ref r2)) (suppliers (ref r3) (ref r4)) (body brace (doc) (kerml-feature))))))
+  (root (package (name "DependencyBodies") (body brace (kerml-feature (name "x") (body semicolon)) (kerml-feature (name "y") (body semicolon)) (dependency (clients (ref r0)) (suppliers (ref r1)) (body semicolon)) (dependency (clients (ref r2)) (suppliers (ref r3) (ref r4)) (body brace (doc (name none) (locale none) (body (span (offset 130) (line 6) (column 15) (len 12)) (normalized "Rationale. "))) (kerml-feature))))))
 )
 ~~~

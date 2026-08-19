@@ -36,7 +36,9 @@ fn port_body(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
 
 fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // `port_usage` is the first alternative, so this scope needs no contended pre-dispatch: it
     // already sees `ref port q;` (`Simple Tests/PartTest.sysml:21`) and `#Tag port t;` before
     // `connector::ref_decl` and the annotating members below can claim their first token.
@@ -239,7 +241,9 @@ const PORT_DEF_OPAQUE_STARTERS: &[&[u8]] = &[b"ref", b"abstract"];
 
 fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     // A `#tag` run and a leading `ref` are both `OccurrenceUsagePrefix` slots that a sibling
     // production in this scope would otherwise claim first -- the two `#` arms immediately below
     // and `connector::ref_decl` further down; see `occurrence_prefix::starts_contended_prefix`.

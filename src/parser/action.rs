@@ -1270,7 +1270,9 @@ pub(crate) fn action_usage_body_element(
 ) -> IResult<Input<'_>, Node<ActionUsageBodyElement>> {
     use crate::parser::state::state_usage;
 
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's
+    // annotating member, which is the `Comment` production's keyword-less spelling.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
     let start = input;
     // A leading `ref` or `#tag` is an `OccurrenceUsagePrefix` slot that `action_ref_decl` and
     // `metadata_keyword_prefix` below would otherwise claim first; see

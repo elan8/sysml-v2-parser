@@ -270,8 +270,20 @@ package '10c-Fuel Economy Analysis' {
                 }
             }
             action dynamicsAnalysis {
+                /*
+				 * Solve for the required engine power as a function of time
+				 * to support the nominal scenarios.
+				 * 
+				 * Note: Vehicle force = power/speed
+				 * Note: EngineRPM * EngineGearRatio/WheelRPM = constant
+				 */
             }
             action fuelConsumptionAnalysis {
+                /*
+				 * Solve the engine equations to determine how much fuel is
+				 * consumed. The engine RPM is a function of the speed of the
+				 * vehicle and the gear state.
+				 */
             }
         }
         requirement vehicleFuelEconomyRequirementsGroup {

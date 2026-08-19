@@ -38,6 +38,6 @@ package CommentKeywordProvenance {
 (parsed-document
   (references
   )
-  (root (package (name "CommentKeywordProvenance") (body brace (comment (keyword (span (offset 39) (line 2) (column 5) (len 7))) (name none) (about) (locale none)) (comment (keyword (span (offset 85) (line 3) (column 5) (len 7))) (name "named") (about) (locale none)) (comment (keyword none) (name none) (about) (locale "en_US")) (comment (keyword (span (offset 183) (line 5) (column 5) (len 7))) (name none) (about) (locale "en_US")))))
+  (root (package (name "CommentKeywordProvenance") (body brace (comment (keyword (span (offset 39) (line 2) (column 5) (len 7))) (name none) (about) (locale none) (body (span (offset 49) (line 2) (column 15) (len 29)) (normalized "an anonymous comment member "))) (comment (keyword (span (offset 85) (line 3) (column 5) (len 7))) (name "named") (about) (locale none) (body (span (offset 101) (line 3) (column 21) (len 24)) (normalized "a named comment member "))) (comment (keyword none) (name none) (about) (locale "en_US") (body (span (offset 149) (line 4) (column 22) (len 27)) (normalized "the keyword-less spelling "))) (comment (keyword (span (offset 183) (line 5) (column 5) (len 7))) (name none) (about) (locale "en_US") (body (span (offset 208) (line 5) (column 30) (len 31)) (normalized "both the keyword and a locale "))))))
 )
 ~~~
