@@ -35,7 +35,7 @@ unrelated work and needed only a pinning fixture.
 | 52 | `unique`/`nonordered` consumed and discarded | Fixed: authored ordering/uniqueness keywords retained with spans |
 | 53 | `ref`/`calc`/`actor` short-name and multiplicity gaps remain | Fixed: sibling-field parity |
 | 55 | Bare `/* ... */` discarded as trivia | Fixed: it is a `Comment`, not trivia |
-| 56 | `doc`/`comment` retained, `rep` rejected | Fixed: `TextualRepresentation` added to the enumeration body |
+| 56 | Every body member family already retained | Already closed; pinned by fixture |
 | 57 | No declared name published | Already closed; pinned by fixture |
 | 58 | Prefix kept but spanless; `variation` rejected | Fixed: spanned prefix, `variation` accepted |
 | 59 | Direction beside `end` rejected | Split: unauthorable per the pin; the reachable half is fixed |
@@ -182,12 +182,21 @@ grammar has no member there to own it.
 **Claim.** `EnumerationBody` is `Body<EnumeratedValue>`, so annotations, per-literal bodies and
 `= expr` initializers are all discarded.
 
-**Evidence.** Mostly closed at the audited revision: the body already carries `Doc`, `Comment` and
-`EnumeratedValue` variants in source order, and an enumerated value already keeps its own brace body
-and its `= expr` initializer. The remaining hole is the third `AnnotatingElement` alternative: `rep
-lang "x" /* r */` in an enumeration body reached `recovered_enumeration_body_element`.
+**Evidence.** Already closed at the audited revision. `EnumerationBody` is
+`Body<EnumerationBodyElement>`, whose `Annotating(AnnotatingMember)` variant is the complete
+`AnnotatingElement` production -- `doc`, `comment`, `rep ... language "..."` and `@Metadata` all
+reach it -- interleaved with `Value(Node<EnumeratedValue>)` in source order, and an
+`EnumeratedValue` keeps its own `body: PartUsageBody` and its `value: Option<Node<FeatureValue>>`
+initializer.
 
-**Disposition. Fixed** by adding the `TextualRepresentation` variant the sibling body enums carry.
+The gap's `rep` claim did not reproduce: `TextualRepresentation` is
+`( 'rep' Identification )? 'language' language = STRING_VALUE body = REGULAR_COMMENT` (KerML BNF
+228), so the `language` keyword is not optional. `rep asText language "text" /* ... */` parses;
+only the `language`-less spelling reaches recovery, correctly.
+
+**Disposition. Already closed.** Pinned by `tests/snapshots/spec42/enumeration_body_members.md`,
+which interleaves all four annotating forms with three enumerated values, one carrying a body, one
+an initializer, and one both.
 
 ## Gap 57 -- anonymous specialization shorthand
 
