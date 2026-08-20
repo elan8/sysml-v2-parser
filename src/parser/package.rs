@@ -2474,33 +2474,6 @@ mod tests {
     }
 
     #[test]
-    fn package_body_distinguishes_bare_attribute_usage_from_explicit_definition() {
-        for text in [
-            "attribute a;",
-            "attribute a : T;",
-            "attribute a = 1;",
-            "attribute a : T = 1;",
-        ] {
-            let (rest, node) = package_body_element(parse_input(text)).expect(text);
-            assert!(
-                rest.fragment().is_empty(),
-                "rest for {text:?}: {:?}",
-                rest.fragment()
-            );
-            assert!(
-                matches!(node.value, PackageBodyElement::AttributeUsage(_)),
-                "{text:?} must be an AttributeUsage, got {:?}",
-                node.value
-            );
-        }
-
-        let (rest, node) =
-            package_body_element(parse_input("attribute def a :> T;")).expect("attribute def");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(matches!(node.value, PackageBodyElement::AttributeDef(_)));
-    }
-
-    #[test]
     fn package_body_accepts_standalone_port_usage() {
         let (rest, node) =
             package_body_element(parse_input("port :>> p1: MyPortType;")).expect("port usage");

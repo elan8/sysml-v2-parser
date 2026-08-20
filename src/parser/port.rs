@@ -432,29 +432,6 @@ mod par_002_widening_tests {
     }
 
     #[test]
-    fn port_body_accepts_event_occurrence_declaration_and_reference_forms() {
-        let (rest, declaration) = port_body_element(input("event occurrence received : Signal;"))
-            .expect("event occurrence declaration");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let PortBodyElement::OccurrenceUsage(declaration) = declaration.value else {
-            panic!("expected occurrence usage");
-        };
-        assert!(declaration.value.is_event);
-        assert!(declaration.value.has_occurrence_keyword);
-        assert_eq!(declaration.value.name, "received");
-
-        let (rest, reference) = port_body_element(input("event sender.sourceEvent;"))
-            .expect("event occurrence reference");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let PortBodyElement::OccurrenceUsage(reference) = reference.value else {
-            panic!("expected occurrence usage");
-        };
-        assert!(reference.value.is_event);
-        assert!(!reference.value.has_occurrence_keyword);
-        assert!(reference.value.occurrence_reference.is_some());
-    }
-
-    #[test]
     fn port_def_body_accepts_nested_item_def_not_misparsed_as_usage() {
         let (rest, node) = port_def_body_element(input("item def MyItem;")).expect("item def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());

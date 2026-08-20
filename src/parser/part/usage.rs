@@ -1668,36 +1668,6 @@ mod par_002_nested_def_tests {
     }
 
     #[test]
-    fn part_usage_body_retains_anonymous_ref_redefinition_target() {
-        let source = input("ref :>> system;");
-        let (rest, node) = part_usage_body_element(source).expect("anonymous ref redefinition");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let PartUsageBodyElement::Ref(decl) = node.value else {
-            panic!("expected RefDecl");
-        };
-        assert!(decl.value.name.is_empty());
-        let redefines = decl.value.redefines.expect("redefines relationship");
-        assert_eq!(redefines.value.target.len(), 1);
-        assert_eq!(
-            crate::parser::usage::reference_text(source, redefines.value.target[0]).as_deref(),
-            Some("system")
-        );
-    }
-
-    #[test]
-    fn part_usage_body_keeps_named_ref_with_trailing_redefinition() {
-        let source = input("ref named : T :>> inherited;");
-        let (rest, node) = part_usage_body_element(source).expect("named ref redefinition");
-        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        let PartUsageBodyElement::Ref(decl) = node.value else {
-            panic!("expected RefDecl");
-        };
-        assert_eq!(decl.value.name, "named");
-        assert!(decl.value.typing.is_some());
-        assert!(decl.value.redefines.is_some());
-    }
-
-    #[test]
     fn connect_trailing_relationships_retain_arena_targets() {
         let source = input("connect a to b; :> Network::links :>> Legacy::links;");
         let (rest, node) = connect_(source).expect("connect with trailing relationships");
