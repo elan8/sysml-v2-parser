@@ -585,20 +585,22 @@ pub struct AnalysisCaseDef {
     pub membership: Membership,
 }
 
-/// Analysis case usage: `analysis` name (`:` type)? body.
+/// Analysis case usage: `OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration CaseBody`
+/// (SysML textual BNF 1533-1535; pinned Pilot `SysML.xtext` 2236).
+///
+/// The prefix is one grammar-owned, source-backed value rather than separate `abstract` and
+/// `individual` flags. In particular, Systems Library `AnalysisCases.sysml:21` writes
+/// `ref analysis self : AnalysisCase :>> Case::self;`; retaining the complete prefix prevents
+/// `ref` from being reinterpreted as an unrelated reference declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AnalysisCaseUsage {
+    /// The complete `OccurrenceUsagePrefix` in its authored slot order.
+    pub prefix: crate::ast::OccurrenceUsagePrefix,
     pub name: String,
     pub type_name: Option<QualifiedReferenceId>,
     pub subsets: Option<Node<SubsettingRelationship>>,
     pub redefines: Option<Node<SubsettingRelationship>>,
-    /// True for `abstract analysis ...`.
-    pub is_abstract: bool,
-    /// Leading `individual` keyword (BNF `OccurrenceUsagePrefix`, GH-90.1), e.g. `individual
-    /// analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 { ... }` (`Individuals Examples/
-    /// AnalysisIndividualExample.sysml:79`).
-    pub is_individual: bool,
     pub body: UseCaseDefBody,
     /// See [`RequirementUsage::membership`]; `analysis_case_usage` captures real visibility,
     /// `kind` always [`crate::ast::MembershipKind::FeatureMembership`].

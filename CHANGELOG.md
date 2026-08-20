@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Analysis case usages retain their complete occurrence prefix.** `AnalysisCaseUsage` now owns
+  the shared source-backed `OccurrenceUsagePrefix`, as required by `AnalysisCaseUsage =
+  OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration CaseBody` (SysML textual BNF
+  1533-1535; pinned Pilot `SysML.xtext` 2236). This claims Systems Library
+  `AnalysisCases.sysml:21`'s `ref analysis self : AnalysisCase :>> Case::self;` before a body
+  expression fallback can consume only `ref`, while leaving `ref case` and `ref verification`
+  on their existing `RefDecl` routes. Emission, semantic projection, visitors, and opacity
+  traversal retain the resulting typed usage. **AST version 198.**
+
 - **State-definition bodies retain part and constraint usages.** `StateBodyItem` admits
   `NonBehaviorBodyItem -> StructureUsageMember -> PartUsage` and its sibling
   `BehaviorUsageMember -> ConstraintUsage` (SysML textual BNF 1200-1205, 910-920, 262-268,

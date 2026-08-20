@@ -1231,8 +1231,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         UseCaseDefBodyElement::ActionUsage(_usage) => {
                             self.write_marker(&mut first, "action-usage")?;
                         }
-                        UseCaseDefBodyElement::AnalysisCaseUsage(_usage) => {
-                            self.write_marker(&mut first, "analysis-case-usage")?;
+                        UseCaseDefBodyElement::AnalysisCaseUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_analysis_case_usage(&usage.value)?;
                         }
                         UseCaseDefBodyElement::CalcUsage(_usage) => {
                             self.write_marker(&mut first, "calc-usage")?;
@@ -1841,8 +1842,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 definition.value.definition_prefix.as_ref(),
                             )?;
                         }
-                        PartDefBodyElement::AnalysisCaseUsage(_usage) => {
-                            self.write_marker(&mut first, "analysis-case-usage")?;
+                        PartDefBodyElement::AnalysisCaseUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_analysis_case_usage(&usage.value)?;
                         }
                         PartDefBodyElement::VerificationCaseDef(_definition) => {
                             self.write_marker(&mut first, "verification-case-def")?;
@@ -3286,8 +3288,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 member.value.definition_prefix.as_ref(),
                             )?;
                         }
-                        super::PartUsageBodyElement::AnalysisCaseUsage(_member) => {
-                            self.write_marker(&mut first, "analysis-case-usage")?;
+                        super::PartUsageBodyElement::AnalysisCaseUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_analysis_case_usage(&member.value)?;
                         }
                         super::PartUsageBodyElement::AliasDef(_member) => {
                             self.write_marker(&mut first, "alias-def")?;
@@ -3918,6 +3921,28 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             self.writer.write_str("none")?;
         }
         self.writer.write_str("))")
+    }
+
+    /// `AnalysisCaseUsage = OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration
+    /// CaseBody` (SysML textual BNF 1533-1535). It used to project as a contentless marker, so
+    /// snapshots could not distinguish Systems Library's `ref analysis self ...` from a bare
+    /// analysis usage or prove that the competing `ref` prefix had been retained.
+    fn write_analysis_case_usage(&mut self, usage: &super::AnalysisCaseUsage) -> io::Result<()> {
+        self.writer.write_str("(analysis-case-usage ")?;
+        self.write_occurrence_usage_prefix(&usage.prefix)?;
+        self.writer.write_str(" (name ")?;
+        write_quoted(self.writer, &usage.name)?;
+        self.writer.write_str(") (type ")?;
+        if let Some(reference) = usage.type_name {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(')')
     }
 
     fn write_subsetting(&mut self, relationship: &SubsettingRelationship) -> io::Result<()> {
@@ -5107,8 +5132,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 "analysis-case-def",
                 definition.value.definition_prefix.as_ref(),
             ),
-            PackageBodyElement::AnalysisCaseUsage(_usage) => {
-                self.write_marker(first, "analysis-case-usage")
+            PackageBodyElement::AnalysisCaseUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_analysis_case_usage(&usage.value)
             }
             PackageBodyElement::VerificationCaseDef(definition) => {
                 self.write_item_prefix(first)?;

@@ -86,19 +86,25 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
 }
 
 pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AnalysisCaseUsage>> {
+    // `OccurrenceUsagePrefix` can allocate a metadata-keyword reference before the following
+    // `analysis` head proves this production applies, so a refused speculative parse must leave
+    // no arena entries behind.
+    crate::parser::span::reference_transaction(input, analysis_case_usage_inner)
+}
+
+fn analysis_case_usage_inner(input: Input<'_>) -> IResult<Input<'_>, Node<AnalysisCaseUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, abstract_kw) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    // BNF `OccurrenceUsagePrefix`: `(isIndividual ?= 'individual')?` (GH-90.1), e.g. `individual
-    // analysis fuelEconomyAnalysis_1 : FuelEconomyAnalysis_1 { ... }` (Individuals Examples/
-    // AnalysisIndividualExample.sysml:79).
-    let (input, individual_kw) = opt(preceded(tag(&b"individual"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"analysis"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
+    // `AnalysisCaseUsage = OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration CaseBody`
+    // (SysML textual BNF 1533-1535; pinned Pilot `SysML.xtext` 2236). The entire prefix is
+    // parsed before the kind head, so `ref analysis` is claimed as one usage rather than letting
+    // the body expression fallback consume `ref` and shred the declaration.
+    let (input, prefix) = crate::parser::occurrence_prefix::occurrence_usage_prefix(input)?;
+    let (input, _) = crate::parser::occurrence_prefix::keyword_token(input, b"analysis")?;
     let (input, usage) = case_like_usage_body(
         input,
-        abstract_kw.is_some(),
+        false,
         crate::ast::Membership::feature(visibility, visibility_span),
     )?;
     Ok((
@@ -107,12 +113,11 @@ pub(crate) fn analysis_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<A
             start,
             input,
             AnalysisCaseUsage {
+                prefix,
                 name: usage.name,
                 type_name: usage.type_name,
                 subsets: usage.subsets,
                 redefines: usage.redefines,
-                is_abstract: usage.is_abstract,
-                is_individual: individual_kw.is_some(),
                 body: usage.body,
                 membership: usage.membership,
             },

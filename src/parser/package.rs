@@ -2107,6 +2107,23 @@ pub(crate) fn package_body_element(
     let starter = crate::parser::grammar_scope::package_body_starter(input.fragment())
         .map(|starter| starter.production)
         .filter(|production| !production.is_prefix());
+    // `ref` is an `OccurrenceUsagePrefix` slot, while `ref case` and `ref verification` remain
+    // grammar-owned `RefDecl` spellings. Give only a *complete* AnalysisCaseUsage first refusal:
+    // Systems Library `AnalysisCases.sysml:21`'s `ref analysis self ...` otherwise reaches the
+    // general reference path before the analysis dispatcher. A failed attempt rolls its arena
+    // work back and leaves the existing RefDecl priority untouched for every other `ref` kind.
+    if crate::parser::occurrence_prefix::starts_contended_prefix(input) {
+        if let Ok((next, usage)) = analysis_case_usage(input) {
+            return Ok((
+                next,
+                Box::new(node_from_to(
+                    start,
+                    next,
+                    PackageBodyElement::AnalysisCaseUsage(usage),
+                )),
+            ));
+        }
+    }
     if let Ok(r) = try_package_body_annotations(input, start, starter) {
         return Ok(r);
     }

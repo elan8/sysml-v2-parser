@@ -575,12 +575,7 @@ pub(crate) fn emit_analysis_case_usage(
     usage: &crate::ast::AnalysisCaseUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if usage.is_abstract {
-        w.push_str("abstract ");
-    }
-    if usage.is_individual {
-        w.push_str("individual ");
-    }
+    structure::emit_occurrence_usage_prefix(w, path, &usage.prefix)?;
     w.push_str("analysis ");
     w.push_str(&format_name(&usage.name));
     if let Some(ty) = &usage.type_name {

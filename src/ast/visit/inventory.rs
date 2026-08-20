@@ -6259,7 +6259,8 @@ macro_rules! ast_traversal {
         pub fn walk_analysis_case_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<AnalysisCaseUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let AnalysisCaseUsage { name, type_name, subsets, redefines, is_abstract, is_individual, body, membership } = &$($mutability)? node.value;
+            let AnalysisCaseUsage { prefix, name, type_name, subsets, redefines, body, membership } = &$($mutability)? node.value;
+            visitor.visit_occurrence_usage_prefix(prefix);
             visitor.visit_text(name);
             if let Some(inner) = type_name {
                 visitor.visit_qualified_reference(inner);
@@ -6270,8 +6271,6 @@ macro_rules! ast_traversal {
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
-            let _ = is_abstract;
-            let _ = is_individual;
             visitor.visit_use_case_def_body_value(body);
             visitor.visit_membership(membership);
             visitor.leave_node(&$($mutability)? node.span);
