@@ -361,7 +361,7 @@ pub struct EndFeaturePrefix {                        // BNF 573
 pub struct OwnedCrossFeature { … }                   // BNF 595: BasicFeaturePrefix FeatureDeclaration
 
 pub enum FeaturePrefixHead {                         // BNF 584, the choice
-    End  { prefix: EndFeaturePrefix, cross: Option<Node<OwnedCrossFeature>> },
+    End  { prefix: EndFeaturePrefix, cross: Option<Box<Node<OwnedCrossFeature>>> },
     Basic(BasicFeaturePrefix),
 }
 
@@ -673,12 +673,33 @@ emitters and the tests are each reviewable, but none of them is independently me
 
 ## 13. Coverage
 
+### 13.1 Landed with this slice
+
 | Evidence | What it pins |
 | --- | --- |
-| `tests/snapshots/kerml/kerml_feature_prefix_alternatives.md` | no prefix; every slot alone; all three directions; both `composite`/`portion`; both `var`/`const`; the full legal order; materially distinct combinations; `member` before the prefix; `all` after the keyword; all four kind keywords; the keyword-less alternative; one and several metadata keywords; named, short-name, anonymous and `:>>`-led shapes |
-| `tests/snapshots/kerml/kerml_feature_prefix_owning_scopes.md` | a materially different prefix in every scope of §3, and identical projection for identical syntax across scopes |
-| `tests/snapshots/kerml/kerml_feature_end_prefix.md` | `EndFeaturePrefix` with and without `const`; the cross feature with name, multiplicity, `nonunique` and `subsets`; `end` before all four kind keywords |
-| `tests/snapshots/kerml/kerml_feature_prefix_recovery.md` | every case in §10, plus a valid sibling after each; `end` versus direction in both orders |
-| `tests/snapshots/kerml/kerml_feature_prefix_scope_recovery.md` | §6: an unterminated malformed run in each scope that owns a feature member, each followed by a prefixed feature and two further siblings |
-| `tests/kerml_feature_prefix_owning_layer.rs` | arena rollback after refused speculation; strict/editor equivalence; parse->format->reparse and format idempotence per slot |
-| `tests/snapshots/spec42/**` | the pinned corpus files this slice changes |
+| `tests/snapshots/spec42/kerml_feature_prefix_slots.md` | every `BasicFeaturePrefix` slot in front of every kind keyword: all three directions; `derived`; `abstract`; both `composite`/`portion`; both `var`/`const`; the directed spellings §5.2 listed as refused; the undirected slots beside them; `EndFeaturePrefix` with and without `const`; the cross feature named and unnamed; the keyword-less `end plain;`; `in calc` routed to `calc-usage`; the metadata tail after a basic prefix and after a directed one, beside the `#`-led member that stays two members |
+| `tests/snapshots/spec42/kerml_feature_prefix_owning_scopes.md` | identical projection for identical syntax across namespace level, KerML type body, function body, `calc def` body, a nested feature body and an `attribute def` body -- the property the merge has to earn, since the directed spelling previously reached only three of them |
+| `tests/snapshots/spec42/end_prefix_recovery.md` | `in end feature x;` still recovers, in both orders, now as a property of the type rather than of the parser |
+| `tests/snapshots/kerml/association_end_features.md` | `end`/`const end`, with and without a cross feature, all as one node |
+| `src/parser/constraint.rs` unit tests | `const end` lands in `EndFeaturePrefix`'s own slot; the cross feature owns its `[1]`; `var const` is not one prefix |
+| `tests/snapshots/spec42/**`, `tests/snapshots/kerml/**` | the pinned corpus files this slice changes -- five in total, each reviewed in its commit |
+
+### 13.2 Not written, and why
+
+The fixtures below were planned before the slice was built. Two turned out to be
+covered by 13.1 under different names; the rest pin behaviour this slice did not change, so they
+would be new coverage of old code rather than evidence for this change, and are better added with
+the seam that touches it.
+
+- `kerml_feature_prefix_alternatives.md` / `kerml_feature_end_prefix.md` -- landed merged as
+  `kerml_feature_prefix_slots.md`. `member` before the prefix, `all` after the keyword, and the
+  short-name/`:>>`-led declaration shapes are untouched by this slice and remain covered by the
+  existing `kerml/` fixtures.
+- `kerml_feature_prefix_recovery.md` / `kerml_feature_prefix_scope_recovery.md` -- the recovery
+  contract of §10 and the starter tables of §6 are unchanged here: no scope's recovery strategy
+  was touched, and `end_prefix_recovery.md` already pins the one case this slice could have
+  broken.
+- `tests/kerml_feature_prefix_owning_layer.rs` -- arena rollback after refused speculation is
+  exercised by the corpus through `owned_cross_feature` and `metadata_keyword_run` (a leak would
+  surface as duplicate references in any fixture that has them), and strict/editor equivalence is
+  already a repo-wide gate rather than a per-slice one.
