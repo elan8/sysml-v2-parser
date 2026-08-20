@@ -6,7 +6,10 @@ use crate::ast::{
     VerifyRequirementMember,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage, redefinition_feature_binding};
-use crate::parser::body::{parse_structured_brace_members_with_skip, BraceMemberSkip};
+use crate::parser::body::{
+    parse_structured_brace_members_with_skip, semicolon_or_structured_definition_body,
+    BraceMemberSkip,
+};
 use crate::parser::constraint::{constraint_def_body, constraint_usage};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::import::import_;
@@ -626,13 +629,10 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
     // `= expr`, `default expr`, and `default = expr` all land on the shared `FeatureValue`
     // clause (`subject generateTorque default engine1.generateTorque;`, OMG spec Annex A).
     let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    // `;` or a braced body (docs / nested members discarded for now — validation `08`
-    // `subject vehicle : Vehicle { doc … }`).
-    let (input, _) = alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
-        map(constraint_def_body, |_| ()),
-    ))
-    .parse(input)?;
+    // `SubjectUsage` completes through `UsageBody = DefinitionBody` (SysML textual BNF 1419,
+    // 305-315; Pilot `SysML.xtext` 2053, 592-605). The body is part of this member's syntax,
+    // so retain it rather than parsing a constraint-body surrogate and discarding its members.
+    let (input, body) = semicolon_or_structured_definition_body(input)?;
     if n.is_empty() && type_name.is_none() && value.is_none() && redefines.is_none() {
         return Err(nom::Err::Error(nom::error::Error::new(
             start,
@@ -651,6 +651,7 @@ fn subject_decl_inner(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>>
                 redefines,
                 multiplicity,
                 value,
+                body,
             },
         ),
     ))
@@ -703,11 +704,7 @@ fn requirement_parameter_decl<'a>(
         crate::parser::usage::multiplicity_node,
     ))
     .parse(input)?;
-    let (input, _) = alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
-        map(constraint_def_body, |_| ()),
-    ))
-    .parse(input)?;
+    let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -720,6 +717,7 @@ fn requirement_parameter_decl<'a>(
                 redefines: None,
                 multiplicity,
                 value: None,
+                body,
             },
         ),
     ))

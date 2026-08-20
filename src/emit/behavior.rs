@@ -1072,7 +1072,7 @@ pub(crate) fn emit_flow_usage(
     emit_definition_body(w, path, &flow.body)
 }
 
-fn emit_definition_body(
+pub(crate) fn emit_definition_body(
     w: &mut EmitWriter<'_>,
     path: &str,
     body: &crate::ast::DefinitionBody,

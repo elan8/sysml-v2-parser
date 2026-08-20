@@ -5824,7 +5824,7 @@ macro_rules! ast_traversal {
         pub fn walk_subject_decl<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<SubjectDecl>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let SubjectDecl { name, short_name, type_name, redefines, multiplicity, value } = &$($mutability)? node.value;
+            let SubjectDecl { name, short_name, type_name, redefines, multiplicity, value, body } = &$($mutability)? node.value;
             visitor.visit_text(name);
             if let Some(inner) = short_name {
                 visitor.visit_text(inner);
@@ -5841,6 +5841,7 @@ macro_rules! ast_traversal {
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
+            visitor.visit_definition_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

@@ -1072,8 +1072,10 @@ fn walk_requirement_def_body(report: &mut OpacityReport, path: &str, body: &Requ
             RequirementDefBodyElement::ConnectionUsage(n) => {
                 walk_connection_def_body(report, &p, &n.value.body)
             }
-            RequirementDefBodyElement::SubjectDecl(_)
-            | RequirementDefBodyElement::SubjectRef(_)
+            RequirementDefBodyElement::SubjectDecl(subject) => {
+                walk_definition_body(report, &p, &subject.value.body)
+            }
+            RequirementDefBodyElement::SubjectRef(_)
             | RequirementDefBodyElement::RequirementActorDecl(_)
             | RequirementDefBodyElement::Stakeholder(_)
             | RequirementDefBodyElement::Purpose(_) => {}
@@ -1145,8 +1147,10 @@ fn walk_use_case_def_body(report: &mut OpacityReport, path: &str, body: &UseCase
             }
             UseCaseDefBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
             UseCaseDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
-            UseCaseDefBodyElement::SubjectDecl(_)
-            | UseCaseDefBodyElement::SubjectRef(_)
+            UseCaseDefBodyElement::SubjectDecl(subject) => {
+                walk_definition_body(report, &p, &subject.value.body)
+            }
+            UseCaseDefBodyElement::SubjectRef(_)
             | UseCaseDefBodyElement::ActorUsage(_)
             | UseCaseDefBodyElement::ActorRedefinitionAssignment(_)
             | UseCaseDefBodyElement::FirstSuccession(_)

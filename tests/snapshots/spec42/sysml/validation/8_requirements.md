@@ -293,7 +293,11 @@ package '8-Requirements' {
         requirement <'1.1'> vehicleMass1 : MassLimitationRequirement {
             doc
             /* The vehicle mass shall be less than or equal to 2000 kg when the fuel tank is full. */
-            subject vehicle : Vehicle;
+            subject vehicle : Vehicle {
+                /*
+				 * The subject of this requirement is redefined to be a "Vehicle".
+				 */
+            }
             :>> massActual : MassValue = vehicle.mass {
                 /*
 				 * This redefinition binds the vehicle mass to the actual mass.

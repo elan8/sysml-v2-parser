@@ -833,31 +833,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         RequirementDefBodyElement::SubjectDecl(subject) => {
                             self.write_item_prefix(&mut first)?;
-                            self.writer.write_str("(subject (name ")?;
-                            write_quoted(self.writer, &subject.value.name)?;
-                            self.writer.write_str(") (short-name ")?;
-                            write_optional_quoted(
-                                self.writer,
-                                subject.value.short_name.as_deref(),
-                            )?;
-                            self.writer.write_str(") (type ")?;
-                            if let Some(reference) = subject.value.type_name {
-                                self.write_reference(reference)?;
-                            } else {
-                                self.writer.write_str("none")?;
-                            }
-                            self.writer.write_str(") (redefines ")?;
-                            match &subject.value.redefines {
-                                Some(redefines) => self.write_subsetting(&redefines.value)?,
-                                None => self.writer.write_str("none")?,
-                            }
-                            self.writer.write_str(") (value ")?;
-                            if let Some(value) = &subject.value.value {
-                                self.write_feature_value(&value.value)?;
-                            } else {
-                                self.writer.write_str("none")?;
-                            }
-                            self.writer.write_str("))")?;
+                            self.write_subject_decl(&subject.value)?;
                         }
                         RequirementDefBodyElement::SubjectRef(_subject) => {
                             self.write_marker(&mut first, "subject-ref")?;
@@ -1096,8 +1072,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_attribute_definition(&definition.value)?;
                         }
-                        UseCaseDefBodyElement::SubjectDecl(_subject) => {
-                            self.write_marker(&mut first, "subject")?;
+                        UseCaseDefBodyElement::SubjectDecl(subject) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_subject_decl(&subject.value)?;
                         }
                         UseCaseDefBodyElement::SubjectRef(_subject) => {
                             self.write_marker(&mut first, "subject-ref")?;
@@ -3859,68 +3836,122 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             super::OccurrenceUsageBody::Brace { elements, .. } => {
                 let mut first = self.open_brace_body()?;
                 for element in elements {
+                    self.write_occurrence_body_element(&mut first, element)?;
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_occurrence_body_element(
+        &mut self,
+        first: &mut bool,
+        element: &Node<super::OccurrenceBodyElement>,
+    ) -> io::Result<()> {
+        match &element.value {
+            super::OccurrenceBodyElement::Error(error) => {
+                self.write_item_prefix(first)?;
+                self.write_malformed(&error.value, &element.span)
+            }
+            super::OccurrenceBodyElement::Annotating(member) => {
+                self.write_item_prefix(first)?;
+                self.write_annotating_member(member)
+            }
+            super::OccurrenceBodyElement::MetadataKeywordUsage(member) => {
+                self.write_item_prefix(first)?;
+                self.write_metadata_keyword_usage(&member.value)
+            }
+            super::OccurrenceBodyElement::AttributeUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_attribute_usage(&usage.value)
+            }
+            super::OccurrenceBodyElement::PartUsage(member) => {
+                self.write_part_usage_member(first, &member.value)
+            }
+            super::OccurrenceBodyElement::ItemUsage(usage) => {
+                self.write_item_usage_member(first, &usage.value)
+            }
+            super::OccurrenceBodyElement::OccurrenceUsage(member) => {
+                self.write_item_prefix(first)?;
+                self.write_occurrence(&member.value)
+            }
+            super::OccurrenceBodyElement::Satisfy(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_satisfy_requirement_usage(&usage.value)
+            }
+            super::OccurrenceBodyElement::RefDecl(declaration) => {
+                self.write_item_prefix(first)?;
+                self.write_ref_declaration(&declaration.value)
+            }
+            super::OccurrenceBodyElement::EndDecl(end) => {
+                self.write_item_prefix(first)?;
+                self.write_end(&end.value)
+            }
+            super::OccurrenceBodyElement::AssertConstraint(_) => {
+                self.write_marker(first, "assert-constraint")
+            }
+            super::OccurrenceBodyElement::FlowUsage(_) => self.write_marker(first, "flow-usage"),
+            super::OccurrenceBodyElement::SuccessionUsage(_) => {
+                self.write_marker(first, "succession-usage")
+            }
+            super::OccurrenceBodyElement::Allocate(_) => self.write_marker(first, "allocate"),
+            super::OccurrenceBodyElement::StateUsage(_) => self.write_marker(first, "state-usage"),
+            super::OccurrenceBodyElement::ConnectionUsage(_) => {
+                self.write_marker(first, "connection-usage")
+            }
+        }
+    }
+
+    fn write_definition_body(&mut self, body: &super::DefinitionBody) -> io::Result<()> {
+        match body {
+            super::DefinitionBody::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::DefinitionBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
                     match &element.value {
-                        super::OccurrenceBodyElement::Error(error) => {
+                        super::DefinitionBodyElement::Error(error) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_malformed(&error.value, &element.span)?;
                         }
-                        super::OccurrenceBodyElement::Annotating(member) => {
+                        super::DefinitionBodyElement::Unsupported(unsupported) => {
                             self.write_item_prefix(&mut first)?;
-                            self.write_annotating_member(member)?;
+                            self.write_unsupported(&unsupported.value, &element.span)?;
                         }
-                        super::OccurrenceBodyElement::MetadataKeywordUsage(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_metadata_keyword_usage(&member.value)?;
-                        }
-                        super::OccurrenceBodyElement::AttributeUsage(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_attribute_usage(&usage.value)?;
-                        }
-                        super::OccurrenceBodyElement::PartUsage(member) => {
-                            self.write_part_usage_member(&mut first, &member.value)?;
-                        }
-                        super::OccurrenceBodyElement::ItemUsage(usage) => {
-                            self.write_item_usage_member(&mut first, &usage.value)?;
-                        }
-                        super::OccurrenceBodyElement::OccurrenceUsage(member) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_occurrence(&member.value)?;
-                        }
-                        super::OccurrenceBodyElement::Satisfy(usage) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_satisfy_requirement_usage(&usage.value)?;
-                        }
-                        super::OccurrenceBodyElement::RefDecl(declaration) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_ref_declaration(&declaration.value)?;
-                        }
-                        super::OccurrenceBodyElement::EndDecl(end) => {
-                            self.write_item_prefix(&mut first)?;
-                            self.write_end(&end.value)?;
-                        }
-                        super::OccurrenceBodyElement::AssertConstraint(_member) => {
-                            self.write_marker(&mut first, "assert-constraint")?;
-                        }
-                        super::OccurrenceBodyElement::FlowUsage(_member) => {
-                            self.write_marker(&mut first, "flow-usage")?;
-                        }
-                        super::OccurrenceBodyElement::SuccessionUsage(_member) => {
-                            self.write_marker(&mut first, "succession-usage")?;
-                        }
-                        super::OccurrenceBodyElement::Allocate(_member) => {
-                            self.write_marker(&mut first, "allocate")?;
-                        }
-                        super::OccurrenceBodyElement::StateUsage(_member) => {
-                            self.write_marker(&mut first, "state-usage")?;
-                        }
-                        super::OccurrenceBodyElement::ConnectionUsage(_member) => {
-                            self.write_marker(&mut first, "connection-usage")?;
+                        super::DefinitionBodyElement::OccurrenceMember(member) => {
+                            self.write_occurrence_body_element(&mut first, member)?;
                         }
                     }
                 }
                 self.writer.write_char(')')
             }
         }
+    }
+
+    fn write_subject_decl(&mut self, subject: &super::SubjectDecl) -> io::Result<()> {
+        self.writer.write_str("(subject (name ")?;
+        write_quoted(self.writer, &subject.name)?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, subject.short_name.as_deref())?;
+        self.writer.write_str(") (type ")?;
+        if let Some(reference) = subject.type_name {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (redefines ")?;
+        match &subject.redefines {
+            Some(redefines) => self.write_subsetting(&redefines.value)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (value ")?;
+        if let Some(value) = &subject.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_definition_body(&subject.body)?;
+        self.writer.write_char(')')
     }
 
     fn write_requirement_definition(

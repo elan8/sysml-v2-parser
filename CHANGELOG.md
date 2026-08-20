@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Subject declarations retain their typed usage bodies.** `SubjectUsage` is a
+  `ReferenceUsage` (`SysML-textual-bnf.kebnf` 1416-1419), hence it completes through
+  `UsageBody = DefinitionBody` (305-315); the sibling Pilot grammar agrees at `SysML.xtext`
+  2049-2055 and 592-605. A braced `subject` body is now retained as `SubjectDecl::body`, emitted,
+  visited, included in opacity traversal, and projected in semantic snapshots instead of being
+  parsed as a constraint-body surrogate and discarded. Fixtures cover regular-comment retention
+  and member recovery after malformed subject-body content. **AST version 191.**
+
 - **Bracket, index, and parenthesized expressions now retain the grammar's typed sequence
   operands instead of a unit-string special case.** KerML textual BNF §8.2.5.8.2 defines
   `BracketExpression = PrimaryArgumentMember '[' SequenceExpressionListMember ']'`, and shares

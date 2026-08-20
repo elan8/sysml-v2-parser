@@ -364,8 +364,7 @@ fn emit_subject_decl(w: &mut EmitWriter<'_>, subject: &SubjectDecl) -> Result<()
     if let Some(value) = &subject.value {
         super::expr::emit_feature_value(w, value)?;
     }
-    w.push_char(';');
-    Ok(())
+    super::behavior::emit_definition_body(w, "subject/body", &subject.body)
 }
 
 pub(crate) fn emit_require_constraint(

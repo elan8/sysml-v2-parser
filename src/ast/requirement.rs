@@ -5,8 +5,8 @@ use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
-    AttributeBody, AttributeDef, AttributeUsage, DefinitionPrefix, MetadataKeywordUsage,
-    VariantUsage,
+    AttributeBody, AttributeDef, AttributeUsage, DefinitionBody, DefinitionPrefix,
+    MetadataKeywordUsage, VariantUsage,
 };
 use super::view::{CalcUsage, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
@@ -164,8 +164,12 @@ impl PartialEq for PurposeMember {
     }
 }
 
-/// Subject declaration: `subject` name? (`:` type)? multiplicity? (`=` value)? `;`
-/// or the bare binding `subject = expr;`.
+/// Subject declaration: `subject` name? (`:` type)? multiplicity? (`=` value)? `UsageBody`.
+///
+/// `SubjectUsage` is a `ReferenceUsage`, so its completion is the shared `UsageBody =
+/// DefinitionBody` production (SysML textual BNF 1419, 305-315; Pilot `SysML.xtext` 2053,
+/// 592-605). In particular, a braced subject body owns its annotating members rather than
+/// treating them as trivia.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubjectDecl {
@@ -182,6 +186,8 @@ pub struct SubjectDecl {
     /// engine1.generateTorque;`, OMG spec Annex A; spec42 Gap 35 widened this from a bare
     /// `=`-only `Expression`).
     pub value: Option<Node<crate::ast::FeatureValue>>,
+    /// The terminating `UsageBody`, including its delimiters and typed members.
+    pub body: DefinitionBody,
 }
 
 /// Actor parameter in a requirement body: `actor` name? `:` type `;`.
