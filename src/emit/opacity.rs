@@ -332,7 +332,6 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
                 walk_action_def_body_elements(report, &p, std::slice::from_ref(n))
             }
             CalcDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
-            CalcDefBodyElement::TypedParameter(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::KermlFeature(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Invariant(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Connector(n) => walk_calc_def_body(report, &p, &n.value.body),

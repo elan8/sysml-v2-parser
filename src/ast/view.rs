@@ -189,10 +189,6 @@ pub enum CalcDefBodyElement {
     /// element enums is Phase-4 work; this variant does not make that debt worse.
     ActionMember(Box<Node<crate::ast::ActionDefBodyElement>>),
     InOutDecl(Box<Node<InOutDecl>>),
-    /// KerML kinded parameter member: `in expr fn[0..*] { ... }`, `in bool test = expr;`,
-    /// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
-    /// Libraries).
-    TypedParameter(Box<Node<crate::ast::TypedParameterMember>>),
     /// KerML feature member (`derived var feature x : T[mult] redefines y;`, `feature all
     /// s: Occurrence subsets a inverse of b { ... }`); see
     /// [`crate::ast::KermlFeatureMember`].

@@ -2043,9 +2043,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::InOutDecl(_declaration) => {
                             self.write_marker(&mut first, "in-out-declaration")?;
                         }
-                        super::CalcDefBodyElement::TypedParameter(_member) => {
-                            self.write_marker(&mut first, "typed-parameter")?;
-                        }
                         super::CalcDefBodyElement::KermlFeature(_member) => {
                             self.write_marker(&mut first, "kerml-feature")?;
                         }

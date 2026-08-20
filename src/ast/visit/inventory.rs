@@ -797,16 +797,6 @@ macro_rules! ast_traversal {
                 walk_in_out_decl(self, node)
             }
 
-            /// Visits [`TypedParameterMember`]; the default implementation walks its children.
-            fn visit_typed_parameter_member(&mut self, node: &$($mutability)? Node<TypedParameterMember>) {
-                walk_typed_parameter_member(self, node)
-            }
-
-            /// Visits [`KermlParameterKind`]; the default implementation walks its children.
-            fn visit_kerml_parameter_kind(&mut self, node: &$($mutability)? KermlParameterKind) {
-                walk_kerml_parameter_kind(self, node)
-            }
-
             /// Visits [`InOut`]; the default implementation walks its children.
             fn visit_in_out(&mut self, node: &$($mutability)? Node<InOut>) {
                 walk_in_out(self, node)
@@ -4864,41 +4854,6 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_typed_parameter_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<TypedParameterMember>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            let TypedParameterMember { direction, is_abstract, kind, name, redefines, type_name, multiplicity, multiplicity_modifiers, value, body } = &$($mutability)? node.value;
-            visitor.visit_in_out_value(direction);
-            let _ = is_abstract;
-            visitor.visit_kerml_parameter_kind(kind);
-            visitor.visit_text(name);
-            if let Some(inner) = redefines {
-                visitor.visit_subsetting_relationship(inner);
-            }
-            if let Some(inner) = type_name {
-                visitor.visit_qualified_reference(inner);
-            }
-            if let Some(inner) = multiplicity {
-                visitor.visit_multiplicity(inner);
-            }
-            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
-            if let Some(inner) = value {
-                visitor.visit_feature_value(inner);
-            }
-            visitor.visit_calc_def_body(body);
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_kerml_parameter_kind<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? KermlParameterKind) {
-            match node {
-                KermlParameterKind::Expr => {}
-                KermlParameterKind::Bool => {}
-                KermlParameterKind::Feature => {}
-                KermlParameterKind::Calc => {}
-                KermlParameterKind::Step => {}
-            }
-        }
-
         pub fn walk_in_out<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<InOut>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
@@ -6819,9 +6774,6 @@ macro_rules! ast_traversal {
                 }
                 CalcDefBodyElement::InOutDecl(field_0) => {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
-                }
-                CalcDefBodyElement::TypedParameter(field_0) => {
-                    visitor.visit_typed_parameter_member(&$($mutability)? **field_0);
                 }
                 CalcDefBodyElement::KermlFeature(field_0) => {
                     visitor.visit_kerml_feature_member(&$($mutability)? **field_0);

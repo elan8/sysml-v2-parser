@@ -40,6 +40,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Feature` (`BasicFeaturePrefix` direction slot, then `FeatureDeclaration`) instead of a second
   recovery diagnostic. `tests/snapshots/spec42/empty_member_after_package.md` records it.
 
+- **The three nodes that spelled one KerML `Feature` production are one node.**
+  `TypedParameterMember`, `KermlParameterKind` and `KermlEndMember` are deleted, and
+  `CalcDefBodyElement` loses `TypedParameter` and `EndMember`.
+
+  The split was discriminated by *optional slots*, not by grammar. `feature a;` and `in feature b;`
+  are the same production with one `?` taken, and the directed node modelled only `direction` plus
+  `abstract` — so every other legal combination was refused outright. These four now parse instead
+  of reaching `recovered_calc_body_element`, pinned in
+  `tests/snapshots/spec42/kerml_feature_prefix_slots.md`:
+
+  ```
+  in derived feature q;      in composite feature o;
+  in var feature p;          in portion feature s;
+  ```
+
+  `KermlEndMember` wrapped a `KermlFeatureMember` while the wrapped node carried its own `is_end`
+  and `is_const`, so end-ness was representable twice on one member. It becomes
+  `FeaturePrefixHead::End`, and its owned cross feature (`OwnedCrossFeature`, KerML BNF 592/595)
+  gains what the wrapper could not hold: its own `BasicFeaturePrefix` and the `MultiplicityPart`
+  keyword slots.
+
+  **One production leaves rather than merging.** `in calc scenario : NominalScenario;`
+  (validation `10c-Fuel Economy Analysis`) is SysML's `CalculationUsage = OccurrenceUsagePrefix
+  'calc' …` (SysML BNF 1355) — not a KerML `Feature`, and not `FeaturePrefix`. It reached the
+  directed-parameter node only because the direction dispatch arm ran ahead of the `calc` arm.
+  `CalcUsage` already models direction, `abstract` and `ref` through `RefPrefix`, so it routes
+  there and `KermlParameterKind::Calc` is deleted.
+
 - **`BasicDefinitionPrefix` reaches every definition kind whose production spells it, and the two
   that spell something else are modelled as such.** Audit and evidence:
   `planning/spec42-upstream-gap-audit.md`. **AST version 178 -> 179.**

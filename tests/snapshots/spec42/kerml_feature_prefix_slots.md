@@ -1,0 +1,59 @@
+# META
+~~~sexpr
+(snapshot (type semantic) (description "Every slot of KerML's BasicFeaturePrefix (BNF 577) is authorable in front of every feature-kind keyword, because Feature (562), Step (863), Expression (895) and BooleanExpression (908) spell one shared FeaturePrefix (584). Before the merge a directed feature had its own node modelling only direction + abstract, so `in derived`, `in composite`, `in var` and `in portion` all reached recovery; `in calc` is not a Feature at all but SysML's CalculationUsage (SysML BNF 1355), and routes to calc-usage."))
+~~~
+# SOURCE
+~~~sysml
+package KermlFeaturePrefixSlots {
+    type DirectedBasicPrefix {
+        in derived feature q;
+        in composite feature o;
+        in var feature p;
+        in portion feature s;
+        out abstract feature r;
+        inout feature t;
+    }
+    type DirectedKinds {
+        in expr e;
+        in bool b;
+        in step st;
+    }
+    type UndirectedSlots {
+        derived feature d;
+        composite feature c;
+        portion feature po;
+        var feature v;
+        const feature k;
+    }
+    type EndCrossFeature {
+        end guardedLink [0..1] feature constrainedLink;
+        end [1] feature transferSource;
+        const end feature constEnd;
+        end plain;
+    }
+    calc def CalcScope {
+        in calc nested;
+    }
+}
+~~~
+# DIAGNOSTICS
+~~~sexpr
+(fixture-diagnostics
+  (document "kerml_feature_prefix_slots.md"
+    (diagnostics
+    )
+  )
+)
+~~~
+# FORMAT
+~~~sexpr
+(stable-idempotent)
+~~~
+# AST
+~~~sexpr
+(parsed-document
+  (references
+  )
+  (root (package (name "KermlFeaturePrefixSlots") (body brace (kerml-classifier (keyword type) (abstract false) (name "DirectedBasicPrefix") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "DirectedKinds") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "UndirectedSlots") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "EndCrossFeature") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature))) (calc-def (name "CalcScope") (modifiers) (body brace (calc-usage))))))
+)
+~~~

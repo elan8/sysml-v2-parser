@@ -251,7 +251,6 @@ fn emit_calc_body_element(
         }
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
-        CalcDefBodyElement::TypedParameter(p) => emit_typed_parameter(w, path, &p.value),
         CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature_member(w, path, &f.value),
         CalcDefBodyElement::Invariant(i) => emit_kerml_invariant_member(w, path, &i.value),
         CalcDefBodyElement::Connector(c) => emit_kerml_connector_member(w, path, &c.value),
@@ -536,37 +535,6 @@ pub(crate) fn emit_kerml_succession_member(
     emit_kerml_connector_end(w, &format!("{path}/then"), &succession.then.value)?;
     w.push_char(';');
     Ok(())
-}
-
-pub(crate) fn emit_typed_parameter(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    param: &crate::ast::TypedParameterMember,
-) -> Result<(), EmitError> {
-    super::structure::emit_direction(w, param.direction);
-    if param.is_abstract {
-        w.push_str("abstract ");
-    }
-    w.push_str(param.kind.as_str());
-    if !param.name.is_empty() {
-        w.push_char(' ');
-        w.push_str(&format_name(&param.name));
-    }
-    if let Some(ty) = param.type_name {
-        w.push_str(" : ");
-        w.push_qualified_reference(&format!("{path}/type"), ty)?;
-    }
-    if let Some(multiplicity) = &param.multiplicity {
-        emit_multiplicity(w, &multiplicity.value)?;
-    }
-    emit_multiplicity_modifiers(w, &param.multiplicity_modifiers);
-    if let Some(redefines) = &param.redefines {
-        super::structure::emit_subsetting_clause(w, &redefines.value)?;
-    }
-    if let Some(value) = &param.value {
-        emit_feature_value(w, value)?;
-    }
-    emit_calc_body(w, path, &param.body)
 }
 
 pub(crate) fn emit_return_decl(w: &mut EmitWriter<'_>, ret: &ReturnDecl) -> Result<(), EmitError> {

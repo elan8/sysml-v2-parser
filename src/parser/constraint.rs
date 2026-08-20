@@ -535,142 +535,6 @@ fn calc_usage_follows_visibility(input: Input<'_>) -> bool {
     had_modifiers && starts_with_keyword(after_mods.fragment(), b"calc")
 }
 
-/// KerML kinded parameter member: `in expr fn[0..*] { ... }`, `in bool test = expr;`,
-/// `in feature clock : Clock[1] default localClock { ... }` (Kernel Function/Semantic
-/// Libraries). The kind keyword distinguishes it from the keyword-less [`in_out_decl`]
-/// parameter form, and its `{ ... }` body follows the calc-body member grammar (nested
-/// parameters plus a `return` result).
-pub(crate) fn typed_parameter_member(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::TypedParameterMember>> {
-    crate::parser::span::reference_transaction(input, typed_parameter_member_inner)
-}
-
-fn typed_parameter_member_inner(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::TypedParameterMember>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, direction) = crate::parser::attribute::direction_prefix(input)?;
-    // `in abstract feature onOccurrence : Occurrence [1] { ... }`
-    // (`FeatureReferencingPerformances.kerml`).
-    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, kind) = alt((
-        map(preceded(tag(&b"expr"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Expr
-        }),
-        map(preceded(tag(&b"bool"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Bool
-        }),
-        map(preceded(tag(&b"feature"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Feature
-        }),
-        map(preceded(tag(&b"calc"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Calc
-        }),
-        map(preceded(tag(&b"step"[..]), ws1), |_| {
-            crate::ast::KermlParameterKind::Step
-        }),
-    ))
-    .parse(input)?;
-    // Leading redefinition may replace the name entirely: `in bool redefines ifTest { ... }`,
-    // `inout feature redefines replacementValues[0..*] : ObserveChange;`.
-    let (input, leading_redefines) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::redefinition,
-    ))
-    .parse(input)?;
-    let (input, name_str) = if leading_redefines.is_some() {
-        (input, String::new())
-    } else {
-        let (input, n) = preceded(ws_and_comments, name).parse(input)?;
-        (input, n)
-    };
-    let (input, leading_multiplicity) = opt(preceded(
-        ws_and_comments,
-        crate::parser::usage::multiplicity_node,
-    ))
-    .parse(input)?;
-    let (input, type_name) = opt(map(
-        (
-            preceded(ws_and_comments, tag(&b":"[..])),
-            preceded(ws_and_comments, qualified_reference),
-        ),
-        |(_, tn)| tn,
-    ))
-    .parse(input)?;
-    let (input, trailing_multiplicity) = if leading_multiplicity.is_none() {
-        opt(preceded(
-            ws_and_comments,
-            crate::parser::usage::multiplicity_node,
-        ))
-        .parse(input)?
-    } else {
-        (input, None)
-    };
-    let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
-    let (input, redefines) = if leading_redefines.is_none() {
-        opt(preceded(
-            ws_and_comments,
-            crate::parser::usage::redefinition,
-        ))
-        .parse(input)?
-    } else {
-        (input, leading_redefines)
-    };
-    // The typing may trail a leading redefinition target: `in step redefines thenClause :
-    // BooleanEvaluationResultToMonitorPerformance { ... }` (`Observation.kerml`).
-    let (input, type_name) = if type_name.is_none() {
-        opt(map(
-            (
-                preceded(ws_and_comments, tag(&b":"[..])),
-                preceded(ws_and_comments, qualified_reference),
-            ),
-            |(_, tn)| tn,
-        ))
-        .parse(input)?
-    } else {
-        (input, type_name)
-    };
-    // The multiplicity may trail the redefinition target: `inout feature replacementValues :
-    // Anything redefines values [*] nonunique;` (`FeatureReferencingPerformances.kerml`).
-    let (input, post_redefines_multiplicity) =
-        if leading_multiplicity.is_none() && trailing_multiplicity.is_none() {
-            opt(preceded(
-                ws_and_comments,
-                crate::parser::usage::multiplicity_node,
-            ))
-            .parse(input)?
-        } else {
-            (input, None)
-        };
-    let (input, modifiers) =
-        crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
-    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    let (input, body) = calc_def_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::TypedParameterMember {
-                direction,
-                is_abstract: is_abstract.is_some(),
-                kind,
-                name: name_str,
-                redefines,
-                type_name,
-                multiplicity: leading_multiplicity
-                    .or(trailing_multiplicity)
-                    .or(post_redefines_multiplicity),
-                multiplicity_modifiers: modifiers,
-                value,
-                body,
-            },
-        ),
-    ))
-}
-
 /// One end of a connector/binding/succession member: `[mult]?` feature chain.
 pub(crate) fn kerml_connector_end(
     input: Input<'_>,
@@ -1056,6 +920,24 @@ fn feature_kind_keyword(
         }
     }
     (input, None)
+}
+
+/// Which member keyword a directed body element introduces, looking past the whole
+/// `BasicFeaturePrefix` (KerML BNF 577) rather than just the direction.
+///
+/// Looking past the *whole* prefix is the point: `in derived feature q;`, `in composite feature
+/// o;`, `in var feature p;` and `in portion feature s;` are all legal, and all reached recovery
+/// while the directed spelling had its own node modelling only `direction` + `abstract`.
+///
+/// Returns `None` when no direction was authored, or when no member keyword follows it -- the
+/// plain `in x;` parameter, which belongs to `InOutDecl`. Consumes nothing.
+fn directed_member_keyword(input: Input<'_>) -> Option<&'static [u8]> {
+    let (input, _) = ws_and_comments(input).ok()?;
+    let (rest, prefix) = crate::parser::feature_prefix::basic_feature_prefix(input);
+    prefix.direction.as_ref()?;
+    [&b"feature"[..], b"step", b"expr", b"bool", b"calc"]
+        .into_iter()
+        .find(|keyword| starts_with_keyword(rest.fragment(), keyword))
 }
 
 /// `OwnedCrossFeature : Feature = BasicFeaturePrefix FeatureDeclaration` (KerML BNF 595), carried
@@ -1528,18 +1410,32 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     {
         // A directed `in part …` was claimed here before the scope had a `PartUsage` arm at all;
         // the arm above owns every part usage now, directed or not.
-        if let Ok((input, param)) = typed_parameter_member(input) {
-            // `in expr …` / `in bool …` / `in feature …` kinded parameters (Kernel
-            // Function/Semantic Libraries), before plain InOutDecl, which would misread the
-            // kind keyword as the parameter name.
-            (input, CalcDefBodyElement::TypedParameter(Box::new(param)))
-        } else if named_in_out_missing_type(input) {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )));
-        } else {
-            map(in_out_decl, |n| CalcDefBodyElement::InOutDecl(Box::new(n))).parse(input)?
+        match directed_member_keyword(input) {
+            // `in calc scenario : NominalScenario;` (validation `10c-Fuel Economy Analysis`) is a
+            // SysML `CalculationUsage = OccurrenceUsagePrefix 'calc' …` (SysML BNF 1355), not a
+            // KerML `Feature`. It reached the directed-parameter node only because this arm ran
+            // before the `calc` arm below; `CalcUsage` already models direction, `abstract` and
+            // `ref` through `RefPrefix`, so the production keeps its own node.
+            Some(keyword) if keyword == b"calc" => {
+                map(calc_usage, |n| CalcDefBodyElement::CalcUsage(Box::new(n))).parse(input)?
+            }
+            // `in expr …` / `in bool …` / `in feature …` / `in step …` are `FeaturePrefix`'s
+            // direction slot in front of the same four productions the undirected spelling uses
+            // (KerML BNF 577/562/863/895/908), so they are the same node. Ahead of plain
+            // `InOutDecl`, which would misread the kind keyword as the parameter name.
+            Some(_) => map(kerml_feature_member, |n| {
+                CalcDefBodyElement::KermlFeature(Box::new(n))
+            })
+            .parse(input)?,
+            None if named_in_out_missing_type(input) => {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
+            }
+            None => {
+                map(in_out_decl, |n| CalcDefBodyElement::InOutDecl(Box::new(n))).parse(input)?
+            }
         }
     } else if calc_def_follows_visibility(input) {
         // Nested `(private|protected|public)? calc def Name { ... }` rollup helper (Domain
