@@ -61,6 +61,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gains what the wrapper could not hold: its own `BasicFeaturePrefix` and the `MultiplicityPart`
   keyword slots.
 
+  **`FeaturePrefix`'s metadata tail is parsed where the feature parser owns the input.**
+  `PrefixMetadataMember*` trails the choice in BNF 584, so `derived #Tag feature z3;` and
+  `in var #Tag #Tag2 feature z4;` are legal — and were refused outright, because the feature parser
+  stopped dead at the `#`. They now carry their keywords in `FeaturePrefix::metadata_keywords` and
+  re-emit them. A `#`-*led* member is unchanged: the owning scopes dispatch their metadata arm
+  first, and `feature_prefix` deliberately refuses a run that no kind keyword follows, so
+  `#Tag feature z1;` stays a prefix member plus a feature and `#service port def Authorisation
+  { … }` keeps parsing as before. `planning/kerml-feature-prefix-matrix.md` §11 records the
+  remainder as a metadata-seam change rather than a prefix one.
+
   **One production leaves rather than merging.** `in calc scenario : NominalScenario;`
   (validation `10c-Fuel Economy Analysis`) is SysML's `CalculationUsage = OccurrenceUsagePrefix
   'calc' …` (SysML BNF 1355) — not a KerML `Feature`, and not `FeaturePrefix`. It reached the

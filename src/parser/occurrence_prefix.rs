@@ -182,7 +182,9 @@ fn basic_usage_prefix(input: Input<'_>) -> (Input<'_>, BasicUsagePrefix) {
 /// pair, so an extension keyword's name is a qualified reference in the document arena with its
 /// own scope, segments and typed separators -- absolute (`#$::Lib::Tag`), qualified
 /// (`#ISQ::mass`), dotted or quoted (`#'safety critical'`) exactly as authored.
-fn usage_extension_keyword(input: Input<'_>) -> IResult<Input<'_>, Node<UsageExtensionKeyword>> {
+pub(crate) fn usage_extension_keyword(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<UsageExtensionKeyword>> {
     let (after_ws, _) = ws_and_comments(input)?;
     let (rest, (hash_span, annotation)) =
         crate::parser::metadata_annotation::metadata_keyword_head(after_ws)?;

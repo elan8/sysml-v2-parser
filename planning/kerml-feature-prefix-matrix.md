@@ -637,6 +637,22 @@ the authored text.
   reads that field, so only an `intersects` following a `unions`/`disjoint from`/`chains`/
   `inverse of` clause survives into `type_relationships`. It is a `FeatureRelationshipPart` defect,
   not a prefix defect; newly recorded in the audit's deferred list.
+- **A `#`-led feature member is still two members.** `FeaturePrefix`'s `PrefixMetadataMember*` tail
+  is parsed and emitted where the feature parser owns the input -- `derived #Tag feature z3;` and
+  `in var #Tag #Tag2 feature z4;` were refused outright before this slice and now carry their
+  keywords in `FeaturePrefix::metadata_keywords`. But when the run *leads* the member, the owning
+  scopes dispatch their `#` arm first, and that arm's contract is explicit: the
+  `PrefixMetadataMember` spelling "owns no body and leaves the prefixed declaration for the next
+  member iteration" (`calc_def_body_element`). So `#Tag feature z1;` remains a metadata member
+  followed by a feature. Absorbing it means reordering that arm in all four scopes that dispatch
+  it, against `part_usage`'s first-refusal guard (`starts_contended_prefix`) -- a metadata-seam
+  change shared with every other member kind, not a `FeaturePrefix` one. `feature_prefix` refuses
+  the run unless a kind keyword follows it, precisely so the seam keeps its current contract
+  (without that guard, `#service port def Authorisation { ... }` is shredded into four members).
+- **`Feature`'s metadata-as-keyword alternative is not modelled.** `Feature = FeaturePrefix
+  ( 'feature' | ownedRelationship += PrefixMetadataMember ) FeatureDeclaration?` (562) lets the
+  last metadata member stand *in place of* the `feature` keyword, so `#Tag z1;` is a feature named
+  `z1`. That is the same dispatch question as the entry above and is deferred with it.
 - **No broader body-recovery rewrite.** The four starter tables of §6 are completed and the scopes
   that own this production resynchronize on them; no other scope's recovery strategy changes.
 - **Feature members are not added to scopes that do not dispatch them.** `TypeBodyElement ->

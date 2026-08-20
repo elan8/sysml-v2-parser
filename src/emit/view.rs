@@ -364,6 +364,23 @@ pub(crate) fn emit_kerml_feature_member(
         head.clear();
         emit_owned_cross_feature(w, &cross.value)?;
     }
+    // `( ownedRelationship += PrefixMetadataMember )*` trails the choice (KerML BNF 584). Each is
+    // a reference, not a keyword, so these flush too.
+    if !feature.prefix.metadata_keywords.is_empty() {
+        if !head.is_empty() {
+            w.push_str(&head.join(" "));
+            w.push_char(' ');
+            head.clear();
+        }
+        for (index, keyword) in feature.prefix.metadata_keywords.iter().enumerate() {
+            w.push_char('#');
+            w.push_qualified_reference(
+                &format!("{path}/prefix/metadata[{index}]"),
+                keyword.value.annotation,
+            )?;
+            w.push_char(' ');
+        }
+    }
     if let Some(kind) = &feature.kind {
         head.push(kind.value.as_str());
     }

@@ -932,12 +932,16 @@ fn feature_kind_keyword(
 /// Returns `None` when no direction was authored, or when no member keyword follows it -- the
 /// plain `in x;` parameter, which belongs to `InOutDecl`. Consumes nothing.
 fn directed_member_keyword(input: Input<'_>) -> Option<&'static [u8]> {
-    let (input, _) = ws_and_comments(input).ok()?;
-    let (rest, prefix) = crate::parser::feature_prefix::basic_feature_prefix(input);
-    prefix.direction.as_ref()?;
-    [&b"feature"[..], b"step", b"expr", b"bool", b"calc"]
-        .into_iter()
-        .find(|keyword| starts_with_keyword(rest.fragment(), keyword))
+    // A lookahead, so the prefix metadata run it walks past is allocated and discarded rather
+    // than kept: the arm this guard picks re-parses the same bytes.
+    crate::parser::span::reference_probe(input, |input| {
+        let (input, _) = ws_and_comments(input).ok()?;
+        let (rest, prefix) = crate::parser::feature_prefix::feature_prefix(input).ok()?;
+        prefix.direction()?;
+        [&b"feature"[..], b"step", b"expr", b"bool", b"calc"]
+            .into_iter()
+            .find(|keyword| starts_with_keyword(rest.fragment(), keyword))
+    })
 }
 
 /// `OwnedCrossFeature : Feature = BasicFeaturePrefix FeatureDeclaration` (KerML BNF 595), carried
@@ -1031,7 +1035,7 @@ fn kerml_feature_member_inner(
     // `FeaturePrefix` (KerML BNF 584). `member` is not part of it -- `TypeFeatureMember` (523)
     // puts that keyword on the membership, ahead of the whole prefix.
     let (input, _) = ws_and_comments(input)?;
-    let (input, mut prefix) = crate::parser::feature_prefix::feature_prefix(input);
+    let (input, mut prefix) = crate::parser::feature_prefix::feature_prefix(input)?;
     // `OwnedCrossFeatureMember` (592) hangs off the `end` alternative only, and needs the
     // declaration parsers this scope already has, so the choice is filled in here.
     let input = if let crate::ast::FeaturePrefixHead::End { cross, .. } = &mut prefix.head {

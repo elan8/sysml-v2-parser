@@ -31,10 +31,12 @@
 
 use crate::ast::{
     BasicFeaturePrefix, EndFeaturePrefix, FeaturePortionKind, FeaturePrefix, FeaturePrefixHead,
-    FeatureVariability,
+    FeatureVariability, Node,
 };
+use crate::parser::lex::{starts_with_any_keyword, ws_and_comments};
 use crate::parser::occurrence_prefix::{optional_alternative, optional_direction, slot_keyword};
 use crate::parser::Input;
+use nom::IResult;
 
 /// `BasicFeaturePrefix : Feature = FeatureDirection? 'derived'? 'abstract'?
 /// ('composite' | 'portion')? ('var' | 'const')?` (KerML BNF 577).
@@ -121,16 +123,70 @@ pub(crate) fn feature_prefix_head(input: Input<'_>) -> (Input<'_>, FeaturePrefix
     (rest, FeaturePrefixHead::Basic(basic))
 }
 
-/// `FeaturePrefix` (KerML BNF 584) with no prefix metadata keywords consumed.
+/// `FeaturePrefix` (KerML BNF 584): the choice, then `( PrefixMetadataMember )*`.
+///
+/// The metadata run trails the prefix in the grammar's order, so `derived #Tag feature z;` is
+/// legal -- and was refused outright before this seam, because the feature parser stopped at the
+/// `#`. Each keyword is `'#' OwnedFeatureTyping`, parsed by the crate's one owning parser for that
+/// pair, so the annotation is a qualified reference in the document arena rather than copied text.
+///
+/// A `#`-led member is *not* claimed here: the owning scopes dispatch their metadata arm before
+/// their feature arm, so `#Tag feature z;` still parses as a prefix member followed by the
+/// feature. That dispatch contract is deliberate and shared with every other member kind (see
+/// `calc_def_body_element`'s `#` arm); folding it into this prefix is a metadata-seam change
+/// rather than a `FeaturePrefix` one, and is recorded as deferred in
+/// `planning/kerml-feature-prefix-matrix.md` §11.
 ///
 /// Takes trivia-free input.
-pub(crate) fn feature_prefix(input: Input<'_>) -> (Input<'_>, FeaturePrefix) {
-    let (input, head) = feature_prefix_head(input);
-    (
-        input,
+pub(crate) fn feature_prefix(input: Input<'_>) -> IResult<Input<'_>, FeaturePrefix> {
+    let (after_head, head) = feature_prefix_head(input);
+    // The run belongs to this prefix only when a feature-kind keyword follows it. `#` also heads
+    // `PrefixMetadataMember` as a member of its own, in front of any declaration at all, and
+    // `#service port def Authorisation { … }` is one: consuming the sigil here without that check
+    // would leave the feature parser holding an authored prefix and let it mis-claim the `port
+    // def` behind it. Transactional, so a rewind takes the annotation's arena entries with it.
+    let (after_metadata, metadata_keywords) = if after_head.fragment().starts_with(b"#") {
+        match crate::parser::span::reference_transaction(after_head, metadata_keyword_run) {
+            Ok((rest, keywords)) => (rest, keywords),
+            Err(_) => (after_head, Vec::new()),
+        }
+    } else {
+        (after_head, Vec::new())
+    };
+    Ok((
+        after_metadata,
         FeaturePrefix {
             head,
-            metadata_keywords: Vec::new(),
+            metadata_keywords,
         },
-    )
+    ))
+}
+
+/// `( ownedRelationship += PrefixMetadataMember )*` followed by a feature-kind keyword.
+///
+/// Fails -- so [`feature_prefix`] rewinds -- when the run is empty or is not this feature's.
+fn metadata_keyword_run(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Vec<Node<crate::ast::UsageExtensionKeyword>>> {
+    let start = input;
+    let mut input = input;
+    let mut keywords = Vec::new();
+    while input.fragment().starts_with(b"#") {
+        let (rest, keyword) = crate::parser::occurrence_prefix::usage_extension_keyword(input)?;
+        keywords.push(keyword);
+        let (rest, _) = ws_and_comments(rest)?;
+        input = rest;
+    }
+    if keywords.is_empty()
+        || !starts_with_any_keyword(
+            input.fragment(),
+            &[&b"feature"[..], b"step", b"expr", b"bool"],
+        )
+    {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    Ok((input, keywords))
 }
