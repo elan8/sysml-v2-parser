@@ -1108,6 +1108,26 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
     };
     let (input, modifiers) = crate::parser::usage::multiplicity_modifier_slots(input)?;
     let (input, clauses) = crate::parser::usage::specialization_clauses(input)?;
+    // `FeatureSpecializationPart` offers a second multiplicity position, after the specialization
+    // clauses: `inout feature replacementValues : Anything redefines values [*] nonunique;`
+    // (Kernel Semantic Library `FeatureReferencingPerformances.kerml:89`). Only the directed node
+    // this one absorbed used to read that position, so it has to be read here or the spelling
+    // regresses to recovery.
+    let (input, post_specialization_multiplicity) =
+        if leading_multiplicity.is_none() && trailing_multiplicity.is_none() {
+            opt(preceded(
+                ws_and_comments,
+                crate::parser::usage::multiplicity_node,
+            ))
+            .parse(input)?
+        } else {
+            (input, None)
+        };
+    // Threaded as an accumulator rather than parsed twice and folded: each `MultiplicityPart`
+    // keyword slot holds one authored spelling, and a second independent read would silently drop
+    // whichever position lost.
+    let (input, modifiers) =
+        crate::parser::usage::multiplicity_modifier_slots_after(modifiers, input)?;
     let subsets = clauses.subsets.map(|(target, _value)| target);
     let redefines = leading_redefines.or(clauses.redefines);
     let references = clauses.references;
@@ -1168,7 +1188,9 @@ fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::
                 is_all: is_all.is_some(),
                 name: name_str,
                 typing,
-                multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                multiplicity: leading_multiplicity
+                    .or(trailing_multiplicity)
+                    .or(post_specialization_multiplicity),
                 multiplicity_modifiers: modifiers,
                 subsets,
                 redefines,

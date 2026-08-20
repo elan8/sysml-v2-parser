@@ -13,6 +13,9 @@ package KermlFeaturePrefixSlots {
         out abstract feature r;
         inout feature t;
     }
+    type SpecializationTail {
+        inout feature replacementValues : Anything redefines values [*] nonunique;
+    }
     type DirectedKinds {
         in expr e;
         in bool b;
@@ -64,6 +67,9 @@ package KermlFeaturePrefixSlots {
         out abstract feature r;
         inout feature t;
     }
+    type SpecializationTail {
+        inout feature replacementValues : Anything[*] nonunique :>> values;
+    }
     type DirectedKinds {
         in expr e;
         in bool b;
@@ -100,9 +106,9 @@ package KermlFeaturePrefixSlots {
 ~~~sexpr
 (parsed-document
   (references
-    (reference r0 (scope relative) (span (offset 833) (line 33) (column 10) (len 3)) (segments (segment 0 (token "Tag") (name "Tag") (separator none) (span (offset 833) (line 33) (column 10) (len 3)))))
-    (reference r1 (scope relative) (span (offset 858) (line 34) (column 10) (len 3)) (segments (segment 0 (token "Tag") (name "Tag") (separator none) (span (offset 858) (line 34) (column 10) (len 3)))))
+    (reference r0 (scope relative) (span (offset 952) (line 36) (column 10) (len 3)) (segments (segment 0 (token "Tag") (name "Tag") (separator none) (span (offset 952) (line 36) (column 10) (len 3)))))
+    (reference r1 (scope relative) (span (offset 977) (line 37) (column 10) (len 3)) (segments (segment 0 (token "Tag") (name "Tag") (separator none) (span (offset 977) (line 37) (column 10) (len 3)))))
   )
-  (root (package (name "KermlFeaturePrefixSlots") (body brace (kerml-classifier (keyword type) (abstract false) (name "DirectedBasicPrefix") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "DirectedKinds") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "UndirectedSlots") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "EndCrossFeature") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature))) (metadata-def (name "Tag") (abstract false) (specializes none) (body semicolon)) (metadata-def (name "Tag2") (abstract false) (specializes none) (body semicolon)) (kerml-classifier (keyword type) (abstract false) (name "MetadataTail") (specializes none) (body brace (kerml-feature) (kerml-feature) (metadata-keyword-usage (type (ref r0)) (body none)) (kerml-feature) (metadata-keyword-usage (type (ref r1)) (body semicolon)))) (calc-def (name "CalcScope") (modifiers) (body brace (calc-usage))))))
+  (root (package (name "KermlFeaturePrefixSlots") (body brace (kerml-classifier (keyword type) (abstract false) (name "DirectedBasicPrefix") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "SpecializationTail") (specializes none) (body brace (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "DirectedKinds") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "UndirectedSlots") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature))) (kerml-classifier (keyword type) (abstract false) (name "EndCrossFeature") (specializes none) (body brace (kerml-feature) (kerml-feature) (kerml-feature) (kerml-feature))) (metadata-def (name "Tag") (abstract false) (specializes none) (body semicolon)) (metadata-def (name "Tag2") (abstract false) (specializes none) (body semicolon)) (kerml-classifier (keyword type) (abstract false) (name "MetadataTail") (specializes none) (body brace (kerml-feature) (kerml-feature) (metadata-keyword-usage (type (ref r0)) (body none)) (kerml-feature) (metadata-keyword-usage (type (ref r1)) (body semicolon)))) (calc-def (name "CalcScope") (modifiers) (body brace (calc-usage))))))
 )
 ~~~
