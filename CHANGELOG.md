@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Interface-definition bodies retain constraint usages.** `InterfaceBodyItem` admits
+  `InterfaceOccurrenceUsageMember -> InterfaceOccurrenceUsageElement -> BehaviorUsageElement ->
+  ConstraintUsage` (SysML textual BNF 727-750, 374-389, and 1382-1395; the pinned Pilot
+  `SysML.xtext` agrees). The existing source-backed usage node now has an owning
+  `InterfaceDefBodyElement` variant with exhaustive emission, semantic projection, opacity
+  traversal, visitor support, and recovery synchronization at `constraint`. Fixtures:
+  `tests/snapshots/sysml/interface_def_constraint_usage.md` and
+  `tests/snapshots/sysml/interface_def_constraint_usage_recovery.md`. **AST version 199.**
+
 - **Analysis case usages retain their complete occurrence prefix.** `AnalysisCaseUsage` now owns
   the shared source-backed `OccurrenceUsagePrefix`, as required by `AnalysisCaseUsage =
   OccurrenceUsagePrefix 'analysis' ConstraintUsageDeclaration CaseBody` (SysML textual BNF

@@ -268,6 +268,9 @@ fn walk_interface_def_body(report: &mut OpacityReport, path: &str, body: &Interf
             InterfaceDefBodyElement::FlowUsage(flow) => {
                 walk_definition_body(report, &p, &flow.value.body)
             }
+            InterfaceDefBodyElement::ConstraintUsage(usage) => {
+                walk_constraint_def_body(report, &p, &usage.value.body)
+            }
             InterfaceDefBodyElement::Annotating(member) => {
                 walk_annotating_member(report, &p, member)
             }

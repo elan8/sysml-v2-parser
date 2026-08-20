@@ -2747,6 +2747,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         InterfaceDefBodyElement::FlowUsage(_usage) => {
                             self.write_marker(&mut first, "flow-usage")?;
                         }
+                        InterfaceDefBodyElement::ConstraintUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_constraint_usage(&usage.value)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')

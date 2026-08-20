@@ -488,6 +488,9 @@ pub(crate) const CONNECTION_DEF_BODY_STARTERS: &[&[u8]] = &[
 /// scope carry the whole shared prefix; see `planning/port-usage-prefix-matrix.md` §6 and §10.1.
 pub(crate) const INTERFACE_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"connect",
+    // `InterfaceOccurrenceUsageElement` includes `BehaviorUsageElement`, whose ConstraintUsage
+    // alternative owns the full occurrence-prefix and calculation-body grammar.
+    b"constraint",
     b"end",
     b"ref",
     b"doc",

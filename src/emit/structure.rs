@@ -888,6 +888,9 @@ fn emit_interface_def_body_element(
         InterfaceDefBodyElement::FlowUsage(f) => {
             super::behavior::emit_flow_usage(w, path, &f.value)
         }
+        InterfaceDefBodyElement::ConstraintUsage(c) => {
+            super::view::emit_constraint_usage(w, path, &c.value)
+        }
         other @ (InterfaceDefBodyElement::ItemDef(_) | InterfaceDefBodyElement::ItemUsage(_)) => w
             .unsupported(
                 path,

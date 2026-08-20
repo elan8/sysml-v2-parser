@@ -3716,6 +3716,9 @@ macro_rules! ast_traversal {
                 InterfaceDefBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }
+                InterfaceDefBodyElement::ConstraintUsage(field_0) => {
+                    visitor.visit_constraint_usage(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }

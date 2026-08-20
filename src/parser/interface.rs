@@ -4,6 +4,7 @@ use crate::ast::{InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, Member
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connector::{connect_stmt, end_decl, ref_decl};
+use crate::parser::constraint::constraint_usage;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::item::{item_def_required, item_usage};
 use crate::parser::lex::{ws_and_comments, INTERFACE_DEF_BODY_STARTERS};
@@ -74,6 +75,13 @@ fn interface_def_body_element(
             crate::parser::flow::flow_usage_member,
             InterfaceDefBodyElement::FlowUsage,
         ),
+        // `InterfaceOccurrenceUsageElement` includes `BehaviorUsageElement`, whose
+        // `ConstraintUsage` alternative retains its own complete occurrence-prefix and
+        // calculation-body grammar (SysML BNF 727-750, 374-389, 1382-1395). This owner adds no
+        // interface-specific interpretation of that shared production.
+        map(constraint_usage, |usage| {
+            InterfaceDefBodyElement::ConstraintUsage(Box::new(usage))
+        }),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

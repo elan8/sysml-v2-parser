@@ -1283,6 +1283,11 @@ pub enum InterfaceDefBodyElement {
     /// `flow p1.torque to p2.torque;` (OMG spec Annex `Vehicle Example/SysML v2 Spec Annex A
     /// SimpleVehicleModel.sysml`). Previously unmodeled -- this body had no flow arm at all.
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    /// `constraint` usage through `InterfaceBodyItem -> InterfaceOccurrenceUsageMember ->
+    /// InterfaceOccurrenceUsageElement -> BehaviorUsageElement -> ConstraintUsage` (SysML BNF
+    /// 727-750, 374-389, 1382-1395). The existing source-backed ConstraintUsage owns its
+    /// occurrence prefix, declaration, and CalculationBody.
+    ConstraintUsage(Box<Node<ConstraintUsage>>),
 }
 
 /// GH-53: the nested-usage kinds confirmed by real usage as an [`EndDecl`]'s target (see
