@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Part-definition bodies retain nested package definitions.** A part definition owns a
+  `DefinitionBody`, whose `DefinitionBodyItem → DefinitionMember → DefinitionElement` path
+  admits both `Package` and `LibraryPackage` (SysML textual BNF 180-207 and 234-248; the pinned
+  Pilot SysML grammar agrees). `PartDefBodyElement` now has separate typed variants for those
+  productions, preserving `library`/`standard library` spelling in the existing
+  `LibraryPackage` node. Formatting, opacity traversal, semantic snapshots, and visitors recurse
+  through their package bodies; recovery synchronizes at `package`, `library`, and `standard`.
+  Fixtures: `tests/snapshots/sysml/part_def_nested_packages.md` and
+  `tests/snapshots/sysml/part_def_nested_packages_recovery.md`. **AST version 195.**
+
 - **Transition effects retain optional typed action bodies.** `EffectBehaviorUsage` admits the
   perform, accept, send, and assignment alternatives with an optional `ActionBody` (SysML
   textual BNF 1314-1334; Pilot `SysML.xtext` 1909-1919). Their brace bodies are now parsed as

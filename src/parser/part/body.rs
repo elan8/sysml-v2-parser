@@ -5,6 +5,7 @@ use super::usage::{
 };
 use crate::parser::action::first_stmt;
 use crate::parser::lex::skip_statement_or_block;
+use crate::parser::package::{library_package_, package_};
 
 /// Part def body: ';' or '{' PartDefBodyElement* '}'
 pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
@@ -226,6 +227,13 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
     }
     let (input, elem) = alt((
         alt((
+            // `PartDefinition` has a `DefinitionBody`, so `DefinitionBodyItem` reaches
+            // `DefinitionMember -> DefinitionElement`, which owns both `Package` and
+            // `LibraryPackage` (SysML BNF 180-207, 234-248; the pinned Pilot SysML grammar
+            // agrees). Reuse the package module's typed parsers rather than reinterpreting a
+            // nested namespace as opaque source.
+            map(package_, PartDefBodyElement::Package),
+            map(library_package_, PartDefBodyElement::LibraryPackage),
             map(
                 crate::parser::body::annotating_member,
                 PartDefBodyElement::Annotating,

@@ -275,6 +275,10 @@ fn emit_part_def_body_element(
         PartDefBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
+        PartDefBodyElement::Package(package) => super::root::emit_package(w, path, &package.value),
+        PartDefBodyElement::LibraryPackage(package) => {
+            super::root::emit_library_package(w, path, &package.value)
+        }
         PartDefBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         PartDefBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PartDefBodyElement::PartDef(p) => emit_part_def(w, path, &p.value),

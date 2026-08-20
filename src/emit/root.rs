@@ -48,7 +48,7 @@ pub(crate) fn emit_package(
     emit_package_body(w, path, &pkg.body)
 }
 
-fn emit_library_package(
+pub(crate) fn emit_library_package(
     w: &mut EmitWriter<'_>,
     path: &str,
     pkg: &LibraryPackage,

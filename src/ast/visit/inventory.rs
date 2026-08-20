@@ -2510,6 +2510,12 @@ macro_rules! ast_traversal {
                 PartDefBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                PartDefBodyElement::Package(field_0) => {
+                    visitor.visit_package(field_0);
+                }
+                PartDefBodyElement::LibraryPackage(field_0) => {
+                    visitor.visit_library_package(field_0);
+                }
                 PartDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }

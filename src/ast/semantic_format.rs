@@ -1597,6 +1597,14 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
                         }
+                        PartDefBodyElement::Package(package) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_package(&package.value)?;
+                        }
+                        PartDefBodyElement::LibraryPackage(package) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_library_package(&package.value)?;
+                        }
                         PartDefBodyElement::MetadataKeywordUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&usage.value)?;

@@ -86,6 +86,14 @@ pub enum PartDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// Nested `package` definition. `PartDefinition` owns a `DefinitionBody`, whose
+    /// `DefinitionMember` admits `DefinitionElement`, including `Package` (SysML textual BNF
+    /// 180-207, 234-248; the pinned Pilot SysML grammar agrees).
+    Package(Node<crate::ast::Package>),
+    /// Nested `library package` / `standard library package` definition. This remains distinct
+    /// from [`Self::Package`], matching the grammar's separate `LibraryPackage` alternative and
+    /// retaining its standard-library spelling without a mirrored discriminator flag.
+    LibraryPackage(Node<crate::ast::LibraryPackage>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     /// A dependency owned by this definition (BNF `DefinitionMember`).
     Dependency(Node<Dependency>),

@@ -96,7 +96,7 @@ fn required_package_identification(
 }
 
 /// [standard] library package Identification PackageBody (BNF LibraryPackage)
-fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>> {
+pub(crate) fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>> {
     crate::parser::span::reference_transaction(input, library_package_inner)
 }
 
@@ -137,7 +137,7 @@ fn library_package_inner(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPac
 }
 
 /// package Identification PackageBody
-fn package_(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
+pub(crate) fn package_(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
     crate::parser::span::reference_transaction(input, package_inner)
 }
 

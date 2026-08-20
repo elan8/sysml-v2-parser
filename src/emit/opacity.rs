@@ -449,6 +449,8 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::Connect(c) => walk_ref_body(report, &p, &c.value.body),
             PartDefBodyElement::PartDef(n) => walk_part_def_body(report, &p, &n.value.body),
             PartDefBodyElement::PartUsage(n) => walk_part_usage_body(report, &p, &n.value.body),
+            PartDefBodyElement::Package(n) => walk_package(report, &p, &n.value),
+            PartDefBodyElement::LibraryPackage(n) => walk_library_package(report, &p, &n.value),
             PartDefBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
             PartDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             PartDefBodyElement::ActionDef(n) => walk_action_def_body(report, &p, &n.value.body),
