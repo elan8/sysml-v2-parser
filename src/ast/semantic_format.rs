@@ -2104,6 +2104,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::Succession(_member) => {
                             self.write_marker(&mut first, "succession")?;
                         }
+                        super::CalcDefBodyElement::FlowUsage(_member) => {
+                            self.write_marker(&mut first, "flow-usage")?;
+                        }
                         super::CalcDefBodyElement::Import(_member) => {
                             self.write_marker(&mut first, "import")?;
                         }

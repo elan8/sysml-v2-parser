@@ -1435,10 +1435,46 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::Succession(Box::new(n))
         })
         .parse(input)?
+    } else if starts_with_keyword(after_visibility, b"flow") {
+        // `TypeBodyElement -> FeatureMember -> OwnedFeatureMember -> FeatureElement -> Flow`
+        // (KerML BNF 434, 519, 526, 360/369, 1303), whose `FlowDeclaration` (BNF 1311) has the
+        // endpoint-only spelling `FlowEndMember 'to' FlowEndMember`. This scope had no arm for
+        // it, so `flow a.y to b.x1;` in a `classifier`/`struct`/`class`/`behavior`/`datatype`/
+        // `function` body reached the terminal bare-expression fallback and was shredded into
+        // four members -- `'flow';`, `a.y;`, `'to';`, `b.x1;` -- with no diagnostic at all.
+        //
+        // `flow_usage_member` is the parser every SysML sibling scope already dispatches for the
+        // identical surface syntax. Only the `flow` keyword routes here, so its two other
+        // spellings are untouched: `message` is SysML-only (`Message`, SysML BNF 805, which no
+        // KerML `FeatureElement` alternative reaches) and reaches a SysML calculation body one
+        // level earlier through `CALCULATION_ACTION_STARTERS`; `succession flow` (KerML
+        // `SuccessionFlow`, BNF 370/1307) is still claimed by the `succession` arm above, which
+        // is a pre-existing gap this slice does not widen.
+        map(crate::parser::flow::flow_usage_member, |n| {
+            CalcDefBodyElement::FlowUsage(Box::new(n))
+        })
+        .parse(input)?
     } else if starts_with_keyword(after_visibility, b"attribute") {
         map(crate::parser::attribute::attribute_usage, |n| {
             CalcDefBodyElement::AttributeUsage(Box::new(n))
         })
+        .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"redefines") {
+        // Keyword-led, nameless redefinition: `redefines predecessors [0];`. A `Feature` (KerML
+        // BNF 562) may be nothing but its `FeatureDeclaration` (601), and that declaration's
+        // second alternative is a bare `FeatureSpecializationPart` (632) = `FeatureSpecialization+
+        // MultiplicityPart?`, reaching `Redefinitions` (663) -> `Redefines` (666) = `REDEFINES
+        // OwnedRedefinition`. `REDEFINES` is spelled `:>>` or `redefines`.
+        //
+        // The `:>>` spelling had an arm below; the word spelling had none, so `redefines
+        // predecessors [0];` was shredded into `'redefines';` and `predecessors ['0'];` with no
+        // diagnostic. `redefinition_feature_binding` is the parser an attribute body, an
+        // occurrence body and a constraint body already dispatch for this exact production, and
+        // it demands the `:>>`/`:>`/`redefines` head, so it cannot shadow the keyword arms.
+        map(
+            crate::parser::attribute::redefinition_feature_binding,
+            |n| CalcDefBodyElement::AttributeUsage(Box::new(n)),
+        )
         .parse(input)?
     } else if input.fragment().starts_with(b":>>") {
         // Anonymous leading-redefinition binding: `:>> dimension = size(components);`

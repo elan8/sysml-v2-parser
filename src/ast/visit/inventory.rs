@@ -6808,6 +6808,9 @@ macro_rules! ast_traversal {
                 CalcDefBodyElement::Succession(field_0) => {
                     visitor.visit_kerml_succession_member(&$($mutability)? **field_0);
                 }
+                CalcDefBodyElement::FlowUsage(field_0) => {
+                    visitor.visit_flow_usage(&$($mutability)? **field_0);
+                }
                 CalcDefBodyElement::Import(field_0) => {
                     visitor.visit_import(&$($mutability)? **field_0);
                 }

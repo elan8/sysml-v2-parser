@@ -263,6 +263,7 @@ fn emit_calc_body_element(
         }
         CalcDefBodyElement::Binding(b) => emit_kerml_binding_member(w, path, &b.value),
         CalcDefBodyElement::Succession(sc) => emit_kerml_succession_member(w, path, &sc.value),
+        CalcDefBodyElement::FlowUsage(f) => super::behavior::emit_flow_usage(w, path, &f.value),
         CalcDefBodyElement::Import(i) => super::root::emit_import(w, &i.value),
         CalcDefBodyElement::AttributeUsage(a) => {
             super::structure::emit_attribute_usage(w, path, &a.value)

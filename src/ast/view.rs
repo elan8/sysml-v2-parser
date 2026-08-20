@@ -219,11 +219,36 @@ pub enum CalcDefBodyElement {
     Binding(Box<Node<crate::ast::KermlBindingMember>>),
     /// KerML succession member; see [`crate::ast::KermlSuccessionMember`].
     Succession(Box<Node<crate::ast::KermlSuccessionMember>>),
+    /// KerML flow member: `flow a.y to b.x1;` inside a `classifier`/`struct`/`class`/`behavior`/
+    /// `datatype`/`function` body.
+    ///
+    /// `TypeBodyElement` (KerML BNF 434) reaches `FeatureMember` (519) -> `OwnedFeatureMember`
+    /// (526) -> `FeatureElement` (360), whose alternatives include `Flow` (369, defined at KerML
+    /// BNF 1303 as `FeaturePrefix 'flow' FlowDeclaration TypeBody`). `FlowDeclaration` (1311)
+    /// has the endpoint-only spelling `FlowEndMember 'to' FlowEndMember`, which is the one this
+    /// variant is named for.
+    ///
+    /// The scope had no arm for it at all: `flow a.y to b.x1;` fell through to the terminal
+    /// bare-expression fallback and was shredded into four unrelated members -- `'flow';`,
+    /// `a.y;`, `'to';`, `b.x1;` -- with no diagnostic, and a round trip wrote all four back out
+    /// (spec42 Gap 61). Modelled by the same [`crate::ast::FlowUsage`] node the SysML sibling
+    /// scopes already use, because `FlowUsage` (SysML BNF 825) and KerML `Flow` share this
+    /// surface syntax and its typed endpoint pair.
+    FlowUsage(Box<Node<crate::ast::FlowUsage>>),
     /// `import` member inside a type body (`private import SequenceFunctions::*;`, Kernel
     /// Function Library `VectorFunctions.kerml`).
     Import(Box<Node<crate::ast::Import>>),
     /// Nested `attribute` usage member (`private attribute position : Natural[1] = ...;`,
     /// Systems Library `Interfaces.sysml`; previously captured opaquely).
+    ///
+    /// Also the keyword-led-but-nameless redefinition spelling `redefines predecessors [0];`,
+    /// which is a `Feature` (KerML BNF 562) whose `FeatureDeclaration` (601) is nothing but a
+    /// `FeatureSpecializationPart` (632) = `FeatureSpecialization+ MultiplicityPart?`, with the
+    /// specialization being `Redefinitions` (663) -> `Redefines` (666) = `REDEFINES
+    /// OwnedRedefinition`. The same node
+    /// [`crate::ast::OccurrenceBodyElement::AttributeUsage`] and
+    /// [`crate::ast::ConstraintDefBodyElement::AttributeUsage`] already carry it in, from the
+    /// same `redefinition_feature_binding` parser (spec42 Gap 61).
     AttributeUsage(Box<Node<crate::ast::AttributeUsage>>),
     /// `assert constraint { ... }` member inside a type body (`ScalarValues.kerml`).
     AssertConstraint(Box<Node<crate::ast::AssertConstraintMember>>),
