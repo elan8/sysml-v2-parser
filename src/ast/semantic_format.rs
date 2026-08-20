@@ -2485,9 +2485,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::Dependency(dependency) => {
                 self.write_dependency(&dependency.value)
             }
-            ActionDefBodyElement::MetadataUsage(_usage) => {
-                self.writer.write_str("(metadata-usage)")
-            }
+            ActionDefBodyElement::MetadataUsage(usage) => self.write_metadata_usage(&usage.value),
             ActionDefBodyElement::RefDecl(declaration) => {
                 self.write_ref_declaration(&declaration.value)
             }
@@ -2507,7 +2505,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::ForkStmt(fork) => {
                 self.write_control_node("fork", &fork.value.declaration, &fork.value.body)
             }
-            ActionDefBodyElement::TerminateStmt(_terminate) => self.writer.write_str("(terminate)"),
+            ActionDefBodyElement::TerminateStmt(terminate) => {
+                self.write_terminate_statement(&terminate.value)
+            }
             ActionDefBodyElement::WhileStmt(_while) => self.writer.write_str("(while)"),
             ActionDefBodyElement::LoopStmt(_loop) => self.writer.write_str("(loop)"),
             ActionDefBodyElement::IfStmt(_if) => self.writer.write_str("(if)"),
@@ -3063,8 +3063,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                                 &member.value.body,
                             )?;
                         }
-                        super::ActionUsageBodyElement::TerminateStmt(_member) => {
-                            self.write_marker(&mut first, "terminate")?;
+                        super::ActionUsageBodyElement::TerminateStmt(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_terminate_statement(&member.value)?;
                         }
                         super::ActionUsageBodyElement::WhileStmt(_member) => {
                             self.write_marker(&mut first, "while")?;
@@ -3644,6 +3645,16 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_attribute_body(&usage.body)?;
         self.writer.write_char(')')
+    }
+
+    /// The currently supported semicolon form of `TerminateNode` (SysML BNF 1116-1121).
+    fn write_terminate_statement(&mut self, terminate: &super::TerminateStmt) -> io::Result<()> {
+        self.writer.write_str("(terminate (target ")?;
+        match &terminate.target {
+            Some(target) => self.write_expression(target)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str("))")
     }
 
     /// `MetadataDefinition = 'metadata' 'def' Definition` (SysML BNF 1670).

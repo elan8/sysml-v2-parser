@@ -341,14 +341,11 @@ pub(crate) fn emit_action_def_body_element(
         ActionDefBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
+        ActionDefBodyElement::MetadataUsage(m) => structure::emit_metadata_usage(w, path, &m.value),
         ActionDefBodyElement::Dependency(d) => {
             super::requirement::emit_dependency(w, path, &d.value)
         }
-        other @ (ActionDefBodyElement::MetadataUsage(_)
-        | ActionDefBodyElement::TerminateStmt(_)) => w.unsupported(
-            path,
-            format!("{other:?}").chars().take(64).collect::<String>(),
-        ),
+        ActionDefBodyElement::TerminateStmt(terminate) => emit_terminate_stmt(w, &terminate.value),
     }
 }
 
@@ -440,16 +437,35 @@ pub(crate) fn emit_action_usage_body_element(
         ActionUsageBodyElement::MetadataKeywordUsage(m) => {
             structure::emit_metadata_keyword_usage(w, path, &m.value)
         }
+        ActionUsageBodyElement::MetadataUsage(m) => {
+            structure::emit_metadata_usage(w, path, &m.value)
+        }
         ActionUsageBodyElement::Dependency(d) => {
             super::requirement::emit_dependency(w, path, &d.value)
         }
-        other @ (ActionUsageBodyElement::MetadataUsage(_)
-        | ActionUsageBodyElement::TerminateStmt(_)
-        | ActionUsageBodyElement::ForLoop(_)) => w.unsupported(
+        ActionUsageBodyElement::TerminateStmt(terminate) => {
+            emit_terminate_stmt(w, &terminate.value)
+        }
+        other @ ActionUsageBodyElement::ForLoop(_) => w.unsupported(
             path,
             format!("{other:?}").chars().take(64).collect::<String>(),
         ),
     }
+}
+
+/// The currently supported semicolon form of `TerminateNode`: `terminate;` or
+/// `terminate target;`. The target remains a typed expression from parsing through emission.
+fn emit_terminate_stmt(
+    w: &mut EmitWriter<'_>,
+    terminate: &crate::ast::TerminateStmt,
+) -> Result<(), EmitError> {
+    w.push_str("terminate");
+    if let Some(target) = &terminate.target {
+        w.push_char(' ');
+        emit_expression(w, &target.value)?;
+    }
+    w.push_char(';');
+    Ok(())
 }
 
 fn emit_assign(w: &mut EmitWriter<'_>, assign: &AssignStmt) -> Result<(), EmitError> {
