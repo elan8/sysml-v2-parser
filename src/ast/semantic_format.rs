@@ -1339,8 +1339,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         StateDefBodyElement::StateUsage(_usage) => {
                             self.write_marker(&mut first, "state-usage")?;
                         }
-                        StateDefBodyElement::Transition(_transition) => {
-                            self.write_marker(&mut first, "transition")?;
+                        StateDefBodyElement::Transition(transition) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_transition(&transition.value)?;
                         }
                         StateDefBodyElement::AttributeUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -1398,6 +1399,183 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write!(self.writer, ") (effect {has_effect}) ")?;
         self.write_state_body(body)?;
         self.writer.write_char(')')
+    }
+
+    fn write_transition(&mut self, transition: &super::Transition) -> io::Result<()> {
+        self.writer.write_str("(transition (name ")?;
+        write_optional_quoted(self.writer, transition.name.as_deref())?;
+        self.writer.write_str(") (source ")?;
+        if let Some(source) = &transition.source {
+            self.write_expression(source)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        write!(
+            self.writer,
+            ") (initial {}) (accept ",
+            transition.is_initial
+        )?;
+        match &transition.accept {
+            Some(accept) => self.write_transition_accept(accept)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (guard ")?;
+        if let Some(guard) = &transition.guard {
+            self.write_expression(guard)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (effect ")?;
+        match &transition.effect {
+            Some(effect) => self.write_transition_effect(effect)?,
+            None => self.writer.write_str("none")?,
+        }
+        self.writer.write_str(") (target ")?;
+        self.write_expression(&transition.target)?;
+        self.writer.write_str(") ")?;
+        self.write_action_body(&transition.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_transition_accept(&mut self, accept: &super::TransitionAccept) -> io::Result<()> {
+        match accept {
+            super::TransitionAccept::Payload(payload, via) => {
+                self.writer.write_str("(payload (name ")?;
+                write_quoted(self.writer, &payload.name)?;
+                self.writer.write_str(") (type ")?;
+                match payload.type_name {
+                    Some(reference) => self.write_reference(reference)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str(") (via ")?;
+                if let Some(via) = via {
+                    self.write_expression(via)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str("))")
+            }
+            super::TransitionAccept::Shorthand(expression, via) => {
+                self.writer.write_str("(shorthand ")?;
+                self.write_expression(expression)?;
+                self.writer.write_str(" (via ")?;
+                if let Some(via) = via {
+                    self.write_expression(via)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str("))")
+            }
+            super::TransitionAccept::TimeTrigger(kind, expression) => {
+                self.writer.write_str("(time-trigger ")?;
+                self.writer.write_str(match kind {
+                    super::TriggerKind::At => "at",
+                    super::TriggerKind::When => "when",
+                    super::TriggerKind::After => "after",
+                })?;
+                self.writer.write_char(' ')?;
+                self.write_expression(expression)?;
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_transition_effect(&mut self, effect: &super::TransitionEffect) -> io::Result<()> {
+        match effect {
+            super::TransitionEffect::Perform {
+                name,
+                type_name,
+                body,
+            } => {
+                self.writer.write_str("(perform (name ")?;
+                write_optional_quoted(self.writer, name.as_deref())?;
+                self.writer.write_str(") (type ")?;
+                match type_name {
+                    Some(reference) => self.write_reference(*reference)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str(") (body ")?;
+                self.write_optional_transition_effect_body(body)?;
+                self.writer.write_str("))")
+            }
+            super::TransitionEffect::Accept {
+                payload,
+                type_name,
+                via,
+                body,
+            } => {
+                self.writer.write_str("(accept (payload ")?;
+                self.write_expression(payload)?;
+                self.writer.write_str(") (type ")?;
+                match type_name {
+                    Some(reference) => self.write_reference(*reference)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str(") (via ")?;
+                if let Some(via) = via {
+                    self.write_expression(via)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") (body ")?;
+                self.write_optional_transition_effect_body(body)?;
+                self.writer.write_str("))")
+            }
+            super::TransitionEffect::Send {
+                payload,
+                type_name,
+                via,
+                to,
+                body,
+            } => {
+                self.writer.write_str("(send (payload ")?;
+                self.write_expression(payload)?;
+                self.writer.write_str(") (type ")?;
+                match type_name {
+                    Some(reference) => self.write_reference(*reference)?,
+                    None => self.writer.write_str("none")?,
+                }
+                self.writer.write_str(") (via ")?;
+                if let Some(via) = via {
+                    self.write_expression(via)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") (to ")?;
+                if let Some(to) = to {
+                    self.write_expression(to)?;
+                } else {
+                    self.writer.write_str("none")?;
+                }
+                self.writer.write_str(") (body ")?;
+                self.write_optional_transition_effect_body(body)?;
+                self.writer.write_str("))")
+            }
+            super::TransitionEffect::Assign { lhs, rhs, body } => {
+                self.writer.write_str("(assign (lhs ")?;
+                self.write_expression(lhs)?;
+                self.writer.write_str(") (rhs ")?;
+                self.write_expression(rhs)?;
+                self.writer.write_str(") (body ")?;
+                self.write_optional_transition_effect_body(body)?;
+                self.writer.write_str("))")
+            }
+            super::TransitionEffect::Expression(expression) => {
+                self.writer.write_str("(expression ")?;
+                self.write_expression(expression)?;
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_optional_transition_effect_body(
+        &mut self,
+        body: &Option<super::ActionDefBody>,
+    ) -> io::Result<()> {
+        match body {
+            Some(body) => self.write_action_body(body),
+            None => self.writer.write_str("none"),
+        }
     }
 
     fn write_part_body(&mut self, body: &PartDefBody) -> io::Result<()> {

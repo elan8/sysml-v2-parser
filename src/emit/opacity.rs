@@ -825,6 +825,25 @@ fn walk_action_def_body(report: &mut OpacityReport, path: &str, body: &ActionDef
     walk_action_def_body_elements(report, path, elements);
 }
 
+/// Transition effect bodies use the same `ActionBodyItem` grammar as an action definition. Keep
+/// this match exhaustive so a new effect spelling cannot silently skip its nested syntax.
+fn walk_transition_effect(
+    report: &mut OpacityReport,
+    path: &str,
+    effect: &crate::ast::TransitionEffect,
+) {
+    let body = match effect {
+        crate::ast::TransitionEffect::Perform { body, .. }
+        | crate::ast::TransitionEffect::Accept { body, .. }
+        | crate::ast::TransitionEffect::Send { body, .. }
+        | crate::ast::TransitionEffect::Assign { body, .. } => body.as_ref(),
+        crate::ast::TransitionEffect::Expression(_) => None,
+    };
+    if let Some(body) = body {
+        walk_action_def_body(report, path, body);
+    }
+}
+
 /// Walk a direction-prefixed parameter declaration's retained `{ ... }` terminator body, which
 /// shares the action-body member grammar.
 fn walk_in_out_decl(report: &mut OpacityReport, path: &str, decl: &crate::ast::InOutDecl) {
@@ -1213,7 +1232,12 @@ fn walk_state_def_body_elements(
             StateDefBodyElement::RequirementUsage(n) => {
                 walk_requirement_def_body(report, &p, &n.value.body)
             }
-            StateDefBodyElement::Transition(n) => walk_action_def_body(report, &p, &n.value.body),
+            StateDefBodyElement::Transition(n) => {
+                walk_action_def_body(report, &p, &n.value.body);
+                if let Some(effect) = &n.value.effect {
+                    walk_transition_effect(report, &format!("{p}/effect"), effect);
+                }
+            }
             StateDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
             StateDefBodyElement::AttributeUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)

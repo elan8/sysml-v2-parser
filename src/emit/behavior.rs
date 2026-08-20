@@ -952,20 +952,29 @@ pub(crate) fn emit_transition_effect(
     effect: &crate::ast::TransitionEffect,
 ) -> Result<(), EmitError> {
     match effect {
-        crate::ast::TransitionEffect::Perform { name, type_name } => {
-            w.push_str("action ");
+        crate::ast::TransitionEffect::Perform {
+            name,
+            type_name,
+            body,
+        } => {
+            w.push_str("action");
             if let Some(n) = name {
+                w.push_char(' ');
                 w.push_str(&format_name(n));
             }
             if let Some(ty) = type_name {
                 w.push_str(" : ");
                 w.push_qualified_reference(path, *ty)?;
             }
+            if let Some(body) = body {
+                emit_action_def_body(w, path, body)?;
+            }
         }
         crate::ast::TransitionEffect::Accept {
             payload,
             type_name,
             via,
+            body,
         } => {
             w.push_str("accept ");
             emit_expression(w, &payload.value)?;
@@ -977,12 +986,16 @@ pub(crate) fn emit_transition_effect(
                 w.push_str(" via ");
                 emit_expression(w, &v.value)?;
             }
+            if let Some(body) = body {
+                emit_action_def_body(w, path, body)?;
+            }
         }
         crate::ast::TransitionEffect::Send {
             payload,
             type_name,
             via,
             to,
+            body,
         } => {
             w.push_str("send ");
             emit_expression(w, &payload.value)?;
@@ -998,12 +1011,18 @@ pub(crate) fn emit_transition_effect(
                 w.push_str(" to ");
                 emit_expression(w, &t.value)?;
             }
+            if let Some(body) = body {
+                emit_action_def_body(w, path, body)?;
+            }
         }
-        crate::ast::TransitionEffect::Assign { lhs, rhs } => {
+        crate::ast::TransitionEffect::Assign { lhs, rhs, body } => {
             w.push_str("assign ");
             emit_expression(w, &lhs.value)?;
             w.push_str(" := ");
             emit_expression(w, &rhs.value)?;
+            if let Some(body) = body {
+                emit_action_def_body(w, path, body)?;
+            }
         }
         crate::ast::TransitionEffect::Expression(e) => emit_expression(w, &e.value)?,
     }

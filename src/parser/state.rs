@@ -2,7 +2,7 @@ use crate::ast::{
     DoAction, EntryAction, ExitAction, FinalState, Membership, Node, RefDecl, StateDef,
     StateDefBody, StateDefBodyElement, StateUsage, ThenStmt, Transition, TransitionEffect,
 };
-use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
+use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
@@ -22,7 +22,7 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::{IResult, Parser};
 
 pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> {
@@ -565,17 +565,18 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     ))
 }
 
-/// Optional trailing `{ ActionBodyItem* }` on a transition effect action usage; contents are
-/// not retained (mirrors how nested action-usage bodies are treated elsewhere in this module).
-fn transition_effect_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    map(
-        delimited(
-            tag(&b"{"[..]),
-            advance_to_closing_brace,
-            preceded(ws_and_comments, tag(&b"}"[..])),
-        ),
-        |_| (),
-    )
+/// The optional brace body owned by every structured `EffectBehaviorUsage` alternative.
+///
+/// This is deliberately brace-only: the authoritative production has `('{'
+/// ActionBodyItem* '}')?` after the action declaration (SysML BNF 1324-1334), not a second
+/// `UsageBody`; a semicolon remains the transition parser's lenient separator.
+fn transition_effect_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Option<crate::ast::ActionDefBody>> {
+    opt(preceded(
+        ws_and_comments,
+        crate::parser::action::action_def_body_brace,
+    ))
     .parse(input)
 }
 
@@ -590,17 +591,19 @@ fn transition_effect_type_suffix(
     .parse(input)
 }
 
-/// `do action` effect: `action` name (`:` type)? — SysML v2 `PerformActionUsageDeclaration`'s
-/// `'action' UsageDeclaration` form, e.g. `do action powerUp : PowerUp;`.
+/// `do action` effect: `action` UsageDeclaration? (`{` ActionBodyItem* `}`)? — SysML v2
+/// `TransitionPerformActionUsage`, e.g. `do action powerUp : PowerUp;` or `do action { in x; }`.
 fn transition_effect_perform(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
     let (input, _) = preceded(tag(&b"action"[..]), ws1).parse(input)?;
-    let (input, action_name) = name(input)?;
+    let (input, action_name) = opt(name).parse(input)?;
     let (input, type_name) = transition_effect_type_suffix(input)?;
+    let (input, body) = transition_effect_body(input)?;
     Ok((
         input,
         TransitionEffect::Perform {
-            name: Some(action_name),
+            name: action_name,
             type_name,
+            body,
         },
     ))
 }
@@ -616,12 +619,14 @@ fn transition_effect_accept(input: Input<'_>) -> IResult<Input<'_>, TransitionEf
         preceded(ws1, expression),
     ))
     .parse(input)?;
+    let (input, body) = transition_effect_body(input)?;
     Ok((
         input,
         TransitionEffect::Accept {
             payload,
             type_name,
             via,
+            body,
         },
     ))
 }
@@ -642,6 +647,7 @@ fn transition_effect_send(input: Input<'_>) -> IResult<Input<'_>, TransitionEffe
         preceded(ws1, expression),
     ))
     .parse(input)?;
+    let (input, body) = transition_effect_body(input)?;
     Ok((
         input,
         TransitionEffect::Send {
@@ -649,6 +655,7 @@ fn transition_effect_send(input: Input<'_>) -> IResult<Input<'_>, TransitionEffe
             type_name,
             via,
             to,
+            body,
         },
     ))
 }
@@ -659,7 +666,8 @@ fn transition_effect_assign(input: Input<'_>) -> IResult<Input<'_>, TransitionEf
     let (input, lhs) = expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":="[..])).parse(input)?;
     let (input, rhs) = preceded(ws_and_comments, expression).parse(input)?;
-    Ok((input, TransitionEffect::Assign { lhs, rhs }))
+    let (input, body) = transition_effect_body(input)?;
+    Ok((input, TransitionEffect::Assign { lhs, rhs, body }))
 }
 
 /// Transition `do` effect: structured `action`/`accept`/`send`/`assign` action usage, or a bare
@@ -674,7 +682,6 @@ fn transition_effect(input: Input<'_>) -> IResult<Input<'_>, TransitionEffect> {
         map(expression, TransitionEffect::Expression),
     ))
     .parse(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, transition_effect_brace)).parse(input)?;
     // Lenient: some models write a trailing `;` after the effect action usage even though
     // the grammar's TransitionUsage has no separator before `then` (matches spec examples,
     // e.g. `do action powerUp : PowerUp;\nthen on;`).

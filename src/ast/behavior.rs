@@ -272,21 +272,26 @@ pub enum TriggerKind {
 /// Transition `do` effect: a structured action-usage form (SysML v2 `EffectBehaviorUsage`)
 /// or a bare expression shorthand.
 ///
-/// Examples: `do action powerUp : PowerUp;`, `do send new TimeoutSignal() via commPort`,
-/// `do accept Ack via commPort`, `do assign x := y`.
+/// Examples: `do action powerUp : PowerUp;`, `do action { in x; }`,
+/// `do send new TimeoutSignal() via commPort`, `do accept Ack via commPort`,
+/// `do assign x := y`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TransitionEffect {
-    /// `action` name (`:` type)? — perform an owned/named action.
+    /// `action` UsageDeclaration? ActionBody? — perform an owned action. The declaration and
+    /// brace body are independently optional (SysML BNF 1324-1325; Pilot `EffectBehaviorUsage`
+    /// 1917-1919), so `do action { ... }` retains a body without inventing a declaration name.
     Perform {
         name: Option<String>,
         type_name: Option<QualifiedReferenceId>,
+        body: Option<ActionDefBody>,
     },
     /// `accept` payload (`:` type)? (`via` expr)?
     Accept {
         payload: Node<Expression>,
         type_name: Option<QualifiedReferenceId>,
         via: Option<Node<Expression>>,
+        body: Option<ActionDefBody>,
     },
     /// `send` payload (`:` type)? ((`via` expr)? (`to` expr)? | `to` expr)
     Send {
@@ -294,11 +299,13 @@ pub enum TransitionEffect {
         type_name: Option<QualifiedReferenceId>,
         via: Option<Node<Expression>>,
         to: Option<Node<Expression>>,
+        body: Option<ActionDefBody>,
     },
     /// `assign` lhs `:=` rhs
     Assign {
         lhs: Node<Expression>,
         rhs: Node<Expression>,
+        body: Option<ActionDefBody>,
     },
     /// Bare expression shorthand (e.g. a reference to an existing action usage).
     Expression(Node<Expression>),

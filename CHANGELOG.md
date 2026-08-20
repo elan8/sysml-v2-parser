@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Transition effects retain optional typed action bodies.** `EffectBehaviorUsage` admits the
+  perform, accept, send, and assignment alternatives with an optional `ActionBody` (SysML
+  textual BNF 1314-1334; Pilot `SysML.xtext` 1909-1919). Their brace bodies are now parsed as
+  typed `ActionDefBody` values, emitted, visited, checked for opacity, and projected in semantic
+  snapshots. This includes anonymous `do action { ... }`, which previously fell through to a
+  bare expression and discarded its body. Fixtures cover the AHF Norway corpus transition and
+  malformed-body recovery with a following valid sibling. **AST version 194.**
+
 - **Occurrence bodies retain typed binding connectors.** `DefinitionBodyItem` admits a
   `NonOccurrenceUsageMember`, whose `NonOccurrenceUsageElement` includes
   `BindingConnectorAsUsage` (SysML textual BNF 237-247, 349-353, 702-707); the pinned Pilot

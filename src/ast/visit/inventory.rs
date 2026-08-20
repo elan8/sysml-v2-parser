@@ -4947,15 +4947,18 @@ macro_rules! ast_traversal {
 
         pub fn walk_transition_effect<V: $Visitor>(visitor: &mut V, node: &$($mutability)? TransitionEffect) {
             match node {
-                TransitionEffect::Perform { name, type_name } => {
+                TransitionEffect::Perform { name, type_name, body } => {
                     if let Some(inner) = name {
                         visitor.visit_text(inner);
                     }
                     if let Some(inner) = type_name {
                         visitor.visit_qualified_reference(inner);
                     }
+                    if let Some(inner) = body {
+                        visitor.visit_action_def_body(inner);
+                    }
                 }
-                TransitionEffect::Accept { payload, type_name, via } => {
+                TransitionEffect::Accept { payload, type_name, via, body } => {
                     visitor.visit_expression(payload);
                     if let Some(inner) = type_name {
                         visitor.visit_qualified_reference(inner);
@@ -4963,8 +4966,11 @@ macro_rules! ast_traversal {
                     if let Some(inner) = via {
                         visitor.visit_expression(inner);
                     }
+                    if let Some(inner) = body {
+                        visitor.visit_action_def_body(inner);
+                    }
                 }
-                TransitionEffect::Send { payload, type_name, via, to } => {
+                TransitionEffect::Send { payload, type_name, via, to, body } => {
                     visitor.visit_expression(payload);
                     if let Some(inner) = type_name {
                         visitor.visit_qualified_reference(inner);
@@ -4975,10 +4981,16 @@ macro_rules! ast_traversal {
                     if let Some(inner) = to {
                         visitor.visit_expression(inner);
                     }
+                    if let Some(inner) = body {
+                        visitor.visit_action_def_body(inner);
+                    }
                 }
-                TransitionEffect::Assign { lhs, rhs } => {
+                TransitionEffect::Assign { lhs, rhs, body } => {
                     visitor.visit_expression(lhs);
                     visitor.visit_expression(rhs);
+                    if let Some(inner) = body {
+                        visitor.visit_action_def_body(inner);
+                    }
                 }
                 TransitionEffect::Expression(field_0) => {
                     visitor.visit_expression(field_0);
