@@ -73,10 +73,7 @@ fn connection_def_body_element(
         )),
         // PAR-002 widening: this body previously had no attribute/item/port coverage at all.
         // Same def-before-usage discipline as `InterfaceDefBodyElement`/other body enums.
-        map(
-            |i| attribute_def(i, true),
-            ConnectionDefBodyElement::AttributeDef,
-        ),
+        map(attribute_def, ConnectionDefBodyElement::AttributeDef),
         map(attribute_usage, ConnectionDefBodyElement::AttributeUsage),
         map(item_def_required, ConnectionDefBodyElement::ItemDef),
         map(item_usage, ConnectionDefBodyElement::ItemUsage),

@@ -1188,6 +1188,10 @@ pub enum PortBodyElement {
     Error(Node<ParseErrorNode>),
     InOutDecl(Node<InOutDecl>),
     PortUsage(Box<Node<PortUsage>>),
+    /// An occurrence usage nested in a port body. In particular, this owns SysML's
+    /// `EventOccurrenceUsage` forms such as `event occurrence received;` and
+    /// `event sourceEvent;`.
+    OccurrenceUsage(Box<Node<OccurrenceUsage>>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     /// Attribute usage nested inside a port usage body (PAR-002 widening; this enum previously

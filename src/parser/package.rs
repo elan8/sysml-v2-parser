@@ -1397,14 +1397,12 @@ fn try_package_body_annotations<'a>(
         start,
         starter,
         Attribute,
-        |i| attribute_def(i, false),
+        attribute_def,
         PackageBodyElement::AttributeDef
     );
     // PAR-002: standalone attribute usage at package level (BNF `PackageMember` allows
-    // `DefinitionElement | UsageElement`). Tried after `attribute_def(.., false)` above, which
-    // is itself `def`-optional and already captures the def-less bare form; this only adds
-    // coverage for usage-only shapes (e.g. `subsets`/`references`/`crosses`/`redefines` clauses)
-    // that `attribute_def`'s grammar doesn't accept.
+    // `DefinitionElement | UsageElement`). `attribute_def` requires its authored `def` token, so
+    // this arm owns every def-less attribute form, including the ordinary typed/value headers.
     try_package_body_dispatch!(
         input,
         start,
@@ -1601,6 +1599,12 @@ fn try_package_body_structure<'a>(
         input,
         start,
         crate::parser::part::part_ref_usage,
+        PackageBodyElement::Ref
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        crate::parser::connector::ref_decl,
         PackageBodyElement::Ref
     );
     try_package_body_dispatch!(
@@ -2467,6 +2471,33 @@ mod tests {
             package_body_element(parse_input("attribute :>> mass = 5;")).expect("attribute usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PackageBodyElement::AttributeUsage(_)));
+    }
+
+    #[test]
+    fn package_body_distinguishes_bare_attribute_usage_from_explicit_definition() {
+        for text in [
+            "attribute a;",
+            "attribute a : T;",
+            "attribute a = 1;",
+            "attribute a : T = 1;",
+        ] {
+            let (rest, node) = package_body_element(parse_input(text)).expect(text);
+            assert!(
+                rest.fragment().is_empty(),
+                "rest for {text:?}: {:?}",
+                rest.fragment()
+            );
+            assert!(
+                matches!(node.value, PackageBodyElement::AttributeUsage(_)),
+                "{text:?} must be an AttributeUsage, got {:?}",
+                node.value
+            );
+        }
+
+        let (rest, node) =
+            package_body_element(parse_input("attribute def a :> T;")).expect("attribute def");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        assert!(matches!(node.value, PackageBodyElement::AttributeDef(_)));
     }
 
     #[test]

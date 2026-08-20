@@ -136,6 +136,7 @@ pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[
     b":>>",
     b":>",
     b"doc",
+    b"event",
     b"port",
     b"in",
     b"out",

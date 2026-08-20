@@ -60,10 +60,7 @@ fn interface_def_body_element(
         // `item_def_required`/`port_def` tried before their usage siblings, same
         // def-before-usage discipline as the other body enums wired in prior increments (their
         // usage parsers have no guard against a bare `def` token).
-        map(
-            |i| attribute_def(i, true),
-            InterfaceDefBodyElement::AttributeDef,
-        ),
+        map(attribute_def, InterfaceDefBodyElement::AttributeDef),
         map(attribute_usage, InterfaceDefBodyElement::AttributeUsage),
         map(item_def_required, InterfaceDefBodyElement::ItemDef),
         map(item_usage, InterfaceDefBodyElement::ItemUsage),

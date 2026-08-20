@@ -3733,6 +3733,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_occurrence(&mut self, occurrence: &super::OccurrenceUsage) -> io::Result<()> {
         self.writer.write_str("(occurrence ")?;
         self.write_occurrence_usage_prefix(&occurrence.prefix)?;
+        // `event` selects `EventOccurrenceUsage`, a distinct production from the ordinary
+        // occurrence/individual family. Keep that grammatical identity visible to snapshots so
+        // an event member cannot round-trip as an indistinguishable plain occurrence.
+        if occurrence.is_event {
+            self.writer.write_str(" (event true)")?;
+        }
         self.writer.write_str(" (declaration ")?;
         write_quoted(self.writer, &occurrence.name)?;
         self.writer.write_str(") (short-name ")?;
@@ -4204,6 +4210,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         super::PortBodyElement::PortUsage(usage) => {
                             self.write_port_usage_member(&mut first, &usage.value)?;
+                        }
+                        super::PortBodyElement::OccurrenceUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_occurrence(&usage.value)?;
                         }
                         super::PortBodyElement::Annotating(member) => {
                             self.write_item_prefix(&mut first)?;

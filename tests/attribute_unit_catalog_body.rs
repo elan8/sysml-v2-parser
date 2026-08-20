@@ -17,9 +17,9 @@ fn targets_text(
         .join(", ")
 }
 
-fn first_package_attribute_def(
+fn first_package_attribute_usage(
     root: &sysml_v2_parser::RootNamespace,
-) -> &sysml_v2_parser::ast::AttributeDef {
+) -> &sysml_v2_parser::ast::AttributeUsage {
     let package = root
         .elements
         .iter()
@@ -31,8 +31,8 @@ fn first_package_attribute_def(
     let attr = match &package.value.body {
         sysml_v2_parser::ast::PackageBody::Brace { elements, .. } => {
             match &elements.first().expect("member").value {
-                PackageBodyElement::AttributeDef(def) => def,
-                other => panic!("expected attribute def, got {other:?}"),
+                PackageBodyElement::AttributeUsage(usage) => usage,
+                other => panic!("expected attribute usage, got {other:?}"),
             }
         }
         _ => panic!("expected brace package body"),
@@ -66,8 +66,8 @@ fn parses_conversion_by_prefix_in_attribute_body() {
         }",
     )
     .expect("parse");
-    let def = first_package_attribute_def(&root);
-    let usages = attribute_body_usages(&def.body);
+    let usage = first_package_attribute_usage(&root);
+    let usages = attribute_body_usages(&usage.body);
     assert_eq!(usages.len(), 1, "expected one unitConversion binding");
     let conversion = usages[0];
     assert_eq!(
@@ -113,8 +113,8 @@ fn parses_conversion_by_convention_in_attribute_body() {
         }",
     )
     .expect("parse");
-    let def = first_package_attribute_def(&root);
-    let usages = attribute_body_usages(&def.body);
+    let usage = first_package_attribute_usage(&root);
+    let usages = attribute_body_usages(&usage.body);
     assert_eq!(usages.len(), 1);
     let conversion = usages[0];
     assert_eq!(

@@ -233,7 +233,7 @@ fn test_enum_def_with_specialization_and_assigned_literals_maps_dedicated() {
 
 #[test]
 fn test_expression_precedence_parse() {
-    let input = "package P { attribute x = 1 + 2 * 3; }";
+    let input = "package P { attribute def x = 1 + 2 * 3; }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -255,7 +255,7 @@ fn test_expression_precedence_parse() {
 #[test]
 fn test_expression_allows_qualified_names_and_invocation_arguments() {
     let input =
-        "package P { attribute x = Vehicles::Engine.power + normalize(System::Sensors::rpm); }";
+        "package P { attribute def x = Vehicles::Engine.power + normalize(System::Sensors::rpm); }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -294,11 +294,11 @@ fn test_feature_value_distinguishes_operator_and_default_keyword() {
     // `default :=`, and bare `default expr` -- across AttributeDef, AttributeUsage, PartUsage,
     // and RefDecl, the four in-scope structs whose `value` field is now `Option<Node<FeatureValue>>`.
     let input = r#"package P {
-attribute bindAttr = 1;
-attribute assignAttr := 2;
-attribute defaultBindAttr default = 3;
-attribute defaultAssignAttr default := 4;
-attribute defaultBareAttr default 5;
+attribute def bindAttr = 1;
+attribute def assignAttr := 2;
+attribute def defaultBindAttr default = 3;
+attribute def defaultAssignAttr default := 4;
+attribute def defaultBareAttr default 5;
 part def D {
   attribute bindUsage = 1;
   attribute assignUsage := 2;
@@ -1869,7 +1869,7 @@ fn test_attribute_usage_accepts_subsets_clause_without_ast_field() {
 #[test]
 fn test_attribute_def_accepts_multiplicity_and_uniqueness_before_specialization() {
     let input = r#"package P {
-  attribute length: LengthValue[*] nonunique :> scalarQuantities;
+  attribute def length: LengthValue[*] nonunique :> scalarQuantities;
 }"#;
     let result = parse_with_diagnostics(input);
     assert!(
@@ -1901,7 +1901,7 @@ fn test_attribute_def_accepts_multiplicity_and_uniqueness_before_specialization(
 #[test]
 fn test_attribute_def_accepts_untyped_multiplicity_uniqueness_brace_body() {
     let input = r#"package P {
-  attribute measuresOfEffectiveness[*] nonunique { doc /* Base feature. */ }
+  attribute def measuresOfEffectiveness[*] nonunique { doc /* Base feature. */ }
 }"#;
     let result = parse_with_diagnostics(input);
     assert!(
@@ -1927,7 +1927,7 @@ fn test_attribute_def_accepts_untyped_multiplicity_uniqueness_brace_body() {
 #[test]
 fn test_attribute_def_accepts_default_value_without_equals_after_specialization() {
     let input = r#"package P {
-  attribute xoffset : LengthValue [0..*] :> scalarQuantities default 0 [m];
+  attribute def xoffset : LengthValue [0..*] :> scalarQuantities default 0 [m];
 }"#;
     let result = parse_with_diagnostics(input);
     assert!(
@@ -1988,7 +1988,7 @@ fn test_attribute_def_accepts_multiple_specialization_targets() {
 #[test]
 fn test_attribute_def_accepts_constructor_default_value() {
     let input = r#"package P {
-  attribute one : DimensionOneUnit[1] = new DimensionOneUnit();
+  attribute def one : DimensionOneUnit[1] = new DimensionOneUnit();
 }"#;
     let result = parse_with_diagnostics(input);
     assert!(

@@ -268,10 +268,7 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
             crate::parser::body::annotating_member,
             AttributeBodyElement::Annotating,
         ),
-        map(
-            |i| attribute_def(i, true),
-            AttributeBodyElement::AttributeDef,
-        ),
+        map(attribute_def, AttributeBodyElement::AttributeDef),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
         // KerML type-body members: this body grammar also serves KerML `class`/`struct`/
         // `datatype` bodies via `class_def`, whose members are feature members (`feature x :
@@ -755,17 +752,11 @@ pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBo
     Ok((input, members.into_body()))
 }
 
-/// Attribute definition: 'attribute' 'def' name ( ':>' | ':' )? qualified_name? body
+/// Attribute definition: 'attribute' 'def' name ( ':>' | ':' )? qualified_name? body.
 ///
-/// When `disambiguate_from_usage` is true (definition bodies that also accept usages), any
-/// declaration without an explicit `def` keyword is left for [`attribute_usage`] — the `def`
-/// keyword is the sole discriminator between an `AttributeDef` and an `AttributeUsage`, never
-/// inferred from typing, modifiers, or the presence of a value. Package-level attributes pass
-/// false, since only definitions are legal there.
-pub(crate) fn attribute_def(
-    input: Input<'_>,
-    disambiguate_from_usage: bool,
-) -> IResult<Input<'_>, Node<AttributeDef>> {
+/// `def` is the sole grammar discriminator from [`attribute_usage`]. It is mandatory in every
+/// scope; a def-less attribute is always a usage, including at package level.
+pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
@@ -780,14 +771,7 @@ pub(crate) fn attribute_def(
         )?;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, has_def) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let has_def = has_def.is_some();
-    if disambiguate_from_usage && !has_def {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
+    let (input, _) = preceded(tag(&b"def"[..]), ws1).parse(input)?;
     let ident_start = input;
     let (input, ident) = identification(input)?;
     let name_span = ident
@@ -1333,10 +1317,7 @@ fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeB
             crate::parser::body::annotating_member,
             AttributeBodyElement::Annotating,
         ),
-        map(
-            |i| attribute_def(i, true),
-            AttributeBodyElement::AttributeDef,
-        ),
+        map(attribute_def, AttributeBodyElement::AttributeDef),
         map(attribute_usage, AttributeBodyElement::AttributeUsage),
         map(metadata_binding, AttributeBodyElement::AttributeUsage),
         // The same structured members `attribute_body_element` already dispatches (spec42
@@ -1658,7 +1639,7 @@ mod attribute_body_tests {
     #[test]
     fn attribute_def_visibility_prefix_is_captured_on_membership() {
         let text = "protected attribute def Samples: Real;";
-        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        let (rest, node) = attribute_def(input(text)).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -1673,7 +1654,7 @@ mod attribute_body_tests {
     #[test]
     fn attribute_def_public_visibility_prefix_is_captured_on_membership() {
         let text = "public attribute def Samples: Real;";
-        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        let (rest, node) = attribute_def(input(text)).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert_eq!(
             node.value.membership.visibility,
@@ -1745,7 +1726,7 @@ mod attribute_body_tests {
     #[test]
     fn attribute_def_retains_ordered_and_nonunique_modifiers() {
         let text = "attribute def Samples :> Real[0..*] ordered nonunique;";
-        let (rest, node) = attribute_def(input(text), false).expect("attribute def");
+        let (rest, node) = attribute_def(input(text)).expect("attribute def");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(node.value.multiplicity_modifiers.is_ordered());
         assert!(!node.value.multiplicity_modifiers.is_unique());

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Package attributes, anonymous reference redefinitions, and port-body events retain their
+  grammatical identity.** Def-less package `attribute` declarations now produce
+  `AttributeUsage`, `ref :>> target;` retains `target` as a redefinition rather than inventing a
+  declaration name, and event occurrences nested in port bodies use the typed occurrence node
+  instead of recovery. `PortBodyElement` gains `OccurrenceUsage`. **AST version 188.**
+
 - **A KerML type body owns the `flow` and keyword-less `redefines` members its `FeatureElement`
   grants it, and a calculation body owns its `message` member.** Fixtures:
   `tests/snapshots/spec42/kerml_type_body_flow_and_redefinition_members.md`,

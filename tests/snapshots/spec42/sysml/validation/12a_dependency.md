@@ -38,9 +38,9 @@ package '12a-Dependency' {
     package 'Data Layer';
     dependency Use from 'Application Layer' to 'Service Layer';
     dependency from 'Service Layer' to 'Data Layer';
-    attribute def x;
-    attribute def y;
-    attribute def z;
+    attribute x;
+    attribute y;
+    attribute z;
     dependency from z to x, y;
 }
 ~~~
@@ -56,6 +56,6 @@ package '12a-Dependency' {
     (reference r5 (scope relative) (span (offset 284) (line 14) (column 18) (len 1)) (segments (segment 0 (token "x") (name "x") (separator none) (span (offset 284) (line 14) (column 18) (len 1)))))
     (reference r6 (scope relative) (span (offset 287) (line 14) (column 21) (len 1)) (segments (segment 0 (token "y") (name "y") (separator none) (span (offset 287) (line 14) (column 21) (len 1)))))
   )
-  (root (package (name "12a-Dependency") (body brace (package (name "Application Layer") (body semicolon)) (package (name "Service Layer") (body semicolon)) (package (name "Data Layer") (body semicolon)) (dependency (clients (ref r0)) (suppliers (ref r1)) (body semicolon)) (dependency (clients (ref r2)) (suppliers (ref r3)) (body semicolon)) (attribute-def (declaration-name "x") (short-name none) (modifiers) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "y") (short-name none) (modifiers) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (attribute-def (declaration-name "z") (short-name none) (modifiers) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (value none) (body semicolon)) (dependency (clients (ref r4)) (suppliers (ref r5) (ref r6)) (body semicolon)))))
+  (root (package (name "12a-Dependency") (body brace (package (name "Application Layer") (body semicolon)) (package (name "Service Layer") (body semicolon)) (package (name "Data Layer") (body semicolon)) (dependency (clients (ref r0)) (suppliers (ref r1)) (body semicolon)) (dependency (clients (ref r2)) (suppliers (ref r3)) (body semicolon)) (attribute-usage) (attribute-usage) (attribute-usage) (dependency (clients (ref r4)) (suppliers (ref r5) (ref r6)) (body semicolon)))))
 )
 ~~~

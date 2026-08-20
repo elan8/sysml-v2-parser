@@ -44,6 +44,13 @@ fn port_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortBodyElemen
     // `connector::ref_decl` and the annotating members below can claim their first token.
     let (input, elem) = alt((
         map(port_usage, |p| PortBodyElement::PortUsage(Box::new(p))),
+        // `EventOccurrenceUsage` is a `StructureUsageElement`, so a port usage body owns the
+        // same typed occurrence member that part and action bodies already dispatch. Keeping it
+        // on `OccurrenceUsage` preserves the event/reference distinction and its source-backed
+        // targets instead of recovering the whole member.
+        map(crate::parser::occurrence_body::occurrence_usage, |usage| {
+            PortBodyElement::OccurrenceUsage(Box::new(usage))
+        }),
         map(in_out_decl, PortBodyElement::InOutDecl),
         map(
             crate::parser::body::annotating_member,
@@ -286,7 +293,7 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
             crate::parser::body::annotating_member,
             PortDefBodyElement::Annotating,
         ),
-        map(|i| attribute_def(i, true), PortDefBodyElement::AttributeDef),
+        map(attribute_def, PortDefBodyElement::AttributeDef),
         map(attribute_usage, PortDefBodyElement::AttributeUsage),
         map(
             attribute_feature_binding,
@@ -422,6 +429,29 @@ mod par_002_widening_tests {
         let (rest, node) = port_body_element(input("item i1: MyItem;")).expect("item usage");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         assert!(matches!(node.value, PortBodyElement::ItemUsage(_)));
+    }
+
+    #[test]
+    fn port_body_accepts_event_occurrence_declaration_and_reference_forms() {
+        let (rest, declaration) = port_body_element(input("event occurrence received : Signal;"))
+            .expect("event occurrence declaration");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PortBodyElement::OccurrenceUsage(declaration) = declaration.value else {
+            panic!("expected occurrence usage");
+        };
+        assert!(declaration.value.is_event);
+        assert!(declaration.value.has_occurrence_keyword);
+        assert_eq!(declaration.value.name, "received");
+
+        let (rest, reference) = port_body_element(input("event sender.sourceEvent;"))
+            .expect("event occurrence reference");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PortBodyElement::OccurrenceUsage(reference) = reference.value else {
+            panic!("expected occurrence usage");
+        };
+        assert!(reference.value.is_event);
+        assert!(!reference.value.has_occurrence_keyword);
+        assert!(reference.value.occurrence_reference.is_some());
     }
 
     #[test]

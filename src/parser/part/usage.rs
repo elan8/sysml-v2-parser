@@ -1137,11 +1137,16 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, _) = opt(preceded(
-        ws_and_comments,
-        preceded(tag(&b":>>"[..]), ws_and_comments),
-    ))
-    .parse(input)?;
+    // An anonymous leading `:>> target` is a redefinition relationship, not punctuation before
+    // a declaration label. Leave that form to `connector::ref_decl`, which retains it in
+    // `RefDecl::redefines`; consuming it here would turn the target into `RefDecl::name`.
+    let (after_ref, _) = ws_and_comments(input)?;
+    if after_ref.fragment().starts_with(b":>>") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     // `ReferenceUsage = ( EndUsagePrefix | RefPrefix ) 'ref' Usage` (SysML BNF 335) reaches
     // `Identification = ( '<' declaredShortName '>' )? ( declaredName )?` through
     // `UsageDeclaration`, so `ref <rd> rd : T;` is legal. This parser went straight to the name
@@ -1653,6 +1658,36 @@ mod par_002_nested_def_tests {
             crate::ast::KermlClassifierKeyword::Struct
         );
         assert_eq!(decl.value.identification.name.as_deref(), Some("Car1_"));
+    }
+
+    #[test]
+    fn part_usage_body_retains_anonymous_ref_redefinition_target() {
+        let source = input("ref :>> system;");
+        let (rest, node) = part_usage_body_element(source).expect("anonymous ref redefinition");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PartUsageBodyElement::Ref(decl) = node.value else {
+            panic!("expected RefDecl");
+        };
+        assert!(decl.value.name.is_empty());
+        let redefines = decl.value.redefines.expect("redefines relationship");
+        assert_eq!(redefines.value.target.len(), 1);
+        assert_eq!(
+            crate::parser::usage::reference_text(source, redefines.value.target[0]).as_deref(),
+            Some("system")
+        );
+    }
+
+    #[test]
+    fn part_usage_body_keeps_named_ref_with_trailing_redefinition() {
+        let source = input("ref named : T :>> inherited;");
+        let (rest, node) = part_usage_body_element(source).expect("named ref redefinition");
+        assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
+        let PartUsageBodyElement::Ref(decl) = node.value else {
+            panic!("expected RefDecl");
+        };
+        assert_eq!(decl.value.name, "named");
+        assert!(decl.value.typing.is_some());
+        assert!(decl.value.redefines.is_some());
     }
 
     #[test]

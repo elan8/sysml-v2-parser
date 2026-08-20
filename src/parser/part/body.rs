@@ -304,11 +304,15 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             }),
             map(state_usage, PartDefBodyElement::StateUsage),
             map(part_ref_usage, PartDefBodyElement::Ref),
+            // Anonymous `ref :>> target;` owns a relationship target rather than a declaration
+            // name, so the shared full ref-declaration parser must get a chance after the named
+            // reference-usage parser declines it.
+            map(crate::parser::connector::ref_decl, PartDefBodyElement::Ref),
             // GH-42 Gap 1: bare `bind a = b;` (BNF `BindingConnectorAsUsage`, §8.2.2.13.2) was
             // never dispatched here, even though `bind_` was already wired into part *usage*
             // bodies (`part_usage_body_element` below) -- mirrors that arm's placement.
             map(bind_, PartDefBodyElement::Bind),
-            map(|i| attribute_def(i, true), PartDefBodyElement::AttributeDef),
+            map(attribute_def, PartDefBodyElement::AttributeDef),
             map(attribute_usage, PartDefBodyElement::AttributeUsage),
             map(
                 attribute_usage_shorthand,

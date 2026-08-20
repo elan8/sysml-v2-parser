@@ -606,10 +606,7 @@ pub(crate) fn use_case_def_body_element(
                 crate::parser::metadata_annotation::metadata_keyword_prefix,
                 UseCaseDefBodyElement::MetadataKeywordUsage,
             ),
-            map(
-                |i| attribute_def(i, true),
-                UseCaseDefBodyElement::AttributeDef,
-            ),
+            map(attribute_def, UseCaseDefBodyElement::AttributeDef),
             map(
                 crate::parser::attribute::directed_attribute_usage,
                 UseCaseDefBodyElement::AttributeUsage,

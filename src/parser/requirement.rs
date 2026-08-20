@@ -204,10 +204,7 @@ fn requirement_def_body_element(
             map(requirement_usage, |usage| {
                 RequirementDefBodyElement::RequirementUsage(Box::new(usage))
             }),
-            map(
-                |i| attribute_def(i, true),
-                RequirementDefBodyElement::AttributeDef,
-            ),
+            map(attribute_def, RequirementDefBodyElement::AttributeDef),
             map(attribute_usage, RequirementDefBodyElement::AttributeUsage),
             // Keyword-less `:>> name = …` / `:> name …` bindings (validation `09`, `14c`).
             map(

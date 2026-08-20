@@ -773,6 +773,9 @@ fn emit_port_body_element(
         PortBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
         PortBodyElement::Annotating(member) => super::root::emit_annotating_member(w, path, member),
         PortBodyElement::PortUsage(p) => emit_port_usage(w, path, &p.value),
+        PortBodyElement::OccurrenceUsage(usage) => {
+            super::behavior::emit_occurrence_usage(w, path, &usage.value)
+        }
         PortBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
         PortBodyElement::InOutDecl(d) => super::behavior::emit_inout_decl(w, path, &d.value),
         PortBodyElement::ItemUsage(i) => super::requirement::emit_item_usage(w, path, &i.value),

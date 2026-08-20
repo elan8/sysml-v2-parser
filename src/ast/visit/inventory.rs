@@ -3576,6 +3576,9 @@ macro_rules! ast_traversal {
                 PortBodyElement::PortUsage(field_0) => {
                     visitor.visit_port_usage(field_0);
                 }
+                PortBodyElement::OccurrenceUsage(field_0) => {
+                    visitor.visit_occurrence_usage(field_0);
+                }
                 PortBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
