@@ -432,11 +432,6 @@ macro_rules! ast_traversal {
                 walk_default_reference_usage(self, node)
             }
 
-            /// Visits [`FeatureBodyElement`]; the default implementation walks its children.
-            fn visit_feature_body_element(&mut self, node: &$($mutability)? Node<FeatureBodyElement>) {
-                walk_feature_body_element(self, node)
-            }
-
             /// Visits [`PortDef`]; the default implementation walks its children.
             fn visit_port_def(&mut self, node: &$($mutability)? Node<PortDef>) {
                 walk_port_def(self, node)
@@ -2842,6 +2837,9 @@ macro_rules! ast_traversal {
                 AttributeBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(field_0);
                 }
+                AttributeBodyElement::DefaultReferenceUsage(field_0) => {
+                    visitor.visit_default_reference_usage(field_0);
+                }
                 AttributeBodyElement::OccurrenceUsage(field_0) => {
                     visitor.visit_occurrence_usage(&$($mutability)? **field_0);
                 }
@@ -3396,8 +3394,12 @@ macro_rules! ast_traversal {
         pub fn walk_default_reference_usage<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DefaultReferenceUsage>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let DefaultReferenceUsage { name, typing, subsets, redefines, value, multiplicity, name_span, typing_span, membership, has_feature_keyword, body } = &$($mutability)? node.value;
+            let DefaultReferenceUsage { prefix, name, short_name, typing, subsets, redefines, references, crosses, intersects, value, multiplicity, multiplicity_modifiers, name_span, typing_span, membership, body } = &$($mutability)? node.value;
+            visitor.visit_ref_prefix(prefix);
             visitor.visit_text(name);
+            if let Some(inner) = short_name {
+                visitor.visit_text(inner);
+            }
             if let Some(inner) = typing {
                 visitor.visit_typing_relationship(inner);
             }
@@ -3407,12 +3409,22 @@ macro_rules! ast_traversal {
             if let Some(inner) = redefines {
                 visitor.visit_subsetting_relationship(inner);
             }
+            if let Some(inner) = references {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = crosses {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            if let Some(inner) = intersects {
+                visitor.visit_subsetting_relationship(inner);
+            }
             if let Some(inner) = value {
                 visitor.visit_feature_value(inner);
             }
             if let Some(inner) = multiplicity {
                 visitor.visit_multiplicity(inner);
             }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
             if let Some(inner) = name_span {
                 visitor.visit_span(inner);
             }
@@ -3420,26 +3432,7 @@ macro_rules! ast_traversal {
                 visitor.visit_span(inner);
             }
             visitor.visit_membership(membership);
-            let _ = has_feature_keyword;
-            if let Some(inner) = body {
-                for inner in inner {
-                    visitor.visit_feature_body_element(inner);
-                }
-            }
-            visitor.leave_node(&$($mutability)? node.span);
-        }
-
-        pub fn walk_feature_body_element<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeatureBodyElement>) {
-            visitor.enter_node(&$($mutability)? node.span);
-            visitor.visit_span(&$($mutability)? node.span);
-            match &$($mutability)? node.value {
-                FeatureBodyElement::Binding(field_0) => {
-                    visitor.visit_default_reference_usage(&$($mutability)? **field_0);
-                }
-                FeatureBodyElement::Annotating(field_0) => {
-                    visitor.visit_annotating_member(field_0);
-                }
-            }
+            visitor.visit_attribute_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
 

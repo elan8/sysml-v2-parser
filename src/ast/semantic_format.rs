@@ -1435,8 +1435,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_attribute_usage(&usage.value)?;
                         }
-                        PartDefBodyElement::DefaultReferenceUsage(_usage) => {
-                            self.write_marker(&mut first, "default-reference-usage")?;
+                        PartDefBodyElement::DefaultReferenceUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_default_reference_usage(&usage.value)?;
                         }
                         PartDefBodyElement::RequirementUsage(_usage) => {
                             self.write_marker(&mut first, "requirement-usage")?;
@@ -2111,8 +2112,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_kerml_classifier(&declaration.value)?;
                         }
-                        super::CalcDefBodyElement::DefaultReferenceUsage(_member) => {
-                            self.write_marker(&mut first, "default-reference-usage")?;
+                        super::CalcDefBodyElement::DefaultReferenceUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_default_reference_usage(&member.value)?;
                         }
                         super::CalcDefBodyElement::ReturnDecl(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -2272,8 +2274,8 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             ActionDefBodyElement::CalcUsage(_usage) => self.writer.write_str("(calc-usage)"),
             ActionDefBodyElement::ActionDef(_def) => self.writer.write_str("(action-def)"),
-            ActionDefBodyElement::DefaultReferenceUsage(_usage) => {
-                self.writer.write_str("(default-reference-usage)")
+            ActionDefBodyElement::DefaultReferenceUsage(usage) => {
+                self.write_default_reference_usage(&usage.value)
             }
         }
     }
@@ -2804,8 +2806,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::ActionDef(_member) => {
                             self.write_marker(&mut first, "action-def")?;
                         }
-                        super::ActionUsageBodyElement::DefaultReferenceUsage(_member) => {
-                            self.write_marker(&mut first, "default-reference-usage")?;
+                        super::ActionUsageBodyElement::DefaultReferenceUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_default_reference_usage(&member.value)?;
                         }
                         super::ActionUsageBodyElement::VariantUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
@@ -2856,8 +2859,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_attribute_usage(&usage.value)?;
                         }
-                        super::PartUsageBodyElement::DefaultReferenceUsage(_member) => {
-                            self.write_marker(&mut first, "default-reference-usage")?;
+                        super::PartUsageBodyElement::DefaultReferenceUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_default_reference_usage(&member.value)?;
                         }
                         super::PartUsageBodyElement::EnumerationUsage(_member) => {
                             self.write_marker(&mut first, "enumeration-usage")?;
@@ -3173,6 +3177,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::AttributeBodyElement::AttributeUsage(usage) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_attribute_usage(&usage.value)?;
+                        }
+                        super::AttributeBodyElement::DefaultReferenceUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_default_reference_usage(&usage.value)?;
                         }
                         super::AttributeBodyElement::PartUsage(member) => {
                             self.write_part_usage_member(&mut first, &member.value)?;
@@ -4317,6 +4325,63 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// Semantic projection of the pinned `DefaultReferenceUsage = RefPrefix Usage` production.
+    fn write_default_reference_usage(
+        &mut self,
+        usage: &super::DefaultReferenceUsage,
+    ) -> io::Result<()> {
+        self.writer
+            .write_str("(default-reference-usage (prefix (direction ")?;
+        self.write_direction(usage.prefix.direction.as_ref().map(|node| node.value))?;
+        write!(
+            self.writer,
+            ") (derived {}) (variance ",
+            usage.prefix.derived_span.is_some()
+        )?;
+        match usage.prefix.variance.as_ref().map(|node| node.value) {
+            Some(super::DefinitionPrefix::Abstract) => self.writer.write_str("abstract")?,
+            Some(super::DefinitionPrefix::Variation) => self.writer.write_str("variation")?,
+            None => self.writer.write_str("none")?,
+        }
+        write!(
+            self.writer,
+            ") (constant {})) (declaration-name ",
+            usage.prefix.constant_span.is_some()
+        )?;
+        self.write_usage_declaration_name(&usage.name)?;
+        self.writer.write_str(") (short-name ")?;
+        write_optional_quoted(self.writer, usage.short_name.as_deref())?;
+        self.writer.write_str(") (typing ")?;
+        if let Some(typing) = &usage.typing {
+            self.write_typing(&typing.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("references", usage.references.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("crosses", usage.crosses.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("intersects", usage.intersects.as_ref())?;
+        self.writer.write_str(" (value ")?;
+        if let Some(value) = &usage.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_attribute_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
     /// A port usage, projected from its pinned production
     /// (`PortUsage = OccurrenceUsagePrefix 'port' Usage`, SysML BNF 645).
     ///
@@ -4871,8 +4936,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_connect(&connect.value)
             }
-            PackageBodyElement::DefaultReferenceUsage(_usage) => {
-                self.write_marker(first, "default-reference-usage")
+            PackageBodyElement::DefaultReferenceUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_default_reference_usage(&usage.value)
             }
             PackageBodyElement::AssertConstraint(_constraint) => {
                 self.write_marker(first, "assert-constraint")

@@ -1464,7 +1464,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
                 PartUsageBodyElement::AttributeUsage,
             ),
             map(
-                attribute_usage_shorthand,
+                default_reference_usage,
                 PartUsageBodyElement::DefaultReferenceUsage,
             ),
             alt((

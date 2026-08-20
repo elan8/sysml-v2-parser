@@ -1088,8 +1088,8 @@ fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>>
 // The bare-`feature` package member (`feature x : Integer;`, `feature f { expr s { ... } }`)
 // now parses through `kerml_feature` -- one typed representation for every
 // `feature`-keyword-led member across package and type-body scopes (spec42 gap 14). The
-// previous `DefaultReferenceUsage`-shaped `feature_usage_member` production and its
-// `FeatureBodyElement::Expr`/`ExprMember` body machinery were removed with it; `expr s { ... }`
+// previous `DefaultReferenceUsage`-shaped `feature_usage_member` production and its expression
+// body machinery were removed with it; `expr s { ... }`
 // members now parse as feature members of kind `expr` inside the shared type-body grammar.
 fn extended_library_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ExtendedLibraryDecl>> {
     let start = input;
@@ -2062,89 +2062,16 @@ fn try_package_body_view<'a>(
     );
     // Keyword-less implicit-feature shorthand, last so every keyword-led production keeps
     // priority: bare `x;`, `y = expr;`, `z : Type;` package members (spec42 gap 23).
-    try_package_body_dispatch!(input, start, package_bare_binding, |n| {
-        PackageBodyElement::DefaultReferenceUsage(n)
-    });
+    try_package_body_dispatch!(
+        input,
+        start,
+        crate::parser::attribute::default_reference_usage,
+        |n| { PackageBodyElement::DefaultReferenceUsage(n) }
+    );
     Err(nom::Err::Error(nom::error::Error::new(
         input,
         nom::error::ErrorKind::Alt,
     )))
-}
-
-/// Keyword-less implicit-feature member at package/namespace scope: `x;`, `y = expr;`,
-/// `z : Type;` (spec42 gap 23; e.g. `causeA;` members in the Cause-and-Effect examples).
-/// Reuses [`crate::ast::DefaultReferenceUsage`], the same shape the keyword-less binding takes
-/// in attribute/action bodies.
-fn package_bare_binding(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
-    crate::parser::span::reference_transaction(input, package_bare_binding_inner)
-}
-
-fn package_bare_binding_inner(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::DefaultReferenceUsage>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, (name_span, name_str)) = crate::parser::with_span(name).parse(input)?;
-    // A bare *reserved keyword* (`then;`) is a misused keyword, not an implicit feature --
-    // keep it on the targeted recovery diagnostic (GH-87.2).
-    if crate::parser::lex::is_reserved_keyword(name_str.as_bytes()) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Verify,
-        )));
-    }
-    let (input, typing) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let before = input;
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, target) =
-                preceded(ws_and_comments, crate::parser::lex::qualified_reference).parse(input)?;
-            let span = crate::parser::span_from_to(before, input);
-            (
-                input,
-                Some(Node::new(
-                    span.clone(),
-                    crate::ast::TypingRelationship {
-                        target: vec![target],
-                        kind: crate::ast::TypingKind::Typing,
-                        span,
-                        is_conjugated: false,
-                        is_implied: false,
-                        spelling: crate::ast::TypingSpelling::Operator,
-                    },
-                )),
-            )
-        } else {
-            (input, None)
-        }
-    };
-    let (input, value) = opt(crate::parser::feature_value::feature_value_part).parse(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    let typing_span = typing.as_ref().map(|t| t.span.clone());
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            crate::ast::DefaultReferenceUsage {
-                name: name_str,
-                typing,
-                subsets: None,
-                redefines: None,
-                value,
-                multiplicity: None,
-                name_span: Some(name_span),
-                typing_span,
-                membership: crate::ast::Membership::feature(visibility, visibility_span),
-                has_feature_keyword: false,
-                body: None,
-            },
-        ),
-    ))
 }
 
 /// PackageBodyElement: Package | Import | PartDef | PartUsage | PortDef | InterfaceDef | AliasDef | ActionDef | ActionUsage
@@ -2168,6 +2095,12 @@ pub(crate) fn package_body_element(
         }
     }
     let start = input;
+    if crate::parser::attribute::is_pilot_end_default_reference(input) {
+        return Err(nom::Err::Failure(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     // One lookup selects the production this element can be: every alternative belonging to a
     // different production is then skipped rather than parsed and rolled back. A prefix-only or
     // unrecognized keyword yields `None`, which keeps the full sequence.
@@ -2282,29 +2215,6 @@ pub(crate) fn package_body_element(
     )
     .parse(input)
     {
-        return Ok((input, Box::new(node_from_to(start, input, elem))));
-    }
-    // GH-87: keyword-less `name = expr;` binding (§6 G26), previously only reachable inside
-    // part/attribute/action bodies, even though official OMG spec-derived examples use it at
-    // package scope: `pressure = force / length^2;` (v1 Spec Examples/8.4.1 Wheel Hub Assembly/
-    // Wheel Package.sysml:9) and `T1 = 10.0 [N * m];` (Vehicle Example/VehicleUsages.sysml:14).
-    // Tried after every specific dispatcher above (including the `#`/`@` metadata-tag forms) so
-    // real keyword-led/typed members keep priority, but before the KerML-opaque fallback below.
-    // Deliberately value-*mandatory* (`feature_value_binding`, not the bare-name-permitting
-    // `bare_or_valued_feature_binding` used in part def bodies for #87.1): package bodies have
-    // their own existing recovery diagnostics for a bare identifier/misused keyword with no value
-    // (`unrecognized_identifier_is_not_reported_as_a_keyword` /
-    // `misused_real_keyword_is_still_reported_as_unexpected_keyword`,
-    // `tests/recovery_diagnostics_integration.rs`) that a permissive bare-`name;` arm here would
-    // silently swallow before those diagnostics ever ran -- same class of regression already
-    // avoided for action bodies, see `feature_value_binding`'s doc comment.
-    if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {
-        map(
-            crate::parser::attribute::feature_value_binding,
-            PackageBodyElement::DefaultReferenceUsage,
-        )
-        .parse(input)
-    }) {
         return Ok((input, Box::new(node_from_to(start, input, elem))));
     }
     if let Ok((input, elem)) = crate::parser::span::reference_transaction(input, |input| {

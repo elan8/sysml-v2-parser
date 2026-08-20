@@ -6,6 +6,7 @@ use super::body::Body;
 use super::common::{AnnotatingMember, Identification, ParseErrorNode};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
+use super::multiplicity_part::MultiplicityModifiers;
 use super::requirement::{
     Dependency, EnumerationUsage, ItemUsage, RequirementUsage, SatisfyRequirementUsage,
 };
@@ -350,6 +351,9 @@ pub enum AttributeBodyElement {
     Annotating(AnnotatingMember),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
+    /// Keyword-less `DefaultReferenceUsage` (`RefPrefix Usage`) nested in an attribute/item
+    /// body. It is distinct from `AttributeUsage`, whose `attribute` keyword is required.
+    DefaultReferenceUsage(Node<DefaultReferenceUsage>),
     /// `occurrence ...` usage (§6 G27). `AttributeBody` is shared with `item def` / `item` usage
     /// bodies, and an item *is* an occurrence, so `occurrence :>> causes;` is a legal member --
     /// see the OMG spec Annex `14c-Language Extensions.sysml`.
@@ -980,13 +984,17 @@ impl PartialEq for AttributeUsage {
     }
 }
 
-/// SysML `DefaultReferenceUsage` (BNF §8.2.2.6 / Spec §7.6.4): a usage without a kind keyword,
-/// e.g. `Capacity : Real;`. Distinct from [`AttributeUsage`], which requires the `attribute`
-/// keyword. Historically parsed via `attribute_usage_shorthand` into `AttributeUsage`.
+/// SysML `DefaultReferenceUsage` (BNF §8.2.2.6.3): `RefPrefix Usage`, a usage without a kind
+/// keyword such as `Capacity : Real;`. Distinct from [`AttributeUsage`], which requires the
+/// `attribute` keyword. The Pilot-only `end` extension is intentionally not representable.
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefaultReferenceUsage {
+    /// The source-backed pinned `RefPrefix` (direction, derived, variance, constant).
+    pub prefix: crate::ast::RefPrefix,
     pub name: String,
+    /// Optional declaration short name from `Identification`.
+    pub short_name: Option<String>,
     /// Type after `:` / `defined by` / `typed by`.
     pub typing: Option<Node<TypingRelationship>>,
     /// Optional `:>` subsetting clause (GH-87), e.g. `torquePerCurrent :>
@@ -995,59 +1003,43 @@ pub struct DefaultReferenceUsage {
     pub subsets: Option<Node<SubsettingRelationship>>,
     /// Optional `:>>` redefinition clause (GH-87), same shorthand position as `subsets`.
     pub redefines: Option<Node<SubsettingRelationship>>,
+    /// Optional `::>` / `references` relationship.
+    pub references: Option<Node<SubsettingRelationship>>,
+    /// Optional `=>` / `crosses` relationship.
+    pub crosses: Option<Node<SubsettingRelationship>>,
+    /// Optional `intersects` relationship.
+    pub intersects: Option<Node<SubsettingRelationship>>,
     /// Optional feature value after `=` / `default`.
     pub value: Option<Node<FeatureValue>>,
     /// Multiplicity clause, e.g. `private instantNum: Natural[1] = ...;` (Kernel Semantic
     /// Library `Occurrences.kerml`). Previously unparseable on keyword-less bindings.
     pub multiplicity: Option<Node<Multiplicity>>,
+    /// `MultiplicityPart` ordering/uniqueness slots, retained independently of the range.
+    pub multiplicity_modifiers: MultiplicityModifiers,
     pub name_span: Option<Span>,
     pub typing_span: Option<Span>,
     pub membership: Membership,
-    /// `true` for the KerML bare `feature x;` / `feature x : Type;` form (explicit `feature`
-    /// keyword, `feature_usage_member` in `package.rs`), `false` for the keyword-less
-    /// `name;`/`name = expr;` form this struct is otherwise documented for. Tracked so
-    /// `emit_default_reference_usage` can round-trip the keyword rather than always omitting it.
-    pub has_feature_keyword: bool,
-    /// Optional `{ ... }` body, e.g. KerML `feature f { expr s { in x; return : Boolean; } }`
-    /// (spec42 `tests/snapshots/spec42/kerml/expressions.md`). `None` means the usage was
-    /// terminated with `;` instead (the only form previously supported). Only reachable for the
-    /// explicit-`feature`-keyword form (`has_feature_keyword == true`); the keyword-less
-    /// `name;`/`name = expr;` forms never populate this.
-    pub body: Option<Vec<Node<FeatureBodyElement>>>,
+    /// `UsageBody = DefinitionBody`, represented by this slice's shared attribute/item body.
+    pub body: AttributeBody,
 }
 
 impl PartialEq for DefaultReferenceUsage {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+        self.prefix == other.prefix
+            && self.name == other.name
+            && self.short_name == other.short_name
             && self.typing == other.typing
             && self.subsets == other.subsets
             && self.redefines == other.redefines
+            && self.references == other.references
+            && self.crosses == other.crosses
+            && self.intersects == other.intersects
             && self.value == other.value
             && self.multiplicity == other.multiplicity
+            && self.multiplicity_modifiers == other.multiplicity_modifiers
             && self.membership == other.membership
-            && self.has_feature_keyword == other.has_feature_keyword
             && self.body == other.body
     }
-}
-
-/// A member nested inside a `feature NAME { ... }` block body (KerML `Feature`'s
-/// `FeatureBodyElement` production alternatives). Narrowly scoped to the shape actually observed
-/// in the pinned KerML fixtures -- a nested owned `expr` feature -- rather than the full KerML
-/// expression sublanguage; see `DefaultReferenceUsage::body`'s doc comment.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-// `AnnotatingMember` keeps the same direct representation here as in every other scope that owns
-// it. Boxing it only where the sibling variant happens to be small would make the public shape of
-// one production depend on which body contains it -- the same reason `ActionDefBodyElement` keeps
-// `ThenAction` unboxed.
-#[allow(clippy::large_enum_variant)]
-pub enum FeatureBodyElement {
-    /// A nested keyword-less binding, e.g. `:>> dimensions = sourceVector.mRef.dimensions;`
-    /// inside `:>> mRef = transformation.target { ... }` (Domain Libraries
-    /// `VectorCalculations.sysml`).
-    Binding(Box<Node<DefaultReferenceUsage>>),
-    /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
-    Annotating(AnnotatingMember),
 }
 
 // ---------------------------------------------------------------------------

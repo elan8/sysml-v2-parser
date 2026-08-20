@@ -911,17 +911,24 @@ fn calc_named_binding_inner(
             start,
             input,
             crate::ast::DefaultReferenceUsage {
+                prefix: crate::ast::RefPrefix::default(),
                 name: name_str,
+                short_name: None,
                 typing,
                 subsets: None,
                 redefines,
+                references: None,
+                crosses: None,
+                intersects: None,
                 value,
                 multiplicity: leading_multiplicity.or(trailing_multiplicity),
+                multiplicity_modifiers: crate::ast::MultiplicityModifiers::default(),
                 name_span: Some(name_span),
                 typing_span,
                 membership: Membership::feature(visibility, visibility_span),
-                has_feature_keyword: false,
-                body: None,
+                body: crate::ast::AttributeBody::Semicolon {
+                    semicolon_span: crate::ast::Span::dummy(),
+                },
             },
         ),
     ))
@@ -1479,9 +1486,10 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
     } else if input.fragment().starts_with(b":>>") {
         // Anonymous leading-redefinition binding: `:>> dimension = size(components);`
         // (`VectorValues.kerml`).
-        map(crate::parser::attribute::feature_value_binding, |n| {
-            CalcDefBodyElement::DefaultReferenceUsage(Box::new(n))
-        })
+        map(
+            crate::parser::attribute::default_reference_value_binding,
+            |n| CalcDefBodyElement::DefaultReferenceUsage(Box::new(n)),
+        )
         .parse(input)?
     } else if starts_with_any_keyword(
         after_visibility,

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Keyword-less DefaultReferenceUsage now has one source-backed, grammar-owned shape.** The
+  pinned SysML grammar defines `DefaultReferenceUsage = RefPrefix Usage`
+  (`SysML-textual-bnf.kebnf` 332-333), with the ordinary nullable `Identification`, full
+  `FeatureSpecializationPart`, `ValuePart`, and `UsageBody`. Package, part, and attribute-shaped
+  bodies now share that parser and retain declaration short names, each `RefPrefix` slot,
+  multiplicity modifiers, all five specialization relationships, values, and nested bodies in the
+  typed AST. `AttributeBodyElement` now dispatches the production directly rather than promoting
+  it to an `AttributeUsage`; older package/value/shorthand parsers and the mirrored `feature`
+  boolean/body shape are gone. The Pilot Xtext grammar's optional bare `end` extension is not in
+  the authoritative pin, so `end : T;` and `end :>> target;` recover explicitly while later
+  members remain intact. Fixtures: `tests/snapshots/sysml/default_reference_usage.md` and
+  `tests/snapshots/sysml/default_reference_usage_end_recovery.md`. **AST version 192.**
+
 - **Subject declarations retain their typed usage bodies.** `SubjectUsage` is a
   `ReferenceUsage` (`SysML-textual-bnf.kebnf` 1416-1419), hence it completes through
   `UsageBody = DefinitionBody` (305-315); the sibling Pilot grammar agrees at `SysML.xtext`

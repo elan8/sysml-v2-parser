@@ -827,7 +827,7 @@ pub(crate) fn action_def_body_element(
             // §6 G26: last, so every keyword-led member above keeps priority over the
             // keyword-less `name = expr;` binding.
             map(
-                crate::parser::attribute::feature_value_binding,
+                crate::parser::attribute::default_reference_value_binding,
                 ActionDefBodyElement::DefaultReferenceUsage,
             ),
         )),
@@ -1383,7 +1383,7 @@ pub(crate) fn action_usage_body_element(
             // §6 G26: last, so every keyword-led member above keeps priority over the
             // keyword-less `name = expr;` binding.
             map(
-                crate::parser::attribute::feature_value_binding,
+                crate::parser::attribute::default_reference_value_binding,
                 ActionUsageBodyElement::DefaultReferenceUsage,
             ),
         )),

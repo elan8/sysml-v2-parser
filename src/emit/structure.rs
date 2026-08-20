@@ -580,6 +580,9 @@ fn emit_attribute_body_element(
         }
         AttributeBodyElement::AttributeDef(a) => emit_attribute_def(w, path, &a.value),
         AttributeBodyElement::AttributeUsage(a) => emit_attribute_usage(w, path, &a.value),
+        AttributeBodyElement::DefaultReferenceUsage(a) => {
+            emit_default_reference_usage(w, path, &a.value)
+        }
         AttributeBodyElement::OccurrenceUsage(o) => {
             super::behavior::emit_occurrence_usage(w, path, &o.value)
         }
@@ -1562,58 +1565,50 @@ pub(crate) fn emit_default_reference_usage(
     usage: &crate::ast::DefaultReferenceUsage,
 ) -> Result<(), EmitError> {
     emit_visibility(w, usage.membership.visibility);
-    if usage.has_feature_keyword {
-        w.push_str("feature ");
+    if let Some(direction) = &usage.prefix.direction {
+        emit_direction(w, direction.value);
     }
-    w.push_str(&format_name(&usage.name));
+    if usage.prefix.derived_span.is_some() {
+        w.push_str("derived ");
+    }
+    emit_definition_prefix(w, usage.prefix.variance.as_ref());
+    if usage.prefix.constant_span.is_some() {
+        w.push_str("constant ");
+    }
+    if let Some(short_name) = &usage.short_name {
+        w.push_char('<');
+        w.push_str(&format_name(short_name));
+        w.push_str("> ");
+    }
+    if !usage.name.is_empty() {
+        w.push_str(&format_name(&usage.name));
+    }
     if let Some(typing) = &usage.typing {
         emit_typing_clause(w, &typing.value)?;
     }
     if let Some(multiplicity) = &usage.multiplicity {
         emit_multiplicity(w, &multiplicity.value)?;
     }
+    emit_multiplicity_modifiers(w, &usage.multiplicity_modifiers);
     if let Some(subsets) = &usage.subsets {
         emit_subsetting_clause(w, &subsets.value)?;
     }
     if let Some(redefines) = &usage.redefines {
         emit_subsetting_clause(w, &redefines.value)?;
     }
+    if let Some(references) = &usage.references {
+        emit_subsetting_clause(w, &references.value)?;
+    }
+    if let Some(crosses) = &usage.crosses {
+        emit_subsetting_clause(w, &crosses.value)?;
+    }
+    if let Some(intersects) = &usage.intersects {
+        emit_subsetting_clause(w, &intersects.value)?;
+    }
     if let Some(value) = &usage.value {
         emit_feature_value(w, value)?;
     }
-    match &usage.body {
-        None => {
-            w.push_char(';');
-            Ok(())
-        }
-        Some(elements) => {
-            w.push_str(" {");
-            w.newline();
-            w.indent();
-            for (i, el) in elements.iter().enumerate() {
-                emit_feature_body_element(w, &format!("{path}/body[{i}]"), &el.value)?;
-                w.newline();
-            }
-            w.dedent();
-            w.push_char('}');
-            Ok(())
-        }
-    }
-}
-
-fn emit_feature_body_element(
-    w: &mut EmitWriter<'_>,
-    path: &str,
-    el: &crate::ast::FeatureBodyElement,
-) -> Result<(), EmitError> {
-    match el {
-        crate::ast::FeatureBodyElement::Binding(b) => {
-            emit_default_reference_usage(w, path, &b.value)
-        }
-        crate::ast::FeatureBodyElement::Annotating(member) => {
-            super::root::emit_annotating_member(w, path, member)
-        }
-    }
+    emit_attribute_body(w, path, &usage.body)
 }
 
 pub(crate) fn emit_metadata_def(

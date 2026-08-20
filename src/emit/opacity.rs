@@ -227,10 +227,12 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
                 walk_relationship_body_elements(report, path, elements);
             }
         }
+        PackageBodyElement::DefaultReferenceUsage(n) => {
+            walk_default_reference_usage(report, path, &n.value)
+        }
         PackageBodyElement::Filter(_)
         | PackageBodyElement::Actor(_)
-        | PackageBodyElement::EnumDef(_)
-        | PackageBodyElement::DefaultReferenceUsage(_) => {}
+        | PackageBodyElement::EnumDef(_) => {}
     }
 }
 
@@ -344,10 +346,12 @@ fn walk_calc_def_body(report: &mut OpacityReport, path: &str, body: &CalcDefBody
             CalcDefBodyElement::KermlClassifier(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::AttributeUsage(n) => walk_attribute_body(report, &p, &n.value.body),
             CalcDefBodyElement::FlowUsage(n) => walk_definition_body(report, &p, &n.value.body),
+            CalcDefBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
+            }
             CalcDefBodyElement::Binding(_)
             | CalcDefBodyElement::Succession(_)
-            | CalcDefBodyElement::Import(_)
-            | CalcDefBodyElement::DefaultReferenceUsage(_) => {}
+            | CalcDefBodyElement::Import(_) => {}
             CalcDefBodyElement::ReturnDecl(n) => walk_calc_def_body(report, &p, &n.value.body),
             CalcDefBodyElement::Expression(_) => {}
         }
@@ -554,7 +558,10 @@ fn walk_part_def_body(report: &mut OpacityReport, path: &str, body: &PartDefBody
             PartDefBodyElement::FirstStmt(first) => {
                 walk_first_merge_body(report, &p, &first.value.body)
             }
-            PartDefBodyElement::DefaultReferenceUsage(_) | PartDefBodyElement::EnumDef(_) => {}
+            PartDefBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
+            }
+            PartDefBodyElement::EnumDef(_) => {}
         }
     }
 }
@@ -681,9 +688,20 @@ fn walk_part_usage_body_elements(
                     walk_relationship_body_elements(report, &p, elements);
                 }
             }
-            PartUsageBodyElement::DefaultReferenceUsage(_) | PartUsageBodyElement::EnumDef(_) => {}
+            PartUsageBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
+            }
+            PartUsageBodyElement::EnumDef(_) => {}
         }
     }
+}
+
+fn walk_default_reference_usage(
+    report: &mut OpacityReport,
+    path: &str,
+    usage: &crate::ast::DefaultReferenceUsage,
+) {
+    walk_attribute_body(report, path, &usage.body);
 }
 
 fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeBody) {
@@ -718,6 +736,9 @@ fn walk_attribute_body(report: &mut OpacityReport, path: &str, body: &AttributeB
             AttributeBodyElement::AttributeDef(n) => walk_attribute_body(report, &p, &n.value.body),
             AttributeBodyElement::AttributeUsage(n) => {
                 walk_attribute_body(report, &p, &n.value.body)
+            }
+            AttributeBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
             }
             AttributeBodyElement::OccurrenceUsage(n) => {
                 walk_occurrence_usage_body(report, &p, &n.value.body)
@@ -878,9 +899,10 @@ fn walk_action_def_body_elements(
                 walk_first_merge_body(report, &p, &fork.value.body)
             }
             ActionDefBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
-            ActionDefBodyElement::TerminateStmt(_)
-            | ActionDefBodyElement::Assign(_)
-            | ActionDefBodyElement::DefaultReferenceUsage(_) => {}
+            ActionDefBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
+            }
+            ActionDefBodyElement::TerminateStmt(_) | ActionDefBodyElement::Assign(_) => {}
         }
     }
 }
@@ -981,9 +1003,10 @@ fn walk_action_usage_body_elements(
                 walk_first_merge_body(report, &p, &fork.value.body)
             }
             ActionUsageBodyElement::InOutDecl(n) => walk_in_out_decl(report, &p, &n.value),
-            ActionUsageBodyElement::TerminateStmt(_)
-            | ActionUsageBodyElement::Assign(_)
-            | ActionUsageBodyElement::DefaultReferenceUsage(_) => {}
+            ActionUsageBodyElement::DefaultReferenceUsage(n) => {
+                walk_default_reference_usage(report, &p, &n.value)
+            }
+            ActionUsageBodyElement::TerminateStmt(_) | ActionUsageBodyElement::Assign(_) => {}
         }
     }
 }

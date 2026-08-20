@@ -315,7 +315,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(attribute_def, PartDefBodyElement::AttributeDef),
             map(attribute_usage, PartDefBodyElement::AttributeUsage),
             map(
-                attribute_usage_shorthand,
+                default_reference_usage,
                 PartDefBodyElement::DefaultReferenceUsage,
             ),
             map(enum_usage, PartDefBodyElement::EnumerationUsage),
@@ -401,10 +401,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         ),
         // GH-87: keyword-less `name;` / `name = expr;` feature binding (§6 G26), previously only
         // reachable inside action bodies even though `part def V { m; }` is real usage (Simple
-        // Tests/AnalysisTest.sysml:4). Tried absolute last, after `attribute_usage_shorthand`
+        // Tests/AnalysisTest.sysml:4). Tried absolute last, after `default_reference_usage`
         // above (which requires `: Type`), so every keyword-led/typed member keeps priority.
         map(
-            crate::parser::attribute::bare_or_valued_feature_binding,
+            crate::parser::attribute::default_reference_usage,
             PartDefBodyElement::DefaultReferenceUsage,
         ),
     ))
