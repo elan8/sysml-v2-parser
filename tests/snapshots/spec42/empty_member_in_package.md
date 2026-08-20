@@ -11,7 +11,6 @@ package MyPkg {;}
 (fixture-diagnostics
   (document "empty_member_in_package.md"
     (diagnostics
-      (diagnostic (code "recovered_package_body_element") (severity error) (category parseerror) (span (offset 15) (line 1) (column 16) (len 1)) (message "unexpected token in package body"))
     )
   )
 )
@@ -27,6 +26,6 @@ package MyPkg {
 (parsed-document
   (references
   )
-  (root (package (name "MyPkg") (body brace (malformed (code "recovered_package_body_element") (found ";") (span (offset 15) (line 1) (column 16) (len 1))))))
+  (root (package (name "MyPkg") (body brace (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)))))
 )
 ~~~

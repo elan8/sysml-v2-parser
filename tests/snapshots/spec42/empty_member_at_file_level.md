@@ -11,7 +11,6 @@
 (fixture-diagnostics
   (document "empty_member_at_file_level.md"
     (diagnostics
-      (diagnostic (code "expected_keyword") (severity error) (category parseerror) (span (offset 0) (line 1) (column 1) (len 17)) (message "expected a specific keyword or punctuation token"))
       (diagnostic (code "expected_keyword") (severity error) (category parseerror) (span (offset 2) (line 1) (column 3) (len 15)) (message "expected a specific keyword or punctuation token"))
     )
   )
@@ -28,6 +27,6 @@ in v : SpeedVal
 (parsed-document
   (references
   )
-  (root (malformed (code "expected_keyword") (found "; in v : SpeedVal") (span (offset 0) (line 1) (column 1) (len 1))) (malformed (code "expected_keyword") (found "in v : SpeedVal") (span (offset 2) (line 1) (column 3) (len 15))))
+  (root (default-reference-usage (prefix (direction none) (derived false) (variance none) (constant false)) (declaration-name none) (short-name none) (typing none) (multiplicity none) (multiplicity-modifiers (ordering none) (uniqueness none)) (subsets none) (redefines none) (references none) (crosses none) (intersects none) (value none) (body semicolon)) (malformed (code "expected_keyword") (found "in v : SpeedVal") (span (offset 2) (line 1) (column 3) (len 15))))
 )
 ~~~

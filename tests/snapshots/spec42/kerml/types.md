@@ -59,8 +59,8 @@ package Types {
     type all x specializes A, Base::things;
     type Singleton[1] specializes Base::Anything;
     type Super specializes Base::Anything {
-        'private';
-        'package';
+        private;
+        package;
         P;
         {
 	        type Sub specializes Super;

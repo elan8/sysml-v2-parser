@@ -76,104 +76,104 @@ standard library package SIPrefixes {
 	 * See also https://en.wikipedia.org/wiki/Unit_prefix
 	 */
     attribute yocto : UnitPrefix {
-        attribute :>> longName = "yocto";
-        attribute :>> symbol = "y";
-        attribute :>> conversionFactor = 1E-24;
+         :>> longName = "yocto";
+         :>> symbol = "y";
+         :>> conversionFactor = 1E-24;
     }
     attribute zepto : UnitPrefix {
-        attribute :>> longName = "zepto";
-        attribute :>> symbol = "z";
-        attribute :>> conversionFactor = 1E-21;
+         :>> longName = "zepto";
+         :>> symbol = "z";
+         :>> conversionFactor = 1E-21;
     }
     attribute atto : UnitPrefix {
-        attribute :>> longName = "atto";
-        attribute :>> symbol = "a";
-        attribute :>> conversionFactor = 1E-18;
+         :>> longName = "atto";
+         :>> symbol = "a";
+         :>> conversionFactor = 1E-18;
     }
     attribute femto : UnitPrefix {
-        attribute :>> longName = "femto";
-        attribute :>> symbol = "f";
-        attribute :>> conversionFactor = 1E-15;
+         :>> longName = "femto";
+         :>> symbol = "f";
+         :>> conversionFactor = 1E-15;
     }
     attribute pico : UnitPrefix {
-        attribute :>> longName = "pico";
-        attribute :>> symbol = "p";
-        attribute :>> conversionFactor = 1E-12;
+         :>> longName = "pico";
+         :>> symbol = "p";
+         :>> conversionFactor = 1E-12;
     }
     attribute nano : UnitPrefix {
-        attribute :>> longName = "nano";
-        attribute :>> symbol = "n";
-        attribute :>> conversionFactor = 1E-9;
+         :>> longName = "nano";
+         :>> symbol = "n";
+         :>> conversionFactor = 1E-9;
     }
     attribute micro : UnitPrefix {
-        attribute :>> longName = "micro";
-        attribute :>> symbol = "μ";
-        attribute :>> conversionFactor = 1E-6;
+         :>> longName = "micro";
+         :>> symbol = "μ";
+         :>> conversionFactor = 1E-6;
     }
     attribute milli : UnitPrefix {
-        attribute :>> longName = "milli";
-        attribute :>> symbol = "m";
-        attribute :>> conversionFactor = 1E-3;
+         :>> longName = "milli";
+         :>> symbol = "m";
+         :>> conversionFactor = 1E-3;
     }
     attribute centi : UnitPrefix {
-        attribute :>> longName = "centi";
-        attribute :>> symbol = "c";
-        attribute :>> conversionFactor = 1E-2;
+         :>> longName = "centi";
+         :>> symbol = "c";
+         :>> conversionFactor = 1E-2;
     }
     attribute deci : UnitPrefix {
-        attribute :>> longName = "deci";
-        attribute :>> symbol = "d";
-        attribute :>> conversionFactor = 1E-1;
+         :>> longName = "deci";
+         :>> symbol = "d";
+         :>> conversionFactor = 1E-1;
     }
     attribute deca : UnitPrefix {
-        attribute :>> longName = "deca";
-        attribute :>> symbol = "da";
-        attribute :>> conversionFactor = 1E1;
+         :>> longName = "deca";
+         :>> symbol = "da";
+         :>> conversionFactor = 1E1;
     }
     attribute hecto : UnitPrefix {
-        attribute :>> longName = "hecto";
-        attribute :>> symbol = "h";
-        attribute :>> conversionFactor = 1E2;
+         :>> longName = "hecto";
+         :>> symbol = "h";
+         :>> conversionFactor = 1E2;
     }
     attribute kilo : UnitPrefix {
-        attribute :>> longName = "kilo";
-        attribute :>> symbol = "k";
-        attribute :>> conversionFactor = 1E3;
+         :>> longName = "kilo";
+         :>> symbol = "k";
+         :>> conversionFactor = 1E3;
     }
     attribute mega : UnitPrefix {
-        attribute :>> longName = "mega";
-        attribute :>> symbol = "M";
-        attribute :>> conversionFactor = 1E6;
+         :>> longName = "mega";
+         :>> symbol = "M";
+         :>> conversionFactor = 1E6;
     }
     attribute giga : UnitPrefix {
-        attribute :>> longName = "giga";
-        attribute :>> symbol = "G";
-        attribute :>> conversionFactor = 1E9;
+         :>> longName = "giga";
+         :>> symbol = "G";
+         :>> conversionFactor = 1E9;
     }
     attribute tera : UnitPrefix {
-        attribute :>> longName = "tera";
-        attribute :>> symbol = "T";
-        attribute :>> conversionFactor = 1E12;
+         :>> longName = "tera";
+         :>> symbol = "T";
+         :>> conversionFactor = 1E12;
     }
     attribute peta : UnitPrefix {
-        attribute :>> longName = "peta";
-        attribute :>> symbol = "P";
-        attribute :>> conversionFactor = 1E15;
+         :>> longName = "peta";
+         :>> symbol = "P";
+         :>> conversionFactor = 1E15;
     }
     attribute exa : UnitPrefix {
-        attribute :>> longName = "exa";
-        attribute :>> symbol = "E";
-        attribute :>> conversionFactor = 1E18;
+         :>> longName = "exa";
+         :>> symbol = "E";
+         :>> conversionFactor = 1E18;
     }
     attribute zetta : UnitPrefix {
-        attribute :>> longName = "zetta";
-        attribute :>> symbol = "Z";
-        attribute :>> conversionFactor = 1E21;
+         :>> longName = "zetta";
+         :>> symbol = "Z";
+         :>> conversionFactor = 1E21;
     }
     attribute yotta : UnitPrefix {
-        attribute :>> longName = "yotta";
-        attribute :>> symbol = "Y";
-        attribute :>> conversionFactor = 1E24;
+         :>> longName = "yotta";
+         :>> symbol = "Y";
+         :>> conversionFactor = 1E24;
     }
     /*
 	 * ISO/IEC 80000-1 prefixes for binary multiples, i.e. multiples of 1024 (= 2^10)
@@ -181,44 +181,44 @@ standard library package SIPrefixes {
 	 * See also https://en.wikipedia.org/wiki/Binary_prefix
 	 */
     attribute kibi : UnitPrefix {
-        attribute :>> longName = "kibi";
-        attribute :>> symbol = "Ki";
-        attribute :>> conversionFactor = 1024;
+         :>> longName = "kibi";
+         :>> symbol = "Ki";
+         :>> conversionFactor = 1024;
     }
     attribute mebi : UnitPrefix {
-        attribute :>> longName = "mebi";
-        attribute :>> symbol = "Mi";
-        attribute :>> conversionFactor = 1024 ^ 2;
+         :>> longName = "mebi";
+         :>> symbol = "Mi";
+         :>> conversionFactor = 1024 ^ 2;
     }
     attribute gibi : UnitPrefix {
-        attribute :>> longName = "gibi";
-        attribute :>> symbol = "Gi";
-        attribute :>> conversionFactor = 1024 ^ 3;
+         :>> longName = "gibi";
+         :>> symbol = "Gi";
+         :>> conversionFactor = 1024 ^ 3;
     }
     attribute tebi : UnitPrefix {
-        attribute :>> longName = "tebi";
-        attribute :>> symbol = "Ti";
-        attribute :>> conversionFactor = 1024 ^ 4;
+         :>> longName = "tebi";
+         :>> symbol = "Ti";
+         :>> conversionFactor = 1024 ^ 4;
     }
     attribute pebi : UnitPrefix {
-        attribute :>> longName = "pebi";
-        attribute :>> symbol = "Pi";
-        attribute :>> conversionFactor = 1024 ^ 5;
+         :>> longName = "pebi";
+         :>> symbol = "Pi";
+         :>> conversionFactor = 1024 ^ 5;
     }
     attribute exbi : UnitPrefix {
-        attribute :>> longName = "exbi";
-        attribute :>> symbol = "Ei";
-        attribute :>> conversionFactor = 1024 ^ 6;
+         :>> longName = "exbi";
+         :>> symbol = "Ei";
+         :>> conversionFactor = 1024 ^ 6;
     }
     attribute zebi : UnitPrefix {
-        attribute :>> longName = "zebi";
-        attribute :>> symbol = "Zi";
-        attribute :>> conversionFactor = 1024 ^ 7;
+         :>> longName = "zebi";
+         :>> symbol = "Zi";
+         :>> conversionFactor = 1024 ^ 7;
     }
     attribute yobi : UnitPrefix {
-        attribute :>> longName = "yobi";
-        attribute :>> symbol = "Yi";
-        attribute :>> conversionFactor = 1024 ^ 8;
+         :>> longName = "yobi";
+         :>> symbol = "Yi";
+         :>> conversionFactor = 1024 ^ 8;
     }
 }
 ~~~
