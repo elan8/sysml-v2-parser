@@ -1503,7 +1503,11 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             CalcDefBodyElement::KermlFeature(Box::new(n))
         })
         .parse(input)?
-    } else if starts_with_keyword(input.fragment(), b"inv") {
+    // `Invariant` is a `FeatureElement`, so the optional `MemberPrefix` visibility belongs to
+    // this member just as it does to the feature arm above (KerML BNF 519-527, 913-917). Dispatch
+    // must inspect beyond that prefix: otherwise `private inv { ... }` falls through to the
+    // expression fallback, which turns `private` into a sibling feature reference.
+    } else if starts_with_keyword(after_visibility, b"inv") {
         map(kerml_invariant_member, |n| {
             CalcDefBodyElement::Invariant(Box::new(n))
         })
