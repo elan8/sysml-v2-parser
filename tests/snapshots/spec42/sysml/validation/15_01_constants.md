@@ -112,15 +112,15 @@ package '15_01-Constants' {
 	     * See https://codata.org/initiatives/strategic-programme/fundamental-physical-constants/
 	     * For the actual values see https://pml.nist.gov/cuu/Constants/ 
 	     */
-        attribute 'fine structure constant' : DimensionOneValue = 7.2973525693E-3 [one];
-        attribute 'electron to proton mass ratio' : DimensionOneValue = 5.44617021487E-4 [one];
-        attribute 'speed of light in vacuum' : SpeedValue = 299792458 ['m/s'];
+        attribute 'fine structure constant' : DimensionOneValue = 7.2973525693E-3[one];
+        attribute 'electron to proton mass ratio' : DimensionOneValue = 5.44617021487E-4[one];
+        attribute 'speed of light in vacuum' : SpeedValue = 299792458[m / s];
     }
     package 'Global Context' {
-        attribute 'nominal earth gravitational acceleration' : AccelerationValue = 9.80665 ['m/s²'];
+        attribute 'nominal earth gravitational acceleration' : AccelerationValue = 9.80665['m/s²'];
     }
     package 'Model X Context' {
-        attribute 'amplifier gain' : DimensionOneValue = 3.5 [one];
+        attribute 'amplifier gain' : DimensionOneValue = 3.5[one];
     }
 }
 ~~~

@@ -81,7 +81,7 @@ package 'Requirement Definitions' {
         subject vehicle : Vehicle;
         :>> massActual = vehicle.dryMass + vehicle.fuelMass;
         assume constraint {
-            vehicle.fuelMass > 0 [kg];
+            vehicle.fuelMass > 0[kg];
         }
     }
     port def ClutchPort;

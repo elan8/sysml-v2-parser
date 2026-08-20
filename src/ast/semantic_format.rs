@@ -262,11 +262,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_char(')')
             }
             Expression::LiteralBoolean(value) => write!(self.writer, "(boolean {value})"),
-            Expression::Unit(value) => {
-                self.writer.write_str("(unit ")?;
-                write_quoted(self.writer, value)?;
-                self.writer.write_char(')')
-            }
             Expression::FeatureRef(reference) | Expression::FeatureChainRef(reference) => {
                 self.write_reference(*reference)
             }
@@ -283,23 +278,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_reference(*member)?;
                 self.writer.write_str("))")
             }
-            Expression::Index { base, index } => {
+            Expression::Index { base, operands, .. } => {
                 self.writer.write_str("(index (base ")?;
                 self.write_expression(base)?;
-                self.writer.write_str(") (index ")?;
-                self.write_expression(index)?;
+                self.writer.write_str(") (operands ")?;
+                self.write_sequence_expression_list(operands)?;
                 self.writer.write_str("))")
             }
-            Expression::Bracket(value) => {
-                self.writer.write_str("(bracket ")?;
-                self.write_expression(value)?;
-                self.writer.write_char(')')
-            }
-            Expression::LiteralWithUnit { value, unit } => {
-                self.writer.write_str("(literal-with-unit (value ")?;
-                self.write_expression(value)?;
-                self.writer.write_str(") (unit ")?;
-                self.write_expression(unit)?;
+            Expression::Bracket { base, operands, .. } => {
+                self.writer.write_str("(bracket (base ")?;
+                self.write_expression(base)?;
+                self.writer.write_str(") (operands ")?;
+                self.write_sequence_expression_list(operands)?;
                 self.writer.write_str("))")
             }
             Expression::BinaryOp { op, left, right } => {
@@ -325,12 +315,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_arguments(args)?;
                 self.writer.write_str("))")
             }
-            Expression::Tuple(items) => {
-                self.writer.write_str("(tuple")?;
-                for item in items {
-                    self.writer.write_char(' ')?;
-                    self.write_expression(item)?;
-                }
+            Expression::Sequence { operands, .. } => {
+                self.writer.write_str("(sequence ")?;
+                self.write_sequence_expression_list(operands)?;
                 self.writer.write_char(')')
             }
             Expression::Classification { metaclass } => {
@@ -377,11 +364,6 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.writer.write_str("))")
             }
             Expression::Null => self.writer.write_str("(null)"),
-            Expression::Parenthesized(value) => {
-                self.writer.write_str("(parenthesized ")?;
-                self.write_expression(value)?;
-                self.writer.write_char(')')
-            }
             Expression::Constructor { type_name, args } => {
                 self.writer.write_str("(constructor (type ")?;
                 self.write_reference(*type_name)?;
@@ -519,6 +501,27 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") (close-brace ")?;
         write_span(self.writer, &body.value.close_brace_span)?;
         self.writer.write_str("))")
+    }
+
+    fn write_sequence_expression_list(
+        &mut self,
+        operands: &Node<crate::ast::SequenceExpressionList>,
+    ) -> io::Result<()> {
+        self.writer.write_str("(sequence-list")?;
+        for element in &operands.value.elements {
+            self.writer.write_str(" (element ")?;
+            if element.comma_before.is_some() {
+                self.writer.write_str("comma ")?;
+            } else {
+                self.writer.write_str("first ")?;
+            }
+            self.write_expression(&element.expression)?;
+            self.writer.write_char(')')?;
+        }
+        if operands.value.trailing_comma_span.is_some() {
+            self.writer.write_str(" (trailing-comma)")?;
+        }
+        self.writer.write_char(')')
     }
 
     fn write_arguments(&mut self, args: &[Argument]) -> io::Result<()> {
@@ -1490,8 +1493,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_interface_definition(&definition.value)?;
                         }
-                        PartDefBodyElement::InterfaceUsage(_usage) => {
-                            self.write_marker(&mut first, "interface-usage")?;
+                        PartDefBodyElement::InterfaceUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_interface_usage(&usage.value)?;
                         }
                         PartDefBodyElement::Connect(connect) => {
                             self.write_item_prefix(&mut first)?;
@@ -2106,8 +2110,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::CalcDefBodyElement::Connector(_member) => {
                             self.write_marker(&mut first, "connector")?;
                         }
-                        super::CalcDefBodyElement::Binding(_member) => {
-                            self.write_marker(&mut first, "binding")?;
+                        super::CalcDefBodyElement::Binding(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_bind(&member.value)?;
                         }
                         super::CalcDefBodyElement::Succession(_member) => {
                             self.write_marker(&mut first, "succession")?;
@@ -2899,8 +2904,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
                         }
-                        super::PartUsageBodyElement::InterfaceUsage(_member) => {
-                            self.write_marker(&mut first, "interface-usage")?;
+                        super::PartUsageBodyElement::InterfaceUsage(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_interface_usage(&member.value)?;
                         }
                         super::PartUsageBodyElement::Connect(_member) => {
                             self.write_marker(&mut first, "connect")?;
@@ -2908,8 +2914,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::FlowUsage(_member) => {
                             self.write_marker(&mut first, "flow-usage")?;
                         }
-                        super::PartUsageBodyElement::Perform(_member) => {
-                            self.write_marker(&mut first, "perform")?;
+                        super::PartUsageBodyElement::Perform(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_perform(&member.value)?;
                         }
                         super::PartUsageBodyElement::SuccessionUsage(_member) => {
                             self.write_marker(&mut first, "succession-usage")?;
@@ -4734,8 +4741,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             PackageBodyElement::ConnectionUsage(_usage) => {
                 self.write_marker(first, "connection-usage")
             }
-            PackageBodyElement::InterfaceUsage(_usage) => {
-                self.write_marker(first, "interface-usage")
+            PackageBodyElement::InterfaceUsage(usage) => {
+                self.write_item_prefix(first)?;
+                self.write_interface_usage(&usage.value)
             }
             PackageBodyElement::Ref(declaration) => {
                 self.write_item_prefix(first)?;

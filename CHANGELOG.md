@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Bracket, index, and parenthesized expressions now retain the grammar's typed sequence
+  operands instead of a unit-string special case.** KerML textual BNF §8.2.5.8.2 defines
+  `BracketExpression = PrimaryArgumentMember '[' SequenceExpressionListMember ']'`, and shares
+  that `SequenceExpressionList` with `IndexExpression` and `SequenceExpression`. The AST now
+  owns those source-spanned operands, comma delimiters, and opening/closing tokens in one form;
+  `[SI::mm]` is a qualified reference, `[N * m]` is a binary expression, and neither can become
+  a declaration multiplicity after a feature value has begun. The older `Unit`, unary bracket,
+  literal-with-unit, tuple, and parenthesized compatibility variants were removed. The sibling
+  Pilot grammar confirms the same repeatable primary-expression postfix at
+  `KerMLExpressions.xtext:299-323,389-394`. Empty or malformed bracket operands now report the
+  structural `invalid_bracket_expression` diagnostic rather than claiming an invalid unit.
+  Fixtures include `tests/snapshots/sysml/bracketed_unit_expressions.md` and the affected Spec42
+  value-expression corpus. **AST version 190.**
+
 - **View bodies retain their ordinary `rendering` and `alias` members.** `ViewBodyItem` and
   `ViewDefinitionBodyItem` each inherit `DefinitionBodyItem`, which admits `AliasMember` and the
   generic `RenderingUsage` alongside the view-specific `render` member. Both scopes now dispatch

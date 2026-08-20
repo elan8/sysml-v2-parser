@@ -2,8 +2,8 @@
 
 use super::diagnostics::{
     bare_comma_sequence_diagnostic, category_from_code, invalid_bare_identifier_in_body_diagnostic,
-    invalid_expose_separator_diagnostic, invalid_typing_operator_diagnostic,
-    invalid_unit_reference_diagnostic, missing_expression_after_operator_diagnostic,
+    invalid_bracket_expression_diagnostic, invalid_expose_separator_diagnostic,
+    invalid_typing_operator_diagnostic, missing_expression_after_operator_diagnostic,
     missing_semicolon_or_body_diagnostic, missing_type_diagnostic, trim_ascii_end,
     trim_ascii_start, unexpected_keyword_in_scope_diagnostic,
 };
@@ -84,7 +84,7 @@ enum RecoveryClassification {
         expected: String,
         suggestion: String,
     },
-    InvalidUnitReference {
+    InvalidBracketExpression {
         code: String,
         message: String,
         expected: String,
@@ -187,9 +187,10 @@ fn classify_recovery(
         };
     }
 
-    if let Some((code, message, expected, suggestion)) = invalid_unit_reference_diagnostic(trimmed)
+    if let Some((code, message, expected, suggestion)) =
+        invalid_bracket_expression_diagnostic(trimmed)
     {
-        return RecoveryClassification::InvalidUnitReference {
+        return RecoveryClassification::InvalidBracketExpression {
             code: code.to_string(),
             message,
             expected,
@@ -322,7 +323,7 @@ pub(crate) fn build_recovery_error_node_from_span(
             expected,
             suggestion,
         }
-        | RecoveryClassification::InvalidUnitReference {
+        | RecoveryClassification::InvalidBracketExpression {
             code,
             message,
             expected,

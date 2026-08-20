@@ -69,7 +69,7 @@ package '15_12-Compound Value Type' {
     }
     attribute frenchTireInfo : TireInfo {
         attribute :>> manufacturer = "Michelin";
-        attribute :>> hubDiameter = 18.0 ['in'];
+        attribute :>> hubDiameter = 18.0['in'];
         attribute :>> width = 245;
     }
 }

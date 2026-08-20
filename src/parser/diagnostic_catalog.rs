@@ -5,7 +5,7 @@ pub const MISSING_TYPE_REFERENCE: &str = "missing_type_reference";
 pub const INVALID_TYPING_OPERATOR: &str = "invalid_typing_operator";
 pub const INVALID_QUALIFIED_NAME_SEPARATOR: &str = "invalid_qualified_name_separator";
 pub const MISSING_EXPRESSION_AFTER_OPERATOR: &str = "missing_expression_after_operator";
-pub const INVALID_UNIT_REFERENCE: &str = "invalid_unit_reference";
+pub const INVALID_BRACKET_EXPRESSION: &str = "invalid_bracket_expression";
 pub const INVALID_BARE_IDENTIFIER_IN_ACTION_BODY: &str = "invalid_bare_identifier_in_action_body";
 pub const INVALID_BARE_IDENTIFIER_IN_STATE_BODY: &str = "invalid_bare_identifier_in_state_body";
 pub const UNEXPECTED_KEYWORD_IN_SCOPE: &str = "unexpected_keyword_in_scope";
@@ -38,7 +38,7 @@ pub const DOCUMENTED_CODES: &[&str] = &[
     INVALID_TYPING_OPERATOR,
     INVALID_QUALIFIED_NAME_SEPARATOR,
     MISSING_EXPRESSION_AFTER_OPERATOR,
-    INVALID_UNIT_REFERENCE,
+    INVALID_BRACKET_EXPRESSION,
     INVALID_BARE_IDENTIFIER_IN_ACTION_BODY,
     INVALID_BARE_IDENTIFIER_IN_STATE_BODY,
     UNEXPECTED_KEYWORD_IN_SCOPE,

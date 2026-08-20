@@ -386,6 +386,10 @@ package '5-State-based Behavior-1' {
             attribute maintenanceTime : Time::DateTime;
             attribute Tmax : TemperatureValue;
             perform 'provide power' :>> VehicleA::'provide power' {
+                /*
+				 * In the context of the 'vehicle1_c1' part, the 'provide power' action
+				 * that is enabled in 'vehicle states' gets its input from the 'fuelCmdPort'.
+				 */
                 in fuelCmd = fuelCmdPort.fuelCmd;
             }
             state 'vehicle states' :>> VehicleA::'vehicle states' {

@@ -244,6 +244,25 @@ impl UnaryOperator {
     }
 }
 
+/// A grammar-owned `SequenceExpressionList`: the comma-separated operand list shared by
+/// `SequenceExpression`, `BracketExpression`, and `IndexExpression` (KerML textual BNF
+/// 8.2.5.8.2). `comma_before` is absent only on the first element; an optional final comma is
+/// retained separately because the grammar admits `OwnedExpression ','?`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SequenceExpressionList {
+    pub elements: Vec<SequenceExpressionElement>,
+    pub trailing_comma_span: Option<Span>,
+}
+
+/// One expression in a [`SequenceExpressionList`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SequenceExpressionElement {
+    pub comma_before: Option<Span>,
+    pub expression: Node<Expression>,
+}
+
 /// Expression: literals, feature refs, member access, index, bracket/unit, etc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -252,9 +271,6 @@ pub enum Expression {
     LiteralReal(String),
     LiteralString(String),
     LiteralBoolean(bool),
-    /// Authored unit token inside brackets. Units may contain operators such as `/` and `^`, so
-    /// they are not qualified references.
-    Unit(String),
     /// Single name or qualified name.
     FeatureRef(QualifiedReferenceId),
     /// base.member (e.g. engine.fuelCmdPort).
@@ -263,17 +279,22 @@ pub enum Expression {
         member: QualifiedReferenceId,
         separator: ReferenceSeparator,
     },
-    /// base#(index) e.g. frontWheel#(1).
+    /// `base#(operands)`, KerML `IndexExpression`.
     Index {
         base: Box<Node<Expression>>,
-        index: Box<Node<Expression>>,
+        hash_span: Span,
+        open_paren_span: Span,
+        operands: Box<Node<SequenceExpressionList>>,
+        close_paren_span: Span,
     },
-    /// `[unit]` e.g. `[kg]`.
-    Bracket(Box<Node<Expression>>),
-    /// value `[unit]` e.g. `1750 [kg]`.
-    LiteralWithUnit {
-        value: Box<Node<Expression>>,
-        unit: Box<Node<Expression>>,
+    /// `base[operands]`, KerML `BracketExpression`. The operands are ordinary typed
+    /// expressions: a unit-looking `SI::mm` remains a source-backed qualified reference and
+    /// `N * m` remains a binary expression, rather than being copied into a unit string.
+    Bracket {
+        base: Box<Node<Expression>>,
+        open_bracket_span: Span,
+        operands: Box<Node<SequenceExpressionList>>,
+        close_bracket_span: Span,
     },
     /// Binary infix operation e.g. `a >= b * c`, `x / y`.
     BinaryOp {
@@ -291,8 +312,6 @@ pub enum Expression {
         callee: Box<Node<Expression>>,
         args: Vec<Argument>,
     },
-    /// Comma-separated sequence in parentheses, e.g. `(engine1, engine2)` for ordered composition values.
-    Tuple(Vec<Node<Expression>>),
     /// Metadata classification: `@Metaclass` (e.g. `@SysML::PartUsage`).
     Classification {
         metaclass: QualifiedReferenceId,
@@ -320,11 +339,13 @@ pub enum Expression {
     },
     /// KerML null or empty sequence ().
     Null,
-    /// Explicitly parenthesized expression, e.g. `(a + b)`. Preserves the fact that the source
-    /// had explicit grouping parens (PAR-005 item 6) instead of only recomputing the span of the
-    /// inner expression. The inner node's own span excludes the parens; this variant's span
-    /// (carried by the enclosing `Node`) includes them.
-    Parenthesized(Box<Node<Expression>>),
+    /// `(operands)`, KerML `SequenceExpression`. A singleton is still a sequence production;
+    /// grouping and comma-list spelling therefore share one source-backed representation.
+    Sequence {
+        open_paren_span: Span,
+        operands: Box<Node<SequenceExpressionList>>,
+        close_paren_span: Span,
+    },
     /// Constructor/instantiation expression: `new Type(...)` (KerML `ConstructorExpression`,
     /// BNF 8.2.5.8.3). `type_name` is an arena-backed qualified type reference, consistent with
     /// [`Expression::TypeCheck`], [`Expression::MetaCast`], and
@@ -451,21 +472,19 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
 
     match expr {
         Expression::MemberAccess { base, .. }
-        | Expression::Bracket(base)
-        | Expression::Parenthesized(base)
         | Expression::MetadataAccess(base)
         | Expression::MetaCast { base, .. }
         | Expression::Select { base, .. }
         | Expression::Collect { base, .. } => {
             out.push(take_box(base));
         }
-        Expression::Index { base, index } => {
+        Expression::Index { base, operands, .. } | Expression::Bracket { base, operands, .. } => {
             out.push(take_box(base));
-            out.push(take_box(index));
-        }
-        Expression::LiteralWithUnit { value, unit } => {
-            out.push(take_box(value));
-            out.push(take_box(unit));
+            out.extend(
+                std::mem::take(&mut operands.value.elements)
+                    .into_iter()
+                    .map(|element| element.expression),
+            );
         }
         Expression::BinaryOp { left, right, .. } => {
             out.push(take_box(left));
@@ -509,8 +528,12 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
         Expression::Constructor { args, .. } => {
             out.extend(std::mem::take(args).into_iter().map(|arg| arg.value));
         }
-        Expression::Tuple(items) => {
-            out.extend(std::mem::take(items));
+        Expression::Sequence { operands, .. } => {
+            out.extend(
+                std::mem::take(&mut operands.value.elements)
+                    .into_iter()
+                    .map(|element| element.expression),
+            );
         }
         Expression::TypeCheck { operand, .. } => {
             if let Some(boxed) = operand.take() {
@@ -521,7 +544,6 @@ fn take_expression_children(expr: &mut Expression, out: &mut Vec<Node<Expression
         | Expression::LiteralReal(_)
         | Expression::LiteralString(_)
         | Expression::LiteralBoolean(_)
-        | Expression::Unit(_)
         | Expression::FeatureRef(_)
         | Expression::Classification { .. }
         | Expression::Null

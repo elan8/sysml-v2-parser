@@ -1525,9 +1525,6 @@ macro_rules! ast_traversal {
                 Expression::LiteralBoolean(field_0) => {
                     let _ = field_0;
                 }
-                Expression::Unit(field_0) => {
-                    visitor.visit_text(field_0);
-                }
                 Expression::FeatureRef(field_0) => {
                     visitor.visit_qualified_reference(field_0);
                 }
@@ -1536,16 +1533,36 @@ macro_rules! ast_traversal {
                     visitor.visit_qualified_reference(member);
                     visitor.visit_reference_separator(separator);
                 }
-                Expression::Index { base, index } => {
+                Expression::Index { base, hash_span, open_paren_span, operands, close_paren_span } => {
                     visitor.visit_expression(&$($mutability)? **base);
-                    visitor.visit_expression(&$($mutability)? **index);
+                    visitor.visit_span(hash_span);
+                    visitor.visit_span(open_paren_span);
+                    visitor.visit_span(&$($mutability)? operands.span);
+                    for element in &$($mutability)? operands.value.elements {
+                        if let Some(comma) = &$($mutability)? element.comma_before {
+                            visitor.visit_span(comma);
+                        }
+                        visitor.visit_expression(&$($mutability)? element.expression);
+                    }
+                    if let Some(comma) = &$($mutability)? operands.value.trailing_comma_span {
+                        visitor.visit_span(comma);
+                    }
+                    visitor.visit_span(close_paren_span);
                 }
-                Expression::Bracket(field_0) => {
-                    visitor.visit_expression(&$($mutability)? **field_0);
-                }
-                Expression::LiteralWithUnit { value, unit } => {
-                    visitor.visit_expression(&$($mutability)? **value);
-                    visitor.visit_expression(&$($mutability)? **unit);
+                Expression::Bracket { base, open_bracket_span, operands, close_bracket_span } => {
+                    visitor.visit_expression(&$($mutability)? **base);
+                    visitor.visit_span(open_bracket_span);
+                    visitor.visit_span(&$($mutability)? operands.span);
+                    for element in &$($mutability)? operands.value.elements {
+                        if let Some(comma) = &$($mutability)? element.comma_before {
+                            visitor.visit_span(comma);
+                        }
+                        visitor.visit_expression(&$($mutability)? element.expression);
+                    }
+                    if let Some(comma) = &$($mutability)? operands.value.trailing_comma_span {
+                        visitor.visit_span(comma);
+                    }
+                    visitor.visit_span(close_bracket_span);
                 }
                 Expression::BinaryOp { op, left, right } => {
                     visitor.visit_binary_operator(op);
@@ -1560,11 +1577,6 @@ macro_rules! ast_traversal {
                     visitor.visit_expression(&$($mutability)? **callee);
                     for inner in args {
                         visitor.visit_argument(inner);
-                    }
-                }
-                Expression::Tuple(field_0) => {
-                    for inner in field_0 {
-                        visitor.visit_expression(inner);
                     }
                 }
                 Expression::Classification { metaclass } => {
@@ -1590,8 +1602,19 @@ macro_rules! ast_traversal {
                     visitor.visit_qualified_reference(selector);
                 }
                 Expression::Null => {}
-                Expression::Parenthesized(field_0) => {
-                    visitor.visit_expression(&$($mutability)? **field_0);
+                Expression::Sequence { open_paren_span, operands, close_paren_span } => {
+                    visitor.visit_span(open_paren_span);
+                    visitor.visit_span(&$($mutability)? operands.span);
+                    for element in &$($mutability)? operands.value.elements {
+                        if let Some(comma) = &$($mutability)? element.comma_before {
+                            visitor.visit_span(comma);
+                        }
+                        visitor.visit_expression(&$($mutability)? element.expression);
+                    }
+                    if let Some(comma) = &$($mutability)? operands.value.trailing_comma_span {
+                        visitor.visit_span(comma);
+                    }
+                    visitor.visit_span(close_paren_span);
                 }
                 Expression::Constructor { type_name, args } => {
                     visitor.visit_qualified_reference(type_name);

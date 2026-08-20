@@ -68,7 +68,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 189;
+pub const PARSE_AST_VERSION: u32 = 190;
 
 /// The pinned grammar release understood by this build of the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

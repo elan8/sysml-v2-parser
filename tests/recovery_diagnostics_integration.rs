@@ -588,7 +588,7 @@ fn diagnostics_include_taxonomy_categories() {
 }
 
 #[test]
-fn invalid_unit_reference_reports_specific_diagnostic() {
+fn invalid_bracket_expression_reports_specific_diagnostic() {
     let input = "package P { action def Evaluate { bind measuredMass = []; in result: Real; } }";
     let (result, elements) = package_elements(input);
 
@@ -599,8 +599,8 @@ fn invalid_unit_reference_reports_specific_diagnostic() {
         result.errors
     );
     let err = &result.errors[0];
-    assert_eq!(err.code.as_deref(), Some("invalid_unit_reference"));
-    assert_eq!(err.expected.as_deref(), Some("unit name inside '[ ]'"));
+    assert_eq!(err.code.as_deref(), Some("invalid_bracket_expression"));
+    assert_eq!(err.expected.as_deref(), Some("expression inside '[ ]'"));
     assert!(err
         .suggestion
         .as_deref()
@@ -960,8 +960,8 @@ fn far_field_comment_bracket_does_not_poison_diagnostic() {
         !result
             .errors
             .iter()
-            .any(|e| e.code.as_deref() == Some("invalid_unit_reference")),
-        "a bracket-like token inside a comment must not be misclassified as a unit reference error: {:?}",
+            .any(|e| e.code.as_deref() == Some("invalid_bracket_expression")),
+        "a bracket-like token inside a comment must not be misclassified as a bracket expression error: {:?}",
         result.errors
     );
     assert!(

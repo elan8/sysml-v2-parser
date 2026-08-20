@@ -50,6 +50,6 @@ package InvariantMemberVisibility {
 (parsed-document
   (references
   )
-  (root (package (name "InvariantMemberVisibility") (body brace (kerml-classifier (keyword class) (abstract false) (name "C") (specializes none) (body brace (invariant) (invariant))) (kerml-classifier (keyword behavior) (abstract false) (name "B") (specializes none) (body brace (invariant) (invariant)))))
+  (root (package (name "InvariantMemberVisibility") (body brace (kerml-classifier (keyword class) (abstract false) (name "C") (specializes none) (body brace (invariant) (invariant))) (kerml-classifier (keyword behavior) (abstract false) (name "B") (specializes none) (body brace (invariant) (invariant))))))
 )
 ~~~

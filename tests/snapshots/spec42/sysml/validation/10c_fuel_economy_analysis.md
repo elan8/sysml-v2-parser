@@ -201,10 +201,10 @@ package '10c-Fuel Economy Analysis' {
             }
         }
         requirement cityFuelEconomyRequirement : FuelEconomyRequirement {
-            :>> requiredFuelEconomy = 25 ['mi/gallon'];
+            :>> requiredFuelEconomy = 25[mi / gallon];
         }
         requirement highwayFuelEconomyRequirement : FuelEconomyRequirement {
-            :>> requiredFuelEconomy = 30 ['mi/gallon'];
+            :>> requiredFuelEconomy = 30[mi / gallon];
         }
     }
     package VehicleDesignModel {
@@ -295,7 +295,7 @@ package '10c-Fuel Economy Analysis' {
 				     */
                 :>> actualFuelEconomy = vehicle.fuelEconomy_city;
                 assume constraint {
-                    vehicle.cargoWeight == 1000 [lb];
+                    vehicle.cargoWeight == 1000[lb];
                 }
             }
             requirement vehicleFuelEconomyRequirement_highway :> highwayFuelEconomyRequirement {
@@ -305,7 +305,7 @@ package '10c-Fuel Economy Analysis' {
 				     */
                 :>> actualFuelEconomy = vehicle.fuelEconomy_highway;
                 assume constraint {
-                    vehicle.cargoWeight == 1000 [lb];
+                    vehicle.cargoWeight == 1000[lb];
                 }
             }
         }
