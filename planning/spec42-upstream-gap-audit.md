@@ -313,9 +313,6 @@ notation. Accepting `in end port p : T;` would be a deliberate deviation from
 
 Found during the audit, out of scope for these commits, recorded so it is not rediscovered:
 
-- `KermlFeatureMember` and `TypedParameterMember` split one production (`BasicFeaturePrefix`) across
-  two AST nodes on whether a direction was authored. They should share one prefix component the way
-  the occurrence-usage families now share `OccurrenceUsagePrefix`.
 - `FeatureSpecializationPart` admits one `MultiplicityPart`, but a declaration that authors two
   *disjoint* slots across its two positions (`[1] ordered : T nonunique`) still retains both. That
   over-accepts against the enclosing production rather than this one, and nothing is dropped, so it
@@ -327,11 +324,19 @@ Found during the audit, out of scope for these commits, recorded so it is not re
   implemented" -- which is false for an ordinary malformed `attribute`/`part` member. The text and
   the siblings are preserved, so nothing is lost, but the classification misattributes the cause.
   Pre-existing and independent of any gap here; it is a body-dispatch question.
-- The parser accepts `derived end feature`, `abstract end feature` and `composite end feature`,
-  which `EndFeaturePrefix` does not spell. Narrowing that is the mirror image of gap 59 and needs
-  corpus evidence for what tolerated it.
-- The `(typed-parameter)` and `(kerml-feature)` semantic projections emit far fewer fields than
-  their nodes carry, so several invariants are only observable through `FORMAT`.
+- `EndFeaturePrefix = ( isConstant ?= 'const' )? isEnd ?= 'end'` (KerML BNF 578) spells no other
+  slot, and the `FeaturePrefix` merge closed most of the over-acceptance: `derived end feature x;`
+  now reaches recovery with an exact span and a surviving sibling. **`abstract end feature x;` does
+  not.** It splits into two members -- the keyword becomes a bare `(expression (ref ...))` naming
+  `abstract`, followed by a `kerml-feature` for the rest -- so a keyword is silently turned into a
+  reference to a feature nobody declared. That is the fabrication class `AGENTS.md` forbids, worse
+  than the plain over-acceptance this entry used to describe. The same shape affects `abstract`
+  followed by any other prefix keyword (`abstract derived feature c;`); it is recorded in
+  `planning/kerml-feature-prefix-matrix.md` §5.2 as pre-existing. Needs its own slice: the fix is a
+  dispatch question about where `abstract` is tried, not a prefix-model question.
+- The `(kerml-feature)` semantic projection is still a bare marker, so the merged node's prefix
+  slots, specialization clauses and multiplicity are observable only through `FORMAT`.
+  `(typed-parameter)` is gone with the node it projected.
 - `attribute x : Real;` at namespace level reaches `AttributeDef` and re-emits as
   `attribute def x : Real;`, inventing a `def` keyword no production spells. `AttributeUsage`
   exists and is reached by other spellings, so this is a dispatch-order question, not a missing
