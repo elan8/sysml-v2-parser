@@ -6703,6 +6703,9 @@ macro_rules! ast_traversal {
                 ConstraintDefBodyElement::RequireConstraint(field_0) => {
                     visitor.visit_require_constraint(&$($mutability)? **field_0);
                 }
+                ConstraintDefBodyElement::ReturnDecl(field_0) => {
+                    visitor.visit_return_decl(&$($mutability)? **field_0);
+                }
             }
             visitor.leave_node(&$($mutability)? node.span);
         }

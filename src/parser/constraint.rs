@@ -263,6 +263,31 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::RequireConstraint(Box::new(n))
         })
         .parse(input)?
+    } else if starts_with_keyword(input.fragment(), b"return") {
+        // `ConstraintDefinition`/`ConstraintUsage` end in `CalculationBody`, whose
+        // `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML BNF 1378, 1382,
+        // 1359, 1366, 1370). Ahead of the terminal expression arm, which read `return` as a
+        // name. The same three parsers the calculation scope dispatches, in the same order and
+        // behind the same guard -- the two scopes are the one production.
+        if named_return_missing_type(input) {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+        if let Ok((next, decl)) = return_decl(input) {
+            (next, ConstraintDefBodyElement::ReturnDecl(Box::new(decl)))
+        } else if let Ok((next, expr)) = return_expression_stmt(input) {
+            (next, ConstraintDefBodyElement::Expression(expr))
+        } else {
+            let (next, node) = other_return_recovery(
+                input,
+                CONSTRAINT_DEF_BODY_STARTERS,
+                "constraint body",
+                "recovered_constraint_body_element",
+            )?;
+            (next, ConstraintDefBodyElement::Error(node))
+        }
     } else if let Ok((rest, binding)) = calc_named_binding(input) {
         // A constraint definition body is a `DefinitionBody`, so a keyword-less feature
         // declaration (`mass : Real;`) is a member of it, not an expression statement.
@@ -1534,7 +1559,13 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         } else if let Ok((input, expr)) = return_expression_stmt(input) {
             (input, CalcDefBodyElement::Expression(expr))
         } else {
-            other_calc_return(input)?
+            let (next, node) = other_return_recovery(
+                input,
+                CALC_DEF_BODY_STARTERS,
+                "calc body",
+                "recovered_calc_body_element",
+            )?;
+            (next, CalcDefBodyElement::Error(node))
         }
     } else if let Ok((next, binding)) = calc_named_binding(input) {
         // Keyword-less named member binding (`private instantNum: Natural[1] = ...;`,
@@ -1670,7 +1701,16 @@ pub(crate) fn return_expression_stmt(input: Input<'_>) -> IResult<Input<'_>, Nod
 /// A `return` member that parses as neither a [`return_decl`] nor a return expression becomes
 /// an explicit recovery node with a diagnostic (previously a diagnostic-silent opaque
 /// `Other(preview)` capture).
-fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement> {
+///
+/// The owning scope supplies its own starters, description and diagnostic code, because both
+/// scopes that dispatch a `ReturnParameterMember` -- the calculation body and the constraint
+/// body it shares `CalculationBody` with -- must report the failure as their own member.
+fn other_return_recovery<'a>(
+    input: Input<'a>,
+    starters: &[&[u8]],
+    scope: &str,
+    code: &'static str,
+) -> IResult<Input<'a>, Node<ParseErrorNode>> {
     let start_unknown = input;
     let (next, _) = skip_statement_or_block(input)?;
     if next.location_offset() == start_unknown.location_offset() {
@@ -1679,15 +1719,8 @@ fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement>
             nom::error::ErrorKind::Many0,
         )));
     }
-    let recovery = build_recovery_error_node_from_span(
-        start_unknown,
-        next,
-        CALC_DEF_BODY_STARTERS,
-        "calc body",
-        "recovered_calc_body_element",
-    );
-    let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
-    Ok((next, CalcDefBodyElement::Error(node)))
+    let recovery = build_recovery_error_node_from_span(start_unknown, next, starters, scope, code);
+    Ok((next, node_from_to(start_unknown, next, recovery)))
 }
 
 pub(crate) fn return_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnDecl>> {

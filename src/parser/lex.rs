@@ -319,6 +319,9 @@ pub(crate) const CONSTRAINT_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"out",
     b"inout",
     b"constraint",
+    // `CalculationBodyItem = ActionBodyItem | ReturnParameterMember` (SysML BNF 1366, 1370), and
+    // a constraint body is a `CalculationBody`, so `return` starts a member here too.
+    b"return",
     b":>>",
     b":>",
     // `CalculationBody` reaches `StructureUsageMember -> PartUsage`, so `part` and the rest of

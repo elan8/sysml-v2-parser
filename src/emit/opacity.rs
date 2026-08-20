@@ -306,6 +306,11 @@ fn walk_constraint_def_body(report: &mut OpacityReport, path: &str, body: &Const
             ConstraintDefBodyElement::PartUsage(pu) => {
                 walk_part_usage_body(report, &p, &pu.value.body)
             }
+            // A `ReturnParameterMember`'s own body is a `CalculationBody`, the same node the
+            // calculation scope walks for its `ReturnDecl`.
+            ConstraintDefBodyElement::ReturnDecl(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
+            }
             ConstraintDefBodyElement::Expression(_) => {}
         }
     }
@@ -1364,6 +1369,9 @@ fn walk_constraint_body_elements(
             }
             ConstraintDefBodyElement::PartUsage(pu) => {
                 walk_part_usage_body(report, &p, &pu.value.body)
+            }
+            ConstraintDefBodyElement::ReturnDecl(n) => {
+                walk_calc_def_body(report, &p, &n.value.body)
             }
             ConstraintDefBodyElement::Expression(_) => {}
         }

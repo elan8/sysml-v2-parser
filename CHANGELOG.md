@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A constraint body owns the `return` member its `CalculationBody` grants it.** Fixtures:
+  `tests/snapshots/sysml/constraint_body_return_member.md`,
+  `tests/snapshots/sysml/constraint_body_return_member_recovery.md`. **AST version 186.**
+
+  `ConstraintDefinition = OccurrenceDefinitionPrefix 'constraint' 'def' DefinitionDeclaration
+  CalculationBody` and `ConstraintUsage = OccurrenceUsagePrefix 'constraint'
+  ConstraintUsageDeclaration CalculationBody` (SysML BNF 1378, 1382), and `CalculationBodyItem =
+  ActionBodyItem | ReturnParameterMember` (SysML BNF 1359, 1366, 1370). A constraint body is a
+  calculation body, so a `ReturnParameterMember` is a member of it. `ConstraintDefBodyElement` had
+  no variant for one.
+
+  The member therefore fell through to the scope's terminal expression arm, which read `return` as
+  a name. `return totalMass <= massLimit;` was silently shredded into two invented members --
+  `'return';` and `totalMass <= massLimit;` -- and formatted back out that way. The library's own
+  spelling could not even do that: `return result = allTrue(assumptions()) implies
+  allTrue(constraints()) { doc /* ... */ }` (`sysml.library/Systems Library/Requirements.sysml:41`)
+  left the `=` unaccounted for after the invented pair and reported
+  `recovered_constraint_body_element` across the rest of the member, which was the last diagnostic
+  standing between the Systems Library and a clean L2 scorecard.
+
+  The constraint scope now dispatches the same three parsers the calculation scope does, in the
+  same order and behind the same named-return guard: `return_decl`, then the return-expression
+  statement, then the shared return recovery -- which grew a scope parameter so a malformed
+  `return` inside a constraint body reports `recovered_constraint_body_element` rather than
+  claiming to be a calc body member. `return` also joins `CONSTRAINT_DEF_BODY_STARTERS`, so
+  recovery resynchronizes on it. `ConstraintDefBodyElement` and `CalcDefBodyElement` model the one
+  `CalculationBody` production and are still two enums; the new variant records that, and unifying
+  them stays follow-up work, because this scope's `Constraint`, `RequireConstraint` and
+  `FeatureDecl` variants raise a separate question the coverage gap does not.
+
 - **A keyword-less `/* ... */` member is dispatched before the member set of every scope, not only
   the scopes whose dispatch happened to reach `annotating_member`.** Fixtures:
   `tests/snapshots/spec42/bare_comment_member_dispatch.md`,

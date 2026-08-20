@@ -1959,6 +1959,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ConstraintDefBodyElement::RequireConstraint(_member) => {
                             self.write_marker(&mut first, "require-constraint")?;
                         }
+                        // Projected exactly as the calculation scope projects its own
+                        // `ReturnParameterMember`; the two scopes share the node.
+                        super::ConstraintDefBodyElement::ReturnDecl(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_return_declaration(&member.value)?;
+                        }
                     }
                 }
                 self.writer.write_char(')')

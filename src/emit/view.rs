@@ -120,6 +120,9 @@ pub(crate) fn emit_constraint_body_element(
         ConstraintDefBodyElement::PartUsage(p) => {
             super::structure::emit_part_usage(w, path, &p.value)
         }
+        // The same `ReturnParameterMember` emitter the calculation scope uses; both scopes end
+        // in the one `CalculationBody`.
+        ConstraintDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
         ConstraintDefBodyElement::AttributeUsage(a) => {
             // Keyword-less `:>> target = …` inside `require name { … }` (validation `10c`).
             if a.value.redefines.is_some()

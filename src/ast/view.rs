@@ -105,6 +105,23 @@ pub enum ConstraintDefBodyElement {
     /// the terminal expression arm and was shredded into `'part';` and `p : T;` with no
     /// diagnostic -- input a round trip then wrote back out as two members.
     PartUsage(Box<Node<crate::ast::PartUsage>>),
+    /// `ReturnParameterMember`, the second alternative of `CalculationBodyItem = ActionBodyItem
+    /// | ReturnParameterMember` (SysML BNF 1366, 1370). `ConstraintDefinition` and
+    /// `ConstraintUsage` both end in `CalculationBody` (SysML BNF 1378, 1382, 1359), so a
+    /// constraint body owns a `return` member exactly as a calculation body does; the scope
+    /// modelled none, so `return result = allTrue(assumptions()) implies
+    /// allTrue(constraints()) { doc /* … */ }` (Systems Library `Requirements.sysml:41`) reached
+    /// the terminal expression arm, which read the keyword as a name, emitted `'return';` and
+    /// `result;` as two invented members, and then reported the remainder of the real member as
+    /// `recovered_constraint_body_element`.
+    ///
+    /// Deliberate duplication, recorded rather than hidden: this enum and
+    /// [`CalcDefBodyElement`] model the one `CalculationBody` production, and this variant is
+    /// the same node [`CalcDefBodyElement::ReturnDecl`] carries. They are not yet one enum
+    /// because this scope also carries `Constraint`, `RequireConstraint` and `FeatureDecl`,
+    /// whose membership in a calculation body is its own question. Unifying them is follow-up
+    /// work; this variant closes the member gap without deciding it.
+    ReturnDecl(Box<Node<ReturnDecl>>),
 }
 
 /// constraint body {}
