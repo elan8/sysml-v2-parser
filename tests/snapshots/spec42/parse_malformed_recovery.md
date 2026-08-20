@@ -28,6 +28,6 @@ package Foo {
 (parsed-document
   (references
   )
-  (root (package (name "Foo") (body brace (malformed (code "recovered_package_body_element") (found "+ bad stuff;") (span (offset 18) (line 2) (column 5) (len 17))) (part-def (name "Bar") (body semicolon)))))
+  (root (package (name "Foo") (body brace (malformed (code "recovered_package_body_element") (found "+ bad stuff;") (span (offset 18) (line 2) (column 5) (len 17))) (part-def (name "Bar") (modifiers) (body semicolon)))))
 )
 ~~~

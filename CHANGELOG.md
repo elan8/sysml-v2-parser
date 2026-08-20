@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`BasicDefinitionPrefix` reaches every definition kind whose production spells it, and the two
+  that spell something else are modelled as such.** Audit and evidence:
+  `planning/spec42-upstream-gap-audit.md`. **AST version 178 -> 179.**
+
+  A previous slice gave the six connection-like and part definitions the spanned
+  `Option<Node<DefinitionPrefix>>` slot but left `variation` refused everywhere else, because the
+  other definition nodes stored this slot as a bare `is_abstract` bool that could not hold the
+  second alternative. Seventeen nodes now carry the typed slot:
+
+  - **Nine converted from `is_abstract: bool`** -- `RequirementDef`, `CaseDef`, `AnalysisCaseDef`,
+    `VerificationCaseDef`, `UseCaseDef`, `ConstraintDef`, `ViewDef`, `RenderingDef`,
+    `OccurrenceDef` -- so `variation requirement def V;` and its siblings parse instead of falling
+    through to the unimplemented extended-library declaration.
+  - **Eight had no field at all and were silently discarding `abstract`** -- `AttributeDef`,
+    `ItemDef`, `StateDef`, `ActionDef`, `CalcDef`, `ViewpointDef`, `PortDef`, `IndividualDef`. The
+    pinned library itself was losing the keyword on a round trip: `abstract attribute def
+    ScalarMeasurementReference`, `abstract calc def Calculation`, `abstract attribute def
+    MeasurementUnit` and a dozen more re-emitted without it.
+
+  `DefinitionPrefixOptions`' two loosely-coupled booleans (`abstract_allowed`, `variation_allowed`)
+  become one `BasicPrefixSlot` enum naming what each production actually spells, so
+  "`variation` but not `abstract`" is unrepresentable, and the `slot_is_abstract` bridging helper
+  is deleted.
+
+  **Two productions genuinely differ, and are not forced into uniformity.**
+  `EnumerationDefinition` (SysML BNF 518; Pilot `SysML.xtext` 767) reaches neither
+  `DefinitionPrefix` nor `OccurrenceDefinitionPrefix`, so it spells no prefix at all.
+  `MetadataDefinition` (BNF 1652; Pilot 121) inlines `isAbstract ?= 'abstract'` with no `variation`
+  alternative, so its `is_abstract` bool is the accurate shape. Both refuse what they do not spell,
+  pinned by `tests/snapshots/sysml/definition_prefix_refusals.md`.
+
+  `IndividualDefinition` (BNF 551) reaches the slot directly and was refusing both keywords; it now
+  accepts them.
+
 - **`MultiplicityPart` admits one keyword per slot, and the excess reaches recovery instead of
   being swallowed.** Audit and evidence: `planning/spec42-upstream-gap-audit.md`.
 

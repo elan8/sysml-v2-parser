@@ -121,6 +121,7 @@ pub(crate) fn emit_attribute_def(
     def: &AttributeDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("attribute def ");
     if let Some(short) = &def.short_name {
         w.push_char('<');
@@ -605,6 +606,7 @@ pub(crate) fn emit_port_def(
     def: &PortDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("port def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -1526,6 +1528,7 @@ pub(crate) fn emit_item_def(
     def: &crate::ast::ItemDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }
@@ -1543,6 +1546,7 @@ pub(crate) fn emit_individual_def(
     def: &crate::ast::IndividualDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("individual def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -1617,6 +1621,8 @@ pub(crate) fn emit_metadata_def(
     def: &crate::ast::MetadataDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    // `MetadataDefinition` inlines `( isAbstract ?= 'abstract' )?` and has no `variation`
+    // alternative (SysML BNF 1652), so this is the one definition kind with a genuine bool here.
     if def.is_abstract {
         w.push_str("abstract ");
     }

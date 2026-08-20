@@ -112,7 +112,7 @@ pub(crate) fn enum_def(input: Input<'_>) -> IResult<Input<'_>, Node<EnumDef>> {
         input,
         DefinitionPrefixOptions::new(b"enum")
             .def_required()
-            .no_abstract()
+            .no_basic_prefix()
             .with_captured_visibility(),
     )?;
     let (input, body) = enumeration_body(input)?;

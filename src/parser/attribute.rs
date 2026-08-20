@@ -769,7 +769,15 @@ pub(crate) fn attribute_def(
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    // `AttributeDefinition = DefinitionPrefix 'attribute' 'def' Definition` (SysML BNF 510; Pilot
+    // `SysML.xtext` 746), and `DefinitionPrefix` (BNF 225) reaches `BasicDefinitionPrefix` (BNF
+    // 219). This used to consume `abstract` and drop it on the floor, and refuse `variation`
+    // outright.
+    let (input, definition_prefix) =
+        crate::parser::definition_prefix::parse_basic_definition_prefix(
+            input,
+            crate::parser::definition_prefix::BasicPrefixSlot::Basic,
+        )?;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, has_def) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
@@ -839,6 +847,7 @@ pub(crate) fn attribute_def(
             start,
             input,
             AttributeDef {
+                definition_prefix,
                 name: name_str,
                 short_name,
                 typing,

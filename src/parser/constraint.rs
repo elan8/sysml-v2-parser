@@ -52,9 +52,7 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
             start,
             input,
             ConstraintDef {
-                is_abstract: crate::parser::definition_prefix::slot_is_abstract(
-                    prefix.basic_prefix.as_ref(),
-                ),
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -399,6 +397,7 @@ fn parse_calc_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Nod
             start,
             input,
             CalcDef {
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,

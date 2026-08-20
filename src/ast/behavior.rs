@@ -16,6 +16,11 @@ use crate::ast::QualifiedReferenceId;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ActionDefinition` (SysML BNF 894) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual action def FuelConsumption_1 :> FuelConsumption;` (GH-90.1, `Individuals
     /// Examples/AnalysisIndividualExample.sysml:77`).
     pub is_individual: bool,
@@ -850,6 +855,11 @@ pub struct AllocationUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StateDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `StateDefinition` (SysML BNF 1191) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual state def ...` (BNF `OccurrenceUsagePrefix`/definition-prefix `isIndividual`,
     /// GH-90.1), mirroring `ActionDef::is_individual`.
     pub is_individual: bool,

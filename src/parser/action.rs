@@ -859,6 +859,7 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
             start,
             input,
             ActionDef {
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,

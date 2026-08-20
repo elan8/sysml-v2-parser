@@ -3,8 +3,8 @@
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::{emit_identification, emit_import};
 use super::structure::{
-    self, emit_attribute_body, emit_direction, emit_multiplicity, emit_multiplicity_modifiers,
-    emit_subsetting_clause, emit_typing_clause,
+    self, emit_attribute_body, emit_definition_prefix, emit_direction, emit_multiplicity,
+    emit_multiplicity_modifiers, emit_subsetting_clause, emit_typing_clause,
 };
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
@@ -21,9 +21,7 @@ pub(crate) fn emit_requirement_def(
     def: &RequirementDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("requirement def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -501,9 +499,7 @@ pub(crate) fn emit_use_case_def(
     def: &UseCaseDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("use case def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -542,9 +538,7 @@ pub(crate) fn emit_analysis_case_def(
     def: &crate::ast::AnalysisCaseDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }
@@ -589,9 +583,7 @@ pub(crate) fn emit_verification_case_def(
     def: &crate::ast::VerificationCaseDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("verification def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -630,9 +622,7 @@ pub(crate) fn emit_case_def(
     def: &crate::ast::CaseDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("case def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {

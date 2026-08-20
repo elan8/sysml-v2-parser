@@ -34,6 +34,6 @@ package OccurrenceBodyMembers {
 (parsed-document
   (references
   )
-  (root (package (name "OccurrenceBodyMembers") (body brace (occurrence-def))))
+  (root (package (name "OccurrenceBodyMembers") (body brace (occurrence-def (modifiers)))))
 )
 ~~~

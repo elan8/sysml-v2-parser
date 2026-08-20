@@ -5,7 +5,7 @@ use super::common::{FilterMember, ImportTarget};
 use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::requirement::RequirementDefBody;
-use super::structure::MetadataKeywordUsage;
+use super::structure::{DefinitionPrefix, MetadataKeywordUsage};
 use crate::ast::core::{
     Expression, Multiplicity, Node, SubsettingRelationship, TypingRelationship,
 };
@@ -15,17 +15,11 @@ use crate::ast::QualifiedReferenceId;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConstraintDef {
-    /// `abstract` from `OccurrenceDefinitionPrefix -> BasicDefinitionPrefix` (SysML BNF 1378,
-    /// 541). The parser has always consumed it and had nowhere to put it, so `abstract
-    /// constraint def ConstraintCheck :> BooleanEvaluation` (Systems Library `Constraints.sysml`)
-    /// came back out of a round trip as a plain `constraint def`.
-    ///
-    /// A `bool` rather than the two-alternative `DefinitionPrefix` enum because the shared
-    /// `parse_definition_prefix` helper -- which every definition family in this crate routes
-    /// through -- recognizes only `abstract`; `variation` on a *definition* prefix is part of the
-    /// still-unbuilt `OccurrenceDefinitionPrefix` component, not of this slice. See
-    /// `planning/constraint-usage-prefix-matrix.md` §5.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ConstraintDefinition` (SysML BNF 1378) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ConstraintDefBody,
@@ -125,6 +119,11 @@ pub enum ConstraintBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CalcDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `CalculationDefinition` (SysML BNF 1351) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     /// Supertype(s) after `:>`, e.g. `Some(..)` for `calc def X :> Y { }`. Mirrors
     /// `PartDef::specializes`/`ActionDef::specializes`.
@@ -303,10 +302,11 @@ impl ReturnKindKeyword {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewDef {
     pub identification: Identification,
-    /// `abstract` keyword, e.g. `abstract view def View :> Part { ... }` (Systems Library
-    /// `Views.sysml`). The definition prefix parser has always produced it; this struct had
-    /// nowhere to put it, so emission dropped the keyword.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ViewDefinition` (SysML BNF 1580) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: ViewDefBody,
     pub membership: Membership,
@@ -388,6 +388,11 @@ pub enum RenderingUsageBodyElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ViewpointDef {
     pub identification: Identification,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ViewpointDefinition` (SysML BNF 1632) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RequirementDefBody,
     pub membership: Membership,
@@ -398,10 +403,11 @@ pub struct ViewpointDef {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RenderingDef {
     pub identification: Identification,
-    /// `abstract` keyword, e.g. `abstract view def View :> Part { ... }` (Systems Library
-    /// `Views.sysml`). The definition prefix parser has always produced it; this struct had
-    /// nowhere to put it, so emission dropped the keyword.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `RenderingDefinition` (SysML BNF 1642) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: RenderingDefBody,
     pub membership: Membership,

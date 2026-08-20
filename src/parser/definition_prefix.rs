@@ -77,21 +77,40 @@ pub enum DerivationRoleMode {
     Connection,
 }
 
+/// Which prefix slot a definition production actually spells, as the pinned grammar writes it.
+///
+/// Three of the pin's definition productions differ here, so this is a grammar fact rather than a
+/// caller preference, and modelling it as one enum keeps the impossible combination
+/// ("`variation` but not `abstract`") unrepresentable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BasicPrefixSlot {
+    /// The production spells no prefix at all, so both keywords are refused.
+    ///
+    /// `EnumerationDefinition = DefinitionExtensionKeyword* 'enum' 'def' DefinitionDeclaration
+    /// EnumerationBody` (SysML BNF 518; Pilot `SysML.xtext` 767) is the only definition in the pin
+    /// that reaches neither `DefinitionPrefix` nor `OccurrenceDefinitionPrefix`.
+    None,
+    /// The production inlines `isAbstract ?= 'abstract'` on its own, so `variation` is refused.
+    ///
+    /// `MetadataDefinition = ( isAbstract ?= 'abstract' )? DefinitionExtensionKeyword* 'metadata'
+    /// 'def' Definition` (SysML BNF 1652; Pilot `SysML.xtext` 121) writes the flag out rather than
+    /// referencing `BasicDefinitionPrefix`, so there is no second alternative to represent.
+    AbstractOnly,
+    /// The production reaches `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?=
+    /// 'variation'` (SysML BNF 219; Pilot `SysML.xtext` 490), through `DefinitionPrefix` (BNF 225),
+    /// `OccurrenceDefinitionPrefix` (BNF 541), `IndividualDefinition` (BNF 551) or
+    /// `ExtendedDefinition` (BNF 1696). Every other definition kind in the pin is in this group.
+    Basic,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct DefinitionPrefixOptions {
     pub keyword: &'static [u8],
     /// Second keyword after the first (`use` then `case`, etc.).
     pub second_keyword: Option<&'static [u8]>,
     pub def: DefKeywordMode,
-    pub abstract_allowed: bool,
-    /// When set, also accept `variation` in the same slot as `abstract` (BNF
-    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`).
-    ///
-    /// Opt-in per caller rather than defaulted on, because only the definition nodes that carry a
-    /// [`DefinitionPrefix`] field can *hold* the answer; a caller that still stores this slot as a
-    /// bare `is_abstract` bool would accept `variation` and then drop it, which is worse than
-    /// refusing it. Those callers are listed in `planning/spec42-upstream-gap-audit.md`.
-    pub variation_allowed: bool,
+    /// The prefix slot this definition's own production spells. See [`BasicPrefixSlot`].
+    pub basic_prefix_slot: BasicPrefixSlot,
     /// When set, accept an optional `individual` prefix after `abstract` (BNF
     /// `OccurrenceDefinitionPrefix`'s `(isIndividual ?= 'individual' ...)?`), captured into
     /// [`DefinitionPrefixResult::is_individual`]. Every definition kind whose BNF production
@@ -120,8 +139,7 @@ impl DefinitionPrefixOptions {
             keyword,
             second_keyword: None,
             def: DefKeywordMode::Optional,
-            abstract_allowed: true,
-            variation_allowed: false,
+            basic_prefix_slot: BasicPrefixSlot::Basic,
             individual_allowed: false,
             visibility: VisibilityPrefix::None,
             derivation_role: DerivationRoleMode::None,
@@ -140,15 +158,16 @@ impl DefinitionPrefixOptions {
         self
     }
 
-    /// Also accept `variation` in the `BasicDefinitionPrefix` slot. See
-    /// [`DefinitionPrefixOptions::variation_allowed`].
-    pub const fn variation_allowed(mut self) -> Self {
-        self.variation_allowed = true;
+    /// This production inlines `isAbstract ?= 'abstract'` instead of reaching
+    /// `BasicDefinitionPrefix`. See [`BasicPrefixSlot::AbstractOnly`].
+    pub const fn abstract_only_prefix(mut self) -> Self {
+        self.basic_prefix_slot = BasicPrefixSlot::AbstractOnly;
         self
     }
 
-    pub const fn no_abstract(mut self) -> Self {
-        self.abstract_allowed = false;
+    /// This production spells no prefix slot at all. See [`BasicPrefixSlot::None`].
+    pub const fn no_basic_prefix(mut self) -> Self {
+        self.basic_prefix_slot = BasicPrefixSlot::None;
         self
     }
 
@@ -210,8 +229,8 @@ pub struct DefinitionPrefixResult {
     /// `BasicDefinitionPrefix` -- one slot, two alternatives -- with the authored keyword's
     /// exact span. `None` is the ordinary "no prefix authored" state.
     ///
-    /// `variation` is only ever produced when the caller set
-    /// [`DefinitionPrefixOptions::variation_allowed`].
+    /// Which alternatives can appear here is [`DefinitionPrefixOptions::basic_prefix_slot`], i.e.
+    /// what this definition's own production spells, not what its node happens to be able to hold.
     pub basic_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual` prefix, captured only when
     /// [`DefinitionPrefixOptions::individual_allowed`] was set; `false` otherwise.
@@ -233,14 +252,20 @@ pub struct DefinitionPrefixResult {
 /// represent `abstract variation`, which the grammar forbids.
 pub(crate) fn parse_basic_definition_prefix(
     input: Input<'_>,
-    variation_allowed: bool,
+    slot: BasicPrefixSlot,
 ) -> IResult<Input<'_>, Option<Node<DefinitionPrefix>>> {
     const ALTERNATIVES: [(&[u8], DefinitionPrefix); 2] = [
         (b"abstract", DefinitionPrefix::Abstract),
         (b"variation", DefinitionPrefix::Variation),
     ];
     for (keyword, value) in ALTERNATIVES {
-        if value == DefinitionPrefix::Variation && !variation_allowed {
+        let spelled = match (slot, value) {
+            (BasicPrefixSlot::None, _) => false,
+            (BasicPrefixSlot::AbstractOnly, DefinitionPrefix::Variation) => false,
+            (BasicPrefixSlot::AbstractOnly, DefinitionPrefix::Abstract)
+            | (BasicPrefixSlot::Basic, _) => true,
+        };
+        if !spelled {
             continue;
         }
         if let Ok((rest, (span, _))) =
@@ -252,19 +277,6 @@ pub(crate) fn parse_basic_definition_prefix(
         }
     }
     Ok((input, None))
-}
-
-/// Whether an authored `BasicDefinitionPrefix` slot spells `abstract`.
-///
-/// A derived reading of [`DefinitionPrefixResult::basic_prefix`], for the definition nodes that
-/// still store this slot as a bare bool; it is not a second stored representation. Takes the slot
-/// rather than the whole result so a caller can read it after moving the result's other fields
-/// into the node it is building.
-pub(crate) fn slot_is_abstract(slot: Option<&Node<DefinitionPrefix>>) -> bool {
-    matches!(
-        slot.map(|prefix| prefix.value),
-        Some(DefinitionPrefix::Abstract)
-    )
 }
 
 /// Parse from start of input through identification and optional subclassification header.
@@ -299,11 +311,7 @@ pub(crate) fn parse_definition_prefix(
         }
     };
 
-    let (input, basic_prefix) = if options.abstract_allowed {
-        parse_basic_definition_prefix(input, options.variation_allowed)?
-    } else {
-        (input, None)
-    };
+    let (input, basic_prefix) = parse_basic_definition_prefix(input, options.basic_prefix_slot)?;
     let is_abstract = matches!(
         basic_prefix.as_ref().map(|prefix| prefix.value),
         Some(DefinitionPrefix::Abstract)
@@ -402,7 +410,10 @@ mod tests {
         let input = span_input("abstract item def Foo :> Base { }");
         let (rest, prefix) =
             parse_definition_prefix(input, DefinitionPrefixOptions::new(b"item")).expect("prefix");
-        assert!(slot_is_abstract(prefix.basic_prefix.as_ref()));
+        assert_eq!(
+            prefix.basic_prefix.as_ref().map(|node| node.value),
+            Some(DefinitionPrefix::Abstract)
+        );
         assert_eq!(prefix.identification.name.as_deref(), Some("Foo"));
         assert_eq!(
             prefix
@@ -417,11 +428,9 @@ mod tests {
     #[test]
     fn prefix_parses_typed_library_header() {
         let input = span_input("connection connections : Connection[0..*] :> linkObjects, parts {");
-        let (rest, prefix) = parse_definition_prefix(
-            input,
-            DefinitionPrefixOptions::new(b"connection").no_abstract(),
-        )
-        .expect("prefix");
+        let (rest, prefix) =
+            parse_definition_prefix(input, DefinitionPrefixOptions::new(b"connection"))
+                .expect("prefix");
         assert_eq!(prefix.identification.name.as_deref(), Some("connections"));
         assert_eq!(
             prefix
@@ -454,7 +463,10 @@ mod tests {
                 len: 11,
             })
         );
-        assert!(slot_is_abstract(prefix.basic_prefix.as_ref()));
+        assert_eq!(
+            prefix.basic_prefix.as_ref().map(|node| node.value),
+            Some(DefinitionPrefix::Abstract)
+        );
         assert_eq!(
             prefix
                 .specializes
@@ -475,7 +487,10 @@ mod tests {
                 .def_required(),
         )
         .expect("prefix");
-        assert!(slot_is_abstract(prefix.basic_prefix.as_ref()));
+        assert_eq!(
+            prefix.basic_prefix.as_ref().map(|node| node.value),
+            Some(DefinitionPrefix::Abstract)
+        );
         assert_eq!(prefix.identification.name.as_deref(), Some("X"));
         assert_eq!(prefix.visibility, Some(crate::ast::Visibility::Private));
     }
@@ -485,12 +500,10 @@ mod tests {
         let input = span_input("individual def X :> Y;");
         let (_, prefix) = parse_definition_prefix(
             input,
-            DefinitionPrefixOptions::new(b"individual")
-                .def_required()
-                .no_abstract(),
+            DefinitionPrefixOptions::new(b"individual").def_required(),
         )
         .expect("prefix");
-        assert!(!slot_is_abstract(prefix.basic_prefix.as_ref()));
+        assert_eq!(prefix.basic_prefix.as_ref().map(|node| node.value), None);
         assert_eq!(
             prefix
                 .specializes

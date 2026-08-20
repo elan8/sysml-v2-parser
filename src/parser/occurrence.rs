@@ -25,9 +25,7 @@ pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
             start,
             input,
             OccurrenceDef {
-                is_abstract: crate::parser::definition_prefix::slot_is_abstract(
-                    prefix.basic_prefix.as_ref(),
-                ),
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,

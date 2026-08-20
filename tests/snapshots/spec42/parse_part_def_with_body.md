@@ -27,6 +27,6 @@ part def Vehicle {
 (parsed-document
   (references
   )
-  (root (part-def (name "Vehicle") (body brace (part-def (name "Engine") (body semicolon)) (part-def (name "Wheel") (body semicolon)))))
+  (root (part-def (name "Vehicle") (modifiers) (body brace (part-def (name "Engine") (modifiers) (body semicolon)) (part-def (name "Wheel") (modifiers) (body semicolon)))))
 )
 ~~~

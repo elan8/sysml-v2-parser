@@ -377,6 +377,7 @@ pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
             start,
             input,
             PortDef {
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,

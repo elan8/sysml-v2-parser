@@ -38,6 +38,6 @@ package CalculationBodyActionMembers {
   (references
     (reference r0 (scope relative) (span (offset 97) (line 4) (column 15) (len 5)) (segments (segment 0 (token "start") (name "start") (separator none) (span (offset 97) (line 4) (column 15) (len 5)))))
   )
-  (root (package (name "CalculationBodyActionMembers") (body brace (calc-def (name "Pipeline") (body brace (in-out-declaration) (first (source (expression (span (offset 97) (line 4) (column 15) (len 5)) (ref r0))) (target none) (body semicolon)) (merge) (decision) (join) (fork) (action-usage (declaration "step") (type none)) (if) (assign) (return-declaration (name "result") (short-name none)))))))
+  (root (package (name "CalculationBodyActionMembers") (body brace (calc-def (name "Pipeline") (modifiers) (body brace (in-out-declaration) (first (source (expression (span (offset 97) (line 4) (column 15) (len 5)) (ref r0))) (target none) (body semicolon)) (merge) (decision) (join) (fork) (action-usage (declaration "step") (type none)) (if) (assign) (return-declaration (name "result") (short-name none)))))))
 )
 ~~~

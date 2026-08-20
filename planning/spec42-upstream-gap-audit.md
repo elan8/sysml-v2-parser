@@ -242,6 +242,39 @@ references and no declared name at all.
 `:>>` shorthand members in one metadata definition so the absence of a declared name and the
 distinctness of the reference identities are both visible.
 
+## Gap 58 -- authored `abstract` on connection-like definitions
+
+**Claim.** `ConnectionDef`, `FlowDef`, `AllocationDef` and `InterfaceDef` carry no abstractness
+field, so `abstract connection def C { ... }` lowers with no modifier fact at all.
+
+**Evidence.** Partly closed at the audited revision and partly not. All four nodes did carry
+`definition_prefix: Option<DefinitionPrefix>`, so `abstract` reached the AST -- but spanless, so a
+consumer could tell `abstract` from omitted and still not point at the keyword. And `variation`,
+the *other* alternative of the same slot, was refused outright: `BasicDefinitionPrefix = isAbstract
+?= 'abstract' | isVariation ?= 'variation'` (SysML BNF 219; Pilot `SysML.xtext` 490) is reached by
+all four through `OccurrenceDefinitionPrefix` (BNF 541), yet `variation connection def V;` fell
+through to the unimplemented extended-library declaration.
+
+**Disposition. Fixed.** The six nodes that carried the slot -- the four connection-like ones plus
+`PartDef` and `ExtendedDefinition` -- now hold `Option<Node<DefinitionPrefix>>`, and the semantic
+projection shows the authored span beside the spelling, so omitted, `abstract` and `variation` are
+all distinguishable. `part_def` and `extended_definition_inner` each carried their own copy of the
+alternation; both call the shared parser that captures the span. Pinned by
+`tests/snapshots/sysml/connection_like_definition_prefixes.md`.
+
+A follow-up slice completed the conversion across every definition kind whose production reaches
+`BasicDefinitionPrefix` -- seventeen nodes, nine converted from `is_abstract: bool` and eight that
+had no field at all and were silently discarding `abstract` (the pinned library was losing it on
+`abstract attribute def ScalarMeasurementReference` and a dozen siblings). `DefinitionPrefixOptions`'
+two loosely-coupled booleans became one `BasicPrefixSlot` enum naming what each production spells.
+
+Two productions genuinely differ and were not forced into uniformity: `EnumerationDefinition`
+(BNF 518; Pilot 767) reaches neither `DefinitionPrefix` nor `OccurrenceDefinitionPrefix` and spells
+no prefix at all, and `MetadataDefinition` (BNF 1652; Pilot 121) inlines `isAbstract ?= 'abstract'`
+with no `variation` alternative, so its bool is the accurate shape. Both refuse what they do not
+spell. Pinned by `tests/snapshots/sysml/definition_prefix_alternatives.md` and
+`definition_prefix_refusals.md`.
+
 ## Gap 59 -- direction combined with an end feature
 
 **Claim.** No spelling authors an end feature that also carries a direction, so KerML 8.3.3.3.1's
@@ -299,11 +332,6 @@ Found during the audit, out of scope for these commits, recorded so it is not re
   corpus evidence for what tolerated it.
 - The `(typed-parameter)` and `(kerml-feature)` semantic projections emit far fewer fields than
   their nodes carry, so several invariants are only observable through `FORMAT`.
-- `variation` is still refused on the definition kinds that store `BasicDefinitionPrefix` as a bare
-  `is_abstract` bool -- `RequirementDef`, `CaseDef`, `AnalysisCaseDef`, `VerificationCaseDef`,
-  `UseCaseDef`, `ConstraintDef`, `ViewDef`, `RenderingDef`, `MetadataDef`, `OccurrenceDef` -- and on
-  `attribute def`, `item def`, `enum def` and `state def`, all of which the pin allows it on. Each
-  needs the same one-slot conversion the six connection-like and part definitions received.
 - `attribute x : Real;` at namespace level reaches `AttributeDef` and re-emits as
   `attribute def x : Real;`, inventing a `def` keyword no production spells. `AttributeUsage`
   exists and is reached by other spellings, so this is a dispatch-order question, not a missing

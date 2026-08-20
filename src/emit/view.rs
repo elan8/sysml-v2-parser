@@ -4,7 +4,8 @@ use super::behavior::emit_inout_decl;
 use super::expr::{emit_expression, emit_feature_value};
 use super::root::emit_identification;
 use super::structure::{
-    emit_multiplicity, emit_multiplicity_modifiers, emit_subsetting_clause, emit_typing_clause,
+    emit_definition_prefix, emit_multiplicity, emit_multiplicity_modifiers, emit_subsetting_clause,
+    emit_typing_clause,
 };
 use super::writer::{emit_visibility, format_name, EmitWriter};
 use super::EmitError;
@@ -19,9 +20,7 @@ pub(crate) fn emit_constraint_def(
     def: &ConstraintDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("constraint def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -145,6 +144,7 @@ pub(crate) fn emit_calc_def(
     def: &CalcDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("calc def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -613,9 +613,7 @@ pub(crate) fn emit_view_def(
     def: &crate::ast::ViewDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("view def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -828,6 +826,7 @@ pub(crate) fn emit_viewpoint_def(
     def: &crate::ast::ViewpointDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("viewpoint def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {
@@ -863,9 +862,7 @@ pub(crate) fn emit_rendering_def(
     def: &crate::ast::RenderingDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     w.push_str("rendering def ");
     emit_identification(w, &def.identification);
     if let Some(spec) = &def.specializes {

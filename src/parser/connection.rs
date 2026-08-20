@@ -193,7 +193,6 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
     parse_connection_def(
         input,
         DefinitionPrefixOptions::new(b"connection")
-            .variation_allowed()
             .with_derivation_role()
             .individual_allowed()
             .with_captured_visibility()
@@ -218,7 +217,6 @@ pub(crate) fn connection_def_required(input: Input<'_>) -> IResult<Input<'_>, No
     parse_connection_def(
         input,
         DefinitionPrefixOptions::new(b"connection")
-            .variation_allowed()
             .def_required()
             .individual_allowed()
             .with_captured_visibility()

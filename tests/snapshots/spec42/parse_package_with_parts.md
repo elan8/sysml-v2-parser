@@ -27,6 +27,6 @@ package Vehicles {
 (parsed-document
   (references
   )
-  (root (package (name "Vehicles") (body brace (part-def (name "Car") (body semicolon)) (part-def (name "Truck") (body semicolon)))))
+  (root (package (name "Vehicles") (body brace (part-def (name "Car") (modifiers) (body semicolon)) (part-def (name "Truck") (modifiers) (body semicolon)))))
 )
 ~~~

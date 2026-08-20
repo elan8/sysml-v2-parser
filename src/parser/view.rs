@@ -240,9 +240,7 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
             input,
             ViewDef {
                 identification: prefix.identification,
-                is_abstract: crate::parser::definition_prefix::slot_is_abstract(
-                    prefix.basic_prefix.as_ref(),
-                ),
+                definition_prefix: prefix.basic_prefix,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),
@@ -266,6 +264,7 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
             start,
             input,
             ViewpointDef {
+                definition_prefix: prefix.basic_prefix,
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 body,
@@ -364,9 +363,7 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
             input,
             RenderingDef {
                 identification: prefix.identification,
-                is_abstract: crate::parser::definition_prefix::slot_is_abstract(
-                    prefix.basic_prefix.as_ref(),
-                ),
+                definition_prefix: prefix.basic_prefix,
                 specializes: prefix.specializes,
                 body,
                 membership: Membership::owning(prefix.visibility, prefix.visibility_span),

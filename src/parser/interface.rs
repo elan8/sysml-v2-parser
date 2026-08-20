@@ -159,7 +159,6 @@ fn parse_interface_def(
 ) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
     let mut options = DefinitionPrefixOptions::new(b"interface")
-        .variation_allowed()
         .individual_allowed()
         .with_captured_visibility()
         .reject_header_keyword(b"connect");

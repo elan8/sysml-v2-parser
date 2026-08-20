@@ -243,7 +243,10 @@ fn extended_definition_inner(input: Input<'_>) -> IResult<Input<'_>, Node<Extend
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, definition_prefix) =
-        crate::parser::definition_prefix::parse_basic_definition_prefix(input, true)?;
+        crate::parser::definition_prefix::parse_basic_definition_prefix(
+            input,
+            crate::parser::definition_prefix::BasicPrefixSlot::Basic,
+        )?;
     let (input, prefix_keywords) =
         many1(preceded(ws_and_comments, extended_definition_prefix_tag)).parse(input)?;
     // `def` is optional: the bare extended-usage shorthand `#clouddd ArrowheadCore { ... }`

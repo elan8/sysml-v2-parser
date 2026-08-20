@@ -23,7 +23,6 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
     let (input, prefix) = parse_definition_prefix(
         input,
         DefinitionPrefixOptions::new(b"allocation")
-            .variation_allowed()
             .def_required()
             .individual_allowed()
             .with_captured_visibility(),

@@ -283,6 +283,11 @@ pub struct ExhibitState {
 #[derive(Debug, Clone, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttributeDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `AttributeDefinition` (SysML BNF 510) reaches it through
+    /// `DefinitionPrefix` (SysML BNF 225).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub name: String,
     /// Short name from `< ... >` when present (e.g. unit symbol `m`, `EUR`).
     pub short_name: Option<String>,
@@ -406,6 +411,11 @@ pub enum AttributeBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ItemDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `ItemDefinition` (SysML BNF 611) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual item def John :> Person { ... }` (GH-90.1, `Individuals Examples/
     /// JohnIndividualExample.sysml:19`).
     pub is_individual: bool,
@@ -423,6 +433,11 @@ pub struct ItemDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IndividualDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `IndividualDefinition` (SysML BNF 551;
+    /// Pilot `SysML.xtext` 817) spells it directly, ahead of the mandatory `individual`.
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
     pub body: AttributeBody,
@@ -1042,6 +1057,11 @@ pub enum FeatureBodyElement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortDef {
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `PortDefinition` (SysML BNF 628) reaches it through
+    /// `DefinitionPrefix` (SysML BNF 225).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("ClutchPort") for `port def ManualClutchPort :> ClutchPort`.
     pub specializes: Option<Node<TypingRelationship>>,
@@ -1659,7 +1679,11 @@ pub struct EnumeratedValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OccurrenceDef {
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `OccurrenceDefinition` (SysML BNF 548) reaches it through
+    /// `OccurrenceDefinitionPrefix` (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual occurrence def IO2 { ... }` (GH-90.1, `Simple Tests/IndividualTest.sysml:3`).
     pub is_individual: bool,
     pub identification: Identification,

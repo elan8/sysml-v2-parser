@@ -1550,8 +1550,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_requirement_definition(&definition.value)?;
                         }
-                        PartDefBodyElement::OccurrenceDef(_definition) => {
-                            self.write_marker(&mut first, "occurrence-def")?;
+                        PartDefBodyElement::OccurrenceDef(definition) => {
+                            self.write_definition_prefix_marker(
+                                &mut first,
+                                "occurrence-def",
+                                definition.value.definition_prefix.as_ref(),
+                            )?;
                         }
                         PartDefBodyElement::ConnectionDef(definition) => {
                             self.write_item_prefix(&mut first)?;
@@ -1581,20 +1585,32 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_view_usage(&usage.value)?;
                         }
-                        PartDefBodyElement::ViewpointDef(_definition) => {
-                            self.write_marker(&mut first, "viewpoint-def")?;
+                        PartDefBodyElement::ViewpointDef(definition) => {
+                            self.write_definition_prefix_marker(
+                                &mut first,
+                                "viewpoint-def",
+                                definition.value.definition_prefix.as_ref(),
+                            )?;
                         }
                         PartDefBodyElement::ViewpointUsage(_usage) => {
                             self.write_marker(&mut first, "viewpoint-usage")?;
                         }
-                        PartDefBodyElement::RenderingDef(_definition) => {
-                            self.write_marker(&mut first, "rendering-def")?;
+                        PartDefBodyElement::RenderingDef(definition) => {
+                            self.write_definition_prefix_marker(
+                                &mut first,
+                                "rendering-def",
+                                definition.value.definition_prefix.as_ref(),
+                            )?;
                         }
                         PartDefBodyElement::RenderingUsage(_usage) => {
                             self.write_marker(&mut first, "rendering-usage")?;
                         }
-                        PartDefBodyElement::CaseDef(_definition) => {
-                            self.write_marker(&mut first, "case-def")?;
+                        PartDefBodyElement::CaseDef(definition) => {
+                            self.write_definition_prefix_marker(
+                                &mut first,
+                                "case-def",
+                                definition.value.definition_prefix.as_ref(),
+                            )?;
                         }
                         PartDefBodyElement::CaseUsage(_usage) => {
                             self.write_marker(&mut first, "case-usage")?;
@@ -1606,8 +1622,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         PartDefBodyElement::UseCaseUsage(_usage) => {
                             self.write_marker(&mut first, "use-case-usage")?;
                         }
-                        PartDefBodyElement::AnalysisCaseDef(_definition) => {
-                            self.write_marker(&mut first, "analysis-case-def")?;
+                        PartDefBodyElement::AnalysisCaseDef(definition) => {
+                            self.write_definition_prefix_marker(
+                                &mut first,
+                                "analysis-case-def",
+                                definition.value.definition_prefix.as_ref(),
+                            )?;
                         }
                         PartDefBodyElement::AnalysisCaseUsage(_usage) => {
                             self.write_marker(&mut first, "analysis-case-usage")?;
@@ -1753,6 +1773,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_action_definition(&mut self, definition: &super::ActionDef) -> io::Result<()> {
         self.writer.write_str("(action-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         self.writer.write_str(") (specializes ")?;
         if let Some(specializes) = &definition.specializes {
             self.write_typing(&specializes.value)?;
@@ -1811,6 +1832,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_calc_definition(&mut self, definition: &super::CalcDef) -> io::Result<()> {
         self.writer.write_str("(calc-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         self.writer.write_str(") ")?;
         self.write_calc_def_body(&definition.body)?;
         self.writer.write_char(')')
@@ -1908,6 +1930,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_constraint_definition(&mut self, definition: &super::ConstraintDef) -> io::Result<()> {
         self.writer.write_str("(constraint-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         self.writer.write_str(") (specializes ")?;
         match &definition.specializes {
             Some(typing) => self.write_typing(&typing.value)?,
@@ -2285,15 +2308,15 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
-    fn write_occurrence_definition_modifiers(
+    /// The contents of a `(modifiers ...)` group for `BasicDefinitionPrefix` (SysML BNF 219).
+    ///
+    /// The authored span travels with the keyword: the whole point of the slot is that a consumer
+    /// can tell `abstract` from `variation` from neither, *and* point at it.
+    fn write_basic_definition_prefix_items(
         &mut self,
         prefix: Option<&Node<super::DefinitionPrefix>>,
-        is_individual: bool,
     ) -> io::Result<()> {
-        self.writer.write_str(") (modifiers")?;
         if let Some(prefix) = prefix {
-            // The authored span travels with the keyword: the whole point of the slot is that a
-            // consumer can tell `abstract` from `variation` from neither, *and* point at it.
             self.writer.write_str(" (")?;
             self.writer.write_str(match prefix.value {
                 super::DefinitionPrefix::Abstract => "abstract",
@@ -2303,10 +2326,45 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             write_span(self.writer, &prefix.span)?;
             self.writer.write_char(')')?;
         }
+        Ok(())
+    }
+
+    /// Closes the preceding field and opens the `(modifiers ...)` group for a definition whose
+    /// production reaches `BasicDefinitionPrefix` but not `OccurrenceDefinitionPrefix`'s
+    /// `individual`. The caller closes the group.
+    fn write_definition_modifiers(
+        &mut self,
+        prefix: Option<&Node<super::DefinitionPrefix>>,
+    ) -> io::Result<()> {
+        self.writer.write_str(") (modifiers")?;
+        self.write_basic_definition_prefix_items(prefix)
+    }
+
+    fn write_occurrence_definition_modifiers(
+        &mut self,
+        prefix: Option<&Node<super::DefinitionPrefix>>,
+        is_individual: bool,
+    ) -> io::Result<()> {
+        self.write_definition_modifiers(prefix)?;
         if is_individual {
             self.writer.write_str(" individual")?;
         }
         Ok(())
+    }
+
+    /// A definition kind whose projection is still a bare kind marker (its declaration and body
+    /// are not projected yet), with its `BasicDefinitionPrefix` slot shown so that `abstract`,
+    /// `variation` and neither are three distinguishable states rather than one marker.
+    fn write_definition_prefix_marker(
+        &mut self,
+        first: &mut bool,
+        kind: &str,
+        prefix: Option<&Node<super::DefinitionPrefix>>,
+    ) -> io::Result<()> {
+        self.write_item_prefix(first)?;
+        write!(self.writer, "({kind} (modifiers")?;
+        self.write_basic_definition_prefix_items(prefix)?;
+        self.writer.write_str("))")
     }
 
     fn write_flow_definition(&mut self, definition: &super::FlowDef) -> io::Result<()> {
@@ -2839,8 +2897,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::PartUsageBodyElement::RequirementDef(_member) => {
                             self.write_marker(&mut first, "requirement-def")?;
                         }
-                        super::PartUsageBodyElement::OccurrenceDef(_member) => {
-                            self.write_marker(&mut first, "occurrence-def")?;
+                        super::PartUsageBodyElement::OccurrenceDef(member) => {
+                            self.write_definition_prefix_marker(
+                                &mut first,
+                                "occurrence-def",
+                                member.value.definition_prefix.as_ref(),
+                            )?;
                         }
                         super::PartUsageBodyElement::PortDef(member) => {
                             self.write_item_prefix(&mut first)?;
@@ -2889,8 +2951,12 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_usage(&usage.value)?;
                         }
-                        super::PartUsageBodyElement::AnalysisCaseDef(_member) => {
-                            self.write_marker(&mut first, "analysis-case-def")?;
+                        super::PartUsageBodyElement::AnalysisCaseDef(member) => {
+                            self.write_definition_prefix_marker(
+                                &mut first,
+                                "analysis-case-def",
+                                member.value.definition_prefix.as_ref(),
+                            )?;
                         }
                         super::PartUsageBodyElement::AnalysisCaseUsage(_member) => {
                             self.write_marker(&mut first, "analysis-case-usage")?;
@@ -2915,14 +2981,22 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_view_usage(&usage.value)?;
                         }
-                        super::PartUsageBodyElement::ViewpointDef(_definition) => {
-                            self.write_marker(&mut first, "viewpoint-def")?;
+                        super::PartUsageBodyElement::ViewpointDef(definition) => {
+                            self.write_definition_prefix_marker(
+                                &mut first,
+                                "viewpoint-def",
+                                definition.value.definition_prefix.as_ref(),
+                            )?;
                         }
                         super::PartUsageBodyElement::ViewpointUsage(_usage) => {
                             self.write_marker(&mut first, "viewpoint-usage")?;
                         }
-                        super::PartUsageBodyElement::RenderingDef(_definition) => {
-                            self.write_marker(&mut first, "rendering-def")?;
+                        super::PartUsageBodyElement::RenderingDef(definition) => {
+                            self.write_definition_prefix_marker(
+                                &mut first,
+                                "rendering-def",
+                                definition.value.definition_prefix.as_ref(),
+                            )?;
                         }
                         super::PartUsageBodyElement::RenderingUsage(_usage) => {
                             self.write_marker(&mut first, "rendering-usage")?;
@@ -3137,6 +3211,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_item_definition(&mut self, definition: &super::ItemDef) -> io::Result<()> {
         self.writer.write_str("(item-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         write!(
             self.writer,
             ") (individual {}) (specializes ",
@@ -3159,6 +3234,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.write_usage_declaration_name(&definition.name)?;
         self.writer.write_str(") (short-name ")?;
         write_optional_quoted(self.writer, definition.short_name.as_deref())?;
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         self.writer.write_str(") (typing ")?;
         match &definition.typing {
             Some(typing) => self.write_typing(&typing.value)?,
@@ -3713,6 +3789,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     ) -> io::Result<()> {
         self.writer.write_str("(requirement-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         self.writer.write_str(") ")?;
         self.write_requirement_body(&definition.body)?;
         self.writer.write_char(')')
@@ -3730,10 +3807,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
         self.writer.write_str(") (short-name ")?;
         write_optional_quoted(self.writer, definition.identification.short_name.as_deref())?;
-        self.writer.write_str(") (modifiers")?;
-        if definition.is_abstract {
-            self.writer.write_str(" abstract")?;
-        }
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         self.writer.write_str(") (specializes ")?;
         match &definition.specializes {
             Some(specializes) => self.write_typing(&specializes.value)?,
@@ -3810,6 +3884,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_use_case_definition(&mut self, definition: &super::UseCaseDef) -> io::Result<()> {
         self.writer.write_str("(use-case-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         self.writer.write_str(") ")?;
         self.write_use_case_body(&definition.body)?;
         self.writer.write_char(')')
@@ -3818,6 +3893,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_state_definition(&mut self, definition: &super::StateDef) -> io::Result<()> {
         self.writer.write_str("(state-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         self.writer.write_str(") ")?;
         self.write_state_body(&definition.body)?;
         self.writer.write_char(')')
@@ -3878,6 +3954,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_part_definition(&mut self, definition: &super::PartDef) -> io::Result<()> {
         self.writer.write_str("(part-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_occurrence_definition_modifiers(
+            definition.definition_prefix.as_ref(),
+            definition.is_individual,
+        )?;
         self.writer.write_str(") ")?;
         self.write_part_body(&definition.body)?;
         self.writer.write_char(')')
@@ -4107,6 +4187,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
     fn write_port_definition(&mut self, definition: &super::PortDef) -> io::Result<()> {
         self.writer.write_str("(port-def (name ")?;
         write_optional_quoted(self.writer, definition.identification.name.as_deref())?;
+        self.write_definition_modifiers(definition.definition_prefix.as_ref())?;
         self.writer.write_str(") (specializes ")?;
         if let Some(specializes) = &definition.specializes {
             self.write_typing(&specializes.value)?;
@@ -4302,9 +4383,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_item_definition(&definition.value)
             }
-            PackageBodyElement::IndividualDef(_definition) => {
-                self.write_marker(first, "individual-def")
-            }
+            PackageBodyElement::IndividualDef(definition) => self.write_definition_prefix_marker(
+                first,
+                "individual-def",
+                definition.value.definition_prefix.as_ref(),
+            ),
             PackageBodyElement::ConstraintDef(definition) => {
                 self.write_item_prefix(first)?;
                 self.write_constraint_definition(&definition.value)
@@ -4325,12 +4408,16 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_view_definition(&definition.value)
             }
-            PackageBodyElement::ViewpointDef(_definition) => {
-                self.write_marker(first, "viewpoint-def")
-            }
-            PackageBodyElement::RenderingDef(_definition) => {
-                self.write_marker(first, "rendering-def")
-            }
+            PackageBodyElement::ViewpointDef(definition) => self.write_definition_prefix_marker(
+                first,
+                "viewpoint-def",
+                definition.value.definition_prefix.as_ref(),
+            ),
+            PackageBodyElement::RenderingDef(definition) => self.write_definition_prefix_marker(
+                first,
+                "rendering-def",
+                definition.value.definition_prefix.as_ref(),
+            ),
             PackageBodyElement::ViewUsage(usage) => {
                 self.write_item_prefix(first)?;
                 self.write_view_usage(&usage.value)
@@ -4357,9 +4444,11 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_item_prefix(first)?;
                 self.write_enumeration_definition(&definition.value)
             }
-            PackageBodyElement::OccurrenceDef(_definition) => {
-                self.write_marker(first, "occurrence-def")
-            }
+            PackageBodyElement::OccurrenceDef(definition) => self.write_definition_prefix_marker(
+                first,
+                "occurrence-def",
+                definition.value.definition_prefix.as_ref(),
+            ),
             PackageBodyElement::OccurrenceUsage(occurrence) => {
                 self.write_item_prefix(first)?;
                 self.write_occurrence(&occurrence.value)
@@ -4381,11 +4470,17 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             PackageBodyElement::FlowUsage(_usage) => self.write_marker(first, "flow-usage"),
             PackageBodyElement::ConcernUsage(_usage) => self.write_marker(first, "concern-usage"),
-            PackageBodyElement::CaseDef(_definition) => self.write_marker(first, "case-def"),
+            PackageBodyElement::CaseDef(definition) => self.write_definition_prefix_marker(
+                first,
+                "case-def",
+                definition.value.definition_prefix.as_ref(),
+            ),
             PackageBodyElement::CaseUsage(_usage) => self.write_marker(first, "case-usage"),
-            PackageBodyElement::AnalysisCaseDef(_definition) => {
-                self.write_marker(first, "analysis-case-def")
-            }
+            PackageBodyElement::AnalysisCaseDef(definition) => self.write_definition_prefix_marker(
+                first,
+                "analysis-case-def",
+                definition.value.definition_prefix.as_ref(),
+            ),
             PackageBodyElement::AnalysisCaseUsage(_usage) => {
                 self.write_marker(first, "analysis-case-usage")
             }
@@ -4396,6 +4491,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                     self.writer,
                     definition.value.identification.name.as_deref(),
                 )?;
+                self.write_definition_modifiers(definition.value.definition_prefix.as_ref())?;
                 self.writer.write_str(") ")?;
                 self.write_use_case_body(&definition.value.body)?;
                 self.writer.write_char(')')

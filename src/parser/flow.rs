@@ -27,7 +27,6 @@ pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
     let (input, prefix) = parse_definition_prefix(
         input,
         DefinitionPrefixOptions::new(b"flow")
-            .variation_allowed()
             .def_required()
             .individual_allowed()
             .with_captured_visibility(),

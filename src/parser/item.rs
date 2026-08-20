@@ -32,6 +32,7 @@ pub(crate) fn item_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<Ite
             start,
             input,
             ItemDef {
+                definition_prefix: prefix.basic_prefix,
                 is_individual: prefix.is_individual,
                 identification: prefix.identification,
                 specializes: prefix.specializes,

@@ -5,7 +5,8 @@ use super::feature_value::FeatureValue;
 use super::membership::Membership;
 use super::structure::RelationshipBodyElement;
 use super::structure::{
-    AttributeBody, AttributeDef, AttributeUsage, MetadataKeywordUsage, VariantUsage,
+    AttributeBody, AttributeDef, AttributeUsage, DefinitionPrefix, MetadataKeywordUsage,
+    VariantUsage,
 };
 use super::view::{CalcUsage, ConstraintDefBody, ConstraintUsage};
 use crate::ast::core::{
@@ -20,8 +21,11 @@ pub struct RequirementDef {
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("UserRequirement") for `requirement def Need :> UserRequirement`.
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract requirement def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `RequirementDefinition` (SysML BNF 1400) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub body: RequirementDefBody,
     /// Ownership/visibility/kind wrapper (parser work item 4b, post-PAR-006), `kind` always
     /// [`crate::ast::MembershipKind::OwningMembership`]. Genuine new grammar coverage (not just
@@ -496,8 +500,11 @@ pub struct ConcernUsage {
 pub struct CaseDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract case def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `CaseDefinition` (SysML BNF 1499) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `case_def`.
     pub membership: Membership,
@@ -529,8 +536,11 @@ pub struct CaseUsage {
 pub struct AnalysisCaseDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract analysis def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `AnalysisCaseDefinition` (SysML BNF 1529) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     /// `individual analysis def FuelEconomyAnalysis_1 :> FuelEconomyAnalysis;` (GH-90.1,
     /// `Individuals Examples/AnalysisIndividualExample.sysml:76`).
     pub is_individual: bool,
@@ -565,8 +575,11 @@ pub struct AnalysisCaseUsage {
 pub struct VerificationCaseDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract verification def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `VerificationCaseDefinition` (SysML BNF 1539) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `verification_case_def`.
     pub membership: Membership,
@@ -631,8 +644,11 @@ pub struct ActorDecl {
 pub struct UseCaseDef {
     pub identification: Identification,
     pub specializes: Option<Node<TypingRelationship>>,
-    /// True for `abstract use case def ...`.
-    pub is_abstract: bool,
+    /// `BasicDefinitionPrefix = isAbstract ?= 'abstract' | isVariation ?= 'variation'`
+    /// (SysML BNF 219; Pilot `SysML.xtext` 490) -- one slot, two alternatives, carrying the
+    /// authored keyword's exact span. `UseCaseDefinition` (SysML BNF 1560) reaches it through `OccurrenceDefinitionPrefix`
+    /// (SysML BNF 541).
+    pub definition_prefix: Option<Node<DefinitionPrefix>>,
     pub body: UseCaseDefBody,
     /// See [`RequirementDef::membership`]; same gap class found again for `use_case_def`.
     pub membership: Membership,

@@ -93,6 +93,7 @@ pub(crate) fn emit_action_def(
     def: &ActionDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }
@@ -593,6 +594,7 @@ pub(crate) fn emit_state_def(
     def: &StateDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }
@@ -1312,9 +1314,7 @@ pub(crate) fn emit_occurrence_def(
     def: &crate::ast::OccurrenceDef,
 ) -> Result<(), EmitError> {
     emit_visibility(w, def.membership.visibility);
-    if def.is_abstract {
-        w.push_str("abstract ");
-    }
+    emit_definition_prefix(w, def.definition_prefix.as_ref());
     if def.is_individual {
         w.push_str("individual ");
     }

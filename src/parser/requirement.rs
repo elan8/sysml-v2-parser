@@ -104,9 +104,7 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
             RequirementDef {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
-                is_abstract: crate::parser::definition_prefix::slot_is_abstract(
-                    prefix.basic_prefix.as_ref(),
-                ),
+                definition_prefix: prefix.basic_prefix,
                 body,
                 membership: crate::ast::Membership::owning(
                     prefix.visibility,

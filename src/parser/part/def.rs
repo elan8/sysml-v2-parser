@@ -8,7 +8,10 @@ pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = crate::parser::lex::visibility_prefix(input)?;
     let (input, definition_prefix) =
-        crate::parser::definition_prefix::parse_basic_definition_prefix(input, true)?;
+        crate::parser::definition_prefix::parse_basic_definition_prefix(
+            input,
+            crate::parser::definition_prefix::BasicPrefixSlot::Basic,
+        )?;
     let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
