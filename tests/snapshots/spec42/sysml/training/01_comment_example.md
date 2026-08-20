@@ -50,7 +50,12 @@ package 'Comment Example' {
 	 * explicitly specified element. 
 	 */
     part def Automobile;
-    alias Car for Automobile {}
+    alias Car for Automobile {
+        /*
+		 * This is a comment annotating its owning
+		 * element.
+		 */
+    }
     alias Torque for ISQ::TorqueValue;
 }
 ~~~
@@ -62,6 +67,6 @@ package 'Comment Example' {
     (reference r1 (scope relative) (span (offset 344) (line 14) (column 16) (len 10)) (segments (segment 0 (token "Automobile") (name "Automobile") (separator none) (span (offset 344) (line 14) (column 16) (len 10)))))
     (reference r2 (scope relative) (span (offset 547) (line 23) (column 19) (len 16)) (segments (segment 0 (token "ISQ") (name "ISQ") (separator none) (span (offset 547) (line 23) (column 19) (len 3))) (segment 1 (token "TorqueValue") (name "TorqueValue") (separator colon-colon) (span (offset 552) (line 23) (column 24) (len 11)))))
   )
-  (root (package (name "Comment Example") (body brace (comment (keyword none) (name none) (about) (locale none) (body (span (offset 31) (line 2) (column 4) (len 102)) (normalized "This is a comment, which is a part of the model, \nannotating (by default) it's owning namespace. "))) (comment (keyword (span (offset 139) (line 5) (column 2) (len 7))) (name "Comment1") (about) (locale none) (body (span (offset 158) (line 5) (column 21) (len 26)) (normalized "This is a named comment. "))) (comment (keyword (span (offset 190) (line 7) (column 2) (len 7))) (name none) (about (ref r0)) (locale none) (body (span (offset 218) (line 8) (column 4) (len 81)) (normalized "This is an unnamed comment, annotating an \nexplicitly specified element. \n"))) (part-def (name "Automobile") (modifiers) (body semicolon)) (alias (name "Car") (target (ref r1)) (body brace (element-count 0))) (alias (name "Torque") (target (ref r2)) (body semicolon)))))
+  (root (package (name "Comment Example") (body brace (comment (keyword none) (name none) (about) (locale none) (body (span (offset 31) (line 2) (column 4) (len 102)) (normalized "This is a comment, which is a part of the model, \nannotating (by default) it's owning namespace. "))) (comment (keyword (span (offset 139) (line 5) (column 2) (len 7))) (name "Comment1") (about) (locale none) (body (span (offset 158) (line 5) (column 21) (len 26)) (normalized "This is a named comment. "))) (comment (keyword (span (offset 190) (line 7) (column 2) (len 7))) (name none) (about (ref r0)) (locale none) (body (span (offset 218) (line 8) (column 4) (len 81)) (normalized "This is an unnamed comment, annotating an \nexplicitly specified element. \n"))) (part-def (name "Automobile") (modifiers) (body semicolon)) (alias (name "Car") (target (ref r1)) (body brace (element-count 1))) (alias (name "Torque") (target (ref r2)) (body semicolon)))))
 )
 ~~~

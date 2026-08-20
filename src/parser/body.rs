@@ -66,7 +66,20 @@ pub(crate) fn relationship_body_annotations(
 /// for their annotation tail.
 fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
+    // Member boundary: `ws_and_notes` leaves a bare `/* ... */` for this scope's annotating
+    // member. This was `ws_and_comments`, which consumed it as trivia before either arm below
+    // could claim it, so an authored comment in an `import` or `dependency` body was dropped
+    // outright -- silently, since the surviving members still parse. Measured across the pinned
+    // release, that lost 18 block comments in 15 files, `sysml.library`'s own `Occurrences.kerml`
+    // and `Requirements.sysml` among them, none of which reports a diagnostic.
+    let (input, _) = crate::parser::lex::ws_and_notes(input)?;
+    // Ahead of the `kerml_feature` attempt, which skips trivia itself and would read the member
+    // written *after* the comment as its own; see `starts_bare_comment`.
+    if starts_bare_comment(input) {
+        let (next, member) = annotating_member(input)?;
+        let elem = RelationshipBodyElement::Annotating(member);
+        return Ok((next, node_from_to(input, next, elem)));
+    }
     if let Ok((input, elem)) = map(crate::parser::constraint::kerml_feature, |n| {
         RelationshipBodyElement::KermlFeature(Box::new(n))
     })

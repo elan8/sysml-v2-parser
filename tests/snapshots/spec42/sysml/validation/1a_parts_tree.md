@@ -165,7 +165,12 @@ package '1a-Parts Tree' {
         part def Wheel;
     }
     package Usages {
-        private import Definitions::* {}
+        private import Definitions::* {
+            /*
+			 * A "private" private import makes the imported names private to the
+			 * imported package.
+			 */
+        }
         part vehicle1 : Vehicle {
             /*
 			 * 'vehicle1' is a package-owned part of type Vehicle.
