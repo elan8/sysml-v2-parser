@@ -530,8 +530,7 @@ pub(crate) fn emit_kerml_binding_member(
     emit_kerml_connector_end(w, &format!("{path}/left"), &binding.left.value)?;
     w.push_str(" = ");
     emit_kerml_connector_end(w, &format!("{path}/right"), &binding.right.value)?;
-    w.push_char(';');
-    Ok(())
+    emit_calc_body(w, path, &binding.body)
 }
 
 pub(crate) fn emit_kerml_succession_member(

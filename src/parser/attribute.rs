@@ -520,7 +520,9 @@ fn feature_binding_body(
     let (mut input, _) = tag(&b"{"[..]).parse(input)?;
     let mut elements = Vec::new();
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        // `FeatureBodyElement::Annotating` owns the keyword-less `Comment` spelling. Keep a
+        // regular comment visible until that typed member dispatch has a chance to claim it.
+        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
         if input.fragment().starts_with(b"}") {
             let (input, _) = tag(&b"}"[..]).parse(input)?;

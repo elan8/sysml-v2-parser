@@ -380,7 +380,9 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        // `OccurrenceBodyElement` includes `AnnotatingElement`; retain a bare regular comment
+        // for that dispatcher rather than consuming it as lexical trivia at the body boundary.
+        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
         if input.fragment().is_empty() {
             return Err(nom::Err::Error(nom::error::Error::new(

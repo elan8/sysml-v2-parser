@@ -3673,6 +3673,82 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    /// A KerML `binding` member owns a `TypeBody`; project it rather than reducing the member to
+    /// a marker so nested annotating members remain observable.
+    fn write_bind(&mut self, bind: &super::KermlBindingMember) -> io::Result<()> {
+        self.writer.write_str("(binding (name ")?;
+        if bind.name.is_empty() {
+            self.writer.write_str("none")?;
+        } else {
+            write_quoted(self.writer, &bind.name)?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_calc_def_body(&bind.body)?;
+        self.writer.write_char(')')
+    }
+
+    /// `InterfaceUsage` is a member-bearing production in all three of its declaration forms.
+    /// Project the form and typed body so a regular comment cannot be invisible in a snapshot.
+    fn write_interface_usage(&mut self, usage: &super::InterfaceUsage) -> io::Result<()> {
+        self.writer.write_str("(interface-usage (form ")?;
+        let body = match usage {
+            super::InterfaceUsage::TypedConnect { body, .. } => {
+                self.writer.write_str("typed-connect")?;
+                body
+            }
+            super::InterfaceUsage::Connection { body, .. } => {
+                self.writer.write_str("connection")?;
+                body
+            }
+            super::InterfaceUsage::Declaration { body, .. } => {
+                self.writer.write_str("declaration")?;
+                body
+            }
+        };
+        self.writer.write_str(") ")?;
+        self.write_interface_usage_body(body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_interface_usage_body(
+        &mut self,
+        body: &super::Body<super::InterfaceUsageBodyElement>,
+    ) -> io::Result<()> {
+        match body {
+            super::Body::Semicolon { .. } => self.writer.write_str("(body semicolon)"),
+            super::Body::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::InterfaceUsageBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::InterfaceUsageBodyElement::RefRedef {
+                            target,
+                            value,
+                            body,
+                        } => {
+                            self.write_item_prefix(&mut first)?;
+                            self.writer.write_str("(ref-redef (target ")?;
+                            self.write_reference(*target)?;
+                            self.writer.write_str(") (value ")?;
+                            self.write_expression(value)?;
+                            self.writer.write_str(") ")?;
+                            self.write_ref_body(body)?;
+                            self.writer.write_char(')')?;
+                        }
+                        super::InterfaceUsageBodyElement::EndDecl(end) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_end(&end.value)?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
+    }
+
     fn write_perform(&mut self, perform: &super::Perform) -> io::Result<()> {
         self.writer.write_str("(perform (declaration ")?;
         write_quoted(self.writer, &perform.action_name)?;

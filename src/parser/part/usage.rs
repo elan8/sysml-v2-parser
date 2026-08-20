@@ -462,9 +462,14 @@ fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
     let open_start = input;
     let (input, _) = tag(&b"{"[..]).parse(open_start)?;
     let open_span = crate::parser::span::span_from_to(open_start, input);
+    // `PerformBodyElement` admits `AnnotatingElement`, whose shortest spelling is a bare regular
+    // comment. Skipping it here would make the inner dispatcher unreachable for that spelling.
     let (input, elements) = preceded(
-        ws_and_comments,
-        many0(preceded(ws_and_comments, perform_body_element)),
+        crate::parser::lex::ws_and_notes,
+        many0(preceded(
+            crate::parser::lex::ws_and_notes,
+            perform_body_element,
+        )),
     )
     .parse(input)?;
     let (close_start, _) = ws_and_comments(input)?;
@@ -903,7 +908,9 @@ fn interface_usage_body(
     let open_span = crate::parser::span::span_from_to(open_start, input);
     let mut elements = Vec::new();
     loop {
-        let (next, _) = ws_and_comments(input)?;
+        // A bare `/* ... */` is an `AnnotatingElement` at this member boundary, not trivia.
+        // Leave it for `interface_usage_body_element`; its final annotating arm owns it.
+        let (next, _) = crate::parser::lex::ws_and_notes(input)?;
         input = next;
         if input.fragment().starts_with(b"}") {
             let close_start = input;
