@@ -108,7 +108,7 @@ package '13a-Model Containment' {
         }
         package VehicleSubsystems {
             public import 'Body&Interior';
-            public import PowerTrain;
+            public import 'PowerTrain';
         }
         package 'Body&Interior' {
             public import BodyAndInteriorRequirements;

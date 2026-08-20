@@ -118,13 +118,16 @@ impl<'a> EmitWriter<'a> {
                     });
                 }
             }
-            let decoded = reference.segment_decoded_text(index).ok_or_else(|| {
-                EmitError::InvalidQualifiedReference {
+            // The arena retains each segment's exact lexical span. Re-emit that authored token
+            // rather than its decoded name: quoting is syntactic provenance, and a quoted name
+            // that happens to be a valid bare identifier must not be normalized away.
+            let authored = document.source.slice(&segment.source_span).ok_or_else(|| {
+                EmitError::InvalidSpan {
                     path: path.to_owned(),
-                    id,
+                    span: segment.source_span.clone(),
                 }
             })?;
-            self.push_str(&format_name(decoded.as_ref()));
+            self.push_str(authored);
         }
         Ok(())
     }
