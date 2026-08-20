@@ -6932,6 +6932,9 @@ macro_rules! ast_traversal {
                 ViewDefBodyElement::MetadataKeywordUsage(field_0) => {
                     visitor.visit_metadata_keyword_usage(field_0);
                 }
+                ViewDefBodyElement::AliasDef(field_0) => {
+                    visitor.visit_alias_def(field_0);
+                }
                 ViewDefBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
                 }
@@ -6946,6 +6949,9 @@ macro_rules! ast_traversal {
                 }
                 ViewDefBodyElement::ViewRendering(field_0) => {
                     visitor.visit_view_rendering_usage(field_0);
+                }
+                ViewDefBodyElement::RenderingUsage(field_0) => {
+                    visitor.visit_rendering_usage(field_0);
                 }
             }
             visitor.leave_node(&$($mutability)? node.span);
@@ -7127,6 +7133,9 @@ macro_rules! ast_traversal {
                 ViewBodyElement::Annotating(field_0) => {
                     visitor.visit_annotating_member(field_0);
                 }
+                ViewBodyElement::AliasDef(field_0) => {
+                    visitor.visit_alias_def(field_0);
+                }
                 ViewBodyElement::RefDecl(field_0) => {
                     visitor.visit_ref_decl(field_0);
                 }
@@ -7135,6 +7144,9 @@ macro_rules! ast_traversal {
                 }
                 ViewBodyElement::ViewRendering(field_0) => {
                     visitor.visit_view_rendering_usage(field_0);
+                }
+                ViewBodyElement::RenderingUsage(field_0) => {
+                    visitor.visit_rendering_usage(field_0);
                 }
                 ViewBodyElement::Expose(field_0) => {
                     visitor.visit_expose_member(field_0);

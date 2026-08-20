@@ -660,6 +660,9 @@ pub(crate) fn emit_view_def(
                     crate::ast::ViewDefBodyElement::MetadataKeywordUsage(usage) => {
                         crate::emit::structure::emit_metadata_keyword_usage(w, path, &usage.value)?;
                     }
+                    crate::ast::ViewDefBodyElement::AliasDef(alias) => {
+                        crate::emit::structure::emit_alias_def(w, path, &alias.value)?;
+                    }
                     crate::ast::ViewDefBodyElement::RefDecl(r) => {
                         crate::emit::structure::emit_ref_decl(w, path, &r.value)?
                     }
@@ -674,6 +677,9 @@ pub(crate) fn emit_view_def(
                     }
                     crate::ast::ViewDefBodyElement::ViewRendering(r) => {
                         emit_view_rendering(w, path, &r.value)?;
+                    }
+                    crate::ast::ViewDefBodyElement::RenderingUsage(r) => {
+                        emit_rendering_usage(w, path, &r.value)?;
                     }
                 }
                 w.newline();
@@ -744,6 +750,9 @@ pub(crate) fn emit_view_usage(
                     crate::ast::ViewBodyElement::Annotating(member) => {
                         super::root::emit_annotating_member(w, path, member)?;
                     }
+                    crate::ast::ViewBodyElement::AliasDef(alias) => {
+                        crate::emit::structure::emit_alias_def(w, path, &alias.value)?;
+                    }
                     crate::ast::ViewBodyElement::RefDecl(r) => {
                         crate::emit::structure::emit_ref_decl(w, path, &r.value)?
                     }
@@ -752,6 +761,9 @@ pub(crate) fn emit_view_usage(
                     }
                     crate::ast::ViewBodyElement::ViewRendering(r) => {
                         emit_view_rendering(w, path, &r.value)?;
+                    }
+                    crate::ast::ViewBodyElement::RenderingUsage(r) => {
+                        emit_rendering_usage(w, path, &r.value)?;
                     }
                     crate::ast::ViewBodyElement::Expose(e) => {
                         w.push_str("expose ");

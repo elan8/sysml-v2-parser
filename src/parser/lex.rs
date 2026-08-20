@@ -375,11 +375,13 @@ pub(crate) const RELATIONSHIP_BODY_STARTERS: &[&[u8]] =
 /// satisfy usage in a view definition body consumed it.
 pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[
     b"@",
+    b"alias",
     b"assert",
     b"doc",
     b"filter",
     b"not",
     b"render",
+    b"rendering",
     b"ref",
     b"satisfy",
     b"abstract",
@@ -399,12 +401,14 @@ pub(crate) const VIEW_DEF_BODY_STARTERS: &[&[u8]] = &[
 ];
 
 pub(crate) const VIEW_BODY_STARTERS: &[&[u8]] = &[
+    b"alias",
     b"assert",
     b"doc",
     b"expose",
     b"filter",
     b"not",
     b"render",
+    b"rendering",
     b"satisfy",
     // FIRST(`OccurrenceUsagePrefix`) on the satisfy usage this scope dispatches. See
     // `planning/occurrence-usage-prefix-matrix.md` §4.

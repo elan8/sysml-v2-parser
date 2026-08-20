@@ -1216,7 +1216,15 @@ fn walk_view_def_body(report: &mut OpacityReport, path: &str, body: &ViewDefBody
             ViewDefBodyElement::MetadataKeywordUsage(n) => {
                 walk_optional_attribute_body(report, &p, &n.value.body)
             }
+            ViewDefBodyElement::AliasDef(alias) => {
+                if let crate::ast::AliasBody::Brace { elements, .. } = &alias.value.body {
+                    walk_relationship_body_elements(report, &p, elements);
+                }
+            }
             ViewDefBodyElement::ViewRendering(n) => {
+                walk_rendering_usage_body(report, &p, &n.value.body)
+            }
+            ViewDefBodyElement::RenderingUsage(n) => {
                 walk_rendering_usage_body(report, &p, &n.value.body)
             }
             ViewDefBodyElement::RefDecl(n) => walk_ref_body(report, &p, &n.value.body),
@@ -1239,7 +1247,15 @@ fn walk_view_body(report: &mut OpacityReport, path: &str, body: &ViewBody) {
 fn walk_view_body_element(report: &mut OpacityReport, path: &str, el: &ViewBodyElement) {
     match el {
         ViewBodyElement::Error(_) => hit(report, path, OpacityKind::ParseError),
+        ViewBodyElement::AliasDef(alias) => {
+            if let crate::ast::AliasBody::Brace { elements, .. } = &alias.value.body {
+                walk_relationship_body_elements(report, path, elements);
+            }
+        }
         ViewBodyElement::ViewRendering(n) => walk_rendering_usage_body(report, path, &n.value.body),
+        ViewBodyElement::RenderingUsage(n) => {
+            walk_rendering_usage_body(report, path, &n.value.body)
+        }
         ViewBodyElement::Expose(n) => walk_relationship_body(report, path, &n.value.body),
         ViewBodyElement::Satisfy(n) => walk_satisfy(report, path, &n.value),
         ViewBodyElement::RefDecl(n) => walk_ref_body(report, path, &n.value.body),

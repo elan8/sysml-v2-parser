@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **View bodies retain their ordinary `rendering` and `alias` members.** `ViewBodyItem` and
+  `ViewDefinitionBodyItem` each inherit `DefinitionBodyItem`, which admits `AliasMember` and the
+  generic `RenderingUsage` alongside the view-specific `render` member. Both scopes now dispatch
+  those existing productions into typed AST variants, emit them, traverse their nested bodies for
+  opacity, and project their retained headers, targets, and bodies in semantic snapshots.
+  Fixtures: `tests/snapshots/sysml/view_body_rendering_and_alias.md` and
+  `tests/snapshots/sysml/view_body_rendering_and_alias_recovery.md`. **AST version 189.**
+
 - **Package attributes, anonymous reference redefinitions, and port-body events retain their
   grammatical identity.** Def-less package `attribute` declarations now produce
   `AttributeUsage`, `ref :>> target;` retains `target` as a redefinition rather than inventing a

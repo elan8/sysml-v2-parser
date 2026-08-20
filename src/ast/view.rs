@@ -369,8 +369,13 @@ pub enum ViewDefBodyElement {
     /// every member may carry a prefix, and `ExtendedUsage` is a `NonOccurrenceUsageElement` --
     /// but modelled neither, so a `#` member was reported unsupported here.
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `AliasMember`, admitted through `ViewDefinitionBodyItem -> DefinitionBodyItem`.
+    AliasDef(Node<crate::ast::AliasDef>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
+    /// Ordinary `RenderingUsage`, distinct from the view-specific `render` spelling above.
+    /// `ViewDefinitionBodyItem -> DefinitionBodyItem -> StructureUsageElement` admits it.
+    RenderingUsage(Node<RenderingUsage>),
     /// `ref`-prefixed feature declaration, e.g. `ref viewpoint :>> self : ViewpointCheck;` and
     /// `abstract ref rendering subrenderings : Rendering[0..*] :> renderings;` (Systems Library
     /// `Views.sysml`). This scope accepted no `ref` member at all.
@@ -514,8 +519,13 @@ pub enum ViewBodyElement {
     Error(Node<ParseErrorNode>),
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
+    /// `AliasMember`, admitted through `ViewBodyItem -> DefinitionBodyItem`.
+    AliasDef(Node<crate::ast::AliasDef>),
     Filter(Node<FilterMember>),
     ViewRendering(Node<ViewRenderingUsage>),
+    /// Ordinary `RenderingUsage`, distinct from the view-specific `render` spelling above.
+    /// `ViewBodyItem -> DefinitionBodyItem -> StructureUsageElement` admits it.
+    RenderingUsage(Node<RenderingUsage>),
     Expose(Node<ExposeMember>),
     /// `SatisfyRequirementUsage` in a view usage body.
     ///

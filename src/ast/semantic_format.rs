@@ -1033,6 +1033,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_annotating_member(member)?;
                         }
+                        ViewBodyElement::AliasDef(alias) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_alias_definition(&alias.value)?;
+                        }
                         ViewBodyElement::RefDecl(declaration) => {
                             self.write_item_prefix(&mut first)?;
                             self.write_ref_declaration(&declaration.value)?;
@@ -1042,6 +1046,10 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         }
                         ViewBodyElement::ViewRendering(_rendering) => {
                             self.write_marker(&mut first, "view-rendering")?;
+                        }
+                        ViewBodyElement::RenderingUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_rendering_usage(&usage.value)?;
                         }
                         ViewBodyElement::Expose(expose) => {
                             self.write_item_prefix(&mut first)?;
@@ -3890,11 +3898,19 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_metadata_keyword_usage(&usage.value)?;
                         }
+                        super::ViewDefBodyElement::AliasDef(alias) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_alias_definition(&alias.value)?;
+                        }
                         super::ViewDefBodyElement::Filter(_filter) => {
                             self.write_marker(&mut first, "filter")?;
                         }
                         super::ViewDefBodyElement::ViewRendering(_rendering) => {
                             self.write_marker(&mut first, "view-rendering")?;
+                        }
+                        super::ViewDefBodyElement::RenderingUsage(usage) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_rendering_usage(&usage.value)?;
                         }
                         super::ViewDefBodyElement::RefDecl(declaration) => {
                             self.write_item_prefix(&mut first)?;
@@ -3928,6 +3944,72 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_str(") ")?;
         self.write_view_body(&usage.body)?;
         self.writer.write_char(')')
+    }
+
+    /// A `RenderingUsage` member carries the generic usage header, not merely the view-specific
+    /// `render` binding marker. Keep each retained clause visible so the same typed node has the
+    /// same semantic projection in both view body scopes.
+    fn write_rendering_usage(&mut self, usage: &super::RenderingUsage) -> io::Result<()> {
+        self.writer.write_str("(rendering-usage (abstract ")?;
+        self.writer
+            .write_str(if usage.is_abstract { "true" } else { "false" })?;
+        self.writer.write_str(") (name ")?;
+        self.write_usage_declaration_name(&usage.name)?;
+        self.writer.write_str(") (type ")?;
+        if let Some(reference) = usage.type_name {
+            self.write_reference(reference)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") (multiplicity ")?;
+        self.write_multiplicity_clause(usage.multiplicity.as_ref())?;
+        self.writer.write_str(") ")?;
+        self.write_multiplicity_modifiers(&usage.multiplicity_modifiers)?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("subsets", usage.subsets.as_ref())?;
+        self.writer.write_char(' ')?;
+        self.write_optional_subsetting("redefines", usage.redefines.as_ref())?;
+        self.writer.write_str(" (value ")?;
+        if let Some(value) = &usage.value {
+            self.write_feature_value(&value.value)?;
+        } else {
+            self.writer.write_str("none")?;
+        }
+        self.writer.write_str(") ")?;
+        self.write_rendering_usage_body(&usage.body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_rendering_usage_body(&mut self, body: &super::RenderingUsageBody) -> io::Result<()> {
+        match body {
+            super::RenderingUsageBody::Semicolon { .. } => {
+                self.writer.write_str("(body semicolon)")
+            }
+            super::RenderingUsageBody::Brace { elements, .. } => {
+                let mut first = self.open_brace_body()?;
+                for element in elements {
+                    match &element.value {
+                        super::RenderingUsageBodyElement::Error(error) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_malformed(&error.value, &element.span)?;
+                        }
+                        super::RenderingUsageBodyElement::Annotating(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_annotating_member(member)?;
+                        }
+                        super::RenderingUsageBodyElement::ViewUsage(view) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_view_usage(&view.value)?;
+                        }
+                        super::RenderingUsageBodyElement::Rendering(nested) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_rendering_usage(&nested.value)?;
+                        }
+                    }
+                }
+                self.writer.write_char(')')
+            }
+        }
     }
 
     fn write_use_case_definition(&mut self, definition: &super::UseCaseDef) -> io::Result<()> {
