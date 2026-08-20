@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Control-node `then` targets retain anonymous declarations.** `merge`, `decide`, `join`, and
+  `fork` now share an explicit anonymous-or-named declaration state and retain their mandatory
+  `ActionBody` (SysML textual BNF 898-909, 969-998; the zero-width-capable
+  `UsageDeclaration` is defined at 42-44 and 308-312, while the pinned Pilot writes it as
+  optional at `SysML.xtext` 1650-1685). `then join` is now dispatched alongside the other three
+  control kinds; all emit, semantic, visitor, opacity, serialization, and recovery boundaries
+  cover it. **AST version 196.**
+
 - **Part-definition bodies retain nested package definitions.** A part definition owns a
   `DefinitionBody`, whose `DefinitionBodyItem → DefinitionMember → DefinitionElement` path
   admits both `Package` and `LibraryPackage` (SysML textual BNF 180-207 and 234-248; the pinned

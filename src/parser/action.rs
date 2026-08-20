@@ -2,9 +2,10 @@
 
 use crate::ast::{
     ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, AssignStmt, DecisionStmt, FirstMergeBody, FirstMergeBodyElement,
-    FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt, LoopStmt, MergeStmt,
-    Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget, WhileStmt,
+    ActionUsageBodyElement, AssignStmt, ControlNodeDeclaration, DecisionStmt, FirstMergeBody,
+    FirstMergeBodyElement, FirstStmt, ForLoop, ForkStmt, IfStmt, InOut, InOutDecl, JoinStmt,
+    LoopStmt, MergeStmt, Multiplicity, Node, ParseErrorNode, TerminateStmt, ThenAction, ThenTarget,
+    WhileStmt,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
@@ -620,6 +621,7 @@ fn then_or_else_target(input: Input<'_>) -> IResult<Input<'_>, ThenTarget> {
         // as a `then` target.
         map(fork_stmt, ThenTarget::Fork),
         map(decision_stmt, ThenTarget::Decide),
+        map(join_stmt, ThenTarget::Join),
         map(
             with_span(|i| {
                 nom::sequence::terminated(
@@ -969,7 +971,20 @@ fn first_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<FirstStmt>> {
     ))
 }
 
-/// Merge stmt: `merge` path body
+/// `UsageDeclaration` after a control keyword. The pinned BNF spells it without `?`, but both
+/// `Identification` fields are optional, making the declaration zero-width; the Pilot grammar
+/// makes that optionality explicit. The body remains mandatory.
+fn control_node_declaration(input: Input<'_>) -> IResult<Input<'_>, ControlNodeDeclaration> {
+    map(opt(preceded(ws1, path_expression)), |declaration| {
+        declaration.map_or(
+            ControlNodeDeclaration::Anonymous,
+            ControlNodeDeclaration::Named,
+        )
+    })
+    .parse(input)
+}
+
+/// Merge stmt: `merge` declaration action-body.
 fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
     crate::parser::span::reference_transaction(input, merge_stmt_inner)
 }
@@ -978,23 +993,15 @@ fn merge_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"merge"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, merge_expr) = path_expression(input)?;
+    let (input, declaration) = control_node_declaration(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            MergeStmt {
-                merge: merge_expr,
-                body,
-            },
-        ),
+        node_from_to(start, input, MergeStmt { declaration, body }),
     ))
 }
 
-/// Decision node: `decide` path body
+/// Decision node: `decide` declaration action-body.
 fn decision_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt>> {
     crate::parser::span::reference_transaction(input, decision_stmt_inner)
 }
@@ -1003,23 +1010,15 @@ fn decision_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<DecisionStmt
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"decide"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, decide_expr) = path_expression(input)?;
+    let (input, declaration) = control_node_declaration(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            DecisionStmt {
-                decide: decide_expr,
-                body,
-            },
-        ),
+        node_from_to(start, input, DecisionStmt { declaration, body }),
     ))
 }
 
-/// Join node: `join` path body
+/// Join node: `join` declaration action-body.
 fn join_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
     crate::parser::span::reference_transaction(input, join_stmt_inner)
 }
@@ -1028,23 +1027,15 @@ fn join_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<JoinStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"join"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, join_expr) = path_expression(input)?;
+    let (input, declaration) = control_node_declaration(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            JoinStmt {
-                join: join_expr,
-                body,
-            },
-        ),
+        node_from_to(start, input, JoinStmt { declaration, body }),
     ))
 }
 
-/// Fork node: `fork` path body
+/// Fork node: `fork` declaration action-body.
 fn fork_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
     crate::parser::span::reference_transaction(input, fork_stmt_inner)
 }
@@ -1053,19 +1044,11 @@ fn fork_stmt_inner(input: Input<'_>) -> IResult<Input<'_>, Node<ForkStmt>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"fork"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, fork_expr) = path_expression(input)?;
+    let (input, declaration) = control_node_declaration(input)?;
     let (input, body) = first_merge_body(input)?;
     Ok((
         input,
-        node_from_to(
-            start,
-            input,
-            ForkStmt {
-                fork: fork_expr,
-                body,
-            },
-        ),
+        node_from_to(start, input, ForkStmt { declaration, body }),
     ))
 }
 

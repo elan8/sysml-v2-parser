@@ -126,17 +126,17 @@ pub struct ForLoop {
     pub body: ActionDefBody,
 }
 
-/// Succession to a following node: `then action ...`, `then perform ...`, `then merge <name>;`,
-/// or `then <name>;`.
+/// Succession to a following node: `then action ...`, `then perform ...`, a control node, or
+/// `then <name>;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThenAction {
     pub target: ThenTarget,
 }
 
-/// What a `then` succession connects to. Only [`ThenTarget::Action`] existed before §6 G23; the
-/// other two forms are the succession shorthand used after `first <name>;` in the OMG spec Annex
-/// (`3a-Function-based Behavior-2.sysml`).
+/// What a `then` succession connects to. Control-node alternatives own their declaration and
+/// mandatory `ActionBody`, rather than degrading an anonymous control keyword into a feature
+/// reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ThenTarget {
@@ -144,13 +144,15 @@ pub enum ThenTarget {
     Action(Box<Node<ActionUsage>>),
     /// `then perform body;` — succession to a perform usage (Systems Library `Actions.sysml`).
     Perform(Box<Node<crate::ast::Perform>>),
-    /// `then merge continue;` — an inline merge node.
+    /// `then merge continue;` or `then merge;` — an inline merge node.
     Merge(Node<MergeStmt>),
     /// `then fork F { in a; out b1; out b2; }` — an inline fork node (GH-86, Simple Tests/
     /// ControlNodeTest.sysml).
     Fork(Node<ForkStmt>),
     /// `then decide D;` — an inline decision node (GH-86, Simple Tests/DecisionTest.sysml).
     Decide(Node<DecisionStmt>),
+    /// `then join J;` or `then join;` — an inline join node.
+    Join(Node<JoinStmt>),
     /// `then accept S;` — an inline accept trigger, reusing the same shorthand/payload/
     /// time-trigger forms already supported after a state `transition` (GH-86, Simple Tests/
     /// ActionTest.sysml).
@@ -536,35 +538,50 @@ pub struct FirstStmt {
     pub body: FirstMergeBody,
 }
 
-/// Merge: `merge` expr body.
+/// The optional declaration following a control-node keyword.
+///
+/// `UsageDeclaration` is syntactically present in the pinned SysML BNF but can be empty because
+/// its `Identification` slots are optional (BNF 42-44, 308-310); the Pilot grammar writes the
+/// same fact as `UsageDeclaration?` (SysML.xtext 1664-1685). Model the two authored states
+/// explicitly rather than encoding an absent declaration as an optional expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ControlNodeDeclaration {
+    /// `merge;`, `decide;`, `join;`, or `fork;`.
+    Anonymous,
+    /// The currently supported named declaration surface, e.g. `merge continue;`.
+    Named(Node<Expression>),
+}
+
+/// Merge: `merge` declaration action-body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MergeStmt {
-    pub merge: Node<Expression>,
+    pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
 
-/// Decision node: `decide` expr body.
+/// Decision node: `decide` declaration action-body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DecisionStmt {
-    pub decide: Node<Expression>,
+    pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
 
-/// Join node: `join` expr body.
+/// Join node: `join` declaration action-body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct JoinStmt {
-    pub join: Node<Expression>,
+    pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
 
-/// Fork node: `fork` expr body.
+/// Fork node: `fork` declaration action-body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ForkStmt {
-    pub fork: Node<Expression>,
+    pub declaration: ControlNodeDeclaration,
     pub body: FirstMergeBody,
 }
 

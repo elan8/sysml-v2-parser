@@ -484,6 +484,7 @@ pub(crate) fn emit_then_action_pub(
         ThenTarget::Merge(m) => emit_merge_stmt(w, path, &m.value),
         ThenTarget::Fork(f) => emit_fork_stmt(w, path, &f.value),
         ThenTarget::Decide(d) => emit_decision_stmt(w, path, &d.value),
+        ThenTarget::Join(j) => emit_join_stmt(w, path, &j.value),
         ThenTarget::Accept(a) => {
             w.push_str("accept ");
             emit_transition_accept(w, path, &a.value)?;
@@ -1292,9 +1293,7 @@ fn emit_merge_stmt(
     path: &str,
     merge: &crate::ast::MergeStmt,
 ) -> Result<(), EmitError> {
-    w.push_str("merge ");
-    emit_expression(w, &merge.merge.value)?;
-    emit_first_merge_body(w, path, &merge.body)
+    emit_control_node(w, path, "merge", &merge.declaration, &merge.body)
 }
 
 fn emit_decision_stmt(
@@ -1302,9 +1301,7 @@ fn emit_decision_stmt(
     path: &str,
     decision: &crate::ast::DecisionStmt,
 ) -> Result<(), EmitError> {
-    w.push_str("decide ");
-    emit_expression(w, &decision.decide.value)?;
-    emit_first_merge_body(w, path, &decision.body)
+    emit_control_node(w, path, "decide", &decision.declaration, &decision.body)
 }
 
 fn emit_join_stmt(
@@ -1312,9 +1309,7 @@ fn emit_join_stmt(
     path: &str,
     join: &crate::ast::JoinStmt,
 ) -> Result<(), EmitError> {
-    w.push_str("join ");
-    emit_expression(w, &join.join.value)?;
-    emit_first_merge_body(w, path, &join.body)
+    emit_control_node(w, path, "join", &join.declaration, &join.body)
 }
 
 fn emit_fork_stmt(
@@ -1322,9 +1317,28 @@ fn emit_fork_stmt(
     path: &str,
     fork: &crate::ast::ForkStmt,
 ) -> Result<(), EmitError> {
-    w.push_str("fork ");
-    emit_expression(w, &fork.fork.value)?;
-    emit_first_merge_body(w, path, &fork.body)
+    emit_control_node(w, path, "fork", &fork.declaration, &fork.body)
+}
+
+/// All four `ControlNode` productions share an empty-or-named declaration followed by their
+/// mandatory action body. Keep declaration emission typed so anonymous controls do not acquire a
+/// fabricated name or spacing before `;` / `{`.
+fn emit_control_node(
+    w: &mut EmitWriter<'_>,
+    path: &str,
+    keyword: &str,
+    declaration: &crate::ast::ControlNodeDeclaration,
+    body: &crate::ast::FirstMergeBody,
+) -> Result<(), EmitError> {
+    w.push_str(keyword);
+    match declaration {
+        crate::ast::ControlNodeDeclaration::Anonymous => {}
+        crate::ast::ControlNodeDeclaration::Named(name) => {
+            w.push_char(' ');
+            emit_expression(w, &name.value)?;
+        }
+    }
+    emit_first_merge_body(w, path, body)
 }
 
 pub(crate) fn emit_occurrence_def(

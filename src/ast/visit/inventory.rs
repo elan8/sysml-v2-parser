@@ -4833,6 +4833,9 @@ macro_rules! ast_traversal {
                 ThenTarget::Decide(field_0) => {
                     visitor.visit_decision_stmt(field_0);
                 }
+                ThenTarget::Join(field_0) => {
+                    visitor.visit_join_stmt(field_0);
+                }
                 ThenTarget::Accept(field_0) => {
                     visitor.visit_transition_accept(field_0);
                 }
@@ -5275,8 +5278,11 @@ macro_rules! ast_traversal {
         pub fn walk_merge_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<MergeStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let MergeStmt { merge, body } = &$($mutability)? node.value;
-            visitor.visit_expression(merge);
+            let MergeStmt { declaration, body } = &$($mutability)? node.value;
+            match declaration {
+                ControlNodeDeclaration::Anonymous => {}
+                ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
+            }
             visitor.visit_first_merge_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5284,8 +5290,11 @@ macro_rules! ast_traversal {
         pub fn walk_decision_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<DecisionStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let DecisionStmt { decide, body } = &$($mutability)? node.value;
-            visitor.visit_expression(decide);
+            let DecisionStmt { declaration, body } = &$($mutability)? node.value;
+            match declaration {
+                ControlNodeDeclaration::Anonymous => {}
+                ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
+            }
             visitor.visit_first_merge_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5293,8 +5302,11 @@ macro_rules! ast_traversal {
         pub fn walk_join_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<JoinStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let JoinStmt { join, body } = &$($mutability)? node.value;
-            visitor.visit_expression(join);
+            let JoinStmt { declaration, body } = &$($mutability)? node.value;
+            match declaration {
+                ControlNodeDeclaration::Anonymous => {}
+                ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
+            }
             visitor.visit_first_merge_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }
@@ -5302,8 +5314,11 @@ macro_rules! ast_traversal {
         pub fn walk_fork_stmt<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<ForkStmt>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let ForkStmt { fork, body } = &$($mutability)? node.value;
-            visitor.visit_expression(fork);
+            let ForkStmt { declaration, body } = &$($mutability)? node.value;
+            match declaration {
+                ControlNodeDeclaration::Anonymous => {}
+                ControlNodeDeclaration::Named(name) => visitor.visit_expression(name),
+            }
             visitor.visit_first_merge_body(body);
             visitor.leave_node(&$($mutability)? node.span);
         }

@@ -1611,6 +1611,7 @@ fn walk_then_target(report: &mut OpacityReport, path: &str, target: &ThenTarget)
         ThenTarget::Merge(merge) => walk_first_merge_body(report, path, &merge.value.body),
         ThenTarget::Fork(fork) => walk_first_merge_body(report, path, &fork.value.body),
         ThenTarget::Decide(decision) => walk_first_merge_body(report, path, &decision.value.body),
+        ThenTarget::Join(join) => walk_first_merge_body(report, path, &join.value.body),
         ThenTarget::Send(action) => {
             walk_optional_action_usage_body(report, path, &action.value.body)
         }

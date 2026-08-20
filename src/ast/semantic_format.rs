@@ -1224,8 +1224,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                             self.write_item_prefix(&mut first)?;
                             self.write_for_loop(&for_loop.value)?;
                         }
-                        UseCaseDefBodyElement::ThenAction(_action) => {
-                            self.write_marker(&mut first, "then-action")?;
+                        UseCaseDefBodyElement::ThenAction(action) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_then_action(&action.value)?;
                         }
                         UseCaseDefBodyElement::ActionUsage(_usage) => {
                             self.write_marker(&mut first, "action-usage")?;
@@ -1922,6 +1923,71 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
         self.writer.write_char(')')
     }
 
+    fn write_control_node_declaration(
+        &mut self,
+        declaration: &super::ControlNodeDeclaration,
+    ) -> io::Result<()> {
+        match declaration {
+            super::ControlNodeDeclaration::Anonymous => self.writer.write_str("anonymous"),
+            super::ControlNodeDeclaration::Named(name) => {
+                self.writer.write_str("(named ")?;
+                self.write_expression(name)?;
+                self.writer.write_char(')')
+            }
+        }
+    }
+
+    fn write_control_node(
+        &mut self,
+        keyword: &str,
+        declaration: &super::ControlNodeDeclaration,
+        body: &FirstMergeBody,
+    ) -> io::Result<()> {
+        self.writer.write_char('(')?;
+        self.writer.write_str(keyword)?;
+        self.writer.write_str(" (declaration ")?;
+        self.write_control_node_declaration(declaration)?;
+        self.writer.write_str(") ")?;
+        self.write_first_merge_body(body)?;
+        self.writer.write_char(')')
+    }
+
+    fn write_then_action(&mut self, action: &super::ThenAction) -> io::Result<()> {
+        match &action.target {
+            super::ThenTarget::Merge(merge) => {
+                self.writer.write_str("(then-control ")?;
+                self.write_control_node("merge", &merge.value.declaration, &merge.value.body)?;
+                self.writer.write_char(')')
+            }
+            super::ThenTarget::Fork(fork) => {
+                self.writer.write_str("(then-control ")?;
+                self.write_control_node("fork", &fork.value.declaration, &fork.value.body)?;
+                self.writer.write_char(')')
+            }
+            super::ThenTarget::Decide(decision) => {
+                self.writer.write_str("(then-control ")?;
+                self.write_control_node(
+                    "decide",
+                    &decision.value.declaration,
+                    &decision.value.body,
+                )?;
+                self.writer.write_char(')')
+            }
+            super::ThenTarget::Join(join) => {
+                self.writer.write_str("(then-control ")?;
+                self.write_control_node("join", &join.value.declaration, &join.value.body)?;
+                self.writer.write_char(')')
+            }
+            // Retain the established compact projection for unrelated alternatives while matching
+            // them explicitly: a new target variant must decide whether it is a control node.
+            super::ThenTarget::Action(_)
+            | super::ThenTarget::Perform(_)
+            | super::ThenTarget::Accept(_)
+            | super::ThenTarget::Send(_)
+            | super::ThenTarget::Feature(_) => self.writer.write_str("(then-action)"),
+        }
+    }
+
     fn write_for_loop(&mut self, for_loop: &super::ForLoop) -> io::Result<()> {
         self.writer.write_str("(for-loop (variable ")?;
         write_quoted(self.writer, &for_loop.var)?;
@@ -2422,10 +2488,18 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             ActionDefBodyElement::Bind(_bind) => self.writer.write_str("(bind)"),
             ActionDefBodyElement::FlowUsage(_flow) => self.writer.write_str("(flow-usage)"),
             ActionDefBodyElement::FirstStmt(first) => self.write_first_statement(&first.value),
-            ActionDefBodyElement::MergeStmt(_merge) => self.writer.write_str("(merge)"),
-            ActionDefBodyElement::DecisionStmt(_decision) => self.writer.write_str("(decision)"),
-            ActionDefBodyElement::JoinStmt(_join) => self.writer.write_str("(join)"),
-            ActionDefBodyElement::ForkStmt(_fork) => self.writer.write_str("(fork)"),
+            ActionDefBodyElement::MergeStmt(merge) => {
+                self.write_control_node("merge", &merge.value.declaration, &merge.value.body)
+            }
+            ActionDefBodyElement::DecisionStmt(decision) => {
+                self.write_control_node("decide", &decision.value.declaration, &decision.value.body)
+            }
+            ActionDefBodyElement::JoinStmt(join) => {
+                self.write_control_node("join", &join.value.declaration, &join.value.body)
+            }
+            ActionDefBodyElement::ForkStmt(fork) => {
+                self.write_control_node("fork", &fork.value.declaration, &fork.value.body)
+            }
             ActionDefBodyElement::TerminateStmt(_terminate) => self.writer.write_str("(terminate)"),
             ActionDefBodyElement::WhileStmt(_while) => self.writer.write_str("(while)"),
             ActionDefBodyElement::LoopStmt(_loop) => self.writer.write_str("(loop)"),
@@ -2454,7 +2528,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
             }
             ActionDefBodyElement::Assign(_assign) => self.writer.write_str("(assign)"),
             ActionDefBodyElement::ForLoop(for_loop) => self.write_for_loop(&for_loop.value),
-            ActionDefBodyElement::ThenAction(_then) => self.writer.write_str("(then-action)"),
+            ActionDefBodyElement::ThenAction(action) => self.write_then_action(&action.value),
             ActionDefBodyElement::AttributeUsage(_usage) => {
                 self.writer.write_str("(attribute-usage)")
             }
@@ -2950,17 +3024,37 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::FirstStmt(_member) => {
                             self.write_marker(&mut first, "first")?;
                         }
-                        super::ActionUsageBodyElement::MergeStmt(_member) => {
-                            self.write_marker(&mut first, "merge")?;
+                        super::ActionUsageBodyElement::MergeStmt(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_control_node(
+                                "merge",
+                                &member.value.declaration,
+                                &member.value.body,
+                            )?;
                         }
-                        super::ActionUsageBodyElement::DecisionStmt(_member) => {
-                            self.write_marker(&mut first, "decision")?;
+                        super::ActionUsageBodyElement::DecisionStmt(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_control_node(
+                                "decide",
+                                &member.value.declaration,
+                                &member.value.body,
+                            )?;
                         }
-                        super::ActionUsageBodyElement::JoinStmt(_member) => {
-                            self.write_marker(&mut first, "join")?;
+                        super::ActionUsageBodyElement::JoinStmt(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_control_node(
+                                "join",
+                                &member.value.declaration,
+                                &member.value.body,
+                            )?;
                         }
-                        super::ActionUsageBodyElement::ForkStmt(_member) => {
-                            self.write_marker(&mut first, "fork")?;
+                        super::ActionUsageBodyElement::ForkStmt(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_control_node(
+                                "fork",
+                                &member.value.declaration,
+                                &member.value.body,
+                            )?;
                         }
                         super::ActionUsageBodyElement::TerminateStmt(_member) => {
                             self.write_marker(&mut first, "terminate")?;
@@ -2983,8 +3077,9 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                         super::ActionUsageBodyElement::Assign(_member) => {
                             self.write_marker(&mut first, "assign")?;
                         }
-                        super::ActionUsageBodyElement::ThenAction(_member) => {
-                            self.write_marker(&mut first, "then-action")?;
+                        super::ActionUsageBodyElement::ThenAction(member) => {
+                            self.write_item_prefix(&mut first)?;
+                            self.write_then_action(&member.value)?;
                         }
                         super::ActionUsageBodyElement::CalcUsage(_member) => {
                             self.write_marker(&mut first, "calc-usage")?;
