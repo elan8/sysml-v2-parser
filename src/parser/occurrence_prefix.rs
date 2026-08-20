@@ -80,7 +80,10 @@ pub(crate) fn optional_keyword_token<'a>(
 /// located span for each failed probe is what made walking the prefix measurable on the corpus
 /// benchmark; this reduces a failure to one keyword comparison. Every success re-establishes the
 /// invariant by consuming the trivia after its own token, so the slots can be probed in sequence.
-fn slot_keyword<'a>(input: Input<'a>, keyword: &'static [u8]) -> Option<(Input<'a>, Span)> {
+pub(crate) fn slot_keyword<'a>(
+    input: Input<'a>,
+    keyword: &'static [u8],
+) -> Option<(Input<'a>, Span)> {
     if !starts_with_keyword(input.fragment(), keyword) {
         return None;
     }
@@ -94,7 +97,7 @@ fn slot_keyword<'a>(input: Input<'a>, keyword: &'static [u8]) -> Option<(Input<'
 /// The first of two alternatives in one slot, as a `Node` carrying the authored keyword's span.
 ///
 /// Takes trivia-free input; see [`slot_keyword`].
-fn optional_alternative<'a, T: Copy>(
+pub(crate) fn optional_alternative<'a, T: Copy>(
     input: Input<'a>,
     alternatives: [(&'static [u8], T); 2],
 ) -> (Input<'a>, Option<Node<T>>) {
@@ -142,7 +145,7 @@ fn ref_prefix(input: Input<'_>) -> (Input<'_>, RefPrefix) {
 }
 
 /// `direction = FeatureDirection` where `FeatureDirection = 'in' | 'out' | 'inout'`.
-fn optional_direction(input: Input<'_>) -> (Input<'_>, Option<Node<InOut>>) {
+pub(crate) fn optional_direction(input: Input<'_>) -> (Input<'_>, Option<Node<InOut>>) {
     for (keyword, value) in [
         (&b"inout"[..], InOut::InOut),
         (&b"in"[..], InOut::In),

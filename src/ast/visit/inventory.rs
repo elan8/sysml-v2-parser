@@ -642,6 +642,51 @@ macro_rules! ast_traversal {
                 walk_occurrence_usage_prefix(self, node)
             }
 
+            /// Visits [`FeaturePortionKind`]; the default implementation walks its children.
+            fn visit_feature_portion_kind(&mut self, node: &$($mutability)? Node<FeaturePortionKind>) {
+                walk_feature_portion_kind(self, node)
+            }
+
+            /// Visits a [`FeaturePortionKind`] stored without a node wrapper.
+            fn visit_feature_portion_kind_value(&mut self, value: &$($mutability)? FeaturePortionKind) {
+                walk_feature_portion_kind_value(self, value)
+            }
+
+            /// Visits [`FeatureVariability`]; the default implementation walks its children.
+            fn visit_feature_variability(&mut self, node: &$($mutability)? Node<FeatureVariability>) {
+                walk_feature_variability(self, node)
+            }
+
+            /// Visits a [`FeatureVariability`] stored without a node wrapper.
+            fn visit_feature_variability_value(&mut self, value: &$($mutability)? FeatureVariability) {
+                walk_feature_variability_value(self, value)
+            }
+
+            /// Visits [`BasicFeaturePrefix`]; the default implementation walks its children.
+            fn visit_basic_feature_prefix(&mut self, node: &$($mutability)? BasicFeaturePrefix) {
+                walk_basic_feature_prefix(self, node)
+            }
+
+            /// Visits [`EndFeaturePrefix`]; the default implementation walks its children.
+            fn visit_end_feature_prefix(&mut self, node: &$($mutability)? EndFeaturePrefix) {
+                walk_end_feature_prefix(self, node)
+            }
+
+            /// Visits [`OwnedCrossFeature`]; the default implementation walks its children.
+            fn visit_owned_cross_feature(&mut self, node: &$($mutability)? Node<OwnedCrossFeature>) {
+                walk_owned_cross_feature(self, node)
+            }
+
+            /// Visits [`FeaturePrefixHead`]; the default implementation walks its children.
+            fn visit_feature_prefix_head(&mut self, node: &$($mutability)? FeaturePrefixHead) {
+                walk_feature_prefix_head(self, node)
+            }
+
+            /// Visits [`FeaturePrefix`]; the default implementation walks its children.
+            fn visit_feature_prefix(&mut self, node: &$($mutability)? FeaturePrefix) {
+                walk_feature_prefix(self, node)
+            }
+
             /// Visits [`OccurrenceUsageBody`]; the default implementation walks its children.
             fn visit_occurrence_usage_body(&mut self, node: &$($mutability)? OccurrenceUsageBody) {
                 walk_occurrence_usage_body(self, node)
@@ -1383,8 +1428,13 @@ macro_rules! ast_traversal {
             }
 
             /// Visits [`KermlFeatureKind`]; the default implementation walks its children.
-            fn visit_kerml_feature_kind(&mut self, node: &$($mutability)? KermlFeatureKind) {
+            fn visit_kerml_feature_kind(&mut self, node: &$($mutability)? Node<KermlFeatureKind>) {
                 walk_kerml_feature_kind(self, node)
+            }
+
+            /// Visits a [`KermlFeatureKind`] stored without a node wrapper.
+            fn visit_kerml_feature_kind_value(&mut self, value: &$($mutability)? KermlFeatureKind) {
+                walk_kerml_feature_kind_value(self, value)
             }
 
             /// Visits [`KermlInvariantMember`]; the default implementation walks its children.
@@ -4174,6 +4224,99 @@ macro_rules! ast_traversal {
                 visitor.visit_occurrence_portion_kind(inner);
             }
             for inner in extension_keywords {
+                visitor.visit_usage_extension_keyword(inner);
+            }
+        }
+
+        pub fn walk_feature_portion_kind<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeaturePortionKind>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            visitor.visit_feature_portion_kind_value(&$($mutability)? node.value);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_feature_portion_kind_value<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? FeaturePortionKind) {
+            match node {
+                FeaturePortionKind::Composite => {}
+                FeaturePortionKind::Portion => {}
+            }
+        }
+
+        pub fn walk_feature_variability<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<FeatureVariability>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            visitor.visit_feature_variability_value(&$($mutability)? node.value);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_feature_variability_value<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? FeatureVariability) {
+            match node {
+                FeatureVariability::Var => {}
+                FeatureVariability::Const => {}
+            }
+        }
+
+        pub fn walk_basic_feature_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? BasicFeaturePrefix) {
+            let BasicFeaturePrefix { direction, derived_span, abstract_span, portioning, variability } = node;
+            if let Some(inner) = direction {
+                visitor.visit_in_out(inner);
+            }
+            if let Some(inner) = derived_span {
+                visitor.visit_span(inner);
+            }
+            if let Some(inner) = abstract_span {
+                visitor.visit_span(inner);
+            }
+            if let Some(inner) = portioning {
+                visitor.visit_feature_portion_kind(inner);
+            }
+            if let Some(inner) = variability {
+                visitor.visit_feature_variability(inner);
+            }
+        }
+
+        pub fn walk_end_feature_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? EndFeaturePrefix) {
+            let EndFeaturePrefix { constant_span, end_span } = node;
+            if let Some(inner) = constant_span {
+                visitor.visit_span(inner);
+            }
+            visitor.visit_span(end_span);
+        }
+
+        pub fn walk_owned_cross_feature<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<OwnedCrossFeature>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            let OwnedCrossFeature { prefix, name, multiplicity, multiplicity_modifiers, subsets } = &$($mutability)? node.value;
+            visitor.visit_basic_feature_prefix(prefix);
+            visitor.visit_text(name);
+            if let Some(inner) = multiplicity {
+                visitor.visit_multiplicity(inner);
+            }
+            visitor.visit_multiplicity_modifiers(multiplicity_modifiers);
+            if let Some(inner) = subsets {
+                visitor.visit_subsetting_relationship(inner);
+            }
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_feature_prefix_head<V: $Visitor>(visitor: &mut V, node: &$($mutability)? FeaturePrefixHead) {
+            match node {
+                FeaturePrefixHead::End { prefix, cross } => {
+                    visitor.visit_end_feature_prefix(prefix);
+                    if let Some(inner) = cross {
+                        visitor.visit_owned_cross_feature(inner);
+                    }
+                }
+                FeaturePrefixHead::Basic(field_0) => {
+                    visitor.visit_basic_feature_prefix(field_0);
+                }
+            }
+        }
+
+        pub fn walk_feature_prefix<V: $Visitor>(visitor: &mut V, node: &$($mutability)? FeaturePrefix) {
+            let FeaturePrefix { head, metadata_keywords } = node;
+            visitor.visit_feature_prefix_head(head);
+            for inner in metadata_keywords {
                 visitor.visit_usage_extension_keyword(inner);
             }
         }
@@ -7237,17 +7380,12 @@ macro_rules! ast_traversal {
         pub fn walk_kerml_feature_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeatureMember>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeatureMember { is_member, is_derived, is_abstract, is_composite, is_portion, is_var, is_const, is_end, kind, has_kind_keyword, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, chains, inverse_of, type_relationships, value, body, membership } = &$($mutability)? node.value;
+            let KermlFeatureMember { is_member, prefix, kind, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, chains, inverse_of, type_relationships, value, body, membership } = &$($mutability)? node.value;
             let _ = is_member;
-            let _ = is_derived;
-            let _ = is_abstract;
-            let _ = is_composite;
-            let _ = is_portion;
-            let _ = is_var;
-            let _ = is_const;
-            let _ = is_end;
-            visitor.visit_kerml_feature_kind(kind);
-            let _ = has_kind_keyword;
+            visitor.visit_feature_prefix(prefix);
+            if let Some(inner) = kind {
+                visitor.visit_kerml_feature_kind(inner);
+            }
             let _ = is_all;
             visitor.visit_text(name);
             if let Some(inner) = typing {
@@ -7286,7 +7424,14 @@ macro_rules! ast_traversal {
             visitor.leave_node(&$($mutability)? node.span);
         }
 
-        pub fn walk_kerml_feature_kind<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? KermlFeatureKind) {
+        pub fn walk_kerml_feature_kind<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeatureKind>) {
+            visitor.enter_node(&$($mutability)? node.span);
+            visitor.visit_span(&$($mutability)? node.span);
+            visitor.visit_kerml_feature_kind_value(&$($mutability)? node.value);
+            visitor.leave_node(&$($mutability)? node.span);
+        }
+
+        pub fn walk_kerml_feature_kind_value<V: $Visitor>(_visitor: &mut V, node: &$($mutability)? KermlFeatureKind) {
             match node {
                 KermlFeatureKind::Feature => {}
                 KermlFeatureKind::Step => {}

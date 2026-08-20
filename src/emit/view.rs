@@ -280,6 +280,59 @@ fn emit_calc_body_element(
     }
 }
 
+/// `BasicFeaturePrefix` (KerML BNF 577) as authored keywords, in the production's order.
+///
+/// Appends rather than writing, so callers that must not emit a trailing space can join.
+fn push_basic_feature_prefix(head: &mut Vec<&str>, prefix: &crate::ast::BasicFeaturePrefix) {
+    if let Some(direction) = &prefix.direction {
+        head.push(match direction.value {
+            crate::ast::InOut::In => "in",
+            crate::ast::InOut::Out => "out",
+            crate::ast::InOut::InOut => "inout",
+        });
+    }
+    if prefix.derived_span.is_some() {
+        head.push("derived");
+    }
+    if prefix.abstract_span.is_some() {
+        head.push("abstract");
+    }
+    if let Some(portioning) = &prefix.portioning {
+        head.push(portioning.value.keyword());
+    }
+    if let Some(variability) = &prefix.variability {
+        head.push(variability.value.keyword());
+    }
+}
+
+/// `OwnedCrossFeature = BasicFeaturePrefix FeatureDeclaration` (KerML BNF 595), the cross feature
+/// between `end` and the feature keyword. Ends with a trailing space so the keyword follows.
+fn emit_owned_cross_feature(
+    w: &mut EmitWriter<'_>,
+    cross: &crate::ast::OwnedCrossFeature,
+) -> Result<(), EmitError> {
+    let mut head: Vec<&str> = Vec::new();
+    push_basic_feature_prefix(&mut head, &cross.prefix);
+    let name = format_name(&cross.name);
+    if !cross.name.is_empty() {
+        head.push(&name);
+    }
+    if !head.is_empty() {
+        w.push_str(&head.join(" "));
+        w.push_char(' ');
+    }
+    if let Some(multiplicity) = &cross.multiplicity {
+        emit_multiplicity(w, &multiplicity.value)?;
+        w.push_char(' ');
+    }
+    emit_multiplicity_modifiers(w, &cross.multiplicity_modifiers);
+    if let Some(subsets) = &cross.subsets {
+        super::structure::emit_subsetting_clause(w, &subsets.value)?;
+        w.push_char(' ');
+    }
+    Ok(())
+}
+
 pub(crate) fn emit_kerml_feature_member(
     w: &mut EmitWriter<'_>,
     path: &str,
@@ -290,29 +343,31 @@ pub(crate) fn emit_kerml_feature_member(
     if feature.is_member {
         head.push("member");
     }
-    if feature.is_derived {
-        head.push("derived");
+    // `FeaturePrefix` (KerML BNF 584), in the production's own order. Keywords go through `head`
+    // rather than straight to the writer so an unkeyworded member (`portion redefines
+    // portionOfLife = ...;`) cannot leave a trailing space before its `redefines` clause.
+    let cross = match &feature.prefix.head {
+        crate::ast::FeaturePrefixHead::End { prefix, cross } => {
+            if prefix.constant_span.is_some() {
+                head.push("const");
+            }
+            head.push("end");
+            cross.as_ref()
+        }
+        crate::ast::FeaturePrefixHead::Basic(basic) => {
+            push_basic_feature_prefix(&mut head, basic);
+            None
+        }
+    };
+    // The owned cross feature is a declaration, not a keyword, so the prefix words flush first.
+    if let Some(cross) = cross {
+        w.push_str(&head.join(" "));
+        w.push_char(' ');
+        head.clear();
+        emit_owned_cross_feature(w, &cross.value)?;
     }
-    if feature.is_abstract {
-        head.push("abstract");
-    }
-    if feature.is_composite {
-        head.push("composite");
-    }
-    if feature.is_portion {
-        head.push("portion");
-    }
-    if feature.is_var {
-        head.push("var");
-    }
-    if feature.is_const {
-        head.push("const");
-    }
-    if feature.is_end {
-        head.push("end");
-    }
-    if feature.has_kind_keyword {
-        head.push(feature.kind.as_str());
+    if let Some(kind) = &feature.kind {
+        head.push(kind.value.as_str());
     }
     if feature.is_all {
         head.push("all");

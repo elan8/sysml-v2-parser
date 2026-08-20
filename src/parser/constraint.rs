@@ -1095,6 +1095,29 @@ fn calc_named_binding_inner(
 /// declaration surface (name or leading redefinition, typing, multiplicity, `ordered`/
 /// `nonunique`, subsets/redefines/references, `inverse of`, value, body). Kernel Semantic
 /// Library `KerML.kerml`/`Occurrences.kerml`.
+/// The feature-kind keyword of `Feature` (562), `Step` (863), `Expression` (895) and
+/// `BooleanExpression` (908) -- the one column in which those four productions differ -- with its
+/// exact span.
+///
+/// Optional, because the first alternative of `Feature` makes `FeatureDeclaration` optional and
+/// the prefixed keyword-less spelling `portion redefines portionOfLife = ...;`
+/// (`Occurrences.kerml`) reaches this node through a prefix alone. Takes trivia-free input.
+fn feature_kind_keyword(
+    input: Input<'_>,
+) -> (Input<'_>, Option<Node<crate::ast::KermlFeatureKind>>) {
+    for (keyword, value) in [
+        (&b"feature"[..], crate::ast::KermlFeatureKind::Feature),
+        (&b"step"[..], crate::ast::KermlFeatureKind::Step),
+        (&b"expr"[..], crate::ast::KermlFeatureKind::Expr),
+        (&b"bool"[..], crate::ast::KermlFeatureKind::Bool),
+    ] {
+        if let Some((rest, span)) = crate::parser::occurrence_prefix::slot_keyword(input, keyword) {
+            return (rest, Some(Node::new(span, value)));
+        }
+    }
+    (input, None)
+}
+
 pub(crate) fn kerml_feature_member(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::KermlFeatureMember>> {
@@ -1108,50 +1131,21 @@ fn kerml_feature_member_inner(
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
     let (input, is_member) = opt(preceded(tag(&b"member"[..]), ws1)).parse(input)?;
-    let (input, is_derived) = opt(preceded(tag(&b"derived"[..]), ws1)).parse(input)?;
-    let (input, is_abstract) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, composite_or_portion) = opt(alt((
-        map(preceded(tag(&b"composite"[..]), ws1), |_| true),
-        map(preceded(tag(&b"portion"[..]), ws1), |_| false),
-    )))
-    .parse(input)?;
-    let (input, is_var) = opt(preceded(tag(&b"var"[..]), ws1)).parse(input)?;
-    // `const end feature b;` (KerML `associations` fixture; spec42 Gap 36).
-    let (input, is_const) = opt(preceded(tag(&b"const"[..]), ws1)).parse(input)?;
-    let (input, is_end) = opt(preceded(tag(&b"end"[..]), ws1)).parse(input)?;
-    let had_prefix = is_member.is_some()
-        || is_derived.is_some()
-        || is_abstract.is_some()
-        || composite_or_portion.is_some()
-        || is_var.is_some()
-        || is_const.is_some()
-        || is_end.is_some();
+    // `FeaturePrefix` (KerML BNF 584). `member` is not part of it -- `TypeFeatureMember` (523)
+    // puts that keyword on the membership, ahead of the whole prefix.
+    let (input, _) = ws_and_comments(input)?;
+    let (input, prefix) = crate::parser::feature_prefix::feature_prefix(input);
+    let had_prefix = is_member.is_some() || prefix.is_authored();
     // The kind keyword is optional when a prefix already marks this as a feature member:
     // `portion redefines portionOfLife = (that as Occurrence).portionOfLife;`
     // (`Occurrences.kerml`).
-    let (input, kind) = opt(alt((
-        map(preceded(tag(&b"feature"[..]), ws1), |_| {
-            crate::ast::KermlFeatureKind::Feature
-        }),
-        map(preceded(tag(&b"step"[..]), ws1), |_| {
-            crate::ast::KermlFeatureKind::Step
-        }),
-        map(preceded(tag(&b"expr"[..]), ws1), |_| {
-            crate::ast::KermlFeatureKind::Expr
-        }),
-        map(preceded(tag(&b"bool"[..]), ws1), |_| {
-            crate::ast::KermlFeatureKind::Bool
-        }),
-    )))
-    .parse(input)?;
-    let has_kind_keyword = kind.is_some();
+    let (input, kind) = feature_kind_keyword(input);
     if kind.is_none() && !had_prefix {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
         )));
     }
-    let kind = kind.unwrap_or(crate::ast::KermlFeatureKind::Feature);
     let (input, is_all) = opt(preceded(tag(&b"all"[..]), ws1)).parse(input)?;
     // Leading redefinition may replace the name: `portion feature redefines spaceBoundary [1];`.
     let (input, leading_redefines) = opt(preceded(ws_and_comments, redefinition)).parse(input)?;
@@ -1257,15 +1251,8 @@ fn kerml_feature_member_inner(
             input,
             crate::ast::KermlFeatureMember {
                 is_member: is_member.is_some(),
-                is_derived: is_derived.is_some(),
-                is_abstract: is_abstract.is_some(),
-                is_composite: composite_or_portion == Some(true),
-                is_portion: composite_or_portion == Some(false),
-                is_var: is_var.is_some(),
-                is_const: is_const.is_some(),
-                is_end: is_end.is_some(),
+                prefix,
                 kind,
-                has_kind_keyword,
                 is_all: is_all.is_some(),
                 name: name_str,
                 typing,
@@ -1841,14 +1828,39 @@ mod const_prefix_tests {
         assert_eq!(node.value.feature.value.name, "a");
     }
 
+    /// `const end feature b;` takes `FeaturePrefix`'s `EndFeaturePrefix` alternative (KerML BNF
+    /// 573/584), so `const` lands in that alternative's own slot rather than on a second,
+    /// independently settable flag beside `end`.
     #[test]
     fn const_prefix_is_retained_on_feature_members() {
         let (rest, node) =
             kerml_feature_member(input("const end feature b;")).expect("const end feature");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
-        assert!(node.value.is_const);
-        assert!(node.value.is_end);
+        let end = node
+            .value
+            .prefix
+            .head
+            .end()
+            .expect("the end alternative of FeaturePrefix");
+        assert!(end.constant_span.is_some(), "const span");
+        assert!(node.value.prefix.is_end());
+        assert!(node.value.prefix.is_constant());
         assert_eq!(node.value.name, "b");
+    }
+
+    /// `var const feature b;` spells one slot twice: `BasicFeaturePrefix`'s last group is
+    /// `( isVariable ?= 'var' | isConstant ?= 'const' )?` (KerML BNF 577), an alternation. Before
+    /// the `FeaturePrefix` seam both keywords were accepted and set two independent booleans.
+    #[test]
+    fn variability_slot_admits_one_keyword() {
+        let parsed = kerml_feature_member(input("var const feature b;"));
+        let Ok((rest, _)) = parsed else {
+            return;
+        };
+        assert!(
+            !rest.fragment().is_empty(),
+            "`var const` must not be consumed as one prefix"
+        );
     }
 }
 

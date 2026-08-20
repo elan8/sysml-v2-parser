@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **KerML's `FeaturePrefix` is modelled as the choice the grammar writes, not as eight independent
+  booleans.** Audit and evidence: `planning/kerml-feature-prefix-matrix.md`.
+  **AST version 179 -> 180.**
+
+  `KermlFeatureMember` carried `is_derived`, `is_abstract`, `is_composite`, `is_portion`, `is_var`,
+  `is_const` and `is_end` as seven separately settable flags, plus `kind` beside a
+  `has_kind_keyword` bool that could disagree with it. The pinned grammar writes one production:
+  `FeaturePrefix = ( EndFeaturePrefix ( OwnedCrossFeatureMember )? | BasicFeaturePrefix )
+  ( PrefixMetadataMember )*` (KerML BNF 584). The new `crate::ast::FeaturePrefix` component models
+  it, alongside `BasicFeaturePrefix` (577), `EndFeaturePrefix` (573), `OwnedCrossFeature` (595) and
+  the two one-slot alternations `FeaturePortionKind` (581) and `FeatureVariability` (582).
+
+  What this makes unrepresentable rather than merely unparsed:
+
+  - **`var const feature b;` was accepted**, setting `is_var` *and* `is_const`. `var` and `const`
+    are two alternatives of one slot, so the merged model has one field and the spelling is gone.
+  - **`in end feature x;`** cannot be built: `direction` lives only in `BasicFeaturePrefix`, and
+    `EndFeaturePrefix` is the *other* alternative of the choice.
+    `tests/snapshots/spec42/end_prefix_recovery.md` already pinned that conclusion for the parser;
+    it is now a property of the type.
+  - **`composite portion`** likewise collapses to one slot.
+
+  Each independent modifier is an `Option<Span>` carrying the authored keyword's exact position, so
+  emission writes a keyword because the author did rather than because a flag says so, and `kind`
+  becomes `Option<Node<KermlFeatureKind>>` — presence *is* "the keyword was authored".
+
+  One behaviour change follows from sharing the prefix: a directed feature now parses in every
+  scope that already accepted the undirected spelling, so `in newX : Real;` at namespace level is a
+  `Feature` (`BasicFeaturePrefix` direction slot, then `FeatureDeclaration`) instead of a second
+  recovery diagnostic. `tests/snapshots/spec42/empty_member_after_package.md` records it.
+
 - **`BasicDefinitionPrefix` reaches every definition kind whose production spells it, and the two
   that spell something else are modelled as such.** Audit and evidence:
   `planning/spec42-upstream-gap-audit.md`. **AST version 178 -> 179.**

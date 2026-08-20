@@ -278,28 +278,23 @@ impl KermlTypeRelationshipKeyword {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KermlFeatureMember {
-    /// `member` prefix (KerML `NonFeatureMember` shorthand used by `KerML.kerml`).
+    /// `member` prefix (KerML `TypeFeatureMember`'s discriminator, BNF 523). On the membership,
+    /// ahead of the whole prefix -- `member abstract feature carSpeed : Real;` -- so it is not a
+    /// [`FeaturePrefix`](crate::ast::FeaturePrefix) slot.
     pub is_member: bool,
-    /// `derived` prefix.
-    pub is_derived: bool,
-    /// `abstract` prefix.
-    pub is_abstract: bool,
-    /// `composite` prefix.
-    pub is_composite: bool,
-    /// `portion` prefix.
-    pub is_portion: bool,
-    /// `var` prefix.
-    pub is_var: bool,
-    /// `const` prefix (`const end feature b;`, KerML `associations` fixture; spec42 Gap 36).
-    pub is_const: bool,
-    /// `end` prefix.
-    pub is_end: bool,
-    /// The feature-kind keyword: `feature`, `step`, `expr`, or `bool`. `has_kind_keyword` is
-    /// `false` for the keyword-less prefixed forms (`portion redefines portionOfLife = ...;`,
-    /// Kernel Semantic Library `Occurrences.kerml`), where the kind defaults to `Feature`.
-    pub kind: KermlFeatureKind,
-    /// Whether the kind keyword was authored. See `kind`.
-    pub has_kind_keyword: bool,
+    /// `FeaturePrefix` (KerML BNF 584): the `EndFeaturePrefix | BasicFeaturePrefix` choice and its
+    /// trailing prefix metadata keywords, as the grammar's own nesting.
+    ///
+    /// Replaces the seven independent booleans this node used to carry. Those made `var const
+    /// feature b;` representable (and, before this seam, *accepted*) and put end-ness in two
+    /// places at once; see `planning/kerml-feature-prefix-matrix.md` §5.
+    pub prefix: crate::ast::FeaturePrefix,
+    /// The feature-kind keyword: `feature`, `step`, `expr`, or `bool`, with its exact span.
+    ///
+    /// `None` for the keyword-less prefixed forms (`portion redefines portionOfLife = ...;`,
+    /// Kernel Semantic Library `Occurrences.kerml`), where `Feature` is implied. Presence *is*
+    /// "the keyword was authored", so there is no separate flag to disagree with the value.
+    pub kind: Option<Node<KermlFeatureKind>>,
     /// `all` after the kind keyword (KerML `isSufficient`).
     pub is_all: bool,
     /// Declared name (may be quoted, e.g. `'in'`). Empty for the redefinition-led form

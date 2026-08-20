@@ -1,6 +1,6 @@
 # META
 ~~~sexpr
-(snapshot (type semantic) (description "Empty member (bare semicolon) at file level after package"))
+(snapshot (type semantic) (description "Empty member (bare semicolon) at file level after package. The trailing `in newX : Real;` is a legal Feature -- BasicFeaturePrefix's direction slot then FeatureDeclaration (KerML BNF 577/601) -- so it parses at namespace level rather than adding a second recovery, which is what the shared FeaturePrefix seam gives every scope that already accepted the undirected spelling."))
 ~~~
 # SOURCE
 ~~~sysml
@@ -12,7 +12,6 @@ package MyPkg { }; in newX : Real;
   (document "empty_member_after_package.md"
     (diagnostics
       (diagnostic (code "expected_keyword") (severity error) (category parseerror) (span (offset 17) (line 1) (column 18) (len 17)) (message "expected a specific keyword or punctuation token"))
-      (diagnostic (code "expected_keyword") (severity error) (category parseerror) (span (offset 19) (line 1) (column 20) (len 15)) (message "expected a specific keyword or punctuation token"))
     )
   )
 )
@@ -31,6 +30,6 @@ in newX : Real;
 (parsed-document
   (references
   )
-  (root (package (name "MyPkg") (body brace)) (malformed (code "expected_keyword") (found "; in newX : Real;") (span (offset 17) (line 1) (column 18) (len 1))) (malformed (code "expected_keyword") (found "in newX : Real;") (span (offset 19) (line 1) (column 20) (len 15))))
+  (root (package (name "MyPkg") (body brace)) (malformed (code "expected_keyword") (found "; in newX : Real;") (span (offset 17) (line 1) (column 18) (len 1))) (kerml-feature (name "newX") (body semicolon)))
 )
 ~~~
