@@ -3899,6 +3899,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 self.write_marker(first, "assert-constraint")
             }
             super::OccurrenceBodyElement::FlowUsage(_) => self.write_marker(first, "flow-usage"),
+            super::OccurrenceBodyElement::Bind(_) => self.write_marker(first, "bind"),
             super::OccurrenceBodyElement::SuccessionUsage(_) => {
                 self.write_marker(first, "succession-usage")
             }

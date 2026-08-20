@@ -1332,6 +1332,7 @@ fn walk_occurrence_body_element(
             walk_constraint_def_body(report, path, &n.value.body)
         }
         OccurrenceBodyElement::FlowUsage(n) => walk_definition_body(report, path, &n.value.body),
+        OccurrenceBodyElement::Bind(n) => walk_bind(report, path, &n.value),
         OccurrenceBodyElement::AttributeUsage(n) => {
             walk_attribute_body(report, path, &n.value.body)
         }

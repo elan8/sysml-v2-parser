@@ -1421,6 +1421,7 @@ pub(crate) fn emit_occurrence_body_element(
             super::view::emit_assert_constraint(w, path, &a.value)
         }
         crate::ast::OccurrenceBodyElement::FlowUsage(f) => emit_flow_usage(w, path, &f.value),
+        crate::ast::OccurrenceBodyElement::Bind(b) => structure::emit_bind(w, path, &b.value),
         crate::ast::OccurrenceBodyElement::AttributeUsage(a) => {
             structure::emit_attribute_usage(w, path, &a.value)
         }

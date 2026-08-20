@@ -4375,6 +4375,9 @@ macro_rules! ast_traversal {
                 OccurrenceBodyElement::FlowUsage(field_0) => {
                     visitor.visit_flow_usage(field_0);
                 }
+                OccurrenceBodyElement::Bind(field_0) => {
+                    visitor.visit_bind(field_0);
+                }
                 OccurrenceBodyElement::AttributeUsage(field_0) => {
                     visitor.visit_attribute_usage(field_0);
                 }

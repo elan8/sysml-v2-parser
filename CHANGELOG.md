@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Occurrence bodies retain typed binding connectors.** `DefinitionBodyItem` admits a
+  `NonOccurrenceUsageMember`, whose `NonOccurrenceUsageElement` includes
+  `BindingConnectorAsUsage` (SysML textual BNF 237-247, 349-353, 702-707); the pinned Pilot
+  SysML grammar agrees. `OccurrenceBodyElement::Bind` now owns the existing structured
+  connector, including its typed ends and usage body, and emission, opacity traversal, semantic
+  snapshots, and visitors handle it exhaustively. Recovery synchronizes on `bind`, preserving a
+  later valid connector after malformed content. Fixtures:
+  `tests/snapshots/sysml/occurrence_body_bind.md` and
+  `tests/snapshots/sysml/occurrence_body_bind_recovery.md`. **AST version 193.**
+
 - **Keyword-less DefaultReferenceUsage now has one source-backed, grammar-owned shape.** The
   pinned SysML grammar defines `DefaultReferenceUsage = RefPrefix Usage`
   (`SysML-textual-bnf.kebnf` 332-333), with the ordinary nullable `Identification`, full

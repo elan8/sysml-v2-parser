@@ -1779,6 +1779,12 @@ pub enum OccurrenceBodyElement {
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     AssertConstraint(Node<AssertConstraintMember>),
     FlowUsage(Node<crate::ast::behavior::FlowUsage>),
+    /// `bind` connector usage in an occurrence body. `OccurrenceDefinition`/`OccurrenceUsage`
+    /// bodies admit `NonOccurrenceUsageMember`, whose `NonOccurrenceUsageElement` includes
+    /// `BindingConnectorAsUsage` (SysML textual BNF 237-247, 349-353, 702-707; the pinned
+    /// Pilot SysML grammar agrees). Keep the existing structured connector rather than
+    /// recovering its text or rediscovering its ends during emission.
+    Bind(Node<Bind>),
     AttributeUsage(Node<AttributeUsage>),
     PartUsage(Box<Node<PartUsage>>),
     /// `item x;` inside an occurrence definition/usage body (GH-87), e.g. `occurrence def Occ {
