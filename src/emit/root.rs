@@ -385,8 +385,8 @@ pub(crate) fn emit_package_body_element(
         PackageBodyElement::KermlInvariant(invariant) => {
             super::view::emit_kerml_invariant_member(w, path, &invariant.value)
         }
-        PackageBodyElement::KermlFeatureMember(feature) => {
-            super::view::emit_kerml_feature_member(w, path, &feature.value)
+        PackageBodyElement::KermlFeature(feature) => {
+            super::view::emit_kerml_feature(w, path, &feature.value)
         }
         PackageBodyElement::FlowDef(f) => behavior::emit_flow_def(w, path, &f.value),
         other @ PackageBodyElement::Actor(_) => w.unsupported(
@@ -471,7 +471,7 @@ fn emit_relationship_body_element(
     match el {
         RelationshipBodyElement::Annotating(member) => emit_annotating_member(w, path, member),
         RelationshipBodyElement::KermlFeature(n) => {
-            super::view::emit_kerml_feature_member(w, path, &n.value)
+            super::view::emit_kerml_feature(w, path, &n.value)
         }
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
     }

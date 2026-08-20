@@ -800,7 +800,7 @@ fn kerml_succession_member_inner(
 /// KerML end member with an owned cross feature: `end` name? mult? (`subsets` targets)?
 /// `feature` <feature member> (`end happensDuring [1..*] feature longerOccurrence: Occurrence
 /// redefines targetOccurrence;`, Kernel Semantic Library `Occurrences.kerml`). Plain
-/// `end feature ...` stays on [`kerml_feature_member`] (its name parse fails on `feature`
+/// `end feature ...` stays on [`kerml_feature`] (its name parse fails on `feature`
 /// here, so dispatch order tries that first).
 /// Keyword-less named member binding in a type body: (visibility)? name mult? (`:` type)? mult?
 /// (`:>>`/`redefines` targets)? value? `;` -- `private instantNum: Natural[1] = if isInstant? 1
@@ -1019,15 +1019,13 @@ fn owned_cross_feature(
     ))
 }
 
-pub(crate) fn kerml_feature_member(
+pub(crate) fn kerml_feature(
     input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::KermlFeatureMember>> {
-    crate::parser::span::reference_transaction(input, kerml_feature_member_inner)
+) -> IResult<Input<'_>, Node<crate::ast::KermlFeature>> {
+    crate::parser::span::reference_transaction(input, kerml_feature_inner)
 }
 
-fn kerml_feature_member_inner(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<crate::ast::KermlFeatureMember>> {
+fn kerml_feature_inner(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::KermlFeature>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, (visibility_span, visibility)) = visibility_prefix(input)?;
@@ -1163,7 +1161,7 @@ fn kerml_feature_member_inner(
         node_from_to(
             start,
             input,
-            crate::ast::KermlFeatureMember {
+            crate::ast::KermlFeature {
                 is_member: is_member.is_some(),
                 prefix,
                 kind,
@@ -1366,9 +1364,9 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             b"expr",
         ],
     ) || (starts_with_any_keyword(after_visibility, &[b"abstract", b"end", b"const"])
-        && kerml_feature_member(input).is_ok())
+        && kerml_feature(input).is_ok())
     {
-        map(kerml_feature_member, |n| {
+        map(kerml_feature, |n| {
             CalcDefBodyElement::KermlFeature(Box::new(n))
         })
         .parse(input)?
@@ -1427,7 +1425,7 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
             // direction slot in front of the same four productions the undirected spelling uses
             // (KerML BNF 577/562/863/895/908), so they are the same node. Ahead of plain
             // `InOutDecl`, which would misread the kind keyword as the parameter name.
-            Some(_) => map(kerml_feature_member, |n| {
+            Some(_) => map(kerml_feature, |n| {
                 CalcDefBodyElement::KermlFeature(Box::new(n))
             })
             .parse(input)?,
@@ -1740,7 +1738,7 @@ mod const_prefix_tests {
     #[test]
     fn const_prefix_is_retained_on_end_members() {
         let (rest, node) =
-            kerml_feature_member(input("const end [1] feature a;")).expect("const end member");
+            kerml_feature(input("const end [1] feature a;")).expect("const end member");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let crate::ast::FeaturePrefixHead::End { prefix, cross } = &node.value.prefix.head else {
             panic!("expected the end alternative of FeaturePrefix");
@@ -1760,8 +1758,7 @@ mod const_prefix_tests {
     /// independently settable flag beside `end`.
     #[test]
     fn const_prefix_is_retained_on_feature_members() {
-        let (rest, node) =
-            kerml_feature_member(input("const end feature b;")).expect("const end feature");
+        let (rest, node) = kerml_feature(input("const end feature b;")).expect("const end feature");
         assert!(rest.fragment().is_empty(), "rest: {:?}", rest.fragment());
         let end = node
             .value
@@ -1780,7 +1777,7 @@ mod const_prefix_tests {
     /// the `FeaturePrefix` seam both keywords were accepted and set two independent booleans.
     #[test]
     fn variability_slot_admits_one_keyword() {
-        let parsed = kerml_feature_member(input("var const feature b;"));
+        let parsed = kerml_feature(input("var const feature b;"));
         let Ok((rest, _)) = parsed else {
             return;
         };

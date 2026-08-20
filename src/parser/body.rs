@@ -67,7 +67,7 @@ pub(crate) fn relationship_body_annotations(
 fn relationship_body_member(input: Input<'_>) -> IResult<Input<'_>, Node<RelationshipBodyElement>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    if let Ok((input, elem)) = map(crate::parser::constraint::kerml_feature_member, |n| {
+    if let Ok((input, elem)) = map(crate::parser::constraint::kerml_feature, |n| {
         RelationshipBodyElement::KermlFeature(Box::new(n))
     })
     .parse(input)

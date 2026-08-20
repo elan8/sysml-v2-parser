@@ -1412,9 +1412,9 @@ macro_rules! ast_traversal {
                 walk_kerml_type_relationship_keyword(self, node)
             }
 
-            /// Visits [`KermlFeatureMember`]; the default implementation walks its children.
-            fn visit_kerml_feature_member(&mut self, node: &$($mutability)? Node<KermlFeatureMember>) {
-                walk_kerml_feature_member(self, node)
+            /// Visits [`KermlFeature`]; the default implementation walks its children.
+            fn visit_kerml_feature(&mut self, node: &$($mutability)? Node<KermlFeature>) {
+                walk_kerml_feature(self, node)
             }
 
             /// Visits [`KermlFeatureKind`]; the default implementation walks its children.
@@ -2353,8 +2353,8 @@ macro_rules! ast_traversal {
                 PackageBodyElement::KermlRelationship(field_0) => {
                     visitor.visit_kerml_relationship_decl(&$($mutability)? **field_0);
                 }
-                PackageBodyElement::KermlFeatureMember(field_0) => {
-                    visitor.visit_kerml_feature_member(&$($mutability)? **field_0);
+                PackageBodyElement::KermlFeature(field_0) => {
+                    visitor.visit_kerml_feature(&$($mutability)? **field_0);
                 }
                 PackageBodyElement::KermlFeatureDecl(field_0) => {
                     visitor.visit_kerml_feature_decl(field_0);
@@ -2846,7 +2846,7 @@ macro_rules! ast_traversal {
                     visitor.visit_item_usage(&$($mutability)? **field_0);
                 }
                 AttributeBodyElement::KermlFeature(field_0) => {
-                    visitor.visit_kerml_feature_member(&$($mutability)? **field_0);
+                    visitor.visit_kerml_feature(&$($mutability)? **field_0);
                 }
                 AttributeBodyElement::Invariant(field_0) => {
                     visitor.visit_kerml_invariant_member(&$($mutability)? **field_0);
@@ -3849,7 +3849,7 @@ macro_rules! ast_traversal {
                     visitor.visit_annotating_member(field_0);
                 }
                 RelationshipBodyElement::KermlFeature(field_0) => {
-                    visitor.visit_kerml_feature_member(&$($mutability)? **field_0);
+                    visitor.visit_kerml_feature(&$($mutability)? **field_0);
                 }
                 RelationshipBodyElement::Error(field_0) => {
                     visitor.visit_parse_error_node(field_0);
@@ -6776,7 +6776,7 @@ macro_rules! ast_traversal {
                     visitor.visit_in_out_decl(&$($mutability)? **field_0);
                 }
                 CalcDefBodyElement::KermlFeature(field_0) => {
-                    visitor.visit_kerml_feature_member(&$($mutability)? **field_0);
+                    visitor.visit_kerml_feature(&$($mutability)? **field_0);
                 }
                 CalcDefBodyElement::Invariant(field_0) => {
                     visitor.visit_kerml_invariant_member(&$($mutability)? **field_0);
@@ -7321,10 +7321,10 @@ macro_rules! ast_traversal {
             }
         }
 
-        pub fn walk_kerml_feature_member<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeatureMember>) {
+        pub fn walk_kerml_feature<V: $Visitor>(visitor: &mut V, node: &$($mutability)? Node<KermlFeature>) {
             visitor.enter_node(&$($mutability)? node.span);
             visitor.visit_span(&$($mutability)? node.span);
-            let KermlFeatureMember { is_member, prefix, kind, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, chains, inverse_of, type_relationships, value, body, membership } = &$($mutability)? node.value;
+            let KermlFeature { is_member, prefix, kind, is_all, name, typing, multiplicity, multiplicity_modifiers, subsets, redefines, references, crosses, chains, inverse_of, type_relationships, value, body, membership } = &$($mutability)? node.value;
             let _ = is_member;
             visitor.visit_feature_prefix(prefix);
             if let Some(inner) = kind {

@@ -251,7 +251,7 @@ fn emit_calc_body_element(
         }
         CalcDefBodyElement::InOutDecl(d) => emit_inout_decl(w, path, &d.value),
         CalcDefBodyElement::ReturnDecl(r) => emit_return_decl(w, &r.value),
-        CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature_member(w, path, &f.value),
+        CalcDefBodyElement::KermlFeature(f) => emit_kerml_feature(w, path, &f.value),
         CalcDefBodyElement::Invariant(i) => emit_kerml_invariant_member(w, path, &i.value),
         CalcDefBodyElement::Connector(c) => emit_kerml_connector_member(w, path, &c.value),
         CalcDefBodyElement::AssertConstraint(a) => emit_assert_constraint(w, path, &a.value),
@@ -331,10 +331,10 @@ fn emit_owned_cross_feature(
     Ok(())
 }
 
-pub(crate) fn emit_kerml_feature_member(
+pub(crate) fn emit_kerml_feature(
     w: &mut EmitWriter<'_>,
     path: &str,
-    feature: &crate::ast::KermlFeatureMember,
+    feature: &crate::ast::KermlFeature,
 ) -> Result<(), EmitError> {
     emit_visibility(w, feature.membership.visibility);
     let mut head: Vec<&str> = Vec::new();

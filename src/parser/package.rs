@@ -273,7 +273,7 @@ pub(crate) fn root_element(input: Input<'_>) -> IResult<Input<'_>, Node<RootElem
         | PackageBodyElement::KermlConnector(_)
         | PackageBodyElement::KermlRelationship(_)
         | PackageBodyElement::KermlInvariant(_)
-        | PackageBodyElement::KermlFeatureMember(_)
+        | PackageBodyElement::KermlFeature(_)
         | PackageBodyElement::KermlBareDeclaration(_)
         | PackageBodyElement::ExtendedLibraryDecl(_)
         | PackageBodyElement::AttributeUsage(_)
@@ -1086,7 +1086,7 @@ fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>>
 }
 
 // The bare-`feature` package member (`feature x : Integer;`, `feature f { expr s { ... } }`)
-// now parses through `kerml_feature_member` -- one typed representation for every
+// now parses through `kerml_feature` -- one typed representation for every
 // `feature`-keyword-led member across package and type-body scopes (spec42 gap 14). The
 // previous `DefaultReferenceUsage`-shaped `feature_usage_member` production and its
 // `FeatureBodyElement::Expr`/`ExprMember` body machinery were removed with it; `expr s { ... }`
@@ -1754,8 +1754,8 @@ fn try_package_body_behavior<'a>(
         start,
         starter,
         Feature,
-        crate::parser::constraint::kerml_feature_member,
-        |n| { PackageBodyElement::KermlFeatureMember(Box::new(n)) }
+        crate::parser::constraint::kerml_feature,
+        |n| { PackageBodyElement::KermlFeature(Box::new(n)) }
     );
     try_package_body_dispatch!(
         input,
@@ -2020,8 +2020,8 @@ fn try_package_body_view<'a>(
     try_package_body_dispatch!(
         input,
         start,
-        crate::parser::constraint::kerml_feature_member,
-        |n| { PackageBodyElement::KermlFeatureMember(Box::new(n)) }
+        crate::parser::constraint::kerml_feature,
+        |n| { PackageBodyElement::KermlFeature(Box::new(n)) }
     );
     // Bare forward declarations for the keywords the structured productions above do not
     // cover (`inv x;`, `occurrence o;`, `succession s;`, ...).

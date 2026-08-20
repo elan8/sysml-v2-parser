@@ -377,8 +377,8 @@ pub enum AttributeBodyElement {
     /// KerML feature member (`feature x : Natural[1];`, `member feature ...`, `composite
     /// feature ...`, `portion feature all ...`, `var x : Integer;`, `step s : S;`, `expr e
     /// { ... }`) nested in a KerML `class`/`struct`/`datatype` body, which shares this body
-    /// grammar via `class_def`; see [`crate::ast::KermlFeatureMember`].
-    KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// grammar via `class_def`; see [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     /// KerML invariant member (`inv checkIt { ... }`) nested in a KerML type body; see
     /// [`crate::ast::KermlInvariantMember`].
     Invariant(Box<Node<crate::ast::KermlInvariantMember>>),
@@ -1518,8 +1518,8 @@ pub enum RelationshipBodyElement {
     /// The complete `AnnotatingElement` production; see [`crate::ast::AnnotatingMember`].
     Annotating(AnnotatingMember),
     /// Owned feature member (`dependency z to x, y { feature e; }`; BNF `RelationshipBody`'s
-    /// `ownedRelatedElement`, spec42 Gap 37); see [`crate::ast::KermlFeatureMember`].
-    KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// `ownedRelatedElement`, spec42 Gap 37); see [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     Error(Node<ParseErrorNode>),
 }
 

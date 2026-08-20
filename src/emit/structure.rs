@@ -561,9 +561,7 @@ fn emit_attribute_body_element(
         AttributeBodyElement::Annotating(member) => {
             super::root::emit_annotating_member(w, path, member)
         }
-        AttributeBodyElement::KermlFeature(n) => {
-            super::view::emit_kerml_feature_member(w, path, &n.value)
-        }
+        AttributeBodyElement::KermlFeature(n) => super::view::emit_kerml_feature(w, path, &n.value),
         AttributeBodyElement::Invariant(n) => {
             super::view::emit_kerml_invariant_member(w, path, &n.value)
         }
@@ -972,7 +970,7 @@ pub(crate) fn emit_relationship_body_element_local(
             super::root::emit_annotating_member(w, path, member)
         }
         RelationshipBodyElement::KermlFeature(n) => {
-            super::view::emit_kerml_feature_member(w, path, &n.value)
+            super::view::emit_kerml_feature(w, path, &n.value)
         }
         RelationshipBodyElement::Error(error) => w.push_recovery_span(path, &error.span),
     }

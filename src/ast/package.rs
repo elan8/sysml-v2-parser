@@ -183,8 +183,8 @@ pub enum PackageBodyElement {
     KermlRelationship(Box<Node<crate::ast::KermlRelationshipDecl>>),
     /// Package-level KerML feature member with the full feature-member surface (`feature i:
     /// Complex[1] = rect(0.0, 1.0);`, Kernel Function Library `ComplexFunctions.kerml`); see
-    /// [`crate::ast::KermlFeatureMember`].
-    KermlFeatureMember(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     KermlFeatureDecl(Node<KermlFeatureDecl>),
     /// Structurally recognized bare KerML declaration: keyword, optional name, optional
     /// multiplicity, terminating `;` -- see [`KermlBareDeclaration`].

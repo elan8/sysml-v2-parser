@@ -11,7 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **KerML's `FeaturePrefix` is modelled as the choice the grammar writes, not as eight independent
   booleans.** Audit and evidence: `planning/kerml-feature-prefix-matrix.md`.
-  **AST version 179 -> 180.**
+  **AST version 179 -> 184.**
+
+  The merged node is `KermlFeature` (was `KermlFeatureMember`), named for the production it models
+  rather than the membership that carries it; `PackageBodyElement::KermlFeatureMember` becomes
+  `::KermlFeature`, matching the three sibling body enums that already spelled it that way.
 
   `KermlFeatureMember` carried `is_derived`, `is_abstract`, `is_composite`, `is_portion`, `is_var`,
   `is_const` and `is_end` as seven separately settable flags, plus `kind` beside a

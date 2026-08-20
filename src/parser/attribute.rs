@@ -277,7 +277,7 @@ fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Attribute
         // `datatype` bodies via `class_def`, whose members are feature members (`feature x :
         // Natural[1];`, `member`/`derived`/`composite`/`portion`/`var` prefixed, `step`/`expr`/
         // `bool` kinds), invariants, connectors, and nested class definitions.
-        map(crate::parser::constraint::kerml_feature_member, |n| {
+        map(crate::parser::constraint::kerml_feature, |n| {
             AttributeBodyElement::KermlFeature(Box::new(n))
         }),
         map(crate::parser::constraint::kerml_invariant_member, |n| {

@@ -277,7 +277,7 @@ impl KermlTypeRelationshipKeyword {
 /// { ... }` (`Occurrences.kerml`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct KermlFeatureMember {
+pub struct KermlFeature {
     /// `member` prefix (KerML `TypeFeatureMember`'s discriminator, BNF 523). On the membership,
     /// ahead of the whole prefix -- `member abstract feature carSpeed : Real;` -- so it is not a
     /// [`FeaturePrefix`](crate::ast::FeaturePrefix) slot.
@@ -334,7 +334,7 @@ pub struct KermlFeatureMember {
     pub membership: crate::ast::Membership,
 }
 
-/// The kind keyword of a [`KermlFeatureMember`].
+/// The kind keyword of a [`KermlFeature`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum KermlFeatureKind {

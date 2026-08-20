@@ -4532,7 +4532,7 @@ impl<'document, 'labels, 'output, 'writer, W: io::Write + ?Sized>
                 }
                 self.writer.write_str("))")
             }
-            PackageBodyElement::KermlFeatureMember(feature) => {
+            PackageBodyElement::KermlFeature(feature) => {
                 self.write_item_prefix(first)?;
                 self.writer.write_str("(kerml-feature (name ")?;
                 self.write_usage_declaration_name(&feature.value.name)?;

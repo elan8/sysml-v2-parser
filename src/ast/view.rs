@@ -191,8 +191,8 @@ pub enum CalcDefBodyElement {
     InOutDecl(Box<Node<InOutDecl>>),
     /// KerML feature member (`derived var feature x : T[mult] redefines y;`, `feature all
     /// s: Occurrence subsets a inverse of b { ... }`); see
-    /// [`crate::ast::KermlFeatureMember`].
-    KermlFeature(Box<Node<crate::ast::KermlFeatureMember>>),
+    /// [`crate::ast::KermlFeature`].
+    KermlFeature(Box<Node<crate::ast::KermlFeature>>),
     /// KerML invariant member (`inv name? { expr }`); see
     /// [`crate::ast::KermlInvariantMember`].
     Invariant(Box<Node<crate::ast::KermlInvariantMember>>),

@@ -18,7 +18,7 @@
 //! AST mismatch was really just the two entry points disagreeing, not a real emit/parser bug.
 //! Covered by `tests/validation/parse_entry_point_equivalence.rs` (GH-70).
 // The deeply mutually recursive AST (type bodies nest parameters that nest type bodies, e.g.
-// `KermlFeatureMember` -> `CalcDefBody` -> `InOutDecl` -> `ActionDefBodyElement` -> ...)
+// `KermlFeature` -> `CalcDefBody` -> `InOutDecl` -> `ActionDefBodyElement` -> ...)
 // exceeds the default trait-solver recursion limit when rustdoc computes auto traits such as
 // `RefUnwindSafe`.
 #![recursion_limit = "256"]
@@ -68,7 +68,7 @@ pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 
 /// Incremented on every breaking AST change. The parse cache uses this to
 /// invalidate entries built against an older schema.
-pub const PARSE_AST_VERSION: u32 = 183;
+pub const PARSE_AST_VERSION: u32 = 184;
 
 /// The pinned grammar release understood by this build of the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

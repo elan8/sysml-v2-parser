@@ -106,9 +106,7 @@ fn walk_package_body_element(report: &mut OpacityReport, path: &str, el: &Packag
         PackageBodyElement::KermlConnector(n) => walk_calc_def_body(report, path, &n.value.body),
         PackageBodyElement::KermlRelationship(_) => {}
         PackageBodyElement::KermlInvariant(n) => walk_calc_def_body(report, path, &n.value.body),
-        PackageBodyElement::KermlFeatureMember(n) => {
-            walk_calc_def_body(report, path, &n.value.body)
-        }
+        PackageBodyElement::KermlFeature(n) => walk_calc_def_body(report, path, &n.value.body),
         // Structurally recognized -- keyword, optional name, optional multiplicity, `;` -- not
         // an opaque/recovery node.
         PackageBodyElement::KermlBareDeclaration(_) => {}
